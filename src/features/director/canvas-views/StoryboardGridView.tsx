@@ -19,7 +19,9 @@ import {
 } from '@/components/generating-frame'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import {
+  isStoppedTake,
   selectLatestAttempt,
+  selectLatestShotAttempt,
   selectNewestSuccessfulTake,
   type VideoTakeSelectionRecord,
 } from '@/lib/director-video-take-selection'
@@ -30,7 +32,9 @@ import {
 } from '@/stores/director-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
-import { useActiveGenerationJobs, activeShotIds, useGenerationQueueStatus, type GenerationQueueStatus } from '@/lib/generation-queue'
+import { useActiveGenerationJobs, activeShotIds, useGenerationQueueStatus, type ActiveJob, type GenerationQueueStatus } from '@/lib/generation-queue'
+import { shotStopTarget } from '@/lib/director/stop-work'
+import { StopMakingButton } from '@/features/director/stop-making-button'
 import { checkStoryboardImageStatus, storyboardImageGenerationState } from '@/features/director/hooks/use-storyboard-image-generation'
 import { useRoughStoryboard, useShotActionDescription } from '@/features/director/hooks/use-rough-storyboard'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
@@ -58,7 +62,7 @@ import { useT } from '@/lib/i18n'
 import { Lumi } from '@/components/lumi/lumi'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { useWriterStore } from '@/stores/writer-store'
-import { filterShotsByStatus, imageRemakeFailed, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
+import { detailTabForShot, filterShotsByStatus, imageRemakeFailed, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
 import { RemakeRetryButton } from '@/features/director/remake-retry-button'
 import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
@@ -113,7 +117,10 @@ export function gridVideoView<T extends GridVideoTakeRecord>(
 ): { cardTake: T | null; generating: boolean; failure: string | null } {
   // ★ 로 고른 멈춘 Take 는 영상이다 — 카드 영상 고르기에서만 멈춤을 지운다.
   const cardTake = selectNewestSuccessfulTake(records.map((r) => (r.is_final ? { ...r, cancelled_at: null } : r)))
-  const { generating, failure } = selectGridVideoAttemptState(records.filter((r) => r.cancelled_at == null), t)
+  const { generating } = selectGridVideoAttemptState(records.filter((r) => r.cancelled_at == null), t)
+  // 실패 글은 샷 상태와 같은 가장 새 시도로 — 그것이 멈춘 Take 면 뒤에서 실패했어도 띄우지 않는다(리드 2026-11-14 규칙).
+  const latest = selectLatestShotAttempt(records)
+  const { failure } = selectGridVideoAttemptState(latest && !isStoppedTake(latest) ? [latest] : [], t)
   return { cardTake, generating, failure }
 }
 
@@ -201,6 +208,7 @@ function ShotCell({
   shotLabel,
   queuedImageShots,
   queuedVideoShots,
+  activeJobs,
   queueStatus,
   descriptionFontSize,
   shotMention,
@@ -218,6 +226,8 @@ function ShotCell({
   /** 지금 큐에 떠 있는 잡의 대상 샷들(#queue-restore) — 탭을 떠났다 와도 진행 표시를 되살린다. */
   queuedImageShots: ReadonlySet<string>
   queuedVideoShots: ReadonlySet<string>
+  /** 지금 도는 작업 — 카드 [멈추기]가 멈출 작업을 고른다(오너 7번). */
+  activeJobs: readonly ActiveJob[]
   queueStatus: GenerationQueueStatus
   /** 큐 원본 — 경과시간 durable 기준점(activeStartedAt) 계산용. */
   descriptionFontSize: string
@@ -237,6 +247,7 @@ function ShotCell({
     (s) => s.generateVideoForShot,
   )
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
+  const openShotDetail = useDirectorCanvasStore((s) => s.openShotDetail)
   // 카드 몸통 = 고르기(시안 D2 · R). 훅이라 조기 반환보다 앞에 둔다.
   const togglePickedShot = useDirectorCanvasStore((s) => s.togglePickedShot)
   const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
@@ -252,6 +263,8 @@ function ShotCell({
   const shotType = useWriterStore((s) => (writerShotId ? s.shots.find((x) => x.shotId === writerShotId)?.shotType ?? null : null))
   // 영상 생성(이미지→영상 체인 포함) 진행 플래그 — 버튼 잠금 + 오버레이(#e12)
   const [videoBusy, setVideoBusy] = useState(false)
+  // 같은 화면에서 빠르게 두 번 불려도 한 번만 시작한다(videoBusy 는 다음 그리기에야 보인다, 검토 b 낮음 2).
+  const videoStartingRef = useRef(false)
   const [videoError, setVideoError] = useState<string | null>(null)
   // 재생성 확인 팝업(#regen-confirm) / Previz 편집 팝업(#e6)
   const [confirm, setConfirm] = useState<null | 'image' | 'video' | 'previz' | 'manual-retry'>(null)
@@ -343,7 +356,8 @@ function ShotCell({
   // ⤢ 상세(시안 R "⤢ = 상세 열기", 오너 2026-11-14): 실사 보기는 샷 상세 팝업, 러프 보기는 지금 연출(화살표) 편집 창(결정 페이지 추천).
   const openDetail = () => {
     if (mediaMode === 'real') {
-      openPopup(node.id)
+      // prose 의 샷 상세 팝업(openShotDetail) — 영상 단계 샷은 영상 탭으로(리드 S4-2 8).
+      openShotDetail(node.id, detailTabForShot(shotState))
       return
     }
     if (writerShotId) setPrevizOpen(true)
@@ -374,19 +388,21 @@ function ShotCell({
   }
   // 영상 생성(#e12): 이미지가 없으면 먼저 생성하고, 성공했을 때만 영상으로 이어간다.
   const runVideo = async () => {
-    if (videoBusy) return
+    if (videoBusy || videoStartingRef.current) return
     if (realBatchBusy) {
       setVideoError(t('Batch live-action generation is running. Try again after it finishes.'))
       return
     }
-    // Take 를 쓰니 잔액을 다시 읽고, 못 읽으면 시작하지 않고 카드 안에 까닭(리드 11/14, D8 과 같은 말).
-    if (!(await takesReadable())) {
-      setVideoError(t(TAKES_UNKNOWN_TEXT))
-      return
-    }
+    // 잔액을 다시 읽는 동안에도 단추를 끈다 — 두 번 눌러 Take 가 두 번 나가지 않게(검토 b 낮음 2).
+    videoStartingRef.current = true
     setVideoBusy(true)
     setVideoError(null)
     try {
+      // Take 를 쓰니 잔액을 다시 읽고, 못 읽으면 시작하지 않고 카드 안에 까닭(리드 11/14, D8 과 같은 말).
+      if (!(await takesReadable())) {
+        setVideoError(t(TAKES_UNKNOWN_TEXT))
+        return
+      }
       if (!hasImage) {
         await useDirectorCanvasStore.getState().hydrateFreshFromDb().catch(() => {})
         // Director 배선 5: 로컬이 낡았을 수 있다 — DB 를 먼저 다시 읽고, 그래도 없을 때만 이미지를 새로 만든다(승인한 그림 보호).
@@ -403,6 +419,7 @@ function ShotCell({
     } catch (error) {
       setVideoError(error instanceof Error ? error.message : t('Failed to generate video.'))
     } finally {
+      videoStartingRef.current = false
       setVideoBusy(false)
     }
   }
@@ -522,6 +539,11 @@ function ShotCell({
 
   // 실사 보기 카드 테두리 = 샷 상태 색(시안 R 416:4941, 오너 2026-11-14 "Director 생성 상태"). 러프 보기는 지금 그대로.
   const realTone = mediaMode === 'real' ? shotStateTone(shotState) : null
+  // 카드 [멈추기](오너 7번 · 시안 D4): 이 샷이 지금 만드는 이미지 · 영상(보낸 작업)만 멈춘다. 차례를 기다리는 샷은 멈출 작업이 없다.
+  const stopKind = shotState === 'video_generating' ? 'video' : 'image'
+  const stopTarget = mediaMode === 'real' && writerShotId && (shotState === 'image_generating' || shotState === 'video_generating')
+    ? shotStopTarget(activeJobs, writerShotId, stopKind)
+    : null
   const durationLabel =
     typeof data.durationSeconds === 'number' && data.durationSeconds > 0
       ? t('{seconds}s', { seconds: Math.round(data.durationSeconds) })
@@ -772,13 +794,14 @@ function ShotCell({
         )}
 
         {/* 꼬리(시안 D1 "● 대기" · D3 "● 이미지 만드는 중") — 실사 보기. 일괄이 맡아 차례를 기다리면 "대기 중",
-            다시 만들기가 실패했으면 "다시 만들기 실패" + [다시 만들기](리드 검토 c ① · ④d). */}
+            다시 만들기가 실패했으면 "다시 만들기 실패" + [다시 만들기](리드 검토 c ① · ④d), 만드는 중이면 [멈추기](오너 7번 · 시안 D4). */}
         {mediaMode === 'real' && !videoError && (
           <ShotStateTail
             state={shotState}
             waiting={imageWaitingOnly}
             remakeFailed={remakeFailed}
             retry={<RemakeRetryButton nodeId={node.id} data={data} />}
+            stop={stopTarget ? <StopMakingButton target={stopTarget} kind={stopKind} /> : null}
             className="absolute bottom-2 left-2 z-10"
           />
         )}
@@ -819,7 +842,8 @@ function ShotCell({
               // 다시 만들어도 지금 이미지는 버전으로 남는다(오너 답 5번 · prose 상세 단추와 같은 말).
               : [t('The new image becomes the current one. The current image stays in the versions.')]
         }
-        confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Regenerate')}
+        // 다시 만들기 단추는 툴바 확인 창과 같은 "다시 만들기"(리드 11/14). 실패 뒤 "다시 생성"은 출시 시험이 그 글자를 박고 있어 그대로.
+        confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Make again')}
         busy={confirm === 'manual-retry' ? !manualUncertain || realBatchBusy : confirm === 'image' && imageGeneration.disabled}
         onConfirm={() => {
           const which = confirm
@@ -1110,6 +1134,7 @@ export function StoryboardGridView({
                     shotLabel={directorNodeLabel(shot.data, boardNames)}
                     queuedImageShots={queuedImageShots}
                     queuedVideoShots={queuedVideoShots}
+                    activeJobs={activeJobs}
                     queueStatus={queueStatus}
                     descriptionFontSize={descriptionFontSize}
                     shotMention={mentionFor('shot', shot.id, mediaMode)}

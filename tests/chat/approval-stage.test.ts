@@ -103,6 +103,22 @@ describe('대기 카드를 승인하는 말', () => {
     }
   })
 
+  // 왜: 리드 결정(검토 b Y2) — Take 카드는 낸 단계에서 "응 · 네"로 승인되는데 글만 고친 카드는 더 좁았다. 낸 단계에서는 같은 낱말로 받는다.
+  it('글만 고친 카드(Take 없음)도 낸 단계에서는 "응" · "네"로 승인되고, 다른 단계의 "응"은 승인하지 않는다', async () => {
+    for (const word of ['응', '네']) {
+      director.setState({ nodes: [shot('s1')] })
+      await chat.getState().sendMessage('Rewrite shot 1')
+      expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+      project.setState({ currentStage: 'writer' })
+      await chat.getState().sendMessage('응')
+      expect(promptOf('s1'), word).toBeNull()
+      project.setState({ currentStage: 'director' })
+      await chat.getState().sendMessage(word)
+      expect(promptOf('s1'), word).toBe('Lumi prompt')
+      expect(chat.getState().pendingProposal, word).toBeNull()
+    }
+  })
+
   // 왜: 정상 경로 고정 — 카드를 낸 그 단계에서는 지금처럼 말로 승인된다.
   it('대기 카드를 낸 단계에서는 지금처럼 "yes"로 승인된다', async () => {
     await chat.getState().sendMessage('Rewrite shot 1')

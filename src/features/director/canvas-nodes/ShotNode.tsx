@@ -1,6 +1,6 @@
 'use client'
 
-import { memo, useState } from 'react'
+import { memo, useRef, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
@@ -33,6 +33,11 @@ import { RemakeRetryButton } from '@/features/director/remake-retry-button'
 import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { dimmedByStatusFilter, shotStateTone } from '@/lib/director/shot-state'
+import { shotStopTarget } from '@/lib/director/stop-work'
+import { StopMakingButton } from '@/features/director/stop-making-button'
+import { NodeWaitCard } from '@/components/feedback/node-wait'
+import { STAGE_PERSONA } from '@/lib/lumi'
+import { useWriterStore } from '@/stores/writer-store'
 
 /** 노드 뷰 미디어 틀의 높이 상한 — 샷 행 간격(SHOT_OFFSET_Y 560px)의 절반 아래로 둬 아래 샷과 겹치지 않는다. */
 const SHOT_NODE_MEDIA_MAX_H = 240
@@ -50,7 +55,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
   // 몸통을 누르면 고르기(시안 D2 · R), 상세는 ⤢ — 상세가 열린 노드만 단계 색 테두리 · 위 단추.
   const picked = useDirectorCanvasStore((s) => s.pickedShotIds?.includes(id) ?? false)
-  const detailOpen = useDirectorCanvasStore((s) => s.selectedNodeId === id)
+  const detailOpen = useDirectorCanvasStore((s) => (s.detailNodeId ?? s.selectedNodeId) === id)
   // 노드 제목은 보드와 같은 전체 번호("Shot 8", 오너 2026-11-02 "전체 번호로 통일").
   const boardNames = useBoardNodeNames()
   const generation = useStoryboardImageGeneration(isShotData(data) ? data : null)
@@ -61,6 +66,9 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // 가지 내기(새 영상 노드 → 바로 생성)도 Take 를 쓴다 — 잔액을 못 읽으면 시작하지 않고 노드 안에 까닭(리드 11/14).
   const takeBalance = useTakeBalance()
   const [takesUnknown, setTakesUnknown] = useState(false)
+  // 잔액을 다시 읽는 동안 가지 단추를 끈다 — 두 번 눌러 새 Take 가 두 번 나가지 않게(검토 b 낮음 2). ref 는 빠른 두 번 불림을 막는다.
+  const [branchReading, setBranchReading] = useState(false)
+  const branchReadingRef = useRef(false)
   // (#e3 2026-08-03) 와이어링된 Prompt 칩은 hover 오버레이 제거와 함께 표시처를 잃었다 —
   //   프롬프트·모델 정보는 카드 본문과 편집 팝업이 담당한다.
 
@@ -74,6 +82,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   const activeJobs = useActiveGenerationJobs(projectId)
   const videoQueued = !!writerShotId && activeShotIds(activeJobs, ['shot_video']).has(writerShotId)
+  // 노드 위 기다림 카드의 둘째 줄 "샷 3 · CU"(시안 D4) — 샷 크기는 Writer 샷 기록에서.
+  const shotType = useWriterStore((s) => (writerShotId ? s.shots.find((x) => x.shotId === writerShotId)?.shotType ?? null : null))
   // 영상 묶음에서 아직 차례를 기다리는 샷(서버 조회의 낼 순서, 11/5 시안 DG · 리드 2026-11-09). 멈추는 중이면 남은 샷은 만들지 않는다.
   const waitingInLine = useDirectorCanvasStore(
     (s) => !!writerShotId && !s.videoBatchCancelled && !!s.videoBatchQueue?.pendingShotIds.includes(writerShotId),
@@ -105,6 +115,10 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       : undefined
   // #names-in-prose: 카드 문구는 이름으로(id 는 구동값, 표시는 이름).
   const prompt = resolveEntityNames(effectivePrompt(data), entityNames)
+  // 노드 위 기다림(시안 D4 406:5275): 이미지를 그리는 동안(보냄 · 그리는 중) 기다리는 카드가 노드를 덮고, 그 안에 [멈추기](오너 7번).
+  //   보낸 작업이 아직 목록에 없으면(막 보냄) 단추 없이 카드만. 응답을 놓친 확인 중에는 덮지 않는다(꼬리가 그 글을 말한다).
+  const drawing = isGenerating && (generation.phase === 'generating' || generation.phase === 'submitting')
+  const imageStop = drawing && writerShotId ? shotStopTarget(activeJobs, writerShotId, 'image') : null
 
   return (
     <>
@@ -129,18 +143,26 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         picked={picked}
         width={280}
         stale={data.stale}
-        beam={isGenerating ? 'success' : null}
+        beam={isGenerating && !drawing ? 'success' : null}
+        inert={drawing}
         stateFrame={shotStateNow ? shotStateTone(shotStateNow).frame : null}
         dimmed={dimmedByStatusFilter(shotStateNow, statusFilter)}
-        canBranch={!videoQueued}
+        canBranch={!videoQueued && !branchReading}
         onBranch={async () => {
-          if (videoQueued) return
-          if (!(await takesReadable())) {
-            setTakesUnknown(true)
-            return
+          if (videoQueued || branchReadingRef.current) return
+          branchReadingRef.current = true
+          setBranchReading(true)
+          try {
+            if (!(await takesReadable())) {
+              setTakesUnknown(true)
+              return
+            }
+            setTakesUnknown(false)
+            void generateVideoForShot(id)
+          } finally {
+            branchReadingRef.current = false
+            setBranchReading(false)
           }
-          setTakesUnknown(false)
-          void generateVideoForShot(id)
         }}
       >
         {/* 입력 핸들(#handle-visibility) — 항상 보이는 라벨 홈들. v3 D1: 제목 줄 아래 20px 간격 · 한국어 라벨. */}
@@ -270,6 +292,16 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         )}
         {takesUnknown && takeBalance.failed && (
           <p className="mt-1 text-[10px] text-destructive">{t(TAKES_UNKNOWN_TEXT)}</p>
+        )}
+        {drawing && (
+          <NodeWaitCard
+            lumi={STAGE_PERSONA.director}
+            title={generation.phase === 'submitting' && generation.label ? t(generation.label) : t('Drawing the image')}
+            description={shotType ? `${nodeTitle} · ${shotType}` : nodeTitle}
+            note={imageStop && imageStop.sheetShots > 1 ? t('{count} shots on the same sheet stop together', { count: imageStop.sheetShots }) : undefined}
+            action={imageStop ? <StopMakingButton target={imageStop} kind="image" place="wait" /> : undefined}
+            className="-inset-[1.5px]"
+          />
         )}
       </BaseNode>
     </>

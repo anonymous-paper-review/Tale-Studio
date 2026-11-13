@@ -1291,7 +1291,8 @@ interface DirectorCanvasState {
   selectStoryboardImageVersion: (shotNodeId: string, versionId: string) => Promise<boolean>
   /** 다시 만들기 — 늘 새 Take 이고 그 샷의 가장 최근 Take(실패해도)의 설정을 이어받는다(마지막 모델 · 해상도).
    *  Take 가 없으면 샷 설정. 상세 · entry D8 [다시 만들기] · Lumi 가 같이 쓴다.
-   *  opts.onAccepted — 접수 알림: 서버가 2xx 로 받아 jobId 를 준 때 한 번(거절 4xx 는 몸에 jobId · queued 가 실려 와도 아니다).
+   *  opts.onAccepted — 접수 알림: 서버가 2xx 로 받아 jobId 를 준 때 한 번. 2xx 가 아니면(몸에 jobId · queued 가 실려 와도 — 4xx · 503 결과 모름)
+   *  · 500 · 연결 끊김 · 실패 알림은 아니다(리드 결정 — 결과를 모르는 것은 부른 쪽이 새 Take 가 만드는 중으로 남았는지로 따로 말한다).
    *  Lumi 는 이것으로 다음 샷을 보낸다(board 검토 b · entry D8 이 같이 쓴다). opts.onJob — 진행 알림 그대로. 둘 다 없으면 지금 그대로. */
   remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void }) => Promise<string | null>
   generateVideoForShot: (
@@ -5002,6 +5003,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             generationJobId: jobId,
             lastAttemptStatus: body.status === 'queued' ? 'generating' : body.status ?? 'generating',
           })
+          // 진짜 작업 id 를 적었으니 도는 작업 목록을 바로 다시 읽는다 — [멈추기]는 그 목록에 든 작업에만 보여(검토 a), 다음 조회까지 늦게 뜨지 않게.
+          //   이미지 길과 같다.
+          refreshGenerationQueue()
           activeJobId = jobId
           options?.onJob?.({ jobId, status: 'queued', httpStatus: res.status })
           const isCurrentAttempt = () => {

@@ -35,6 +35,8 @@ import {
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
+import { useActiveGenerationJobs } from '@/lib/generation-queue'
+import { isStoppableJob } from '@/lib/director/stop-work'
 import { aspectRatioFromFormat } from '@/types/project'
 import type { ShotNodeData, VideoOverride } from '@/types/director'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
@@ -56,6 +58,9 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const setVideoFinal = useDirectorCanvasStore((s) => s.setVideoFinal)
   const cancelRunningJobs = useDirectorCanvasStore((s) => s.cancelRunningJobs)
+  // [멈추기]는 지금 도는 작업 목록에 그 작업이 있을 때만(검토 a) — 'default' 는 프로젝트를 열기 전 자리 값이라 큐를 묻지 않는다.
+  const queueProjectId = useDirectorCanvasStore((s) => (s.projectId && s.projectId !== 'default' ? s.projectId : null))
+  const activeJobs = useActiveGenerationJobs(queueProjectId)
   const [stopError, setStopError] = useState<string | null>(null)
   const projectFormat = useProjectFormatStore((s) => s.format)
   const { takes, final } = shotDetailTakes(nodes, shotNodeId)
@@ -125,7 +130,8 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                   <div className="flex flex-wrap gap-1.5">
                     <Button type="button" size="pill" variant="secondary" aria-pressed={current?.id === take.id} onClick={() => setPicked(take.id)}>{t('View')}</Button>
                     {/* 멈추기(오너 7번) — 화면에서만 멈춘다. fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다. */}
-                    {phase === 'making' && take.data.generationJobId ? (
+                    {/*   요청이 오가는 동안 Take 에 든 것은 화면이 만든 요청 키라 멈추지 못한다 — 서버가 받은 작업이 목록에 오면 보인다. */}
+                    {phase === 'making' && isStoppableJob(take.data.generationJobId, activeJobs) ? (
                       <Button type="button" size="pill" variant="ghost" onClick={() => {
                         setStopError(null)
                         void cancelRunningJobs([take.data.generationJobId!]).catch(() => setStopError(t('Could not stop it. Try again.')))

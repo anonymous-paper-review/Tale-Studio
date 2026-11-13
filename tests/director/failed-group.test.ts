@@ -21,7 +21,9 @@ const running = (shotId: string, n: number, extra: Record<string, unknown> = {})
 const BOARD = [
   shot('s1'), running('s1', 1, { cancelledAt: STOPPED }),
   shot('s2'), finished('s2', 1, { cancelledAt: STOPPED }),
-  shot('s3'), finished('s3', 1, { cancelledAt: STOPPED }), failed('s3', 2),
+  // 샷 3 의 Take 1 은 Take 2 가 시작(02:00)하기 전에 멈췄다(01:30) — 서버는 멈추지 않은 Take 둘을 한 샷에 함께 돌리지 않으니,
+  //   "멈춘 뒤 끝남 → 더 새로 실패"는 멈춘 때가 새 Take 시작보다 앞이다(set ef85ae3d: 멈춘 Take 의 시각 = 멈춘 때).
+  shot('s3'), finished('s3', 1, { cancelledAt: '2026-11-14T01:30:00Z' }), failed('s3', 2),
   shot('s4'), failed('s4', 1),
 ]
 const names = boardNodeNames({ scenes: [{ sceneId: 'sc1' }] }, ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1' })))

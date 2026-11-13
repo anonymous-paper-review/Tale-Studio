@@ -16,6 +16,7 @@ vi.mock('@/lib/generation-queue', () => ({ refreshGenerationQueue: vi.fn() }))
 vi.mock('@/lib/shots-cache', () => ({ invalidateShots: () => Promise.resolve() }))
 
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import { refreshGenerationQueue } from '@/lib/generation-queue'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { latestShotTake, takeSettings } from '@/lib/director/remake-take'
 import { remakeNotice } from '@/lib/director/editor-handover'
@@ -195,5 +196,38 @@ describe('넘기기 창 [영상 만들기]가 시작하지 못한 까닭', () =>
     }
     expect(remakeNotice('video_limit', (key, params) => translate('ko', key, params)))
       .toBe('동시에 만드는 영상 수가 다 찼어요(멈춘 Take 도 끝날 때까지 자리를 써요). 하나가 끝나면 만들 수 있어요.')
+  })
+})
+
+describe('영상 요청 뒤 도는 작업 목록', () => {
+  it('영상 요청이 접수되면 도는 작업 목록을 바로 다시 읽어 [멈추기]가 곧 생긴다', async () => {
+    // 왜: 검토 a — [멈추기]는 서버가 받은 작업이 도는 목록에 있을 때만 보인다. 영상 길은 진짜 작업 id 를 적고도 목록을 다시 읽지 않아,
+    //   다음 조회(다른 작업이 돌면 최대 4초, 쉬던 중이면 15초)까지 [멈추기]가 늦게 떴다. 이미지 길은 이미 바로 다시 읽는다.
+    const order: string[] = []
+    let newTakeId: string | null = null
+    let jobIdAtRefresh: string | null | undefined
+    vi.mocked(refreshGenerationQueue).mockImplementation(() => {
+      order.push('refresh')
+      if (jobIdAtRefresh === undefined && newTakeId) {
+        const node = api().nodes.find((n) => n.id === newTakeId)
+        jobIdAtRefresh = node && isVideoData(node.data) ? node.data.generationJobId : null
+      }
+    })
+    const before = new Set(api().nodes.map((n) => n.id))
+    fetcher.mockImplementation((url: string) => {
+      if (url === '/api/director/generate-video') {
+        newTakeId = api().nodes.find((n) => !before.has(n.id) && isVideoData(n.data))?.id ?? null
+        return Promise.resolve(Response.json({ jobId: 'job-accepted', status: 'queued', videoClipId: 'clip-new', takeNumber: 2 }))
+      }
+      if (url.startsWith('/api/generation-jobs/')) {
+        order.push('poll')
+        return Promise.resolve(Response.json({ ok: true, data: { status: 'failed', error: 'stopped by test' } }))
+      }
+      return Promise.resolve(Response.json({ ok: true }))
+    })
+    await api().remakeShotVideo(shotId)
+    expect(order).toContain('refresh')
+    expect(order.indexOf('refresh')).toBeLessThan(order.indexOf('poll'))
+    expect(jobIdAtRefresh).toBe('job-accepted')
   })
 })

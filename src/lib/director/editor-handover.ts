@@ -4,7 +4,7 @@
 //   화면에서 멈춘 Take 는 ★ 가 아니면 영상 없음 — 투영 · 샷 상태 · 일괄 검사와 같은 규칙(오너 2026-11-14 7번, 리드 검토 a 5).
 //   Editor 는 DB 샷(Writer 샷)만 컷으로 받는다 — Director 에서 더한 샷(writerShotId 없음)은 창에 넣지 않는다(검토 b 보통 1).
 //   약속: tests/director/editor-handover.test.ts
-import { selectHandoffTake, selectLatestAttempt } from '@/lib/director-video-take-selection'
+import { isStoppedTake, selectHandoffTake, selectLatestShotAttempt } from '@/lib/director-video-take-selection'
 import { directorFullLabel, sortByBoard, type BoardNodeNames } from '@/features/director/node-label'
 import { latestShotTake, takeSettings } from '@/lib/director/remake-take'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
@@ -65,13 +65,15 @@ export function editorHandoverView(nodes: readonly DirectorNode[], names: BoardN
       }]
     })
     const chosen = selectHandoffTake(records)
-    const latest = chosen ? null : selectLatestAttempt(records)
-    // 멈춘 Take 는 뒤에서 돌아도 만드는 중이 아니다 — 이 창에서 새 Take 를 바로 만들 수 있다.
+    // 가장 새 시도는 샷 상태와 같게 고른다 — 멈춘 Take 의 시각은 멈춘 때(리드 2026-11-14 규칙). 그것이 멈춘 Take 면
+    //   뒤에서 돌든 실패했든 만드는 중도 실패도 아니다(아직 만들지 않음) — 이 창에서 새 Take 를 바로 만들 수 있다.
+    const latest = chosen ? null : selectLatestShotAttempt(records)
+    const live = latest && !isStoppedTake(latest) ? latest : null
     const missing: MissingVideoReason | null = chosen
       ? null
-      : latest?.cancelled_at == null && (latest?.last_attempt_status === 'generating' || latest?.last_attempt_status === 'pending')
+      : live?.last_attempt_status === 'generating' || live?.last_attempt_status === 'pending'
         ? 'generating'
-        : latest?.last_attempt_status === 'failed' || latest?.status === 'failed'
+        : live?.last_attempt_status === 'failed' || live?.status === 'failed'
           ? 'failed'
           : 'not_made'
     const seconds = isShotData(data) && Number.isFinite(data.durationSeconds) ? data.durationSeconds : 0

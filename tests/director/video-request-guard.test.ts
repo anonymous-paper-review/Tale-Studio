@@ -10,7 +10,7 @@ vi.mock('@/lib/llm', () => ({ llmChat: mocks.llmChat }))
 vi.mock('@/lib/chat-trace-server', () => ({ persistChatTraceBestEffort: mocks.persistTrace }))
 vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.userOwnsProject }))
 
-import { groundVideoRequest, type ChatShotRef } from '@/lib/director/chat-video-targets'
+import { answeredShotNumbers, askedBackShotNumbers, groundVideoRequest, type ChatShotRef } from '@/lib/director/chat-video-targets'
 import { POST } from '@/app/api/director/chat/route'
 
 // 보드: 샷 1~6 — 샷 1~4 는 이미지가 나왔고, 샷 5 · 6 은 영상이 실패했다.
@@ -318,6 +318,34 @@ describe('고르는 말(검토 a 통합 낮음)', () => {
   it('고르는 말("샷 3이나 4" · "샷 3 또는 4" · "shot 3 or 4")이 있으면 바로 만들지 않고 두 샷을 센 목록으로 되묻는다', () => {
     for (const text of ['샷 3이나 4 영상 만들어줘', '샷 3 또는 4 영상 만들어줘', 'Make the video for shot 3 or 4']) {
       expect(ground(text, ids(3, 4)), text).toEqual(confirm(3, 4))
+    }
+  })
+})
+
+describe('번호 목록의 이음말(검토 b 낮음)', () => {
+  // 왜: 검토 b 낮음 — "샷 3이랑 4"의 4 를 읽지 못해 샷 3 만 되물었다("응"이면 샷 3 만 만듦). "과 · 와"와 같은 "그리고" 말이다.
+  it('"샷 3이랑 4" · "샷 3하고 4" · "샷 3랑 4"처럼 "그리고" 말로 이은 번호는 모두 세어 "샷 3과 4"처럼 바로 만든다', () => {
+    for (const text of ['샷 3이랑 4 영상 만들어줘', '샷 3하고 4 영상 만들어줘', '샷 3랑 4 영상 만들어줘']) {
+      expect(ground(text, ids(3, 4)), text).toEqual(run(3, 4))
+    }
+  })
+  // 왜: 같은 까닭 — 고르는 말("이든 · / · vs")도 두 번호를 다 읽어, 바로 만들지 않고 센 목록으로 되묻는다.
+  it('"샷 3이든 4든" · "샷 3/4" · "shot 3 vs 4"처럼 고르는 말은 두 샷을 센 목록으로 되묻는다', () => {
+    for (const text of ['샷 3이든 4든 영상 만들어줘', '샷 3/4 영상 만들어줘', 'Make the video for shot 3 vs 4']) {
+      expect(ground(text, ids(3, 4)), text).toEqual(confirm(3, 4))
+    }
+  })
+})
+
+describe('고르는 말 앞뒤의 번호(검토 b 탐침 revb35 C1 · C2)', () => {
+  // 왜: 검토 b 탐침 — "샷 3 아니면 4" · "3이나 4번 샷"은 번호 하나를 놓쳐 그 샷만 되물었고, 번호를 물은 뒤 "3 아니면 4" · "3이든 4든"은 대답으로도 되묻기로도 읽지 못했다.
+  it('"샷 3 아니면 4" · "3이나 4번 샷"처럼 고르는 말 앞뒤의 번호를 모두 읽어 두 샷을 센 목록으로 되묻고, 번호를 물은 뒤의 "3 아니면 4" · "3이든 4든"도 그 목록으로 되묻는다', () => {
+    for (const text of ['샷 3 아니면 4 영상 만들어줘', '3이나 4번 샷 영상 만들어줘']) {
+      expect(ground(text, ids(3, 4)), text).toEqual(confirm(3, 4))
+    }
+    for (const text of ['3 아니면 4', '3이든 4든']) {
+      expect(answeredShotNumbers(text), text).toBeNull()
+      expect([...(askedBackShotNumbers(text) ?? [])], text).toEqual([3, 4])
     }
   })
 })

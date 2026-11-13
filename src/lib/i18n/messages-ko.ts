@@ -3379,6 +3379,9 @@ export const KO: Record<string, string> = {
   'Stopped. Takes for the videos being made are not refunded. If they finish later, they stay in the history.': '멈췄어요. 만들던 영상의 Take 는 돌려드리지 않아요. 뒤늦게 끝나면 기록에 남아요.',
   'Stopped. If the images being made finish later, they stay in the versions.': '멈췄어요. 그리던 이미지는 뒤늦게 끝나면 버전으로 남아요.',
   'Stopped.': '멈췄어요.',
+  '{count} shots on the same sheet stop together': '같은 장 샷 {count}개가 같이 멈춰요',
+  'Stopped {count} shots on the same sheet. If the images finish later, they stay in the versions.': '같은 장 샷 {count}개를 같이 멈췄어요. 그리던 이미지는 뒤늦게 끝나면 버전으로 남아요.',
+  'It was already done.': '이미 다 만든 뒤였어요.',
   'Drawing the image': '이미지를 그리고 있어요',
   'Make images, then their videos?': '이미지를 만들고 이어서 영상도 만들까요?',
   'Makes {count} images, and each video starts by itself when its image is done.': '이미지 {count}장을 만들고, 이미지가 끝나는 샷부터 영상이 저절로 시작돼요.',
@@ -3423,6 +3426,8 @@ export const KO: Record<string, string> = {
   'The video for {shots} needs an image first.': '{shots} 영상은 이미지가 먼저 필요해요.',
   "Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.": '동시에 만드는 영상이 많아 {shots} 영상은 시작하지 못했어요. 하나가 끝나면 다시 부탁해 주세요.',
   "I couldn't start the video for {shots}. Please ask again in a moment.": '{shots} 영상을 시작하지 못했어요. 잠시 뒤 다시 부탁해 주세요.',
+  // 2xx 가 아닌데 새 Take 가 만드는 중으로 남은 다시 만들기(리드 결정 — 503 결과 모름 · 409 영수증 필요 · 400 + jobId · queued).
+  "I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.": '{shots} 영상은 접수됐는지 아직 몰라요. 카드에서 결과를 볼 수 있어요.',
   // 글 카드에 생성을 묶는 사이 그 카드가 닫혔다(검토 a 통합) — 카드를 되살리지 않고 다시 부탁해 달라고 한다.
   "The text card closed in the meantime, so I didn't start what was waiting for it. Please ask again.": '그사이 글 카드가 닫혀 그 카드를 기다리던 생성은 시작하지 않았어요. 다시 부탁해 주세요.',
   '{shots} has a text change waiting for [Apply]. Apply or discard it, then make it again.': '{shots}에는 [적용]을 기다리는 글 고침이 있어요. 적용하거나 버린 뒤 다시 만들어 주세요.',

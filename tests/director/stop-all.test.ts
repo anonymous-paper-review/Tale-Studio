@@ -22,6 +22,8 @@ import { toast } from 'sonner'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { runRealBatch } from '@/lib/director/real-batch-client'
 import { stoppableJobs, stopNotice, videoBatchLive } from '@/lib/director/stop-work'
+import { freshActiveJobs } from '@/lib/director/stop-all-client'
+import { _setGenerationQueueSnapshotForTests } from '@/lib/generation-queue'
 import { translate } from '@/lib/i18n/translate'
 
 const ko = (text: string) => translate('ko', text)
@@ -54,6 +56,8 @@ beforeEach(() => {
     if (url.startsWith('/api/generation-jobs/')) {
       return new Response(JSON.stringify({ data: { status: 'queued' } }), { status: 200 })
     }
+    // 다시 읽기(hydrateFromDb)가 받는 Take 목록 — 비어 있음(이것이 깨지면 끝 알림까지 가지 못한다).
+    if (url.startsWith('/api/director/video-takes')) return new Response(JSON.stringify({ takes: [] }), { status: 200 })
     if (url === '/api/director/jobs/cancel') {
       const ids = ((init?.body ? JSON.parse(String(init.body)) : {}) as { jobIds?: string[] }).jobIds ?? []
       return new Response(JSON.stringify({ ok: true, data: { cancelled: ids.map((jobId) => ({ jobId, kind: 'storyboard_real_grid', writerShotIds: ['s1', 's2', 's3', 's4'], videoClipId: null, cancelledAt: '2026-11-14T00:00:00.000Z' })) } }), { status: 200 })
@@ -80,7 +84,8 @@ describe('같이 정한 것', () => {
     const stopAll = stopAllSource()
     expect(stopAll).toContain('run.cancelRealBatch()')
     expect(stopAll).toContain('await run.cancelVideoBatch()')
-    expect(stopAll).toContain('stoppableJobs(activeJobsSnapshot(run.projectId))')
+    // 누를 때 목록을 한 번 새로 읽는다(아래 "새로 읽어" 시험) — 2026-11-14 리드 검토 a 낮음(예전 기대 'stoppableJobs(activeJobsSnapshot(run.projectId))').
+    expect(stopAll).toContain('stoppableJobs(await freshActiveJobs(run.projectId))')
     expect(stopAll).toMatch(/await run\.cancelRunningJobs\(/)
   })
 
@@ -130,5 +135,45 @@ describe('혼자 정한 것', () => {
     const stops = calls.filter((c) => c.url === '/api/director/jobs/cancel')
     expect(stops.map((c) => c.body?.jobIds)).toContainEqual(['job-1'])
     expect(toast.success).not.toHaveBeenCalled()
+  })
+})
+
+describe('누를 때 작업 목록 새로 읽기 (리드 검토 a 낮음)', () => {
+  afterEach(() => {
+    _setGenerationQueueSnapshotForTests({ projectId: '', jobs: [] })
+  })
+
+  it('[모두 멈추기]는 누를 때 작업 목록을 한 번 새로 읽어, 다른 탭 · 기기가 마지막 조회 뒤에 낸 낱개 작업도 멈춘다', async () => {
+    // 왜: 저장해 둔 목록(쉴 때는 15초마다 읽음)만 쓰면 그사이 다른 탭 · 기기가 낸 작업은 멈추지 않고 계속 "만드는 중"이었다.
+    _setGenerationQueueSnapshotForTests({ projectId: 'p1', jobs: [job('seen', 'shot_video')] })
+    const urls: string[] = []
+    vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+      urls.push(String(input))
+      return new Response(JSON.stringify({ ok: true, data: { jobs: [job('seen', 'shot_video'), job('other-tab', 'shot_storyboard')] } }), { status: 200 })
+    }))
+    expect((await freshActiveJobs('p1')).map((j) => j.id)).toEqual(['seen', 'other-tab'])
+    expect(urls).toEqual(['/api/generation/active?projectId=p1'])
+    expect(stopAllSource()).toContain('stoppableJobs(await freshActiveJobs(run.projectId))')
+  })
+
+  it('작업 목록 새로 읽기가 늦으면 기다리지 않고 저장해 둔 목록으로 멈춘다', async () => {
+    // 왜: 목록 라우트가 느리면 그만큼 낱개 작업 멈추기가 늦게 나가고 그동안 "중단하는 중"이었다(검토 c 낮음) — 한도는 2.5초.
+    _setGenerationQueueSnapshotForTests({ projectId: 'p1', jobs: [job('seen', 'shot_video')] })
+    vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    })))
+    let settled: readonly ActiveJob[] | null = null
+    void freshActiveJobs('p1').then((jobs) => { settled = jobs })
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(settled).toBeNull()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(settled ? (settled as readonly ActiveJob[]).map((j) => j.id) : null).toEqual(['seen'])
+  })
+
+  it('작업 목록을 새로 읽지 못하면 저장해 둔 목록으로 멈춘다', async () => {
+    // 왜: 목록 읽기가 끊겨도 멈출 수 있는 것은 멈춘다(정상 경로 고정 — 예전처럼).
+    _setGenerationQueueSnapshotForTests({ projectId: 'p1', jobs: [job('seen', 'shot_video')] })
+    vi.stubGlobal('fetch', vi.fn(async () => new Response('down', { status: 500 })))
+    expect((await freshActiveJobs('p1')).map((j) => j.id)).toEqual(['seen'])
   })
 })

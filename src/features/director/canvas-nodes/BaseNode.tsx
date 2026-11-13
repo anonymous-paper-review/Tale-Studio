@@ -82,13 +82,16 @@ function BaseNodeImpl({
   const t = useT()
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
+  const openShotDetail = useDirectorCanvasStore((s) => s.openShotDetail)
   const openDeleteConfirm = useDirectorCanvasStore((s) => s.openDeleteConfirm)
 
   const stop = (e: React.MouseEvent) => e.stopPropagation()
   const handleEdit = (e: React.MouseEvent) => {
     stop(e)
-    // theme별 분기: scene=모달, shot/video=좌측 상세 패널 선택 (노드 뷰 격리)
+    // theme별 분기: scene=모달, shot/video=샷 상세(prose openShotDetail — 노드형은 왼쪽 패널, 샷은 이미지 탭 · Take 는 영상 탭,
+    //   리드 S4-2 8), 에셋=좌측 상세 패널 선택 (노드 뷰 격리)
     if (editActionForKind(theme) === 'popup') openPopup(id)
+    else if (theme === 'shot' || theme === 'video') openShotDetail(id, theme === 'video' ? 'video' : 'image')
     else selectNode(id)
   }
   const handleBranch = (e: React.MouseEvent) => {

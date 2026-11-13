@@ -7,7 +7,7 @@
 
 import { toast } from 'sonner'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { refreshGenerationQueue } from '@/lib/generation-queue'
+import { activeJobsSnapshot, refreshGenerationQueue } from '@/lib/generation-queue'
 import { invalidateShots } from '@/lib/shots-cache'
 import { notifyIfQuotaExceeded, notifyQuotaExceeded } from '@/lib/generation-quota-toast'
 import { prerequisiteWaitKey, waitForPrerequisite, type PrerequisiteBody, type PrerequisiteCode } from '@/lib/generation-prerequisite-toast'
@@ -222,6 +222,8 @@ export async function runRealBatch(
         if (ours) opts?.onJob?.({ jobId: s.jobId, status: 'queued', httpStatus: res.status })
         for (let i = 0; i < 60; i++) {
           if (store.getState().realBatchCancelled) break
+          // 카드 · 노드 [멈추기]로 화면에서 멈춘 장은 끝나기를 기다리지 않고 다음 장으로 간다(오너 7번) — fal 에서는 몇 분 더 돈다.
+          if (activeJobsSnapshot(projectId).some((job) => job.id === s.jobId && job.cancelledAt)) break
           // 응답은 {ok, data:{status}} 봉투(#real-grid-fix 실측: 최상위 status 읽기로 8잡×300s 헛대기)
           //   조회가 한 번 끊겨도 판을 멈추지 않고 다음 틱에 다시 묻는다.
           const envelope = (await fetch(`/api/generation-jobs/${encodeURIComponent(s.jobId)}`)
@@ -291,11 +293,12 @@ export async function runRealBatch(
     if (generated > 0) {
       await invalidateShots(projectId)
       await store.getState().hydrateFromDb(projectId)
-      // 멈춘 판은 "만들었어요"라고 하지 않는다 — 보낸 장은 화면에서 멈췄다(오너 7번).
-      if (!stoppedByUser) {
+      // 멈춘 판은 "만들었어요"라고 하지 않는다 — 보낸 장은 화면에서 멈췄다(오너 7번). 수는 끝난 장의 샷만 센다 —
+      //   카드 · 노드 [멈추기]로 멈춘 장 · 끝나기를 기다리지 않은 장은 세지 않는다(검토 a cbb84e64 낮음 2).
+      if (!stoppedByUser && imagesDone > 0) {
         toast.success(
           translate(useLocaleStore.getState().locale, 'Generated {count} live-action storyboard shots', {
-            count: generated,
+            count: imagesDone,
           }),
         )
       }

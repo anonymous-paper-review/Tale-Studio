@@ -5,6 +5,7 @@
 //   완성 표시: 단계 그라데이션 "✓ 완성" 배지(DoneBadge) + 단계 색 테두리(STAGE_FRAME).
 //   색은 lumi 옷(data-stage) — 놓인 화면이 다른 단계여도 Lumi 와 테두리 · 막대가 같은 단계를 말한다. 약속: tests/project/node-wait.test.ts
 //   Lumi 는 늘 그림(still) — 카드가 여럿 뜨면 움직이는 Lumi 마다 WebGL 문맥을 하나씩 열어 브라우저 한도에 걸린다(검토 C 2026-11-09).
+import type { ReactNode } from 'react'
 import { Lumi } from '@/components/lumi/lumi'
 import { useT } from '@/lib/i18n'
 import { lumiStageTheme, type LumiPersona } from '@/lib/lumi'
@@ -24,11 +25,15 @@ export interface NodeWaitCardProps {
   note?: string
   /** 화면 읽기에 알린다(role="status"). 여럿이 동시에 뜨면 겹쳐 읽으니 부르는 쪽이 하나만 고른다(보드 · Director 는 첫 카드). 기본 false. */
   announce?: boolean
+  /** 맨 아래 단추(예: Director [멈추기], 1110 시안 D4). 없으면 그리지 않는다. */
+  action?: ReactNode
+  /** 테두리 · 막대 색 — 기본은 단계 색, video 는 Director 상태 색 "영상 만드는 중" 보라(1110 시안 D4 · R). */
+  tone?: 'stage' | 'video'
   className?: string
 }
 
 /** 놓인 노드(부모 relative)를 꽉 채우는 기다림 카드. */
-export function NodeWaitCard({ lumi, title, description, progress, note, announce = false, className }: NodeWaitCardProps) {
+export function NodeWaitCard({ lumi, title, description, progress, note, announce = false, action, tone = 'stage', className }: NodeWaitCardProps) {
   const pct = typeof progress === 'number' && Number.isFinite(progress) ? Math.max(0, Math.min(100, Math.round(progress))) : null
   return (
     <div
@@ -37,7 +42,7 @@ export function NodeWaitCard({ lumi, title, description, progress, note, announc
       aria-live={announce ? 'polite' : undefined}
       className={cn(
         'absolute inset-0 z-10 flex flex-col items-center justify-center gap-[15px] rounded-[inherit] bg-side p-[18px] text-center shadow-dialog',
-        STAGE_FRAME,
+        tone === 'video' ? 'border-[1.5px] border-state-video' : STAGE_FRAME,
         className,
       )}
     >
@@ -48,10 +53,11 @@ export function NodeWaitCard({ lumi, title, description, progress, note, announc
       </div>
       {pct !== null ? (
         <div className="h-1 w-full overflow-hidden rounded-[2px] bg-progress-track" aria-hidden>
-          <div className="h-full rounded-[2px] bg-stage-gradient transition-[width] duration-350 ease-out" style={{ width: `${pct}%` }} />
+          <div className={cn('h-full rounded-[2px] transition-[width] duration-350 ease-out', tone === 'video' ? 'bg-state-video' : 'bg-stage-gradient')} style={{ width: `${pct}%` }} />
         </div>
       ) : null}
       {note ? <p className="text-micro font-medium text-subtle-foreground">{note}</p> : null}
+      {action ?? null}
     </div>
   )
 }

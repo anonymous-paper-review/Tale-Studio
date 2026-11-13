@@ -4,9 +4,11 @@ import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
+// 지금 도는 작업 목록 — [멈추기]는 이 목록에 든 작업에만 보인다(시험마다 바꿀 수 있게).
+const queue = vi.hoisted(() => ({ jobs: [] as Array<{ id: string; kind: string; target: Record<string, unknown>; cancelledAt?: string | null }> }))
 vi.mock('@/lib/generation-queue', async (original) => ({
   ...await original<typeof import('@/lib/generation-queue')>(),
-  useActiveGenerationJobs: () => [],
+  useActiveGenerationJobs: () => queue.jobs,
   useGenerationQueueStatus: () => 'ready',
 }))
 vi.mock('@/lib/use-debug-prompts', () => ({ useDebugPrompts: () => false }))
@@ -18,8 +20,10 @@ import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorD
 import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
-import type { VideoNodeData } from '@/types/director'
+import type { ShotNodeData, VideoNodeData } from '@/types/director'
+import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { keptStoryboardImage, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { translate } from '@/lib/i18n/translate'
 
 let shotId = ''
 const IMAGE = { url: 'https://media.test/start.png', status: 'completed' as const, errorMessage: null, generatedAt: 1, frames: { start: 'https://media.test/start.png', direction: 'https://media.test/dir.png', end: 'https://media.test/end.png' } }
@@ -52,6 +56,7 @@ function buttonTag(out: string, label: string): string {
 }
 
 beforeEach(() => {
+  queue.jobs = []
   director.setState({ projectId: 'detail-project', nodes: [], edges: [], realBatchBusy: false, generatingNodeIds: {} })
   shotId = director.getState().addShotNode(null, { x: 0, y: 0 })
   director.getState().updateNodeData<'shot'>(shotId, { writerShotId: 'sh_01_01', storyboardImage: IMAGE })
@@ -154,6 +159,25 @@ describe('Director 샷 상세 화면', () => {
     expect(render('panel', 'video')).toContain('시작 v1 + 끝 v1 · Seedance 2.0 · 720p')
   })
 
+  it('노드 위 이미지 단추는 그림이 있으면 "이미지 다시 만들기"다 — 시안 단추 이름(이미지 만들기 · 다시 만들기)과 같은 말', () => {
+    // 왜: 리드 11/14 말 맞추기(set 이 찾음) — 노드 위 단추만 옛 말 "이미지 재생성"이었다. 위 툴바 [이미지 다시 만들기]와 같은 글 · 같은 영어.
+    const shot = director.getState().nodes.find((n) => n.id === shotId)!.data as ShotNodeData
+    const button = () => renderToStaticMarkup(createElement(StoryboardImageButton, { nodeId: shotId, data: shot }))
+    expect(button()).toContain('>Make images again<')
+    setLocale('ko')
+    expect(button()).toContain('>이미지 다시 만들기<')
+    expect(button()).not.toContain('이미지 재생성')
+  })
+
+  it('이미지를 다시 만들기 전 확인 창의 단추는 "다시 만들기"다 — 카드 · 꼬리 · 툴바 확인 창과 같은 말', () => {
+    // 왜: 리드 11/14 말 맞추기 — 제목은 "이미지를 다시 만들까요?"인데 단추만 옛 말 "재생성"이었다(카드 · 꼬리 · 툴바는 set 84cf453b 가 맞춤).
+    //   직접 추가한 이미지의 "다시 생성"은 출시 시험이 글자로 박고 있어 그대로다.
+    const button = readFileSync('src/features/director/storyboard-image-button.tsx', 'utf8')
+    expect(button).toContain("confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Make again')}")
+    expect(button).not.toContain("t('Regenerate')")
+    expect(translate('ko', 'Make again')).toBe('다시 만들기')
+  })
+
   it('이미지를 다시 만들기 전 확인 창은 지금 이미지가 버전으로 남는다고 알린다', () => {
     // 왜: 버전이 생겨(오너 답 5번) "기존 이미지가 새 결과로 교체됩니다"는 이제 틀린 말이다 — 앞 그림은 v1 로 남는다.
     const button = readFileSync('src/features/director/storyboard-image-button.tsx', 'utf8')
@@ -165,6 +189,7 @@ describe('Director 샷 상세 화면', () => {
     // 왜: 오너 7번 "이미 생성이 진행 중인 것들은 UI로는 취소된걸로 보이게 해서 유저가 수정해서 다시 생성 요청할 수 있게" — Take 는 돌려주지 않는다.
     done(1)
     const making = addTake({ takeNumber: 2, status: 'generating', lastAttemptStatus: 'generating', generationJobId: '11111111-1111-4111-8111-111111111111' })
+    queue.jobs = [{ id: '11111111-1111-4111-8111-111111111111', kind: 'shot_video', target: {} }]
     const out = render('panel', 'video')
     // 시안 글 "멈추기"(리드 검토 a 4 — 기존 키 'Stop' 은 한국어 "정지"라 새 키).
     expect(out).toContain('>Stop making<')
@@ -179,6 +204,19 @@ describe('Director 샷 상세 화면', () => {
     expect(buttonTag(stopped, 'Make a new Take · 5 Takes')).not.toContain('disabled=""')
     setLocale('ko')
     expect(render('panel', 'video')).toContain('멈췄어요 · Take 는 돌려드리지 않아요. 뒤늦게 끝나면 이 목록에 남아요.')
+  })
+
+  it('만드는 중인 Take 의 [멈추기]는 지금 도는 작업 목록에 그 작업이 있을 때만 보이고, 요청이 오가는 동안에는 보이지 않는다', () => {
+    // 왜: 검토 a — 요청이 오가는 동안 Take 에 든 것은 화면이 만든 요청 키라, 그때 누르면 아무 말 없이 멈추지 못하고 Take 는 그대로 만들어졌다.
+    done(1)
+    const making = addTake({ takeNumber: 2, status: 'generating', lastAttemptStatus: 'generating', generationJobId: 'request-key-before-response' })
+    expect(render('panel', 'video')).not.toContain('>Stop making<')
+    director.getState().updateNodeData<'video'>(making, { generationJobId: '11111111-1111-4111-8111-111111111111' })
+    expect(render('panel', 'video')).not.toContain('>Stop making<')
+    queue.jobs = [{ id: '11111111-1111-4111-8111-111111111111', kind: 'shot_video', target: {} }]
+    expect(render('panel', 'video')).toContain('>Stop making<')
+    queue.jobs = [{ id: '11111111-1111-4111-8111-111111111111', kind: 'shot_video', target: {}, cancelledAt: '2026-11-14T03:00:00Z' }]
+    expect(render('panel', 'video')).not.toContain('>Stop making<')
   })
 
   it('멈춘 뒤 끝난 Take 는 목록에 남아 "멈춘 뒤 끝났어요"를 보이고 ★ 최종(자동)이 되지 않는다', () => {

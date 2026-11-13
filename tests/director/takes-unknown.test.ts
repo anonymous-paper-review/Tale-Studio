@@ -56,7 +56,8 @@ describe('카드 · 노드의 영상 단추', () => {
   it('샷 노드에서 영상 노드를 새로 내어 바로 만들 때도 잔액을 다시 읽어, 못 읽으면 시작하지 않고 노드 안에 까닭을 보인다', () => {
     // 왜: 가지 내기도 바로 Take 를 쓰는 길이다.
     const shot = read('src/features/director/canvas-nodes/ShotNode.tsx')
-    expect(shot).toMatch(/onBranch=\{async \(\) => \{\s*if \(videoQueued\) return\s*if \(!\(await takesReadable\(\)\)\) \{\s*setTakesUnknown\(true\)\s*return\s*\}/)
+    // 읽는 동안 두 번 불림 막이(takes-reread-guard.test.ts)가 앞에 붙어도 같은 약속: 다시 읽고, 못 읽으면 까닭만 보이고 시작하지 않는다.
+    expect(shot).toMatch(/onBranch=\{async \(\) => \{\s*if \(videoQueued[^\n]*\) return[\s\S]*?if \(!\(await takesReadable\(\)\)\) \{\s*setTakesUnknown\(true\)\s*return\s*\}/)
     expect(shot).toContain('{takesUnknown && takeBalance.failed && (')
   })
 
@@ -65,5 +66,32 @@ describe('카드 · 노드의 영상 단추', () => {
     const grid = read('src/features/director/canvas-views/StoryboardGridView.tsx')
     const run = grid.slice(grid.indexOf('const runVideo = async () => {'), grid.indexOf('const runVideo = async () => {') + 700)
     expect(run).toMatch(/if \(!\(await takesReadable\(\)\)\) \{\s*setVideoError\(t\(TAKES_UNKNOWN_TEXT\)\)\s*return\s*\}/)
+  })
+})
+
+describe('툴바 확인 창', () => {
+  /** 그 확인 창의 [확인] 몸 — open={…} 부터 다음 확인 창(또는 끝)까지. */
+  const confirmBody = (open: string) => {
+    const start = page.indexOf(`open={${open}}`)
+    const next = page.indexOf('<RegenerateConfirmDialog', start)
+    const body = page.slice(start, next === -1 ? undefined : next)
+    return body.slice(body.indexOf('onConfirm='))
+  }
+
+  it('툴바 확인 창을 연 뒤 Take 잔액을 못 읽게 되면 [확인]을 눌러도 시작하지 않고 까닭을 보인다', () => {
+    // 왜: 창을 열기 직전 한 번 더 읽는 잔액(출시 시험 video-batch-takes 약속)이 실패하면 열린 창의 계획이 "과금 꺼짐"처럼
+    //   Take 줄 없이 전부 허용으로 바뀌었고, [확인]은 그것을 다시 보지 않았다(리드 검토 a 재확인).
+    const confirm = confirmBody('confirmVideoBatch')
+    expect(confirm).toMatch(/if \(takeState\.failed\) \{\s*setTakesUnknown\(true\)\s*return\s*\}/)
+    expect(confirm.indexOf('if (takeState.failed)')).toBeGreaterThan(confirm.indexOf('setConfirmVideoBatch(false)'))
+    expect(confirm.indexOf('if (takeState.failed)')).toBeLessThan(confirm.indexOf('runVideoBatch('))
+  })
+
+  it('이어서 만들기 확인 창도 연 뒤 Take 잔액을 못 읽게 되면 이미지도 영상도 시작하지 않고 까닭을 보인다', () => {
+    // 왜: 같은 틈(confirmChain). 누를 때 못 읽으면 아무것도 시작하지 않는 규칙과 같게 — 이미지만 먼저 나가면 영상은 이어지지 않는다.
+    const confirm = confirmBody('confirmChain')
+    expect(confirm).toMatch(/if \(takeState\.failed\) \{\s*setTakesUnknown\(true\)\s*return\s*\}/)
+    expect(confirm.indexOf('if (takeState.failed)')).toBeGreaterThan(confirm.indexOf('setConfirmChain(false)'))
+    expect(confirm.indexOf('if (takeState.failed)')).toBeLessThan(confirm.indexOf('startImages()'))
   })
 })

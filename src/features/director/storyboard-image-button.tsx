@@ -49,7 +49,8 @@ export function StoryboardImageButton({ nodeId, data, className, idleLabel, chan
         {generation.disabled && generation.phase !== 'error'
           ? <Loader2 className="size-3.5 animate-spin" />
           : <ImageIcon className="size-3.5" />}
-        {generation.label ? t(generation.label) : idleLabel ?? (hasImage ? t('Regenerate image') : t('Generate image'))}
+        {/* 그림이 있으면 위 툴바 · 시안과 같은 "이미지 다시 만들기"(리드 11/14 말 맞추기). */}
+        {generation.label ? t(generation.label) : idleLabel ?? (hasImage ? t('Make images again') : t('Generate image'))}
       </Button>
       {generation.phase === 'error' && (
         <Button type="button" size="sm" variant="ghost" onClick={refreshGenerationQueue}>
@@ -79,7 +80,8 @@ export function StoryboardImageButton({ nodeId, data, className, idleLabel, chan
           : t('Generates a new shooting image for this shot.')}
         // 버전(디자이너 11/13 D6 · 오너 2026-11-14 답 5번) — 앞 그림은 덮이지 않고 버전으로 남는다.
         impact={confirm === 'manual-retry' ? [] : [t('The new image becomes the current one. The current image stays in the versions.')]}
-        confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Regenerate')}
+        // 단추 글은 카드 · 꼬리 · 툴바 확인 창과 같은 "다시 만들기"(리드 11/14). 직접 추가한 이미지의 "다시 생성"은 그대로.
+        confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Make again')}
         busy={confirm === 'manual-retry' ? !manualUncertain || generation.batchBusy : generation.disabled}
         onConfirm={() => {
           if (confirm !== 'manual-retry') { run(); return }
