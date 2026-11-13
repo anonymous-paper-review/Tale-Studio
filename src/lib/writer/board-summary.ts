@@ -120,10 +120,11 @@ export interface DirectorConfirmExtra {
   /** Artist 에서 그림이 있는 인물 · 배경 카드 수. */
   characters: number
   backgrounds: number
-  /** 넘어가는 샷 중 실사 이미지가 아직 없는 샷 수 — "넘어가면서 이미지 N장 만들기"의 N. */
-  imagesToMake: number
-  /** 영상 한 편의 Take — 지금 Take 계산기 값(오너 2026-11-14 답 11번). */
-  takesPerShot: number
+  /** 넘어가는 샷 중 실사 이미지가 아직 없는 샷 수 — "넘어가면서 이미지 N장 만들기"의 N.
+   *  저장된 실사를 아직 읽는 중이면 'counting', 읽기에 실패하면 많아야 몇 장인지(atMost)만 안다(검토 b 낮음 7). */
+  imagesToMake: number | 'counting' | { atMost: number }
+  /** 영상 한 편의 Take — 지금 Take 계산기 값(오너 2026-11-14 답 11번). Take 과금이 꺼져 있으면 null — 값을 보이지 않는다(낮음 5). */
+  takesPerShot: number | null
 }
 
 export interface DirectorConfirmView {
@@ -151,10 +152,24 @@ export function directorConfirmView(summary: DirectorHandoffSummary, locale: App
     : more > 0
       ? translate(locale, 'These shots have no rough and are left out this time: {shots} and {count} more.', { shots, count: more })
       : translate(locale, 'These shots have no rough and are left out this time: {shots}.', { shots })
-  const images = extra.imagesToMake
+  const images = typeof extra.imagesToMake === 'number' ? extra.imagesToMake : null
+  const atMost = typeof extra.imagesToMake === 'object' ? extra.imagesToMake.atMost : null
+  const showTakes = extra.takesPerShot !== null
+  const nextRow =
+    extra.imagesToMake === 'counting'
+      ? translate(locale, 'Rough → real images · counting')
+      : atMost !== null
+        ? showTakes
+          ? translate(locale, 'Rough → up to {count} real images · about {minutes} min · No Takes used', { count: atMost, minutes: realImageBatchMinutes(atMost) })
+          : translate(locale, 'Rough → up to {count} real images · about {minutes} min', { count: atMost, minutes: realImageBatchMinutes(atMost) })
+        : images && images > 0
+          ? showTakes
+            ? translate(locale, 'Rough → {count} real images · about {minutes} min · No Takes used', { count: images, minutes: realImageBatchMinutes(images) })
+            : translate(locale, 'Rough → {count} real images · about {minutes} min', { count: images, minutes: realImageBatchMinutes(images) })
+          : translate(locale, 'The real images are already made')
   return {
     title: translate(locale, 'Move on to Director?'),
-    description: images > 0 ? translate(locale, 'We start by turning the {count} roughs into real images.', { count: images }) : null,
+    description: images && images > 0 ? translate(locale, 'We start by turning the {count} roughs into real images.', { count: images }) : null,
     rows: [
       {
         label: translate(locale, 'Moving over'),
@@ -166,18 +181,23 @@ export function directorConfirmView(summary: DirectorHandoffSummary, locale: App
           roughs: summary.movingShots,
         }),
       },
+      { label: translate(locale, 'Next'), value: nextRow },
       {
-        label: translate(locale, 'Next'),
-        value: images > 0
-          ? translate(locale, 'Rough → {count} real images · about {minutes} min · No Takes used', { count: images, minutes: realImageBatchMinutes(images) })
-          : translate(locale, 'The real images are already made'),
+        label: translate(locale, 'After that'),
+        value: extra.takesPerShot !== null
+          ? translate(locale, 'Check the images and make the videos · {takes} Takes per shot', { takes: extra.takesPerShot })
+          : translate(locale, 'Check the images and make the videos'),
       },
-      { label: translate(locale, 'After that'), value: translate(locale, 'Check the images and make the videos · {takes} Takes per shot', { takes: extra.takesPerShot }) },
     ],
     warning,
     canDrawRemaining: summary.missing.some((item) => item.drawable),
     makeImages: {
-      label: translate(locale, 'Make {count} images while moving over', { count: images }),
+      label:
+        extra.imagesToMake === 'counting'
+          ? translate(locale, 'Make images while moving over')
+          : atMost !== null
+            ? translate(locale, 'Make up to {count} images while moving over', { count: atMost })
+            : translate(locale, 'Make {count} images while moving over', { count: images ?? 0 }),
       description: translate(locale, 'You can look at other screens while you wait. We show the first ones as soon as they are ready and tell you when they are all done.'),
       disabled: images === 0,
     },
@@ -185,7 +205,7 @@ export function directorConfirmView(summary: DirectorHandoffSummary, locale: App
       label: translate(locale, 'Move over and pick yourself'),
       description: translate(locale, 'Choose the shots to make and make them one by one.'),
     },
-    defaultChoice: images > 0 ? 'makeImages' : 'pickYourself',
+    defaultChoice: images === 0 ? 'pickYourself' : 'makeImages',
   }
 }
 

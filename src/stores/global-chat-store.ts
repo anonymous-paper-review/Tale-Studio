@@ -41,6 +41,8 @@ import {
 } from '@/stores/director-store'
 import { isShotData, isVideoData } from '@/types/director'
 import { editorHandoverView } from '@/lib/director/editor-handover'
+import { latestShotTake } from '@/lib/director/remake-take'
+import { clearImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
 import { useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
 import {
   buildScriptLines,
@@ -1924,17 +1926,25 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
   remakeMissingVideo: async (shotNodeId) => {
     // 창 없이도 부른다 — Storyboard 카드(board 갈래)의 [다시 만들기](2026-11-14). 창이 열려 있으면 그대로 둔다.
-    const director = useDirectorCanvasStore.getState()
+    // 일괄이 도는 중이면 창이 단추를 끄고 까닭을 보인다(검토 b 낮음 1) — 여기서도 말없이 Take 를 만들지 않는다.
+    if (useDirectorCanvasStore.getState().realBatchBusy || useDirectorCanvasStore.getState().videoBatchBusy) return
     // 이미지가 없으면 영상이 이미지 없이(T2V) 만들어진다 — 그리드의 [영상 만들기]처럼 이미지부터 만든다(Director 배선 5).
     const hasImage = () => {
       const node = useDirectorCanvasStore.getState().nodes.find((n) => n.id === shotNodeId)
       return !!node && isShotData(node.data) && node.data.storyboardImage?.status === 'completed'
     }
     if (!hasImage()) {
-      await director.generateStoryboardImage(shotNodeId)
-      if (!hasImage()) return
+      // 화면이 낡았을 수 있다 — 저장된 그림을 먼저 다시 읽고, 그래도 없을 때만 새로 그린다(승인한 그림 보호, 그리드와 같다 · 낮음 2).
+      await useDirectorCanvasStore.getState().hydrateFreshFromDb().catch(() => {})
+      if (!hasImage()) {
+        await useDirectorCanvasStore.getState().generateStoryboardImage(shotNodeId)
+        if (!hasImage()) return
+      }
     }
-    await useDirectorCanvasStore.getState().generateVideoForShot(shotNodeId)
+    // 단추 값을 센 그 Take(latestShotTake)의 배선 · 모델 · 해상도를 물려받는 새 Take(검토 b 보통 2) — prose 의 remakeShotVideo 와
+    //   같은 식이다. 두 갈래를 합친 뒤에는 remakeShotVideo(shotNodeId) 하나로 부르면 된다.
+    const latest = latestShotTake(useDirectorCanvasStore.getState().nodes, shotNodeId)
+    await useDirectorCanvasStore.getState().generateVideoForShot(shotNodeId, latest ? { inheritFromVideoNodeId: latest.id } : undefined)
   },
 
   closeHandoffConfirm: () => set({ handoffConfirm: null }),
@@ -2394,6 +2404,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
     if (get().directorHandoff && isCancellationUtterance(trimmed)) {
       set({ directorHandoff: null, pendingNavigatePath: null })
+      // 넘김을 거두면 넘어가면서 이미지 만들기(D0)도 거둔다 — 남으면 10분 안 다른 길의 Director 진입에서 일괄이 시작된다(검토 b 낮음 6).
+      clearImagesOnDirectorEntry()
       get().appendLocalExchange(stage, trimmed, translate(contentLocale(), 'Cancelled the pending stage move. Your saved work is unchanged.'))
       return
     }

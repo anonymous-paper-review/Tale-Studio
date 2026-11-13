@@ -11,8 +11,8 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
 import { boardNodeNames } from '@/features/director/node-label'
-import { editorHandoverView, type EditorHandoverShot } from '@/lib/director/editor-handover'
-import { videoBatchTakeCosts } from '@/lib/director/video-batch-plan'
+import { editorHandoverView, proceedButtonLabel, remakeButton, type EditorHandoverShot } from '@/lib/director/editor-handover'
+import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
@@ -27,6 +27,9 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
   const proceed = useGlobalChatStore((s) => s.proceedToEditorWithVideos)
   const remake = useGlobalChatStore((s) => s.remakeMissingVideo)
   const close = useGlobalChatStore((s) => s.closeHandoffConfirm)
+  // 일괄이 도는 중이면 줄 단추를 끄고 까닭을 적는다(검토 b 낮음 1). Take 값은 노드와 같은 숨김 규칙(과금이 꺼져 있으면 숨김, 낮음 5).
+  const batch = useDirectorCanvasStore((s) => (s.realBatchBusy ? 'images' : s.videoBatchBusy ? 'videos' : null))
+  const showTakes = useTakeBalance().mode !== 'off'
   const [starting, setStarting] = useState<string | null>(null)
   if (!open) return null
   const view = editorHandoverView(nodes, boardNodeNames(manifest, writerShots ?? []))
@@ -46,10 +49,6 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
     close()
     useDirectorCanvasStore.getState().openPopup(row.shotNodeId)
   }
-  const missingLabel =
-    view.missing.length === 1
-      ? t('Hand over without {label} · {cuts} cuts · {seconds}s', { label: view.missing[0].label, cuts: view.cuts, seconds: view.seconds })
-      : t('Hand over without {count} shots · {cuts} cuts · {seconds}s', { count: view.missing.length, cuts: view.cuts, seconds: view.seconds })
 
   return (
     <Dialog open={open} onOpenChange={(next) => (next ? null : close())}>
@@ -63,7 +62,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
 
         <ul className="min-h-0 space-y-2 overflow-y-auto pr-1">
           {view.shots.map((row) => {
-            const takes = videoBatchTakeCosts(nodes, [row.shotNodeId])[0]
+            const button = row.missing ? remakeButton(nodes, row, { showTakes, batch }, t) : null
             const busy = starting === row.shotNodeId || row.missing === 'generating'
             return (
               <li
@@ -97,10 +96,10 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
                     </span>
                   )}
                 </span>
-                {row.missing ? (
-                  <Button size="sm" variant="outline" className="shrink-0" disabled={busy} onClick={() => void remakeRow(row)} data-testid="editor-handover-remake">
-                    {busy ? <Loader2 className="size-3.5 animate-spin" /> : null}
-                    {row.missing === 'not_made' ? t('Make video · {takes} Takes', { takes }) : t('Make again · {takes} Takes', { takes })}
+                {button ? (
+                  <Button size="sm" variant="outline" className="shrink-0" disabled={busy || button.disabled} onClick={() => void remakeRow(row)} data-testid="editor-handover-remake">
+                    {busy || batch ? <Loader2 className="size-3.5 animate-spin" /> : null}
+                    {button.label}
                   </Button>
                 ) : (
                   <Button size="sm" variant="ghost" className="shrink-0" onClick={() => openDetail(row)}>
@@ -118,7 +117,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
             {t('Go back')}
           </Button>
           <Button onClick={() => void proceed()} disabled={view.cuts === 0} data-testid="editor-handover-proceed">
-            {missingLabel}
+            {proceedButtonLabel(view, t)}
             <ArrowRight className="size-4" />
           </Button>
         </DialogFooter>

@@ -54,6 +54,27 @@ describe('Director 넘기기 창 — 넘어가면서 이미지 만들기', () =>
     expect(view.defaultChoice).toBe('pickYourself')
   })
 
+  // 왜(검토 b 낮음 5): Take 과금이 꺼진 때는 노드의 Take 값도 숨긴다(#payments-phase-2) — 넘기기 창도 같은 규칙. 꺼진 때 보이라는 오너 답은 없다.
+  it('Take 과금이 꺼져 있으면 Director 넘기기 창에 Take 값을 보이지 않는다', () => {
+    const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, takesPerShot: null })
+    expect(view.rows.slice(1)).toEqual([
+      { label: '다음', value: '러프 → 실사 이미지 3장 · 약 2분' },
+      { label: '그다음', value: '이미지를 확인하고 영상을 만들어요' },
+    ])
+  })
+
+  // 왜(검토 b 낮음 7): 저장된 실사를 다 읽기 전이나 읽기에 실패했을 때 샷 전부를 만들 수로 보였다 — 모르는 것은 모른다고, 아는 만큼만 보인다.
+  it('Director 넘기기 창은 저장된 실사 그림을 다 읽기 전엔 만들 그림 수를 "세는 중"으로, 읽기에 실패하면 "최대 N장"으로 보인다', () => {
+    const counting = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, imagesToMake: 'counting' })
+    expect(counting.rows[1].value).toBe('러프 → 실사 이미지 · 세는 중')
+    expect(counting.makeImages).toMatchObject({ label: '넘어가면서 이미지 만들기', disabled: false })
+    expect(counting.description).toBeNull()
+    const unknown = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, imagesToMake: { atMost: 3 } })
+    expect(unknown.rows[1].value).toBe('러프 → 실사 이미지 최대 3장 · 약 2분 · Takes 안 써요')
+    expect(unknown.makeImages.label).toBe('넘어가면서 이미지 최대 3장 만들기')
+    expect(unknown.defaultChoice).toBe('makeImages')
+  })
+
   // 왜(혼자 정한 것): 예상은 실제 걸린 시간에서 — 일괄은 4샷 시트를 두 장씩 함께 그리고 시트 하나가 약 92초다(개발 DB p50). Director 툴바 예상과 같은 셈.
   it('실사 이미지 일괄 예상은 8샷마다 약 1.5분으로 셈해 분으로 올린다', () => {
     expect([0, 1, 6, 8, 10, 24].map(realImageBatchMinutes)).toEqual([0, 2, 2, 2, 4, 5])
@@ -96,6 +117,22 @@ describe('넘어간 뒤 Director 에서 일괄 이미지 시작', () => {
     expect(takeImagesOnDirectorEntry('proj-1')).toBe(false)
     requestImagesOnDirectorEntry('proj-1', 0)
     expect(takeImagesOnDirectorEntry('proj-1', 10 * 60_000 + 1)).toBe(false)
+  })
+
+  // 왜(검토 b 낮음 6): 넘어가는 중에 채팅으로 "취소"하면 넘김은 거둬지는데 고른 이미지 만들기 표시가 남아, 10분 안에 다른 길로 Director 에
+  //   들어가면 일괄이 시작됐다 — 취소는 넘김과 함께 그 표시도 거둔다.
+  it('Director 로 넘어가는 중에 채팅으로 취소하면 "넘어가면서 이미지 만들기"도 거둔다', async () => {
+    await handOverToDirector({ makeImages: true })
+    await useGlobalChatStore.getState().sendMessage('취소')
+    expect(useGlobalChatStore.getState().pendingNavigatePath).toBeNull()
+    expect(takeImagesOnDirectorEntry('proj-1')).toBe(false)
+  })
+
+  // 왜(검토 b 낮음 6, 정상 경로 고정): Director 를 여는 데 실패한 것은 사람이 마음을 바꾼 것이 아니다 — 고른 대로 다음 진입에서 시작한다(리드 판단).
+  it('Director 를 여는 데 실패해도 고른 "넘어가면서 이미지 만들기"는 남는다', async () => {
+    await handOverToDirector({ makeImages: true })
+    useGlobalChatStore.getState().failDirectorHandoff()
+    expect(takeImagesOnDirectorEntry('proj-1')).toBe(true)
   })
 
   // 왜: 시작은 Director 화면이 준비된 뒤 그 화면이 한다 — 진입 자동 채움(8/27 에 지운 것)과 다른 길이라는 것을 코드에 둔다.
