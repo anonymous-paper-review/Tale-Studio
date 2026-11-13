@@ -77,20 +77,57 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(lastModel()).toBe('Started making videos for Shots 1 · 2 · 10 Takes. Progress shows on the line above the cards.')
   })
 
-  // 왜: 확인 카드가 없으니 말을 잘못 읽어 엉뚱한 샷에 Take 를 쓰면 되돌릴 수 없다 — 영상은 사용자가 분명히 말한 샷에서만 만든다(혼자 정한 것 A · 검토 b 보통 2).
-  it('Take 를 쓰는 부탁은 대상 샷이 사용자 말에 분명할 때만 바로 하고, 모델이 그 밖의 샷을 담으면 만들지 않고 "어느 샷인지 번호로 말해 주세요"라고 묻는다', async () => {
+  // 왜: 확인 카드가 없으니 말을 잘못 읽어 엉뚱한 샷에 Take 를 쓰면 되돌릴 수 없다 — 아주 분명한 꼴만 바로 하고 그 밖은 목록으로 되묻는다(혼자 정한 것 A · 재검토 b 보통 A).
+  it('Take 를 쓰는 부탁은 아주 분명한 두 꼴(샷 번호만 · 생성 말과 붙은 묶음 말만)일 때만 바로 하고, 모델이 더 담은 샷은 더하지 않는다', async () => {
     reply([{ type: 'generateVideos', shotIds: ['s1', 's2'] }])
     await chat.getState().sendMessage('Make a video for shot 1')
-    expect(mocks.run).not.toHaveBeenCalled()
-    expect(lastModel()).toBe('Which shots should get videos? Tell me the shot numbers. Videos use Takes, so I only make the shots you name.')
-    // 샷 하나를 말했는데 모델이 "남은 샷 전부"로 읽어도 만들지 않는다.
+    expect(runShots()).toEqual(['s1'])
+    mocks.run.mockClear()
     reply([{ type: 'generateVideos' }])
     await chat.getState().sendMessage('Make a video for shot 2')
+    expect(runShots()).toEqual(['s2'])
+  })
+
+  // 왜: 재검토 b 보통 A — 빼기 · 부정 · 범위 말이 끼면 읽기 규칙을 늘려도 틀린다. 만들지 않고 화면이 센 목록으로 묻고, "응"일 때만 그 목록 그대로.
+  it('"샷 2 빼고 영상 다 만들어줘"는 바로 만들지 않고 샷 2 를 뺀 목록으로 되묻고, "응"이라고 하면 그 목록 그대로 만든다', async () => {
+    reply([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('Shall I make 3 videos for Shots 1 · 3 · 4 (15 Takes)? Say yes to start.')
+    expect(translate('ko', 'Shall I make {count} videos for {shots} ({takes} Takes)? Say yes to start.', { count: 3, shots: '샷 1·3·4', takes: 15 }))
+      .toBe('샷 1·3·4 영상 3개(Take 15)를 만들까요? "응"이라고 하면 시작해요.')
+    await chat.getState().sendMessage('응')
+    expect(runShots()).toEqual(['s1', 's3', 's4'])
+    expect(lastModel()).toBe('Started making videos for Shots 1 · 3 · 4 · 15 Takes. Progress shows on the line above the cards.')
+  })
+
+  // 왜: 되묻기는 "응"일 때만 만든다 — 아니라고 하거나 다른 말을 하거나 다른 단계에서 답하면 그 목록은 버린다.
+  it('되물은 영상 목록은 같은 단계에서 "응 · 좋아 · yes"라고 할 때만 만들고, 아니라고 하거나 다른 말 · 다른 단계면 만들지 않는다', async () => {
+    reply([{ type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('영상 하나만 만들어줘')
+    await chat.getState().sendMessage('아니')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('I did not make any videos.')
+
+    reply([{ type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('영상 하나만 만들어줘')
+    reply([])
+    await chat.getState().sendMessage('Make shot 1 warmer')
+    await chat.getState().sendMessage('yes')
+    expect(mocks.run).not.toHaveBeenCalled()
+
+    reply([{ type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('영상 하나만 만들어줘')
+    project.setState({ currentStage: 'editor' })
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ reply: 'advice' })))
+    await chat.getState().sendMessage('좋아')
+    project.setState({ currentStage: 'director' })
+    await chat.getState().sendMessage('좋아')
     expect(mocks.run).not.toHaveBeenCalled()
   })
 
-  // 왜: 묶음 말(남은 전부 · 실패한 · 이미지 나온 · 고른)은 그 묶음 안의 샷만 만든다 — 시안 D5 칩 "이미지 나온 샷 영상 만들어 줘" · "실패한 샷 다시 만들어 줘".
-  it('묶음으로 말하면(남은 전부 · 실패한 · 이미지 나온 · 고른) 그 묶음 안의 샷 영상만 만든다', async () => {
+  // 왜: 묶음 말(남은 전부 · 실패한 · 이미지 나온 · 고른)만 있으면 그 묶음 안의 샷만 바로 만든다 — 모델이 묶음 밖을 더 담아도 더하지 않는다.
+  it('묶음 말(남은 전부 · 실패한 · 이미지 나온 · 고른)만 있으면 그 묶음 안의 샷 영상만 바로 만들고, 모델이 더 담은 샷은 더하지 않는다', async () => {
     reply([{ type: 'generateVideos', shotIds: ['s1', 's2', 's4'] }])
     await chat.getState().sendMessage('Make videos for the shots whose images are ready')
     expect(runShots()).toEqual(['s1', 's2', 's4'])
@@ -98,7 +135,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     mocks.run.mockClear()
     reply([{ type: 'generateVideos', shotIds: ['s4', 's3'] }])
     await chat.getState().sendMessage('Remake the failed shot videos')
-    expect(mocks.run).not.toHaveBeenCalled()
+    expect(runShots()).toEqual(['s4'])
 
     mocks.run.mockClear()
     reply([{ type: 'generateVideos', shotIds: ['s4'] }])
@@ -265,6 +302,25 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     reply([{ type: 'generateVideos', shotIds: ['s1'] }])
     await chat.getState().sendMessage('Make the video for shot 1')
     expect(lastModel()).toBe("I couldn't start the videos. Please ask again in a moment.")
+  })
+
+  // 왜: 재검토 b 보통 B — 글 카드가 기다리는 중에 다음 말로 그 샷 영상을 부탁하면 옛 글로 바로 시작됐다. 그 카드의 [적용]에 더해 묶는다.
+  it('글 카드가 기다리는 샷의 영상을 다음 말로 부탁하면 옛 글로 바로 만들지 않고 그 카드의 [적용]에 묶는다', async () => {
+    let promptAtRun: string | null = null
+    mocks.run.mockImplementation(async (projectId: string, opts?: { shotIds?: readonly string[] }) => {
+      promptAtRun = promptOf('s1')
+      return startsBatch(projectId, opts)
+    })
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }])
+    await chat.getState().sendMessage('Make shot 1 warm')
+    reply([{ type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('Make the video for shot 1')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('Applying the text card makes the video for Shot 1 with the new text.')
+    expect(chat.getState().pendingProposal?.impact).toContain('Applying also makes the video for Shot 1 right away · 5 Takes.')
+    await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
+    expect(runShots()).toEqual(['s1'])
+    expect(promptAtRun).toBe('Warm')
   })
 
   // 왜: 서버 지시문도 같은 약속을 말해야 모델이 "확인 카드가 뜰 거예요"라고 하지 않는다.

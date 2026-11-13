@@ -16,6 +16,7 @@ import { useWriterStore as writer } from '@/stores/writer-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { DIRECTOR_QUICK_CHIPS, STAGE_PLACEHOLDER } from '@/lib/constants'
 import { translate } from '@/lib/i18n/translate'
+import { createPendingProposal } from '@/lib/pending-proposal'
 
 const originalGenerate = director.getState().generateStoryboardImage
 const IMG = (id: string, status = 'completed') => ({ status, url: status === 'completed' ? `https://media.test/${id}.png` : null, jobId: null })
@@ -130,6 +131,21 @@ describe('Director 빠른 칩(시안 D5)', () => {
     expect(mocks.real).not.toHaveBeenCalled()
     expect(mocks.run).not.toHaveBeenCalled()
     expect(lastModel()).toBe('There are no such shots right now.')
+  })
+
+  // 왜: 재검토 b 보통 B — 글 카드가 기다리는 샷을 칩으로 만들면 옛 글로 만들어진다. 칩도 그 샷은 카드 [적용]에 묶는다.
+  it('글 카드가 기다리는 샷은 빠른 칩도 바로 만들지 않고 그 카드의 [적용]에 묶는다', async () => {
+    chat.setState({
+      pendingProposal: createPendingProposal({
+        traceId: 't-card', stage: 'director', kind: 'directorTextEdit', target: 'Text changes', action: 'Apply the text Lumi suggested',
+        impact: ['Shot 2 prompt · before: base s2', 'Shot 2 prompt · after: Warm'],
+        payload: { projectId: 'p-dir', edits: [{ nodeId: 's2', kind: 'shot', field: 'prompt', before: 'base s2', after: 'Warm' }] },
+      }),
+    })
+    await chat.getState().sendMessage(chip(1))
+    expect(mocks.run).toHaveBeenCalledWith('p-dir', expect.objectContaining({ shotIds: ['s5'] }))
+    expect(chat.getState().messages.map((m) => m.content)).toContain('Applying the text card makes the video for Shot 2 with the new text.')
+    expect(chat.getState().pendingProposal?.impact).toContain('Applying also makes the video for Shot 2 right away · 5 Takes.')
   })
 
   // 왜(혼자 정한 것 C): "지금 어디까지 됐어?"는 생성 없이 수로 답한다 — 실패한 샷은 번호까지.

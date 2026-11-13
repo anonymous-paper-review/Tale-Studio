@@ -115,6 +115,7 @@ Destructive — opens confirmation modal (NOT immediate):
 - Put in "shotIds" exactly the shots the user named: by board name ("Shot 3"), the shot they selected, the failed shots, or the shots whose images are ready. Leave "shotIds" out only when the user asked for every remaining shot ("영상 다 만들어줘", "make all the videos").
 - To remake failed shots, emit generateImage for each shot whose image failed and generateVideos with the shots whose video failed.
 - Never state Take numbers yourself: the app checks the real balance, then adds how many videos started and how many Takes they use, or why it could not start.
+- The app starts videos at once only for plain requests (shot numbers only, or one group such as "all" or "the failed shots"). If the user leaves shots out, says not now, names a scene, or asks for a number of videos, still emit generateVideos with the shots you think they mean: the app shows that list and starts only when the user says yes. So never say the videos have started.
 - Do not emit addVideoTake to start a video; it only adds an empty take.
 - Keep your reply short and never say a video is finished.
 </video_request_rule>
