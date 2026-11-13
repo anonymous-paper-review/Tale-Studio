@@ -8,18 +8,23 @@
 //   사용자는 고른 모델 값을 내고 영상을 받는다(오너 확인 2026-10-12). 마지막 모델까지 실패해야
 //   markDirectorVideoAttemptFailed 로 실패 처리하고 그때 이용권을 돌려준다.
 //
+// 화면에서 멈춘 작업(오너 2026-11-14 7번)은 다음 모델로 넘기지 않는다 — 생성처가 거절하면 그대로 실패로 끝내
+//   실패 규칙대로 이용권을 돌려준다(리드 확인 3). 멈춘 뒤 Seedance 가 거절하자 미니맥스로 다시 나가 완성됐다(영어 재점검 11/14).
+//
 // 해상도(오너 2026-10-31): 다음 모델도 처음 고른 해상도(작업 기록의 resolution)를 낼 수 있으면 그 값으로 만든다 —
 //   해피홀스는 1080p 를 낸다. 미니맥스는 늘 768P 다. 1080p 로 잡은 Take 도 위 규칙대로 그대로 둔다.
 //
 // 차지(claim): 실패한 요청 id 를 들고 있는 queued 작업만 'reserved:' 로 바꿔 차지한다. 웹훅과 폴링이
 //   같은 실패를 동시에 보더라도 한 쪽만 다음 모델을 보낸다. 'reserved:' 상태는 폴링·청소가 손대지 않는
 //   "제출 중" 표시이고, 제출이 끝나면 attach 가 새 요청 id 로 바꾼다(첫 제출과 같은 순서).
+//   멈춤으로 끝낼 때도 같은 차지를 거친다 — 진 쪽은 실패로 덮지 않고 지금 작업을 돌려준다(검토 a · 리드 11/14).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import {
   attachProviderRequestToReservedVideoJob,
   markDirectorVideoAttemptFailed,
 } from '@/lib/director-video-takes'
 import { getGenerationJobById, type GenerationJob } from '@/lib/generation-jobs'
+import { isJobCancelled } from '@/lib/director/job-cancellations'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import type { ModerationReceipt } from '@/lib/moderation/creem'
 import {
@@ -184,7 +189,7 @@ function describeSubmitError(error: unknown): string {
 }
 
 /**
- * 생성처가 실패를 알린 연결된 영상 작업을 다음 모델로 넘긴다. 넘길 모델이 없거나 넘길 수 없는 작업이면
+ * 생성처가 실패를 알린 연결된 영상 작업을 다음 모델로 넘긴다. 넘길 모델이 없거나 넘길 수 없는 작업 · 화면에서 멈춘 작업이면
  * 실패로 끝낸다(이용권 반환 포함). 돌려주는 값은 처리 뒤의 작업 상태다.
  */
 export async function failDirectorVideoAttemptOrFallback(job: GenerationJob, evidence: string): Promise<GenerationJob> {
@@ -193,10 +198,23 @@ export async function failDirectorVideoAttemptOrFallback(job: GenerationJob, evi
   if (plan) {
     let steps = plan.steps
     let expectedRequestId = job.request_id
+    // 행에 지금 적힌 작업 기록 — 멈춤으로 끝내려고 차지할 때는 기록을 바꾸지 않는다.
+    let storedSnapshot: Record<string, unknown> = plan.snapshot
     for (;;) {
       const triedModels = [...(plan.primaryModel ? [plan.primaryModel] : []), ...steps.map((step) => step.model)]
       const next = nextVideoFallbackModel(triedModels, plan.imageUrls.length > 0)
       if (!next) break
+      // 넘어가기 직전마다(첫 넘김 포함) 멈춤을 본다 — 앞 대체 모델이 바로 거절된 사이에도 멈출 수 있다.
+      //   넘길 모델이 없으면 어차피 실패라 읽지 않는다. 멈춤 표를 읽지 못하면 멈추지 않은 것으로 본다(지금 동작).
+      if (await isJobCancelled(job.id)) {
+        // 멈춤으로 끝낼 때도 대체를 내는 쪽과 같은 차지를 거친다(검토 a · 리드 11/14) — 웹훅과 폴링이 같은 실패를 함께 보는 사이
+        //   멈춤이 적히면 멈춤을 못 본 쪽이 먼저 차지해 다음 모델을 보낼 수 있다. 그 작업을 실패로 덮지 않는다.
+        if (!await claimForFallback(job, expectedRequestId, storedSnapshot, reason)) {
+          return (await getGenerationJobById(job.id)) ?? job
+        }
+        console.warn('[director/video-fallback] stopped job is not moved to the next model:', job.id)
+        break
+      }
       const request = buildFallbackRequest(next, plan)
       steps = [...steps, { model: next, endpoint: request.model, reason, started_at: new Date().toISOString() }]
       const snapshot = { ...plan.snapshot, video_fallback: { steps } }
@@ -205,6 +223,7 @@ export async function failDirectorVideoAttemptOrFallback(job: GenerationJob, evi
         return (await getGenerationJobById(job.id)) ?? job
       }
       expectedRequestId = `reserved:${job.id}`
+      storedSnapshot = snapshot
       let submission: Awaited<ReturnType<typeof submitFalReferenceToVideo>>
       try {
         submission = await submitFalReferenceToVideo(request, resolveWebhookUrl(), job.fal_key_id, plan.moderation)

@@ -56,6 +56,8 @@ import { LumiAvatar } from '@/components/lumi/lumi'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { describeVideoBatchPlan, planVideoBatch, videoBatchTakeCosts } from '@/lib/director/video-batch-plan'
 import { refetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
+import { takeValuesShown } from '@/lib/billing/take-cost'
+import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
 import { AltArrowHint } from '@/components/alt-arrow-hint'
@@ -85,7 +87,9 @@ import { isVideoData } from '@/types/director'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
-import { useGenerationBatches } from '@/lib/generation-queue'
+import { useActiveGenerationJobs, useGenerationBatches } from '@/lib/generation-queue'
+import { stoppableJobs, stopNotice, videoBatchLive } from '@/lib/director/stop-work'
+import { freshActiveJobs } from '@/lib/director/stop-all-client'
 import { withStoryboardBacklog } from '@/lib/generation-batches'
 import { getDirectorGaps, ledgerGapLabels, summarizeGaps } from '@/lib/completeness'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -376,6 +380,7 @@ function CanvasInner() {
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
   const togglePickedShot = useDirectorCanvasStore((s) => s.togglePickedShot)
   const selectEdge = useDirectorCanvasStore((s) => s.selectEdge)
+  const closeShotDetail = useDirectorCanvasStore((s) => s.closeShotDetail)
   const persistNodePosition = useDirectorCanvasStore(
     (s) => s.persistNodePosition,
   )
@@ -783,6 +788,8 @@ function CanvasInner() {
         onPaneClick={() => {
           selectNode(null)
           selectEdge(null)
+          // ⤢ 로 연 샷 상세(openShotDetail)도 닫는다 — 예전 ⤢(고르기)처럼 빈 캔버스를 누르면 닫힌다(검토 c 낮음).
+          closeShotDetail()
           setContextMenu(null)
         }}
         // 우클릭(#context-menu): 노드=편집/복사/삭제 메뉴, 빈 캔버스=노드 생성 메뉴.
@@ -958,13 +965,24 @@ function PaletteBar() {
   const stateList = [...shotStates.values()]
   const makingImages = stateList.filter((s) => s === 'image_generating').length
   const makingVideos = stateList.filter((s) => s === 'video_generating').length
-  const making = makingImages + makingVideos > 0 || realBatchBusy || videoBatchBusy
+  // 멈춘 일괄은 도는 것으로 세지 않는다(오너 7번 — 멈추면 바로 다시 만들 수 있다). 멈춘 영상 묶음은 화면에서 멈추지 않은 영상이 남았을 때만 돈다.
+  const activeJobs = useActiveGenerationJobs(projectId ?? null)
+  const videoQueueJobKey = useDirectorCanvasStore((s) => (s.videoBatchQueue?.jobIds ?? []).join('|'))
+  const imageBatchLive = realBatchBusy && !realBatchCancelled
+  const videoLive = videoBatchLive(
+    { busy: videoBatchBusy, cancelled: videoBatchCancelled, jobIds: videoQueueJobKey ? videoQueueJobKey.split('|') : [] },
+    activeJobs,
+  )
+  const making = makingImages + makingVideos > 0 || imageBatchLive || videoLive
   // [다음: Editor로] · 사이드바 Editor · 채팅 넘김은 같은 조건 — 완성 영상이 하나라도 있으면 켜진다(시안 R, 결정 페이지 추천, 리드 검토 a 낮음 7).
   const canHandOff = directorHasFinishedVideo(nodes)
   // 꺼진 단추와 까닭(결정 페이지 "꺼진 단추 아래 이유 한 줄", 리드 검토 a 보통 1 · 낮음 4) — 일괄이 도는 동안은 눌러도 새 판이 서지 않으니 끈다.
   const imageBlock = imageWorkBlock(workStates, picked, realBatchBusy, statusFilter !== 'all')
-  const videoBlock = videoWorkBlock(workStates, picked, videoBatchBusy, statusFilter !== 'all')
-  const blockLine = workBlockLine(imageBlock, videoBlock, t)
+  const videoBlock = videoWorkBlock(workStates, picked, videoLive, statusFilter !== 'all')
+  // Take 잔액(오너 답 11) — 못 읽었으면 Take 를 쓰는 단추가 시작하지 않고 단추 아래 까닭을 보인다(리드 11/14, D8 과 같은 말).
+  const takeState = useTakeBalance()
+  const [takesUnknown, setTakesUnknown] = useState(false)
+  const blockLine = takesUnknown && takeState.failed ? t(TAKES_UNKNOWN_TEXT) : workBlockLine(imageBlock, videoBlock, t)
   // 넘기기 크림은 보드 전체에 만들 것이 없을 때만 — 상태 고르기 · 고른 샷으로 좁혀 보일 때 크림이 넘기기로 튀지 않게.
   const boardWorkLeft = imageWorkShotIds(shotStates, null).length + videoWorkShotIds(shotStates, null).length
   const primary = primaryWorkAction({
@@ -975,7 +993,6 @@ function PaletteBar() {
   })
   // 약속 E1·E2(2026-09-04): 확인창에 만들 영상 수·필요한 Take·가진 Take — 채팅 승인 카드와 같은 계산(video-batch-plan).
   //   오너 답 11: Take 는 지금 계산 그대로(모델 · 해상도마다, 1080p 두 배) 예상 칸 · 확인창에.
-  const takeState = useTakeBalance()
   const videoPlan = planVideoBatch(videoBatchTakeCosts(nodes, videoWork), takeState.balance, takeState.mode)
   const modelOf = (id: string) => videoBatchShotSettings(nodes, id)?.model ?? DEFAULT_VIDEO_MODEL
   const videoModels = videoWork.map(modelOf)
@@ -990,7 +1007,8 @@ function PaletteBar() {
     images: primary === 'image' ? imageWork.length : primary !== 'video' && imageMode.mode === 'remake' ? imageMode.shotIds.length : 0,
     videoModels: primary === 'video' ? videoModels : primary === 'image' && chainOn ? imageWork.map(modelOf) : [],
     videoTakes: primary === 'image' && chainOn ? chainPlan.requiredTakes : videoPlan.requiredTakes,
-    takesShown: takeState.mode !== 'off',
+    // 잔액을 못 읽었으면 값을 보이고, 과금이 정말 꺼졌을 때만 숨긴다(entry takeValuesShown, 리드 11/14).
+    takesShown: takeValuesShown(takeState),
     making,
     chain: primary === 'image' && chainOn,
   }, t)
@@ -1006,14 +1024,18 @@ function PaletteBar() {
     return node && isShotData(node.data) ? node.data.writerShotId : null
   }
   // [이미지 만들기 · N]: 빈 샷은 일괄(빈칸만), 실패한 샷 · 손으로 더한 샷은 한 장씩 다시. Take 는 쓰지 않아 확인 없이 바로(Takes 0).
-  const runImages = () => {
+  const runImages = async () => {
     if (imageMode.mode === 'remake') {
       setConfirmRemake(true)
       return
     }
-    // 영상까지 이어서면 Take 를 쓰니 영상 확인 창부터(약속 E).
+    // 영상까지 이어서면 Take 를 쓰니 잔액을 다시 읽고 영상 확인 창부터(약속 E) — 못 읽으면 시작하지 않는다(리드 11/14).
     if (chainOn) {
-      refetchTakeBalance()
+      if (!(await takesReadable())) {
+        setTakesUnknown(true)
+        return
+      }
+      setTakesUnknown(false)
       setConfirmChain(true)
       return
     }
@@ -1047,14 +1069,22 @@ function PaletteBar() {
     if (batch.length > 0) void runRealBatch(pid, { force: true, shotIds: batch })
   }
   // [영상 만들기 · N]: Take 를 쓰니 지금처럼 확인창을 거친다(약속 E).
-  const runVideos = () => {
+  //   누를 때 잔액을 다시 읽고, 그래도 못 읽으면 확인 창을 열지 않는다 — 못 읽은 채 열면 Take 줄 없이 전부 시작했다(리드 11/14).
+  const runVideos = async () => {
     if (videoWork.length === 0) return
+    if (!(await takesReadable())) {
+      setTakesUnknown(true)
+      return
+    }
+    setTakesUnknown(false)
+    // 약속 E1 · E2(출시 시험 video-batch-takes): 확인 창을 열기 직전에 잔액을 다시 읽는다 — 확인 창 숫자가 늘 새 값이게.
     refetchTakeBalance()
     setConfirmVideoBatch(true)
   }
-  // [모두 멈추기](시안 D3 · D4, 오너 답 7) — 아직 보내지 않은 것만 멈춘다: 이미지 일괄은 다음 장을 보내지 않고,
-  //   영상 묶음은 지금 만들고 있는 영상까지만 마친다(#batch-resume 2026-09-09 오너 결정 ①).
-  const stopping = (!realBatchBusy || realBatchCancelled) && (!videoBatchBusy || videoBatchCancelled)
+  // [모두 멈추기](시안 D3 · D4, 오너 답 7) — 아직 보내지 않은 것은 보내지 않고(이미지 일괄은 다음 장 · 영상 묶음은 다음 영상),
+  //   이미 만들고 있는 이미지 · 영상은 화면에서 멈춘다(fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다 · 뒤늦게 끝나면 기록에만).
+  const [stopRequested, setStopRequested] = useState(false)
+  const stopping = stopRequested
   const stopAll = async () => {
     const run = useDirectorCanvasStore.getState()
     // 걸어 둔 다시 돌기(러프 · 시트를 기다린 샷)도 거둔다 — 멈춘 뒤 저절로 다시 돌지 않게(리드 검토 a 보통 5).
@@ -1062,20 +1092,22 @@ function PaletteBar() {
     // 이어 보내기 기다림도 비운다 — 이미 보낸 이미지가 끝나도 영상은 시작하지 않는다(오너 답 7, 리드 검토 a 보통 6).
     run.setChainWaitingShots([])
     if (realBatchBusy && !realBatchCancelled) run.cancelRealBatch()
-    if (!videoBatchBusy || videoBatchCancelled) {
-      if (realBatchBusy) toast.info(t('Stop after the images being made now finish.'))
-      return
-    }
-    const stillCurrent = () => {
-      const current = useDirectorCanvasStore.getState()
-      return current.projectId === run.projectId && current.videoBatchRunId === run.videoBatchRunId
-    }
+    const stillCurrent = () => useDirectorCanvasStore.getState().projectId === run.projectId
+    setStopRequested(true)
     try {
-      await run.cancelVideoBatch()
-      if (stillCurrent()) toast.info(t('Stop after current videos finish.'))
+      // 묶음을 먼저 멈춰 서버가 새 영상을 더 내지 않게 한 뒤, 지금 만드는 것을 멈춘다(그사이 낸 영상은 묶음 조회가 멈춘다).
+      if (videoBatchBusy && !videoBatchCancelled) await run.cancelVideoBatch()
+      // 누를 때 작업 목록을 한 번 새로 읽는다 — 다른 탭 · 기기가 마지막 조회 뒤에 낸 낱개 작업도 멈추게(리드 검토 a 낮음).
+      const asked = stoppableJobs(await freshActiveJobs(run.projectId))
+      const stopped = new Set(asked.length > 0 ? await run.cancelRunningJobs(asked.map((job) => job.id)) : [])
+      const stoppedJobs = asked.filter((job) => stopped.has(job.id))
+      const videos = stoppedJobs.filter((job) => job.kind === 'shot_video').length
+      if (stillCurrent()) toast.info(t(stopNotice({ images: stoppedJobs.length - videos, videos })))
     } catch (error) {
-      console.error('[video-batches] cancel failed:', error)
-      if (stillCurrent()) toast.error(t('Please try again in a moment.'))
+      console.error('[director] stop all failed:', error)
+      if (stillCurrent()) toast.error(t('Could not stop it. Try again.'))
+    } finally {
+      setStopRequested(false)
     }
   }
   // 이어 보내기 지켜보기(오너 답 6 — 이 화면이 한다): 이미지가 끝난 샷은 영상을 시작하고, 그림이 없게 된 샷은 기다림에서 뺀다.
@@ -1107,7 +1139,7 @@ function PaletteBar() {
   const progressLabel =
     makingImages > 0 && makingVideos > 0
       ? makingLabel(makingImages, makingVideos, t)
-      : makingVideos > 0 || videoBatchBusy
+      : makingVideos > 0 || videoLive
         ? makingVideos > 1 ? t('Making {count} videos', { count: makingVideos }) : t('Making 1 video')
         : makingImages > 1 ? t('Making {count} images', { count: makingImages }) : t('Making 1 image')
 
@@ -1279,17 +1311,16 @@ function PaletteBar() {
                   )}
                 </span>
               )}
-              {(realBatchBusy || videoBatchBusy) && (
-                <button
-                  type="button"
-                  onClick={() => void stopAll()}
-                  disabled={stopping}
-                  className={cn(TOOLBAR_PILL, 'h-8 px-3 disabled:cursor-not-allowed disabled:opacity-60')}
-                >
-                  {stopping ? <Loader2 className="size-3.5 animate-spin" /> : <Square className="size-3 fill-current" />}
-                  <span>{stopping ? t('Stopping') : t('Stop all')}</span>
-                </button>
-              )}
+              {/* 만드는 것이 무엇이든(일괄 · 카드 · 상세 · 채팅) 여기서 모두 멈춘다(오너 7번). */}
+              <button
+                type="button"
+                onClick={() => void stopAll()}
+                disabled={stopping}
+                className={cn(TOOLBAR_PILL, 'h-8 px-3 disabled:cursor-not-allowed disabled:opacity-60')}
+              >
+                {stopping ? <Loader2 className="size-3.5 animate-spin" /> : <Square className="size-3 fill-current" />}
+                <span>{stopping ? t('Stopping') : t('Stop all')}</span>
+              </button>
             </div>
           )}
         </div>
@@ -1327,7 +1358,7 @@ function PaletteBar() {
           {/* 단추 셋은 늘 같은 자리(시안 R) — 만들 게 없거나 일괄이 도는 중이면 꺼지고, 까닭은 단추 아래 한 줄로 보인다. */}
           <button
             type="button"
-            onClick={runImages}
+            onClick={() => void runImages()}
             disabled={imageBlock !== null}
             aria-describedby={imageBlock !== null ? 'director-work-block' : undefined}
             className={workButtonClass(primary === 'image')}
@@ -1339,7 +1370,7 @@ function PaletteBar() {
           </button>
           <button
             type="button"
-            onClick={runVideos}
+            onClick={() => void runVideos()}
             disabled={videoBlock !== null}
             aria-describedby={videoBlock !== null ? 'director-work-block' : undefined}
             className={workButtonClass(primary === 'video')}
@@ -1372,6 +1403,11 @@ function PaletteBar() {
         confirmLabel={t('Make images + videos')}
         onConfirm={() => {
           setConfirmChain(false)
+          // 창을 연 뒤 잔액을 못 읽게 됐으면 이미지도 영상도 시작하지 않고 단추 아래 까닭(리드 검토 a 재확인).
+          if (takeState.failed) {
+            setTakesUnknown(true)
+            return
+          }
           // Take 가 없으면 영상은 못 만들어도 이미지는 만든다 — 이미지는 Take 를 쓰지 않는다(리드 검토 a 낮음 9).
           if (chainPlan.runCount === 0) {
             toast.warning(t('No videos can be made until you add Takes.'))
@@ -1388,7 +1424,8 @@ function PaletteBar() {
         onOpenChange={setConfirmRemake}
         title={countText(t, imageMode.shotIds.length, 'Make 1 image again?', 'Make {count} images again?', { count: imageMode.shotIds.length })}
         description={countText(t, imageMode.shotIds.length, 'Remakes the image for the 1 picked shot. No Takes are used.', 'Remakes the image for the {count} picked shots. No Takes are used.', { count: imageMode.shotIds.length })}
-        impact={[t('Replaces the current images in the picked shots.')]}
+        // 다시 만들어도 지금 이미지는 버전으로 남는다(오너 답 5번).
+        impact={[countText(t, imageMode.shotIds.length, 'The new image becomes the current one. The current image stays in the versions.', 'The new images become the current ones. The current images stay in the versions.')]}
         confirmLabel={t('Make again')}
         onConfirm={remakePicked}
       />
@@ -1410,6 +1447,11 @@ function PaletteBar() {
         busy={videoBatchBusy}
         onConfirm={() => {
           setConfirmVideoBatch(false)
+          // 창을 연 뒤 잔액을 못 읽게 됐으면 시작하지 않고 단추 아래 까닭(리드 검토 a 재확인) — 열린 창의 계획은 Take 줄이 빠져 있다.
+          if (takeState.failed) {
+            setTakesUnknown(true)
+            return
+          }
           if (videoPlan.runCount === 0) {
             toast.warning(t('No videos can be made until you add Takes.'))
             return

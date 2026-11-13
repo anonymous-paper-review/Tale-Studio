@@ -41,21 +41,20 @@ vi.mock('@/lib/generation-queue', async (original) => ({
 }))
 vi.mock('@/lib/use-debug-prompts', () => ({ useDebugPrompts: () => false }))
 
-import { ShotDetailPanel } from '@/features/director/canvas-panels/ShotDetailPanel'
-import { ShotNodePopup } from '@/features/director/canvas-popups/ShotNodePopup'
+import { DirectorShotDetail } from '@/features/director/shot-detail/director-shot-detail'
 import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
 import { storyboardImageGenerationState } from '@/features/director/hooks/use-storyboard-image-generation'
 import { Button } from '@/components/ui/button'
 import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
-import { type ShotNodeData } from '@/types/director'
 
 type Element = ReactElement<Record<string, unknown>>
 let shotId: string
 function elements(node: ReactNode): Element[] {
   if (Array.isArray(node)) return node.flatMap(elements)
   if (!isValidElement<Record<string, unknown>>(node)) return []
-  if (typeof node.type === 'function' && node.type.name === 'StoryboardImageButton') {
+  // 새 샷 상세(시안 D6 · D7)의 이미지 탭과 그 안의 이미지 만들기 단추를 그 자리에서 그린다.
+  if (typeof node.type === 'function' && (node.type.name === 'StoryboardImageButton' || node.type.name === 'ShotImageTab')) {
     return elements((node.type as (props: Record<string, unknown>) => ReactNode)(node.props))
   }
   return [node, ...elements(node.props.children as ReactNode)]
@@ -65,10 +64,12 @@ function textOf(node: ReactNode): string {
   if (Array.isArray(node)) return node.map(textOf).join('')
   return isValidElement<{ children?: ReactNode }>(node) ? textOf(node.props.children) : ''
 }
-function render(component = ShotDetailPanel) {
+// 샷 상세 — 스토리보드형 팝업 · 노드형 왼쪽 패널이 같은 상세를 연다(시안 D6 · D7). 옛 샷 편집 패널 · 팝업 자리.
+const shotDetailPopup = () => DirectorShotDetail({ shotNodeId: shotId, initialTab: 'image', layout: 'popup', onClose: () => {} })
+const shotDetailPanel = () => DirectorShotDetail({ shotNodeId: shotId, initialTab: 'image', layout: 'panel', onClose: () => {} })
+function render(surface: () => ReactNode = shotDetailPopup) {
   hooks.cursor = 0
-  const data = director.getState().nodes.find(node => node.id === shotId)!.data as ShotNodeData
-  return elements(component({ nodeId: shotId, data }))
+  return elements(surface())
 }
 function generateButton(nodes: Element[]) {
   const button = nodes.find(node => node.type === Button && /이미지|접수|생성 상태/.test(textOf(node)))
@@ -88,7 +89,7 @@ beforeEach(() => {
   useLocaleStore.setState({ locale: 'ko' })
 })
 
-it.each([['편집 패널', ShotDetailPanel], ['편집 팝업', ShotNodePopup]] as const)('이미지 작업을 접수하거나 생성 중이면 버튼을 잠그고 진행 상태를 보여준다 (%s)', (_label, component) => {
+it.each([['샷 상세 패널', shotDetailPanel], ['샷 상세 팝업', shotDetailPopup]] as const)('이미지 작업을 접수하거나 생성 중이면 버튼을 잠그고 진행 상태를 보여준다 (%s)', (_label, component) => {
   const generate = vi.fn(() => {
     director.getState().updateNodeData<'shot'>(shotId, {
       storyboardImage: { url: '', status: 'generating', generatedAt: 0, errorMessage: null },
@@ -117,7 +118,8 @@ it('서버에 이미지 작업이 남아 있으면 다시 들어온 화면에서
   expect(textOf(button)).toContain('이미지 생성 중')
 })
 
-it('기존 이미지를 다시 만들면 교체 확인 후 생성한다', () => {
+it('기존 이미지를 다시 만들면 확인 후 생성하고, 확인 창은 지금 이미지가 버전으로 남는다고 알린다', () => {
+  // 왜: 오너 2026-11-14 답 5번 · 리드 A — 이미지 버전이 생겨 앞 그림은 덮이지 않고 v1 로 남는다(옛 이름 "교체 확인 후 생성한다").
   const generate = vi.fn().mockResolvedValue(null)
   director.setState({ generateStoryboardImage: generate })
   director.getState().updateNodeData<'shot'>(shotId, {
@@ -128,7 +130,7 @@ it('기존 이미지를 다시 만들면 교체 확인 후 생성한다', () => 
   const dialog = render().find(node => node.type === RegenerateConfirmDialog)!
   expect(dialog).toBeDefined()
   expect(dialog.props.open).toBe(true)
-  expect(dialog.props.impact).toEqual(['기존 촬영용 이미지가 새 결과로 교체됩니다.'])
+  expect(dialog.props.impact).toEqual(['새 이미지가 지금 이미지가 되고, 지금 이미지는 버전으로 남아요.'])
   ;(dialog.props.onConfirm as () => void)()
   expect(generate).toHaveBeenCalledExactlyOnceWith(shotId)
 })

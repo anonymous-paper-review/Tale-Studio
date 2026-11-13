@@ -14,7 +14,8 @@ vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTra
 const nav = vi.hoisted(() => ({ handoffToStage: vi.fn(async (stage: string) => `/studio/${stage}`) }))
 vi.mock('@/lib/stage-nav', () => ({ handoffToStage: nav.handoffToStage }))
 
-import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice } from '@/lib/director/editor-handover'
+import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice, withRowNotice, withStartingRow } from '@/lib/director/editor-handover'
+import type { GenerationJobObserver, GenerationJobReceipt } from '@/lib/generation-jobs-client'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
 import { readFileSync } from 'node:fs'
 import { translate } from '@/lib/i18n/translate'
@@ -151,6 +152,47 @@ describe('Editor 넘기기 창의 단추 글', () => {
     expect(handoverHeaderLine(view, ko)).toBe('영상 2/3 · 약\u00a07초 · 영상이 없는 샷은 타임라인에 빈 칸으로 들어가지 않아요.')
     expect(handoverHeaderLine(view, (key, params) => translate('en', key, params))).toBe('2/3 videos · about 7s · Shots without video do not go into the timeline as empty slots.')
   })
+
+  // 왜(리드 11/14, entry 탐침): 창의 '누른 줄'이 한 칸이라, 먼저 누른 줄의 다시 만들기가 끝나면 나중에 누른 다른 줄의 스피너까지 꺼졌다 —
+  //   그 줄이 아직 이미지를 그리는 중(접수 전)이면 단추가 다시 켜졌다. 이 저장소엔 화면을 눌러 볼 시험 도구가 없어 줄 모음 함수와 창의 쓰임을 본다.
+  it('먼저 누른 줄이 끝나도 나중에 누른 다른 줄의 스피너는 꺼지지 않는다', () => {
+    let rows: ReadonlySet<string> = new Set()
+    rows = withStartingRow(rows, 'n_a2', true)
+    rows = withStartingRow(rows, 'n_a3', true)
+    rows = withStartingRow(rows, 'n_a2', false)
+    expect([...rows]).toEqual(['n_a3'])
+    const dialog = readFileSync('src/components/handoff/editor-handover-dialog.tsx', 'utf8')
+    expect(dialog).toMatch(/withStartingRow\(current, row\.shotNodeId, false\)/)
+    expect(dialog).toMatch(/const busy = starting\.has\(row\.shotNodeId\)/)
+  })
+
+  // 왜(검토 b 낮음, 리드 11/14): 까닭 줄도 창에 한 칸이라, A 가 까닭으로 끝난 뒤 B 가 다른 까닭으로 끝나면 A 것이 사라졌고,
+  //   다른 줄을 누르는 순간에도 앞 줄 까닭이 지워졌다. 스피너처럼 줄마다 둔다 — 그 줄을 다시 누를 때만 그 줄 것을 지운다.
+  it('한 줄의 까닭은 다른 줄을 누르거나 다른 줄이 끝나도 남는다', () => {
+    const unknown = remakeNotice('takes_unknown', ko)!
+    const limit = remakeNotice('video_limit', ko)!
+    let notices: ReadonlyMap<string, string> = new Map()
+    notices = withRowNotice(notices, 'n_a2', unknown) // 2번 줄이 까닭으로 끝남
+    notices = withRowNotice(notices, 'n_a3', null) // 3번 줄을 누름
+    notices = withRowNotice(notices, 'n_a3', limit) // 3번 줄이 다른 까닭으로 끝남
+    expect([...notices]).toEqual([['n_a2', unknown], ['n_a3', limit]])
+    notices = withRowNotice(notices, 'n_a2', null) // 2번 줄을 다시 누르면 2번 줄 것만 지운다
+    expect([...notices]).toEqual([['n_a3', limit]])
+    const dialog = readFileSync('src/components/handoff/editor-handover-dialog.tsx', 'utf8')
+    expect(dialog).toMatch(/withRowNotice\(current, row\.shotNodeId, null\)/)
+    expect(dialog).toMatch(/withRowNotice\(current, row\.shotNodeId, message\)/)
+    expect(dialog).toMatch(/const rowNotice = notices\.get\(row\.shotNodeId\)/)
+  })
+
+  // 왜(검토 a 낮음, 리드 11/14): 넘기기 창 부품은 늘 붙어 있고 open 만 바뀌어, 까닭 모음이 닫기 · 다시 열기를 건너 살아남았다 —
+  //   나중에 다시 열면 그새 상황이 바뀌었어도 옛 까닭("동시에 만드는 영상 수가 다 찼어요" 등)이 줄 아래 그대로 보였다.
+  //   화면을 눌러 볼 시험 도구가 없어 창의 쓰임(소스 글자)을 본다. 돌기 표시는 다시 만들기가 끝날 때(finally) 비우니 그대로다.
+  it('넘기기 창을 닫았다 다시 열면 앞에서 남은 까닭 줄은 모두 지워진다', () => {
+    const host = readFileSync('src/components/handoff/handoff-confirm-dialogs.tsx', 'utf8')
+    expect(host).toMatch(/<EditorHandoverDialog open=\{/)
+    const dialog = readFileSync('src/components/handoff/editor-handover-dialog.tsx', 'utf8')
+    expect(dialog).toMatch(/useEffect\(\(\) => \{\n\s*setNotices\(new Map\(\)\)\n\s*\}, \[open\]\)/)
+  })
 })
 
 const userLines = () => useGlobalChatStore.getState().messages.filter((m) => m.role === 'user').map((m) => m.content)
@@ -197,6 +239,12 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     useDirectorCanvasStore.setState({ nodes: [], generateVideoForShot, generateStoryboardImage, hydrateFreshFromDb })
     useLocaleStore.setState({ locale: 'en' })
   })
+  // 영상 요청이 접수된 것처럼 — 서버가 2xx 로 받아 jobId 를 준 알림을 보내고 새 Take id 를 돌려준다(D8 은 접수로 시작을 센다, 리드 11/14).
+  const acceptedVideo = () =>
+    vi.fn(async (_shotNodeId: string, options?: { onJob?: GenerationJobObserver }) => {
+      options?.onJob?.({ jobId: 'job-1', status: 'queued', httpStatus: 202 })
+      return 'v_new'
+    })
 
   // 왜: 정상 경로 고정 — 다 만든 사람에게 확인 창을 또 띄우지 않는다(10/1 오너 "그 구간은 일단 없이").
   it('Director에서 다음 단계 버튼을 누를 때 모든 샷에 영상이 있으면 창 없이 넘김 문장을 남기고 Editor로 넘어간다', async () => {
@@ -243,7 +291,7 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     useDirectorCanvasStore.setState({ generateVideoForShot: makeVideo } as never)
     await useGlobalChatStore.getState().requestNextStep()
     await useGlobalChatStore.getState().remakeMissingVideo('n_a2')
-    expect(makeVideo).toHaveBeenCalledWith('n_a2', { inheritFromVideoNodeId: 'v_a2_1' })
+    expect(makeVideo).toHaveBeenCalledWith('n_a2', { inheritFromVideoNodeId: 'v_a2_1', onJob: expect.any(Function) })
     expect(useGlobalChatStore.getState().handoffConfirm).toMatchObject({ kind: 'editorMissingVideos' })
     expect(nav.handoffToStage).not.toHaveBeenCalled()
   })
@@ -292,7 +340,7 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     await useGlobalChatStore.getState().remakeMissingVideo('n_a3')
     expect(hydrate).toHaveBeenCalledTimes(1)
     expect(makeImage).not.toHaveBeenCalled()
-    expect(makeVideo).toHaveBeenCalledWith('n_a3', undefined)
+    expect(makeVideo).toHaveBeenCalledWith('n_a3', { onJob: expect.any(Function) })
   })
 
   // 왜(검토 b 보통 1): Writer 샷이 모두 영상이 있으면 Director 에서 더한 빈 샷이 있어도 창 없이 넘긴다(10/1).
@@ -307,7 +355,7 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
   // 왜(검토 b 2차 낮음 3): 일괄 중이거나 그 샷 이미지를 이미 만드는 중이면 [다시 만들기]가 요청 · Take · 알림 없이 말없이 끝났다 —
   //   시작했는지, 못 했으면 왜인지 돌려주어 창이 보이게 한다.
   it('일괄 중이거나 그 샷 이미지를 만드는 중이면 [다시 만들기]는 시작하지 않고 그 까닭을 돌려준다', async () => {
-    const makeVideo = vi.fn(async () => 'v_new')
+    const makeVideo = acceptedVideo()
     const makeImage = vi.fn(async () => undefined)
     useDirectorCanvasStore.setState({ generateVideoForShot: makeVideo, generateStoryboardImage: makeImage, hydrateFreshFromDb: vi.fn(async () => undefined) } as never)
     useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
@@ -329,7 +377,7 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
   // 왜(검토 b 2차 낮음 1, 혼자 정한 것): 잔액을 못 읽은 채 Take 를 쓰는 [다시 만들기]를 시작하지 않는다 — Lumi 채팅 영상 부탁과 같은 판단이다
   //   (board "Take 를 확인하지 못해 시작하지 않았어요"). 누를 때마다 잔액을 다시 읽어, 읽히면 그대로 시작한다.
   it('Take 잔액을 읽지 못하면 [다시 만들기]는 시작하지 않고 그 까닭을 그 줄에 보이고, 다시 눌러 잔액이 읽히면 시작한다', async () => {
-    const makeVideo = vi.fn(async () => 'v_new')
+    const makeVideo = acceptedVideo()
     useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')), generateVideoForShot: makeVideo } as never)
     useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
     let balanceUp = false
@@ -345,6 +393,96 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     balanceUp = true
     await expect(useGlobalChatStore.getState().remakeMissingVideo('n_a2')).resolves.toEqual({ started: true })
     expect(makeVideo).toHaveBeenCalledTimes(1)
+  })
+
+  // 왜(리드 11/14, entry 탐침): 다시 만들기는 영상이 끝날 때까지(5초마다 확인, 최대 10분) 돌아오지 않았다 — 창의 [다시 만들기] 스피너가
+  //   영상이 끝날 때까지 돌고 '시작했다'는 결과도 끝에서야 왔다. 서버가 2xx 로 받아 jobId 를 준 때(접수)가 시작이다.
+  it('Editor 넘기기 창의 [다시 만들기]는 영상 요청이 접수되면 영상이 끝나기를 기다리지 않고 시작했다고 돌려준다', async () => {
+    // 접수 알림은 바로 오고, 영상은 끝나지 않는다.
+    const makeVideo = vi.fn((_shotNodeId: string, options?: { onJob?: GenerationJobObserver }) => {
+      options?.onJob?.({ jobId: 'job-1', status: 'queued', httpStatus: 202 })
+      return new Promise<string | null>(() => {})
+    })
+    useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')), generateVideoForShot: makeVideo } as never)
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
+    const waited = new Promise((resolve) => setTimeout(() => resolve('영상이 끝나기를 기다렸다'), 1_000))
+    await expect(Promise.race([useGlobalChatStore.getState().remakeMissingVideo('n_a2'), waited])).resolves.toEqual({ started: true })
+    expect(makeVideo).toHaveBeenCalledTimes(1)
+  })
+
+  // 왜(리드 11/14 — 시작은 서버가 2xx 로 받아 jobId 를 준 때뿐): 서버 오류 · 연결 끊김에도 다시 만들기는 실패로 표시한 새 Take 의 id 를
+  //   돌려준다 — 그 id 를 시작으로 세면 창이 아무 말 없이 줄만 '만들다 실패'로 바꿨다. 새 Take 가 없으면(id 없음) 지금처럼 시작하지 못한 것이다.
+  it('Editor 넘기기 창의 [다시 만들기]는 영상 요청이 접수되지 않고 실패로 끝나면(서버 오류 · 연결 끊김 · 새 Take 없음) 시작하지 못했다고 그 까닭을 돌려준다', async () => {
+    const endsFailed = (error: string) =>
+      vi.fn(async (_shotNodeId: string, options?: { onJob?: GenerationJobObserver }) => {
+        const failedTake = take('a2', 2, 'failed')
+        useDirectorCanvasStore.setState((s) => ({ nodes: [...s.nodes, failedTake] }))
+        options?.onJob?.({ jobId: null, status: 'failed', error })
+        return failedTake.id
+      })
+    const noTake = vi.fn(async () => null)
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
+    for (const makeVideo of [endsFailed('HTTP 500'), endsFailed('Failed to fetch'), noTake]) {
+      useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')), generateVideoForShot: makeVideo } as never)
+      await expect(useGlobalChatStore.getState().remakeMissingVideo('n_a2')).resolves.toEqual({ started: false, reason: 'not_started' })
+    }
+  })
+
+  // 왜(검토 b 참고 1): 500 + jobId · failed 뒤 다시 읽기마저 실패하면 이번에 돌려받은 Take 가 status generating(마지막 시도는 failed)으로
+  //   남는다 — 그 Take 때문에 "이 샷 영상을 이미 만드는 중이에요"가 나왔다. 이번 Take 는 이번 결과로만 본다.
+  it("이번 다시 만들기가 실패로 끝났으면 그 Take 때문에 '이미 만드는 중'이라고 말하지 않는다", async () => {
+    const makeVideo = vi.fn(async (_shotNodeId: string, options?: { onJob?: GenerationJobObserver }) => {
+      const stale = take('a2', 2, 'generating', { lastAttemptStatus: 'failed' })
+      useDirectorCanvasStore.setState((s) => ({ nodes: [...s.nodes, stale] }))
+      options?.onJob?.({ jobId: 'job-1', status: 'failed', httpStatus: 500, error: 'HTTP 500' })
+      return stale.id
+    })
+    useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')), generateVideoForShot: makeVideo } as never)
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
+    await expect(useGlobalChatStore.getState().remakeMissingVideo('n_a2')).resolves.toEqual({ started: false, reason: 'not_started' })
+  })
+
+  // 왜(리드 11/14): 2xx 가 아닌 답에 jobId · queued 가 실려 오면(503 결과 모름 · 400 등) 접수로 세지 않지만, 새 Take 는 보드에서 만드는 중으로
+  //   남는다 — 그 줄 글은 상점에서 나오므로 '시작하지 못했어요'를 붙이면 '만드는 중'인 줄과 어긋난다(Lumi 의 "아직 몰라요"와 같은 판단).
+  it('Editor 넘기기 창의 [다시 만들기]는 서버 답이 모호하면(접수 알림 없이 새 Take 가 보드에서 만드는 중) 그 줄은 만드는 중으로 두고 시작하지 못했다고 말하지 않는다', async () => {
+    const ambiguous = (receipt: GenerationJobReceipt) =>
+      vi.fn(async (_shotNodeId: string, options?: { onJob?: GenerationJobObserver }) => {
+        const making = take('a2', 2, 'generating')
+        useDirectorCanvasStore.setState((s) => ({ nodes: [...s.nodes, making] }))
+        options?.onJob?.(receipt)
+        return making.id
+      })
+    const receipts: GenerationJobReceipt[] = [
+      { jobId: 'job-1', status: 'queued', httpStatus: 503 }, // 제출 결과 모름
+      { jobId: 'job-1', status: 'queued', httpStatus: 400 }, // 거절 꼴인데 몸에 jobId · queued 가 실려 왔다
+    ]
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
+    for (const receipt of receipts) {
+      useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')), generateVideoForShot: ambiguous(receipt) } as never)
+      await expect(useGlobalChatStore.getState().remakeMissingVideo('n_a2')).resolves.toEqual({ started: true })
+      const row = editorHandoverView(useDirectorCanvasStore.getState().nodes, names).shots.find((r) => r.shotNodeId === 'n_a2')
+      expect(row?.missing).toBe('generating')
+    }
+  })
+
+  // 왜(리드 11/14, entry 브라우저 확인): [바꾸기]가 샷 팝업(openPopup)으로 열어, 노드 보기에서는 창만 닫히고 아무것도 열리지 않았고
+  //   (노드 보기의 팝업은 씬만) 스토리보드 보기에서는 이미지 탭으로 열렸다. Take 는 영상 탭에서 고른다 — 두 보기 모두 샷 상세(detailNodeId · detailTab)를 따른다.
+  it('넘기기 창의 [바꾸기]는 창을 닫고 그 샷 상세를 영상 탭(Take 고르기)으로 연다 — 노드 보기 · 스토리보드 보기 모두', () => {
+    const { viewMode } = useDirectorCanvasStore.getState()
+    try {
+      for (const view of ['node', 'storyboard'] as const) {
+        useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a3', 1, 'completed')), viewMode: view, popupNodeId: null, detailNodeId: null })
+        useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
+        useGlobalChatStore.getState().changeHandoverTake('n_a1')
+        expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
+        expect(useDirectorCanvasStore.getState()).toMatchObject({ viewMode: view, detailNodeId: 'n_a1', detailTab: 'video', popupNodeId: null })
+      }
+    } finally {
+      useDirectorCanvasStore.setState({ viewMode, popupNodeId: null, detailNodeId: null })
+    }
+    const dialog = readFileSync('src/components/handoff/editor-handover-dialog.tsx', 'utf8')
+    expect(dialog).toMatch(/changeTake\(row\.shotNodeId\)/)
+    expect(dialog).not.toMatch(/openPopup\(/)
   })
 
   // 왜(혼자 정한 것): 채팅으로 넘겨 달라고 해도 같은 판단을 탄다 — Director 준비 창이 채팅에서도 열리는 것과 같게.

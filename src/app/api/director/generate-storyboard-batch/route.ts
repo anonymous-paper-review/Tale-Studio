@@ -4,6 +4,7 @@
 //   architecture §5: 차 있는 것 교체는 사람의 개별 재생성=단일 스트립). 검증: 실험 시트 통과(011fd4bd).
 import { NextResponse } from 'next/server'
 import { existingStoryboardJobId } from '@/lib/director/storyboard-active-job'
+import { hasStoryboardImage } from '@/lib/director/storyboard-image'
 import type { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
@@ -38,6 +39,7 @@ import { storageKeySegment } from '@/lib/storage/key-segment'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
+import { cancelledJobsById } from '@/lib/director/job-cancellations'
 
 export const runtime = 'nodejs'
 // 시트 2장(러프 12장씩 합성 · 업로드 · 예약 · 제출)이 60초를 넘겨 끊겼다 — 10/9 · 10/10 운영 6번 중 4번 504,
@@ -152,8 +154,12 @@ export async function POST(req: NextRequest) {
       .eq('status', 'queued')
       .in('kind', ['shot_storyboard', 'storyboard_real_grid'])
     if (queuedError) throw queuedError
+    // 화면에서 멈춘 작업(오너 2026-11-14 7번)은 fal 에서 끝날 때까지 queued 로 남지만 그 샷을 막지 않는다 — 같은 샷 하나만 검사
+    //   (guard_storyboard_singleflight)와 같은 규칙(검토 a). 멈춤 표를 읽지 못하면(운영 DB 에 아직 없음 등) 지금처럼 센다.
+    const stoppedJobs = await cancelledJobsById((queuedJobs ?? []).map((j) => j.id as string))
     const busyJobByShot = new Map<string, { jobId: string; fresh: boolean; sameRun: boolean }>()
     for (const j of queuedJobs ?? []) {
+      if (stoppedJobs.has(j.id as string)) continue
       const fresh = Date.now() - new Date(j.created_at as string).getTime() < STALE_QUEUED_MS
       const sameRun = !!batchRunId && runIdOfTarget(j.target) === batchRunId
       for (const id of shotsOfTarget(j.target)) {
@@ -192,7 +198,8 @@ export async function POST(req: NextRequest) {
       if (wanted && !wanted.has(s.shot_id as string)) continue
       // 기본은 빈칸만(교체는 개별 재생성 소관). force 면 이미 있는 것도 다시 만든다 —
       //   오너가 "하나씩 하는 거 짜쳐서" 전체 재생성을 원한 경로(#c3).
-      if (!force && s.storyboard_image) continue
+      //   지금 그림이 있는지는 칸이 있는지가 아니라 지금 그림으로 본다 — 멈춘 그림만 있는 샷은 칸이 있어도 "이미지 필요"다(오너 2026-11-14 7번).
+      if (!force && hasStoryboardImage(s.storyboard_image)) continue
       const busy = busyJobByShot.get(s.shot_id as string)
       if (busy) {
         if (busy.fresh) waitFor(busy.jobId, [s.shot_id as string], busy.sameRun)

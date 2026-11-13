@@ -42,6 +42,8 @@ vi.mock('next/navigation', () => ({
 }))
 vi.mock('@/lib/writer/use-writer-status', () => ({ useWriterStatus: () => ({ status: null }) }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn() }))
+const takes = vi.hoisted(() => ({ state: { balance: null as number | null, mode: 'off' as 'off' | 'shadow' | 'enforce', loading: false, failed: false } }))
+vi.mock('@/lib/billing/use-take-balance', () => ({ useTakeBalance: () => takes.state, fetchTakeBalance: vi.fn(async () => takes.state), refetchTakeBalance: vi.fn() }))
 
 import { GlobalChat } from '@/components/layout/global-chat'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -89,6 +91,8 @@ function take(id: string, parent: string): DirectorNode {
 beforeEach(() => {
   vi.clearAllMocks()
   hooks.pathname = '/studio/director'
+  // 잔액을 읽기 전 모습(과금 꺼짐으로 보임) — 시험마다 바꾼다.
+  takes.state = { balance: null, mode: 'off', loading: false, failed: false }
   useGlobalChatStore.getState().reset()
   useProjectStore.setState({ projectId: 'p-dir', currentStage: 'director', projectLocale: 'ko', projectLocaleLocked: true })
   useLocaleStore.setState({ locale: 'ko' })
@@ -141,6 +145,17 @@ describe('지금 할 일 줄 자리(시안 D5)', () => {
     expect(lineText()).toBe('지금 할 일 · 다음: Editor로')
     useDirectorCanvasStore.setState({ nodes: [] })
     expect(lineText()).toBeNull()
+  })
+})
+
+describe('지금 할 일 줄의 Take 값', () => {
+  // 왜: lead_rules(리드 11/14) — 잔액을 잠깐 못 읽은 것은 과금 꺼짐이 아니다. 값을 숨기면 Take 를 안 쓰는 일로 읽힌다(툴바 · D0 · D8 과 같은 판단, entry takeValuesShown).
+  it('Take 잔액을 잠깐 못 읽었으면 지금 할 일 줄은 Take 값을 그대로 보이고, 과금이 정말 꺼졌을 때만 숨긴다', () => {
+    useDirectorCanvasStore.setState({ nodes: [shot('s1', IMG('s1')), shot('s2', IMG('s2')), shot('s3', IMG('s3'))] })
+    takes.state = { balance: null, mode: 'off', loading: false, failed: true }
+    expect(lineText()).toBe('지금 할 일 · 영상 3개 · 약 3분 · Takes 15')
+    takes.state = { balance: null, mode: 'off', loading: false, failed: false }
+    expect(lineText()).toBe('지금 할 일 · 영상 3개 · 약 3분')
   })
 })
 

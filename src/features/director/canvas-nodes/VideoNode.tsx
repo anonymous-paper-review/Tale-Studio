@@ -24,10 +24,14 @@ import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useT } from '@/lib/i18n'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
-import { takeCostForVideo } from '@/lib/billing/take-cost'
+import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
+import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
+import { StopMakingButton } from '@/features/director/stop-making-button'
+import { isStoppableJob } from '@/lib/director/stop-work'
+import { useActiveGenerationJobs } from '@/lib/generation-queue'
 import { normalizeProvider } from '@/lib/video-models'
 import { useShotState } from '@/features/director/hooks/use-shot-states'
-import { dimmedByStatusFilter, videoTakeFrame, videoTakeTail } from '@/lib/director/shot-state'
+import { dimmedByStatusFilter, takeCountsAsVideo, takeIsRunning, videoTakeFrame, videoTakeTail } from '@/lib/director/shot-state'
 import { StateTailLine } from '@/features/director/shot-status'
 
 /** 영상 노드 틀의 높이 상한(세로·정사각 포맷) — 테이크 간격(VIDEO_OFFSET_Y 260px) 안에서 겹치지 않게. */
@@ -51,7 +55,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     const parent = isVideoData(data) ? data.parentShotNodeId : null
     return !!parent && (s.pickedShotIds?.includes(parent) ?? false)
   })
-  const detailOpen = useDirectorCanvasStore((s) => s.selectedNodeId === id)
+  const detailOpen = useDirectorCanvasStore((s) => (s.detailNodeId ?? s.selectedNodeId) === id)
   // "영상까지 이어서"로 이미지를 기다리는 샷(시안 D4) — 빈 영상 노드에 "이미지가 끝나면 자동으로 시작해요".
   const chainWaiting = useDirectorCanvasStore((s) => {
     const parent = isVideoData(data) ? data.parentShotNodeId : null
@@ -79,7 +83,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           isVideoData(node.data) &&
           (node.data.parentShotNodeId ?? node.data.standaloneVideoKey) ===
             videoOwnerKey &&
-          node.data.lastAttemptStatus === 'generating',
+          takeIsRunning(node.data),
       ),
   )
   // 카드 제목 = 연결된 부모 샷 번호(#e3 2026-07-15): take_v1 대신 'Shot 14'처럼 표기.
@@ -117,6 +121,16 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // 해상도(오너 2026-10-31): 다음에 만들 때 고른 값 — Take 표시용. 모델이 못 내면(Kling O3 Pro) 계산기가 기본값으로 센다.
   const chosenResolution = useDirectorCanvasStore((s) => getVideoNodeResolution(s, id))
   const takeBalance = useTakeBalance()
+  // 잔액을 못 읽어 시작하지 않았다 — 노드 안에 까닭(리드 11/14). 잔액이 읽히면 저절로 사라진다.
+  const [takesUnknown, setTakesUnknown] = useState(false)
+  // 잔액을 다시 읽는 동안 [영상 리테이크]를 끈다 — 두 번 눌러 새 Take 가 두 번 나가지 않게(검토 b 낮음 2, prose 이미지 탭과 같은 꼴).
+  //   상태는 단추를 끄고, ref 는 같은 화면에서 빠르게 두 번 불려도 한 번만 시작하게 한다.
+  const [retakeReading, setRetakeReading] = useState(false)
+  const retakeReadingRef = useRef(false)
+  // [멈추기]는 서버가 받아 도는 작업 목록에 그 작업이 있을 때만(검토 a cbb84e64 보통 1) — 요청이 오가는 동안 Take 에 든 것은
+  //   화면이 만든 요청 키라 멈추지 못한다(prose 상세와 같은 판단 isStoppableJob). 'default' 는 프로젝트를 열기 전 자리 값이라 묻지 않는다.
+  const queueProjectId = useDirectorCanvasStore((s) => (s.projectId && s.projectId !== 'default' ? s.projectId : null))
+  const activeJobs = useActiveGenerationJobs(queueProjectId)
 
   // effect 입력은 early-return 전에 안전 추출 (훅은 무조건 호출돼야 함).
   const vStatus = isVideoData(data) ? data.status : null
@@ -152,8 +166,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   if (!isVideoData(data)) return null
 
   const isPlaying = playingNodeId === id
-  const generating = data.lastAttemptStatus === 'generating'
-  const completed = (data.lastAttemptStatus ?? data.status) === 'completed'
+  // 화면에서 멈춘 Take(오너 2026-11-14 7번)는 뒤에서 돌아도 만드는 중 카드로 덮지 않고, ★ 가 아니면 끝나도 "✓ 완성"이 아니다.
+  const generating = takeIsRunning(data)
+  const completed = (data.lastAttemptStatus ?? data.status) === 'completed' && takeCountsAsVideo(data)
   const requestedSeconds = effectiveProvider && effectiveSeconds !== null ? requestedVideoSeconds(effectiveProvider, effectiveSeconds) : null
   // 1080p 표시는 지금 영상에 대한 말이다 — 그 영상을 낸 작업 기록 기준(2026-10-31 리뷰). 설정은 왼쪽 패널이 보여준다.
   const madeAt1080p = !!data.videoUrl && data.videoResolution === '1080p'
@@ -218,22 +233,37 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           <Button
             size="sm"
             className="h-7 gap-1 rounded-full px-3 text-xs"
-            disabled={ownerGenerating || data.lastAttemptStatus === 'generating'}
-            onClick={(e) => {
+            disabled={ownerGenerating || generating || retakeReading}
+            onClick={async (e) => {
               e.stopPropagation()
-              // #retake-inherit: 이 테이크의 체인·프레임 배선을 새 테이크가 물려받는다.
-              if (parentShotId)
-                void generateVideoForShot(parentShotId, {
-                  inheritFromVideoNodeId: id,
-                })
-              else void regenerateVideo(id)
+              if (retakeReadingRef.current) return
+              retakeReadingRef.current = true
+              setRetakeReading(true)
+              try {
+                // 단추 값이 곧 동의인 자리 — 잔액을 다시 읽고, 못 읽으면 시작하지 않는다(리드 11/14).
+                if (!(await takesReadable())) {
+                  setTakesUnknown(true)
+                  return
+                }
+                setTakesUnknown(false)
+                // #retake-inherit: 이 테이크의 체인·프레임 배선을 새 테이크가 물려받는다.
+                if (parentShotId)
+                  void generateVideoForShot(parentShotId, {
+                    inheritFromVideoNodeId: id,
+                  })
+                else void regenerateVideo(id)
+              } finally {
+                retakeReadingRef.current = false
+                setRetakeReading(false)
+              }
             }}
           >
             <RefreshCw className="size-3" />
             {t('Retake video')}
           </Button>
           {/* #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지 숨김. */}
-          {takeBalance.mode !== 'off' && (
+          {/* 잔액을 못 읽었으면 값을 보이고, 과금이 정말 꺼졌을 때만 숨긴다(entry takeValuesShown, 리드 11/14). */}
+          {takeValuesShown(takeBalance) && (
             <span className="font-num text-[11px] font-medium text-muted-foreground">
               {/* 표시는 서버가 실제로 쓰는 모델 · 해상도 기준이어야 한다 — 설정에 남은 옛 모델 이름은
                   제출 전에 기본 모델로 바뀐다(video-batch-plan 의 승인 카드와 같은 계산). 1080p 는 두 배. */}
@@ -363,7 +393,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             <Play className="size-6 fill-muted-foreground text-muted-foreground" />
             {completed && <VideoLengthChip url={data.videoUrl} />}
           </button>
-        ) : data.lastAttemptStatus === 'generating' ? null : (
+        ) : generating ? null : (
           // 만드는 중이면 아무 글도 쓰지 않는다. 아래 "영상 생성 중"과 같이 보이면 헷갈린다(11/5 시안 DG 맞춰 보기 2026-11-09).
           //   비어 있는 까닭(시안 D1 노드형 406:4051 · D4, 리드 답 5a): 이어 보내기를 기다리면 "이미지가 끝나면 자동으로 시작해요",
           //   그 샷에 이미지가 없으면 "이미지가 생기면 만들 수 있어요", 있으면 "영상을 만들 수 있어요".
@@ -378,7 +408,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         )}
 
         <GeneratingOverlay
-          active={data.lastAttemptStatus === 'generating'}
+          active={generating}
           label={t('Generating video')}
         />
       </div>
@@ -432,6 +462,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         </p>
       )}
       {finalError && <p className="mt-1 text-[10px] text-destructive" inert={generating}>{finalError}</p>}
+      {takesUnknown && takeBalance.failed && (
+        <p className="mt-1 text-[10px] text-destructive" inert={generating}>{t(TAKES_UNKNOWN_TEXT)}</p>
+      )}
       {data.lastAttemptError && (
         <p className="mt-1 text-[10px] text-destructive" inert={generating}>{data.lastAttemptError}</p>
       )}
@@ -449,6 +482,12 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           progress={batchPercent ?? undefined}
           note={nextInLineNote(nextNames ? nextNames.split('\n') : [], t)}
           announce={announce}
+          // 영상 만드는 노드는 상태 색 보라(시안 D4 · R) — 이미지 그리는 노드 카드는 단계 파랑 그대로.
+          tone="video"
+          // [멈추기](시안 D4 · 오너 7번) — 이 Take 를 화면에서 멈춘다. fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다.
+          action={data.generationJobId && isStoppableJob(data.generationJobId, activeJobs)
+            ? <StopMakingButton target={{ jobIds: [data.generationJobId], sheetShots: 1 }} kind="video" place="wait" />
+            : undefined}
           className="-inset-[1.5px]"
         />
       )}

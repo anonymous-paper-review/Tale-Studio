@@ -3,6 +3,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { DirectorNode } from '@/types/director'
 
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
+// Take 카드를 승인하면 묶인 영상이 시작된다 — 잔액 · 일괄 러너만 바꿔 끼운다(승인 말 판단은 그대로).
+const run = vi.hoisted(() => vi.fn(async () => ({ total: 1, started: 1, failed: 0 })))
+vi.mock('@/lib/billing/use-take-balance', () => ({ fetchTakeBalance: vi.fn(async () => ({ balance: 40, mode: 'enforce', failed: false, loading: false })), refetchTakeBalance: vi.fn() }))
+vi.mock('@/lib/director/video-batch-client', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/director/video-batch-client')>(), runVideoBatch: run }))
 
 import { useGlobalChatStore as chat } from '@/stores/global-chat-store'
 import { useProjectStore as project } from '@/stores/project-store'
@@ -76,6 +80,43 @@ describe('대기 카드를 승인하는 말', () => {
     expect(promptOf('s1')).toBeNull()
     expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
     expect(chat.getState().messages.filter((m) => m.role === 'model').at(-1)?.content).toBe('Shall I start? Please answer yes or no.')
+  })
+
+  // 왜: 검토 a 통합 보통 B — Lumi 는 "'응' 또는 '아니'로 답해 주세요"라고 묻는데 Take 카드는 "응 · 네"를 승인으로 받지 않았다. 다른 단계의 "응"은 지금처럼 거절한다.
+  it('Take 가 걸린 카드는 낸 단계에서 "응" · "네"로도 승인되고, 다른 단계의 "응"은 승인하지 않는다', async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).includes('/api/director/chat')
+        ? Response.json({ reply: 'Ready.', updates: [{ type: 'updateShot', id: 's1', patch: { prompt: 'Lumi prompt' } }, { type: 'generateVideos', shotIds: ['s1'] }] })
+        : Response.json({ reply: 'Okay.', updates: [] }),
+    )
+    for (const word of ['응', '네']) {
+      director.setState({ nodes: [shot('s1')] })
+      await chat.getState().sendMessage('Rewrite shot 1 and make its video')
+      expect(chat.getState().pendingProposal?.payload.then).toMatchObject({ videos: ['s1'] })
+      project.setState({ currentStage: 'writer' })
+      await chat.getState().sendMessage('응')
+      expect(promptOf('s1'), word).toBeNull()
+      project.setState({ currentStage: 'director' })
+      await chat.getState().sendMessage(word)
+      expect(promptOf('s1'), word).toBe('Lumi prompt')
+      expect(chat.getState().pendingProposal, word).toBeNull()
+    }
+  })
+
+  // 왜: 리드 결정(검토 b Y2) — Take 카드는 낸 단계에서 "응 · 네"로 승인되는데 글만 고친 카드는 더 좁았다. 낸 단계에서는 같은 낱말로 받는다.
+  it('글만 고친 카드(Take 없음)도 낸 단계에서는 "응" · "네"로 승인되고, 다른 단계의 "응"은 승인하지 않는다', async () => {
+    for (const word of ['응', '네']) {
+      director.setState({ nodes: [shot('s1')] })
+      await chat.getState().sendMessage('Rewrite shot 1')
+      expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+      project.setState({ currentStage: 'writer' })
+      await chat.getState().sendMessage('응')
+      expect(promptOf('s1'), word).toBeNull()
+      project.setState({ currentStage: 'director' })
+      await chat.getState().sendMessage(word)
+      expect(promptOf('s1'), word).toBe('Lumi prompt')
+      expect(chat.getState().pendingProposal, word).toBeNull()
+    }
   })
 
   // 왜: 정상 경로 고정 — 카드를 낸 그 단계에서는 지금처럼 말로 승인된다.

@@ -15,11 +15,16 @@ describe('혼자 정한 것', () => {
     expect(page()).toMatch(/\{videoBatch\.done\}\/\{videoBatch\.total\}/)
   })
 
-  // 왜: 오너 답 7 · 시안 D3 — 멈추는 단추는 2줄의 [모두 멈추기]. 영상 묶음은 지금 만드는 영상까지만 마치고 멈춘다(#batch-resume ①).
-  it('영상 묶음을 멈추는 단추는 2줄의 [모두 멈추기]이고, 누르면 지금 만드는 영상까지만 마치고 멈춘다', () => {
+  // 왜: 오너 답 7 · 시안 D3 — 멈추는 단추는 2줄의 [모두 멈추기]. 아직 내지 않은 영상은 내지 않고, 만들고 있는 영상은 화면에서 멈춘다
+  //   (fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다). 2026-11-14 문장 바꿈(오너 7번 "이미 생성이 진행 중인 것들은 UI로는 취소된걸로"):
+  //   예전 "…누르면 지금 만드는 영상까지만 마치고 멈춘다"(기대 글 'Stop after current videos finish.').
+  it('영상 묶음을 멈추는 단추는 2줄의 [모두 멈추기]이고, 누르면 아직 내지 않은 영상은 내지 않고 만들고 있는 영상은 화면에서 멈춘다', () => {
     expect(t('Stop all')).toBe('모두 멈추기')
     expect(page()).toMatch(/await run\.cancelVideoBatch\(\)/)
-    expect(page()).toContain("toast.info(t('Stop after current videos finish.'))")
+    // 누를 때 작업 목록을 한 번 새로 읽는다(리드 검토 a 낮음, 예전 기대 'stoppableJobs(activeJobsSnapshot(run.projectId))').
+    expect(page()).toContain('stoppableJobs(await freshActiveJobs(run.projectId))')
+    expect(page()).toMatch(/await run\.cancelRunningJobs\(/)
+    expect(page()).not.toContain("toast.info(t('Stop after current videos finish.'))")
   })
 
   // 왜: 시안 D1 · R "영상 만들기 · N" — 이미지가 있고 영상이 없는 샷 수. 이름이 상태에 따라 바뀌지 않는다(늘 같은 자리).
@@ -29,11 +34,12 @@ describe('혼자 정한 것', () => {
     expect(page()).toContain('{videoWork.length}')
   })
 
-  // 왜: 정상 경로 고정. 멈추기를 누른 뒤 이미 접수된 영상이 끝나기를 기다리는 동안은 "중단하는 중"이다.
+  // 왜: 정상 경로 고정. 멈추기를 누른 뒤 멈추기 요청이 오가는 동안은 "중단하는 중"이다.
+  //   2026-11-14 본문 바꿈(오너 7번): 만들던 것은 화면에서 바로 멈추므로 이미 접수된 영상이 끝나기를 기다리지 않는다
+  //   (예전 기대 'const stopping = (!realBatchBusy || realBatchCancelled) && (!videoBatchBusy || videoBatchCancelled)').
   it("멈추는 중이면 [모두 멈추기] 자리에 '중단하는 중'을 쓴다", () => {
     expect(t('Stopping')).toBe('중단하는 중')
-    // 이미지 일괄과 영상 묶음 둘 다 멈추는 중이면(돌던 것 모두) "중단하는 중"(S4 에서 이미지 일괄 멈추기를 더함).
-    expect(page()).toContain('const stopping = (!realBatchBusy || realBatchCancelled) && (!videoBatchBusy || videoBatchCancelled)')
+    expect(page()).toContain('const stopping = stopRequested')
     expect(page()).toContain("stopping ? t('Stopping') : t('Stop all')")
   })
 })

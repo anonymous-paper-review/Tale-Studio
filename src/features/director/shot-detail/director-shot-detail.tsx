@@ -3,12 +3,15 @@
 // Director 샷 상세(디자이너 11/13 시안 D6 · D7, 오너 2026-11-14) — 샷 하나에 이미지 · 영상 탭.
 //   스토리보드형은 팝업(DirectorNodePopup), 노드형은 왼쪽 패널(DirectorDetailPanel)이 이 부품을 같은 내용으로 연다.
 //   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { shotDetailTakes, videoTabLabelKey, type ShotDetailTab } from '@/lib/director/shot-detail'
+import { latestShotTake, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings, videoTabLabelKey, type ShotDetailTab } from '@/lib/director/shot-detail'
+import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
+import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
+import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { isShotData } from '@/types/director'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
@@ -26,15 +29,54 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
 }) {
   const t = useT()
   const [tab, setTab] = useState<ShotDetailTab>(initialTab)
+  // [다음: 영상 만들기]가 Take 를 확인하지 못해 시작하지 않은 까닭 — 이미지 탭 단추 아래에 보이고, 다음에 누를 때 지운다.
+  const [nextNotice, setNextNotice] = useState<string | null>(null)
+  // 잔액을 다시 읽는 동안 [다음: 영상 만들기]를 끈다 — 두 번 눌러 새 Take 가 두 번 나가지 않게(검토 b 탐침 D4, 영상 탭 단추와 같은 꼴).
+  //   상태는 단추를 끄고, ref 는 같은 화면에서 빠르게 두 번 불려도 한 번만 시작하게 한다.
+  const [nextStarting, setNextStarting] = useState(false)
+  const nextStartingRef = useRef(false)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
+  const remakeShotVideo = useDirectorCanvasStore((s) => s.remakeShotVideo)
+  const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
+  const takeBalance = useTakeBalance()
   // 이름은 캔버스 · 보드와 같은 것("Shot 4" · "Scene 1") — Writer 의 원래 id(sh_01_04)를 보이지 않는다.
   const boardNames = useBoardNodeNames()
   const node = nodes.find((n) => n.id === shotNodeId)
+  const imageGeneration = useStoryboardImageGeneration(node && isShotData(node.data) ? node.data : null)
   if (!node || !isShotData(node.data)) return null
   const data = node.data
   const scene = data.parentSceneNodeId ? nodes.find((n) => n.id === data.parentSceneNodeId) : undefined
   const { takes } = shotDetailTakes(nodes, shotNodeId)
   const videoLabel = videoTabLabelKey(takes.length)
+  // [다음: 영상 만들기 · N Take](D6) — 다시 만들기와 같은 설정(가장 최근 Take, 없으면 샷)으로 새 Take 를 만들고 영상 탭으로 간다.
+  const settings = takeSettings(data, latestShotTake(nodes, shotNodeId)?.data ?? null)
+  const count = takeCostForVideo(settings.model, settings.resolution)
+  const makeVideo = {
+    // 단추 값이 곧 동의인 자리 — 잔액을 못 읽어도 값을 보인다(영상 탭 단추 · entry D8 과 같은 말, 리드 2026-11-14).
+    label: takeValuesShown(takeBalance) ? t('Next: make the video · {count} Takes', { count }) : t('Next: make the video'),
+    // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
+    disabled: !shotDetailFrames(data.storyboardImage).start || videoBatchBusy || takes.some((take) => takePhaseOf(take.data) === 'making')
+      || imageGeneration.generating || data.storyboardImage?.status === 'pending' || nextStarting,
+    // 누를 때 잔액을 다시 읽고, 못 읽으면 시작하지 않고 이미지 탭에 남아 까닭을 보인다.
+    run: async () => {
+      if (nextStartingRef.current) return
+      nextStartingRef.current = true
+      setNextStarting(true)
+      setNextNotice(null)
+      try {
+        if ((await fetchTakeBalance()).failed) {
+          setNextNotice(t("I couldn't check your Takes, so I didn't start. Please try again in a moment."))
+          return
+        }
+        void remakeShotVideo(shotNodeId)
+        setTab('video')
+      } finally {
+        nextStartingRef.current = false
+        setNextStarting(false)
+      }
+    },
+    notice: nextNotice,
+  }
   const meta = [scene ? directorNodeLabel(scene.data, boardNames) : null, t('{seconds}s', { seconds: data.durationSeconds }), effectivePrompt(data)].filter(Boolean).join(' · ')
 
   return (
@@ -57,7 +99,7 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
       </header>
       <p className="line-clamp-2 shrink-0 text-caption text-subtle-foreground">{meta}</p>
       {tab === 'image'
-        ? <ShotImageTab nodeId={shotNodeId} data={data} layout={layout} onMakeVideo={() => setTab('video')} />
+        ? <ShotImageTab nodeId={shotNodeId} data={data} layout={layout} makeVideo={makeVideo} />
         : <ShotVideoTab shotNodeId={shotNodeId} data={data} layout={layout} initialTakeId={initialTakeId} />}
     </div>
   )

@@ -7,8 +7,9 @@ import { useProjectStore } from '@/stores/project-store'
 import { createClient } from '@/lib/supabase/client'
 import { cancelShotsLoad, loadShotsResult } from '@/lib/shots-cache'
 import {
+  isStoppedTake,
   selectHandoffTake,
-  selectLatestAttempt,
+  selectLatestShotAttempt,
   type VideoTakeSelectionRecord,
 } from '@/lib/director-video-take-selection'
 import {
@@ -28,6 +29,7 @@ import { nearestEditPoint } from '@/lib/editor/timeline-segments'
 import { TRANSITION_DEFAULT_SEC, cleanTransition, crossSourceSec, dipOpacityAt, dissolveOpacityAt, edgeFadeAt, edgeTransition, joinedNeighbor, transitionWindows, type TransitionEdge, type TransitionWindow } from '@/lib/editor/transition'
 import { VIDEO_EFFECT_DEFAULT, patchEffects, type VideoEffectKind, type VideoEffectPatch } from '@/lib/editor/video-effects'
 import { TITLE_CLIP_SECONDS, TITLE_SIZE_DEFAULT, cleanTitleText } from '@/lib/editor/title-clip'
+import { withCancelledTakes } from '@/lib/director/take-cancellations'
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -2176,7 +2178,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             loadShotsResult(projectId),
             supabase
               .from('video_clips')
-              .select('id, shot_id, url, status, is_final, take_number, created_at, deleted_at, thumbnail_url, last_attempt_status, last_attempt_at')
+              .select('id, shot_id, url, status, is_final, take_number, created_at, deleted_at, thumbnail_url, last_attempt_status, last_attempt_at, last_attempt_job_id')
               .eq('project_id', projectId),
           ]),
           timedOut,
@@ -2191,8 +2193,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         if (clipsError) throw new Error(`Editor video clips load failed: ${clipsError.message}`)
 
         // The thumbnail must represent the same successful take chosen for export/editor handoff.
+        //   화면에서 멈춘 Take(오너 2026-11-14 7번)는 ★ 로 고르지 않은 한 넘기지 않는다 — 멈춤을 붙여 고른다.
+        const liveClips = await withCancelledTakes(supabase, (dbClips ?? []) as HandoffClip[])
+        if (
+          editorLoadEpoch !== loadEpoch ||
+          useProjectStore.getState().projectId !== projectId
+        ) {
+          return
+        }
         const clipsByShot = new Map<string, HandoffClip[]>()
-        for (const clip of dbClips ?? []) {
+        for (const clip of liveClips) {
           if (typeof clip.shot_id !== 'string') continue
           const clips = clipsByShot.get(clip.shot_id) ?? []
           clips.push(clip)
@@ -2203,8 +2213,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         for (const [shotId, clips] of clipsByShot) {
           const handoff = selectHandoffTake(clips)
           if (handoff) handoffByShot.set(shotId, handoff)
-          const latestAttempt = selectLatestAttempt(clips)
-          if (latestAttempt) latestAttemptByShot.set(shotId, latestAttempt)
+          // 가장 새 시도는 Director 샷 상태와 같은 규칙(멈춘 Take 의 시각은 멈춘 때) — 그것이 멈춘 Take 면 그 샷은 생성 중도 실패도 아닌 대기 중(검토 a).
+          const latestAttempt = selectLatestShotAttempt(clips)
+          if (latestAttempt && !isStoppedTake(latestAttempt)) latestAttemptByShot.set(shotId, latestAttempt)
         }
 
         if (dbShots?.length) {

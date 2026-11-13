@@ -10,7 +10,7 @@ vi.mock('@/lib/llm', () => ({ llmChat: mocks.llmChat }))
 vi.mock('@/lib/chat-trace-server', () => ({ persistChatTraceBestEffort: mocks.persistTrace }))
 vi.mock('@/lib/generation-jobs', () => ({ userOwnsProject: mocks.userOwnsProject }))
 
-import { groundVideoRequest, type ChatShotRef } from '@/lib/director/chat-video-targets'
+import { answeredShotNumbers, askedBackShotNumbers, groundVideoRequest, type ChatShotRef } from '@/lib/director/chat-video-targets'
 import { POST } from '@/app/api/director/chat/route'
 
 // 보드: 샷 1~6 — 샷 1~4 는 이미지가 나왔고, 샷 5 · 6 은 영상이 실패했다.
@@ -310,6 +310,59 @@ describe('반대로 걸리던 말(검토 b efac9881 탐침)', () => {
   it('"Don’t make the videos" · "Don’t skip shot 2, make all the videos"처럼 둥근 따옴표(’)로 써도 같은 말로 읽는다', () => {
     expect(ground('Don’t make the videos', null)).toEqual(NONE)
     expect(ground('Don’t skip shot 2, make all the videos', null)).toEqual(confirm(1, 2, 3, 4, 5, 6))
+  })
+})
+
+describe('고르는 말(검토 a 통합 낮음)', () => {
+  // 왜: 검토 a 통합 낮음 — "샷 3이나 4"는 둘 중 하나를 고르는 말인데 "그리고"로 읽어 두 샷 영상을 바로 만들었다(Take 두 배).
+  it('고르는 말("샷 3이나 4" · "샷 3 또는 4" · "shot 3 or 4")이 있으면 바로 만들지 않고 두 샷을 센 목록으로 되묻는다', () => {
+    for (const text of ['샷 3이나 4 영상 만들어줘', '샷 3 또는 4 영상 만들어줘', 'Make the video for shot 3 or 4']) {
+      expect(ground(text, ids(3, 4)), text).toEqual(confirm(3, 4))
+    }
+  })
+})
+
+describe('번호 목록의 이음말(검토 b 낮음)', () => {
+  // 왜: 검토 b 낮음 — "샷 3이랑 4"의 4 를 읽지 못해 샷 3 만 되물었다("응"이면 샷 3 만 만듦). "과 · 와"와 같은 "그리고" 말이다.
+  it('"샷 3이랑 4" · "샷 3하고 4" · "샷 3랑 4"처럼 "그리고" 말로 이은 번호는 모두 세어 "샷 3과 4"처럼 바로 만든다', () => {
+    for (const text of ['샷 3이랑 4 영상 만들어줘', '샷 3하고 4 영상 만들어줘', '샷 3랑 4 영상 만들어줘']) {
+      expect(ground(text, ids(3, 4)), text).toEqual(run(3, 4))
+    }
+  })
+  // 왜: 같은 까닭 — 고르는 말("이든 · / · vs")도 두 번호를 다 읽어, 바로 만들지 않고 센 목록으로 되묻는다.
+  it('"샷 3이든 4든" · "샷 3/4" · "shot 3 vs 4"처럼 고르는 말은 두 샷을 센 목록으로 되묻는다', () => {
+    for (const text of ['샷 3이든 4든 영상 만들어줘', '샷 3/4 영상 만들어줘', 'Make the video for shot 3 vs 4']) {
+      expect(ground(text, ids(3, 4)), text).toEqual(confirm(3, 4))
+    }
+  })
+})
+
+describe('고르는 말 앞뒤의 번호(검토 b 탐침 revb35 C1 · C2)', () => {
+  // 왜: 검토 b 탐침 — "샷 3 아니면 4" · "3이나 4번 샷"은 번호 하나를 놓쳐 그 샷만 되물었고, 번호를 물은 뒤 "3 아니면 4" · "3이든 4든"은 대답으로도 되묻기로도 읽지 못했다.
+  it('"샷 3 아니면 4" · "3이나 4번 샷"처럼 고르는 말 앞뒤의 번호를 모두 읽어 두 샷을 센 목록으로 되묻고, 번호를 물은 뒤의 "3 아니면 4" · "3이든 4든"도 그 목록으로 되묻는다', () => {
+    for (const text of ['샷 3 아니면 4 영상 만들어줘', '3이나 4번 샷 영상 만들어줘']) {
+      expect(ground(text, ids(3, 4)), text).toEqual(confirm(3, 4))
+    }
+    for (const text of ['3 아니면 4', '3이든 4든']) {
+      expect(answeredShotNumbers(text), text).toBeNull()
+      expect([...(askedBackShotNumbers(text) ?? [])], text).toEqual([3, 4])
+    }
+  })
+})
+
+describe('다시 만들기 — 영상이 이미 있는 샷(리드 결정)', () => {
+  // 왜: 리드 결정(오너 9번 · 샷 상세 [다시 만들기]는 늘 새 Take) — 영상이 있는 샷을 번호로 다시 부탁하면 "지금 그런 샷이 없어요"였다.
+  //   묶음 말("실패한 샷" · "남은 샷")은 지금처럼 영상이 있는 샷을 넣지 않는다.
+  it('다시 만들기 부탁이면 번호로 댄 샷은 영상이 있어도 겨누고(번호 + 시키는 말뿐이면 바로, 아니면 목록으로 되묻기), 묶음 말은 지금처럼 영상이 없는 샷만 겨눈다', () => {
+    // 샷 1 · 3 · 4 는 영상이 있고(만들 수 있는 샷이 아님), 샷 2 · 5 · 6 은 영상이 없다. 만드는 중인 샷은 없다(다시 만들 수 있는 샷 = 전부).
+    const remake = (text: string, requested: string[] | null) =>
+      groundVideoRequest({ text, requested, shots, eligible: ids(2, 5, 6), selected: [], remakable: ALL })
+    expect(remake('샷 1 영상 다시 만들어줘', ids(1))).toEqual(run(1))
+    expect(remake('샷 1 영상 다시 만들어줘, 더 밝게', ids(1))).toEqual(confirm(1))
+    expect(remake('실패한 샷 다시 만들어줘', null)).toEqual(run(5, 6))
+    expect(remake('남은 샷 영상 다시 만들어줘', null)).toEqual(run(2, 5, 6))
+    // 다시 만들기가 아니면(remakable 없음) 영상이 있는 샷은 지금처럼 겨누지 않는다.
+    expect(groundVideoRequest({ text: '샷 1 영상 만들어줘', requested: ids(1), shots, eligible: ids(2, 5, 6), selected: [] })).toEqual(run())
   })
 })
 

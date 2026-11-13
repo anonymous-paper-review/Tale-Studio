@@ -54,8 +54,9 @@ export function RemakeRetryButton({
         }}
         title={t('Regenerate the image?')}
         description={t('Generates a new shooting image for this shot.')}
-        impact={[t('Replaces the existing shooting image with the new result.')]}
-        confirmLabel={t('Regenerate')}
+        impact={[t('The new image becomes the current one. The current image stays in the versions.')]}
+        // 단추는 툴바 확인 창과 같은 "다시 만들기"(리드 11/14 — 옛 말 "재생성").
+        confirmLabel={t('Make again')}
         busy={generation.disabled}
         onConfirm={() => {
           setConfirm(false)

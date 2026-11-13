@@ -12,7 +12,9 @@ import { useLumiNoticeStore } from '@/stores/lumi-notice-store'
 import { notifyQuotaExceeded } from '@/lib/generation-quota-toast'
 import { buildVideoBatchInputs } from '@/lib/director/video-batch-inputs'
 import type { VideoBatchStartResponse, VideoBatchSummary } from '@/lib/director/video-batch-types'
+import { videoBatchQueueOf } from '@/lib/director/video-batch-queue'
 import { invalidateShots } from '@/lib/shots-cache'
+import { activeJobsSnapshot } from '@/lib/generation-queue'
 
 const EMPTY_RESULT = { total: 0, started: 0, failed: 0 }
 /** 서버 저장/조회로 이어가는 배치의 진행을 다시 확인하는 주기(#batch-resume, 2026-09-09). */
@@ -37,6 +39,8 @@ export function eligibleVideoBatchShotIds(nodes: DirectorNode[]): string[] {
       const children = videosByShot.get(shot.id) ?? []
       return !children.some((video) => {
         if (!isVideoData(video.data)) return false
+        // 화면에서 멈춘 Take(오너 2026-11-14 7번)는 ★ 가 아니면 영상도, 만드는 중도 아니다 — 샷 상태 · 서버 일괄 검사와 같은 규칙.
+        if (video.data.cancelledAt && !video.data.final) return false
         const playable =
           video.data.status === 'completed' &&
           typeof video.data.videoUrl === 'string' &&
@@ -77,15 +81,19 @@ function isBatchActive(summary: VideoBatchSummary): boolean {
 }
 
 /**
- * 묶음의 차례(11/5 시안 DG, 2026-11-09): 지금 만드는 작업과 아직 안 낸 샷. 멈췄거나 쉬는 묶음의 남은 샷은 만들지 않으므로
- * 차례에 두지 않는다(계속 기다리는 것처럼 보이면 안 된다).
+ * 멈춘 묶음(running 아님)에 남은 영상이 모두 화면에서 멈춘 것이면 끝난 것으로 본다 — 그 영상이 생성처에서 끝나기를(몇 분)
+ * 기다리지 않는다(오너 7번 · 리드 11/14). 묶음이 도는 동안은 상세 · 넘기기 창 · Lumi 가 그 샷을 다시 만들지 못한다.
+ * 멈춤은 지금 도는 작업 목록(멈춘 때가 붙은 것)으로 안다 — 목록이 아직 모르면 다음 조회에서 다시 본다.
  */
-function queueOf(summary: VideoBatchSummary): { jobIds: string[]; pendingShotIds: string[] } {
-  return {
-    jobIds: summary.jobs.flatMap((job) => (job.jobId && job.status === 'queued' ? [job.jobId] : [])),
-    pendingShotIds: summary.status === 'running' ? summary.pendingShotIds ?? [] : [],
-  }
+function onlyStoppedLeft(projectId: string, summary: VideoBatchSummary): boolean {
+  if (summary.status === 'running' || summary.active === 0) return false
+  const stopped = new Set(activeJobsSnapshot(projectId).flatMap((job) => (job.cancelledAt ? [job.id] : [])))
+  const running = summary.jobs.filter((job) => job.status === 'queued')
+  return running.length > 0 && running.every((job) => !!job.jobId && stopped.has(job.jobId))
 }
+
+/** 묶음의 차례 — 지금 만드는 작업과 아직 안 낸 샷(video-batch-queue.ts, [먼저 하기]와 같이 쓴다). */
+const queueOf = videoBatchQueueOf
 
 /**
  * 서버가 이어가는 배치를 GET 으로 계속 읽어 store 진행 상태를 반영한다. 이 함수는 저장된
@@ -103,6 +111,22 @@ async function pollVideoBatch(
 ): Promise<VideoBatchSummary | null> {
   const store = useDirectorCanvasStore
   let summary = initial
+  /** 화면에서 멈추라고 이미 부탁한 작업 — 같은 작업은 한 번만 멈춘다. */
+  const stopAsked = new Set<string>()
+  // 사람이 묶음을 멈췄다(cancelled) — 그 묶음이 이미 낸 영상도 화면에서 멈춘다(오너 2026-11-14 7번). [모두 멈추기]와 서버의
+  //   다음 영상 내기가 엇갈려 막 낸 영상도 놓치지 않는다. 진행 표시와는 따로 돌고, 실패하면 다음 조회 때 다시 부탁한다.
+  const stopStartedVideos = () => {
+    if (summary.status !== 'cancelled') return
+    const toStop = summary.jobs.flatMap((job) => (job.jobId && job.status === 'queued' && !stopAsked.has(job.jobId) ? [job.jobId] : []))
+    if (toStop.length === 0) return
+    for (const id of toStop) stopAsked.add(id)
+    void Promise.resolve()
+      .then(() => store.getState().cancelRunningJobs(toStop))
+      .catch((error) => {
+        for (const id of toStop) stopAsked.delete(id)
+        console.error('[video-batches] stopping started videos failed:', error)
+      })
+  }
   const apply = () => {
     if (!ownsRun()) return
     store.setState({
@@ -114,6 +138,7 @@ async function pollVideoBatch(
       },
       videoBatchQueue: queueOf(summary),
     })
+    stopStartedVideos()
     let sawNewTerminalJob = false
     let sawNewRunningJob = false
     for (const job of summary.jobs) {
@@ -147,7 +172,7 @@ async function pollVideoBatch(
   while (true) {
     apply()
     if (!ownsRun()) return null
-    if (!isBatchActive(summary)) return summary
+    if (!isBatchActive(summary) || onlyStoppedLeft(projectId, summary)) return summary
     await sleep(POLL_INTERVAL_MS)
     if (!ownsRun()) return null
 
@@ -182,7 +207,9 @@ export async function runVideoBatch(
 ): Promise<VideoBatchResult> {
   const store = useDirectorCanvasStore
   const current = store.getState()
-  if (!projectId || current.projectId !== projectId || current.videoBatchBusy) {
+  // 멈춘 묶음이 뒤에서 아직 돌아도(화면에서 멈춘 영상이 fal 에서 끝나기를 기다림) 새 묶음은 바로 시작한다(오너 7번) —
+  //   새 실행 id 가 옛 조회를 조용히 끝낸다.
+  if (!projectId || current.projectId !== projectId || (current.videoBatchBusy && !current.videoBatchCancelled)) {
     return { ...EMPTY_RESULT }
   }
 
@@ -256,8 +283,11 @@ export async function runVideoBatch(
   const failed = finalSummary.failedToStart + skipped
   const done = finalSummary.done
   const completedFailures = finalSummary.failed + skipped
+  // 멈춘 영상만 남아 끝난 묶음(완료 · 실패 0)은 끝 줄 · 알림 카드를 띄우지 않는다 — 멈춤 알림이 이미 떴다(리드 11/14).
+  //   완료 · 실패가 하나라도 있으면 지금처럼 알린다(멈춘 영상은 아직 도는 중이라 세지 않는다).
+  const stoppedOnly = done === 0 && completedFailures === 0 && finalSummary.active > 0
 
-  if (ownsRun() && total > 0) {
+  if (ownsRun() && total > 0 && !stoppedOnly) {
     const line = translate(useLocaleStore.getState().locale, '{done} videos done, {failed} failed', {
       done,
       failed: completedFailures,

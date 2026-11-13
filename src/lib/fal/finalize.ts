@@ -38,6 +38,9 @@ import {
   uploadImmutableObject,
 } from '@/lib/storage/immutable-object'
 import { storageKeySegment } from '@/lib/storage/key-segment'
+import { updateStoryboardImage } from '@/lib/director/storyboard-image-store'
+import { isJobCancelled } from '@/lib/director/job-cancellations'
+import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
 // Natural IDs stay in the database; new storage objects use the shared versioned,
@@ -949,6 +952,11 @@ async function cleanupRefSheet(job: GenerationJob): Promise<void> {
   }
 }
 
+/** 실사 프레임 파일 자리 — 작업마다 새 이름(_g{작업 id})이라 다시 만들어도 옛 버전 그림이 남는다. 끝말(_storyboard_{프레임}.png)은 그대로. */
+function storyboardFramePath(base: string, seg: string, jobId: string, frame: 'start' | 'direction' | 'end'): string {
+  return `${base}/${seg}_g${jobId}_storyboard_${frame}.png`
+}
+
 /**
  * 실사 3프레임 스트립(#real-strip 2026-07-22) 영속화 — 스트립 원본 업로드 → strip1 크롭 →
  *   샷별 3프레임 업로드 → shots.storyboard_image 를 frames shape(url=start 하위호환)로 갱신.
@@ -1013,9 +1021,10 @@ async function finalizeStoryboardStripJob(
   }
   // 경로를 변수로 뽑아 원본 업로드와 썸네일 생성이 **같은 문자열**을 쓴다 — 문자열을 두 번
   //   쓰면 오타 하나로 짝이 어긋나고, 404 폴백 때문에 조용히 원본이 나간다(#thumb-pipeline).
-  const startPath = `${base}/${seg}_storyboard_start.png`
-  const directionPath = `${base}/${seg}_storyboard_direction.png`
-  const endPath = `${base}/${seg}_storyboard_end.png`
+  //   작업마다 새 이름(_g{작업 id}) — 옛 버전의 그림을 덮지 않는다(디자이너 11/13 D6 · 오너 2026-11-14 답 5번).
+  const startPath = storyboardFramePath(base, seg, job.id, 'start')
+  const directionPath = storyboardFramePath(base, seg, job.id, 'direction')
+  const endPath = storyboardFramePath(base, seg, job.id, 'end')
   const [startUrl, directionUrl, endUrl] = await Promise.all([
     upload(startPath, frames.start),
     upload(directionPath, frames.direction),
@@ -1029,22 +1038,19 @@ async function finalizeStoryboardStripJob(
     uploadThumbnail(endPath, frames.end),
   ])
 
-  const { error } = await supabaseAdmin
-    .from('shots')
-    .update({
-      storyboard_image: {
-        url: startUrl, // 하위 호환 대표 프레임 (Node 뷰 등 구 소비처는 url 만 읽음)
-        frames: { start: startUrl, direction: directionUrl, end: endUrl },
-        status: 'completed',
-        errorMessage: null,
-        generatedAt: Date.now(),
-        // 약속 I4: 참조한 러프의 시각 — 러프가 바뀌면 "러프 바뀜"(자동 재생성은 하지 않는다, 오너 I5).
-        roughGeneratedAt: job.target.roughGeneratedAt ?? null,
-      },
-    })
-    .eq('project_id', job.project_id)
-    .eq('shot_id', writerShotId)
-  if (error) throw error
+  // 버전 하나를 쌓고 지금 그림으로 — 위 칸(url = start 하위 호환 대표 프레임 · frames)은 이 버전을 비춘다.
+  //   화면에서 멈춘 작업(오너 7번)이면 기록에만 넣고 지금 그림은 그대로 둔다.
+  const stopped = await isJobCancelled(job.id)
+  await updateStoryboardImage(job.project_id, writerShotId, (current) => withStoryboardVersion(current, {
+    id: job.id,
+    url: startUrl,
+    frames: { start: startUrl, direction: directionUrl, end: endUrl },
+    generatedAt: Date.now(),
+    source: 'generated',
+    // 약속 I4: 참조한 러프의 시각 — 러프가 바뀌면 "러프 바뀜"(자동 재생성은 하지 않는다, 오너 I5).
+    roughGeneratedAt: job.target.roughGeneratedAt ?? null,
+    ...(stopped ? { cancelled: true as const } : {}),
+  }, { select: !stopped }))
 
   await completeGenerationJob(job.id, startUrl)
   await cleanupRefSheet(job) // #ref-sheet-ttl — 일회용 합성 레퍼런스 회수(성공 후, 무해 실패)
@@ -1066,24 +1072,20 @@ export async function finalizeShotStoryboardJob(
     throw new Error('shot_storyboard job target missing workspaceId/writerShotId')
   }
   await recordFalResponseSnapshot(job, falPayload)
-  const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_storyboard_image.png`
+  // 작업마다 새 이름(_g{작업 id}) — 옛 버전의 그림을 덮지 않는다(오너 2026-11-14 답 5번).
+  const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_g${job.id}_storyboard_image.png`
   const publicUrl = await uploadImageFromUrl(falImageUrl, path)
 
-  // upload-image 라우트와 동일한 JSONB shape (ShotNode/StoryboardGridView가 소비).
-  const { error } = await supabaseAdmin
-    .from('shots')
-    .update({
-      storyboard_image: {
-        url: publicUrl,
-        status: 'completed',
-        errorMessage: null,
-        generatedAt: Date.now(),
-        roughGeneratedAt: job.target.roughGeneratedAt ?? null,
-      },
-    })
-    .eq('project_id', job.project_id)
-    .eq('shot_id', writerShotId)
-  if (error) throw error
+  // upload-image 라우트와 같은 모양 + 버전 하나(ShotNode/StoryboardGridView 는 위 칸만 읽는다). 멈춘 작업이면 기록에만.
+  const stopped = await isJobCancelled(job.id)
+  await updateStoryboardImage(job.project_id, writerShotId, (current) => withStoryboardVersion(current, {
+    id: job.id,
+    url: publicUrl,
+    generatedAt: Date.now(),
+    source: 'generated',
+    roughGeneratedAt: job.target.roughGeneratedAt ?? null,
+    ...(stopped ? { cancelled: true as const } : {}),
+  }, { select: !stopped }))
 
   await completeGenerationJob(job.id, publicUrl)
   return publicUrl
@@ -1145,15 +1147,17 @@ async function finalizeRealGridJob(
     sheetFormatOfJob(job),
     'repaint', // #repaint-crop: 실사 표면 — 스펙 셀 고정+인셋
   )
+  const stoppedSheet = await isJobCancelled(job.id)
   let representativeUrl = ''
   for (let i = 0; i < writerShotIds.length; i++) {
     const shotId = writerShotIds[i]
     const seg = storageKeySegment(shotId)
     const frames = perShot[i]
     // 업로드·썸네일이 같은 경로 문자열을 공유 + 3프레임 전부 생성 (#thumb-pipeline — 위 strip 경로와 동일 규칙).
-    const startPath = `${base}/${seg}_storyboard_start.png`
-    const directionPath = `${base}/${seg}_storyboard_direction.png`
-    const endPath = `${base}/${seg}_storyboard_end.png`
+    //   작업마다 새 이름 — 한 장(4샷)이라도 샷마다 자기 버전 파일이다.
+    const startPath = storyboardFramePath(base, seg, job.id, 'start')
+    const directionPath = storyboardFramePath(base, seg, job.id, 'direction')
+    const endPath = storyboardFramePath(base, seg, job.id, 'end')
     const [startUrl, directionUrl, endUrl] = await Promise.all([
       upload(startPath, frames.start),
       upload(directionPath, frames.direction),
@@ -1166,21 +1170,17 @@ async function finalizeRealGridJob(
       uploadThumbnail(endPath, frames.end),
     ])
 
-    const { error } = await supabaseAdmin
-      .from('shots')
-      .update({
-        storyboard_image: {
-          url: startUrl, // 하위 호환 대표 프레임 (Node 뷰 등 구 소비처는 url 만 읽음) [#real-grid-final]
-          frames: { start: startUrl, direction: directionUrl, end: endUrl },
-          status: 'completed',
-          errorMessage: null,
-          generatedAt: Date.now(),
-          roughGeneratedAt: job.target.roughGeneratedAtByShot?.[shotId] ?? null,
-        },
-      })
-      .eq('project_id', job.project_id)
-      .eq('shot_id', shotId)
-    if (error) throw error
+    // 샷마다 버전 하나를 쌓고 지금 그림으로 — url 은 하위 호환 대표 프레임(start) [#real-grid-final].
+    //   화면에서 멈춘 장(오너 7번)이면 넷 다 기록에만 넣고 지금 그림은 그대로 둔다.
+    await updateStoryboardImage(job.project_id, shotId, (current) => withStoryboardVersion(current, {
+      id: job.id,
+      url: startUrl,
+      frames: { start: startUrl, direction: directionUrl, end: endUrl },
+      generatedAt: Date.now(),
+      source: 'generated',
+      roughGeneratedAt: job.target.roughGeneratedAtByShot?.[shotId] ?? null,
+      ...(stoppedSheet ? { cancelled: true as const } : {}),
+    }, { select: !stoppedSheet }))
   }
 
   await completeGenerationJob(job.id, representativeUrl)

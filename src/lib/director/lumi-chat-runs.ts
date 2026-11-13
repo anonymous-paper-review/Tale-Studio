@@ -9,8 +9,11 @@ import { effectivePromptOf } from '@/lib/director/video-frame-inputs'
 import type { BoardNodeNames } from '@/features/director/node-label'
 import { directorNodeLabel } from '@/features/director/node-label'
 import type { DirectorCanvasUpdate } from '@/stores/director-store'
-import { isSceneData, isShotData, isVideoData, type DirectorNode } from '@/types/director'
+import { isSceneData, isShotData, type DirectorNode } from '@/types/director'
 import type { ChatShotRef } from '@/lib/director/chat-video-targets'
+import { shotFactsByNode, shotState, type DirectorShotState } from '@/lib/director/shot-state'
+import { latestShotTake, takeSettings } from '@/lib/director/remake-take'
+import { takeCostForVideo } from '@/lib/billing/take-cost'
 
 /** 보드 번호("Shot 8" → 8). 보드에 없는 샷(Director 에서 만든 것 · 이름을 바꾼 것)은 null. */
 function boardNo(node: DirectorNode, names: BoardNodeNames | null): number | null {
@@ -19,26 +22,33 @@ function boardNo(node: DirectorNode, names: BoardNodeNames | null): number | nul
   return match ? Number(match[1]) : null
 }
 
-/** 샷마다 보드 번호 · 이미지 준비 · 영상 실패(완성 Take 가 없고 마지막 시도가 실패, 만드는 중이 아님). */
-export function directorShotRefs(nodes: readonly DirectorNode[], names: BoardNodeNames | null): ChatShotRef[] {
-  const takes = new Map<string, DirectorNode[]>()
-  for (const node of nodes) {
-    if (!isVideoData(node.data) || node.data.parentShotNodeId === null) continue
-    takes.set(node.data.parentShotNodeId, [...(takes.get(node.data.parentShotNodeId) ?? []), node])
-  }
+/** 샷마다 보드 번호 · 이미지 준비 · 영상 실패. 영상 실패는 보드가 빨강(영상 실패)으로 보이는 샷 그대로다 — 화면에서 멈춘 Take 규칙까지
+ *  보드와 같은 판단(shot-state) 하나로 센다(리드 검토 a). states 를 주면(큐 · 일괄 대기까지 센 보드 상태) 그것을, 없으면 노드만으로 센다. */
+export function directorShotRefs(
+  nodes: readonly DirectorNode[],
+  names: BoardNodeNames | null,
+  states?: ReadonlyMap<string, DirectorShotState>,
+): ChatShotRef[] {
+  const board = states ?? new Map([...shotFactsByNode(nodes, { queuedImageShots: new Set(), queuedVideoShots: new Set() })].map(([id, facts]) => [id, shotState(facts)]))
   return nodes.flatMap((node) => {
     if (!isShotData(node.data)) return []
     const image = node.data.storyboardImage
-    const own = (takes.get(node.id) ?? []).flatMap((take) => (isVideoData(take.data) ? [take.data] : []))
-    const playable = own.some((take) => take.status === 'completed' && !!take.videoUrl)
-    const making = own.some((take) => take.status === 'generating' || take.lastAttemptStatus === 'generating')
-    const failed = own.some((take) => take.lastAttemptStatus === 'failed' || (take.lastAttemptStatus == null && take.status === 'failed'))
     return [{
       nodeId: node.id,
       shotNo: boardNo(node, names),
       imageReady: image?.status === 'completed' && !!image.url,
-      videoFailed: !playable && !making && failed,
+      videoFailed: board.get(node.id) === 'video_failed',
     }]
+  })
+}
+
+/** 다시 만들기에 드는 Take — 그 샷의 가장 최근 Take(실패해도)의 모델 · 해상도로 센다(넘기기 창 · 샷 상세 [다시 만들기] 단추 값과 같은 셈). */
+export function remakeTakeCosts(nodes: readonly DirectorNode[], shotIds: readonly string[]): number[] {
+  return shotIds.map((id) => {
+    const shot = nodes.find((node) => node.id === id)
+    if (!shot || !isShotData(shot.data)) return takeCostForVideo(null)
+    const { model, resolution } = takeSettings(shot.data, latestShotTake(nodes, id)?.data ?? null)
+    return takeCostForVideo(model, resolution)
   })
 }
 

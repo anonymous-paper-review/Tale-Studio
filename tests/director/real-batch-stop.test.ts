@@ -1,4 +1,4 @@
-// [모두 멈추기]를 누르면 이미지 일괄은 아직 보내지 않은 장을 보내지 않는다 — 이미 보낸 장은 끝까지 만든다 (시안 D3 406:4931, 오너 답 7)
+// [모두 멈추기]를 누르면 이미지 일괄은 아직 보내지 않은 장을 보내지 않는다 — 이미 보낸 장은 화면에서 멈춘다(서버에서는 끝까지 돈다) (시안 D3 406:4931, 오너 답 7)
 import { readFileSync } from 'node:fs'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -60,10 +60,12 @@ describe('이미지 일괄 멈추기', () => {
     expect(useDirectorCanvasStore.getState().realBatchBusy).toBe(false)
   })
 
-  it('[모두 멈추기]는 이미지 일괄이나 영상 묶음이 돌 때 보이고, 누르면 둘 다 아직 보내지 않은 것을 멈춘다', () => {
-    // 왜: 시안 D3 · D4 — 2줄 진행 옆 [모두 멈추기] 하나.
+  it('[모두 멈추기]는 이 화면에서 무엇이든 만들고 있으면 보이고, 누르면 이미지 일괄 · 영상 묶음의 아직 보내지 않은 것을 멈춘다', () => {
+    // 왜: 시안 D3 · D4 — 2줄 진행 옆 [모두 멈추기] 하나. 2026-11-14 문장 바꿈(오너 7번 — 만드는 중인 것도 화면에서 멈추게 되어 일괄이 아닐 때도 보인다,
+    //   만드는 중인 것은 stop-all.test.ts): 예전 "[모두 멈추기]는 이미지 일괄이나 영상 묶음이 돌 때 보이고, 누르면 둘 다 아직 보내지 않은 것을 멈춘다".
     const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
-    expect(page).toContain('(realBatchBusy || videoBatchBusy) && (')
+    expect(page).not.toContain('(realBatchBusy || videoBatchBusy) && (')
     expect(page).toContain('if (realBatchBusy && !realBatchCancelled) run.cancelRealBatch()')
+    expect(page).toContain('await run.cancelVideoBatch()')
   })
 })

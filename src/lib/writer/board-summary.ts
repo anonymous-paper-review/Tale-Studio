@@ -1,5 +1,6 @@
 // Storyboard 보드의 숫자 · 샷 이름 · Director 넘김 창 내용 (리뉴얼 1차 2026-10-19, 프로토타입 S1 · S7).
 //   보드 카드 · 화면 머리 · 넘김 창이 같은 셈을 쓰도록 한 곳에 둔다 — 러닝타임은 목표가 아니라 샷 길이의 합(지표)이다.
+import { countText } from '@/lib/i18n/count-text'
 import { translate } from '@/lib/i18n/translate'
 import type { AppLocale } from '@/lib/locale'
 import { isRoughDrawn } from '@/lib/writer/rough-progress'
@@ -82,7 +83,8 @@ export function sceneStats(manifest: BoardManifest, shots: readonly Pick<Shot, '
 
 /** 씬 머리 "3컷 · 7초". */
 export function sceneStatsLabel(stats: SceneStats, locale: AppLocale): string {
-  return translate(locale, '{count} cuts · {seconds}s', { count: stats.shots, seconds: stats.seconds })
+  // 영어는 컷이 하나면 단수 문장(리드 11/14 — 영어 재점검 "1 cuts").
+  return countText((key, params) => translate(locale, key, params), stats.shots, '1 cut · {seconds}s', '{count} cuts · {seconds}s', { count: stats.shots, seconds: stats.seconds })
 }
 
 export interface DirectorHandoffSummary {

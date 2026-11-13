@@ -12,6 +12,8 @@ const mocks = vi.hoisted(() => ({
 vi.mock('react', async (original) => ({
   ...await original<typeof import('react')>(),
   useMemo: (factory: () => unknown) => factory(),
+  // 새 샷 상세 이미지 탭은 바꾸고 싶은 점 칸을 자기 상태로 둔다 — 이 시험은 한 번 그린 화면만 본다.
+  useState: (initial: unknown) => [typeof initial === 'function' ? (initial as () => unknown)() : initial, () => {}],
 }))
 vi.mock('@/lib/i18n', () => ({ useT: () => (text: string) => text }))
 vi.mock('@/lib/use-debug-prompts', () => ({ useDebugPrompts: () => false }))
@@ -38,14 +40,16 @@ vi.mock('@/stores/director-store', () => {
     effectivePrompt: (data: ShotNodeData) => data.prompt,
   }
 })
+vi.mock('@/stores/project-format-store', () => ({
+  useProjectFormatStore: (selector: (value: { format: string }) => unknown) => selector({ format: 'horizontal_16:9' }),
+}))
 vi.mock('@/stores/asset-storage-store', () => ({
   useAssetStorageStore: (selector: (value: { characters: Record<string, never>; worlds: Record<string, never> }) => unknown) =>
     selector({ characters: {}, worlds: {} }),
 }))
 
 import { AssetDetailPanel } from '@/features/director/canvas-panels/AssetDetailPanel'
-import { ShotDetailPanel } from '@/features/director/canvas-panels/ShotDetailPanel'
-import { ShotNodePopup } from '@/features/director/canvas-popups/ShotNodePopup'
+import { ShotImageTab } from '@/features/director/shot-detail/shot-image-tab'
 
 type Element = ReactElement<Record<string, unknown>>
 function elements(node: ReactNode): Element[] {
@@ -77,8 +81,9 @@ const asset: AssetNodeData = {
 }
 const surfaces = [
   ['이미지 편집 패널', () => AssetDetailPanel({ nodeId: 'node-1', data: asset })],
-  ['샷 편집 패널', () => ShotDetailPanel({ nodeId: 'node-1', data: shot })],
-  ['샷 편집 팝업', () => ShotNodePopup({ nodeId: 'node-1', data: shot })],
+  // 샷 상세(시안 D6 · D7)의 이미지 탭 — 참고 이미지 올리기가 있는 곳. 노드형 왼쪽 패널 · 스토리보드형 팝업이 같은 탭을 연다.
+  ['샷 상세 패널', () => ShotImageTab({ nodeId: 'node-1', data: shot, layout: 'panel' })],
+  ['샷 상세 팝업', () => ShotImageTab({ nodeId: 'node-1', data: shot, layout: 'popup' })],
 ] as const
 
 function selectFile(render: () => ReactNode, file: File) {

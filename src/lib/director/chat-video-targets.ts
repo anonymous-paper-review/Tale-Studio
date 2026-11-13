@@ -16,10 +16,13 @@ export interface ChatShotRef {
 /** 숫자 하나 — 바로 뒤에 단위(초 · s · sec · % · 배 · x · fps · 분)가 붙으면 샷 번호가 아니다("샷 3, 5초짜리로"의 5). */
 const UNIT = String.raw`(?:초|s\b|secs?\b|seconds?\b|%|배|x\b|fps\b|분|mins?\b|minutes?\b)` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const NUM = String.raw`\d+(?!\d)(?!\s*${UNIT})`
-const NUMBER_LIST = String.raw`${NUM}(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및)\s*${NUM})*` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+const NUMBER_LIST = String.raw`${NUM}(?:\s*(?:[·,、&~\-–/]|to|and|or|vs|와|과|및|이랑|랑|하고|이나|또는|혹은|이든|아니면)\s*${NUM})*` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+/** 고르는 말("샷 3이나 4" · "또는" · "이든" · "3/4" · "or" · "vs") — 둘 중 하나를 고르라는 말이라 바로 만들지 않고 센 목록으로 되묻는다(검토 a 통합 · 검토 b 낮음). */
+const CHOICE = /(이나|거나|또는|혹은|아니면|이든|\/|\bor\b|\beither\b|\bvs\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 /** "샷 3" · "Shot 3" · "@Real Shot 3" — 낱말 가운데("Screenshots 2" · "스크린샷 2")는 샷이 아니다. */
 const SHOT_LIST = new RegExp(String.raw`(?<![A-Za-z가-힣])(?:샷|shots?)\s*#?\s*(${NUMBER_LIST})`, 'gi') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-const NUMBERED_SHOT = new RegExp(String.raw`(${NUM})\s*번\s*샷`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+/** "3번 샷" · "3이나 4번 샷" — "번 샷" 앞의 번호 목록 전부(고르는 말 앞의 번호도 놓치지 않게, 검토 b 탐침 C1). */
+const NUMBERED_SHOT = new RegExp(String.raw`(${NUMBER_LIST})\s*번\s*샷`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 /** 바로 앞 번호를 빼는 말("2 빼고" · "샷 4 말고") · 바로 뒤 번호를 빼는 말("except shot 2" · "not shot 4" · "leave out shot 2").
  *   "빼지 말고" · "don't skip" · "without skipping"은 빼는 말이 아니다(검토 b efac9881). */
 const EXCLUDED_BEFORE = new RegExp(String.raw`(${NUMBER_LIST})\s*(?:번)?\s*(?:샷)?\s*(?:은|는|을|를|이|가)?\s*(?:영상\s*(?:은|는)?\s*)?(?:말고|빼고|제외|그대로\s*두|됐고|됐어|필요\s*없)`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
@@ -64,6 +67,12 @@ const GROUPS: Record<Group, RegExp[]> = {
   selected: [/(?:고른|선택한|선택된)\s*샷|(?<![가-힣])이\s*샷/, /\b(?:selected|chosen|picked)\s+shots?\b|\bthis\s+shot\b/i], // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 }
 
+/** 다시 만들기 말("다시" · again · remake · regenerate · redo) — 영상은 [다시 만들기]처럼 그 샷의 가장 최근 Take 설정을 이어받는다(리드 낮음 6). */
+const REMAKE = /(다시|\b(?:again|remake|regenerate|redo)\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+export function asksRemake(text: string): boolean {
+  return REMAKE.test(text)
+}
+
 /** 목록(1·2 · 1, 2 · 1과 2)과 구간(1~3 · 1-3 · 1 to 3)을 편다. */
 function expandNumbers(list: string, into: Set<number>): void {
   const tokens = list.match(/\d+|~|-|–|\bto\b/gi) ?? []
@@ -86,20 +95,28 @@ function expandNumbers(list: string, into: Set<number>): void {
 export function mentionedShotNumbers(text: string): Set<number> {
   const numbers = new Set<number>()
   for (const match of text.matchAll(SHOT_LIST)) expandNumbers(match[1], numbers)
-  for (const match of text.matchAll(NUMBERED_SHOT)) numbers.add(Number(match[1]))
+  for (const match of text.matchAll(NUMBERED_SHOT)) expandNumbers(match[1], numbers)
   return numbers
 }
 
 /** Lumi 가 번호를 물은 바로 다음 말 — 번호만으로 된 대답("3번" · "3번이랑 4번" · "1, 2" · "샷 3")이면 그 번호들, 아니면 null. */
-const NUMBER_ANSWER = new RegExp(String.raw`^(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및|랑|이랑|하고)\s*(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?)*\s*(?:샷|shots?)?\s*(?:영상|videos?)?\s*(?:을|를)?\s*(?:만들어\s*(?:줘|주세요)?|해\s*(?:줘|주세요)|please)?$`, 'i') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-export function answeredShotNumbers(text: string): Set<number> | null {
-  // "2?"는 대답이 아니라 되묻는 말이다(물음표 규칙 — 재재검토 b).
-  if (/[?？]/.test(text)) return null
-  const said = text.trim().replace(/[.!]+$/, '').trim()
+const NUMBER_ANSWER = new RegExp(String.raw`^(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?(?:\s*(?:[·,、&~\-–/]|to|and|or|vs|와|과|및|랑|이랑|하고|이나|또는|혹은|이든|아니면)\s*(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?(?:든)?)*\s*(?:샷|shots?)?\s*(?:영상|videos?)?\s*(?:을|를)?\s*(?:만들어\s*(?:줘|주세요)?|해\s*(?:줘|주세요)|please)?$`, 'i') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+function numbersOfAnswer(text: string): Set<number> | null {
+  const said = text.replace(/[?？]+/g, '').trim().replace(/[.!]+$/, '').trim()
   if (!NUMBER_ANSWER.test(said)) return null
   const numbers = new Set<number>()
   expandNumbers(said, numbers)
   return numbers.size > 0 ? numbers : null
+}
+export function answeredShotNumbers(text: string): Set<number> | null {
+  // "2?"(되묻는 말 — 재재검토 b) · "3이나 4"(고르는 말 — 검토 a 통합)는 대답이 아니다 — askedBackShotNumbers 가 그 목록으로 되묻는다.
+  if (/[?？]/.test(text) || CHOICE.test(text)) return null
+  return numbersOfAnswer(text)
+}
+/** 번호를 물은 뒤 "2?" · "3이나 4"처럼 되묻거나 고르는 말로 답했으면 그 번호들 — 바로 만들지 않고 그 샷 목록으로 되묻는다. 아니면 null. */
+export function askedBackShotNumbers(text: string): Set<number> | null {
+  if (!/[?？]/.test(text) && !CHOICE.test(text)) return null
+  return numbersOfAnswer(text)
 }
 
 /** 절 — 문장 부호(번호 목록 안의 쉼표는 빼고) · 접속 말 · "말고 · 빼고 · 아니고" 뒤에서 자른다("다 만드는 건 아니고 샷 3 만"의 샷 3 은 뒤 절). */
@@ -128,7 +145,8 @@ function groupsOf(clause: string): { wanted: Set<Group>; excluded: Set<Group> } 
 
 /** 허락하는 꼴 — 물음표가 없고, 샷 번호 · 묶음 말을 지운 나머지가 시키는 말 하나와 조각 · 문장 부호뿐이다. */
 function plainCommand(text: string): boolean {
-  if (/[?？]/.test(text)) return false
+  // 물음표(묻는 말) · 고르는 말("3이나 4" · or)이 있으면 허락하는 꼴이 아니다.
+  if (/[?？]/.test(text) || CHOICE.test(text)) return false
   let rest = text.replace(SHOT_LIST, ' ').replace(NUMBERED_SHOT, ' ')
   for (const patterns of Object.values(GROUPS)) {
     for (const pattern of patterns) rest = rest.replace(new RegExp(pattern.source, pattern.flags.replace('g', '') + 'g'), ' ')
@@ -139,28 +157,8 @@ function plainCommand(text: string): boolean {
   return rest.replace(/[\s.!,·、~…]+/g, '') === ''
 }
 
-export type VideoGrounding =
-  /** 아주 분명한 꼴 — 이 샷들만 바로 만든다(캔버스 순서). 빈 목록이면 "지금 그런 샷이 없어요". */
-  | { kind: 'run'; shotIds: string[] }
-  /** 분명하지 않다 — 이 목록으로 되묻고 "응"이면 그대로 만든다(캔버스 순서, 비지 않음). */
-  | { kind: 'confirm'; shotIds: string[] }
-  /** 목록을 셀 수 없다 — 만들지 않고 번호로 묻는다. */
-  | { kind: 'ask' }
-  /** 만들지 말라는 말이다 — 만들지 않는다. */
-  | { kind: 'none' }
-
-/**
- * requested = 모델이 고른 샷(노드 id) · null 이면 모델이 "남은 샷 전부"로 읽었다. eligible = 지금 영상을 만들 수 있는 샷(캔버스 순서).
- *   돌려주는 샷은 eligible 안에서만 — 이미 영상이 있거나 만드는 중인 샷은 빠진다.
- */
-export function groundVideoRequest(input: {
-  text: string
-  requested: readonly string[] | null
-  shots: readonly ChatShotRef[]
-  eligible: readonly string[]
-  selected: readonly string[]
-}): VideoGrounding {
-  const { text, requested, shots, eligible, selected } = input
+/** 말을 절로 읽는다 — 댄 번호(뺀 번호 · 만들지 말라는 절의 번호는 뺌) · 뺀 번호 · 부탁한 묶음 · 뺀 묶음 · 만들지 말라는 말 · 만들라는 말. */
+function readRequest(text: string) {
   const named = new Set<number>()
   const excluded = new Set<number>()
   const groups = new Set<Group>()
@@ -185,8 +183,43 @@ export function groundVideoRequest(input: {
     for (const group of found.wanted) groups.add(group)
     for (const group of found.excluded) excludedGroups.add(group)
   }
-  if (stopped && !asked) return { kind: 'none' }
   for (const n of excluded) named.delete(n)
+  return { named, excluded, groups, excludedGroups, stopped, asked }
+}
+
+/** 그 부탁에서 사람이 번호로 댄 샷 번호 — "샷 2 빼고"의 2 · 만들지 말라는 절의 번호는 댄 것이 아니다(리드 11/14 · 검토 b 낮음 1).
+ *  영상 있는 샷의 새 Take 는 여기 든 샷만 만든다. */
+export function namedShotNumbers(text: string): Set<number> {
+  return readRequest(text).named
+}
+
+export type VideoGrounding =
+  /** 아주 분명한 꼴 — 이 샷들만 바로 만든다(캔버스 순서). 빈 목록이면 "지금 그런 샷이 없어요". */
+  | { kind: 'run'; shotIds: string[] }
+  /** 분명하지 않다 — 이 목록으로 되묻고 "응"이면 그대로 만든다(캔버스 순서, 비지 않음). */
+  | { kind: 'confirm'; shotIds: string[] }
+  /** 목록을 셀 수 없다 — 만들지 않고 번호로 묻는다. */
+  | { kind: 'ask' }
+  /** 만들지 말라는 말이다 — 만들지 않는다. */
+  | { kind: 'none' }
+
+/**
+ * requested = 모델이 고른 샷(노드 id) · null 이면 모델이 "남은 샷 전부"로 읽었다. eligible = 지금 영상을 만들 수 있는 샷(캔버스 순서).
+ *   돌려주는 샷은 eligible 안에서만 — 이미 영상이 있거나 만드는 중인 샷은 빠진다.
+ */
+export function groundVideoRequest(input: {
+  text: string
+  requested: readonly string[] | null
+  shots: readonly ChatShotRef[]
+  eligible: readonly string[]
+  selected: readonly string[]
+  /** 다시 만들기 부탁일 때 번호로 대면 겨눌 수 있는 샷(영상이 이미 있어도 · 만드는 중은 빼고) — 리드 결정(오너 9번 · 샷 상세 [다시 만들기]는 늘 새 Take).
+   *  묶음 말은 이것을 쓰지 않는다(지금처럼 eligible 만). 없으면 번호도 eligible 만. */
+  remakable?: readonly string[]
+}): VideoGrounding {
+  const { text, requested, shots, eligible, selected } = input
+  const { named, excluded, groups, excludedGroups, stopped, asked } = readRequest(text)
+  if (stopped && !asked) return { kind: 'none' }
 
   // 화면이 센 묶음 — 말한 번호 · 부탁한 묶음(없으면 제한 없음)과 뺀 것.
   const inGroup = (shot: ChatShotRef, group: Group) =>
@@ -203,20 +236,29 @@ export function groundVideoRequest(input: {
   }
   const picks = requested === null ? null : new Set(requested)
   const pick = (id: string) => (picks === null || picks.has(id)) && !removed.has(id)
+  // 겨눌 수 있는 샷(캔버스 순서) — 번호로 댄 샷은 다시 만들기면 remakable 도, 그 밖은 eligible 만.
+  const eligibleSet = new Set(eligible)
+  const remakableSet = new Set(input.remakable ?? [])
+  const namedIds = new Set(shots.filter((shot) => shot.shotNo !== null && named.has(shot.shotNo)).map((shot) => shot.nodeId))
+  const shotOrder = shots.map((shot) => shot.nodeId)
+  const pool = [
+    ...shotOrder.filter((id) => eligibleSet.has(id) || (namedIds.has(id) && remakableSet.has(id))),
+    ...eligible.filter((id) => !shotOrder.includes(id)),
+  ]
 
   const plain = plainCommand(text) && excluded.size === 0 && excludedGroups.size === 0
   const clearNumbers = plain && named.size > 0 && groups.size === 0 && VIDEO.test(text)
   // 묶음 꼴은 영상 말이 있어야 한다 — "실패한 샷 다시"만은 영상이 실패한 샷이라 영상 말 없이도 분명하다.
   const clearGroups = plain && named.size === 0 && groups.size > 0 && (VIDEO.test(text) || [...groups].every((group) => group === 'failed'))
   if (clearNumbers || clearGroups) {
-    const screen = eligible.filter((id) => allowed.has(id))
+    const screen = pool.filter((id) => allowed.has(id))
     const shotIds = screen.filter(pick)
     // 모델이 말한 샷 밖만 골랐다 — 무엇을 원하는지 모른다.
     return screen.length > 0 && shotIds.length === 0 ? { kind: 'ask' } : { kind: 'run', shotIds }
   }
   // 범위 · 수량 말이 있는데 모델이 칸을 비웠다 — 전부를 목록으로 내밀지 않고 번호로 묻는다.
   if (picks === null && SCOPE.test(text)) return { kind: 'ask' }
-  const list = eligible.filter((id) => pick(id) && (!said || allowed.has(id)))
+  const list = pool.filter((id) => pick(id) && (!said || allowed.has(id)))
   if (list.length > 0) return { kind: 'confirm', shotIds: list }
   return stopped ? { kind: 'none' } : { kind: 'ask' }
 }

@@ -56,9 +56,12 @@ beforeEach(() => {
   vi.resetAllMocks()
   mocks.upload.mockResolvedValue({ error: null })
   mocks.storageFrom.mockReturnValue({ upload: mocks.upload })
-  mocks.dbFrom.mockReturnValue({
-    update: () => ({ eq: () => ({ eq: () => Promise.resolve({ error: null }) }) }),
-  })
+  // 실사는 버전을 쌓느라 지금 그림을 먼저 읽고(select … maybeSingle) 차례(rev)를 보며 쓴다(오너 2026-11-14 답 5번) — 가짜 표도 둘 다 받는다.
+  const table: Record<string, unknown> = {}
+  for (const method of ['select', 'update', 'eq', 'is']) table[method] = () => table
+  table.maybeSingle = () => Promise.resolve({ data: { storyboard_image: null }, error: null })
+  table.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ data: [{ shot_id: 'shot' }], error: null }).then(resolve)
+  mocks.dbFrom.mockReturnValue(table)
 })
 
 describe('러프 그리드 저장 — 세 장면 미리보기', () => {
