@@ -2442,7 +2442,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     //   그 샷 영상이 이미 도는 중이면 그 까닭(멈춘 Take 는 만드는 중이 아니다 — 오너 7번), 아니면(Take 부족은 그 자리에서 따로 알린다) 일반 까닭.
     const refused = videoLimitRefusal()
     if (refused && refused !== refusedBefore && refused.shotNodeId === shotNodeId) return { started: false, reason: 'video_limit' }
-    const videoRunning = director().nodes.some((n) => isVideoData(n.data) && n.data.parentShotNodeId === shotNodeId && n.data.status === 'generating' && !n.data.cancelledAt)
+    //   이번에 돌려받은 Take 는 빼고 본다 — 실패로 끝났는데 다시 읽기마저 실패하면 status 가 generating 으로 남아 "이미 만드는 중"이 나왔다(검토 b 참고 1).
+    const videoRunning = director().nodes.some((n) => n.id !== outcome.takeId && isVideoData(n.data) && n.data.parentShotNodeId === shotNodeId && n.data.status === 'generating' && !n.data.cancelledAt)
     return { started: false, reason: videoRunning ? 'video_running' : 'not_started' }
   },
 

@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
 import { boardNodeNames } from '@/features/director/node-label'
-import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice, withStartingRow, type EditorHandoverShot } from '@/lib/director/editor-handover'
+import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice, withRowNotice, withStartingRow, type EditorHandoverShot } from '@/lib/director/editor-handover'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeValuesShown } from '@/lib/billing/take-cost'
 import { useT } from '@/lib/i18n'
@@ -33,18 +33,18 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
   const showTakes = takeValuesShown(useTakeBalance())
   // [다시 만들기]를 누른 줄들 — 줄마다 따로 둔다(먼저 누른 줄이 끝나도 나중에 누른 다른 줄의 스피너는 그대로, 리드 11/14).
   const [starting, setStarting] = useState<ReadonlySet<string>>(() => new Set())
-  // [다시 만들기]를 시작하지 못한 까닭 — 그 줄 아래에 보인다(검토 b 2차 낮음 3).
-  const [notice, setNotice] = useState<{ shotNodeId: string; message: string } | null>(null)
+  // [다시 만들기]를 시작하지 못한 까닭 — 그 줄 아래에 보인다(검토 b 2차 낮음 3). 줄마다 따로 둔다 — 다른 줄을 누르거나 끝나도 남는다(검토 b 낮음).
+  const [notices, setNotices] = useState<ReadonlyMap<string, string>>(() => new Map())
   if (!open) return null
   const view = editorHandoverView(nodes, boardNodeNames(manifest, writerShots ?? []))
 
   const remakeRow = async (row: EditorHandoverShot) => {
     setStarting((current) => withStartingRow(current, row.shotNodeId, true))
-    setNotice(null)
+    setNotices((current) => withRowNotice(current, row.shotNodeId, null))
     try {
       const result = await remake(row.shotNodeId)
       const message = result.started ? null : remakeNotice(result.reason, t)
-      if (message) setNotice({ shotNodeId: row.shotNodeId, message })
+      setNotices((current) => withRowNotice(current, row.shotNodeId, message))
     } catch (error) {
       toast.error(error instanceof Error ? error.message : t('Failed to generate video.'))
     } finally {
@@ -69,6 +69,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
           {view.shots.map((row) => {
             const button = row.missing ? remakeButton(nodes, row, { showTakes, batch }, t) : null
             const busy = starting.has(row.shotNodeId) || row.missing === 'generating'
+            const rowNotice = notices.get(row.shotNodeId)
             return (
               <li
                 key={row.shotNodeId}
@@ -101,9 +102,9 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
                           : t('Not made yet. Leave it out and it joins Editor once its video is ready')}
                     </span>
                   )}
-                  {notice?.shotNodeId === row.shotNodeId ? (
+                  {rowNotice ? (
                     <span className="mt-0.5 block text-caption text-muted-foreground" role="status" data-testid="editor-handover-notice">
-                      {notice.message}
+                      {rowNotice}
                     </span>
                   ) : null}
                 </span>

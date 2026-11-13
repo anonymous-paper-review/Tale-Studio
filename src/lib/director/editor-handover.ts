@@ -133,6 +133,15 @@ export function withStartingRow(rows: ReadonlySet<string>, shotNodeId: string, s
   return next
 }
 
+/** [다시 만들기]를 시작하지 못한 까닭 모음 — 줄마다 따로 넣고 뺀다(null 이면 그 줄 것만 지운다). 한 칸이던 때는 다른 줄을
+ *  누르거나 다른 줄이 끝나면 앞 줄의 까닭이 사라졌다(검토 b 낮음, 리드 2026-11-14). */
+export function withRowNotice(notices: ReadonlyMap<string, string>, shotNodeId: string, message: string | null): ReadonlyMap<string, string> {
+  const next = new Map(notices)
+  if (message) next.set(shotNodeId, message)
+  else next.delete(shotNodeId)
+  return next
+}
+
 /** [다시 만들기]를 시작하지 못한 까닭 글 — 그 줄 아래에 보인다. 창이 닫혀 있었으면(no_window) 보일 것이 없다. */
 export function remakeNotice(reason: RemakeFailReason, t: Translate): string | null {
   switch (reason) {
