@@ -107,18 +107,39 @@ const MAX_ROUNDS = 200
 const MAX_ROUND_RETRIES = 2
 const ROUND_RETRY_DELAY_MS = 5000
 
-/** 라운드 반복 일괄 생성 — 완료 시 캔버스 rehydrate. 이미 진행 중이면 no-op. */
-export async function runRealBatch(
-  projectId: string,
-  opts?: {
-    silent?: boolean
-    force?: boolean
-    traceId?: string
-    onJob?: GenerationJobObserver
-    /** 고른 샷만(시안 D2, 오너 2026-11-14) — Writer 샷 id. 없으면 지금처럼 빈 샷 전부. */
-    shotIds?: readonly string[]
-  },
-): Promise<RealBatchResult> {
+type RealBatchOptions = {
+  silent?: boolean
+  force?: boolean
+  traceId?: string
+  onJob?: GenerationJobObserver
+  /** 고른 샷만(시안 D2, 오너 2026-11-14) — Writer 샷 id. 없으면 지금처럼 빈 샷 전부. */
+  shotIds?: readonly string[]
+}
+
+/** 지금 도는 판 — 멈춘 판이 서버 답을 기다려 보낸 장을 멈추는 동안 새 판이 그 정리를 기다리게 한다. */
+let currentRun: Promise<RealBatchResult> | null = null
+
+/** 라운드 반복 일괄 생성 — 완료 시 캔버스 rehydrate. 이미 진행 중이면 no-op.
+ *  멈춘 판이 아직 정리 중이면(작업 행이 생기기 전에 [모두 멈추기]) 그 정리가 끝난 뒤 새 판을 연다 — 툴바는 멈추자마자 켜지므로
+ *  누름이 말없이 무시되지 않게, 앞 판의 끝 정리가 새 판의 표시를 지우지 않게(영어 재점검 S1). */
+export async function runRealBatch(projectId: string, opts?: RealBatchOptions): Promise<RealBatchResult> {
+  const store = useDirectorCanvasStore
+  const now = store.getState()
+  if (now.realBatchBusy) {
+    if (!now.realBatchCancelled || !currentRun) return { generated: 0, quotaBlocked: false }
+    await currentRun.catch(() => undefined)
+    if (store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
+  }
+  const run = runRealBatchOnce(projectId, opts)
+  currentRun = run
+  try {
+    return await run
+  } finally {
+    if (currentRun === run) currentRun = null
+  }
+}
+
+async function runRealBatchOnce(projectId: string, opts?: RealBatchOptions): Promise<RealBatchResult> {
   const store = useDirectorCanvasStore
   if (store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
   store.setState({
@@ -214,6 +235,12 @@ export async function runRealBatch(
       store.setState({ realBatchRemaining: remaining })
       if (!submitted.length && !inProgress.length) break
       generated += ourJobs.reduce((n, s) => n + s.shotIds.length, 0)
+      // 멈춘 판이 서버 답을 받았다 — 받은 장을 "만드는 중"으로 띄우지 않고(목록을 다시 읽지 않음) 아래 끝에서 바로 멈춘다
+      //   (영어 재점검 S1: 카드가 0.5초 "Making image · Stop making"으로 깜빡였다).
+      if (store.getState().realBatchCancelled) {
+        for (const s of [...submitted, ...inProgress]) waitedJobs.add(s.jobId)
+        break
+      }
       // 잡이 큐에 앉는 즉시 진행 표시(알림바·카드 스피너)가 켜지게 — 폴링 틱을 기다리지 않는다.
       refreshGenerationQueue()
       for (const s of [...submitted, ...inProgress]) {
