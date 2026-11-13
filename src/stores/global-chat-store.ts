@@ -4390,21 +4390,24 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             // 번호를 묻기 전에 — 모델 부탁에 제출할 수 없는 샷(같은 답에서 더한 새 샷 등)이 끼면 범위 말이 있어도 묻지 않고 그 까닭을 말한다(검토 b efac9881).
             const addedShotIds = useDirectorCanvasStore.getState().nodes.filter((node) => isShotData(node.data) && !before.nodes.some((old) => old.id === node.id)).map((node) => node.id)
             const hold = grounding.kind === 'ask' ? await askHoldReason(requestedIds, addedShotIds) : null
-            // 번호를 댄 샷 중 만드는 중이라 빠진 샷은 먼저 그렇다고 말한다(검토 b 낮음 — 말 없이 빠졌다). 그래서 겨눌 샷이 없으면
-            //   "지금 그런 샷이 없어요" 대신 그 말만 한다(리드 결정).
-            const named = grounding.kind === 'run' || grounding.kind === 'confirm' ? mentionedShotNumbers(trimmed) : new Set<number>()
-            const makingNamed = named.size > 0
-              ? directorShotsBeingMade(directorShotRefs(useDirectorCanvasStore.getState().nodes, names).filter((ref) => ref.shotNo !== null && named.has(ref.shotNo)).map((ref) => ref.nodeId))
+            // 번호를 댄 샷 중 만드는 중이라 빠진 샷은 꼴(바로 · 되묻기 · 번호 묻기)과 상관없이 먼저 그렇다고 말한다(검토 b 낮음 · M8 — 말 없이 빠졌다).
+            //   댄 샷이 모두 만드는 중이라 겨눌 샷이 없으면(바로 꼴의 빈 목록 · 번호 묻기) "지금 그런 샷이 없어요" · 번호 질문 대신 그 말만 한다(리드 결정).
+            const named = grounding.kind === 'none' ? new Set<number>() : mentionedShotNumbers(trimmed)
+            const namedIds = named.size > 0
+              ? directorShotRefs(useDirectorCanvasStore.getState().nodes, names).filter((ref) => ref.shotNo !== null && named.has(ref.shotNo)).map((ref) => ref.nodeId)
               : []
+            const makingNamed = directorShotsBeingMade(namedIds)
             if (makingNamed.length > 0) {
               lumiSays(translate(locale, 'The video for {shots} is being made right now.', { shots: shotListLabel(locale, makingNamed.map((id) => shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === id), names))) }))
             }
-            const said = hold ?? (makingNamed.length > 0 && grounding.kind === 'run' && grounding.shotIds.length === 0 ? null : groundingReply(grounding, (key) => translate(locale, key)))
+            const onlyMaking = makingNamed.length > 0 && makingNamed.length === namedIds.length &&
+              ((grounding.kind === 'run' && grounding.shotIds.length === 0) || grounding.kind === 'ask')
+            const said = hold ?? (onlyMaking ? null : groundingReply(grounding, (key) => translate(locale, key)))
             if (said) lumiSays(said)
             if (grounding.kind === 'run') videoIds = grounding.shotIds
             if (grounding.kind === 'confirm') confirmIds = grounding.shotIds
             // 번호를 물었다 — 다음 말의 "3번" · 맨 숫자를 샷 번호로 읽는다.
-            if (grounding.kind === 'ask' && !hold && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true, ...(remake ? { remake } : {}) } })
+            if (grounding.kind === 'ask' && !hold && !onlyMaking && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true, ...(remake ? { remake } : {}) } })
           }
           // 되묻기 목록 중 이 답의 글 카드가 건 샷은 그 카드 [적용]이 곧 허락이다 — 카드에 묶고, 나머지만 "응"으로 묻는다.
           const boundVideos = [...videoIds, ...confirmIds].filter((id) => bound.has(id))

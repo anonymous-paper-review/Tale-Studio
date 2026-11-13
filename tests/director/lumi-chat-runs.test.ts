@@ -770,6 +770,33 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
     expect(startedLine).toBeGreaterThan(makingLine)
   })
 
+  // 왜: 검토 b(M8) — 시키는 꼴 밖의 말이 붙어 되묻는 꼴이 되면, 댄 샷이 만드는 중이어도 그 말 없이 "어느 샷의 영상을 만들까요?"로 번호를 다시 물었다.
+  it('번호로 댄 샷이 만드는 중이면 꼴과 상관없이 "샷 N 영상은 지금 만드는 중이에요"를 먼저 말하고, 댄 샷이 모두 만드는 중이면 번호를 다시 묻지 않는다', async () => {
+    remakeBoard(['q1', 'q2'])
+    remakeServer([], [], { q1: 'unknown' })
+    await chat.getState().startDirectorVideos(['q1'], 'Make Shot 1 again', { remake: true })
+    expect(generated).toEqual(['q1'])
+    // 댄 샷(샷 1)이 모두 만드는 중 — 번호를 묻지 않고 그 말만.
+    remakeServer([{ type: 'generateVideos', shotIds: ['q1'] }])
+    const before = chat.getState().messages.length
+    await chat.getState().sendMessage('샷 1 영상 다시 만들어줘. 다 되면 알려줘')
+    const said = chat.getState().messages.slice(before).filter((m) => m.role === 'model').map((m) => m.content)
+    expect(said).toContain('The video for Shot 1 is being made right now.')
+    expect(said.join('\n')).not.toContain('Which shots should get videos?')
+    expect(chat.getState().directorVideoAsk).toBeNull()
+    expect(generated).toEqual([])
+    // 일부만 만드는 중 — 그 말을 먼저 하고 나머지(샷 2)는 지금처럼 목록으로 되묻는다.
+    remakeServer([{ type: 'generateVideos', shotIds: ['q1', 'q2'] }])
+    const mark = chat.getState().messages.length
+    await chat.getState().sendMessage('샷 1, 2 영상 다시 만들어줘. 다 되면 알려줘')
+    const next = chat.getState().messages.slice(mark).filter((m) => m.role === 'model').map((m) => m.content)
+    const making = next.indexOf('The video for Shot 1 is being made right now.')
+    const ask = next.indexOf('Shall I make the video for Shot 2 (5 Takes)? Say yes to start.')
+    expect(making).toBeGreaterThanOrEqual(0)
+    expect(ask).toBeGreaterThan(making)
+    expect(chat.getState().directorVideoAsk).toMatchObject({ shotIds: ['q2'], remake: true })
+  })
+
   // 왜: 검토 b 메모 — 볼 것은 이번에 만든 새 Take 하나다. 그 샷의 다른 Take(예: 멈춘 채 뒤에서 도는 Take)가 돌아도 이번 것이 실패면 "아직 몰라요"가 아니다.
   it('그 샷의 다른 Take 가 돌고 있어도 이번 새 Take 가 실패면 "시작하지 못했어요"라고 한다', async () => {
     writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: [{ shotId: 'w-x1', sceneId: 'sc1' }] as never })
