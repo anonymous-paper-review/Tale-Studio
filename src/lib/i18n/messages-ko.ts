@@ -3385,6 +3385,7 @@ export const KO: Record<string, string> = {
   'Stopped. Takes for the videos being made are not refunded. If they finish later, they stay in the history.': '멈췄어요. 만들던 영상의 Take 는 돌려드리지 않아요. 뒤늦게 끝나면 기록에 남아요.',
   'Stopped. If the images being made finish later, they stay in the versions.': '멈췄어요. 그리던 이미지는 뒤늦게 끝나면 버전으로 남아요.',
   'Stopped.': '멈췄어요.',
+  'Wrapping up the previous work. It will start right after.': '앞 작업을 정리하는 중이에요. 끝나면 바로 시작해요.',
   '{count} shots on the same sheet stop together': '같은 장 샷 {count}개가 같이 멈춰요',
   'Stopped {count} shots on the same sheet. If the images finish later, they stay in the versions.': '같은 장 샷 {count}개를 같이 멈췄어요. 그리던 이미지는 뒤늦게 끝나면 버전으로 남아요.',
   'It was already done.': '이미 다 만든 뒤였어요.',

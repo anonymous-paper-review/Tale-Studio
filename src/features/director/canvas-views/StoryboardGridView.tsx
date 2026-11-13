@@ -67,7 +67,7 @@ import { detailTabForShot, filterShotsByStatus, imageRemakeFailed, shotStateTone
 import { RemakeRetryButton } from '@/features/director/remake-retry-button'
 import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
-import { ImageFailedPanel, ImageNeededTag, PickBox, ShotPipelineRow, ShotStateTail } from '@/features/director/shot-status'
+import { ImageFailedPanel, ImageNeededTag, PickBox, RoughChangedTag, ShotPipelineRow, ShotStateTail } from '@/features/director/shot-status'
 
 type SceneGroup = {
   key: string
@@ -702,33 +702,30 @@ function ShotCell({
           // 꼬리표 줄은 ⤢ 단추 자리 앞에서 끝나고(좁을 때 그림표 · 넓을 때 "⤢ 상세"), 넘치면 줄여 쓴다(영어 재점검 S3).
           <div className="absolute left-9 right-9 top-2 z-10 flex min-w-0 items-center gap-1 overflow-hidden @min-[15rem]:right-[5.5rem]">
             {shotState === 'image_needed' && <ImageNeededTag />}
-            {roughChanged && (
-              <span className="inline-flex items-center rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-warning">
-                {t('Rough changed')}
-              </span>
-            )}
+            {roughChanged && <RoughChangedTag />}
           </div>
         )}
         {mediaMode === 'previz' && !generating && stageBadge && (
-          <div className="group/badge absolute left-10 top-2 z-10">
-            <span
-              className={cn(
-                'inline-flex items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold',
-                stageBadge.cls,
-              )}
-            >
-              {stageBadge.video ? (
-                <Play className="size-3 shrink-0 fill-current" />
-              ) : (
-                <ImageIcon className="size-3 shrink-0" />
-              )}
-              <span className="whitespace-nowrap">{stageBadge.label}</span>
-            </span>
-            {roughChanged && (
-              <span className="ml-1 inline-flex items-center rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-warning">
-                {t('Rough changed')}
+          // 러프 보기 꼬리표도 실사 보기 줄과 같은 자리 — ⤢ 단추 앞에서 끝나고, 넘치면 줄여 쓴다(검토 b S1d).
+          //   줄은 ⤢ 앞까지 넓지만 마우스는 꼬리표만 받는다 — 아래 동작 목록이 지금처럼 꼬리표 위에서만 열리게.
+          <div className="group/badge pointer-events-none absolute left-9 right-9 top-2 z-10 @min-[15rem]:right-[5.5rem]">
+            <div className="flex min-w-0 items-center gap-1 overflow-hidden">
+              <span
+                title={stageBadge.label}
+                className={cn(
+                  'pointer-events-auto inline-flex min-w-0 items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold',
+                  stageBadge.cls,
+                )}
+              >
+                {stageBadge.video ? (
+                  <Play className="size-3 shrink-0 fill-current" />
+                ) : (
+                  <ImageIcon className="size-3 shrink-0" />
+                )}
+                <span className="min-w-0 truncate">{stageBadge.label}</span>
               </span>
-            )}
+              {roughChanged && <RoughChangedTag className="pointer-events-auto" />}
+            </div>
             {/* 액션 목록(#e1 2026-08-12) — absolute 라 자리를 차지하지 않는다: 리스트가 투명한
                 동안(pointer-events-none) 그 영역 호버는 통과되므로 **배지 위에서만** 열린다.
                 열린 뒤에는 pt-1 브리지가 배지→리스트 이동 중 호버 이탈을 막는다. w-24 로 축소. */}

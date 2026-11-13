@@ -193,6 +193,19 @@ export function ImageNeededTag({ className }: { className?: string }) {
   )
 }
 
+/** 러프가 실사 이미지 뒤에 바뀐 샷의 꼬리표(약속 I4) — "이미지 필요"와 같이 좁은 카드에서는 줄여 쓴다(검토 b S1d). */
+export function RoughChangedTag({ className }: { className?: string }) {
+  const t = useT()
+  return (
+    <span
+      title={t('Rough changed')}
+      className={cn('inline-flex min-w-0 items-center rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-warning', className)}
+    >
+      <span className="min-w-0 truncate">{t('Rough changed')}</span>
+    </span>
+  )
+}
+
 /** 이미지를 못 만든 샷의 그림 자리(시안 없음 — 결정 페이지 추천: 빨강 테두리 + 다시 만들기). */
 export function ImageFailedPanel({ onRetry, detail, disabled }: { onRetry: () => void; detail?: string | null; disabled?: boolean }) {
   const t = useT()

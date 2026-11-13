@@ -118,6 +118,17 @@ type RealBatchOptions = {
 
 /** 지금 도는 판 — 멈춘 판이 서버 답을 기다려 보낸 장을 멈추는 동안 새 판이 그 정리를 기다리게 한다. */
 let currentRun: Promise<RealBatchResult> | null = null
+/** [모두 멈추기]를 누른 차례 — 정리를 기다리던 누름은 그사이 이 수가 바뀌었으면 서지 않는다(사람이 마지막에 누른 것을 따른다, 검토 b S1b). */
+let stopTurn = 0
+/** 정리를 기다리는 누름의 수 — 거둘 알림이 있을 때만 거둔다. */
+let waitingPresses = 0
+const WAITING_TOAST_ID = 'real-batch-waiting'
+
+/** [모두 멈추기] · 알림의 [취소] — 멈춘 판의 정리를 기다리던 누름을 거둔다(그 뒤에 누른 것은 선다). "끝나면 바로 시작해요" 알림도 거둔다. */
+export function cancelWaitingRealBatch(): void {
+  stopTurn += 1
+  if (waitingPresses > 0) toast.dismiss(WAITING_TOAST_ID)
+}
 
 /** 라운드 반복 일괄 생성 — 완료 시 캔버스 rehydrate. 이미 진행 중이면 no-op.
  *  멈춘 판이 아직 정리 중이면(작업 행이 생기기 전에 [모두 멈추기]) 그 정리가 끝난 뒤 새 판을 연다 — 툴바는 멈추자마자 켜지므로
@@ -127,8 +138,24 @@ export async function runRealBatch(projectId: string, opts?: RealBatchOptions): 
   const now = store.getState()
   if (now.realBatchBusy) {
     if (!now.realBatchCancelled || !currentRun) return { generated: 0, quotaBlocked: false }
+    // 누름이 말없이 기다리지 않게 한 줄 알린다 — 여러 번 눌러도 한 줄(검토 b S1c). 저절로 도는 판은 말하지 않는다.
+    //   새 판이 시작하거나 취소될 때까지 남고, [취소]로 기다리던 누름을 거둔다 — 다른 것이 안 돌면 [모두 멈추기]가 안 보인다(리드 11/14 결정 ③).
+    if (!opts?.silent) {
+      const locale = useLocaleStore.getState().locale
+      toast.info(translate(locale, 'Wrapping up the previous work. It will start right after.'), {
+        id: WAITING_TOAST_ID,
+        duration: Infinity,
+        action: { label: translate(locale, 'Cancel'), onClick: () => cancelWaitingRealBatch() },
+      })
+    }
+    const turn = stopTurn
+    waitingPresses += 1
     await currentRun.catch(() => undefined)
-    if (store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
+    waitingPresses -= 1
+    // 기다림이 끝났다 — 새 판이 서든 거둬졌든 알림은 내린다.
+    toast.dismiss(WAITING_TOAST_ID)
+    // 기다리는 사이 [모두 멈추기]를 눌렀으면 서지 않는다(검토 b S1b).
+    if (turn !== stopTurn || store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
   }
   const run = runRealBatchOnce(projectId, opts)
   currentRun = run

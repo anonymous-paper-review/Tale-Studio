@@ -28,7 +28,7 @@ import { Loader2,
   Square, ChevronDown, ChevronUp, LayoutGrid, Boxes, Lock, Unlock, Plus, Minus, Maximize2, Play, ImageIcon } from 'lucide-react'
 
 import { toast } from 'sonner'
-import { cancelRealBatchResume, runRealBatch } from '@/lib/director/real-batch-client'
+import { cancelRealBatchResume, cancelWaitingRealBatch, runRealBatch } from '@/lib/director/real-batch-client'
 import { takeImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
 import {
   runVideoBatch,
@@ -1095,6 +1095,8 @@ function PaletteBar() {
     // 도는 이미지 판을 멈추면 알림은 그림 문장 — 보낸 장의 작업이 아직 목록에 없어도(서버 답 전) 판이 답을 받는 대로 멈춘다(S1).
     const imageBatchWasLive = realBatchBusy && !realBatchCancelled
     if (realBatchBusy && !realBatchCancelled) run.cancelRealBatch()
+    // 멈춘 판의 정리를 기다리던 [이미지 만들기]도 거둔다 — 사람이 마지막에 누른 것을 따른다(검토 b S1b).
+    cancelWaitingRealBatch()
     const stillCurrent = () => useDirectorCanvasStore.getState().projectId === run.projectId
     setStopRequested(true)
     try {
