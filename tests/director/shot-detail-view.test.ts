@@ -20,7 +20,8 @@ import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorD
 import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
-import type { VideoNodeData } from '@/types/director'
+import type { ShotNodeData, VideoNodeData } from '@/types/director'
+import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { keptStoryboardImage, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { translate } from '@/lib/i18n/translate'
 
@@ -156,6 +157,16 @@ describe('Director 샷 상세 화면', () => {
     expect(out).toContain('The start and end images changed · A new Take will use them')
     setLocale('ko')
     expect(render('panel', 'video')).toContain('시작 v1 + 끝 v1 · Seedance 2.0 · 720p')
+  })
+
+  it('노드 위 이미지 단추는 그림이 있으면 "이미지 다시 만들기"다 — 시안 단추 이름(이미지 만들기 · 다시 만들기)과 같은 말', () => {
+    // 왜: 리드 11/14 말 맞추기(set 이 찾음) — 노드 위 단추만 옛 말 "이미지 재생성"이었다. 위 툴바 [이미지 다시 만들기]와 같은 글 · 같은 영어.
+    const shot = director.getState().nodes.find((n) => n.id === shotId)!.data as ShotNodeData
+    const button = () => renderToStaticMarkup(createElement(StoryboardImageButton, { nodeId: shotId, data: shot }))
+    expect(button()).toContain('>Make images again<')
+    setLocale('ko')
+    expect(button()).toContain('>이미지 다시 만들기<')
+    expect(button()).not.toContain('이미지 재생성')
   })
 
   it('이미지를 다시 만들기 전 확인 창의 단추는 "다시 만들기"다 — 카드 · 꼬리 · 툴바 확인 창과 같은 말', () => {

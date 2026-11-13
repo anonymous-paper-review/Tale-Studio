@@ -49,7 +49,8 @@ export function StoryboardImageButton({ nodeId, data, className, idleLabel, chan
         {generation.disabled && generation.phase !== 'error'
           ? <Loader2 className="size-3.5 animate-spin" />
           : <ImageIcon className="size-3.5" />}
-        {generation.label ? t(generation.label) : idleLabel ?? (hasImage ? t('Regenerate image') : t('Generate image'))}
+        {/* 그림이 있으면 위 툴바 · 시안과 같은 "이미지 다시 만들기"(리드 11/14 말 맞추기). */}
+        {generation.label ? t(generation.label) : idleLabel ?? (hasImage ? t('Make images again') : t('Generate image'))}
       </Button>
       {generation.phase === 'error' && (
         <Button type="button" size="sm" variant="ghost" onClick={refreshGenerationQueue}>
