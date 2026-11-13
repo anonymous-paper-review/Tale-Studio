@@ -65,7 +65,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
             return (
               <li
                 key={row.shotNodeId}
-                className={cn('flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-card px-4 py-3 sm:flex-nowrap', row.missing && 'border border-destructive')}
+                className={cn('flex items-center gap-x-3 gap-y-2 rounded-xl bg-card px-4 py-3', row.missing && 'flex-wrap border border-destructive sm:flex-nowrap')}
                 data-testid={row.missing ? 'editor-handover-missing' : 'editor-handover-shot'}
               >
                 {row.thumbUrl && !row.missing ? (
@@ -73,9 +73,9 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
                 ) : !row.missing ? (
                   <span className="h-11 w-8 shrink-0 rounded-md bg-art-placeholder" aria-hidden />
                 ) : null}
-                {/* 좁은 화면(시안 없음)에서는 단추가 줄 아래로 내려가 샷 이름이 잘리지 않는다(리드 2026-11-14). */}
-                <span className="min-w-0 flex-1 basis-48">
-                  <span className="block break-words text-label font-semibold text-foreground sm:truncate">
+                {/* 좁은 화면(시안 없음)에서는 영상 없는 줄의 긴 단추가 줄 아래로 내려가 샷 이름이 잘리지 않는다(리드 2026-11-14). */}
+                <span className={cn('min-w-0 flex-1', row.missing && 'basis-48')}>
+                  <span className={cn('block text-label font-semibold text-foreground', row.missing ? 'break-words sm:truncate' : 'truncate')}>
                     {row.missing ? t('{label} · No video', { label: row.label }) : t('{label} · {seconds}s', { label: row.label, seconds: row.seconds })}
                   </span>
                   {row.take ? (
@@ -115,7 +115,8 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
           <Button variant="secondary" onClick={close}>
             {t('Go back')}
           </Button>
-          <Button onClick={() => void proceed()} disabled={view.cuts === 0} data-testid="editor-handover-proceed">
+          {/* 좁은 화면에서는 긴 넘기기 글이 창을 밀어내지 않게 줄을 바꾼다(시안 없음). */}
+          <Button onClick={() => void proceed()} disabled={view.cuts === 0} className="whitespace-normal break-keep text-center sm:whitespace-nowrap" data-testid="editor-handover-proceed">
             {proceedButtonLabel(view, t)}
             <ArrowRight className="size-4" />
           </Button>
