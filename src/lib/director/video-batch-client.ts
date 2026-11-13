@@ -283,8 +283,11 @@ export async function runVideoBatch(
   const failed = finalSummary.failedToStart + skipped
   const done = finalSummary.done
   const completedFailures = finalSummary.failed + skipped
+  // 멈춘 영상만 남아 끝난 묶음(완료 · 실패 0)은 끝 줄 · 알림 카드를 띄우지 않는다 — 멈춤 알림이 이미 떴다(리드 11/14).
+  //   완료 · 실패가 하나라도 있으면 지금처럼 알린다(멈춘 영상은 아직 도는 중이라 세지 않는다).
+  const stoppedOnly = done === 0 && completedFailures === 0 && finalSummary.active > 0
 
-  if (ownsRun() && total > 0) {
+  if (ownsRun() && total > 0 && !stoppedOnly) {
     const line = translate(useLocaleStore.getState().locale, '{done} videos done, {failed} failed', {
       done,
       failed: completedFailures,
