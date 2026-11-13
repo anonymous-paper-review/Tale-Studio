@@ -57,6 +57,26 @@ export function rememberServerSeenAt(projectId: string, updatedAt: string): void
   }
 }
 
+/**
+ * 서버를 못 읽고 처음 상태로 열었을 때 적는 "본 시각" — 아주 옛 값이라 다음에 열 때 샷 있는 서버 편집이 먼저 열린다. 본 시각이 아예
+ *   없는 고침 전 저장본과도 구분된다(검토 c 보통 1, 2026-11-14).
+ */
+export const NEVER_SEEN = '1970-01-01T00:00:00.000Z'
+
+const SET_ASIDE_PREFIX = 'tale:editor:v1:set-aside:'
+
+/**
+ * 서버 편집이 이겨 이 브라우저 편집 대신 열릴 때, 덮이기 전 이 브라우저 편집을 따로 칸에 한 벌 남긴다(마지막 한 벌) — 다른 브라우저 편집
+ *   알림 뒤에 고친 것 · 서버에 못 올린 고침을 되살릴 길(검토 c 낮음 3 · A6, 2026-11-14). 화면은 아직 없다.
+ */
+export function setAsideLocalEdit(projectId: string, saved: PersistedEditor): void {
+  try {
+    localStorage.setItem(SET_ASIDE_PREFIX + projectId, JSON.stringify(saved))
+  } catch {
+    // 저장 공간이 꽉 차면 남기지 못한다 — 여는 것은 막지 않는다.
+  }
+}
+
 /** a 가 b 보다 나중에 저장한 것인가. 둘 중 하나라도 읽을 수 없는 시각이면 false. */
 export function savedLater(a: string | null | undefined, b: string | null | undefined): boolean {
   const ta = a ? Date.parse(a) : Number.NaN

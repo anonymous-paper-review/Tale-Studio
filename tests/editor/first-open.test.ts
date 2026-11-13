@@ -198,7 +198,8 @@ describe('처음 여는 동안 · 연 뒤 고친 것이 없어지지 않는다',
   it('서버 저장이 실패해도 편집 화면은 연다 — 이 브라우저에는 저장해 두고 서버 저장은 뒤에서 다시 시도한다', async () => {
     // 왜: 서버가 잠시 고장 나도 편집을 막지 않는다. 고장: 서버 저장이 500 을 돌려줄 때.
     vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
-    fetchMock.mockImplementation(async () => new Response('{"error":"db down"}', { status: 500 }))
+    fetchMock.mockImplementation(async (_url: string, init?: RequestInit) =>
+      init?.method === 'PUT' ? new Response('{"error":"db down"}', { status: 500 }) : new Response('{}', { status: 200 }))
     const opening = openLikePage()
     await vi.advanceTimersByTimeAsync(2_000)
     await opening

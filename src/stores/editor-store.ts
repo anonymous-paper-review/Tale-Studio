@@ -19,7 +19,7 @@ import {
   rehydrateAudioUrls,
   type PersistedEditor,
 } from '@/lib/editor-persistence'
-import { hasShots, readServerCopy, rememberServerSeenAt, savedLater, serverSeenAt } from '@/lib/editor/server-copy'
+import { NEVER_SEEN, hasShots, readServerCopy, rememberServerSeenAt, savedLater, serverSeenAt, setAsideLocalEdit } from '@/lib/editor/server-copy'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
@@ -894,14 +894,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // 서버 편집을 읽지 못했다 — 편집은 막지 않는다(서버가 잠시 고장 나도 연다, 약속: tests/editor/first-open.test.ts). 이 브라우저
       //   편집이 있으면 그것, 없으면 처음 상태로 열고, 서버에 쓰기 전에 서버를 다시 읽어 이 브라우저가 못 본 편집이 있으면 덮지 않는다.
       const opened = !!localEdit && tryApply(localEdit)
+      // 처음 상태로 열었으면 "본 시각"을 아주 옛 값으로 적는다 — 다음에 열 때 샷 있는 서버 편집이 이 처음 상태보다 먼저 열린다(검토 c 보통 1).
+      if (!opened) rememberServerSeenAt(projectId, NEVER_SEEN)
       blindOpens.set(projectId, { opened: opened ? 'local' : 'fresh', seen: serverSeenAt(projectId) })
       return opened
     }
 
     // 다른 곳에서 이 브라우저가 마지막으로 본 뒤에 서버에 저장했으면 서버 편집을 먼저 연다. 이번 고침 전 저장본은 견줄 표시가 없어
     //   이 브라우저 것을 먼저 연다 — E2b 로 서버 편집이 처음 상태 · 빈 편집으로 덮인 프로젝트가 있다(운영 3945d1e6).
+    //   다만 고침 뒤 화면이 쓴 서버 저장본(serverAware)은 누군가 고침 뒤에 고친 것이라 고침 전 저장본보다 먼저다(검토 c, A6 다듬기) —
+    //   이 규칙은 고침 전 저장본이 남아 있는 동안(옮겨 가는 동안)만 쓰인다.
     const seen = serverSeenAt(projectId)
-    const serverFirst = !!serverEdit && (!localEdit || (seen !== undefined && savedLater(server.updatedAt, seen)))
+    const serverFirst =
+      !!serverEdit &&
+      (!localEdit || (seen === undefined ? serverEdit.serverAware === true : savedLater(server.updatedAt, seen)))
     for (const candidate of serverFirst ? [serverEdit, localEdit] : [localEdit, serverEdit]) {
       if (!candidate) continue
       const fromServer = candidate === serverEdit
@@ -910,8 +916,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (stale()) return false
       if (!tryApply(candidate)) continue
       if (fromServer) {
-        // 다음에 이 브라우저에서 서버를 기다리지 않고 열리게 바로 저장하고, 서버의 그 저장 시각을 적어 둔다.
-        saveEditorStateNow(projectId, compactSnapshot({ version: 1, ...pickPersisted(get()) }))
+        // 덮이기 전 이 브라우저 편집을 따로 칸에 한 벌 남긴다(검토 c 낮음 3 · A6). 다음에 이 브라우저에서 서버를 기다리지 않고 열리게
+        //   바로 저장하고, 서버의 그 저장 시각을 적어 둔다.
+        if (local && local !== candidate) setAsideLocalEdit(projectId, local)
+        saveEditorStateNow(projectId, persistSnapshot(get()))
         if (server.updatedAt) rememberServerSeenAt(projectId, server.updatedAt)
       }
       return true
@@ -1876,28 +1884,31 @@ const blindOpens = new Map<string, { opened: 'fresh' | 'local'; seen: string | u
 // 이번 화면에서 서버 쓰기를 멈춘 프로젝트 — 서버에 다른 곳 편집이 있어 덮지 않는다(이 브라우저에는 계속 저장). 다시 열면 풀린다.
 const serverWritesStopped = new Set<string>()
 
-/** 서버에 써도 되는가 — 열 때 서버를 읽었으면 늘 된다. 읽지 못하고 열었으면 지금 다시 읽어 본다. */
-async function mayWriteServer(projectId: string): Promise<boolean> {
+/**
+ * 서버에 써도 되는가 — 열 때 서버를 읽었으면 늘 된다('write'). 읽지 못하고 열었으면 지금 다시 읽어 본다: 다시 읽기도 실패하면 쓰지 않고
+ *   뒤에서 다시 시도('wait' — 이 브라우저에는 저장돼 잃는 것이 없다, 검토 c 낮음 1), 이 브라우저가 못 본 샷 있는 편집이 서버에 있으면
+ *   이번 화면에서는 쓰지 않는다('stop'). 다시 읽어 괜찮으면 '못 읽고 엶' 표시를 지워 다음부터 자기 저장을 남의 것으로 보지 않는다(낮음 2).
+ */
+async function serverWriteDecision(projectId: string): Promise<'write' | 'wait' | 'stop'> {
   const blind = blindOpens.get(projectId)
-  if (!blind) return true
+  if (!blind) return 'write'
   const copy = await readServerCopy(projectId)
-  // 서버가 아직 고장이면 쓰기도 실패해 뒤에서 다시 시도한다(약속: first-open "서버 저장은 뒤에서 다시 시도한다").
-  if (!copy) return true
+  if (!copy) return 'wait'
   const elsewhere =
     hasShots(copy.state) &&
     (blind.opened === 'fresh' || (blind.seen !== undefined && savedLater(copy.updatedAt, blind.seen)))
   if (!elsewhere) {
     blindOpens.delete(projectId)
-    return true
+    return 'write'
   }
   serverWritesStopped.add(projectId)
-  toast.warning(
-    translate(
-      useLocaleStore.getState().locale,
-      "Edits saved in another browser are on the server, so they weren't overwritten. Reopen the Editor to see them.",
-    ),
-  )
-  return false
+  // 다시 열면 서버 편집이 열리고 이 화면에서 고친 것은 따로 칸에 한 벌 남는다(검토 c 낮음 3). [다시 열기]는 바로 다시 연다.
+  const locale = useLocaleStore.getState().locale
+  toast.warning(translate(locale, "There are edits saved in another browser. Changes you make here won't be saved to the server."), {
+    duration: Number.POSITIVE_INFINITY,
+    action: { label: translate(locale, 'Reopen'), onClick: () => useEditorStore.getState().reset() },
+  })
+  return 'stop'
 }
 
 // 저장 결과 3분류 — 'saved' 성공 / 'retry' 일시 장애(5초 뒤 재시도) / 'fatal' 재시도로
@@ -1980,12 +1991,18 @@ function runServerSave(projectId: string, generation: number): Promise<ServerSav
   const latestSnapshot = serverSaveSnapshots.get(projectId)
   if (!latestSnapshot) return Promise.resolve(null)
   serverSaveInFlight.set(projectId, true)
-  return mayWriteServer(projectId).then(async (allowed) => {
-    if (!allowed) {
+  return serverWriteDecision(projectId).then(async (decision) => {
+    if (decision === 'stop') {
       // 서버에 다른 곳 편집이 있다 — 이번 화면에서는 서버에 쓰지 않는다(이 브라우저에는 이미 저장했다).
       serverSaveInFlight.delete(projectId)
       serverSaveSnapshots.delete(projectId)
       return null
+    }
+    if (decision === 'wait') {
+      // 서버를 아직 다시 읽지 못했다 — 쓰지 않고 잠시 뒤 다시 읽어 본다.
+      serverSaveInFlight.delete(projectId)
+      scheduleServerSave(projectId, latestSnapshot, 5000, generation)
+      return 'retry' as const
     }
     const result = await saveEditorStateToServer(
       projectId,
@@ -2036,13 +2053,18 @@ const pickPersisted = (s: EditorState) => ({
   panelSizes: s.panelSizes,
 })
 
+/** 저장본 — 서버와 견주는 화면이 썼다는 표시(serverAware)를 함께 적는다(검토 c, 2026-11-14). 파형은 소수 둘째 자리로 줄인다(검토 A E2a). */
+function persistSnapshot(state: EditorState): PersistedEditor {
+  return compactSnapshot({ version: 1, serverAware: true, ...pickPersisted(state) })
+}
+
 /**
  * 지금 편집 상태를 바로 저장한다 — 이 브라우저에 쓰고 서버 답까지 기다린다. Editor 를 처음 열 때 소리를 다 나눈 결과를
  *   편집 화면을 열기 전에 남긴다(오너 2026-11-10 "DB에 다 올라왔을 때 내용이 보여지게"). 서버가 잠시 고장이면 뒤에서 다시 시도한다.
  *   약속: tests/editor/first-open.test.ts
  */
 export function saveEditorNow(projectId: string): Promise<ServerSaveResult | null> {
-  const snapshot = compactSnapshot({ version: 1, ...pickPersisted(useEditorStore.getState()) })
+  const snapshot = persistSnapshot(useEditorStore.getState())
   saveEditorStateNow(projectId, snapshot)
   const generation = (serverSaveGenerations.get(projectId) ?? 0) + 1
   serverSaveGenerations.set(projectId, generation)
@@ -2083,7 +2105,7 @@ if (typeof window !== 'undefined') {
     if (!projectId) return
 
     // 파형은 소수 둘째 자리로 줄여 저장한다(검토 A E2a — 꽉 차면 저장이 실패한다). 화면의 편집 상태는 그대로.
-    const snapshot = compactSnapshot({ version: 1, ...cur })
+    const snapshot = persistSnapshot(state)
     saveEditorState(projectId, snapshot)
     scheduleServerSave(projectId, snapshot)
   })

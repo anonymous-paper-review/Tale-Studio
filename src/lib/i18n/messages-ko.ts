@@ -1178,9 +1178,9 @@ export const KO: Record<string, string> = {
     '편집 내용을 서버에 저장할 수 없어요. 프로젝트가 삭제됐거나 세션이 만료됐을 수 있어요. 새로고침하면 최근 프로젝트로 복원돼요.',
   "Couldn't save your edits in this browser. Browser storage may be full.":
     '이 브라우저에 편집 내용을 저장하지 못했어요. 브라우저 저장 공간이 꽉 찼을 수 있어요.',
-  // E2b(2026-11-14): 서버 편집을 읽지 못하고 연 화면이 서버에 쓰기 전에 다시 읽었더니 다른 브라우저 편집이 있었을 때.
-  "Edits saved in another browser are on the server, so they weren't overwritten. Reopen the Editor to see them.":
-    '다른 브라우저에서 저장한 편집이 서버에 있어 덮어쓰지 않았어요. Editor 를 다시 열면 그 편집이 열려요.',
+  // E2b(2026-11-14, 검토 c 낮음 3): 서버 편집을 읽지 못하고 연 화면이 서버에 쓰기 전에 다시 읽었더니 다른 브라우저 편집이 있었을 때.
+  "There are edits saved in another browser. Changes you make here won't be saved to the server.":
+    '다른 브라우저에서 저장한 편집이 있어요. 여기서 고친 것은 서버에 저장되지 않아요.',
 
   // ── misc: card-mention.ts (direct) ──
   Person: '인물',

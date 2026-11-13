@@ -5,6 +5,11 @@ import { useLocaleStore } from '@/stores/locale-store'
 
 export interface PersistedEditor {
   version: number
+  /**
+   * 서버 편집과 견주는 화면(E2b 고침 뒤)이 쓴 저장본 — 이 표시가 있는 서버 저장본은 이 브라우저의 고침 전 저장본보다 먼저 연다
+   *   (검토 c, 2026-11-14). 표시가 없으면 고침 전 저장본끼리라 이 브라우저 것이 먼저다(E2b 로 비워진 프로젝트 되살리기).
+   */
+  serverAware?: boolean
   shots: Shot[]
   clipOrder: Record<string, string[]>
   videoClips: VideoClip[]
