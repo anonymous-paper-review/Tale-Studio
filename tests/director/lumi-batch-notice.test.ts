@@ -22,6 +22,12 @@ const VIDEO = { projectId: 'p-dir', kind: 'video' as const, done: 5, failed: 1 }
 const states = (...list: Array<[string, DirectorShotState]>) => new Map(list)
 const BOARD = states(['s1', 'video_done'], ['s2', 'video_done'], ['s3', 'video_done'], ['s4', 'video_failed'], ['s5', 'video_done'], ['s6', 'video_done'])
 const labelOf = (id: string) => Number(id.slice(1))
+/** 러너처럼 — 시작하면 그 자리에서 새 묶음 표시를 단다(끝난 것으로 바로 풀어 다음 부탁을 막지 않는다). */
+async function startsBatch(_projectId: string, opts?: { shotIds?: readonly string[] }) {
+  director.getState().beginVideoBatch(opts?.shotIds?.length ?? 0)
+  director.setState({ videoBatchBusy: false })
+  return { total: opts?.shotIds?.length ?? 0, started: opts?.shotIds?.length ?? 0, failed: 0 }
+}
 
 function shot(id: string): DirectorNode {
   return { id, type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: `w-${id}`, writerShotId: `w-${id}`, derivedPrompt: `base ${id}`, promptOverride: null, camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }, lighting: { position: 'front', brightness: 50, colorTemp: 5600 }, cameraPreset: { brand: 'arri', focalLength: 35, aperture: 2.8, whiteBalance: 5600 }, provider: 'seedance', durationSeconds: 3, storyboardImage: { status: 'completed', url: `https://media.test/${id}.png`, jobId: null }, referenceImages: [], imageInputs: [] } } as unknown as DirectorNode
@@ -36,7 +42,7 @@ beforeEach(() => {
   useChatUiStore.setState({ collapsed: true })
   notices.setState({ notice: null })
   mocks.balance = { balance: 40, mode: 'enforce' }
-  mocks.run.mockResolvedValue({ total: 1, started: 1, failed: 0 })
+  mocks.run.mockImplementation(startsBatch)
 })
 
 describe('Lumi 알림 카드가 뜨는 때(시안 D8)', () => {

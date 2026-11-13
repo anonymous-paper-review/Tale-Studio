@@ -115,6 +115,19 @@ export function splitDirectorTextEdits(
   return { immediate, edits }
 }
 
+/**
+ * 글 고침이 걸린 샷(노드 id) — 그 샷의 글을 고치거나, 그 샷이 속한 씬의 글을 고친다. 같은 답의 그림 · 영상이 이 샷이면 바로 만들지 않고
+ *   글 카드 [적용]을 기다린다 — 옛 글로 만들어 Take 를 쓰지 않게(검토 b 보통 1).
+ */
+export function textBoundShotIds(edits: readonly DirectorTextEdit[], nodes: readonly DirectorNode[]): Set<string> {
+  const scenes = new Set(edits.filter((edit) => edit.kind === 'scene').map((edit) => edit.nodeId))
+  const out = new Set(edits.filter((edit) => edit.kind === 'shot').map((edit) => edit.nodeId))
+  for (const node of nodes) {
+    if (isShotData(node.data) && node.data.parentSceneNodeId && scenes.has(node.data.parentSceneNodeId)) out.add(node.id)
+  }
+  return out
+}
+
 const FIELD_NAME: Record<DirectorTextField, string> = {
   label: 'name',
   prompt: 'prompt',

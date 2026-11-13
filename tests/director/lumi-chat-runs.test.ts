@@ -1,10 +1,11 @@
-// Director 에서 Lumi 에게 말로 부탁하면 확인 카드 없이 바로 실행하고(이미지 · 영상), 말하지 않은 샷에는 Take 를 쓰지 않으며, 글은 전 · 후를 보고 적용해야 바뀌는지 검사한다 (오너 2026-11-14 9번)
+// Director 에서 Lumi 에게 말로 부탁하면 확인 카드 없이 바로 실행하고(이미지 · 영상), 말하지 않은 샷에는 Take 를 쓰지 않으며, 글은 전 · 후를 보고 적용해야 바뀌고
+//   그 글이 걸린 샷의 생성은 [적용]을 기다리는지 검사한다 (오너 2026-11-14 9번 · 검토 b)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { DirectorNode } from '@/types/director'
 
-const mocks = vi.hoisted(() => ({ run: vi.fn(), balance: { balance: 40 as number | null, mode: 'enforce' as 'enforce' | 'shadow' | 'off' } }))
+const mocks = vi.hoisted(() => ({ run: vi.fn(), balance: { balance: 40 as number | null, mode: 'enforce' as 'enforce' | 'shadow' | 'off', failed: false } }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 vi.mock('@/lib/billing/use-take-balance', () => ({ fetchTakeBalance: vi.fn(async () => mocks.balance), refetchTakeBalance: vi.fn() }))
 vi.mock('@/lib/director/video-batch-client', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/director/video-batch-client')>(), runVideoBatch: mocks.run }))
@@ -14,6 +15,8 @@ import { useProjectStore as project } from '@/stores/project-store'
 import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useWriterStore as writer } from '@/stores/writer-store'
 import { useLocaleStore } from '@/stores/locale-store'
+import { translate } from '@/lib/i18n/translate'
+import { fetchTakeBalance } from '@/lib/billing/use-take-balance'
 
 const originalGenerate = director.getState().generateStoryboardImage
 const IMG = (id: string) => ({ status: 'completed', url: `https://media.test/${id}.png`, jobId: null })
@@ -29,6 +32,13 @@ const reply = (updates: unknown[], text = 'Okay.') => vi.stubGlobal('fetch', vi.
 const lastModel = () => chat.getState().messages.filter((m) => m.role === 'model').at(-1)?.content ?? ''
 const saidAll = () => chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content).join('\n')
 const runShots = () => (mocks.run.mock.calls[0]?.[1] as { shotIds?: string[] } | undefined)?.shotIds
+const promptOf = (id: string) => (director.getState().nodes.find((n) => n.id === id)!.data as { promptOverride: string | null }).promptOverride
+/** 러너처럼 — 시작하면 그 자리에서 새 묶음 표시를 단다(끝난 것으로 바로 풀어 다음 부탁을 막지 않는다). */
+async function startsBatch(_projectId: string, opts?: { shotIds?: readonly string[] }) {
+  director.getState().beginVideoBatch(opts?.shotIds?.length ?? 0)
+  director.setState({ videoBatchBusy: false })
+  return { total: opts?.shotIds?.length ?? 0, started: opts?.shotIds?.length ?? 0, failed: 0 }
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -38,8 +48,8 @@ beforeEach(() => {
   useLocaleStore.setState({ locale: 'en' })
   writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: ['s1', 's2', 's3', 's4'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1' })) as never })
   director.setState({ projectId: 'p-dir', nodes: NODES(), edges: [], selectedNodeId: null, videoBatchBusy: false, realBatchBusy: false, generateStoryboardImage: originalGenerate })
-  mocks.balance = { balance: 40, mode: 'enforce' }
-  mocks.run.mockResolvedValue({ total: 2, started: 2, failed: 0 })
+  mocks.balance = { balance: 40, mode: 'enforce', failed: false }
+  mocks.run.mockImplementation(startsBatch)
 })
 afterEach(() => {
   director.setState({ generateStoryboardImage: originalGenerate })
@@ -59,7 +69,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
   })
 
   // 왜: 오너 9번 — Take 를 쓰는 영상도 확인 카드 없이 바로. 대신 무엇을 몇 Take 로 시작했는지 답에 되짚는다(혼자 정한 것 B).
-  it('채팅으로 샷 몇 개의 영상을 만들어 달라고 하면 확인 카드 없이 그 샷만 바로 만들기 시작하고, 쓰는 Take 를 답한다', async () => {
+  it('영상을 바로 시작하면 답에 대상 샷과 쓰는 Take 를 되짚는다 — "샷 1·2 영상을 만들기 시작했어요 · Take 10"', async () => {
     reply([{ type: 'generateVideos', shotIds: ['s1', 's2'] }])
     await chat.getState().sendMessage('Make videos for shot 1 and 2')
     expect(mocks.run).toHaveBeenCalledWith('p-dir', expect.objectContaining({ shotIds: ['s1', 's2'] }))
@@ -67,8 +77,8 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(lastModel()).toBe('Started making videos for Shots 1 · 2 · 10 Takes. Progress shows on the line above the cards.')
   })
 
-  // 왜: 확인 카드가 없으니 말을 잘못 읽어 엉뚱한 샷에 Take 를 쓰면 되돌릴 수 없다 — 영상은 사용자가 말한 샷(번호 · 묶음)에서만 만든다(혼자 정한 것 A).
-  it('영상을 부탁한 말에 없는 샷에는 Take 를 쓰지 않고, 어느 샷인지 번호로 말해 달라고 묻는다', async () => {
+  // 왜: 확인 카드가 없으니 말을 잘못 읽어 엉뚱한 샷에 Take 를 쓰면 되돌릴 수 없다 — 영상은 사용자가 분명히 말한 샷에서만 만든다(혼자 정한 것 A · 검토 b 보통 2).
+  it('Take 를 쓰는 부탁은 대상 샷이 사용자 말에 분명할 때만 바로 하고, 모델이 그 밖의 샷을 담으면 만들지 않고 "어느 샷인지 번호로 말해 주세요"라고 묻는다', async () => {
     reply([{ type: 'generateVideos', shotIds: ['s1', 's2'] }])
     await chat.getState().sendMessage('Make a video for shot 1')
     expect(mocks.run).not.toHaveBeenCalled()
@@ -108,8 +118,8 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
   })
 
   // 왜: 오너 9번 "Take 가 모자라면 지금 알림 그대로" — 확인 카드가 없으니 일부만 만들지 않고 아무것도 시작하지 않는다(혼자 정한 것 C).
-  it('Take 가 모자라면 영상을 하나도 시작하지 않고 필요한 Take · 가진 Take 를 채팅에 말한다', async () => {
-    mocks.balance = { balance: 5, mode: 'enforce' }
+  it('쓰는 Take 가 가진 Take 보다 많으면 일부만 만들지 않고 하나도 시작하지 않으며, 필요한 Take · 가진 Take 를 채팅에 말한다', async () => {
+    mocks.balance = { balance: 5, mode: 'enforce', failed: false }
     reply([{ type: 'generateVideos', shotIds: ['s1', 's2'] }])
     await chat.getState().sendMessage('Make videos for shot 1 and 2')
     expect(mocks.run).not.toHaveBeenCalled()
@@ -152,6 +162,109 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(data.lighting.position).toBe('left')
     expect(data.provider).toBe('kling-o3')
     expect(chat.getState().pendingProposal).toBeNull()
+  })
+
+  // 왜: 검토 b 보통 1 — 글 고침과 영상을 한 답에 부탁하면 영상이 옛 글로 바로 시작돼 Take 가 나갔다. 그 샷의 생성은 글 카드 [적용]에 묶는다.
+  it('글 고침과 같은 샷의 영상을 한 답에 부탁하면 영상은 바로 시작하지 않고 글 카드에 "적용하면 샷 1 영상을 바로 만들어요 · Take 5"로 묶인다', async () => {
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'A warmer close-up in the rain' } }, { type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('Make shot 1 warmer and then make the video for shot 1')
+    expect(mocks.run).not.toHaveBeenCalled()
+    const card = chat.getState().pendingProposal
+    expect(card?.kind).toBe('directorTextEdit')
+    expect(card?.impact).toContain('Applying also makes the video for Shot 1 right away · 5 Takes.')
+    expect(translate('ko', 'Applying also makes the video for {shots} right away · {takes} Takes.', { shots: '샷 1', takes: 5 })).toBe('적용하면 샷 1 영상을 바로 만들어요 · Take 5.')
+  })
+
+  // 왜: [적용]은 "글을 바꾼 뒤 그 글로 생성", [버리기]는 "둘 다 안 함"(검토 b 보통 1). 그림도 같은 묶음이다.
+  it('글 카드의 [적용]을 누르면 글을 바꾼 뒤 그 글로 영상 · 그림을 만들고, [버리기]면 둘 다 하지 않는다', async () => {
+    const generate = vi.fn().mockResolvedValue(null)
+    director.setState({ generateStoryboardImage: generate })
+    let promptAtRun: string | null = null
+    mocks.run.mockImplementation(async (projectId: string, opts?: { shotIds?: readonly string[] }) => {
+      promptAtRun = promptOf('s1')
+      return startsBatch(projectId, opts)
+    })
+    reply([
+      { type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } },
+      { type: 'generateVideos', shotIds: ['s1'] },
+      { type: 'updateShot', id: 's3', patch: { prompt: 'Rain' } },
+      { type: 'generateImage', id: 's3' },
+    ])
+    await chat.getState().sendMessage('Make shot 1 warm and make its video. Make shot 3 rainy and draw it')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(generate).not.toHaveBeenCalled()
+    expect(chat.getState().pendingProposal?.impact).toContain('Applying also makes the live-action image for Shot 3 right away · No Takes used.')
+    await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
+    expect(promptAtRun).toBe('Warm')
+    expect(runShots()).toEqual(['s1'])
+    expect(generate).toHaveBeenCalledWith('s3', expect.any(Object))
+
+    mocks.run.mockClear()
+    reply([{ type: 'updateShot', id: 's2', patch: { prompt: 'Cold' } }, { type: 'generateVideos', shotIds: ['s2'] }])
+    await chat.getState().sendMessage('Make shot 2 cold and make its video')
+    chat.getState().dismissPendingProposal()
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(promptOf('s2')).toBeNull()
+  })
+
+  // 왜: 글이 걸리지 않은 샷까지 기다리게 하면 9번 "바로 실행"이 깨진다.
+  it('글 고침이 걸리지 않은 샷의 영상 · 그림은 같은 답에 글 고침이 있어도 지금처럼 바로 시작한다', async () => {
+    const generate = vi.fn().mockResolvedValue(null)
+    director.setState({ generateStoryboardImage: generate })
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s2'] }, { type: 'generateImage', id: 's3' }])
+    await chat.getState().sendMessage('Make shot 1 warm, the video for shot 2 and the image for shot 3')
+    expect(runShots()).toEqual(['s2'])
+    expect(generate).toHaveBeenCalledWith('s3', expect.any(Object))
+    expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+  })
+
+  // 왜: 검토 b 보통 2(c) — "만들지 마"를 모델이 영상 부탁으로 읽어도 만들지 않고, 만들지 않았다고 분명히 말한다.
+  it('만들지 말라는 말에 모델이 영상을 담아도 만들지 않고 "영상은 만들지 않았어요"라고 말한다', async () => {
+    reply([{ type: 'generateVideos', shotIds: ['s2'] }])
+    await chat.getState().sendMessage("Don't make a video for shot 2")
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('I did not make any videos.')
+    expect(translate('ko', 'I did not make any videos.')).toBe('영상은 만들지 않았어요.')
+  })
+
+  // 왜: 검토 b 낮음 4 — 잔액을 못 읽으면 "과금 꺼짐"으로 읽혀 Take 셈이 빠졌다. 못 읽은 것과 정말 꺼진 것을 가른다.
+  it('Take 잔액을 확인하지 못하면 영상을 시작하지 않고 "Take 를 확인하지 못해 시작하지 않았어요"라고 말한다', async () => {
+    mocks.balance = { balance: null, mode: 'off', failed: true }
+    reply([{ type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('Make the video for shot 1')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe("I couldn't check your Takes, so I didn't start. Please ask again in a moment.")
+    expect(translate('ko', "I couldn't check your Takes, so I didn't start. Please ask again in a moment.")).toBe('Take 를 확인하지 못해 시작하지 않았어요. 잠시 뒤 다시 부탁해 주세요.')
+  })
+
+  // 왜: 실패를 "꺼짐"과 같은 값으로 돌려주면 위 막이가 설 곳이 없다 — 조회 실패는 실패로 알린다.
+  it('Take 잔액 조회가 실패하면 과금 꺼짐과 구별해 실패로 알려 준다', async () => {
+    const real = await vi.importActual<typeof import('@/lib/billing/use-take-balance')>('@/lib/billing/use-take-balance')
+    vi.stubGlobal('fetch', vi.fn(async () => { throw new TypeError('Failed to fetch') }))
+    expect(await real.fetchTakeBalance()).toMatchObject({ failed: true })
+    vi.stubGlobal('fetch', vi.fn(async () => Response.json({ balance: null, mode: 'off' })))
+    expect(await real.fetchTakeBalance()).toMatchObject({ mode: 'off', failed: false })
+    expect(vi.isMockFunction(fetchTakeBalance)).toBe(true)
+  })
+
+  // 왜: 검토 b 낮음 5 — Take 를 세는 사이 다른 묶음(다른 부탁 · 툴바)이 시작되면 러너는 아무것도 안 하는데 "시작했어요"라고 했다.
+  it('영상을 시작하기 직전에 다른 영상 묶음이 돌기 시작했으면 시작했다고 말하지 않고 이미 돌고 있다고 말한다', async () => {
+    vi.mocked(fetchTakeBalance).mockImplementationOnce(async () => {
+      director.setState({ videoBatchBusy: true })
+      return { ...mocks.balance, loading: false }
+    })
+    reply([{ type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('Make the video for shot 1')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('A video batch is already running. Ask again when it finishes.')
+  })
+
+  // 왜: 러너가 시작하지 않은 것(다른 프로젝트로 바뀜 등)을 "시작했어요"라고 말하지 않는다 — 러너는 시작하면 그 자리에서 묶음 표시를 단다.
+  it('러너가 영상을 시작하지 않았으면 "시작했어요"라고 말하지 않는다', async () => {
+    mocks.run.mockImplementationOnce(async () => ({ total: 0, started: 0, failed: 0 }))
+    reply([{ type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('Make the video for shot 1')
+    expect(lastModel()).toBe("I couldn't start the videos. Please ask again in a moment.")
   })
 
   // 왜: 서버 지시문도 같은 약속을 말해야 모델이 "확인 카드가 뜰 거예요"라고 하지 않는다.

@@ -1314,6 +1314,8 @@ export function GlobalChat() {
     !!suggestion?.action && suggestion.action.kind !== 'choices' && !choices && !(suggestion.action.kind === 'confirmScenes' && (sceneStoryProposal || sceneStoryProposalPending?.projectId === projectId)) &&
     roughRedrawOfferHere(suggestion.action, boardProjectId)
   const showProposal = !!pendingProposal
+  // Editor 는 조언만 하는 채팅이다(오너 10번) — 다른 단계의 대기 카드는 단추 없이 보이고 그 단계 화면에서 답한다(검토 b 보통 3).
+  const proposalActionable = !!pendingProposal && currentStage !== 'editor'
   let cascadeSlots = 0
   const suggestionSlot = showSuggestion ? cascadeSlots++ : 0
   const proposalSlot = showProposal ? cascadeSlots++ : 0
@@ -1329,7 +1331,7 @@ export function GlobalChat() {
   //   넘기기"가 사실상 마우스 전용이 된다. 그래서 Enter 를 빌려준다 — 단 입력창에 쓰던 글이
   //   있으면 그건 전송이 먼저다(양보). 선택지(kind:'choices')는 자체 핸들러가 있고 showSuggestion
   //   이 이미 배제한다. 캡처 단계에서 듣고 stopPropagation 하므로 textarea 의 Enter 와 겹치지 않는다.
-  const proposalOpen = showProposal && !!pendingProposal
+  const proposalOpen = showProposal && proposalActionable
   const suggestionOpen =
     showSuggestion && !!suggestion?.action && suggestion.action.kind !== 'choices'
   useEffect(() => {
@@ -1663,7 +1665,12 @@ export function GlobalChat() {
                     )}
                   </div>
                 </div>
-                {/* CTA — oiioii form 카드의 캡슐 버튼 매핑(Confirm & Continue). 승인은 전폭 캡슐. */}
+                {!proposalActionable ? (
+                  <p className="mt-2 text-caption text-muted-foreground">
+                    {t('Answer this on the {stage} screen.', { stage: STAGE_LABEL[pendingProposal.stage] })}
+                  </p>
+                ) : (
+                /* CTA — oiioii form 카드의 캡슐 버튼 매핑(Confirm & Continue). 승인은 전폭 캡슐. */
                 <div className="mt-3 flex flex-col gap-1.5">
                   <Button size="sm" className="w-full rounded-full" onClick={handlePendingProposalApprove}>
                     {pendingProposal.kind === 'producerPreserveScript' ? t('Keep as written') : pendingProposal.kind === 'directorTextEdit' ? t('Apply') : t('Approve')}
@@ -1688,6 +1695,7 @@ export function GlobalChat() {
                     <KeyHint dismissible />
                   </div>
                 </div>
+                )}
               </div>
             )}
             <div ref={chatEndRef} />

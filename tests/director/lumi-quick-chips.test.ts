@@ -36,6 +36,12 @@ const NODES = () => [
 const fetchMock = vi.fn(async () => Response.json({ reply: 'Model reply' }))
 const lastModel = () => chat.getState().messages.filter((m) => m.role === 'model').at(-1)?.content ?? ''
 const chip = (index: number) => translate('en', DIRECTOR_QUICK_CHIPS[index])
+/** 러너처럼 — 시작하면 그 자리에서 새 묶음 표시를 단다(끝난 것으로 바로 풀어 다음 부탁을 막지 않는다). */
+async function startsBatch(_projectId: string, opts?: { shotIds?: readonly string[] }) {
+  director.getState().beginVideoBatch(opts?.shotIds?.length ?? 0)
+  director.setState({ videoBatchBusy: false })
+  return { total: opts?.shotIds?.length ?? 0, started: opts?.shotIds?.length ?? 0, failed: 0 }
+}
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -46,7 +52,7 @@ beforeEach(() => {
   writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: ['s1', 's2', 's3', 's4', 's5'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1' })) as never })
   director.setState({ projectId: 'p-dir', nodes: NODES(), edges: [], selectedNodeId: null, videoBatchBusy: false, realBatchBusy: false, generateStoryboardImage: originalGenerate })
   mocks.balance = { balance: 40, mode: 'enforce' }
-  mocks.run.mockResolvedValue({ total: 1, started: 1, failed: 0 })
+  mocks.run.mockImplementation(startsBatch)
   mocks.real.mockResolvedValue({ generated: 1, quotaBlocked: false })
   vi.stubGlobal('fetch', fetchMock)
 })

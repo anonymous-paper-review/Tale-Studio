@@ -400,9 +400,14 @@ function validateCanvasUpdates(raw: unknown[]): unknown[] {
         break
       }
       case 'generateVideos': {
-        // shotIds 가 있으면 그 샷만, 없으면 남은 샷 전부 — 화면이 막이(말한 샷만) · Take 셈 뒤 바로 시작한다(오너 2026-11-14 9번).
+        // shotIds 가 있으면 그 샷만, 칸이 아예 없으면 남은 샷 전부 — 화면이 막이(말한 샷만) · Take 셈 뒤 바로 시작한다(오너 2026-11-14 9번).
+        //   칸은 있는데 쓸 값이 없으면 "전부"로 바꾸지 않고 빈 목록으로 넘긴다 — 화면이 번호를 묻는다(검토 b 보통 2).
+        if (!('shotIds' in rec)) {
+          out.push({ type: 'generateVideos' })
+          break
+        }
         const shotIds = Array.isArray(rec.shotIds) ? rec.shotIds.flatMap((id) => (asNonEmptyString(id) ? [asNonEmptyString(id)!] : [])) : []
-        out.push(shotIds.length > 0 ? { type: 'generateVideos', shotIds } : { type: 'generateVideos' })
+        out.push({ type: 'generateVideos', shotIds })
         break
       }
       case 'generateVideo':
