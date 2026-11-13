@@ -156,6 +156,20 @@ describe('누를 때 작업 목록 새로 읽기 (리드 검토 a 낮음)', () =
     expect(stopAllSource()).toContain('stoppableJobs(await freshActiveJobs(run.projectId))')
   })
 
+  it('작업 목록 새로 읽기가 늦으면 기다리지 않고 저장해 둔 목록으로 멈춘다', async () => {
+    // 왜: 목록 라우트가 느리면 그만큼 낱개 작업 멈추기가 늦게 나가고 그동안 "중단하는 중"이었다(검토 c 낮음) — 한도는 2.5초.
+    _setGenerationQueueSnapshotForTests({ projectId: 'p1', jobs: [job('seen', 'shot_video')] })
+    vi.stubGlobal('fetch', vi.fn((_input: RequestInfo | URL, init?: RequestInit) => new Promise<Response>((_resolve, reject) => {
+      init?.signal?.addEventListener('abort', () => reject(new DOMException('aborted', 'AbortError')))
+    })))
+    let settled: readonly ActiveJob[] | null = null
+    void freshActiveJobs('p1').then((jobs) => { settled = jobs })
+    await vi.advanceTimersByTimeAsync(2000)
+    expect(settled).toBeNull()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(settled ? (settled as readonly ActiveJob[]).map((j) => j.id) : null).toEqual(['seen'])
+  })
+
   it('작업 목록을 새로 읽지 못하면 저장해 둔 목록으로 멈춘다', async () => {
     // 왜: 목록 읽기가 끊겨도 멈출 수 있는 것은 멈춘다(정상 경로 고정 — 예전처럼).
     _setGenerationQueueSnapshotForTests({ projectId: 'p1', jobs: [job('seen', 'shot_video')] })

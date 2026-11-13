@@ -66,12 +66,17 @@ describe('이미지가 끝나면 영상 시작', () => {
   })
 })
 
+/** 원본에서 start 부터 그 뒤 처음 나오는 end 까지(못 찾으면 끝까지) — 글자 수로 자르지 않아 앞에 줄이 붙어도 거짓으로 실패하지 않는다(검토 c 낮음). */
+function between(src: string, start: string, end: string): string {
+  const from = src.indexOf(start)
+  if (from === -1) return ''
+  const to = src.indexOf(end, from + start.length)
+  return src.slice(from, to === -1 ? undefined : to)
+}
+
 describe('이어 보내기가 약속한 만큼 · 이 화면에서만', () => {
-  const chainEffect = () => {
-    const src = page()
-    const start = src.indexOf('useEffect(() => {\n    if (chainWaitingShotIds.length === 0) return')
-    return src.slice(start, start + 1200)
-  }
+  // 그 effect 하나(닫는 "}, [" 까지).
+  const chainEffect = () => between(page(), 'useEffect(() => {\n    if (chainWaitingShotIds.length === 0) return', '\n  }, [')
 
   it('이미지가 끝난 샷의 영상은 서버 영상 묶음으로 한꺼번에 보내, 사람당 한도를 넘는 샷도 묶음이 차례로 낸다', () => {
     // 왜: 한 샷씩 바로 보내면 한도(기본 3)를 넘은 샷이 거절되고 Take 노드가 지워진 채 기다림에서 빠졌다 —
@@ -98,22 +103,22 @@ describe('이어 보내기가 약속한 만큼 · 이 화면에서만', () => {
   it('Director 화면을 떠나면 이어 보내기 기다림을 비우고 스위치를 끈다', () => {
     // 왜: 기다림이 남아 있다가 나중에 돌아오면 그사이 끝난 이미지의 영상이 확인 없이 시작됐다 —
     //   "이 화면을 닫으면 영상은 시작되지 않아요"와 어긋났다(리드 검토 a S5 보통 4).
-    const src = page()
-    const cleanup = src.slice(src.indexOf('export default function DirectorCanvasPage'), src.indexOf('export default function DirectorCanvasPage') + 1500)
+    // 페이지 함수 전체(맨 바깥 닫는 괄호까지).
+    const cleanup = between(page(), 'export default function DirectorCanvasPage', '\n}\n')
     expect(cleanup).toContain('useDirectorCanvasStore.getState().setChainVideoAfterImage(false)')
   })
 
   it('[모두 멈추기]는 이어 보내기 기다림도 비운다', () => {
     // 왜: 멈춘 뒤에도 이미 보낸 이미지가 끝나면 그 영상이 시작됐다(Take) — 오너 답 7 "아직 보내지 않은 것은 보내지 않는다"(리드 검토 a 보통 6).
-    const src = page()
-    const stopAll = src.slice(src.indexOf('const stopAll = async () => {'), src.indexOf('const stopAll = async () => {') + 700)
+    // [모두 멈추기] 함수 전체(닫는 "  }" 까지).
+    const stopAll = between(page(), 'const stopAll = async () => {', '\n  }\n')
     expect(stopAll).toContain('run.setChainWaitingShots([])')
   })
 
   it('Take 가 없어도 [이미지+영상 만들기]는 이미지를 만들고, 영상은 Take 가 없어 못 만든다고 알린다', () => {
     // 왜: Take 가 0 이면 이미지도 만들지 않고 경고만 떴다 — 이미지는 Take 를 쓰지 않는다(리드 검토 a 낮음 9).
-    const src = page()
-    const confirm = src.slice(src.indexOf('open={confirmChain}'), src.indexOf('open={confirmChain}') + 1200)
+    // 그 확인 창 하나(다음 확인 창 앞까지) — takes-unknown 의 confirmBody 와 같은 꼴.
+    const confirm = between(page(), 'open={confirmChain}', '<RegenerateConfirmDialog')
     expect(confirm).toMatch(/if \(chainPlan\.runCount === 0\) \{\s*toast\.warning\(t\('No videos can be made until you add Takes\.'\)\)\s*startImages\(\)\s*return\s*\}/)
   })
 
