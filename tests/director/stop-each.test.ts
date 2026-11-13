@@ -24,6 +24,7 @@ vi.mock('@/lib/i18n', async () => {
   return { translate, useT: () => (text: string, params?: Record<string, string | number>) => translate('ko', text, params) }
 })
 
+import { toast } from 'sonner'
 import { ShotStateTail } from '@/features/director/shot-status'
 import { shotStopTarget, stopNotice, stopShotWork } from '@/lib/director/stop-work'
 import { _setGenerationQueueSnapshotForTests } from '@/lib/generation-queue'
@@ -102,6 +103,7 @@ describe('혼자 정한 것', () => {
           posts += 1
           return new Response(JSON.stringify({ ok: true, data: { submitted: [{ jobId: `job-${posts}`, shotIds: ['s1', 's2', 's3', 's4'] }], remaining: 4 } }), { status: 200 })
         }
+        if (url.startsWith('/api/director/video-takes')) return new Response(JSON.stringify({ takes: [] }), { status: 200 })
         if (url.startsWith('/api/generation-jobs/')) return new Response(JSON.stringify({ data: { status: 'queued' } }), { status: 200 })
         return new Response(JSON.stringify({ ok: true, data: { jobs: [], cancelled: [] } }), { status: 200 })
       }))
@@ -110,6 +112,34 @@ describe('혼자 정한 것', () => {
       vi.useRealTimers()
       vi.unstubAllGlobals()
       _setGenerationQueueSnapshotForTests({ projectId: '', jobs: [] })
+    })
+
+    it('이미지 일괄 중 한 장을 멈추면 끝 알림의 "만들었어요" 수는 끝난 장의 샷만 센다', async () => {
+      // 왜: 검토 a cbb84e64 낮음 2 — 멈춘 장의 샷까지 "N컷 만들었어요"로 셌다.
+      vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
+        const url = typeof input === 'string' ? input : input.toString()
+        if (url.startsWith('/api/director/generate-storyboard-batch')) {
+          posts += 1
+          const shotIds = posts === 1 ? ['s1', 's2', 's3', 's4'] : ['s5', 's6', 's7', 's8']
+          return new Response(JSON.stringify({ ok: true, data: { submitted: [{ jobId: `job-${posts}`, shotIds }], remaining: posts === 1 ? 4 : 0 } }), { status: 200 })
+        }
+        // 다시 읽기(hydrateFromDb)가 받는 Take 목록 — 비어 있음.
+        if (url.startsWith('/api/director/video-takes')) return new Response(JSON.stringify({ takes: [] }), { status: 200 })
+        if (url.startsWith('/api/generation-jobs/job-2')) return new Response(JSON.stringify({ data: { status: 'completed' } }), { status: 200 })
+        if (url.startsWith('/api/generation-jobs/')) return new Response(JSON.stringify({ data: { status: 'queued' } }), { status: 200 })
+        return new Response(JSON.stringify({ ok: true, data: { jobs: [], cancelled: [] } }), { status: 200 })
+      }))
+      vi.mocked(toast.success).mockClear()
+      let done = false
+      const run = runRealBatch('p1').finally(() => { done = true })
+      await vi.advanceTimersByTimeAsync(10)
+      _setGenerationQueueSnapshotForTests({ projectId: 'p1', jobs: [job('job-1', 'storyboard_real_grid', { target: { writerShotIds: ['s1', 's2', 's3', 's4'] }, cancelledAt: '2026-11-14T00:00:00.000Z' })] })
+      for (let i = 0; i < 60 && !done; i++) await vi.advanceTimersByTimeAsync(1000)
+      await run
+      expect(posts).toBe(2)
+      expect(vi.mocked(toast.success)).toHaveBeenCalledTimes(1)
+      expect(String(vi.mocked(toast.success).mock.calls[0]![0])).toMatch(/\b4\b/)
+      expect(String(vi.mocked(toast.success).mock.calls[0]![0])).not.toMatch(/\b8\b/)
     })
 
     it('이미지 일괄이 돌 때 한 장을 멈추면 일괄은 그 장이 끝나기를 기다리지 않고 다음 장으로 간다', async () => {

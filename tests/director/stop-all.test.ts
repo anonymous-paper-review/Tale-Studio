@@ -56,6 +56,8 @@ beforeEach(() => {
     if (url.startsWith('/api/generation-jobs/')) {
       return new Response(JSON.stringify({ data: { status: 'queued' } }), { status: 200 })
     }
+    // 다시 읽기(hydrateFromDb)가 받는 Take 목록 — 비어 있음(이것이 깨지면 끝 알림까지 가지 못한다).
+    if (url.startsWith('/api/director/video-takes')) return new Response(JSON.stringify({ takes: [] }), { status: 200 })
     if (url === '/api/director/jobs/cancel') {
       const ids = ((init?.body ? JSON.parse(String(init.body)) : {}) as { jobIds?: string[] }).jobIds ?? []
       return new Response(JSON.stringify({ ok: true, data: { cancelled: ids.map((jobId) => ({ jobId, kind: 'storyboard_real_grid', writerShotIds: ['s1', 's2', 's3', 's4'], videoClipId: null, cancelledAt: '2026-11-14T00:00:00.000Z' })) } }), { status: 200 })

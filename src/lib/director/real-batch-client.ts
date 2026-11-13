@@ -293,11 +293,12 @@ export async function runRealBatch(
     if (generated > 0) {
       await invalidateShots(projectId)
       await store.getState().hydrateFromDb(projectId)
-      // 멈춘 판은 "만들었어요"라고 하지 않는다 — 보낸 장은 화면에서 멈췄다(오너 7번).
-      if (!stoppedByUser) {
+      // 멈춘 판은 "만들었어요"라고 하지 않는다 — 보낸 장은 화면에서 멈췄다(오너 7번). 수는 끝난 장의 샷만 센다 —
+      //   카드 · 노드 [멈추기]로 멈춘 장 · 끝나기를 기다리지 않은 장은 세지 않는다(검토 a cbb84e64 낮음 2).
+      if (!stoppedByUser && imagesDone > 0) {
         toast.success(
           translate(useLocaleStore.getState().locale, 'Generated {count} live-action storyboard shots', {
-            count: generated,
+            count: imagesDone,
           }),
         )
       }
