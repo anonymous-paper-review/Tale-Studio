@@ -130,6 +130,42 @@ describe('그 밖이면 바로 만들지 않고 화면이 센 목록으로 되�
   })
 })
 
+describe('번호 길의 틈 — 그대로 두기 · 단위 · 서수 · 비슷한 낱말(재검토 b 낮음 2)', () => {
+  it('"샷 2 는 그대로 두고 샷 3 영상 만들어줘"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
+    expect(ground('샷 2 는 그대로 두고 샷 3 영상 만들어줘', ids(3))).toEqual(confirm(3))
+  })
+  it('"Leave shot 2 as it is and make the video for shot 3"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
+    expect(ground('Leave shot 2 as it is and make the video for shot 3', ids(3))).toEqual(confirm(3))
+  })
+  it('"Don\'t bother with shot 2, make the video for shot 3"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
+    expect(ground("Don't bother with shot 2, make the video for shot 3", ids(3))).toEqual(confirm(3))
+  })
+  it('"No video for shot 2, make the video for shot 3"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
+    expect(ground('No video for shot 2, make the video for shot 3', ids(3))).toEqual(confirm(3))
+  })
+  it('"샷 3 영상 만들기 전에 물어봐"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
+    expect(ground('샷 3 영상 만들기 전에 물어봐', ids(3))).toEqual(confirm(3))
+  })
+  // 왜: 숫자 바로 뒤 단위(초 · s · sec · % · 배)는 샷 번호가 아니다 — "샷 3, 5초짜리로"를 샷 3 · 5 로 읽었다.
+  it('"샷 3, 5초짜리로 영상 만들어줘"는 5초를 샷 5 로 읽지 않고 샷 3 목록으로 되묻는다', () => {
+    expect(ground('샷 3, 5초짜리로 영상 만들어줘', ids(3, 5))).toEqual(confirm(3))
+    expect(ground('Make the video for shot 3 at 5s', ids(3, 5))).toEqual(confirm(3))
+  })
+  // 왜: "a second shot"(하나 더) · "The first shot looks great"(감상)는 샷 번호가 아니다 — 서수는 번호로 읽지 않고 되묻는다.
+  it('"a second shot" · "The first shot looks great"처럼 서수는 샷 번호로 읽지 않고 되묻는다', () => {
+    expect(ground('Make a second shot of the hallway as a video', ids(2))).toEqual(confirm(2))
+    expect(ground('The first shot looks great, make its video', ids(1))).toEqual(confirm(1))
+  })
+  // 왜: "Screenshots 2 and 3"의 "shots 2 and 3"은 샷 번호가 아니다(낱말 가운데).
+  it('"Screenshots 2 and 3"은 샷 번호로 읽지 않고 되묻는다', () => {
+    expect(ground('Make videos like the screenshots 2 and 3', ids(2, 3))).toEqual(confirm(2, 3))
+    expect(ground('스크린샷 2 처럼 영상 만들어줘', ids(2))).toEqual(confirm(2))
+  })
+  it('"씬 2의 세 번째 샷 영상 만들어줘"는 바로 만들지 않고 모델이 고른 샷 목록으로 되묻는다', () => {
+    expect(ground('씬 2의 세 번째 샷 영상 만들어줘', ids(5))).toEqual(confirm(5))
+  })
+})
+
 describe('만들지 말라는 말이면 만들지 않는다', () => {
   it('"샷 2 는 영상 만들지 마" · "Don\'t make a video for shot 4"면 아무 영상도 만들지 않는다', () => {
     expect(ground('샷 2 는 영상 만들지 마', ids(2))).toEqual(NONE)

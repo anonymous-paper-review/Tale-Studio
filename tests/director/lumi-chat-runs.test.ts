@@ -69,7 +69,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
   })
 
   // 왜: 오너 9번 — Take 를 쓰는 영상도 확인 카드 없이 바로. 대신 무엇을 몇 Take 로 시작했는지 답에 되짚는다(혼자 정한 것 B).
-  it('영상을 바로 시작하면 답에 대상 샷과 쓰는 Take 를 되짚는다 — "샷 1·2 영상을 만들기 시작했어요 · Take 10"', async () => {
+  it('영상을 바로 시작하면 답에 대상 샷과 쓰는 Take 를 되짚는다 — "샷 1·2 영상을 만들기 시작했어요 · 10 Take"', async () => {
     reply([{ type: 'generateVideos', shotIds: ['s1', 's2'] }])
     await chat.getState().sendMessage('Make videos for shot 1 and 2')
     expect(mocks.run).toHaveBeenCalledWith('p-dir', expect.objectContaining({ shotIds: ['s1', 's2'] }))
@@ -95,7 +95,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(mocks.run).not.toHaveBeenCalled()
     expect(lastModel()).toBe('Shall I make 3 videos for Shots 1 · 3 · 4 (15 Takes)? Say yes to start.')
     expect(translate('ko', 'Shall I make {count} videos for {shots} ({takes} Takes)? Say yes to start.', { count: 3, shots: '샷 1·3·4', takes: 15 }))
-      .toBe('샷 1·3·4 영상 3개(Take 15)를 만들까요? "응"이라고 하면 시작해요.')
+      .toBe('샷 1·3·4 영상 3개(15 Take)를 만들까요? "응"이라고 하면 시작해요.')
     await chat.getState().sendMessage('응')
     expect(runShots()).toEqual(['s1', 's3', 's4'])
     expect(lastModel()).toBe('Started making videos for Shots 1 · 3 · 4 · 15 Takes. Progress shows on the line above the cards.')
@@ -202,14 +202,14 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
   })
 
   // 왜: 검토 b 보통 1 — 글 고침과 영상을 한 답에 부탁하면 영상이 옛 글로 바로 시작돼 Take 가 나갔다. 그 샷의 생성은 글 카드 [적용]에 묶는다.
-  it('글 고침과 같은 샷의 영상을 한 답에 부탁하면 영상은 바로 시작하지 않고 글 카드에 "적용하면 샷 1 영상을 바로 만들어요 · Take 5"로 묶인다', async () => {
+  it('글 고침과 같은 샷의 영상을 한 답에 부탁하면 영상은 바로 시작하지 않고 글 카드에 "적용하면 샷 1 영상을 바로 만들어요 · 5 Take"로 묶인다', async () => {
     reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'A warmer close-up in the rain' } }, { type: 'generateVideos', shotIds: ['s1'] }])
     await chat.getState().sendMessage('Make shot 1 warmer and then make the video for shot 1')
     expect(mocks.run).not.toHaveBeenCalled()
     const card = chat.getState().pendingProposal
     expect(card?.kind).toBe('directorTextEdit')
     expect(card?.impact).toContain('Applying also makes the video for Shot 1 right away · 5 Takes.')
-    expect(translate('ko', 'Applying also makes the video for {shots} right away · {takes} Takes.', { shots: '샷 1', takes: 5 })).toBe('적용하면 샷 1 영상을 바로 만들어요 · Take 5.')
+    expect(translate('ko', 'Applying also makes the video for {shots} right away · {takes} Takes.', { shots: '샷 1', takes: 5 })).toBe('적용하면 샷 1 영상을 바로 만들어요 · 5 Take.')
   })
 
   // 왜: [적용]은 "글을 바꾼 뒤 그 글로 생성", [버리기]는 "둘 다 안 함"(검토 b 보통 1). 그림도 같은 묶음이다.
@@ -321,6 +321,41 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
     expect(runShots()).toEqual(['s1'])
     expect(promptAtRun).toBe('Warm')
+  })
+
+  // 왜: 재검토 b 낮음 3 — 되묻기가 늘었다. Lumi 가 번호를 물은 바로 다음 말은 "3번" · 맨 숫자로 답해도 샷 번호로 읽어야 한다.
+  it('Lumi 가 번호를 물은 다음 말에서는 "3번" · "3번이랑 4번" · 맨 숫자도 샷 번호로 읽어 그 샷 영상을 바로 만든다', async () => {
+    const ask = async () => {
+      reply([{ type: 'generateVideos', shotIds: ['s2'] }])
+      await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
+      expect(lastModel()).toBe("Which shots should get videos? Tell me the numbers, like 'shot 3'. Videos use Takes, so I only make the shots you name.")
+    }
+    await ask()
+    await chat.getState().sendMessage('3번')
+    expect(runShots()).toEqual(['s3'])
+    mocks.run.mockClear()
+    await ask()
+    await chat.getState().sendMessage('3번이랑 4번')
+    expect(runShots()).toEqual(['s3', 's4'])
+    mocks.run.mockClear()
+    await ask()
+    await chat.getState().sendMessage('1')
+    expect(runShots()).toEqual(['s1'])
+    // 묻지 않았으면 맨 숫자는 샷 번호가 아니다(평소 말로 간다).
+    mocks.run.mockClear()
+    reply([])
+    await chat.getState().sendMessage('2')
+    expect(mocks.run).not.toHaveBeenCalled()
+  })
+
+  // 왜: 재검토 b 낮음 1 — 묶어 둔 샷 영상이 그사이 다른 길로 만들어지면 [적용] 때 낼 것이 없는데 "시작했어요 · 5 Take"라고 했다.
+  it('묶어 둔 샷 영상이 그사이 다른 길로 만들어졌으면 [적용] 때 다시 만들지 않고 "지금 그런 샷이 없어요"라고 한다', async () => {
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s1'] }])
+    await chat.getState().sendMessage('Make shot 1 warm and make its video')
+    director.setState({ nodes: [...director.getState().nodes, { id: 'v1', type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: 'v1', parentShotNodeId: 's1', status: 'completed', lastAttemptStatus: 'completed', videoUrl: 'https://media.test/v1.mp4', final: false, takeNumber: 1, override: {} } } as unknown as DirectorNode] })
+    await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('There are no such shots right now.')
   })
 
   // 왜: 서버 지시문도 같은 약속을 말해야 모델이 "확인 카드가 뜰 거예요"라고 하지 않는다.

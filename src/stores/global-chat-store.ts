@@ -64,7 +64,7 @@ import { roughRedrawCandidates, roughRedrawChangedScenes, roughRedrawOfferHere, 
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
 import { currentDirectorText, directorShotRefs, directorTextEditLines, shotLabelOf, shotListLabel, splitDirectorTextEdits, textBoundShotIds, type DirectorTextEdit } from '@/lib/director/lumi-chat-runs'
-import { groundVideoRequest, type VideoGrounding } from '@/lib/director/chat-video-targets'
+import { answeredShotNumbers, groundVideoRequest, type VideoGrounding } from '@/lib/director/chat-video-targets'
 import { directorProgressLine, directorQuickChipOf, directorShotStatesNow, quickChipTargets, type DirectorQuickChip } from '@/lib/director/lumi-quick-chips'
 import { activeJobsSnapshot } from '@/lib/generation-queue'
 import { handoffToStage } from '@/lib/stage-nav'
@@ -222,8 +222,9 @@ interface GlobalChatState {
   startComicStyleGate: { projectId: string; page: ChatImageInput } | null
   /** 채팅 모델이 첨부 그림을 그림체로 쓰자고 해 묻는 중(2026-10-10 오너 결정) — 답하면 같은 길(runMaterialPlan)로 정하고, 다른 말이면 내린다. */
   styleAttachmentGate: { projectId: string; image: ChatImageInput } | null
-  /** Director 에서 Lumi 가 되물은 영상 목록(재검토 b 보통 A) — 같은 단계에서 "응 · 좋아 · yes"면 이 목록 그대로 만들고, 다른 말이면 버린다. */
-  directorVideoAsk: { projectId: string; shotIds: string[] } | null
+  /** Director 에서 Lumi 가 영상을 되물은 중(재검토 b 보통 A · 낮음 3) — 목록이면 같은 단계에서 "응 · 좋아 · yes"일 때 그 목록 그대로 만들고,
+   *  번호를 물었으면 다음 말의 "3번" · 맨 숫자를 샷 번호로 읽는다. 다른 말이면 버린다. */
+  directorVideoAsk: { projectId: string; shotIds: string[] } | { projectId: string; numbers: true } | null
   /** 그림에서 그림체를 정하는 중인 프로젝트(매체 고르기 · 저장) — 그동안 스타일 선택 창을 자동으로 띄우지 않는다. */
   styleSettingFor: string | null
   /** Producer 본문을 막고 로딩 원을 보일 일 — 새 프로젝트가 넘긴 일 · 만화 옮기기(2026-10-09 오너, lib/producer/busy.ts). */
@@ -1370,7 +1371,7 @@ async function groundChatVideos(input: { userText: string; requested: string[] |
 
 /** 막이가 만들지 않기로 한 영상 부탁에 Lumi 가 하는 말 — 묻기 · 만들지 않음 · 그런 샷 없음. 시작하거나 목록으로 되물을 샷이 있으면 null. */
 function groundingReply(grounding: VideoGrounding, t: (key: string) => string): string | null {
-  if (grounding.kind === 'ask') return t('Which shots should get videos? Tell me the shot numbers. Videos use Takes, so I only make the shots you name.')
+  if (grounding.kind === 'ask') return t("Which shots should get videos? Tell me the numbers, like 'shot 3'. Videos use Takes, so I only make the shots you name.")
   if (grounding.kind === 'none') return t('I did not make any videos.')
   return grounding.kind === 'run' && grounding.shotIds.length === 0 ? t('There are no such shots right now.') : null
 }
@@ -1405,6 +1406,13 @@ async function confirmVideosLine(shotIds: readonly string[], locale: AppLocale):
   return free
     ? t('Shall I make {count} videos for {shots}? Say yes to start.', { count: shotIds.length, shots })
     : t('Shall I make {count} videos for {shots} ({takes} Takes)? Say yes to start.', { count: shotIds.length, shots, takes: cost })
+}
+
+/** Take 를 쓰는 생성이 묶인 카드 — 옛 영상 일괄 카드 · 영상이 묶인 글 카드. 이런 카드는 그 카드를 낸 단계에서만 말로 승인한다. */
+function proposalUsesTakes(proposal: PendingProposal): boolean {
+  if (proposal.kind === 'directorGenerateVideoBatch') return true
+  const held = proposal.kind === 'directorTextEdit' ? (proposal.payload.then as HeldDirectorWork | undefined) : undefined
+  return !!held && held.videos.length > 0
 }
 
 /** Lumi 가 되물은 목록에 "그래" — 승인 말(좋아 · 진행 · yes …)에 짧은 대답(응 · 네 · 어 · ㅇㅇ · yeah)을 더한다. 되묻기에서만 쓴다. */
@@ -1536,12 +1544,19 @@ async function startVideosFor(input: {
     return
   }
   // 러너 · 잔액 훅은 지연 로드 — video-batch-client 가 이 스토어를 import 하므로 정적 import 는 순환이 된다.
-  const [{ runVideoBatch }, { fetchTakeBalance }, { planVideoBatch, videoBatchTakeCosts, describeVideoBatchPlan }] =
+  const [{ runVideoBatch, eligibleVideoBatchShotIds }, { fetchTakeBalance }, { planVideoBatch, videoBatchTakeCosts, describeVideoBatchPlan }] =
     await Promise.all([
       import('@/lib/director/video-batch-client'),
       import('@/lib/billing/use-take-balance'),
       import('@/lib/director/video-batch-plan'),
     ])
+  // 그사이 다른 길로 영상이 생겼거나 만드는 중인 샷은 뺀다 — 낼 것이 없는데 "시작했어요"라고 하지 않는다(재검토 b 낮음 1).
+  const open = new Set(eligibleVideoBatchShotIds(useDirectorCanvasStore.getState().nodes))
+  input = { ...input, shotIds: input.shotIds.filter((id) => open.has(id)) }
+  if (input.shotIds.length === 0) {
+    input.say(t('There are no such shots right now.'))
+    return
+  }
   const hold = await videoHoldReason(input.shotIds)
   if (!input.isCurrent()) return
   if (hold) {
@@ -2731,11 +2746,22 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (videoAsk && !opts?.silentUser) {
       set({ directorVideoAsk: null })
       if (stage === 'director' && projectId && videoAsk.projectId === projectId) {
-        if (saysYes(trimmed)) {
+        // 번호를 물었다 — "3번" · "3번이랑 4번" · 맨 숫자도 샷 번호다(재검토 b 낮음 3). 그 번호의 샷만 바로 만든다(분명한 꼴 (1)).
+        const numbers = 'numbers' in videoAsk ? answeredShotNumbers(trimmed) : null
+        if (numbers) {
+          await runDirectorTurn(projectId, trimmed, isCurrentSession, async (say) => {
+            const shots = directorShotRefs(useDirectorCanvasStore.getState().nodes, directorBoardNames())
+            const shotIds = shots.filter((shot) => shot.shotNo !== null && numbers.has(shot.shotNo)).map((shot) => shot.nodeId)
+            if (shotIds.length === 0) say(translate(contentLocale(), 'There are no such shots right now.'))
+            else await startVideosFor({ shotIds, say, isCurrent: isCurrentSession })
+          })
+          return
+        }
+        if ('shotIds' in videoAsk && saysYes(trimmed)) {
           await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => startVideosFor({ shotIds: videoAsk.shotIds, say, isCurrent: isCurrentSession }))
           return
         }
-        if (isCancellationUtterance(trimmed)) {
+        if ('shotIds' in videoAsk && isCancellationUtterance(trimmed)) {
           get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'I did not make any videos.'))
           return
         }
@@ -2959,8 +2985,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       return
     }
     // Editor 는 조언만 하는 채팅이라 "yes · 응 · 좋아"로 어떤 카드도 승인하지 않는다(오너 10번 · 검토 b 보통 3) — 그 말은 조언 질문으로 간다.
-    //   다른 단계 탭에서 말로 승인하는 것은 지금처럼 받는다(출시 시험 request-preservation "다른 탭에서 승인해도 …").
-    const approvesHere = stage !== 'editor' && !!pendingProposal && isApprovalUtterance(trimmed)
+    //   Take 를 쓰는 카드는 그 카드를 낸 단계 화면에서만 말로 승인한다 — 다른 탭에서는 단추로만(리드 판단, 재검토 b 낮음 5).
+    //   Take 를 안 쓰는 카드는 다른 단계 탭에서 말로 승인하는 것을 지금처럼 받는다(출시 시험 request-preservation "다른 탭에서 승인해도 …").
+    const approvesHere = stage !== 'editor' && !!pendingProposal && isApprovalUtterance(trimmed) &&
+      (pendingProposal.stage === stage || !proposalUsesTakes(pendingProposal))
     if (pendingProposal && approvesHere && pendingProposal.kind === 'producerWriterInitialHandoff' && !useProjectStore.getState().producerLocked) {
       // Writer 첫 넘김 = Producer 잠금(2026-10-01) — 말로 승인해도 버튼과 같은 확정 창을 거친다.
       get().appendLocalExchange(stage, trimmed, translate(contentLocale(), 'Check the values in the window, then confirm to hand over.'))
@@ -4103,6 +4131,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             if (said) lumiSays(said)
             if (grounding.kind === 'run') videoIds = grounding.shotIds
             if (grounding.kind === 'confirm') confirmIds = grounding.shotIds
+            // 번호를 물었다 — 다음 말의 "3번" · 맨 숫자를 샷 번호로 읽는다.
+            if (grounding.kind === 'ask' && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true } })
           }
           held.videos = videoIds.filter((id) => bound.has(id))
           let textCardOffered = false

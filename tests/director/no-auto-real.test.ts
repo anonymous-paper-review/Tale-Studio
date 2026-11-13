@@ -79,7 +79,7 @@ describe('#영상거짓수락 → 오너 2026-11-14 9번 — 채팅 영상은 �
 
   // 왜: 확인 카드가 없으니 시작하지 못한 까닭(어느 샷인지 모름 · Take 부족 · 이미 도는 묶음)을 채팅에 남겨야 "만들게요"만 남지 않는다.
   it('채팅이 영상을 시작하지 못하면 그 이유를 사용자에게 솔직히 알린다', () => {
-    expect(globalChatStore).toContain('Which shots should get videos? Tell me the shot numbers.')
+    expect(globalChatStore).toContain("Which shots should get videos? Tell me the numbers, like 'shot 3'.")
     expect(globalChatStore).toContain('I did not start any videos. Add Takes or ask for fewer shots.')
     expect(globalChatStore).toContain('A video batch is already running. Ask again when it finishes.')
   })

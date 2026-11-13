@@ -47,6 +47,23 @@ describe('대기 카드를 승인하는 말', () => {
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes('/api/editor/chat'))).toHaveLength(3)
   })
 
+  // 왜: 리드 판단(재검토 b 낮음 5) — Take 를 쓰는 카드는 그 카드를 낸 화면에서만 말로 승인한다. 다른 탭에서는 단추로만(Take 없는 카드는 9/22 약속대로 말 승인).
+  it('Take 를 쓰는 카드는 다른 단계 탭에서 "응"이라고 해도 승인되지 않는다', async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      String(url).includes('/api/director/chat')
+        ? Response.json({ reply: 'Ready.', updates: [{ type: 'updateShot', id: 's1', patch: { prompt: 'Lumi prompt' } }, { type: 'generateVideos', shotIds: ['s1'] }] })
+        : Response.json({ reply: 'Okay.', updates: [] }),
+    )
+    await chat.getState().sendMessage('Rewrite shot 1 and make its video')
+    expect(chat.getState().pendingProposal?.payload.then).toMatchObject({ videos: ['s1'] })
+    project.setState({ currentStage: 'writer' })
+    for (const word of ['응', 'yes', '좋아']) {
+      await chat.getState().sendMessage(word)
+      expect(promptOf('s1')).toBeNull()
+      expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+    }
+  })
+
   // 왜: 정상 경로 고정 — 카드를 낸 그 단계에서는 지금처럼 말로 승인된다.
   it('대기 카드를 낸 단계에서는 지금처럼 "yes"로 승인된다', async () => {
     await chat.getState().sendMessage('Rewrite shot 1')

@@ -12,13 +12,15 @@ export interface ChatShotRef {
   videoFailed: boolean
 }
 
-const NUMBER_LIST = String.raw`\d+(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및)\s*\d+)*` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-const SHOT_LIST = new RegExp(String.raw`(?:샷|shots?)\s*#?\s*(${NUMBER_LIST})`, 'gi') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-const NUMBERED_SHOT = /(\d+)\s*번\s*샷/g // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-const KO_ORDINALS = ['첫', '두', '세', '네', '다섯', '여섯', '일곱', '여덟', '아홉', '열'] // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-const EN_ORDINALS = ['first', 'second', 'third', 'fourth', 'fifth', 'sixth', 'seventh', 'eighth', 'ninth', 'tenth']
-const KO_ORDINAL_SHOT = new RegExp(String.raw`(${KO_ORDINALS.join('|')}|\d+)\s*번째\s*샷`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-const EN_ORDINAL_SHOT = new RegExp(String.raw`\b(${EN_ORDINALS.join('|')})\s+shot\b`, 'gi')
+/** 숫자 하나 — 바로 뒤에 단위(초 · s · sec · % · 배 · x · fps · 분)가 붙으면 샷 번호가 아니다("샷 3, 5초짜리로"의 5). */
+const UNIT = String.raw`(?:초|s\b|secs?\b|seconds?\b|%|배|x\b|fps\b|분|mins?\b|minutes?\b)` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+const NUM = String.raw`\d+(?!\d)(?!\s*${UNIT})`
+const NUMBER_LIST = String.raw`${NUM}(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및)\s*${NUM})*` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+/** "샷 3" · "Shot 3" · "@Real Shot 3" — 낱말 가운데("Screenshots 2" · "스크린샷 2")는 샷이 아니다. */
+const SHOT_LIST = new RegExp(String.raw`(?<![A-Za-z가-힣])(?:샷|shots?)\s*#?\s*(${NUMBER_LIST})`, 'gi') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+const NUMBERED_SHOT = new RegExp(String.raw`(${NUM})\s*번\s*샷`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+/** 몇 번째(서수) — 샷 번호로 읽지 않는다("a second shot" · "The first shot looks great"). 있으면 되묻는다. */
+const ORDINAL = /((?:첫|두|세|네|다섯|여섯|일곱|여덟|아홉|열|\d+)\s*번째|\b(?:first|second|third|fourth|fifth|sixth|seventh|eighth|ninth|tenth|last)\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 /** 바로 앞 번호를 빼는 말("2 빼고" · "샷 4 말고") · 바로 뒤 번호를 빼는 말("except shot 2" · "not shot 4"). */
 const EXCLUDED_BEFORE = new RegExp(String.raw`(${NUMBER_LIST})\s*(?:번)?\s*(?:샷)?\s*(?:은|는|을|를|이|가)?\s*(?:말고|빼고|제외)`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const EXCLUDED_AFTER = new RegExp(String.raw`\b(?:except|excluding|without|not|skip|skipping)\s+(?:for\s+)?(?:the\s+)?(?:shots?\s*)?#?\s*(${NUMBER_LIST})`, 'gi')
@@ -26,10 +28,11 @@ const EXCLUDED_AFTER = new RegExp(String.raw`\b(?:except|excluding|without|not|s
 const STOP = /(만들지\s*(?:는|도)?\s*(?:마|말|않아도)|생성하지\s*(?:는|도)?\s*(?:마|말)|하지\s*(?:는|도)?\s*(?:마|말)|안\s*만들|만들\s*필요\s*없|나중에|이따가|\b(?:don'?t|do\s+not|never|no\s+need\s+to)\s+(?:make|create|generate|render|remake|do)\b|\bhold\s+off\b|\blater\b|\bnot\s+now\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 /** 바로 만들지 않을 말 — 빼기 · 부정 · 미루기 · 묻기 · 범위(씬 · 그중) · 수량. 하나라도 있으면 목록으로 되묻는다. */
 const UNCLEAR = new RegExp([
-  '빼고', '말고', '제외', '만들지', String.raw`하지\s*(?:는|도)?\s*(?:마|말)`, String.raw`안\s*만들`, '나중에', '이따가', '물어', '묻고', // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+  '빼고', '말고', '제외', '만들지', String.raw`하지\s*(?:는|도)?\s*(?:마|말)`, String.raw`안\s*만들`, '나중에', '이따가', '물어', '묻고', String.raw`그대로\s*두`, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
   '씬', '장면', '중에', '하나', String.raw`한\s*개`, String.raw`(?:두|세|네)\s*(?:개|편|가지|장)`, '(?<![가-힣])둘', '몇', '일부', '(?<![가-힣])반(?![가-힣])', // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
   String.raw`\bexcept\b`, String.raw`\bexcluding\b`, String.raw`\bwithout\b`, String.raw`\bnot\b`, String.raw`\bdon'?t\b`, String.raw`\bdo\s+not\b`, String.raw`\bnever\b`,
   String.raw`\bhold\s+off\b`, String.raw`\blater\b`, String.raw`\bask\b`, String.raw`\bskip\b`, String.raw`\bscenes?\b`, String.raw`\bof\s+the\b`,
+  String.raw`\bleave\b`, String.raw`\bas\s+it\s+is\b`, String.raw`\bbother\b`, String.raw`\bno\s+videos?\b`, String.raw`\d+\s*${UNIT}`,
   String.raw`\b(?:one|two|three|four|five|some|few|couple|half)\b`,
 ].join('|'), 'i')
 /** 생성 말 · 영상 말 — 묶음 말은 생성 말과 같은 절에 있을 때만 받는다. 번호 꼴은 둘 다 있어야 분명하다. */
@@ -74,15 +77,22 @@ function expandNumbers(list: string, into: Set<number>): void {
   }
 }
 
-/** 말에 나온 샷 번호 — "샷 3" · "Shot 3" · "@Real Shot 3" · "3번 샷", 목록 · 구간 포함. ordinals = "세 번째 샷" · "third shot". */
-export function mentionedShotNumbers(text: string): { numbers: Set<number>; ordinals: Set<number> } {
+/** 말에 나온 샷 번호 — "샷 3" · "Shot 3" · "@Real Shot 3" · "3번 샷", 목록 · 구간 포함(단위가 붙은 숫자 · 낱말 가운데는 빼고). */
+export function mentionedShotNumbers(text: string): Set<number> {
   const numbers = new Set<number>()
-  const ordinals = new Set<number>()
   for (const match of text.matchAll(SHOT_LIST)) expandNumbers(match[1], numbers)
   for (const match of text.matchAll(NUMBERED_SHOT)) numbers.add(Number(match[1]))
-  for (const match of text.matchAll(KO_ORDINAL_SHOT)) ordinals.add(/^\d+$/.test(match[1]) ? Number(match[1]) : KO_ORDINALS.indexOf(match[1]) + 1)
-  for (const match of text.matchAll(EN_ORDINAL_SHOT)) ordinals.add(EN_ORDINALS.indexOf(match[1].toLowerCase()) + 1)
-  return { numbers, ordinals }
+  return numbers
+}
+
+/** Lumi 가 번호를 물은 바로 다음 말 — 번호만으로 된 대답("3번" · "3번이랑 4번" · "1, 2" · "샷 3")이면 그 번호들, 아니면 null. */
+const NUMBER_ANSWER = new RegExp(String.raw`^(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및|랑|이랑|하고)\s*(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?)*\s*(?:샷|shots?)?\s*(?:영상|videos?)?\s*(?:을|를)?\s*(?:만들어\s*(?:줘|주세요)?|해\s*(?:줘|주세요)|please)?$`, 'i') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+export function answeredShotNumbers(text: string): Set<number> | null {
+  const said = text.trim().replace(/[.!?]+$/, '').trim()
+  if (!NUMBER_ANSWER.test(said)) return null
+  const numbers = new Set<number>()
+  expandNumbers(said, numbers)
+  return numbers.size > 0 ? numbers : null
 }
 
 /** 절 — 문장 부호(번호 목록 안의 쉼표는 빼고) · 접속 말 · "말고 · 빼고" 뒤에서 자른다. */
@@ -132,7 +142,6 @@ export function groundVideoRequest(input: {
 }): VideoGrounding {
   const { text, requested, shots, eligible, selected } = input
   const named = new Set<number>()
-  const ordinal = new Set<number>()
   const excluded = new Set<number>()
   const groups = new Set<Group>()
   const excludedGroups = new Set<Group>()
@@ -142,12 +151,11 @@ export function groundVideoRequest(input: {
     const mentioned = mentionedShotNumbers(clause)
     if (STOP.test(clause)) {
       stopped = true
-      for (const n of [...mentioned.numbers, ...mentioned.ordinals]) excluded.add(n)
+      for (const n of mentioned) excluded.add(n)
       continue
     }
     if (MAKE.test(clause) || VIDEO.test(clause)) asked = true
-    for (const n of mentioned.numbers) named.add(n)
-    for (const n of mentioned.ordinals) ordinal.add(n)
+    for (const n of mentioned) named.add(n)
     for (const match of clause.matchAll(EXCLUDED_BEFORE)) expandNumbers(match[1], excluded)
     for (const match of clause.matchAll(EXCLUDED_AFTER)) expandNumbers(match[1], excluded)
     const found = groupsOf(clause)
@@ -155,19 +163,16 @@ export function groundVideoRequest(input: {
     for (const group of found.excluded) excludedGroups.add(group)
   }
   if (stopped && !asked) return { kind: 'none' }
-  for (const n of excluded) {
-    named.delete(n)
-    ordinal.delete(n)
-  }
+  for (const n of excluded) named.delete(n)
 
-  // 화면이 센 묶음 — 말한 번호 · 몇 번째 · 부탁한 묶음(없으면 제한 없음)과 뺀 것.
+  // 화면이 센 묶음 — 말한 번호 · 부탁한 묶음(없으면 제한 없음)과 뺀 것.
   const inGroup = (shot: ChatShotRef, group: Group) =>
     group === 'all' ? true : group === 'failed' ? shot.videoFailed : group === 'imageReady' ? shot.imageReady : selected.includes(shot.nodeId)
-  const said = named.size > 0 || ordinal.size > 0 || groups.size > 0
+  const said = named.size > 0 || groups.size > 0
   const allowed = new Set<string>()
   const removed = new Set<string>()
   for (const shot of shots) {
-    if (shot.shotNo !== null && (named.has(shot.shotNo) || ordinal.has(shot.shotNo))) allowed.add(shot.nodeId)
+    if (shot.shotNo !== null && named.has(shot.shotNo)) allowed.add(shot.nodeId)
     if ([...groups].some((group) => inGroup(shot, group))) allowed.add(shot.nodeId)
     if (shot.shotNo !== null && excluded.has(shot.shotNo)) removed.add(shot.nodeId)
     // "전부 말고"는 "전부는 아니고"다 — 모든 샷을 빼지 않는다.
@@ -176,7 +181,7 @@ export function groundVideoRequest(input: {
   const picks = requested === null ? null : new Set(requested)
   const pick = (id: string) => (picks === null || picks.has(id)) && !removed.has(id)
 
-  const unclear = UNCLEAR.test(text) || ordinal.size > 0 || excluded.size > 0 || excludedGroups.size > 0
+  const unclear = UNCLEAR.test(text) || ORDINAL.test(text) || excluded.size > 0 || excludedGroups.size > 0
   const clearNumbers = !unclear && named.size > 0 && groups.size === 0 && VIDEO.test(text) && MAKE.test(text)
   const clearGroups = !unclear && named.size === 0 && groups.size > 0
   if (clearNumbers || clearGroups) {
