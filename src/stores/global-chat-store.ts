@@ -1399,6 +1399,13 @@ async function videoHoldReason(shotIds: readonly string[]): Promise<string | nul
       : 'Video generation is on hold because a shot could not be found. Check the current shots and try again.')
 }
 
+/** 번호를 묻기 전에 — 모델이 고른 샷(칸이 비었으면 지금 만들 수 있는 샷 전부)에 제출할 수 없는 샷이 끼면 그 까닭, 아니면 null(검토 b efac9881). */
+async function askHoldReason(requested: readonly string[] | null): Promise<string | null> {
+  const { eligibleVideoBatchShotIds } = await import('@/lib/director/video-batch-client')
+  const eligible = eligibleVideoBatchShotIds(useDirectorCanvasStore.getState().nodes)
+  return videoHoldReason(requested === null ? eligible : eligible.filter((id) => requested.includes(id)))
+}
+
 /** 되묻는 말 — "샷 1·3·4 영상 3개(Take 15)를 만들까요? '응'이라고 하면 시작해요." Take 를 안 쓰는 계정이면 Take 수는 뺀다. */
 async function confirmVideosLine(shotIds: readonly string[], locale: AppLocale): Promise<string> {
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
@@ -4240,13 +4247,16 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           let confirmIds: string[] = []
           if (videoRequests.length > 0) {
             const requested = videoRequests[0]
-            const grounding = await groundChatVideos({ userText: trimmed, requested: requested ? requested.map(resolve) : null })
-            const said = groundingReply(grounding, (key) => translate(locale, key))
+            const requestedIds = requested ? requested.map(resolve) : null
+            const grounding = await groundChatVideos({ userText: trimmed, requested: requestedIds })
+            // 번호를 묻기 전에 — 모델 부탁에 제출할 수 없는 샷(같은 답에서 더한 새 샷 등)이 끼면 범위 말이 있어도 묻지 않고 그 까닭을 말한다(검토 b efac9881).
+            const hold = grounding.kind === 'ask' ? await askHoldReason(requestedIds) : null
+            const said = hold ?? groundingReply(grounding, (key) => translate(locale, key))
             if (said) lumiSays(said)
             if (grounding.kind === 'run') videoIds = grounding.shotIds
             if (grounding.kind === 'confirm') confirmIds = grounding.shotIds
             // 번호를 물었다 — 다음 말의 "3번" · 맨 숫자를 샷 번호로 읽는다.
-            if (grounding.kind === 'ask' && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true } })
+            if (grounding.kind === 'ask' && !hold && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true } })
           }
           // 되묻기 목록 중 이 답의 글 카드가 건 샷은 그 카드 [적용]이 곧 허락이다 — 카드에 묶고, 나머지만 "응"으로 묻는다.
           held.videos = [...videoIds, ...confirmIds].filter((id) => bound.has(id))

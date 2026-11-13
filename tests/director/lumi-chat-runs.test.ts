@@ -400,6 +400,23 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(runShots()).toEqual(['s2'])
   })
 
+  // 왜: 검토 b efac9881 — 범위 말("씬")에 모델이 샷 칸을 비우면 번호부터 물어, 같은 답에서 더한 새 샷처럼 낼 수 없는 샷이 낀 부탁에 까닭 대신 번호를 물었다.
+  it('모델 부탁에 Writer 에 없는 샷(같은 답에서 더한 새 샷)이 끼면 범위 · 수량 말이 있어도 번호를 묻지 않고 그 까닭을 말한다', async () => {
+    reply([{ type: 'addScene', label: 'New scene', tempId: 'S9' }, { type: 'addShot', sceneId: 'S9', label: 'New shot', tempId: 'H9' }, { type: 'generateVideos' }])
+    await chat.getState().sendMessage('새 씬과 샷을 하나 더하고 영상을 만들어줘')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(chat.getState().directorVideoAsk).toBeNull()
+    expect(saidAll()).not.toContain('Which shots should get videos?')
+    expect(lastModel()).toBe('Video generation is on hold because a shot is not linked to Writer. Please request videos for shots created in Writer.')
+    // 낼 수 없는 샷이 없으면 지금처럼 번호를 묻는다.
+    chat.getState().reset()
+    director.setState({ nodes: NODES(), edges: [] })
+    reply([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('씬 1 영상 만들어줘')
+    expect(lastModel()).toBe("Which shots should get videos? Tell me the numbers, like 'shot 3'. Videos use Takes, so I only make the shots you name.")
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true })
+  })
+
   // 왜: 재재검토 b 낮음 3(C5) — Director 에서 되물은 뒤 다른 단계에서 "좋아"라고 하면 Take 가 묶인 글 카드가 승인돼 영상이 나갔다.
   it('Director 에서 되물은 뒤 다른 단계에서 "좋아"라고 해도 Take 가 묶인 글 카드는 승인되지 않고 영상도 시작하지 않는다', async () => {
     reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s1', 's2'] }])

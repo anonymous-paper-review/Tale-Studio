@@ -20,13 +20,15 @@ const NUMBER_LIST = String.raw`${NUM}(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|
 /** "샷 3" · "Shot 3" · "@Real Shot 3" — 낱말 가운데("Screenshots 2" · "스크린샷 2")는 샷이 아니다. */
 const SHOT_LIST = new RegExp(String.raw`(?<![A-Za-z가-힣])(?:샷|shots?)\s*#?\s*(${NUMBER_LIST})`, 'gi') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const NUMBERED_SHOT = new RegExp(String.raw`(${NUM})\s*번\s*샷`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-/** 바로 앞 번호를 빼는 말("2 빼고" · "샷 4 말고") · 바로 뒤 번호를 빼는 말("except shot 2" · "not shot 4"). */
+/** 바로 앞 번호를 빼는 말("2 빼고" · "샷 4 말고") · 바로 뒤 번호를 빼는 말("except shot 2" · "not shot 4" · "leave out shot 2").
+ *   "빼지 말고" · "don't skip" · "without skipping"은 빼는 말이 아니다(검토 b efac9881). */
 const EXCLUDED_BEFORE = new RegExp(String.raw`(${NUMBER_LIST})\s*(?:번)?\s*(?:샷)?\s*(?:은|는|을|를|이|가)?\s*(?:영상\s*(?:은|는)?\s*)?(?:말고|빼고|제외|그대로\s*두|됐고|됐어|필요\s*없)`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-const EXCLUDED_AFTER = new RegExp(String.raw`\b(?:except|excluding|without|not|skip|skipping|leave|don'?t\s+bother\s+with|no\s+videos?\s+for)\s+(?:for\s+)?(?:the\s+)?(?:shots?\s*)?#?\s*(${NUMBER_LIST})`, 'gi')
-/** 생성을 말리거나 미루는 말 — 그 절의 번호 · 묶음은 대상이 아니다. */
-const STOP = /(만들지\s*(?:는|도)?\s*(?:마|말|않아도|않을래|않을게|않겠)|건\s*아니|만들진\s*(?:마|말)|(?:만들면|하면)\s*안\s*(?:돼|되)|싫어|생성하지\s*(?:는|도)?\s*(?:마|말)|하지\s*(?:는|도)?\s*(?:마|말)|안\s*만들|만들\s*필요\s*없|나중에|이따가|\b(?:don'?t|do\s+not|never|no\s+need\s+to)\s+(?:make|create|generate|render|remake|do)\b|\b(?:stop|cancel)\b|\bhold\s+off\b|\blater\b|\bnot\s+now\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-/** 범위 · 수량 말(씬 · 그중 · 하나 · two of …) — 모델이 샷 칸을 비웠으면(남은 전부) 이 말이 가리키는 샷을 화면이 몰라 번호로 묻는다. */
-const SCOPE = /(씬|장면|중에|하나|한\s*개|(?:두|세|네)\s*(?:개|편|가지|장)|(?<![가-힣])둘|몇|일부|\bscenes?\b|\bof\s+the\b|\b(?:one|two|three|four|five|some|few|couple|half)\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+const EXCLUDED_AFTER = new RegExp(String.raw`(?<!\b(?:don['’]?t|do\s+not|never|without)\s+)\b(?:except|excluding|without|not|skip|skipping|leave(?:\s+out)?|other\s+than|don['’]?t\s+bother\s+with|no\s+videos?\s+for)\s+(?:for\s+)?(?:the\s+)?(?:shots?\s*)?#?\s*(${NUMBER_LIST})`, 'gi')
+/** 생성을 말리거나 미루는 말 — 그 절의 번호 · 묶음은 대상이 아니다. "건 아니"는 만들기 말에 붙은 꼴만("급한 건 아니니까"는 부탁 — 검토 b efac9881). */
+const STOP = /(만들지\s*(?:는|도)?\s*(?:마|말|않아도|않을래|않을게|않겠)|(?:만드는|만들|만들려는|만들라는|생성하는|생성할|생성하라는)\s*(?:건|게)\s*아니|만들진\s*(?:마|말)|(?:만들면|하면)\s*안\s*(?:돼|되)|싫어|생성하지\s*(?:는|도)?\s*(?:마|말)|하지\s*(?:는|도)?\s*(?:마|말)|안\s*만들|만들\s*필요\s*없|나중에|이따가|\b(?:don['’]?t|do\s+not|never|no\s+need\s+to)\s+(?:make|create|generate|render|remake|do)\b|\b(?:stop|cancel)\b|\bhold\s+off\b|\blater\b|\bnot\s+now\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+/** 범위 · 수량 말(씬 · 그중 · 하나 · two of …) — 모델이 샷 칸을 비웠으면(남은 전부) 이 말이 가리키는 샷을 화면이 몰라 번호로 묻는다.
+ *   "하나씩 · 하나도 · 한 개도 · one by one"은 몇 개만 고르라는 말이 아니다(검토 b efac9881). */
+const SCOPE = /(씬|장면|중에|하나(?![씩도])|한\s*개(?!\s*[씩도])|(?:두|세|네)\s*(?:개|편|가지|장)|(?<![가-힣])둘|몇|일부|\bscenes?\b|\bof\s+the\b|\b(?:(?<!\bby\s+)one(?!\s+(?:by\s+one|at\s+a\s+time)\b)|two|three|four|five|some|few|couple|half)\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 /** 시키는 말 — 샷 번호 · 묶음 말을 지운 나머지가 이 동사 하나와 아래 조각 · 문장 부호뿐이면 시키는 꼴이다. */
 const COMMAND_VERB = /(?:만들어|생성해|뽑아)\s*(?:줘|주세요|줄래)?\s*요?|\b(?:make|remake|generate|regenerate)\b/gi // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const COMMAND_FILLER = [
@@ -100,10 +102,10 @@ export function answeredShotNumbers(text: string): Set<number> | null {
   return numbers.size > 0 ? numbers : null
 }
 
-/** 절 — 문장 부호(번호 목록 안의 쉼표는 빼고) · 접속 말 · "말고 · 빼고" 뒤에서 자른다. */
+/** 절 — 문장 부호(번호 목록 안의 쉼표는 빼고) · 접속 말 · "말고 · 빼고 · 아니고" 뒤에서 자른다("다 만드는 건 아니고 샷 3 만"의 샷 3 은 뒤 절). */
 function clausesOf(text: string): string[] {
   return text
-    .replace(/(말고|빼고|제외하고)/g, '$1\n') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+    .replace(/(말고|빼고|제외하고|아니고|아니라(?!면))/g, '$1\n') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
     .split(/[.;!?\n]+|,(?!\s*\d)|\s(?:그리고|하지만|근데|그런데|but|then)\s/i) // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
     .map((clause) => clause.trim())
     .filter(Boolean)

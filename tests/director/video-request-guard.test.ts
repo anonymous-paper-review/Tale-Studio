@@ -240,6 +240,45 @@ describe('되묻는 목록에서 빼는 말(검토자 탐침 revb22)', () => {
   })
 })
 
+describe('반대로 걸리던 말(검토 b efac9881 탐침)', () => {
+  // 왜: "건 아니"는 만들기 말에 붙었을 때만 만들지 말라는 말이다 — "급한 건 아니니까"는 부탁이다.
+  it('"급한 건 아니니까 영상 다 만들어줘" · "어려운 건 아니지만 샷 3 영상 만들어줘"는 만들지 말라는 말이 아니라 목록으로 되묻는다', () => {
+    expect(ground('급한 건 아니니까 영상 다 만들어줘', null)).toEqual(confirm(1, 2, 3, 4, 5, 6))
+    expect(ground('어려운 건 아니지만 샷 3 영상 만들어줘', ids(3))).toEqual(confirm(3))
+  })
+  // 왜: "다 만드는 건 아니고 샷 3 만"처럼 한 문장에 이어 부탁하면 뒤의 샷 3 까지 만들지 말라는 말로 읽어 아무것도 만들지 않았다.
+  it('"영상 다 만드는 건 아니고 샷 3 만 만들어줘" · "영상 다 만들라는 건 아니고 샷 3 만 만들어줘"는 만들지 말라는 말을 앞 절에만 두고 샷 3 목록으로 되묻는다', () => {
+    expect(ground('영상 다 만드는 건 아니고 샷 3 만 만들어줘', null)).toEqual(confirm(3))
+    expect(ground('영상 다 만들라는 건 아니고 샷 3 만 만들어줘', ids(3))).toEqual(confirm(3))
+  })
+  // 왜: "빼지 말고" · "don't skip"은 빼는 말이 아니다 — 그 샷을 목록에서 빼면 사람이 넣으라고 한 샷이 빠진다.
+  it('"영상 다 만들어줘, 한 개도 빼지 말고" · "샷 2 빼지 말고 영상 다 만들어줘" · "Don\'t skip shot 2, make all the videos" · "Make all the videos without skipping shot 2"는 빼는 말이 아니라 아무 샷도 빼지 않은 목록으로 되묻는다', () => {
+    for (const text of ['영상 다 만들어줘, 한 개도 빼지 말고', '샷 2 빼지 말고 영상 다 만들어줘', "Don't skip shot 2, make all the videos", 'Make all the videos without skipping shot 2']) {
+      expect(ground(text, null), text).toEqual(confirm(1, 2, 3, 4, 5, 6))
+    }
+  })
+  // 왜: 빼는 영어 말이 목록에 없어 빼라고 한 샷이 되묻는 목록에 남았다 — "응" 한 번에 그 샷에 Take 를 쓴다.
+  it('"Make all the videos but leave out shot 2" · "Make all the videos other than shot 2"는 샷 2 를 뺀 목록으로 되묻는다', () => {
+    expect(ground('Make all the videos but leave out shot 2', null)).toEqual(confirm(1, 3, 4, 5, 6))
+    expect(ground('Make all the videos other than shot 2', null)).toEqual(confirm(1, 3, 4, 5, 6))
+    expect(ground("Make all the videos, don't leave out shot 2", null)).toEqual(confirm(1, 2, 3, 4, 5, 6))
+  })
+  // 왜: "하나씩 · 하나도 · one by one"은 몇 개만 고르라는 말이 아니다 — 번호를 물으면 "다 만들어줘"에 답하지 못한다.
+  it('"영상 다 하나씩 만들어줘" · "하나도 빼지 말고 영상 다 만들어줘" · "영상 다 만들어줘, 한 개도 빠짐없이" · "Make all the videos one by one"의 "하나씩 · 하나도 · 한 개도 · one by one"은 수량 말이 아니라 번호를 묻지 않고 목록으로 되묻는다', () => {
+    for (const text of ['영상 다 하나씩 만들어줘', '하나도 빼지 말고 영상 다 만들어줘', '영상 다 만들어줘, 한 개도 빠짐없이', 'Make all the videos one by one']) {
+      expect(ground(text, null), text).toEqual(confirm(1, 2, 3, 4, 5, 6))
+    }
+    // "하나만" · "한 개만"은 지금처럼 수량 말이다.
+    expect(ground('영상 하나만 만들어줘', null)).toEqual(ASK)
+    expect(ground('Make one of the videos', null)).toEqual(ASK)
+  })
+  // 왜: 휴대폰의 자동 따옴표는 don't 를 don’t 로 바꾼다 — 만들지 말라는 말을 놓쳐 목록으로 되물었다.
+  it('"Don’t make the videos" · "Don’t skip shot 2, make all the videos"처럼 둥근 따옴표(’)로 써도 같은 말로 읽는다', () => {
+    expect(ground('Don’t make the videos', null)).toEqual(NONE)
+    expect(ground('Don’t skip shot 2, make all the videos', null)).toEqual(confirm(1, 2, 3, 4, 5, 6))
+  })
+})
+
 describe('만들지 말라는 말이면 만들지 않는다', () => {
   it('"샷 2 는 영상 만들지 마" · "Don\'t make a video for shot 4"면 아무 영상도 만들지 않는다', () => {
     expect(ground('샷 2 는 영상 만들지 마', ids(2))).toEqual(NONE)
