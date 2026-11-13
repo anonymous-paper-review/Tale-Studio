@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-import type { ShotSubtitle, TitleCardData } from '@/types/shot'
+import type { ShotSubtitle, TitleCardData, TitleTextData } from '@/types/shot'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
 import type { Shot, VideoClip, DialogueLine, AudioTrackClip, AudioSource, ClipTransition, ClipTransitionType, ClipMotion } from '@/types'
 import { toast } from 'sonner'
@@ -27,6 +27,7 @@ import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
 import { nearestEditPoint } from '@/lib/editor/timeline-segments'
 import { TRANSITION_DEFAULT_SEC, cleanTransition, edgeFadeAt, edgeTransition, joinedNeighbor, transitionWindows, type TransitionEdge } from '@/lib/editor/transition'
 import { VIDEO_EFFECT_DEFAULT, patchEffects, type VideoEffectKind, type VideoEffectPatch } from '@/lib/editor/video-effects'
+import { TITLE_CLIP_SECONDS, TITLE_SIZE_DEFAULT, cleanTitleText, titleLayersAt } from '@/lib/editor/title-clip'
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -82,10 +83,10 @@ const speedPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
 // Per-shot debounce timers for trim persist (300ms) — speed 와 동일 패턴 (#a3-state-loss)
 const trimPersistTimers = new Map<string, ReturnType<typeof setTimeout>>()
 
-// 컷/드래그-투-애드/타이틀카드가 만드는 로컬 전용 조각(shot_id 에 __c/__i/__t 접미).
+// 컷/드래그-투-애드/타이틀카드/제목 클립이 만드는 로컬 전용 조각(shot_id 에 __c/__i/__t/__g 접미).
 //   DB shots 에 행이 없으므로 트림 write-through 대상에서 제외하고,
-//   loadPersisted 가 editor_states 스냅샷에서 복원한다 (#a3-state-loss, #owner-title-card).
-const SYNTHETIC_SHOT_RE = /__(?:c|i|t)[A-Za-z0-9-]+$/
+//   loadPersisted 가 editor_states 스냅샷에서 복원한다 (#a3-state-loss, #owner-title-card, 2단계 ⑥).
+const SYNTHETIC_SHOT_RE = /__(?:c|i|t|g)[A-Za-z0-9-]+$/
 export function isSyntheticShotId(shotId: string): boolean {
   return SYNTHETIC_SHOT_RE.test(shotId)
 }
@@ -106,6 +107,16 @@ export function rootShotIdOf(shotId: string): string {
 const TITLE_CARD_RE = /__t[A-Za-z0-9-]+(?:__[ci][A-Za-z0-9-]+)*$/
 export function isTitleCardShotId(shotId: string): boolean {
   return TITLE_CARD_RE.test(shotId)
+}
+
+// 제목 클립 판별(2단계 ⑥) — __g 접미(자른 조각 `title__gX__cY` 도 제목 클립). 타이틀 카드처럼 원본 shot 에 이어지지 않는다.
+const TITLE_CLIP_RE = /__g[A-Za-z0-9-]+(?:__[ci][A-Za-z0-9-]+)*$/
+export function isTitleClipShotId(shotId: string): boolean {
+  return TITLE_CLIP_RE.test(shotId)
+}
+/** 영상 없이 그리는 클립 — 타이틀 카드 · 제목 클립. 원본 길이가 없어 끝을 늘린 만큼 길어진다(0.5 ~ 600초). */
+export function isDrawnClipShotId(shotId: string): boolean {
+  return isTitleCardShotId(shotId) || isTitleClipShotId(shotId)
 }
 
 /** 사람이 뺀 원본 샷 목록에 더한다 — 조각(자른 · 끼운 · 타이틀 카드)은 저절로 돌아올 일이 없어 적지 않는다(검토 c, 2026-11-14). */
@@ -161,7 +172,7 @@ interface EditorState {
   currentTime: number   // 전역 playhead 위치 (초)
   pxPerSec: number      // 타임라인 zoom (1초당 픽셀). 마우스휠 zoom이 조절
   isPlaying: boolean    // 연속 재생 중
-  toolMode: 'select' | 'cut'  // 도구 모드: V=선택, C=자르기
+  toolMode: 'select' | 'cut' | 'text'  // 도구 모드: V=선택, C=자르기, T=문자(제목 클립, 2단계 ⑥)
 
   // 오디오 트랙 (비디오와 독립). 외부 업로드. 기본 mute.
   audioClips: AudioTrackClip[]
@@ -235,6 +246,13 @@ interface EditorState {
   updateTitleCard: (shotId: string, patch: Partial<TitleCardData>) => void
   /** 약속 J3·J4: 타이틀 카드 길이를 초 단위 숫자로 — 5초를 넘을 수 있다. */
   setTitleCardDuration: (shotId: string, seconds: number) => void
+  /**
+   * 문자 도구(T)로 V 트랙을 누름 — 그 줄 그 시각에 2초 제목 클립을 만든다(V1 을 누르면 V2, 시안 E2 · 결정 페이지). 그 자리에 클립이 있으면
+   *   그 뒤에 놓이고 뒤 클립은 민다. 만든 제목을 고르고 선택 도구로 돌아간다. 잠근 줄이면 만들지 않는다(null). 되돌리기 한 칸(2단계 ⑥).
+   */
+  addTitleClip: (trackId: string, atSec: number, text: string) => string | null
+  /** 제목 글자 · 크기 · 위치 — 범위 안으로. 되돌리기 칸은 부르는 쪽이 쌓는다(글자는 입력을 시작할 때, 슬라이더는 첫 바뀜에). */
+  updateTitleText: (shotId: string, patch: Partial<TitleTextData>) => void
   /** 약속 K: 클립 자막(글자·자리) — 손대는 순간 대사 초기값이 저장값이 된다. null 이면 지운다. */
   setSubtitle: (shotId: string, patch: Partial<ShotSubtitle> | null) => void
   /** 화면 전환(2026-09-08): 클립 앞 경계의 전환을 넣거나(종류 · 길이) 뺀다(null) — setClipTransition 의 시작 끝. 되돌리기 대상. */
@@ -334,7 +352,7 @@ interface EditorState {
   // 재생 / 도구 / Undo·Redo 액션
   togglePlay: () => void
   setPlaying: (playing: boolean) => void
-  setToolMode: (mode: 'select' | 'cut') => void
+  setToolMode: (mode: 'select' | 'cut' | 'text') => void
   nudge: (deltaSec: number) => void   // 화살표 키 프레임 이동 (재생 중이면 정지)
   pushHistory: () => void             // 드래그 시작 등 연속 편집 직전 1회 스냅샷
   undo: () => void
@@ -496,7 +514,8 @@ export function selectProgramLayout(input: TimelineInput & { videoTracks?: reado
   const tracks = input.videoTracks ?? DEFAULT_VIDEO_TRACKS
   const rank = new Map(tracks.map((t, i) => [t.id, i]))
   const hidden = new Set(tracks.filter((t) => t.hidden).map((t) => t.id))
-  const items = selectVideoLayout(input).filter((i) => !hidden.has(i.trackId) && i.durationSec > 0)
+  // 제목 클립은 영상 위에 따로 얹는다(selectTitlesAt) — 맨 위 그림 · 전환 셈에 끼지 않는다(2단계 ⑥).
+  const items = selectVideoLayout(input).filter((i) => !hidden.has(i.trackId) && i.durationSec > 0 && !isTitleClipShotId(i.shotId))
   const cuts = [...new Set(items.flatMap((i) => [i.startSec, i.startSec + i.durationSec]))].sort((a, b) => a - b)
   const out: ProgramItem[] = []
   for (let k = 0; k + 1 < cuts.length; k++) {
@@ -539,13 +558,35 @@ export function selectStackAt(input: TimelineInput & { videoTracks?: readonly Vi
   const layout = selectVideoLayout(input)
   const windows = transitionWindows(layout, input.videoClips)
   const here = layout
-    .filter((item) => !hidden.has(item.trackId) && item.durationSec > 0 && t >= item.startSec && t < item.startSec + item.durationSec)
+    .filter((item) => !hidden.has(item.trackId) && item.durationSec > 0 && t >= item.startSec && t < item.startSec + item.durationSec && !isTitleClipShotId(item.shotId))
     .sort((a, b) => (rank.get(a.trackId) ?? 0) - (rank.get(b.trackId) ?? 0))
   for (let i = here.length - 1; i > 0; i--) {
     const id = here[i].shotId
     if (coversFrame(input.videoClips.find((c) => c.shotId === id)) && edgeFadeAt(windows, id, t) >= 1) return here.slice(i)
   }
   return here
+}
+
+/**
+ * 시각 t 에 모니터가 영상 위에 얹을 제목 클립과 그 옅기 — 눈을 켠 줄, 아래 줄부터(2단계 ⑥, 시안 E2). 제목은 화면을 다 덮지 않아 아래 영상은
+ *   그대로 그린다. 더 위 줄에 화면을 다 덮는 영상이 있으면 그 아래 제목은 가려진다. 약속: tests/editor/title-clips.test.ts
+ */
+export function selectTitlesAt(input: TimelineInput & { videoTracks?: readonly VideoTrackState[] }, t: number): Array<TrackLayoutItem & { fade: number }> {
+  const tracks = input.videoTracks ?? DEFAULT_VIDEO_TRACKS
+  const rank = new Map(tracks.map((track, i) => [track.id, i]))
+  const hidden = new Set(tracks.filter((track) => track.hidden).map((track) => track.id))
+  const layout = selectVideoLayout(input)
+  const titles = layout
+    .filter((item) => isTitleClipShotId(item.shotId) && !hidden.has(item.trackId))
+    .sort((a, b) => (rank.get(a.trackId) ?? 0) - (rank.get(b.trackId) ?? 0) || a.startSec - b.startSec)
+  if (titles.length === 0) return []
+  const windows = transitionWindows(layout, input.videoClips)
+  // 화면을 다 덮는 가장 위 영상 — selectStackAt 은 그 아래를 이미 잘랐으니 남은 것 중 처음 덮는 클립이다.
+  const cover = selectStackAt(input, t).find((item) => coversFrame(input.videoClips.find((c) => c.shotId === item.shotId)) && edgeFadeAt(windows, item.shotId, t) >= 1)
+  const coverRank = cover ? rank.get(cover.trackId) ?? 0 : -1
+  return titleLayersAt(titles, windows, t)
+    .map(({ shotId, fade }) => ({ ...titles.find((item) => item.shotId === shotId)!, fade }))
+    .filter((item) => (rank.get(item.trackId) ?? 0) > coverRank)
 }
 
 /** 모션 칸 — 범위 안으로(위치 −1 ~ 1, 비율 0.1 ~ 3), 처음 값(0 · 0 · 1)이면 없앤다. */
@@ -1002,6 +1043,23 @@ function placeInStory(order: string[], shotId: string, story: string[]): string[
   const firstShot = roots.findIndex((root) => story.includes(root))
   const at = firstShot >= 0 ? firstShot : order.length
   return [...order.slice(0, at), shotId, ...order.slice(at)]
+}
+
+/** 저장본의 독립 클립(타이틀 카드 · 제목 클립) 되살리기 — 영상 주소 없이, 저장한 구간 · 빠르기 · 전환 · 모션 · 불투명도 그대로. */
+function restoredDrawnClip(shotId: string, savedClip: VideoClip | undefined): VideoClip {
+  return {
+    shotId,
+    url: null,
+    status: 'completed',
+    thumbnailUrl: null,
+    trimStart: savedClip?.trimStart,
+    trimEnd: savedClip?.trimEnd,
+    speed: savedClip?.speed ?? 1.0,
+    transitionIn: savedClip?.transitionIn ?? null,
+    ...(savedClip?.transitionOut ? { transitionOut: savedClip.transitionOut } : {}),
+    ...(savedClip?.motion ? { motion: savedClip.motion } : {}),
+    ...(savedClip?.opacity !== undefined ? { opacity: savedClip.opacity } : {}),
+  }
 }
 
 /**
@@ -1667,18 +1725,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         // 저장된 shot/clip을 그대로 복원한다 (텍스트/이미지/길이 모두 스냅샷에 있음).
         if (isTitleCardShotId(savedShot.shotId)) {
           restoredShots.push(savedShot)
-          const savedClip = savedClipByShot.get(savedShot.shotId)
-          restoredClips.push({
-            shotId: savedShot.shotId,
-            url: null,
-            status: 'completed',
-            thumbnailUrl: null,
-            trimStart: savedClip?.trimStart,
-            trimEnd: savedClip?.trimEnd,
-            speed: savedClip?.speed ?? 1.0,
-            transitionIn: savedClip?.transitionIn ?? null,
-            ...(savedClip?.transitionOut ? { transitionOut: savedClip.transitionOut } : {}),
-          })
+          restoredClips.push(restoredDrawnClip(savedShot.shotId, savedClipByShot.get(savedShot.shotId)))
+          canonicalShotIds.add(savedShot.shotId)
+          continue
+        }
+        // 제목 클립(2단계 ⑥)도 같은 독립 클립 — 글자 · 크기 · 자리는 shot(titleText)에, 모션 · 불투명도는 클립에 있다.
+        if (isTitleClipShotId(savedShot.shotId)) {
+          restoredShots.push(savedShot)
+          restoredClips.push(restoredDrawnClip(savedShot.shotId, savedClipByShot.get(savedShot.shotId)))
           canonicalShotIds.add(savedShot.shotId)
           continue
         }
@@ -1749,7 +1803,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       //   않는다. 타이틀 카드는 영상 없이 그리는 클립이라 그대로 둔다. 저장할 때 영상이 없어 빠져 있던 샷에 영상이 생기면 이야기 순서의
       //   제자리에 들어온다. 약속: tests/editor/shots-with-video.test.ts
       const clipUrl = new Map(combinedClips.map((c) => [c.shotId, c.url]))
-      const playable = (shotId: string) => isTitleCardShotId(shotId) || !!clipUrl.get(shotId)
+      const playable = (shotId: string) => isDrawnClipShotId(shotId) || !!clipUrl.get(shotId)
       const savedShotIds = new Set((saved.shots ?? []).map((s) => s.shotId))
       // 사람이 뺀 원본 샷 — 새 저장본은 목록으로 적혀 있고, 고침 전 저장본은 "저장할 때 있었는데 순서에 없는 샷"이다(그때는 영상 없는
       //   샷도 빈 칸으로 순서에 있었다). 영상이 없어져 저절로 빠진 샷은 이 목록에 없어 영상이 생기면 돌아온다(검토 c, 2026-11-14).
@@ -1831,7 +1885,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const shownClips = regap({ shots: combinedShots, videoClips: combinedClips, clipOrder: shownOrder }, placed)
       const shownLayout = selectTimelineLayout({ shots: combinedShots, videoClips: shownClips, clipOrder: shownOrder })
       const nowLayout = new Map(selectTimelineLayout(timeline).map((l) => [l.shotId, l]))
-      const takenOut = new Set(shownLayout.filter((l) => !nowLayout.has(l.shotId) && !isTitleCardShotId(l.shotId)).map((l) => rootShotIdOf(l.shotId)))
+      const takenOut = new Set(shownLayout.filter((l) => !nowLayout.has(l.shotId) && !isDrawnClipShotId(l.shotId)).map((l) => rootShotIdOf(l.shotId)))
       const shifted = takenOut.size || entered.length
         ? retargeted.map((a) => (a.linkedShotId ? a : { ...a, startSec: movedTime(a.startSec, shownLayout, nowLayout) }))
         : retargeted
@@ -2349,8 +2403,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const videoClips = state.videoClips.map((c) =>
         c.shotId === shotId ? { ...c, trimStart: from, trimEnd } : c,
       )
-      // 약속 J3: 타이틀 카드는 원본 영상이 없어 "원본 길이"가 없다 — 손잡이로 늘린 만큼 카드 길이가 길어진다.
-      const shots = isTitleCardShotId(shotId)
+      // 약속 J3: 타이틀 카드 · 제목 클립은 원본 영상이 없어 "원본 길이"가 없다 — 손잡이로 늘린 만큼 길어진다.
+      const shots = isDrawnClipShotId(shotId)
         ? state.shots.map((s) => (s.shotId === shotId && trimEnd > s.durationSeconds ? { ...s, durationSeconds: trimEnd } : s))
         : state.shots
       if (place) {
@@ -2813,7 +2867,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addVideoEffect: (shotId, kind) =>
     set((state) => {
       const clip = state.videoClips.find((c) => c.shotId === shotId)
-      if (!clip || isTitleCardShotId(shotId) || clipLocked(state, shotId)) return state
+      if (!clip || isDrawnClipShotId(shotId) || clipLocked(state, shotId)) return state
       const selected = { selectedClipShotId: shotId, selectedShotIds: [shotId], selectedAudioId: null, selectedAudioIds: [], previewSourceShotId: null }
       if (clip.effects?.[kind] !== undefined) return selected
       const effects = { ...clip.effects, [kind]: structuredClone(VIDEO_EFFECT_DEFAULT[kind]) }
@@ -2938,6 +2992,65 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
       })
+    }),
+
+  // 제목 클립(2단계 ⑥, 시안 E2 409:5231–5288 · 409:5374). 약속: tests/editor/title-clips.test.ts
+  addTitleClip: (trackId, atSec, text) => {
+    let created: string | null = null
+    set((state) => {
+      // 제목은 영상 위 줄에 — V1 을 누르면 V2 에 만든다(결정 페이지 "새 제목은 V2 위 2초 글자 클립").
+      const target = trackId === 'v1' ? 'v2' : trackId
+      if (!state.videoTracks.some((t) => t.id === target) || trackLocked(state, target)) return state
+      const newId = `title__g${uid()}`
+      created = newId
+      const newShot: Shot = {
+        shotId: newId,
+        sceneId: state.selectedSceneId ?? state.shots[0]?.sceneId ?? 'scene_1',
+        shotType: 'WS',
+        actionDescription: '',
+        characters: [],
+        durationSeconds: TITLE_CLIP_SECONDS,
+        generationMethod: 'T2V',
+        dialogueLines: [],
+        camera: { ...DEFAULT_CAMERA },
+        lighting: { ...DEFAULT_LIGHTING },
+        referenceImageUrl: null,
+        titleText: cleanTitleText({ text, size: TITLE_SIZE_DEFAULT, place: 'middle' }),
+      }
+      const newClip: VideoClip = { shotId: newId, url: null, status: 'completed', thumbnailUrl: null, trimStart: 0, trimEnd: TITLE_CLIP_SECONDS }
+      const shots = [...state.shots, newShot]
+      const videoClips = [...state.videoClips, newClip]
+      // 누른 시각에 — 그 자리에 클립이 있으면 그 뒤에 놓이고, 뒤 클립은 민다(지금 줄 놓기 규칙).
+      const overlay = resolveOverlay(
+        { shots, videoClips, clipOrder: state.clipOrder },
+        { ...state.overlay, [newId]: { trackId: target, startSec: round3(Math.max(0, atSec)) } },
+        newId,
+      )
+      return withLinkedAudio(state, {
+        shots,
+        videoClips,
+        overlay,
+        selectedClipShotId: newId,
+        selectedShotIds: [newId],
+        selectedAudioId: null,
+        selectedAudioIds: [],
+        previewSourceShotId: null,
+        // 만든 제목을 효과 컨트롤 텍스트 칸에서 바로 고친다 — 문자 도구가 남으면 다음 누름이 또 제목을 만든다.
+        toolMode: 'select',
+        past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+        future: [],
+      })
+    })
+    return created
+  },
+
+  updateTitleText: (shotId, patch) =>
+    set((state) => {
+      const shot = state.shots.find((s) => s.shotId === shotId)
+      if (!shot?.titleText || clipLocked(state, shotId)) return state
+      const next = cleanTitleText({ ...shot.titleText, ...patch })
+      if (JSON.stringify(next) === JSON.stringify(shot.titleText)) return state
+      return { shots: state.shots.map((s) => (s.shotId === shotId ? { ...s, titleText: next } : s)) }
     }),
 
 }))

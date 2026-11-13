@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useCallback, useState } from 'react'
 import { useRouter } from 'next/navigation'
-import { MousePointer2, Scissors, Minus, Plus } from 'lucide-react'
+import { MousePointer2, Scissors, Minus, Plus, Type } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { AiBusyCard } from '@/components/ai-busy-overlay'
@@ -12,6 +12,7 @@ import { EDITOR_FETCH_LIMIT, finishEditorOpen, runLimited } from '@/features/edi
 import { VideoPreviewer } from '@/features/editor/video-previewer'
 import { Timeline } from '@/features/editor/timeline'
 import { ProjectPanel } from '@/features/editor/video-source-panel'
+import { defaultTitleText } from '@/lib/editor/title-clip'
 import { EffectControls } from '@/features/editor/effect-controls'
 import { SourceMonitor } from '@/features/editor/source-monitor'
 import { EditorTopActions, EditorWorkbar, ExportTab, ShortcutsDialog, type EditorTab } from '@/features/editor/editor-workbar'
@@ -83,6 +84,7 @@ export default function PostPage() {
     splitVideoClipAt,
     addClipInstanceAt,
     addTitleCard,
+    addTitleClip,
     setTitleCardDuration,
     addAudioSource,
     removeAudioSource,
@@ -459,6 +461,13 @@ export default function PostPage() {
     if (next === 'export') useEditorStore.getState().setPlaying(false)
     setTab(next)
   }
+  // 타임라인 머리의 도구 설명 — 지금 고른 도구로 할 수 있는 것(문자 도구는 시안 E2 409:5374).
+  const toolHint =
+    toolMode === 'cut'
+      ? t('Cut tool · Click a clip to split it there')
+      : toolMode === 'text'
+        ? t('Type tool · Click a V track to add a title there')
+        : t('Selection tool · Drag to move, drag an edge to change length')
   const toolButton = (active: boolean) =>
     cn(
       'size-8 rounded-lg border-[1.5px]',
@@ -568,13 +577,17 @@ export default function PostPage() {
                 />
               </div>
 
-              {/* 도구 열 (V/C) — 고른 도구는 지금 단계 색 테두리 · 18% 바탕(고르기 칩과 같은 규칙) */}
+              {/* 도구 열 (V/C/T) — 고른 도구는 지금 단계 색 테두리 · 18% 바탕(고르기 칩과 같은 규칙). 시안 E2 의 ⇹ · ✥ 는 뜻을 디자이너에게
+                  여쭐 것이라(결정 페이지) 두지 않는다. */}
               <div className="flex w-11 shrink-0 flex-col items-center gap-1 rounded-[20px] bg-panel py-2">
                 <Button size="icon" variant="ghost" className={toolButton(toolMode === 'select')} onClick={() => setToolMode('select')} title={t('Select tool (V)')} aria-label={t('Select tool (V)')} aria-pressed={toolMode === 'select'}>
                   <MousePointer2 className="size-4" />
                 </Button>
                 <Button size="icon" variant="ghost" className={toolButton(toolMode === 'cut')} onClick={() => setToolMode('cut')} title={t('Cut tool (C)')} aria-label={t('Cut tool (C)')} aria-pressed={toolMode === 'cut'}>
                   <Scissors className="size-4" />
+                </Button>
+                <Button size="icon" variant="ghost" className={toolButton(toolMode === 'text')} onClick={() => setToolMode('text')} title={t('Type tool (T)')} aria-label={t('Type tool (T)')} aria-pressed={toolMode === 'text'}>
+                  <Type className="size-4" />
                 </Button>
               </div>
 
@@ -628,6 +641,7 @@ export default function PostPage() {
                     onSetTrim={setTrim}
                     onSetTitleCardDuration={setTitleCardDuration}
                     onSetTransition={setClipTransition}
+                    onAddTitle={(trackId, atSec) => addTitleClip(trackId, atSec, defaultTitleText(projectTitle, t('New title')))}
                     onPushHistory={pushHistory}
                     videoTracks={videoTracks}
                     overlayLayout={overlayLayout}
@@ -652,11 +666,8 @@ export default function PostPage() {
                           {t('A track')}
                         </Button>
                         {/* 도구 설명은 남는 폭만 쓰고 줄어든다 — 단추가 늘어도(2단계 ③ [스냅 켬] · [마커]) 확대 −·+ 가 둘째 줄로 내려가지 않게. */}
-                        <span
-                          className="min-w-0 flex-1 basis-0 truncate text-right text-meta text-subtle-foreground"
-                          title={toolMode === 'cut' ? t('Cut tool · Click a clip to split it there') : t('Selection tool · Drag to move, drag an edge to change length')}
-                        >
-                          {toolMode === 'cut' ? t('Cut tool · Click a clip to split it there') : t('Selection tool · Drag to move, drag an edge to change length')}
+                        <span className="min-w-0 flex-1 basis-0 truncate text-right text-meta text-subtle-foreground" title={toolHint}>
+                          {toolHint}
                         </span>
                         {/* 축척 −·+ (2026-09-08 오너 지시 5번 · 시안 E1 409:4806 · 409:4808) — 축척 숫자는 없앴다(결정 페이지 추천). */}
                         <div className="flex items-center gap-1">

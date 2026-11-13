@@ -219,10 +219,10 @@ describe('내보내기 탭 · 단축키', () => {
     // 왜: 시안 E1 409:4646 [단축키]. 목록이 실제 단축키와 어긋나면 안 된다 — 단축키를 받는 코드에 같은 키가 있다.
     const markup = text(html(createElement(ShortcutsList)))
     for (const item of EDITOR_SHORTCUTS) expect(markup).toContain(item.keys)
-    // Ctrl+K · M 은 2단계 ③(tests/editor/split-snap-markers.test.ts).
-    expect(EDITOR_SHORTCUTS.map((s) => s.keys)).toEqual(['Space', '← →', 'Shift+← →', 'Ctrl+← →', 'Ctrl+Z', 'Ctrl+Y', 'V', 'C', 'Ctrl+K', 'M', 'Delete', 'Shift+Delete'])
+    // Ctrl+K · M 은 2단계 ③(tests/editor/split-snap-markers.test.ts), T(문자 도구)는 ⑥(tests/editor/title-clips.test.ts).
+    expect(EDITOR_SHORTCUTS.map((s) => s.keys)).toEqual(['Space', '← →', 'Shift+← →', 'Ctrl+← →', 'Ctrl+Z', 'Ctrl+Y', 'V', 'C', 'T', 'Ctrl+K', 'M', 'Delete', 'Shift+Delete'])
     const handler = read('src/features/editor/use-editor-playback.ts')
-    for (const key of ["case ' ':", "e.key === 'ArrowRight'", "case 'v':", "case 'c':", "case 'Delete':", 'e.shiftKey) s.rippleDeleteSelectedClips()']) expect(handler).toContain(key)
+    for (const key of ["case ' ':", "e.key === 'ArrowRight'", "case 'v':", "case 'c':", "case 't':", "case 'Delete':", 'e.shiftKey) s.rippleDeleteSelectedClips()']) expect(handler).toContain(key)
   })
 
   it('한글 입력 상태여도 V · C 자리 키를 누르면 선택 · 자르기 도구로 바뀐다', () => {

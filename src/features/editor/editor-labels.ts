@@ -67,10 +67,15 @@ export function clipMenuTitle(input: { isTitleCard: boolean; shotType: string; d
 
 /**
  * 샷 이름 — "샷 2 · MS · Take 1"(시안 E1 409:4656). 번호는 이야기 순서, Take 는 Editor 로 온 ★ 최종 Take(모르면 뺀다).
- *   타이틀 카드는 "타이틀 카드". 프로젝트 판 줄 · 효과 컨트롤 머리가 같이 쓴다(2단계 ① 새 배치). 약속: tests/editor/panels.test.ts
+ *   타이틀 카드는 "타이틀 카드", 제목 클립은 "제목 · 글자"(시안 E2 409:5231). 프로젝트 판 줄 · 효과 컨트롤 머리가 같이 쓴다(2단계 ① 새 배치).
+ *   약속: tests/editor/panels.test.ts · tests/editor/title-clips.test.ts
  */
-export function shotLabel(input: { number: number | null; shotType?: string | null; takeNumber?: number | null; isTitleCard?: boolean }, t: Translate): string {
+export function shotLabel(
+  input: { number: number | null; shotType?: string | null; takeNumber?: number | null; isTitleCard?: boolean; titleText?: string | null },
+  t: Translate,
+): string {
   if (input.isTitleCard) return t('Title card')
+  if (input.titleText != null) return input.titleText.trim() ? `${t('Title clip')} · ${input.titleText.trim()}` : t('Title clip')
   return [
     input.number != null ? t('Shot {number}', { number: input.number }) : null,
     input.shotType || null,

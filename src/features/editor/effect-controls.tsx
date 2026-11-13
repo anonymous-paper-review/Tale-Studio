@@ -3,16 +3,19 @@
 // 효과 컨트롤(시안 E1 409:4652–4713) — 타임라인에서 고른 클립의 이름 · 자리와 속도 · 소리 볼륨을 고른 자리에서 바로 바꾼다
 //   (2단계 ① 새 배치, 2026-11-14). 모션(위치 X · Y · 비율) · 불투명도는 슬라이더로 바꾸고 % 글자를 두 번 누르면 처음 값(2단계 ④).
 //   전환은 시작 · 끝 줄 — 효과 탭에서 끌어 놓은 전환의 이름(맞닿은 컷이면 "앞 · 뒤 클립과 이어짐")과 0.5 · 1 · 2초 칸 · [빼기],
-//   넣은 영상 효과는 "효과" 묶음에서 고치고 뺀다. 소리 조각은 볼륨과 시작 · 끝 페이드(2단계 ⑤). 우클릭 메뉴도 그대로 남는다.
-//   약속: tests/editor/panels.test.ts · tests/editor/motion-opacity.test.ts · tests/editor/transitions-effects.test.ts
+//   넣은 영상 효과는 "효과" 묶음에서 고치고 뺀다. 소리 조각은 볼륨과 시작 · 끝 페이드(2단계 ⑤). 제목 클립은 텍스트 · 크기 · 위치(⑥, 시안 E2
+//   409:5233–5252)와 모션 · 불투명도 · 전환. 우클릭 메뉴도 그대로 남는다.
+//   약속: tests/editor/panels.test.ts · tests/editor/motion-opacity.test.ts · tests/editor/transitions-effects.test.ts · tests/editor/title-clips.test.ts
 import { useState, type ReactNode } from 'react'
 import { ChoiceChip } from '@/components/controls/choice-chip'
+import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { AUDIO_FADE_LABEL, TRANSITION_CHOICES, TRANSITION_LABEL, edgeTransition, type TransitionEdge } from '@/lib/editor/transition'
 import { VIDEO_EFFECTS, VIDEO_EFFECT_DEFAULT, VIDEO_EFFECT_LABEL } from '@/lib/editor/video-effects'
+import { TITLE_PLACES, TITLE_PLACE_LABEL, TITLE_SIZE_DEFAULT, TITLE_SIZE_MAX, TITLE_SIZE_MIN } from '@/lib/editor/title-clip'
 import { clipSpanLine, shotLabel } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
-import { isSyntheticShotId, isTitleCardShotId, rootShotIdOf, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
+import { isSyntheticShotId, isTitleCardShotId, isTitleClipShotId, rootShotIdOf, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
 
 /** 효과 컨트롤의 속도 칸(시안 E1 409:4707–4713). 지금 빠르기가 그 밖이면(우클릭으로 0.25~4배) 그 값 칸을 하나 더 붙인다. */
 export const SPEED_CHOICES = [0.5, 1, 1.5, 2] as const
@@ -59,6 +62,7 @@ function SliderRow({
   value,
   min,
   max,
+  unit = '%',
   resetTitle,
   onStart,
   onChange,
@@ -68,6 +72,8 @@ function SliderRow({
   value: number
   min: number
   max: number
+  /** 값 뒤 글자 — 처음은 %(제목 크기는 숫자만, 시안 E2 409:5242). */
+  unit?: string
   resetTitle: string
   onStart: () => void
   onChange: (value: number) => void
@@ -95,7 +101,7 @@ function SliderRow({
         title={resetTitle}
         className="w-12 text-left font-num text-meta font-medium text-foreground tabular-nums"
       >
-        {value}%
+        {`${value}${unit}`}
       </button>
     </Row>
   )
@@ -174,9 +180,12 @@ export function EffectControls() {
   const removeVideoEffect = useEditorStore((s) => s.removeVideoEffect)
   const setAudioVolume = useEditorStore((s) => s.setAudioVolume)
   const setAudioFade = useEditorStore((s) => s.setAudioFade)
+  const updateTitleText = useEditorStore((s) => s.updateTitleText)
   const pushHistory = useEditorStore((s) => s.pushHistory)
   // 소리 볼륨 슬라이더도 값이 처음 바뀔 때 한 칸(검토 c (D) 낮음 2 — 예전에는 누르기만 해도 쌓였고, 화살표로 바꾼 값은 쌓이지 않았다).
   const [volumeHistory] = useState(() => sliderHistory(pushHistory))
+  // 제목 글자 칸 — 입력을 시작할 때(포커스 뒤 첫 글자) 되돌리기 한 칸(2단계 ⑥).
+  const [textHistory] = useState(() => sliderHistory(pushHistory))
 
   // ── 소리 조각 ──
   const audio = selectedAudioIds.length > 0 ? audioClips.find((a) => a.id === (anchorAudioId ?? selectedAudioIds[0])) : undefined
@@ -245,7 +254,11 @@ export function EffectControls() {
   }
 
   const isTitleCard = isTitleCardShotId(item.shotId)
+  const isTitleClip = isTitleClipShotId(item.shotId)
   const shot = shots.find((s) => s.shotId === item.shotId)
+  const titleText = isTitleClip ? (shot?.titleText ?? null) : null
+  // 크기 · 위치는 고른 제목 클립 모두에 — 글자는 머리 클립 하나만(여러 제목에 같은 글자를 쓸 일이 없다).
+  const titleTargets = targets.filter((id) => isTitleClipShotId(id))
   const clip = videoClips.find((c) => c.shotId === item.shotId)
   const rootId = rootShotIdOf(item.shotId)
   const number = shots.filter((s) => !isSyntheticShotId(s.shotId)).findIndex((s) => s.shotId === rootId)
@@ -253,7 +266,7 @@ export function EffectControls() {
   const title =
     targets.length > 1
       ? t('{count} clips', { count: targets.length })
-      : shotLabel({ number: number >= 0 ? number + 1 : null, shotType: shot?.shotType, takeNumber: rootClip?.takeNumber, isTitleCard }, t)
+      : shotLabel({ number: number >= 0 ? number + 1 : null, shotType: shot?.shotType, takeNumber: rootClip?.takeNumber, isTitleCard, titleText: titleText?.text ?? null }, t)
   const speed = clip?.speed ?? 1
   const motion = clip?.motion ?? { x: 0, y: 0, scale: 1 }
   const opacity = clip?.opacity ?? 1
@@ -291,6 +304,44 @@ export function EffectControls() {
           </p>
         ) : null}
       </div>
+
+      {titleText ? (
+        // 제목 클립 글자 · 크기 · 위치(시안 E2 409:5233–5252).
+        <Section title={t('Text')}>
+          <Input
+            className="h-8"
+            value={titleText.text}
+            aria-label={t('Text')}
+            onFocus={textHistory.arm}
+            onChange={(e) => {
+              const value = e.target.value
+              textHistory.change(() => updateTitleText(item.shotId, { text: value }))
+            }}
+          />
+          <SliderRow
+            label={t('Size')}
+            value={titleText.size}
+            min={TITLE_SIZE_MIN}
+            max={TITLE_SIZE_MAX}
+            unit=""
+            resetTitle={t('Double-click to reset to {value}', { value: String(TITLE_SIZE_DEFAULT) })}
+            onStart={() => pushHistory()}
+            onChange={(v) => titleTargets.forEach((id) => updateTitleText(id, { size: v }))}
+            onReset={() => resetTo(titleText.size !== TITLE_SIZE_DEFAULT, () => titleTargets.forEach((id) => updateTitleText(id, { size: TITLE_SIZE_DEFAULT })))}
+          />
+          <Row label={t('Position')}>
+            {TITLE_PLACES.map((place) => (
+              <ChoiceChip
+                key={place}
+                selected={titleText.place === place}
+                onClick={() => resetTo(titleText.place !== place, () => titleTargets.forEach((id) => updateTitleText(id, { place })))}
+              >
+                {t(TITLE_PLACE_LABEL[place])}
+              </ChoiceChip>
+            ))}
+          </Row>
+        </Section>
+      ) : null}
 
       {isTitleCard ? null : (
         <>
@@ -418,7 +469,7 @@ export function EffectControls() {
         })}
       </Section>
 
-      {isTitleCard ? null : (
+      {isTitleCard || isTitleClip ? null : (
         <Section title={t('Speed')}>
           <Row label={t('Speed')}>
             {speedChoices(speed).map((rate) => (

@@ -109,6 +109,11 @@ export interface Shot {
    */
   titleCard?: TitleCardData | null
   /**
+   * 제목 클립(2단계 ⑥, 시안 E2) — 영상 위에 글자만 얹는 synthetic 클립(shotId 접미 __g) 전용 필드. 타이틀 카드와 달리 바탕이 없다.
+   *   DB shots 에 대응 행이 없다(editor_states 스냅샷 소관). 모양은 src/lib/editor/title-clip.ts.
+   */
+  titleText?: TitleTextData | null
+  /**
    * 클립 자막(약속 K, 2026-09-04) — 클립마다 한 덩어리. undefined = 손대지 않음(Writer 대사가 초기값), null = 지움.
    *   자리는 화면 비율(덩어리 가운데). 편집기 스냅샷(editor_states)에 저장된다.
    */
@@ -129,6 +134,15 @@ export interface ShotSubtitle {
   text: string
   x: number
   y: number
+}
+
+/** 제목 클립 글자 자리 — 위 · 가운데 · 아래 · 아래쪽 배경 띠(시안 E2 409:5243–5252). */
+export type TitleTextPlace = 'top' | 'middle' | 'bottom' | 'band'
+/** 제목 클립 글자 — 크기 10 ~ 100(글자 높이 = 화면 높이 × 크기 ÷ 400). */
+export interface TitleTextData {
+  text: string
+  size: number
+  place: TitleTextPlace
 }
 
 /** 타이틀 카드 레이어 자리 — 카드 폭·높이 비율(0..1). x·y 는 왼쪽 위, w 는 폭 비율(높이는 내용이 정한다). */

@@ -13,8 +13,8 @@ const isLetter = (e: KeyboardEvent, letter: string) => !e.altKey && (e.key.toLow
 
 /**
  * Editor 전역 단축키(포커스 무관): Space(재생/정지), ←/→(프레임 이동), Ctrl+←/→(편집점), Ctrl+Z(undo),
- *   Ctrl+Y / Ctrl+Shift+Z(redo), Ctrl+K(플레이헤드 자리 나누기), V(선택), C(자르기), M(마커), Delete.
- *   약속: tests/editor/panels.test.ts · tests/editor/split-snap-markers.test.ts
+ *   Ctrl+Y / Ctrl+Shift+Z(redo), Ctrl+K(플레이헤드 자리 나누기), V(선택), C(자르기), T(문자), M(마커), Delete.
+ *   약속: tests/editor/panels.test.ts · tests/editor/split-snap-markers.test.ts · tests/editor/title-clips.test.ts
  */
 export function handleEditorKey(e: KeyboardEvent) {
   // 입력 필드/셀렉트에서 조작 중이면 무시 (오디오 이름 input, 배속 select 등)
@@ -73,8 +73,8 @@ export function handleEditorKey(e: KeyboardEvent) {
     s.addMarker()
     return
   }
-  // V · C 도 키 자리로 알아본다 — 아래는 글자로 견준다.
-  const key = isLetter(e, 'v') ? 'v' : isLetter(e, 'c') ? 'c' : e.key
+  // V · C · T 도 키 자리로 알아본다 — 아래는 글자로 견준다.
+  const key = isLetter(e, 'v') ? 'v' : isLetter(e, 'c') ? 'c' : isLetter(e, 't') ? 't' : e.key
   switch (key) {
     case ' ':
       e.preventDefault()
@@ -87,6 +87,10 @@ export function handleEditorKey(e: KeyboardEvent) {
     case 'c':
     case 'C':
       s.setToolMode('cut')
+      break
+    // 문자 도구 — V 트랙을 누르면 그 자리에 제목 클립(2단계 ⑥, 시안 E2 409:5374).
+    case 't':
+      s.setToolMode('text')
       break
     case 'Delete':
     case 'Backspace':

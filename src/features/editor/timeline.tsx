@@ -10,12 +10,13 @@ import type { ClipTransition, ClipTransitionType } from '@/types'
 import type { Shot, VideoClip, AudioTrackClip } from '@/types'
 import { cn } from '@/lib/utils'
 import { drawWaveform } from '@/lib/audio-waveform'
-import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isTitleCardShotId, useEditorStore, type TrackLayoutItem, type VideoTrackState, type AudioTrackState } from '@/stores/editor-store'
+import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isDrawnClipShotId, isTitleCardShotId, isTitleClipShotId, useEditorStore, type TrackLayoutItem, type VideoTrackState, type AudioTrackState } from '@/stores/editor-store'
 import { timelineSegments } from '@/lib/editor/timeline-segments'
 import { formatTimecode, sequenceLengthSec } from '@/lib/editor/sequence-info'
 import { SNAP_PX, draggedIds, makeSnapper, snapTargets } from '@/lib/editor/snap'
 import { RulerMarkers } from '@/features/editor/timeline-markers'
 import { AudioFadeMarks, EFFECT_DROP_CLASS, FxBadge, TransitionMarks } from '@/features/editor/timeline-transitions'
+import { TitleClipFace } from '@/features/editor/title-clip-layer'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -73,7 +74,7 @@ interface TimelineProps {
   selectedAudioIds: string[]
   currentTime: number
   pxPerSec: number
-  toolMode: 'select' | 'cut'
+  toolMode: 'select' | 'cut' | 'text'
   binDragKind: 'video' | 'audio' | null
   binDropSec: number | null
   audioClips: AudioTrackClip[]
@@ -99,6 +100,8 @@ interface TimelineProps {
   onSetSpeed: (shotId: string, speed: number) => void
   /** 화면 전환 — 고른 클립들의 시작 · 끝 전환을 넣고 바꾸고 뺀다(우클릭 메뉴, 2단계 ⑤). */
   onSetTransition: (shotIds: string[], edge: TransitionEdge, transition: ClipTransition | null) => void
+  /** 문자 도구로 V 줄을 누름 — 그 줄 그 시각에 제목 클립(2단계 ⑥). */
+  onAddTitle: (trackId: string, atSec: number) => void
   onAddAudioTrack: () => void
   onRemoveAudioTrack: (trackId: string) => void
   onToggleAudioTrackMute: (trackId: string) => void
@@ -464,6 +467,7 @@ export function Timeline({
   onSplitVideo,
   onSetSpeed,
   onSetTransition,
+  onAddTitle,
   onAddAudioTrack,
   onRemoveAudioTrack,
   onToggleAudioTrackMute,
@@ -522,6 +526,8 @@ export function Timeline({
   const overlayH = overlayTracks.length * OVERLAY_ROW_H
 
   const cutMode = toolMode === 'cut'
+  // 문자 도구(T) — V 줄 · 그 위 클립을 누르면 그 시각에 제목 클립을 만든다(2단계 ⑥, 시안 E2 409:5374).
+  const textMode = toolMode === 'text'
 
   const segments = useMemo(() => timelineSegments(layout), [layout])
   // 모든 영상 줄의 클립 자리와 전환 칸(2단계 ⑤) — 맞닿은 컷은 같은 줄에서만 본다.
@@ -562,6 +568,11 @@ export function Timeline({
   const snapStart = useCallback(
     (candidateStart: number, durationSec: number, excludeId: string) => snapperFor([excludeId]).start(candidateStart, durationSec),
     [snapperFor],
+  )
+  // 문자 도구로 누른 자리 — 스냅이 켜져 있으면 경계 · 플레이헤드 · 마커에 붙는다.
+  const addTitleAt = useCallback(
+    (trackId: string, clientX: number) => onAddTitle(trackId, snapperFor([]).point(clientXToSec(clientX))),
+    [onAddTitle, snapperFor, clientXToSec],
   )
   const snapPoint = useCallback((sec: number, excludeId: string) => snapperFor([excludeId]).point(sec), [snapperFor])
 
@@ -626,6 +637,7 @@ export function Timeline({
       if (e.button === 2) return
       if ((e.target as HTMLElement).closest('[data-no-seek]')) return
       if (cutMode) { onSeek(clientXToSec(e.clientX)); return }
+      if (textMode) { addTitleAt('v1', e.clientX); return }
       const trackEl = videoTrackRef.current
       if (!trackEl) return
       const trackRect = trackEl.getBoundingClientRect()
@@ -667,7 +679,7 @@ export function Timeline({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, onSeek, onSetSelection, onClearSelection, layout, segments, v1Track],
+    [cutMode, textMode, addTitleAt, clientXToSec, onSeek, onSetSelection, onClearSelection, layout, segments, v1Track],
   )
 
   // Audio 레인 빈 영역: 마퀴 드래그(여러 레인 가로지르며 다중 선택) 또는 클릭-seek.
@@ -730,6 +742,7 @@ export function Timeline({
       e.stopPropagation()
       // 잠근 줄의 클립은 고르거나 옮기지 않는다(2단계 ②).
       if (lockedTracks.has(trackId)) return
+      if (textMode) { addTitleAt(trackId, e.clientX); return }
       if (cutMode) { onSplitVideo(item.shotId, snapToPlayhead(clientXToSec(e.clientX))); return }
       if (e.ctrlKey || e.metaKey) { onToggleSelect(item.shotId); return }
       if (e.shiftKey) { onRangeSelect(item.shotId); return }
@@ -772,7 +785,7 @@ export function Timeline({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, snapToPlayhead, snapperFor, audioClips, onSplitVideo, onToggleSelect, onRangeSelect, onSelect, onSeek, computeDropIndex, onMoveClipToIndex, onPlaceClipAt, onMoveClipToTrack, layout, lockedTracks],
+    [cutMode, textMode, addTitleAt, clientXToSec, snapToPlayhead, snapperFor, audioClips, onSplitVideo, onToggleSelect, onRangeSelect, onSelect, onSeek, computeDropIndex, onMoveClipToIndex, onPlaceClipAt, onMoveClipToTrack, layout, lockedTracks],
   )
 
   // 줄 머리 단추(시안 E1 Track Header, 2단계 ②) — 자물쇠: 그 줄을 고칠 수 없게 · 눈: 미리 보기 · 내보내기에서 뺀다.
@@ -830,7 +843,7 @@ export function Timeline({
             // 효과 탭에서 끌어 놓는 자리(2단계 ⑤) — 타이틀 카드에는 영상 효과가 놓이지 않는다.
             data-clip-drop="video"
             data-shot-id={item.shotId}
-            data-title-card={isTitleCardShotId(item.shotId) ? '' : undefined}
+            data-title-card={isDrawnClipShotId(item.shotId) ? '' : undefined}
             onPointerDown={(e) => handleClipPointerDown(e, item, row.trackId)}
             title={resolveEntityNames(shot.actionDescription, entityNames)}
             className={cn(
@@ -838,7 +851,7 @@ export function Timeline({
               'group absolute flex flex-col overflow-hidden rounded-[10px] border-[1.5px] bg-chat-lumi-bubble',
               EFFECT_DROP_CLASS,
               row.locked && 'pointer-events-none',
-              cutMode ? 'cursor-col-resize' : 'cursor-pointer',
+              cutMode ? 'cursor-col-resize' : textMode ? 'cursor-text' : 'cursor-pointer',
               isDragging && 'opacity-60',
               isSelected ? 'border-stage' : 'border-transparent hover:border-border-strong',
             )}
@@ -852,6 +865,9 @@ export function Timeline({
                     {shot.titleCard?.text || t('Title')}
                   </span>
                 </div>
+              ) : isTitleClipShotId(item.shotId) ? (
+                // 제목 클립(2단계 ⑥) — "T 글자"(시안 E2 409:5500).
+                <TitleClipFace text={shot.titleText?.text ?? ''} />
               ) : clip?.url ? (
                 <video src={clip.url} poster={clip.thumbnailUrl ?? thumbUrl(shot.referenceImageUrl)} className="h-full w-full object-cover" muted preload={(clip.thumbnailUrl ?? shot.referenceImageUrl) ? 'none' : 'metadata'} draggable={false} />
               ) : shot.referenceImageUrl ? (
@@ -889,6 +905,8 @@ export function Timeline({
                 className="absolute left-1 top-0.5 z-20 w-14 rounded border border-primary bg-black px-1 font-mono text-[9px] text-white outline-none"
               />
             ) : null}
+            {/* 이름 칸 — 제목 클립은 얼굴에 "T 글자"가 있어 두지 않는다. */}
+            {isTitleClipShotId(item.shotId) ? null : (
             <span
               data-no-seek={isTitleCardShotId(item.shotId) ? true : undefined}
               onPointerDown={(e) => {
@@ -910,6 +928,7 @@ export function Timeline({
               {isTitleCardShotId(item.shotId) ? clipMenuTitle({ isTitleCard: true, shotType: shot.shotType, durationSec: item.durationSec }, t) : shot.shotType}
               {clip?.speed && clip.speed !== 1 && <span className="ml-1 text-stage">{clip.speed.toFixed(2)}×</span>}
             </span>
+            )}
             {/* 영상을 불러오지 못한 클립은 그 클립만 오른쪽 위에 "불러오지 못함"(QA 2026-11-03 밤). */}
             {clip?.url && unplayableUrls.includes(clip.url) ? (
               <span
@@ -978,8 +997,8 @@ export function Timeline({
                 const t0 = clip?.trimStart ?? 0
                 const startSec = item.startSec
                 const minRight = startSec + TRIM_MIN
-                // 약속 J3: 타이틀 카드는 원본이 없어 끝이 없다 — 늘린 만큼 길어진다(상한 600초).
-                const maxRight = isTitleCardShotId(item.shotId)
+                // 약속 J3: 타이틀 카드 · 제목 클립은 원본이 없어 끝이 없다 — 늘린 만큼 길어진다(상한 600초).
+                const maxRight = isTitleClipShotId(item.shotId) || isTitleCardShotId(item.shotId)
                   ? startSec + 600
                   : startSec + (base - t0) / speed // 원본 끝까지만
                 const startX = e.clientX
@@ -1255,10 +1274,15 @@ export function Timeline({
                 className={cn(
                   'relative h-16 border-b border-border-subtle transition-colors',
                   track.hidden && 'opacity-40',
+                  textMode && 'cursor-text',
                   binDragKind === 'video' && !track.locked && 'bg-stage/10 ring-1 ring-inset ring-stage/40',
                 )}
                 onPointerDown={(e) => {
                   if (e.button === 2 || (e.target as HTMLElement).closest('[data-no-seek]')) return
+                  if (textMode) {
+                    addTitleAt(track.id, e.clientX)
+                    return
+                  }
                   onClearSelection()
                   setGapChip(null)
                   onSeek(clientXToSec(e.clientX))
@@ -1293,7 +1317,7 @@ export function Timeline({
               data-drop="video-track"
               data-track-id="v1"
               data-pps={pxPerSec}
-              className={cn('relative h-24 transition-colors', v1Track?.hidden && 'opacity-40', binDragKind === 'video' && !v1Track?.locked && 'bg-stage/10 ring-1 ring-inset ring-stage/40')}
+              className={cn('relative h-24 transition-colors', v1Track?.hidden && 'opacity-40', textMode && 'cursor-text', binDragKind === 'video' && !v1Track?.locked && 'bg-stage/10 ring-1 ring-inset ring-stage/40')}
               onPointerDown={handleVideoTrackPointerDown}
             >
               {layout.map((item) => renderVideoClip(item, { trackId: 'v1', top: 12, height: 72, locked: !!v1Track?.locked, scope: 'video' }))}

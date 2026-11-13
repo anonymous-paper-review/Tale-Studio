@@ -3500,5 +3500,19 @@ export const KO: Record<string, string> = {
   'Contrast': '대비',
   'Start transition': '시작 전환',
   'End transition': '끝 전환',
+
+  // 2단계 ⑥ 제목 클립 · 문자 도구(시안 E2 409:5231–5252 · 409:5374).
+  'Title clip': '제목',
+  'New title': '제목',
+  'Text': '텍스트',
+  'Size': '크기',
+  'Position': '위치',
+  'Upper': '위',
+  'Center': '가운데',
+  'Lower': '아래',
+  'Background band': '배경 띠',
+  'Type tool (T)': '문자 도구 (T)',
+  'Type tool': '문자 도구',
+  'Type tool · Click a V track to add a title there': '문자 도구 · V 트랙을 누르면 그 자리에 제목이 생겨요',
   'Add a marker': '마커 달기',
 }

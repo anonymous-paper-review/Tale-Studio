@@ -10,8 +10,9 @@ import { useRef, useState, useEffect, useCallback, type CSSProperties } from 're
 import { Button } from '@/components/ui/button'
 import { TitleCardStage } from '@/features/editor/title-card-stage'
 import { SubtitleLayer } from '@/features/editor/subtitle-layer'
+import { TitleTextLayer } from '@/features/editor/title-clip-layer'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
-import { useEditorStore, selectProgramLayout, selectStackAt, selectVideoLayout, isTitleCardShotId } from '@/stores/editor-store'
+import { useEditorStore, selectProgramLayout, selectStackAt, selectTitlesAt, selectVideoLayout, isTitleCardShotId, isTitleClipShotId } from '@/stores/editor-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { editPointTarget } from '@/lib/editor/timeline-segments'
 import { SEQUENCE_FPS, exportFrameSize, formatTimecode, sequenceLengthSec } from '@/lib/editor/sequence-info'
@@ -116,6 +117,10 @@ export function VideoPreviewer() {
   const crossVideos = useRef(new Map<string, HTMLVideoElement>())
   const crossPairRef = useRef<string[]>([])
   const [crossPair, setCrossPair] = useState<string[]>([])
+  // 제목 클립(2단계 ⑥) — 그 시각에 영상 위에 얹을 제목(아래 줄부터). 옅기는 재생 고리가 바깥 틀에 입힌다.
+  const titleBoxes = useRef(new Map<string, HTMLDivElement>())
+  const titleIdsRef = useRef<string[]>([])
+  const [titleIds, setTitleIds] = useState<string[]>([])
   const activeIdRef = useRef<string | null>(null)
 
   // 아래 줄 — 위 클립이 화면을 다 덮지 않을 때 그 밑에 비쳐 보이는 클립들(아래 줄부터, 2단계 ④). 영상 그림은 shotId 로 찾는다.
@@ -162,6 +167,10 @@ export function VideoPreviewer() {
           crossPairRef.current = []
           setCrossPair([])
         }
+        if (titleIdsRef.current.length) {
+          titleIdsRef.current = []
+          setTitleIds([])
+        }
         // 소스 미리 보기는 원본 그대로 — 타임라인에서 옅게 한 불투명도를 거둔다.
         if (v?.style.opacity) v.style.opacity = ''
         if (underIdsRef.current.length) {
@@ -204,12 +213,27 @@ export function VideoPreviewer() {
       const videoLayout = selectVideoLayout(st)
       const windows = transitionWindows(videoLayout, st.videoClips)
       const dips = dipOpacityAt(windows, layout, t)
+      // 제목 클립 끝의 물들이기 — 제목은 영상 계산에 끼지 않아 제목 자리로 따로 센다(2단계 ⑥).
+      const titleDips = dipOpacityAt(windows, videoLayout.filter((l) => isTitleClipShotId(l.shotId)), t)
       // 타이틀 카드는 영상이 아니라 빈 끝의 교차 디졸브를 검은 막으로 — 검정에서 나타나고 검정으로 사라진다.
       const titleFade = item && isTitleCardShotId(item.shotId) ? 1 - edgeFadeAt(windows, item.shotId, t) : 0
       // 디졸브(2026-09-08): 검은 막의 투명도만 시간에 따라 — 영상 픽셀은 손대지 않는다. 예전 시작 디졸브(내보내기와 같은 함수)에
       //   끝 · 빈 끝 쪽을 더하고, 흰색으로 물들이기는 같은 자리의 흰 막이다.
-      if (dissolveRef.current) dissolveRef.current.style.opacity = String(Math.max(dissolveOpacityAt(layout, st.videoClips, t), dips.black, titleFade))
-      if (whiteRef.current) whiteRef.current.style.opacity = String(dips.white)
+      if (dissolveRef.current) dissolveRef.current.style.opacity = String(Math.max(dissolveOpacityAt(layout, st.videoClips, t), dips.black, titleDips.black, titleFade))
+      if (whiteRef.current) whiteRef.current.style.opacity = String(Math.max(dips.white, titleDips.white))
+
+      // 제목 클립(2단계 ⑥) — 영상 위에 글자만 얹는다. 옅기 = 불투명도 × 전환(빈 끝 · 맞닿은 두 제목의 교차 디졸브).
+      const titles = selectTitlesAt(st, t)
+      const nextTitleIds = titles.map((l) => l.shotId)
+      if (nextTitleIds.join('|') !== titleIdsRef.current.join('|')) {
+        titleIdsRef.current = nextTitleIds
+        setTitleIds(nextTitleIds)
+      }
+      for (const title of titles) {
+        const box = titleBoxes.current.get(title.shotId)
+        const c = st.videoClips.find((x) => x.shotId === title.shotId)
+        if (box) box.style.opacity = String(Math.round((c?.opacity ?? 1) * title.fade * 1000) / 1000)
+      }
 
       // 교차 디졸브 — 맨 위 클립 위로 다른 클립을 겹쳐 투명도를 바꾼다(모자란 원본은 첫 장 · 끝 장에 멈춤). 재생 중이면 먼저 불러 둔다.
       //   경계에서 맨 위 영상이 바뀌어 다시 불러오는 동안은 겹친 층의 같은 클립이 맨 위 영상 자리를 대신한다(검은 번쩍임 없이).
@@ -512,6 +536,33 @@ export function VideoPreviewer() {
           // 영상 없는 구간 = 검은 화면. 타임라인이 비었을 때만 안내 문구.
           !hasClips && <p className="text-label text-subtle-foreground">{t('No clips in the timeline')}</p>
         )}
+
+        {/* 제목 클립(2단계 ⑥) — 시퀀스 틀 위에 글자만 얹는다(아래 줄부터). 틀 밖으로 나간 글자는 잘린다. 클릭은 통과 */}
+        {titleIds.length > 0 ? (
+          <div
+            data-testid="program-title-layer"
+            className="pointer-events-none absolute left-1/2 top-1/2 z-10 -translate-x-1/2 -translate-y-1/2 overflow-hidden"
+            style={frame.width > 0 ? { width: frame.width, height: frame.height } : { width: '100%', height: '100%' }}
+          >
+            {titleIds.map((id) => {
+              const data = shots.find((s) => s.shotId === id)?.titleText
+              if (!data) return null
+              return (
+                <div
+                  key={id}
+                  ref={(el) => {
+                    if (el) titleBoxes.current.set(id, el)
+                    else titleBoxes.current.delete(id)
+                  }}
+                  className="absolute inset-0"
+                  style={{ opacity: 0 }}
+                >
+                  <TitleTextLayer data={data} frameHeight={frame.height} motion={videoClips.find((c) => c.shotId === id)?.motion} />
+                </div>
+              )
+            })}
+          </div>
+        ) : null}
 
         {/* 디졸브 막(2026-09-08): 검은 화면의 투명도만 바뀐다 — 클릭은 통과 */}
         <div ref={dissolveRef} data-testid="dissolve-overlay" className="pointer-events-none absolute inset-0 z-20 bg-black" style={{ opacity: 0 }} />

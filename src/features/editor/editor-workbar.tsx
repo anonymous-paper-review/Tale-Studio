@@ -146,6 +146,7 @@ export const EDITOR_SHORTCUTS: readonly { keys: string; action: string }[] = [
   { keys: 'Ctrl+Y', action: 'Redo' },
   { keys: 'V', action: 'Selection tool' },
   { keys: 'C', action: 'Cut tool' },
+  { keys: 'T', action: 'Type tool' },
   { keys: 'Ctrl+K', action: 'Split at the playhead' },
   { keys: 'M', action: 'Add a marker' },
   { keys: 'Delete', action: 'Remove the clip and leave a gap' },

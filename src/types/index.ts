@@ -16,6 +16,8 @@ export type {
   AudioTrackClip,
   AudioSource,
   ClipTransition,
+  TitleTextData,
+  TitleTextPlace,
   ClipTransitionType,
   ClipEffects,
   ClipMotion,
