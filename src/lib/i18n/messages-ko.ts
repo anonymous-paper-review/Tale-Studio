@@ -1361,6 +1361,8 @@ export const KO: Record<string, string> = {
   'Generate videos for eligible shots?': '생성 가능한 샷의 영상을 만들까요?',
   'Generate videos for {count} eligible shots.': '생성 가능한 샷 {count}개의 영상을 만듭니다.',
   'Costs money for every generated video: {count} videos.': '영상 {count}개 생성마다 비용이 발생합니다.',
+  'Generate a video for 1 eligible shot.': '생성 가능한 샷 1개의 영상을 만듭니다.',
+  'Costs money for every generated video: 1 video.': '영상 1개 생성마다 비용이 발생합니다.',
   'Only shots without a completed video or active generation will be included.': '완성 영상이 없고 현재 생성 중이지 않은 샷만 포함합니다.',
   'All storyboards have already been generated.': '이미 모든 스토리보드가 생성되어 있습니다.',
   'To regenerate an individual shot, double-click it.': '개별 재생성은 샷을 더블클릭해서 진행하세요.',

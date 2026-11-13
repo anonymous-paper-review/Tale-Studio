@@ -598,7 +598,8 @@ function ShotCell({
       <div
         className={cn(
           // v3 S1 그림 칸: 모서리 14, 그림이 없으면 그림 자리 그라데이션.
-          'relative overflow-hidden rounded-[14px] bg-art-placeholder',
+          // @container: 위쪽 줄(꼬리표 · ⤢)이 그림 칸 폭을 보고 줄인다 — 한 줄 6장에서도 겹치지 않게(영어 재점검 S3).
+          '@container relative overflow-hidden rounded-[14px] bg-art-placeholder',
           // 영상·단일 이미지·자리표시·생성 중 상자는 Producer 포맷의 비율(2026-09-30) — 가로 프로젝트만 종전 16:9.
           !(framePanel && !generating) && !gridFrame && 'aspect-video',
         )}
@@ -691,13 +692,15 @@ function ShotCell({
           aria-label={t('Open details')}
           className="absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-foreground transition-colors hover:bg-black/65"
         >
-          <Maximize2 className="size-3" />
-          {t('Details')}
+          {/* 좁은 그림 칸(한 줄 5장 이상)에서는 그림표만 — 이름은 aria-label 이 말한다. */}
+          <Maximize2 className="size-3 shrink-0" />
+          <span className="hidden @min-[15rem]:inline">{t('Details')}</span>
         </button>
 
         {/* 실사 보기: 이미지가 필요한 샷만 주황 태그(시안 R). 만드는 일은 위쪽 단추 · 상세가 맡는다(카드 위 숨은 단추 없앰). */}
         {mediaMode === 'real' && !generating && (shotState === 'image_needed' || roughChanged) && (
-          <div className="absolute left-10 top-2 z-10 flex items-center gap-1">
+          // 꼬리표 줄은 ⤢ 단추 자리 앞에서 끝나고(좁을 때 그림표 · 넓을 때 "⤢ 상세"), 넘치면 줄여 쓴다(영어 재점검 S3).
+          <div className="absolute left-9 right-9 top-2 z-10 flex min-w-0 items-center gap-1 overflow-hidden @min-[15rem]:right-[5.5rem]">
             {shotState === 'image_needed' && <ImageNeededTag />}
             {roughChanged && (
               <span className="inline-flex items-center rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-warning">

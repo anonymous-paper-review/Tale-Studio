@@ -57,4 +57,17 @@ describe('영어 단수', () => {
     expect(ko('Makes 1 image, and its video starts by itself when the image is done.')).toBe('이미지 1장을 만들고, 이미지가 끝나면 영상이 저절로 시작돼요.')
     expect(ko("1 video didn't start because its image wasn't made.")).toBe('이미지를 못 만들어 영상 1개는 시작하지 않았어요')
   })
+
+  it('영상 확인 창의 영어는 1개일 때 단수다', () => {
+    // 왜: 영어 재점검 S2 — "Generate videos for 1 eligible shots." · "Costs money for every generated video: 1 videos."로 읽혔다(main 부터 있던 글).
+    //   한국어는 그대로다.
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    expect(countText(en, 1, 'Generate a video for 1 eligible shot.', 'Generate videos for {count} eligible shots.', { count: 1 })).toBe('Generate a video for 1 eligible shot.')
+    expect(countText(en, 1, 'Costs money for every generated video: 1 video.', 'Costs money for every generated video: {count} videos.', { count: 1 })).toBe('Costs money for every generated video: 1 video.')
+    expect(page).toContain("countText(t, videoPlan.total, 'Generate a video for 1 eligible shot.', 'Generate videos for {count} eligible shots.', { count: videoPlan.total })")
+    expect(page).toContain("countText(t, videoPlan.runCount, 'Costs money for every generated video: 1 video.', 'Costs money for every generated video: {count} videos.', { count: videoPlan.runCount })")
+    expect(page).toContain("countText(t, chainPlan.total, 'Costs money for every generated video: 1 video.', 'Costs money for every generated video: {count} videos.', { count: chainPlan.total })")
+    expect(ko('Generate a video for 1 eligible shot.')).toBe(ko('Generate videos for {count} eligible shots.', { count: 1 }))
+    expect(ko('Costs money for every generated video: 1 video.')).toBe(ko('Costs money for every generated video: {count} videos.', { count: 1 }))
+  })
 })

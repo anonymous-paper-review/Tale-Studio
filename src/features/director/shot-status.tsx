@@ -180,13 +180,15 @@ export function ImageNeededTag({ className }: { className?: string }) {
   const t = useT()
   return (
     <span
+      title={t('Image needed')}
       className={cn(
-        'inline-flex items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-stage-producer',
+        // 좁은 카드에서는 줄여 쓴다(…) — ⤢ 상세 단추와 겹치지 않게(영어 재점검 S3).
+        'inline-flex min-w-0 items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-stage-producer',
         className,
       )}
     >
       <ImageIcon className="size-3 shrink-0" />
-      <span className="whitespace-nowrap">{t('Image needed')}</span>
+      <span className="min-w-0 truncate">{t('Image needed')}</span>
     </span>
   )
 }
