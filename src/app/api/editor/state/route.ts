@@ -38,13 +38,6 @@ async function writeIfNotNewer(
   return 'newer'
 }
 
-/** 옮기기 전 한 벌(beforeV2)은 되살릴 때만 쓴다 — 화면에는 보내지 않는다(열 때마다 두 배를 받지 않게). */
-function withoutBackup(state: unknown): unknown {
-  if (!state || typeof state !== 'object' || Array.isArray(state) || !('beforeV2' in state)) return state
-  const { beforeV2: _before, ...rest } = state as Record<string, unknown>
-  return rest
-}
-
 export async function GET(req: Request) {
   try {
     const { searchParams } = new URL(req.url)
@@ -67,7 +60,7 @@ export async function GET(req: Request) {
     if (error) throw error
 
     // 저장 시각도 돌려준다 — 화면이 이 브라우저가 마지막으로 본 시각과 견줘 다른 곳에서 더 나중에 고쳤는지 안다(E2b, 2026-11-14).
-    return NextResponse.json({ state: withoutBackup(data?.state ?? null), updatedAt: data?.updated_at ?? null })
+    return NextResponse.json({ state: data?.state ?? null, updatedAt: data?.updated_at ?? null })
   } catch (err) {
     const errMsg = err instanceof Error ? err.message : 'Unknown error'
     console.error('[editor/state GET]', errMsg)
@@ -93,12 +86,11 @@ export async function PUT(req: Request) {
     const incoming = Number.isInteger(state?.version) ? (state.version as number) : 1
     const { data: stored, error: readError } = await supabaseAdmin
       .from('editor_states')
-      .select('version:state->version, beforeV2:state->beforeV2')
+      .select('version:state->version')
       .eq('project_id', projectId)
       .maybeSingle()
     if (readError) throw readError
-    const storedRow = stored as { version?: unknown; beforeV2?: unknown } | null
-    const storedVersion = Number(storedRow?.version ?? 0)
+    const storedVersion = Number((stored as { version?: unknown } | null)?.version ?? 0)
     if (storedVersion > incoming) {
       return NextResponse.json(
         { error: 'This project was saved by a newer version of the editor. Refresh the page.' },
@@ -106,27 +98,7 @@ export async function PUT(req: Request) {
       )
     }
 
-    // 옮기기 전 한 벌 — 옛 형식 저장본을 새 형식이 처음 덮을 때 그 저장본을 그대로 beforeV2 칸에 남기고, 그 뒤 새 형식 저장마다
-    //   서버에 있던 한 벌을 실어 나른다(화면이 보낸 것은 쓰지 않는다). 옮겨 적기는 되돌릴 수 없어서(리드 2026-11-14, 2단계 위험 2)
-    //   새 형식에 고장이 나면 이 한 벌로 "옮기던 때의 편집"을 되살린다 — 되살리기는 사람이 한다. 예전 화면은 이 칸을 모르니
-    //   배포를 되돌린 뒤 예전 화면이 한 번 저장하면 없어진다(되살리기는 되돌리기 전에). 약속: tests/editor/save-format.test.ts
-    let toStore = state
-    if (incoming >= 2 && state && typeof state === 'object') {
-      const { beforeV2: _sent, ...rest } = state as Record<string, unknown>
-      let before = storedRow?.beforeV2 ?? null
-      if (before == null && storedRow && storedVersion < 2) {
-        const { data: full, error: fullError } = await supabaseAdmin
-          .from('editor_states')
-          .select('state')
-          .eq('project_id', projectId)
-          .maybeSingle()
-        if (fullError) throw fullError
-        before = (full as { state?: unknown } | null)?.state ?? null
-      }
-      toStore = before != null ? { ...rest, beforeV2: before } : rest
-    }
-
-    const written = await writeIfNotNewer(projectId, toStore, incoming, new Date().toISOString())
+    const written = await writeIfNotNewer(projectId, state, incoming, new Date().toISOString())
     if (written === 'newer') {
       return NextResponse.json(
         { error: 'This project was saved by a newer version of the editor. Refresh the page.' },

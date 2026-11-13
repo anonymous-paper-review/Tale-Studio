@@ -81,22 +81,6 @@ export function saveEditorStateNow(projectId: string, data: PersistedEditor): vo
   writeLocal(projectId, data)
 }
 
-const BEFORE_V2_PREFIX = 'tale:editor:v1:before-v2:'
-
-/**
- * 이 브라우저 저장본이 옛 형식(1판)이면 새 형식으로 옮겨 적기 전에 따로 칸에 그대로 한 벌 남긴다 — 처음 한 번만 쓰고 덮지 않는다
- *   (리드 2026-11-14, 2단계 위험 2). 서버 저장본 안 한 벌(beforeV2)과 같은 뜻이고, 서버에 못 올린 이 브라우저 고침은 여기에만 남는다.
- *   되살리는 화면은 아직 없다. 약속: tests/editor/free-placement.test.ts
- */
-function keepBeforeV2(projectId: string, raw: string, version: unknown): void {
-  if (typeof version === 'number' && version >= 2) return
-  try {
-    if (localStorage.getItem(BEFORE_V2_PREFIX + projectId) == null) localStorage.setItem(BEFORE_V2_PREFIX + projectId, raw)
-  } catch {
-    // 저장 공간이 꽉 찼다 — 남기지 못한다. 여는 것은 막지 않는다.
-  }
-}
-
 export async function loadEditorState(projectId: string): Promise<PersistedEditor | null> {
   if (typeof window === 'undefined') return null
 
@@ -105,8 +89,6 @@ export async function loadEditorState(projectId: string): Promise<PersistedEdito
     const raw = localStorage.getItem(LS_PREFIX + projectId)
     if (!raw) return null
     parsed = JSON.parse(raw) as PersistedEditor
-    // 읽을 때 남긴다 — 이 브라우저 저장본은 이것을 읽은 뒤에야 새 형식으로 덮인다.
-    keepBeforeV2(projectId, raw, parsed.version)
   } catch {
     return null
   }

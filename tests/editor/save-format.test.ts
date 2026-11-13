@@ -1,4 +1,4 @@
-// 새 형식(자유 배치 2판) 편집 저장본을 예전 화면이 옛 형식으로 덮지 못하게 서버가 막고(판 검사와 쓰기를 한 문장으로), 옮기기 전 옛 형식 저장본을 한 벌 남기는지 검사한다 (오너 답 1 "자유 배치 — 추천대로" · 리드 위험 2 · 검토 c 낮음 6, 2026-11-14)
+// 새 형식(자유 배치 2판) 편집 저장본을 예전 화면이 옛 형식으로 덮지 못하게 서버가 막는지(판 검사와 쓰기를 한 문장으로) 검사한다 (오너 답 1 "자유 배치 — 추천대로" · 검토 c 낮음 6, 2026-11-14)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 서버 저장본 표(가짜) — 한 행. 읽기는 행에서 칸을 뽑고, 쓰기는 조건부 갱신(판 칸이 없거나 N 이하) · 새로 넣기(이미 있으면 23505)를
@@ -27,8 +27,7 @@ vi.mock('@/lib/supabase/admin', () => {
       if (op === 'select') {
         const row = mocks.row
         if (!row) return { data: null, error: null }
-        if (cols.startsWith('version:')) return { data: { version: row.state.version ?? null, beforeV2: row.state.beforeV2 ?? null }, error: null }
-        if (cols === 'state') return { data: { state: row.state }, error: null }
+        if (cols.startsWith('version:')) return { data: { version: row.state.version ?? null }, error: null }
         return { data: { state: row.state, updated_at: row.updated_at }, error: null }
       }
       if (op === 'update') {
@@ -76,14 +75,13 @@ vi.mock('@/lib/supabase/admin', () => {
   return { supabaseAdmin: { from: () => query() } }
 })
 
-import { GET, PUT } from '@/app/api/editor/state/route'
+import { PUT } from '@/app/api/editor/state/route'
 
-const put = (version: number, extra: Record<string, unknown> = {}) =>
-  PUT(new Request('http://localhost/api/editor/state', { method: 'PUT', body: JSON.stringify({ projectId: 'p1', state: { version, shots: [], ...extra } }) }))
+const put = (version: number) =>
+  PUT(new Request('http://localhost/api/editor/state', { method: 'PUT', body: JSON.stringify({ projectId: 'p1', state: { version, shots: [] } }) }))
 /** 지금 서버에 적혀 있는 저장본. */
 const written = () => mocks.row?.state as Record<string, unknown>
 const stored = (state: Record<string, unknown>) => ({ state, updated_at: '2026-11-14T00:00:00.000Z' })
-const legacy = { version: 1, shots: [{ shotId: 'A' }], clipOrder: { sc_1: ['A'] }, videoClips: [{ shotId: 'A', url: 'https://video.test/A.mp4' }] }
 
 beforeEach(() => {
   mocks.row = null
@@ -144,46 +142,5 @@ describe('저장 형식 2판', () => {
     // 왜: 정상 경로 고정 — 지워진 프로젝트를 연 채 둔 화면이 자동 저장을 계속 쏘면 서버 고장이 아니라 끝난 화면이다(다시 시도 멈춤).
     mocks.insertError = { code: '23503', message: 'violates foreign key constraint' }
     expect((await put(2)).status).toBe(410)
-  })
-})
-
-describe('옮기기 전 한 벌', () => {
-  it('예전 저장본을 새 형식으로 옮겨도 옛 형식 저장본은 그대로 남는다 — 서버 저장본 안 따로 칸에 한 벌', async () => {
-    // 왜: 옮겨 적기는 되돌릴 수 없다(리드 2026-11-14, 2단계 위험 2) — 새 형식에 고장이 나면 이 한 벌로 "옮기던 때의 편집"을 되살린다.
-    //   어느 브라우저가 옮기든 서버가 옮기기 직전에 적혀 있던 것을 그대로 남긴다. 되살리기는 사람이 한다(화면 없음).
-    mocks.row = stored(legacy)
-    expect((await put(2)).status).toBe(200)
-    expect(written().version).toBe(2)
-    expect(written().beforeV2).toEqual(legacy)
-  })
-
-  it('옮긴 뒤 새 형식으로 다시 저장해도 옮기기 전 한 벌은 그대로 따라가고, 화면이 보낸 것으로 바뀌지 않는다', async () => {
-    // 왜: 저장할 때마다 한 벌이 빠지거나 바뀌면 되살릴 것이 없다. 화면은 한 벌을 받지도 보내지도 않는다(아래 열기 시험).
-    mocks.row = stored({ version: 2, shots: [], beforeV2: legacy })
-    await put(2, { beforeV2: { version: 1, shots: [] } })
-    expect(written().beforeV2).toEqual(legacy)
-    await put(2)
-    expect(written().beforeV2).toEqual(legacy)
-  })
-
-  it('처음부터 새 형식인 편집이나 예전 화면이 옛 형식으로 저장할 때는 따로 칸을 만들지 않는다', async () => {
-    // 왜: 옮긴 적이 없으면 남길 것이 없다. 예전 화면(배포하는 동안 열려 있던 탭 · 배포를 되돌린 뒤)은 지금처럼 저장한다.
-    mocks.row = null
-    await put(2)
-    expect(written()).not.toHaveProperty('beforeV2')
-    mocks.row = stored({ version: 2, shots: [] })
-    await put(2)
-    expect(written()).not.toHaveProperty('beforeV2')
-    mocks.row = stored(legacy)
-    await put(1)
-    expect(written()).not.toHaveProperty('beforeV2')
-  })
-
-  it('Editor 를 열 때 서버는 옮기기 전 한 벌을 빼고 보낸다', async () => {
-    // 왜: 한 벌은 되살릴 때만 쓴다 — 열 때마다 두 배를 받으면 Editor 가 늦게 열린다.
-    mocks.row = { state: { version: 2, shots: [{ shotId: 'A' }], beforeV2: legacy }, updated_at: '2026-11-14T01:00:00.000Z' }
-    const body = await (await GET(new Request('http://localhost/api/editor/state?projectId=p1'))).json()
-    expect(body.state).toEqual({ version: 2, shots: [{ shotId: 'A' }] })
-    expect(body.updatedAt).toBe('2026-11-14T01:00:00.000Z')
   })
 })
