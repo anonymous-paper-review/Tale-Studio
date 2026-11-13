@@ -916,6 +916,7 @@ function PaletteBar() {
   const makingImages = stateList.filter((s) => s === 'image_generating').length
   const makingVideos = stateList.filter((s) => s === 'video_generating').length
   const making = makingImages + makingVideos > 0 || realBatchBusy || videoBatchBusy
+  // [다음: Editor로] · 사이드바 Editor 는 같은 조건 — 완성 영상이 하나라도 있으면 켜진다(시안 R, 결정 페이지 추천).
   const canHandOff = stateList.some((s) => s === 'video_done')
   const primary = primaryWorkAction({ imageCount: imageWork.length, videoCount: videoWork.length, canHandOff })
   // 약속 E1·E2(2026-09-04): 확인창에 만들 영상 수·필요한 Take·가진 Take — 채팅 승인 카드와 같은 계산(video-batch-plan).
@@ -1007,6 +1008,14 @@ function PaletteBar() {
   //   가장 밝은(크림) 단추는 지금 할 일 하나(시안 R) — 만들 게 없는 단추는 꺼진다.
   return (
     <div className="flex shrink-0 flex-col gap-3 px-4 pb-3 pt-4">
+      {/* 다음 단계 단추(2026-10-01 오너 — 각 단계 오른쪽 위) — v3 위 막대 오른쪽 자리. 툴바와 같은 판정으로 켜짐 · 크림을 정한다. */}
+      <TopBarActions>
+        <NextStepButton
+          blocked={!canHandOff}
+          blockedReason={t('A finished video lets you move on.')}
+          emphasis={primary === 'editor' ? 'primary' : 'secondary'}
+        />
+      </TopBarActions>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex min-w-0 items-center gap-3">
           {/* Node / Storyboard 토글 */}
@@ -1389,10 +1398,6 @@ export default function DirectorCanvasPage() {
     // v3 D1(2026-11-03): 위 막대 아래 캔버스 판 하나(모서리 16 · --canvas-bg) — 아래 8px 띄움, 오른쪽 8px 는 스튜디오 틀 여백(SHELL_INSET)이 준다.
     //   제목 "The Set" · 도움말은 판 안 툴바 왼쪽으로, [다음: Editor로]는 위 막대 오른쪽으로 옮겼다.
     <div className="flex flex-1 flex-col overflow-hidden pb-2">
-      {/* 다음 단계 버튼(2026-10-01 오너 — 채팅 위 버튼을 각 단계 오른쪽 위로 옮김) → v3 위 막대 오른쪽 자리. */}
-      <TopBarActions>
-        <NextStepButton />
-      </TopBarActions>
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-canvas-bg">
         {/* Center: top Palette bar(#e1 — 하단→상단 이동) + Canvas (Node/Storyboard) */}
         <PaletteBar />

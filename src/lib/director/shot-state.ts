@@ -253,3 +253,21 @@ export function shotStageDots(state: DirectorShotState): { image: ShotStageDot; 
       return { image: 'image_done', video: 'failed' }
   }
 }
+
+/** [다음: Editor로] · 사이드바 Editor 가 켜지는 조건 — 완성된 영상이 하나라도 있다(시안 R, 결정 페이지 추천). */
+export function directorHasFinishedVideo(nodes: readonly DirectorNode[]): boolean {
+  return nodes.some((n) => isVideoData(n.data) && n.data.status === 'completed' && hasUrl(n.data.videoUrl))
+}
+
+/** 사이드바 Editor 칸을 [다음: Editor로]와 같은 넘김으로 열 때 — 아직 Director 까지만 왔고(넘기기 전) 완성 영상이 있을 때. */
+export function railEditorViaHandoff({
+  stage,
+  reachedDirectorOnly,
+  finishedVideo,
+}: {
+  stage: string
+  reachedDirectorOnly: boolean
+  finishedVideo: boolean
+}): boolean {
+  return stage === 'editor' && reachedDirectorOnly && finishedVideo
+}

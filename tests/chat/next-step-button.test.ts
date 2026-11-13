@@ -62,7 +62,8 @@ describe('다음 단계 버튼은 단계마다 다음 단계를 가리킨다', (
     expect(nextStepAction('producer', { producerLocked: false })).toMatchObject({ kind: 'handoff', label: 'Hand over to Artist', utterance: 'Please hand over to Artist' })
     expect(nextStepAction('artist', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Hand over to Storyboard' })
     expect(nextStepAction('writer', { producerLocked: true })).toBeNull()
-    expect(nextStepAction('director', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Hand over to Editor' })
+    // 1110 확정 시안 D1 "다음: Editor로"(오너 2026-11-14 허락: 시안으로 바뀌는 출시 시험은 새 기대값으로).
+    expect(nextStepAction('director', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Next: Editor' })
     expect(nextStepAction('editor', { producerLocked: true })).toBeNull()
     expect(nextStepAction('producer', { producerLocked: true })).toMatchObject({ kind: 'open', label: 'Go to Artist', stage: 'artist' })
   })

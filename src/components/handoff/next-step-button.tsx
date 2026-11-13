@@ -11,7 +11,22 @@ import { useT } from '@/lib/i18n'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 
-export function NextStepButton({ className, hidden = false }: { className?: string; hidden?: boolean }) {
+export function NextStepButton({
+  className,
+  hidden = false,
+  blocked = false,
+  blockedReason,
+  emphasis = 'primary',
+}: {
+  className?: string
+  hidden?: boolean
+  /** 화면이 아직 넘길 수 없다고 본다(Director: 완성 영상이 하나도 없음, 시안 R). */
+  blocked?: boolean
+  /** 막혔을 때 마우스를 올리면 보일 이유. */
+  blockedReason?: string
+  /** 지금 할 일이 아니면 보조 단추(시안 R "가장 밝은 버튼 = 지금 할 일 하나"). 기본은 지금처럼 크림. */
+  emphasis?: 'primary' | 'secondary'
+}) {
   const t = useT()
   const stage = useProjectStore((s) => s.currentStage)
   const producerLocked = useProjectStore((s) => s.producerLocked)
@@ -37,8 +52,9 @@ export function NextStepButton({ className, hidden = false }: { className?: stri
   return (
     <Button
       size="sm"
-      variant={action.kind === 'open' ? 'outline' : 'default'}
-      disabled={chatBusy || confirmOpen || checking || (stage === 'producer' && proposalPending)}
+      variant={action.kind === 'open' ? 'outline' : emphasis === 'secondary' ? 'secondary' : 'default'}
+      disabled={blocked || chatBusy || confirmOpen || checking || (stage === 'producer' && proposalPending)}
+      title={blocked ? blockedReason : undefined}
       onClick={() => void run()}
       className={className}
       data-testid="next-step-button"
