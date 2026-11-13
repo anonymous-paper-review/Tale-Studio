@@ -5,7 +5,7 @@ import { storyboardImageEndFrame, storyboardImageStartFrame } from '@/lib/direct
 import { IMAGE_MODEL_ORDER, imageModelSupportsSheetCanvas, normalizeImageModelKey, resolveSheetImageModel, type ImageModelKey } from '@/lib/image-models'
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
 import { currentStoryboardVersion, versionOfFrames } from '@/lib/director/storyboard-image-versions'
-import { DEFAULT_VIDEO_RESOLUTION, isVideoResolution, normalizeProvider, type VideoModelKey, type VideoResolution } from '@/lib/video-models'
+import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
 import type { DirectorNode, ShotNodeData, StoryboardImage, VideoNodeData, VideoOverride } from '@/types/director'
 
 export type ShotDetailTab = 'image' | 'video'
@@ -70,19 +70,9 @@ export function shotDetailTakes(nodes: readonly DirectorNode[], shotNodeId: stri
   return { takes, final: chosen ? { id: String(chosen.id), auto: chosen.is_final !== true } : null }
 }
 
-/** 다시 만들기가 이어받을 Take — 그 샷의 가장 최근 Take(번호 큰 것, 실패해도). 없으면 null. */
-export function latestShotTake(nodes: readonly DirectorNode[], shotNodeId: string): ShotDetailTake | null {
-  return shotDetailTakes(nodes, shotNodeId).takes[0] ?? null
-}
-
-/** 그 Take 의 모델 · 해상도 — Take 에 고른 값이 없으면 샷 설정, 해상도는 720p(마더 샷에는 해상도가 없다). Take 가 없으면 샷 설정. */
-export function takeSettings(shot: Pick<ShotNodeData, 'provider'>, take: Pick<VideoNodeData, 'override'> | null): { model: VideoModelKey; resolution: VideoResolution } {
-  const override = (take?.override ?? {}) as VideoOverride
-  return {
-    model: normalizeProvider(override.provider ?? shot.provider),
-    resolution: isVideoResolution(override.resolution) ? override.resolution : DEFAULT_VIDEO_RESOLUTION,
-  }
-}
+// 다시 만들기가 이어받을 Take(가장 최근 · 실패해도)와 그 모델 · 해상도 — entry 갈래 D8 [다시 만들기]와 같은 파일(remake-take.ts)의 함수를 쓴다
+//   (리드 검토 b 보통 2: 단추에 적는 Take 값과 실제 요청이 같은 함수에서 나온다).
+export { latestShotTake, takeSettings } from '@/lib/director/remake-take'
 
 /** 바꿀 점을 붙인 이번 생성 프롬프트 — 바꿀 점은 이번 생성에만 붙고 샷 프롬프트는 바꾸지 않는다. 비워 두면 그대로. */
 export function promptWithChange(prompt: string, change: string, subject: 'image' | 'video' = 'image'): string {

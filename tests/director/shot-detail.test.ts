@@ -201,4 +201,11 @@ describe('Director 샷 상세', () => {
     const picked = [take('v1', 1), take('v2', 2, { cancelledAt: '2026-11-14T03:00:00Z', final: true })]
     expect(shotDetailTakes(picked, 'shot-1').final).toEqual({ id: 'v2', auto: false })
   })
+
+  it('D8 [다시 만들기] · 샷 상세 · Lumi 는 이어받을 Take 와 그 모델 · 해상도를 같은 함수(공유 파일)로 고른다', async () => {
+    // 왜: 리드 검토 b 보통 2 — 단추에 적는 Take 값과 실제 요청이 같은 Take 에서 나와야 한다. entry 갈래와 같은 파일을 둔다(remake-take.ts).
+    const shared = await import('@/lib/director/remake-take')
+    expect(latestShotTake).toBe(shared.latestShotTake)
+    expect(takeSettings).toBe(shared.takeSettings)
+  })
 })
