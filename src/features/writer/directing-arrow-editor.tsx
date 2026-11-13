@@ -47,6 +47,19 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
+/** 편집기 밑층(화살표를 지운 그림) — 지금 연출 그림(generatedAt)에서 만든 것만 쓴다. 서버 캐시(cleanDirection)가 지금 그림의 것이면
+ *  그것, 아니면 이 편집기에서 지금 그림을 분리한 것. 팝업을 연 채로 연출 그림을 다시 만들면 둘 다 옛 그림의 것이라 밑층이 없다 —
+ *  옛 밑층을 그대로 쓰면 지우개로 긁을 때 바뀌기 전 그림이 드러나고 저장하면 새 연출 그림에 박혔다(2026-11-14 미들 프레임 고장).
+ *  순수 함수 — 테스트 대상(tests/writer/directing-clean-plate.test.ts). */
+export function cleanPlateFor(
+  panel: Pick<RoughStoryboardImage, 'generatedAt' | 'cleanDirection'>,
+  separated: { url: string; for: number } | null,
+): string | null {
+  if (panel.cleanDirection && panel.cleanDirection.for === panel.generatedAt) return panel.cleanDirection.url
+  if (separated && separated.for === panel.generatedAt) return separated.url
+  return null
+}
+
 export function DirectingArrowEditor({
   projectId,
   shotId,
@@ -62,13 +75,10 @@ export function DirectingArrowEditor({
   const directionUrl = panel.frames?.direction
     ? withCacheBust(panel.frames.direction, panel.generatedAt)
     : null
-  // 서버 캐시가 현 generatedAt 파생이면 재분리 없이 바로 밑층으로 쓴다(재과금 방지).
-  const freshClean =
-    panel.cleanDirection && panel.cleanDirection.for === panel.generatedAt
-      ? panel.cleanDirection.url
-      : null
-  const [cleanUrl, setCleanUrl] = useState<string | null>(freshClean)
-  const effectiveClean = cleanUrl ?? freshClean
+  // 서버 캐시가 현 generatedAt 파생이면 재분리 없이 바로 밑층으로 쓴다(재과금 방지). 이 편집기에서 분리한 밑층은
+  //   어느 그림(generatedAt)에서 지운 것인지 함께 두어, 연출 그림이 다시 만들어지면 버린다(cleanPlateFor).
+  const [separated, setSeparated] = useState<{ url: string; for: number } | null>(null)
+  const effectiveClean = cleanPlateFor(panel, separated)
 
   const topCanvasRef = useRef<HTMLCanvasElement>(null)
   const drawingRef = useRef(false)
@@ -239,7 +249,7 @@ export function DirectingArrowEditor({
       })
       const j = await res.json().catch(() => null)
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
-      setCleanUrl(j.data.cleanUrl as string)
+      setSeparated({ url: j.data.cleanUrl as string, for: panel.generatedAt })
       setTool('eraser') // 분리 직후 자연스러운 다음 동작 = 긁어보기
       toast.success(
         j.data.cached
