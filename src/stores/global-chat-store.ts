@@ -79,6 +79,8 @@ import {
 } from '@/lib/chat-blocks'
 import { isDemoSession, getDemoSnapshot, withDemoShare } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
+import { editorChatContext } from '@/lib/editor/chat-context'
+import { useEditorStore } from '@/stores/editor-store'
 import { handoffMarker } from '@/lib/chat-blocks'
 import {
   buildChatTrace,
@@ -2989,6 +2991,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             scriptLines,
           ),
           ...(lineRefs.length > 0 ? { lineRefs } : {}),
+        }
+        break
+      }
+      case 'editor': {
+        // Editor 의 Lumi 는 조언만 한다(오너 2026-11-14 10번 "작업물에는 터치 못 하게") — 지금 타임라인 요약을 읽기만 해서 보내고,
+        //   답은 글만 받는다. 아래 답 처리에도 Editor 가 작업물을 바꾸는 갈래는 없다. 약속: tests/chat/editor-advice-chat.test.ts
+        endpoint = '/api/editor/chat'
+        body = {
+          message: trimmed,
+          history: historyPayload,
+          uiLocale: useLocaleStore.getState().locale,
+          timelineContext: editorChatContext(useEditorStore.getState()),
+          projectId,
         }
         break
       }

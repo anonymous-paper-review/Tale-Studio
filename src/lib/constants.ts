@@ -129,7 +129,8 @@ export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   // 새 인물 · 배경은 채팅으로 만들지 않는다(디자이너 QA 1차 #04) — 있는 인물을 고치는 예시를 든다.
   artist: "E.g. make the main character's hair shorter",
   director: 'Try generating the rough storyboard into shooting-ready images.',
-  editor: "Chat isn't available at this stage yet.",
+  // Editor 채팅은 조언만 한다(오너 2026-11-14 10번) — 작업물을 바꾸지 않으니 "어떻게 하나"를 묻는 예시를 든다.
+  editor: 'E.g. how do I connect two cuts smoothly?',
 }
 
 // ── GlobalChat: 응답 대기 사고 흐름 (#oiioii-chat v2 2026-08-06) ──
@@ -196,16 +197,22 @@ export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
     'Make the lighting more dramatic',
     'Write the shot description more specifically',
   ],
-  editor: [],
+  // Editor 는 조언 질문만(오너 2026-11-14 10번 — 작업물에는 손대지 않는다).
+  editor: [
+    'How do I connect two cuts smoothly?',
+    'Is any cut too long?',
+    'How do I add background music?',
+  ],
 }
 
 // writer 채팅: 러프 스토리보드 검토 단계에서 씬/샷 CRUD (api/writer/chat + global-chat-store 'writer' case).
-//   editor 만 미지원 (라우트·case 없음).
+//   editor 채팅은 조언만 한다(api/editor/chat — 오너 2026-11-14 10번, 작업물을 바꾸는 길이 없다).
 export const CHAT_SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([
   'producer',
   'writer',
   'artist',
   'director',
+  'editor',
 ])
 
 // ── GlobalChat: 컨텍스트 관리 (chat-context-management Phase 1) ──
