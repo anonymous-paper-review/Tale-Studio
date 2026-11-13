@@ -157,28 +157,8 @@ function plainCommand(text: string): boolean {
   return rest.replace(/[\s.!,·、~…]+/g, '') === ''
 }
 
-export type VideoGrounding =
-  /** 아주 분명한 꼴 — 이 샷들만 바로 만든다(캔버스 순서). 빈 목록이면 "지금 그런 샷이 없어요". */
-  | { kind: 'run'; shotIds: string[] }
-  /** 분명하지 않다 — 이 목록으로 되묻고 "응"이면 그대로 만든다(캔버스 순서, 비지 않음). */
-  | { kind: 'confirm'; shotIds: string[] }
-  /** 목록을 셀 수 없다 — 만들지 않고 번호로 묻는다. */
-  | { kind: 'ask' }
-  /** 만들지 말라는 말이다 — 만들지 않는다. */
-  | { kind: 'none' }
-
-/**
- * requested = 모델이 고른 샷(노드 id) · null 이면 모델이 "남은 샷 전부"로 읽었다. eligible = 지금 영상을 만들 수 있는 샷(캔버스 순서).
- *   돌려주는 샷은 eligible 안에서만 — 이미 영상이 있거나 만드는 중인 샷은 빠진다.
- */
-export function groundVideoRequest(input: {
-  text: string
-  requested: readonly string[] | null
-  shots: readonly ChatShotRef[]
-  eligible: readonly string[]
-  selected: readonly string[]
-}): VideoGrounding {
-  const { text, requested, shots, eligible, selected } = input
+/** 말을 절로 읽는다 — 댄 번호(뺀 번호 · 만들지 말라는 절의 번호는 뺌) · 뺀 번호 · 부탁한 묶음 · 뺀 묶음 · 만들지 말라는 말 · 만들라는 말. */
+function readRequest(text: string) {
   const named = new Set<number>()
   const excluded = new Set<number>()
   const groups = new Set<Group>()
@@ -203,8 +183,43 @@ export function groundVideoRequest(input: {
     for (const group of found.wanted) groups.add(group)
     for (const group of found.excluded) excludedGroups.add(group)
   }
-  if (stopped && !asked) return { kind: 'none' }
   for (const n of excluded) named.delete(n)
+  return { named, excluded, groups, excludedGroups, stopped, asked }
+}
+
+/** 그 부탁에서 사람이 번호로 댄 샷 번호 — "샷 2 빼고"의 2 · 만들지 말라는 절의 번호는 댄 것이 아니다(리드 11/14 · 검토 b 낮음 1).
+ *  영상 있는 샷의 새 Take 는 여기 든 샷만 만든다. */
+export function namedShotNumbers(text: string): Set<number> {
+  return readRequest(text).named
+}
+
+export type VideoGrounding =
+  /** 아주 분명한 꼴 — 이 샷들만 바로 만든다(캔버스 순서). 빈 목록이면 "지금 그런 샷이 없어요". */
+  | { kind: 'run'; shotIds: string[] }
+  /** 분명하지 않다 — 이 목록으로 되묻고 "응"이면 그대로 만든다(캔버스 순서, 비지 않음). */
+  | { kind: 'confirm'; shotIds: string[] }
+  /** 목록을 셀 수 없다 — 만들지 않고 번호로 묻는다. */
+  | { kind: 'ask' }
+  /** 만들지 말라는 말이다 — 만들지 않는다. */
+  | { kind: 'none' }
+
+/**
+ * requested = 모델이 고른 샷(노드 id) · null 이면 모델이 "남은 샷 전부"로 읽었다. eligible = 지금 영상을 만들 수 있는 샷(캔버스 순서).
+ *   돌려주는 샷은 eligible 안에서만 — 이미 영상이 있거나 만드는 중인 샷은 빠진다.
+ */
+export function groundVideoRequest(input: {
+  text: string
+  requested: readonly string[] | null
+  shots: readonly ChatShotRef[]
+  eligible: readonly string[]
+  selected: readonly string[]
+  /** 다시 만들기 부탁일 때 번호로 대면 겨눌 수 있는 샷(영상이 이미 있어도 · 만드는 중은 빼고) — 리드 결정(오너 9번 · 샷 상세 [다시 만들기]는 늘 새 Take).
+   *  묶음 말은 이것을 쓰지 않는다(지금처럼 eligible 만). 없으면 번호도 eligible 만. */
+  remakable?: readonly string[]
+}): VideoGrounding {
+  const { text, requested, shots, eligible, selected } = input
+  const { named, excluded, groups, excludedGroups, stopped, asked } = readRequest(text)
+  if (stopped && !asked) return { kind: 'none' }
 
   // 화면이 센 묶음 — 말한 번호 · 부탁한 묶음(없으면 제한 없음)과 뺀 것.
   const inGroup = (shot: ChatShotRef, group: Group) =>
@@ -221,20 +236,29 @@ export function groundVideoRequest(input: {
   }
   const picks = requested === null ? null : new Set(requested)
   const pick = (id: string) => (picks === null || picks.has(id)) && !removed.has(id)
+  // 겨눌 수 있는 샷(캔버스 순서) — 번호로 댄 샷은 다시 만들기면 remakable 도, 그 밖은 eligible 만.
+  const eligibleSet = new Set(eligible)
+  const remakableSet = new Set(input.remakable ?? [])
+  const namedIds = new Set(shots.filter((shot) => shot.shotNo !== null && named.has(shot.shotNo)).map((shot) => shot.nodeId))
+  const shotOrder = shots.map((shot) => shot.nodeId)
+  const pool = [
+    ...shotOrder.filter((id) => eligibleSet.has(id) || (namedIds.has(id) && remakableSet.has(id))),
+    ...eligible.filter((id) => !shotOrder.includes(id)),
+  ]
 
   const plain = plainCommand(text) && excluded.size === 0 && excludedGroups.size === 0
   const clearNumbers = plain && named.size > 0 && groups.size === 0 && VIDEO.test(text)
   // 묶음 꼴은 영상 말이 있어야 한다 — "실패한 샷 다시"만은 영상이 실패한 샷이라 영상 말 없이도 분명하다.
   const clearGroups = plain && named.size === 0 && groups.size > 0 && (VIDEO.test(text) || [...groups].every((group) => group === 'failed'))
   if (clearNumbers || clearGroups) {
-    const screen = eligible.filter((id) => allowed.has(id))
+    const screen = pool.filter((id) => allowed.has(id))
     const shotIds = screen.filter(pick)
     // 모델이 말한 샷 밖만 골랐다 — 무엇을 원하는지 모른다.
     return screen.length > 0 && shotIds.length === 0 ? { kind: 'ask' } : { kind: 'run', shotIds }
   }
   // 범위 · 수량 말이 있는데 모델이 칸을 비웠다 — 전부를 목록으로 내밀지 않고 번호로 묻는다.
   if (picks === null && SCOPE.test(text)) return { kind: 'ask' }
-  const list = eligible.filter((id) => pick(id) && (!said || allowed.has(id)))
+  const list = pool.filter((id) => pick(id) && (!said || allowed.has(id)))
   if (list.length > 0) return { kind: 'confirm', shotIds: list }
   return stopped ? { kind: 'none' } : { kind: 'ask' }
 }

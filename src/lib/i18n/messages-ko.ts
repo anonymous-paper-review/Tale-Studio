@@ -3433,6 +3433,9 @@ export const KO: Record<string, string> = {
   "I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.": '{shots} 영상은 접수됐는지 아직 몰라요. 카드에서 결과를 볼 수 있어요.',
   // 다시 부탁한 샷이 보드에서 영상을 만드는 중이라 보내지 않을 때(리드 결정 — "지금 그런 샷이 없어요" 대신).
   'The video for {shots} is being made right now.': '{shots} 영상은 지금 만드는 중이에요.',
+  // "다시" 없이 영상 있는 샷을 번호로 댔을 때(리드 11/14 — 만들지 않음, Take 0).
+  '{shots} already has a video. To make a new Take, say "Make the video for {shots} again".': '{shots}에는 이미 영상이 있어요. 새 Take 로 다시 만들려면 "{shots} 영상 다시 만들어줘"라고 말해 주세요.',
+  '{shots} already have videos. To make new Takes, say "Make the videos for {shots} again".': '{shots}에는 이미 영상이 있어요. 새 Take 로 다시 만들려면 "{shots} 영상 다시 만들어줘"라고 말해 주세요.',
   // 글 카드에 생성을 묶는 사이 그 카드가 닫혔다(검토 a 통합) — 카드를 되살리지 않고 다시 부탁해 달라고 한다.
   "The text card closed in the meantime, so I didn't start what was waiting for it. Please ask again.": '그사이 글 카드가 닫혀 그 카드를 기다리던 생성은 시작하지 않았어요. 다시 부탁해 주세요.',
   '{shots} has a text change waiting for [Apply]. Apply or discard it, then make it again.': '{shots}에는 [적용]을 기다리는 글 고침이 있어요. 적용하거나 버린 뒤 다시 만들어 주세요.',
