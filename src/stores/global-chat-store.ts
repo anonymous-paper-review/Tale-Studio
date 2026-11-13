@@ -40,7 +40,7 @@ import {
   videoLimitRefusal,
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
-import { isShotData, isVideoData } from '@/types/director'
+import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { directorHasFinishedVideo } from '@/lib/director/shot-state'
 import { editorHandoverView, type RemakeResult } from '@/lib/director/editor-handover'
 import { clearImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
@@ -67,6 +67,10 @@ import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dial
 import { roughRedrawCandidates, roughRedrawChangedScenes, roughRedrawOfferHere, roughVisibleState, type RoughVisibleState } from '@/lib/writer/chat-rough-redraw'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
+import { currentDirectorText, directorShotRefs, directorTextEditLines, shotLabelOf, shotListLabel, splitDirectorTextEdits, textBoundShotIds, type DirectorTextEdit } from '@/lib/director/lumi-chat-runs'
+import { answeredShotNumbers, groundVideoRequest, type VideoGrounding } from '@/lib/director/chat-video-targets'
+import { directorPendingContext, directorProgressLine, directorQuickChipOf, directorShotStatesNow, quickChipTargets, type DirectorQuickChip } from '@/lib/director/lumi-quick-chips'
+import { activeJobsSnapshot } from '@/lib/generation-queue'
 import { handoffToStage } from '@/lib/stage-nav'
 import {
   loadLatestChatTrace,
@@ -83,6 +87,8 @@ import {
 } from '@/lib/chat-blocks'
 import { isDemoSession, getDemoSnapshot, withDemoShare } from '@/lib/demo/context'
 import { cannedFor } from '@/lib/demo/canned'
+import { editorChatContext } from '@/lib/editor/chat-context'
+import { useEditorStore } from '@/stores/editor-store'
 import { handoffMarker } from '@/lib/chat-blocks'
 import {
   buildChatTrace,
@@ -220,6 +226,9 @@ interface GlobalChatState {
   startComicStyleGate: { projectId: string; page: ChatImageInput } | null
   /** 채팅 모델이 첨부 그림을 그림체로 쓰자고 해 묻는 중(2026-10-10 오너 결정) — 답하면 같은 길(runMaterialPlan)로 정하고, 다른 말이면 내린다. */
   styleAttachmentGate: { projectId: string; image: ChatImageInput } | null
+  /** Director 에서 Lumi 가 영상을 되물은 중(재검토 b 보통 A · 낮음 3) — 목록이면 같은 단계에서 "응 · 좋아 · yes"일 때 그 목록 그대로 만들고,
+   *  번호를 물었으면 다음 말의 "3번" · 맨 숫자를 샷 번호로 읽는다. 다른 말이면 버린다. */
+  directorVideoAsk: { projectId: string; shotIds: string[] } | { projectId: string; numbers: true } | null
   /** 그림에서 그림체를 정하는 중인 프로젝트(매체 고르기 · 저장) — 그동안 스타일 선택 창을 자동으로 띄우지 않는다. */
   styleSettingFor: string | null
   /** Producer 본문을 막고 로딩 원을 보일 일 — 새 프로젝트가 넘긴 일 · 만화 옮기기(2026-10-09 오너, lib/producer/busy.ts). */
@@ -291,6 +300,8 @@ interface GlobalChatState {
   appendLocalExchange: (stage: StageId, userText: string, modelText: string) => void
   /** 사람이 한 말만 남긴다(답은 나중에 — 예: 산문 수정안이 오면 Writer 화면이 "고쳐 봤어요"를 남긴다). */
   appendLocalUser: (stage: StageId, userText: string) => void
+  /** D8 Lumi 알림 카드 단추(11/13 시안, 오너 2026-11-14 "추천대로") — 누른 단추 글을 채팅에 남기고 그 샷들 영상을 바로 만든다(Take 셈 · 말로 부탁한 영상과 같은 길). */
+  startDirectorVideos: (shotIds: string[], userText: string) => Promise<void>
   /** preempt: 떠 있는 제안(선택지 등)을 밀어내고 이 제안을 세운다 — 핸드오프처럼 "지금이 그 순간"인 것만. */
   offerSuggestion: (suggestion: ChatSuggestion, opts?: { preempt?: boolean }) => void
   /** implicit: 유저가 다른 말을 해서 내려간 것 — id 를 기록하지 않아 나중에 다시 뜰 수 있다. */
@@ -1337,6 +1348,373 @@ function offerStyleFromAttachment(
 /** 씬 스토리 확정을 보내는 중인 프로젝트 — 두 번 누름 방지(2026-10-01). */
 const sceneGateInFlight = new Set<string>()
 
+/** Director 의 보드 이름(씬 · 샷 전체 번호) — 채팅이 샷을 부르는 이름과 같다(오너 2026-11-02 "전체 번호로 통일"). */
+function directorBoardNames() {
+  const writerBoard = useWriterStore.getState()
+  return boardNodeNames(writerBoard.sceneManifest, writerBoard.shots)
+}
+
+/** 지금 고른 샷(노드 id) — "고른 샷 영상 만들어 줘"가 쓴다. */
+function selectedShotNodeIds(): string[] {
+  const canvas = useDirectorCanvasStore.getState()
+  const node = canvas.nodes.find((item) => item.id === canvas.selectedNodeId)
+  return node && isShotData(node.data) ? [node.id] : []
+}
+
+/**
+ * 채팅의 영상 부탁이 겨누는 샷을 정한다(오너 2026-11-14 9번 "루미에게 부탁하면 바로 실행해줘" — 확인 카드가 없다).
+ *   막이: 사용자가 분명히 말한 샷만(번호 · 생성 말과 붙은 묶음 말), 모호하면 묻고, 만들지 말라면 만들지 않는다(lib/director/chat-video-targets).
+ *   이미 영상이 있거나 만드는 중인 샷은 뺀다. 시작은 startVideosFor(Take 셈 뒤 버튼과 같은 일괄 실행 길).
+ */
+async function groundChatVideos(input: { userText: string; requested: string[] | null }): Promise<VideoGrounding> {
+  // 러너는 지연 로드 — video-batch-client 가 이 스토어를 import 하므로 정적 import 는 순환이 된다.
+  const { eligibleVideoBatchShotIds } = await import('@/lib/director/video-batch-client')
+  const { nodes } = useDirectorCanvasStore.getState()
+  return groundVideoRequest({
+    text: input.userText,
+    requested: input.requested,
+    shots: directorShotRefs(nodes, directorBoardNames()),
+    eligible: eligibleVideoBatchShotIds(nodes),
+    selected: selectedShotNodeIds(),
+  })
+}
+
+/** 막이가 만들지 않기로 한 영상 부탁에 Lumi 가 하는 말 — 묻기 · 만들지 않음 · 그런 샷 없음. 시작하거나 목록으로 되물을 샷이 있으면 null. */
+function groundingReply(grounding: VideoGrounding, t: (key: string) => string): string | null {
+  if (grounding.kind === 'ask') return t("Which shots should get videos? Tell me the numbers, like 'shot 3'. Videos use Takes, so I only make the shots you name.")
+  if (grounding.kind === 'none') return t('I did not make any videos.')
+  return grounding.kind === 'run' && grounding.shotIds.length === 0 ? t('There are no such shots right now.') : null
+}
+
+/** 실제로 제출할 수 없는 샷이 끼어 있으면 그 까닭(Writer 에 없는 샷 · 준비 안 된 연결 · 없는 샷), 아니면 null — 시작 전 · 되묻기 전에 본다. */
+async function videoHoldReason(shotIds: readonly string[]): Promise<string | null> {
+  const { buildVideoBatchInputs } = await import('@/lib/director/video-batch-inputs')
+  const { projectId, nodes } = useDirectorCanvasStore.getState()
+  const reason = buildVideoBatchInputs(projectId, nodes, [...shotIds]).skipped[0]?.reason
+  if (!reason) return null
+  return translate(contentLocale(), reason === 'missing_writer_shot_id'
+    ? 'Video generation is on hold because a shot is not linked to Writer. Please request videos for shots created in Writer.'
+    : reason === 'unresolvable_manual_wiring'
+      ? 'Video generation is on hold because a connected image or previous video is not ready. Check the image connections or wait for the previous video to finish.'
+      : 'Video generation is on hold because a shot could not be found. Check the current shots and try again.')
+}
+
+/** 번호를 묻기 전에 — 모델이 고른 샷(칸이 비었으면 같은 답에서 더한 샷)에 제출할 수 없는 샷이 끼면 그 까닭, 아니면 null(검토 b efac9881).
+ *  칸이 비었을 때 보드 전체를 보면 보드에 원래 있던 낼 수 없는 샷 때문에 번호 대신 엉뚱한 까닭을 말한다(재검토 낮음 3). */
+async function askHoldReason(requested: readonly string[] | null, addedShotIds: readonly string[]): Promise<string | null> {
+  const { eligibleVideoBatchShotIds } = await import('@/lib/director/video-batch-client')
+  const eligible = eligibleVideoBatchShotIds(useDirectorCanvasStore.getState().nodes)
+  const candidates = requested ?? addedShotIds
+  return videoHoldReason(eligible.filter((id) => candidates.includes(id)))
+}
+
+/** 되묻는 말 — "샷 1·3·4 영상 3개(Take 15)를 만들까요? '응'이라고 하면 시작해요." Take 를 안 쓰는 계정이면 Take 수는 뺀다. */
+async function confirmVideosLine(shotIds: readonly string[], locale: AppLocale): Promise<string> {
+  const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  const nodes = useDirectorCanvasStore.getState().nodes
+  const names = directorBoardNames()
+  const shots = shotListLabel(locale, shotIds.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
+  // 지연 로드 — Take 계산기 · 잔액 훅(영상 러너와 같은 까닭).
+  const [{ videoBatchTakeCosts }, { fetchTakeBalance }] = await Promise.all([import('@/lib/director/video-batch-plan'), import('@/lib/billing/use-take-balance')])
+  const takes = await fetchTakeBalance()
+  const cost = videoBatchTakeCosts(nodes, shotIds).reduce((sum, n) => sum + n, 0)
+  const free = takes.mode === 'off' && !takes.failed
+  if (shotIds.length === 1) {
+    return free ? t('Shall I make the video for {shots}? Say yes to start.', { shots }) : t('Shall I make the video for {shots} ({takes} Takes)? Say yes to start.', { shots, takes: cost })
+  }
+  return free
+    ? t('Shall I make {count} videos for {shots}? Say yes to start.', { count: shotIds.length, shots })
+    : t('Shall I make {count} videos for {shots} ({takes} Takes)? Say yes to start.', { count: shotIds.length, shots, takes: cost })
+}
+
+/** Take 를 쓰는 생성이 묶인 카드 — 옛 영상 일괄 카드 · 영상이 묶인 글 카드. 이런 카드는 그 카드를 낸 단계에서만 말로 승인한다. */
+function proposalUsesTakes(proposal: PendingProposal): boolean {
+  if (proposal.kind === 'directorGenerateVideoBatch') return true
+  const held = proposal.kind === 'directorTextEdit' ? (proposal.payload.then as HeldDirectorWork | undefined) : undefined
+  return !!held && held.videos.length > 0
+}
+
+/** Lumi 가 되물은 목록에 "그래" — 승인 말(좋아 · 진행 · yes …)에 짧은 대답(응 · 네 · 어 · ㅇㅇ · yeah)을 더한다. 되묻기에서만 쓴다. */
+function saysYes(text: string): boolean {
+  // "네?" · "좋아?"는 되묻는 말이다 — 물음표가 있으면 "그래"가 아니다(재재검토 b 보통 D).
+  if (/[?？]/.test(text)) return false
+  const said = text.trim().replace(/[.!,~…]+/g, '').trim()
+  return isApprovalUtterance(said) || /^(?:응|웅|어|ㅇㅇ|네|예|넵|sure|yep|yeah|yes please)$/i.test(said) // i18n-ok: 사용자 대답을 알아듣는 낱말 목록 자체
+}
+
+/** "네?" · "응?" · "yes?" · "좋아?" — 물음표가 붙은 짧은 "그래". 시작하지 않고 다시 묻는다. */
+function asksBackYes(text: string): boolean {
+  return /[?？]/.test(text) && saysYes(text.replace(/[?？]+/g, ''))
+}
+
+/** 이 프로젝트의 기다리는 글 카드와 그 카드가 건 샷(그 샷 · 그 씬) — 그 샷의 그림 · 영상은 카드 [적용]을 기다린다(재검토 b 보통 B). */
+function waitingTextCard(projectId: string | null | undefined): { proposal: PendingProposal; bound: Set<string> } | null {
+  const proposal = useGlobalChatStore.getState().pendingProposal
+  if (!projectId || proposal?.kind !== 'directorTextEdit' || proposal.payload.projectId !== projectId) return null
+  const edits = Array.isArray(proposal.payload.edits) ? (proposal.payload.edits as DirectorTextEdit[]) : []
+  return { proposal, bound: textBoundShotIds(edits, useDirectorCanvasStore.getState().nodes) }
+}
+
+/** 기다리는 글 카드에 그림 · 영상을 더 묶는다 — 카드의 묶음 · 안내 줄을 고치고, Lumi 가 "글 고침 카드를 [적용]하면 그 글로 만들어요"라고 말한다. */
+async function holdOnTextCard(
+  card: { proposal: PendingProposal },
+  more: HeldDirectorWork,
+  say: (content: string) => void,
+): Promise<void> {
+  const locale = contentLocale()
+  const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  const names = directorBoardNames()
+  const nodes = useDirectorCanvasStore.getState().nodes
+  const before = (card.proposal.payload.then as HeldDirectorWork | undefined) ?? { images: [], allBlankImages: false, videos: [] }
+  const then: HeldDirectorWork = {
+    images: [...new Set([...before.images, ...more.images])],
+    allBlankImages: before.allBlankImages || more.allBlankImages,
+    videos: [...new Set([...before.videos, ...more.videos])],
+  }
+  const edits = Array.isArray(card.proposal.payload.edits) ? (card.proposal.payload.edits as DirectorTextEdit[]) : []
+  useGlobalChatStore.getState().offerPendingProposal({
+    ...card.proposal,
+    impact: [...directorTextEditLines(locale, edits, nodes, names), ...(await heldWorkLines(then, locale, names))],
+    payload: { ...card.proposal.payload, then },
+  })
+  const shots = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
+  if (more.allBlankImages) say(t('Applying the text card makes the live-action images with the new text.'))
+  if (more.images.length > 0) say(t('Applying the text card makes the image for {shots} with the new text.', { shots: shots(more.images) }))
+  if (more.videos.length > 0) say(t('Applying the text card makes the video for {shots} with the new text.', { shots: shots(more.videos) }))
+}
+
+/** 글 카드 [적용]에 묶인 생성(검토 b 보통 1) — [적용]이면 글을 바꾼 뒤 만들고, [버리기]면 만들지 않는다. 샷은 노드 id. */
+interface HeldDirectorWork {
+  images: string[]
+  /** "이미지 필요한 샷 전부" 그림(글이 걸린 빈 샷이 끼어 있어 통째로 묶음). */
+  allBlankImages: boolean
+  videos: string[]
+}
+
+/** 글 카드에 싣는 줄 — "적용하면 샷 1 영상을 바로 만들어요 · Take 5". 영상은 그 샷의 지금 모델 · 해상도로 센 Take 다. */
+async function heldWorkLines(held: HeldDirectorWork, locale: AppLocale, names: ReturnType<typeof directorBoardNames>): Promise<string[]> {
+  const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  const nodes = useDirectorCanvasStore.getState().nodes
+  const shots = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
+  const lines: string[] = []
+  if (held.allBlankImages) lines.push(t('Applying also makes the live-action images for the shots that need one right away · No Takes used.'))
+  if (held.images.length > 0) lines.push(t('Applying also makes the live-action image for {shots} right away · No Takes used.', { shots: shots(held.images) }))
+  if (held.videos.length > 0) {
+    // 지연 로드 — Take 계산기 · 잔액 훅(영상 러너와 같은 까닭).
+    const [{ videoBatchTakeCosts }, { fetchTakeBalance }] = await Promise.all([import('@/lib/director/video-batch-plan'), import('@/lib/billing/use-take-balance')])
+    const takes = await fetchTakeBalance()
+    const cost = videoBatchTakeCosts(nodes, held.videos).reduce((sum, n) => sum + n, 0)
+    lines.push(takes.mode === 'off' && !takes.failed
+      ? t('Applying also makes the video for {shots} right away.', { shots: shots(held.videos) })
+      : t('Applying also makes the video for {shots} right away · {takes} Takes.', { shots: shots(held.videos), takes: cost }))
+  }
+  return lines
+}
+
+/** 글 카드 [적용] 뒤 — 묶어 둔 그림 · 영상을 바뀐 글로 만든다(그림은 버튼과 같은 길로 Take 없이, 영상은 Take 셈 뒤). */
+async function runHeldDirectorWork(held: HeldDirectorWork, ctx: {
+  projectId: string
+  traceId?: string | null
+  say: (content: string) => void
+  onJob: GenerationJobObserver
+  isCurrent: () => boolean
+}): Promise<void> {
+  const locale = contentLocale()
+  const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  const canvas = useDirectorCanvasStore.getState()
+  const options = { ...(ctx.traceId ? { traceId: ctx.traceId } : {}), onJob: ctx.onJob }
+  if (held.allBlankImages || held.images.length > 0) {
+    if (canvas.realBatchBusy) {
+      ctx.say(t('Batch live-action generation is running. Try again after it finishes.'))
+    } else if (held.allBlankImages) {
+      const count = canvas.nodes.filter((node) => isShotData(node.data) && node.data.storyboardImage?.status !== 'completed' && node.data.storyboardImage?.status !== 'generating').length
+      const { runRealBatch } = await import('@/lib/director/real-batch-client')
+      if (!ctx.isCurrent()) return
+      void runRealBatch(ctx.projectId, options)
+      ctx.say(t('Started making live-action images for {count} shots · No Takes used. Progress shows on the line above the cards.', { count }))
+    } else {
+      const names = directorBoardNames()
+      for (const id of held.images) void canvas.generateStoryboardImage(id, options)
+      ctx.say(t('Started making live-action images for {shots} · No Takes used. Progress shows on the line above the cards.', {
+        shots: shotListLabel(locale, held.images.map((id) => shotLabelOf(canvas.nodes.find((node) => node.id === id), names))),
+      }))
+    }
+  }
+  if (held.videos.length > 0) await startVideosFor({ shotIds: held.videos, say: ctx.say, onJob: ctx.onJob, isCurrent: ctx.isCurrent })
+}
+
+/**
+ * 고른 샷(노드 id)의 영상을 바로 시작한다 — 말로 부탁한 영상(startChatVideos)과 빠른 칩이 같이 쓴다.
+ *   버튼과 같은 일괄 실행 길(runVideoBatch)을 타고, 그 전에 Take 를 센다 — 모자라면 하나도 시작하지 않고 필요한 Take · 가진 Take 를 말한다.
+ *   시작하면 무엇을 몇 Take 로 시작했는지 되짚는다.
+ */
+async function startVideosFor(input: {
+  shotIds: string[]
+  say: (content: string) => void
+  onJob?: GenerationJobObserver
+  isCurrent: () => boolean
+}): Promise<void> {
+  const locale = contentLocale()
+  const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  if (!useDirectorCanvasStore.getState().projectId) return
+  // 기다리는 글 카드가 건 샷은 옛 글로 만들지 않고 그 카드 [적용]에 묶는다(재검토 b 보통 B) — 채팅 · 칩 · 알림 카드 · 되묻기 "응" 모두 여기를 지난다.
+  const card = waitingTextCard(useDirectorCanvasStore.getState().projectId)
+  const waiting = card ? input.shotIds.filter((id) => card.bound.has(id)) : []
+  if (card && waiting.length > 0) {
+    await holdOnTextCard(card, { images: [], allBlankImages: false, videos: waiting }, input.say)
+    input = { ...input, shotIds: input.shotIds.filter((id) => !card.bound.has(id)) }
+    if (input.shotIds.length === 0) return
+  }
+  if (useDirectorCanvasStore.getState().videoBatchBusy) {
+    input.say(t('A video batch is already running. Ask again when it finishes.'))
+    return
+  }
+  // 러너 · 잔액 훅은 지연 로드 — video-batch-client 가 이 스토어를 import 하므로 정적 import 는 순환이 된다.
+  const [{ runVideoBatch, eligibleVideoBatchShotIds }, { fetchTakeBalance }, { planVideoBatch, videoBatchTakeCosts, describeVideoBatchPlan }] =
+    await Promise.all([
+      import('@/lib/director/video-batch-client'),
+      import('@/lib/billing/use-take-balance'),
+      import('@/lib/director/video-batch-plan'),
+    ])
+  // 그사이 다른 길로 영상이 생겼거나 만드는 중인 샷은 뺀다 — 낼 것이 없는데 "시작했어요"라고 하지 않는다(재검토 b 낮음 1).
+  const open = new Set(eligibleVideoBatchShotIds(useDirectorCanvasStore.getState().nodes))
+  input = { ...input, shotIds: input.shotIds.filter((id) => open.has(id)) }
+  if (input.shotIds.length === 0) {
+    input.say(t('There are no such shots right now.'))
+    return
+  }
+  const hold = await videoHoldReason(input.shotIds)
+  if (!input.isCurrent()) return
+  if (hold) {
+    input.say(hold)
+    return
+  }
+  const { projectId: pid, nodes } = useDirectorCanvasStore.getState()
+  const takes = await fetchTakeBalance()
+  if (!input.isCurrent()) return
+  // 잔액을 못 읽은 것은 "과금 꺼짐"이 아니다 — Take 셈 없이 시작하지 않는다(검토 b 낮음 4).
+  if (takes.failed) {
+    input.say(t("I couldn't check your Takes, so I didn't start. Please ask again in a moment."))
+    return
+  }
+  const plan = planVideoBatch(videoBatchTakeCosts(nodes, input.shotIds), takes.balance, takes.mode)
+  if (plan.mode === 'enforce' && plan.short) {
+    input.say(`${describeVideoBatchPlan(plan, t)[0]} ${t('I did not start any videos. Add Takes or ask for fewer shots.')}`)
+    return
+  }
+  // Take 를 세는 사이 다른 묶음(다른 부탁 · 툴바)이 시작됐으면 러너는 아무것도 하지 않는다 — 시작했다고 말하지 않는다(검토 b 낮음 5).
+  if (useDirectorCanvasStore.getState().videoBatchBusy) {
+    input.say(t('A video batch is already running. Ask again when it finishes.'))
+    return
+  }
+  const runBefore = useDirectorCanvasStore.getState().videoBatchRunId
+  void runVideoBatch(pid, { onJob: input.onJob, shotIds: input.shotIds })
+  // 러너는 시작하면 그 자리에서 새 묶음 표시를 단다 — 그대로면 시작하지 않은 것이다.
+  if (useDirectorCanvasStore.getState().videoBatchRunId === runBefore) {
+    input.say(t("I couldn't start the videos. Please ask again in a moment."))
+    return
+  }
+  const names = directorBoardNames()
+  const shots = shotListLabel(locale, input.shotIds.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
+  input.say(plan.mode === 'off'
+    ? t('Started making videos for {shots}. Progress shows on the line above the cards.', { shots })
+    : t('Started making videos for {shots} · {takes} Takes. Progress shows on the line above the cards.', { shots, takes: plan.requiredTakes }))
+}
+
+/**
+ * Director 빠른 칩(11/13 시안 D5, 오너 2026-11-14 "추천대로") — AI 를 거치지 않고 지금 보드 상태로 바로 한다(잘못 읽을 일 · 채팅 비용이 없다).
+ *   이미지는 버튼과 같은 길로 Take 없이(빈 샷 전부 = runRealBatch, 실패한 샷 = 샷마다 generateStoryboardImage), 영상은 startVideosFor
+ *   (Take 셈 뒤 runVideoBatch). 해당 샷이 없으면 아무것도 만들지 않고 그렇다고 말한다. 약속: tests/director/lumi-quick-chips.test.ts
+ */
+async function runDirectorQuickChip(input: {
+  chip: DirectorQuickChip
+  projectId: string
+  say: (content: string) => void
+  isCurrent: () => boolean
+}): Promise<void> {
+  const locale = contentLocale()
+  const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  const canvas = useDirectorCanvasStore.getState()
+  // 보드를 아직 안 읽었거나 다른 프로젝트 보드면 샷이 없는 것으로 본다(엉뚱한 보드의 샷을 만들지 않는다).
+  const nodes = canvas.projectId === input.projectId ? canvas.nodes : []
+  const names = directorBoardNames()
+  const labelOf = (id: string) => shotLabelOf(nodes.find((node) => node.id === id), names)
+  // 보드처럼 일괄이 맡아 차례를 기다리는 샷 · 영상 묶음이 아직 내지 않은 샷도 만드는 중으로 센다(set c19f8008 — 칩이 그 샷을 다시 겨누지 않게).
+  const states = directorShotStatesNow(nodes, activeJobsSnapshot(input.projectId), directorPendingContext({
+    nodes,
+    realBatchBusy: canvas.realBatchBusy,
+    realBatchCancelled: canvas.realBatchCancelled,
+    realBatchShotIds: canvas.realBatchShotIds,
+    writerShots: useWriterStore.getState().shots ?? [],
+    videoBatchCancelled: canvas.videoBatchCancelled,
+    videoPendingShotIds: canvas.videoBatchQueue?.pendingShotIds ?? [],
+  }))
+  if (input.chip === 'status') {
+    input.say(directorProgressLine(locale, states, labelOf))
+    return
+  }
+  const targets = quickChipTargets(input.chip, states)
+  if (targets.images.length === 0 && targets.videos.length === 0) {
+    input.say(t('There are no such shots right now.'))
+    return
+  }
+  // 기다리는 글 카드가 건 샷의 그림은 옛 글로 만들지 않고 그 카드 [적용]에 묶는다(재검토 b 보통 B — 영상은 startVideosFor 가 묶는다).
+  const card = waitingTextCard(input.projectId)
+  if (card && targets.images.some((id) => card.bound.has(id))) {
+    const waiting = targets.images.filter((id) => card.bound.has(id))
+    // 빈 샷 전부(일괄)는 샷을 골라 보낼 수 없어 통째로 묶는다.
+    await holdOnTextCard(card, input.chip === 'images' ? { images: [], allBlankImages: true, videos: [] } : { images: waiting, allBlankImages: false, videos: [] }, input.say)
+    targets.images = input.chip === 'images' ? [] : targets.images.filter((id) => !card.bound.has(id))
+  }
+  if (targets.images.length > 0) {
+    if (canvas.realBatchBusy) {
+      input.say(t('Batch live-action generation is running. Try again after it finishes.'))
+    } else {
+      if (input.chip === 'images') {
+        // 빈 샷 전부 — 위쪽 [이미지 만들기]와 같은 일괄 길. 러너는 지연 로드(이 스토어를 import 해 정적 import 는 순환).
+        const { runRealBatch } = await import('@/lib/director/real-batch-client')
+        if (!input.isCurrent()) return
+        void runRealBatch(input.projectId)
+      } else {
+        // 실패한 샷만 — 카드의 [다시 만들기]와 같은 샷 하나 길.
+        for (const id of targets.images) void canvas.generateStoryboardImage(id)
+      }
+      input.say(targets.images.length === 1
+        ? t('Started making live-action images for {shots} · No Takes used. Progress shows on the line above the cards.', { shots: shotListLabel(locale, targets.images.map(labelOf)) })
+        : t('Started making live-action images for {count} shots · No Takes used. Progress shows on the line above the cards.', { count: targets.images.length }))
+    }
+  }
+  if (targets.videos.length > 0) await startVideosFor({ shotIds: targets.videos, say: input.say, isCurrent: input.isCurrent })
+}
+
+/**
+ * Director 에서 AI 를 거치지 않고 바로 하는 한 턴(빠른 칩 · 알림 카드 단추) — 누른 말을 채팅에 남기고, 하는 동안 입력을 잠그고,
+ *   Lumi 답을 남긴다(같은 세션 · 같은 프로젝트일 때만).
+ */
+async function runDirectorTurn(
+  projectId: string,
+  userText: string,
+  isCurrent: () => boolean,
+  work: (say: (content: string) => void) => Promise<void>,
+): Promise<void> {
+  useGlobalChatStore.setState((state) => ({
+    messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'user' as const, content: userText }],
+    loading: true,
+    error: null,
+  }))
+  saveChatMessage(projectId, 'director', 'user', userText)
+  const say = (content: string) => {
+    if (!isCurrent()) return
+    useGlobalChatStore.setState((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'model' as const, content }] }))
+    saveChatMessage(projectId, 'director', 'model', content)
+  }
+  try {
+    await work(say)
+  } finally {
+    if (isCurrent()) useGlobalChatStore.setState({ loading: false })
+  }
+}
+
 /** 리뉴얼 1차 Writer(id producer) 산문을 고칠 수 있는 때 — 확정 전 산문 초안이 있고 지금 Writer 화면이다. */
 function writerProseLive(): boolean {
   const project = useProjectStore.getState()
@@ -1553,6 +1931,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   comicRewriteGate: null,
   startComicStyleGate: null,
   styleAttachmentGate: null,
+  directorVideoAsk: null,
   styleSettingFor: null,
   boardBusy: null,
   deferredProposals: [],
@@ -1925,6 +2304,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
   remakeMissingVideo: async (shotNodeId) => {
     if (get().handoffConfirm?.kind !== 'editorMissingVideos') return { started: false, reason: 'no_window' }
+    // 기다리는 글 카드가 건 샷(그 샷 · 그 씬)은 옛 글로 만들지 않는다 — 카드에 묶지 않고 창 줄 밑 · 채팅에 까닭을 알리고 멈춘다(검토 b 재검토 보통 1).
+    const projectId = useProjectStore.getState().projectId
+    if (projectId && waitingTextCard(projectId)?.bound.has(shotNodeId)) {
+      const locale = contentLocale()
+      const label = shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === shotNodeId), directorBoardNames())
+      producerSpeaker(projectId, 'director')(translate(locale, '{shots} has a text change waiting for [Apply]. Apply or discard it, then make it again.', { shots: shotListLabel(locale, [label]) }))
+      return { started: false, reason: 'pending_text_edit' }
+    }
     const director = () => useDirectorCanvasStore.getState()
     // 일괄이 도는 중이면 창이 단추를 끄고 까닭을 보인다(검토 b 낮음 1) — 여기서도 Take 를 만들지 않고 까닭을 돌려준다(2차 낮음 3).
     if (director().realBatchBusy) return { started: false, reason: 'image_batch' }
@@ -2462,6 +2849,65 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       get().dismissSuggestion({ implicit: true })
     }
 
+    // Lumi 가 되물은 영상 목록(재검토 b 보통 A) — 같은 단계에서 "응 · 좋아 · yes"면 그 목록 그대로 만들고, 아니라고 하면 만들지 않았다고 답한다.
+    //   다른 말이면 목록은 버리고 그 말을 평소대로 받는다(다른 단계에서 한 말도 목록을 버린다).
+    const videoAsk = get().directorVideoAsk
+    if (videoAsk && !opts?.silentUser) {
+      set({ directorVideoAsk: null })
+      if (stage === 'director' && projectId && videoAsk.projectId === projectId) {
+        // 번호를 물었는데 "2?"처럼 물음표로 답했다 — 바로 만들지 않고 그 샷 목록으로 되묻는다(물음표 규칙 — 재검토 b 낮음 2).
+        const askedBack = 'numbers' in videoAsk && /[?？]/.test(trimmed) ? answeredShotNumbers(trimmed.replace(/[?？]+/g, '')) : null
+        if (askedBack) {
+          const { eligibleVideoBatchShotIds } = await import('@/lib/director/video-batch-client')
+          const nodes = useDirectorCanvasStore.getState().nodes
+          const open = new Set(eligibleVideoBatchShotIds(nodes))
+          const shotIds = directorShotRefs(nodes, directorBoardNames()).filter((shot) => shot.shotNo !== null && askedBack.has(shot.shotNo) && open.has(shot.nodeId)).map((shot) => shot.nodeId)
+          if (shotIds.length === 0) {
+            get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'There are no such shots right now.'))
+            return
+          }
+          get().appendLocalUser('director', trimmed)
+          set({ directorVideoAsk: { projectId, shotIds } })
+          const line = await confirmVideosLine(shotIds, contentLocale())
+          if (!isCurrentSession()) return
+          set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'model' as const, content: line }] }))
+          saveChatMessage(projectId, 'director', 'model', line)
+          return
+        }
+        // 번호를 물었다 — "3번" · "3번이랑 4번" · 맨 숫자도 샷 번호다(재검토 b 낮음 3). 그 번호의 샷만 바로 만든다(분명한 꼴 (1)).
+        const numbers = 'numbers' in videoAsk ? answeredShotNumbers(trimmed) : null
+        if (numbers) {
+          await runDirectorTurn(projectId, trimmed, isCurrentSession, async (say) => {
+            const shots = directorShotRefs(useDirectorCanvasStore.getState().nodes, directorBoardNames())
+            const shotIds = shots.filter((shot) => shot.shotNo !== null && numbers.has(shot.shotNo)).map((shot) => shot.nodeId)
+            if (shotIds.length === 0) say(translate(contentLocale(), 'There are no such shots right now.'))
+            else await startVideosFor({ shotIds, say, isCurrent: isCurrentSession })
+          })
+          return
+        }
+        if ('shotIds' in videoAsk && asksBackYes(trimmed)) {
+          set({ directorVideoAsk: videoAsk })
+          get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'Shall I start? Please answer yes or no.'))
+          return
+        }
+        if ('shotIds' in videoAsk && saysYes(trimmed)) {
+          await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => startVideosFor({ shotIds: videoAsk.shotIds, say, isCurrent: isCurrentSession }))
+          return
+        }
+        if ('shotIds' in videoAsk && isCancellationUtterance(trimmed)) {
+          get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'I did not make any videos.'))
+          return
+        }
+      }
+    }
+
+    // Director 빠른 칩(11/13 시안 D5, 오너 2026-11-14) — 칩 말은 AI 를 거치지 않고 지금 보드 상태로 바로 한다. 보낸 말 · Lumi 답은 채팅에 남는다.
+    const quickChip = stage === 'director' && !opts?.silentUser ? directorQuickChipOf(trimmed) : null
+    if (quickChip && projectId) {
+      await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => runDirectorQuickChip({ chip: quickChip, projectId, say, isCurrent: isCurrentSession }))
+      return
+    }
+
     // 채팅 모델이 첨부 그림을 그림체로 쓰자고 해 묻는 중(2026-10-10 오너 결정) — 그림체 · 참고 자료(예 · 아니오)로 답하면 그대로 하고,
     //   다른 말이면 그림체를 정하지 않고 그 말을 이어서 처리한다(그림은 이미 참고 자료로 갔다). 정하는 일은 새 프로젝트 · 채팅과 같은 곳.
     const styleAsk = get().styleAttachmentGate
@@ -2671,13 +3117,24 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       }
       return
     }
-    if (pendingProposal && isApprovalUtterance(trimmed) && pendingProposal.kind === 'producerWriterInitialHandoff' && !useProjectStore.getState().producerLocked) {
+    // Editor 는 조언만 하는 채팅이라 "yes · 응 · 좋아"로 어떤 카드도 승인하지 않는다(오너 10번 · 검토 b 보통 3) — 그 말은 조언 질문으로 간다.
+    //   Take 를 쓰는 카드는 그 카드를 낸 단계 화면에서만 말로 승인한다 — 다른 탭에서는 단추로만(리드 판단, 재검토 b 낮음 5).
+    //   Take 를 안 쓰는 카드는 다른 단계 탭에서 말로 승인하는 것을 지금처럼 받는다(출시 시험 request-preservation "다른 탭에서 승인해도 …").
+    //   Take 를 쓰는 카드에 "좋아?"처럼 물음표로 답하면 승인하지 않고 다시 묻는다(재재검토 b 보통 D).
+    if (stage !== 'editor' && pendingProposal && proposalUsesTakes(pendingProposal) && pendingProposal.stage === stage && asksBackYes(trimmed)) {
+      get().appendLocalExchange(stage, trimmed, translate(contentLocale(), 'Shall I start? Please answer yes or no.'))
+      return
+    }
+    const approvesHere = stage !== 'editor' && !!pendingProposal && isApprovalUtterance(trimmed) &&
+      (pendingProposal.stage === stage || !proposalUsesTakes(pendingProposal)) &&
+      !(proposalUsesTakes(pendingProposal) && /[?？]/.test(trimmed))
+    if (pendingProposal && approvesHere && pendingProposal.kind === 'producerWriterInitialHandoff' && !useProjectStore.getState().producerLocked) {
       // Writer 첫 넘김 = Producer 잠금(2026-10-01) — 말로 승인해도 버튼과 같은 확정 창을 거친다.
       get().appendLocalExchange(stage, trimmed, translate(contentLocale(), 'Check the values in the window, then confirm to hand over.'))
       get().openProducerLock(pendingProposal.id)
       return
     }
-    if (pendingProposal && isApprovalUtterance(trimmed)) {
+    if (pendingProposal && approvesHere) {
       const userMsg: GlobalChatMessage = {
         id: makeId(),
         stage,
@@ -3079,6 +3536,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             scriptLines,
           ),
           ...(lineRefs.length > 0 ? { lineRefs } : {}),
+        }
+        break
+      }
+      case 'editor': {
+        // Editor 의 Lumi 는 조언만 한다(오너 2026-11-14 10번 "작업물에는 터치 못 하게") — 지금 타임라인 요약을 읽기만 해서 보내고,
+        //   답은 글만 받는다. 아래 답 처리에도 Editor 가 작업물을 바꾸는 갈래는 없다. 약속: tests/chat/editor-advice-chat.test.ts
+        endpoint = '/api/editor/chat'
+        body = {
+          message: trimmed,
+          history: historyPayload,
+          uiLocale: useLocaleStore.getState().locale,
+          timelineContext: editorChatContext(useEditorStore.getState()),
+          projectId,
         }
         break
       }
@@ -3736,125 +4206,143 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         })
       }
       if (stage === 'director') {
-        // Agentic 응답 — DirectorCanvasUpdate[]
+        // 오너 2026-11-14 9번 "루미에게 부탁하면 바로 실행해줘" — 확인 카드 없이 바로 한다. 그림은 Take 를 쓰지 않아 곧장 만들고,
+        //   영상은 사용자가 말한 샷만(막이) · Take 가 모자라면 하나도 시작하지 않는다. 글(샷 이름 · 프롬프트, 씬 설명 등)은
+        //   "끝난 결과가 글이면 전후 비교 후 변화 채택" — 전 · 후를 보이고 [적용]을 눌러야 바뀐다. 설정 · 연결 · 새 노드는 지금처럼 바로.
+        //   약속: tests/director/lumi-chat-runs.test.ts
         if (Array.isArray(data.updates)) {
           const updates = data.updates as DirectorCanvasUpdate[]
-          // 이미지는 과금 생성이므로 채팅 응답에서 바로 실행하지 않는다. 같은 응답의 무과금
-          // 수정은 즉시 반영하되, 이미지 생성은 하나의 승인 카드로만 묶는다.
-          // 약속 E3(2026-09-04): 영상 일괄도 승인 카드로만 — 버튼 확인창과 같은 숫자를 보인다.
-          const videoBatchUpdates = updates.filter((update) => update.type === 'generateVideos')
-          const immediateUpdates = updates.filter(
-            (update) => update.type !== 'generateImage' && update.type !== 'generateVideos',
+          const lumiSays = (content: string) => {
+            if (!isCurrentSession()) return
+            set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'model' as const, content }] }))
+            if (projectId) saveChatMessage(projectId, stage, 'model', content)
+          }
+          const before = useDirectorCanvasStore.getState()
+          const names = directorBoardNames()
+          const blank = (node: DirectorNode) => isShotData(node.data) && node.data.storyboardImage?.status !== 'completed' && node.data.storyboardImage?.status !== 'generating'
+          // 그림을 "남은 것 전부"로 부탁하면 만들기 전에 몇 장인지 센다(만들기 시작하면 상태가 바뀐다).
+          const missingImages = before.nodes.filter(blank).length
+          // 예전 모양(Take 노드 하나의 영상)이 와도 그 샷의 영상 부탁으로 읽어 같은 막이를 거친다.
+          const videoRequests: Array<string[] | null> = updates.flatMap((update) => {
+            if (update.type === 'generateVideos') return [Array.isArray(update.shotIds) ? update.shotIds : null]
+            if (update.type === 'generateVideo') {
+              const take = before.nodes.find((node) => node.id === update.id)
+              return take && isVideoData(take.data) && take.data.parentShotNodeId ? [[take.data.parentShotNodeId]] : [[update.id]]
+            }
+            return []
+          })
+          const split = splitDirectorTextEdits(
+            updates.filter((update) => update.type !== 'generateVideos' && update.type !== 'generateVideo'),
+            before.nodes,
           )
-          const result = useDirectorCanvasStore
-            .getState()
-            .applyUpdates(immediateUpdates, {
-              traceId,
-              onJob: observeGeneration,
-            })
+          const edits = split.edits
+          // 글 고침이 걸린 샷의 그림 · 영상은 바로 만들지 않고 글 카드 [적용]에 묶는다 — 옛 글로 만들어 Take 를 쓰지 않게(검토 b 보통 1).
+          //   글이 걸리지 않은 샷은 지금처럼 바로. "빈 샷 전부" 그림은 글이 걸린 빈 샷이 하나라도 있으면 통째로 묶는다.
+          const bound = textBoundShotIds(edits, before.nodes)
+          const held: HeldDirectorWork = { images: [], allBlankImages: false, videos: [] }
+          // 앞 턴의 글 카드가 아직 기다리면 그 카드가 건 샷의 그림도 그 카드에 묶는다(재검토 b 보통 B — 영상은 startVideosFor 가 묶는다).
+          const waitingCard = waitingTextCard(projectId)
+          const toWaitingCard: HeldDirectorWork = { images: [], allBlankImages: false, videos: [] }
+          const immediate = split.immediate.filter((update) => {
+            if (update.type !== 'generateImage') return true
+            if (update.id) {
+              if (bound.has(update.id)) held.images.push(update.id)
+              else if (waitingCard?.bound.has(update.id)) toWaitingCard.images.push(update.id)
+              else return true
+              return false
+            }
+            if (before.nodes.some((node) => bound.has(node.id) && blank(node))) held.allBlankImages = true
+            else if (waitingCard && before.nodes.some((node) => waitingCard.bound.has(node.id) && blank(node))) toWaitingCard.allBlankImages = true
+            else return true
+            return false
+          })
+          const result = useDirectorCanvasStore.getState().applyUpdates(immediate, { traceId, onJob: observeGeneration })
           const resolvedIds = result.resolvedIds ?? {}
-          const imageUpdates = updates.filter((update) => update.type === 'generateImage').map(update =>
-            update.id && Object.hasOwn(resolvedIds, update.id) ? { ...update, id: resolvedIds[update.id] } : update,
-          )
-          let imageProposalAccepted = false
-          let videoProposalAccepted = false
+          const resolve = (id: string) => (Object.hasOwn(resolvedIds, id) ? resolvedIds[id] : id)
+          const locale = contentLocale()
+          const imageUpdates = immediate.filter((update): update is Extract<DirectorCanvasUpdate, { type: 'generateImage' }> => update.type === 'generateImage')
           if (imageUpdates.length > 0) {
-            const locale = contentLocale()
-            imageProposalAccepted = get().offerPendingProposal(
+            const after = useDirectorCanvasStore.getState().nodes
+            const named = imageUpdates.flatMap((update) => (update.id ? [resolve(update.id)] : []))
+            const labels = named.map((id) => shotLabelOf(after.find((node) => node.id === id), names))
+            lumiSays(
+              imageUpdates.some((update) => !update.id)
+                ? missingImages === 0
+                  ? translate(locale, 'There are no such shots right now.')
+                  : translate(locale, 'Started making live-action images for {count} shots · No Takes used. Progress shows on the line above the cards.', { count: missingImages })
+                : translate(locale, 'Started making live-action images for {shots} · No Takes used. Progress shows on the line above the cards.', { shots: shotListLabel(locale, labels) }),
+            )
+          }
+          if (waitingCard && (toWaitingCard.images.length > 0 || toWaitingCard.allBlankImages)) await holdOnTextCard(waitingCard, toWaitingCard, lumiSays)
+          // 영상 막이 — 아주 분명한 꼴만 바로 하고, 그 밖은 화면이 센 목록으로 되묻고, 만들지 말라면 만들지 않는다(재검토 b 보통 A).
+          let videoIds: string[] = []
+          let confirmIds: string[] = []
+          if (videoRequests.length > 0) {
+            const requested = videoRequests[0]
+            const requestedIds = requested ? requested.map(resolve) : null
+            const grounding = await groundChatVideos({ userText: trimmed, requested: requestedIds })
+            // 번호를 묻기 전에 — 모델 부탁에 제출할 수 없는 샷(같은 답에서 더한 새 샷 등)이 끼면 범위 말이 있어도 묻지 않고 그 까닭을 말한다(검토 b efac9881).
+            const addedShotIds = useDirectorCanvasStore.getState().nodes.filter((node) => isShotData(node.data) && !before.nodes.some((old) => old.id === node.id)).map((node) => node.id)
+            const hold = grounding.kind === 'ask' ? await askHoldReason(requestedIds, addedShotIds) : null
+            const said = hold ?? groundingReply(grounding, (key) => translate(locale, key))
+            if (said) lumiSays(said)
+            if (grounding.kind === 'run') videoIds = grounding.shotIds
+            if (grounding.kind === 'confirm') confirmIds = grounding.shotIds
+            // 번호를 물었다 — 다음 말의 "3번" · 맨 숫자를 샷 번호로 읽는다.
+            if (grounding.kind === 'ask' && !hold && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true } })
+          }
+          // 되묻기 목록 중 이 답의 글 카드가 건 샷은 그 카드 [적용]이 곧 허락이다 — 카드에 묶고, 나머지만 "응"으로 묻는다.
+          held.videos = [...videoIds, ...confirmIds].filter((id) => bound.has(id))
+          confirmIds = confirmIds.filter((id) => !bound.has(id))
+          let textCardOffered = false
+          if (edits.length > 0) {
+            const heldLines = await heldWorkLines(held, locale, names)
+            textCardOffered = get().offerPendingProposal(
               createPendingProposal({
                 traceId,
                 stage: 'director',
-                kind: 'directorGenerateStoryboardImage',
-                target: translate(locale, 'Storyboard image'),
-                action: translate(locale, 'Generate image'),
-                impact: [
-                  translate(locale, 'Costs money to generate the image.'),
-                  translate(locale, 'Nothing runs until you approve.'),
-                ],
-                payload: { updates: imageUpdates },
+                kind: 'directorTextEdit',
+                target: translate(locale, 'Text changes'),
+                action: translate(locale, 'Apply the text Lumi suggested'),
+                impact: [...directorTextEditLines(locale, edits, before.nodes, names), ...heldLines],
+                payload: { projectId, edits, then: held },
               }),
             )
-            if (!imageProposalAccepted) {
-              set({
-                error: translate(
-                  locale,
-                  'A proposal is already pending, so the new Director image generation proposal was held back.',
-                ),
-              })
+            if (!textCardOffered) {
+              set({ error: translate(locale, heldLines.length > 0
+                ? 'A proposal is already pending, so the new text change and the images or videos waiting for it were held back.'
+                : 'A proposal is already pending, so the new text change was held back.') })
+              // 글이 걸린 샷의 그림 · 영상은 되묻기에도 넣지 않았다 — 무엇을 뺐는지 말한다(재재검토 b 낮음 2).
+              const shots = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(before.nodes.find((node) => node.id === id), names)))
+              if (held.videos.length > 0) lumiSays(translate(locale, "I left out the video for {shots} because its text change isn't applied yet.", { shots: shots(held.videos) }))
+              if (held.images.length > 0) lumiSays(translate(locale, "I left out the image for {shots} because its text change isn't applied yet.", { shots: shots(held.images) }))
+              if (held.allBlankImages) lumiSays(translate(locale, "I left out the live-action images because a text change isn't applied yet."))
             }
           }
-          if (videoBatchUpdates.length > 0) {
-            const locale = contentLocale()
-            const tr = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
-            if (imageUpdates.length > 0) {
-              set({ error: tr('A proposal is already pending, so the video generation proposal was held back.') })
-            } else {
-              // 러너·잔액 훅은 지연 로드 — video-batch-client 가 스토어를 import 하므로 정적 import 는 순환이 된다.
-              const [{ eligibleVideoBatchShotIds }, { fetchTakeBalance }, { planVideoBatch, videoBatchTakeCosts, describeVideoBatchPlan }] =
-                await Promise.all([
-                  import('@/lib/director/video-batch-client'),
-                  import('@/lib/billing/use-take-balance'),
-                  import('@/lib/director/video-batch-plan'),
-                ])
-              const { buildVideoBatchInputs } = await import('@/lib/director/video-batch-inputs')
-              if (!isCurrentSession()) return
-              const nodes = useDirectorCanvasStore.getState().nodes
-              const eligible = eligibleVideoBatchShotIds(nodes)
-              const inputs = buildVideoBatchInputs(projectId ?? '', nodes, eligible)
-              const inputSignature = JSON.stringify({ projectId, eligible, inputs })
-              if (eligible.length === 0) {
-                get().notifyIssue('director', tr('Every shot already has a video or one in progress.'))
-              } else if (inputs.skipped.length > 0) {
-                const reason = inputs.skipped[0].reason
-                const message = reason === 'missing_writer_shot_id'
-                  ? 'Video generation is on hold because a shot is not linked to Writer. Please request videos for shots created in Writer.'
-                  : reason === 'unresolvable_manual_wiring'
-                    ? 'Video generation is on hold because a connected image or previous video is not ready. Check the image connections or wait for the previous video to finish.'
-                    : 'Video generation is on hold because a shot could not be found. Check the current shots and try again.'
-                get().notifyIssue('director', tr(message))
-              } else {
-                const takes = await fetchTakeBalance()
-                if (!isCurrentSession()) return
-                const plan = planVideoBatch(videoBatchTakeCosts(nodes, eligible), takes.balance, takes.mode)
-                videoProposalAccepted = get().offerPendingProposal(
-                  createPendingProposal({
-                    traceId,
-                    stage: 'director',
-                    kind: 'directorGenerateVideoBatch',
-                    target: tr('Videos'),
-                    action: tr('Generate videos for {count} shots', { count: plan.total }),
-                    impact: [
-                      tr('Costs Takes for every generated video.'),
-                      ...describeVideoBatchPlan(plan, tr),
-                      tr('Nothing runs until you approve.'),
-                    ],
-                    payload: {
-                      projectId,
-                      inputSignature,
-                      limit: plan.runCount,
-                      total: plan.total,
-                      requiredTakes: plan.requiredTakes,
-                      balance: plan.balance,
-                      mode: plan.mode,
-                    },
-                  }),
-                )
-                if (!videoProposalAccepted) {
-                  set({ error: tr('A proposal is already pending, so the video generation proposal was held back.') })
-                }
-              }
+          const nowVideos = videoIds.filter((id) => !bound.has(id))
+          if (nowVideos.length > 0) {
+            await startVideosFor({ shotIds: nowVideos, say: lumiSays, onJob: observeGeneration, isCurrent: isCurrentSession })
+          }
+          // 앞 턴의 글 카드가 아직 기다리면 그 카드가 건 샷도 그 카드에 묶는다.
+          if (waitingCard && confirmIds.some((id) => waitingCard.bound.has(id))) {
+            await holdOnTextCard(waitingCard, { images: [], allBlankImages: false, videos: confirmIds.filter((id) => waitingCard.bound.has(id)) }, lumiSays)
+            confirmIds = confirmIds.filter((id) => !waitingCard.bound.has(id))
+          }
+          // 되묻기 — "응"이면 이 목록 그대로 만든다(sendMessage 맨 앞의 directorVideoAsk 받기).
+          if (confirmIds.length > 0 && projectId && isCurrentSession()) {
+            // 제출할 수 없는 샷이 끼어 있으면 묻지 않고 그 까닭을 말한다(시작할 때 막힐 목록을 "응"으로 받지 않는다).
+            const hold = await videoHoldReason(confirmIds)
+            if (hold) lumiSays(hold)
+            else {
+              set({ directorVideoAsk: { projectId, shotIds: confirmIds } })
+              lumiSays(await confirmVideosLine(confirmIds, locale))
             }
           }
           patchTrace({
             appliedCount: result.applied,
             skippedCount: result.skipped.length,
-            pendingProposal: imageProposalAccepted || videoProposalAccepted,
-            ...(imageProposalAccepted || videoProposalAccepted
-              ? { generationStatus: 'awaiting_approval' }
-              : immediateUpdates.some((u) => u.type === 'generateVideo') &&
-                  result.skipped.length > 0
-              ? { generationStatus: 'skipped' }
-              : {}),
+            pendingProposal: textCardOffered,
+            ...(textCardOffered ? { generationStatus: 'awaiting_approval' } : {}),
           })
           if (result.skipped.length > 0) {
             console.warn(
@@ -3867,23 +4355,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                 count: result.skipped.length,
               }),
             )
-          }
-          // 방어선(#영상거짓수락) — 프롬프트 규칙이 뚫려 모델이 그래도 generateVideo 를 냈을 때,
-          //   "생성할게요" 라고 이미 답한 채팅에 거절 흔적이 안 남는 사고를 막는다. skip 사유로
-          //   판별해 정직한 안내를 별도 모델 메시지로 영속화한다(원래 reply 는 건드리지 않는다).
-          if (result.skipped.some((s) => s.update.type === 'generateVideo')) {
-            // 약속 E3(2026-09-04): 일괄은 승인 카드로 되지만 샷 하나는 여전히 안 된다 — 문구도 그대로 말한다.
-            const honestNotice = translate(
-              contentLocale(),
-              'Chat can start videos only for all remaining shots at once. For one shot, use the Video take button on the Shot node.',
-            )
-            set((state) => ({
-              messages: [
-                ...state.messages,
-                { id: makeId(), stage, role: 'model' as const, content: honestNotice },
-              ],
-            }))
-            if (projectId) saveChatMessage(projectId, stage, 'model', honestNotice)
           }
         }
       }
@@ -4255,6 +4726,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       saveChatMessage(projectId, stage, 'user', userText)
       saveChatMessage(projectId, stage, 'model', modelText)
     }
+  },
+
+  startDirectorVideos: async (shotIds, userText) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId || shotIds.length === 0 || get().loading) return
+    const session = chatSession
+    const isCurrent = () => session === chatSession && projectId === useProjectStore.getState().projectId
+    await runDirectorTurn(projectId, userText, isCurrent, (say) => startVideosFor({ shotIds, say, isCurrent }))
   },
 
   // 프로액티브 제안 띄우기 — 한 번에 하나만(이미 떠 있으면 무시), 이미 dismiss/승인한 id 도 무시.
@@ -5040,6 +5519,34 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           },
         })
         if (!key) { proposal.submissionUncertain = false; throw new Error(translate(contentLocale(), 'Could not start')) }
+      } else if (proposal.kind === 'directorTextEdit') {
+        // 오너 2026-11-14 9번 — Lumi 가 고친 글은 전 · 후를 본 뒤 [적용]해야 바뀐다. 그새 사람이 그 글을 고쳤으면 옛 글 기준의 수정안으로 덮지 않는다.
+        const edits = Array.isArray(proposal.payload.edits) ? (proposal.payload.edits as DirectorTextEdit[]) : []
+        if (edits.length === 0) throw new Error('text edits missing')
+        const canvas = useDirectorCanvasStore.getState()
+        const stale = edits.some((edit) => {
+          const node = canvas.nodes.find((item) => item.id === edit.nodeId)
+          return !node || currentDirectorText(node, edit.field) !== edit.before
+        })
+        if (stale) {
+          speak(translate(contentLocale(), 'The text changed since Lumi suggested this. Please ask again.'))
+          return false
+        }
+        const patches = new Map<string, { kind: DirectorTextEdit['kind']; patch: Record<string, string> }>()
+        for (const edit of edits) {
+          const entry = patches.get(edit.nodeId) ?? { kind: edit.kind, patch: {} }
+          entry.patch[edit.field] = edit.after
+          patches.set(edit.nodeId, entry)
+        }
+        const textUpdates = [...patches].map(([id, { kind, patch }]) =>
+          (kind === 'shot' ? { type: 'updateShot', id, patch } : { type: 'updateScene', id, patch }) as DirectorCanvasUpdate,
+        )
+        const applied = canvas.applyUpdates(textUpdates)
+        if (applied.applied === 0) throw new Error('no text edits could apply')
+        speak(translate(contentLocale(), 'Applied the text.'))
+        // 같은 답에서 이 글을 기다리던 그림 · 영상 — 바뀐 글로 지금 만든다(검토 b 보통 1).
+        const held = proposal.payload.then as HeldDirectorWork | undefined
+        if (held && projectId) await runHeldDirectorWork(held, { projectId, traceId: proposal.traceId, say: speak, onJob: observeGeneration, isCurrent: isCurrentSession })
       } else if (proposal.kind === 'directorGenerateStoryboardImage') {
         if (proposal.payload.projectId && proposal.payload.projectId !== useProjectStore.getState().projectId) {
           throw new Error(translate(contentLocale(), 'This approval belongs to a different project. Please request it again.'))
@@ -5275,6 +5782,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       comicRewriteGate: null,
       startComicStyleGate: null,
       styleAttachmentGate: null,
+      directorVideoAsk: null,
       styleSettingFor: null,
       boardBusy: null,
       deferredProposals: [],

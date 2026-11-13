@@ -12,8 +12,10 @@ import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 
 type Translate = (key: string, params?: Record<string, string | number>) => string
 
-/** [다시 만들기]를 시작하지 못한 까닭 — 창이 그 줄에 보인다(검토 b 2차 낮음 3 — 전엔 말없이 끝났다). no_window 는 보이지 않는다. */
-export type RemakeFailReason = 'no_window' | 'image_batch' | 'video_batch' | 'image_running' | 'image_failed' | 'video_running' | 'video_limit' | 'not_started'
+/** [다시 만들기]를 시작하지 못한 까닭 — 창이 그 줄에 보인다(검토 b 2차 낮음 3 — 전엔 말없이 끝났다). no_window 는 보이지 않는다.
+ *  pending_text_edit = 그 샷에 [적용]을 기다리는 Lumi 글 고침 카드가 있다(옛 글로 만들지 않는다 — board 검토 b 재검토 보통 1).
+ *  video_limit = 내 영상 동시 한도에 걸렸다(멈춘 Take 도 뒤에서 끝날 때까지 자리를 쓴다 — 리드 재검토 a). */
+export type RemakeFailReason = 'no_window' | 'pending_text_edit' | 'image_batch' | 'video_batch' | 'image_running' | 'image_failed' | 'video_running' | 'video_limit' | 'not_started'
 export type RemakeResult = { started: true } | { started: false; reason: RemakeFailReason }
 
 /** 영상이 없는 까닭 — 실패(마지막 시도가 실패) · 만드는 중 · 아직 만들지 않음. */
@@ -137,6 +139,8 @@ export function remakeNotice(reason: RemakeFailReason, t: Translate): string | n
       return t('Too many videos are being made at once (stopped Takes keep their spot until they finish). You can make it once one is done.')
     case 'not_started':
       return t('Could not start the video. Try again in a moment.')
+    case 'pending_text_edit':
+      return t('A text change is waiting for [Apply]. Apply or discard it, then make it again.')
     default:
       return null
   }

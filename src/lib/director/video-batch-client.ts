@@ -8,6 +8,7 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { notifyBatchSummary } from '@/lib/generation-notify'
+import { useLumiNoticeStore } from '@/stores/lumi-notice-store'
 import { notifyQuotaExceeded } from '@/lib/generation-quota-toast'
 import { buildVideoBatchInputs } from '@/lib/director/video-batch-inputs'
 import type { VideoBatchStartResponse, VideoBatchSummary } from '@/lib/director/video-batch-types'
@@ -178,6 +179,7 @@ async function pollVideoBatch(
  */
 export async function runVideoBatch(
   projectId: string,
+  /** shotIds — 이 샷들만(그중 영상을 만들 수 있는 것만). 없으면 남은 샷 전부(오너 2026-11-14 9번 채팅 · 고른 샷). */
   opts?: { onJob?: GenerationJobObserver; silent?: boolean; limit?: number; shotIds?: readonly string[] },
 ): Promise<VideoBatchResult> {
   const store = useDirectorCanvasStore
@@ -192,6 +194,8 @@ export async function runVideoBatch(
   const total = shotIds.length
   // #batch-resume: 첫 await 전에 이번 실행이 낼 목록을 고정한다 — 그 뒤 캔버스가 바뀌어도 흔들리지 않는다.
   const { items, skipped: buildSkipped } = buildVideoBatchInputs(projectId, current.nodes, shotIds)
+  // 낼 것이 없으면 묶음 표시(진행 · 묶음 id)를 달지 않는다 — 시작하지 않은 것을 시작한 것으로 읽지 않게(재검토 b 낮음 1).
+  if (items.length === 0) return { total, started: 0, failed: buildSkipped.length }
 
   // 중단 표시를 풀고 진행 상태를 연다(#batch-resume 오너 결정 ①).
   store.getState().beginVideoBatch(total)
@@ -261,6 +265,8 @@ export async function runVideoBatch(
       failed: completedFailures,
     })
     notifyBatchSummary('director', `${done > 0 ? '✓' : '⚠'} ${line}`)
+    // 채팅을 접어 둔 Director 면 오른쪽 아래 Lumi 알림 카드도(11/13 시안 D8).
+    useLumiNoticeStore.getState().batchEnded({ projectId, kind: 'video', done, failed: completedFailures })
   }
 
   if (ownsRun() && !opts?.silent && total > 0 && finalSummary.status !== 'cancelled') {

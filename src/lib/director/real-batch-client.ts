@@ -14,6 +14,8 @@ import { prerequisiteWaitKey, waitForPrerequisite, type PrerequisiteBody, type P
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import type { GenerationJobObserver } from '@/lib/generation-jobs-client'
+import { notifyBatchSummary } from '@/lib/generation-notify'
+import { useLumiNoticeStore } from '@/stores/lumi-notice-store'
 
 export interface RealBatchResult {
   generated: number
@@ -127,6 +129,9 @@ export async function runRealBatch(
     realBatchResumeShotIds: [],
   })
   let generated = 0
+  /** 이 판이 낸 작업 중 끝난 샷 · 실패한 샷(작업 상태로 센다) — 끝날 때 채팅 한 줄 · Lumi 알림 카드에 쓴다. */
+  let imagesDone = 0
+  let imagesFailed = 0
   let quotaBlocked = false
   let lastSkipped: BatchSkipped[] = []
   const runId = crypto.randomUUID()
@@ -232,6 +237,8 @@ export async function runRealBatch(
                 status,
                 resultUrl: typeof resultUrl === 'string' ? resultUrl : null,
               })
+              if (status === 'completed') imagesDone += s.shotIds.length
+              else imagesFailed += s.shotIds.length
             }
             break
           }
@@ -290,6 +297,13 @@ export async function runRealBatch(
           'No shots to generate. Only shots with a rough panel and no image yet are eligible.',
         ),
       )
+    }
+    // 끝나면 채팅에 한 줄(약속 E4 — 영상 일괄과 같게), 채팅을 접어 둔 Director 면 오른쪽 아래 Lumi 알림 카드도(11/13 시안 D8).
+    //   그새 다른 프로젝트로 갔으면 남기지 않는다(그 프로젝트 채팅에 엉뚱한 줄이 남는다).
+    if (imagesDone + imagesFailed > 0 && store.getState().projectId === projectId) {
+      const line = translate(useLocaleStore.getState().locale, '{done} images done, {failed} failed', { done: imagesDone, failed: imagesFailed })
+      notifyBatchSummary('director', `${imagesDone > 0 ? '✓' : '⚠'} ${line}`)
+      useLumiNoticeStore.getState().batchEnded({ projectId, kind: 'image', done: imagesDone, failed: imagesFailed })
     }
   } catch (e) {
     if (!opts?.silent) {
