@@ -1397,7 +1397,8 @@ function PaletteBar() {
         title={t('Make images, then their videos?')}
         description={countText(t, imageWork.length, 'Makes 1 image, and its video starts by itself when the image is done.', 'Makes {count} images, and each video starts by itself when its image is done.', { count: imageWork.length })}
         impact={[
-          t('Costs money for every generated video: {count} videos.', { count: chainPlan.total }),
+          // 영어는 1개면 단수(영어 재점검 S2).
+          countText(t, chainPlan.total, 'Costs money for every generated video: 1 video.', 'Costs money for every generated video: {count} videos.', { count: chainPlan.total }),
           ...describeVideoBatchPlan(chainPlan, t),
           t("If you close this screen, the videos won't start."),
         ]}
@@ -1434,13 +1435,10 @@ function PaletteBar() {
         open={confirmVideoBatch}
         onOpenChange={setConfirmVideoBatch}
         title={t('Generate videos for eligible shots?')}
-        description={t('Generate videos for {count} eligible shots.', {
-          count: videoPlan.total,
-        })}
+        // 영어는 1개면 단수(영어 재점검 S2) — 한국어는 그대로.
+        description={countText(t, videoPlan.total, 'Generate a video for 1 eligible shot.', 'Generate videos for {count} eligible shots.', { count: videoPlan.total })}
         impact={[
-          t('Costs money for every generated video: {count} videos.', {
-            count: videoPlan.runCount,
-          }),
+          countText(t, videoPlan.runCount, 'Costs money for every generated video: 1 video.', 'Costs money for every generated video: {count} videos.', { count: videoPlan.runCount }),
           ...describeVideoBatchPlan(videoPlan, t),
           t('Only shots without a completed video or active generation will be included.'),
         ]}
