@@ -242,11 +242,11 @@ export function VideoPreviewer() {
         box.style.zIndex = String(i === undefined ? 0 : i + 1)
         box.style.opacity = i === undefined ? '0' : String(plan.layers[i].alpha)
       }
-      // 영상 층 시각 맞추기 — 내보내기와 같은 함수(src/lib/editor/layer-sync.ts).
+      // 영상 층 시각 맞추기 — 내보내기와 같은 함수(src/lib/editor/layer-sync.ts). 보이는 맨 위 층은 0.3초 넘게 어긋나면 바로 다시 찾는다.
       for (const layer of all) {
         if (layer.kind !== 'video') continue
         const el = layerVideos.current.get(layer.shotId)
-        if (el) syncLayerVideo(el, layer, st.videoClips.find((c) => c.shotId === layer.shotId)?.speed ?? 1.0, st.isPlaying)
+        if (el) syncLayerVideo(el, layer, st.videoClips.find((c) => c.shotId === layer.shotId)?.speed ?? 1.0, st.isPlaying, layer.shotId === plan.topShotId)
       }
       // 물들이기 막(2026-09-08 · 2단계 ⑤) — 검은 · 흰 막의 투명도만 시간에 따라(영상 픽셀은 손대지 않는다). 자막 위에 덮는다.
       if (dissolveRef.current) dissolveRef.current.style.opacity = String(plan.black)

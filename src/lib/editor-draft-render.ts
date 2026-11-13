@@ -403,7 +403,7 @@ export async function renderDraftTimeline(opts: {
       const entry = videoOf(layer.shotId)
       if (!entry) continue
       wanted.add(layer.shotId)
-      syncLayerVideo(entry.el, layer, videoClips.find((c) => c.shotId === layer.shotId)?.speed ?? 1, playing)
+      syncLayerVideo(entry.el, layer, videoClips.find((c) => c.shotId === layer.shotId)?.speed ?? 1, playing, layer.shotId === plan.topShotId)
     }
     for (const [id, entry] of pool) {
       if (wanted.has(id)) continue

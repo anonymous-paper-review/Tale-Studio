@@ -22,7 +22,7 @@ import { handleEditorKey } from '@/features/editor/use-editor-playback'
 import { TitleClipFace, TitleTextLayer } from '@/features/editor/title-clip-layer'
 import { defaultTitleText, titleTextBox } from '@/lib/editor/title-clip'
 import { editorChatContext } from '@/lib/editor/chat-context'
-import { clipMenuTitle } from '@/features/editor/editor-labels'
+import { clipMenuTitle, titleNoTrackNotice } from '@/features/editor/editor-labels'
 import { translate } from '@/lib/i18n/translate'
 import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { Shot, VideoClip } from '@/types'
@@ -377,9 +377,10 @@ describe('검토 c ⑥ (F) — 리드 11/14 같이 정한 것', () => {
     expect(placeOf(id)?.trackId).toBe('v3')
     api().toggleTrackLock('v3')
     expect(api().addTitleClip('v1', 4, '비')).toBeNull()
+    // 알림 글은 막힌 까닭을 그대로 말한다(리드 11/14 — 옛 글자: 한 글 'There is no track to put the title on. Add V2 or unlock a track.').
     const page = read('src/app/studio/editor/page.tsx')
-    expect(page).toMatch(/if \(!created && trackId === 'v1'\) toast\.info\(t\('There is no track to put the title on\. Add V2 or unlock a track\.'\)\)/)
-    expect(translate('ko', 'There is no track to put the title on. Add V2 or unlock a track.')).toBe('제목을 놓을 줄이 없어요. V2 를 더하거나 잠금을 풀어 주세요.')
+    expect(page).toMatch(/if \(!created && trackId === 'v1'\) toast\.info\(titleNoTrackNotice\(useEditorStore\.getState\(\)\.videoTracks, t\)\)/)
+    expect(titleNoTrackNotice(api().videoTracks, (text, params) => translate('ko', text, params))).toBe('제목을 놓을 줄이 없어요. V2 의 잠금을 풀어 주세요.')
   })
 })
 
@@ -394,6 +395,24 @@ describe('검토 c W4 — 리드 11/14 같이 정한 것', () => {
     expect(placeOf(direct)?.trackId).toBe('v2')
     api().toggleTrackVisible('v3')
     expect(api().addTitleClip('v1', 8, '눈')).toBeNull()
-    expect(read('src/app/studio/editor/page.tsx')).toMatch(/if \(!created && trackId === 'v1'\) toast\.info\(t\('There is no track to put the title on\. Add V2 or unlock a track\.'\)\)/)
+    // F3 알림 — 막힌 까닭(눈 꺼짐)을 그대로(리드 11/14 — 옛 글자: 한 글 'Add V2 or unlock a track.').
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/if \(!created && trackId === 'v1'\) toast\.info\(titleNoTrackNotice\(useEditorStore\.getState\(\)\.videoTracks, t\)\)/)
+    expect(titleNoTrackNotice(api().videoTracks, (text, params) => translate('ko', text, params))).toBe('제목을 놓을 줄이 없어요. V2 의 눈을 켜 주세요.')
+  })
+
+  it('문자 도구로 V1 을 눌렀는데 제목을 놓을 줄이 없으면 막힌 까닭을 그대로 알린다 — 가장 가까운 위 줄이 잠겼으면 잠금을, 눈이 꺼졌으면 눈을, 둘 다면 둘 다, 위 줄이 없으면 V2 더하기를', () => {
+    // 왜: 리드 11/14 — 한 글("V2 를 더하거나 잠금을 풀어 주세요")이 눈 끈 줄 때문일 때도 같아, 무엇을 하면 되는지 말하지 못했다. 가장 가까운 위 줄을
+    //   풀면 제목이 그 줄에 놓인다.
+    const ko = (tracks: Parameters<typeof titleNoTrackNotice>[0]) => titleNoTrackNotice(tracks, (text, params) => translate('ko', text, params))
+    const en = (tracks: Parameters<typeof titleNoTrackNotice>[0]) => titleNoTrackNotice(tracks, (text, params) => translate('en', text, params))
+    const v1 = { id: 'v1' }
+    expect(ko([v1])).toBe('제목을 놓을 줄이 없어요. V2 를 더해 주세요.')
+    expect(en([v1])).toBe('There is no track to put the title on. Add V2.')
+    expect(ko([v1, { id: 'v2', locked: true }, { id: 'v3', locked: true }])).toBe('제목을 놓을 줄이 없어요. V2 의 잠금을 풀어 주세요.')
+    expect(en([v1, { id: 'v2', locked: true }, { id: 'v3', locked: true }])).toBe('There is no track to put the title on. Unlock V2.')
+    expect(ko([v1, { id: 'v2', hidden: true }, { id: 'v3', locked: true }])).toBe('제목을 놓을 줄이 없어요. V2 의 눈을 켜 주세요.')
+    expect(en([v1, { id: 'v2', hidden: true }, { id: 'v3', locked: true }])).toBe('There is no track to put the title on. Show V2.')
+    expect(ko([v1, { id: 'v3', hidden: true, locked: true }])).toBe('제목을 놓을 줄이 없어요. V3 의 눈을 켜고 잠금을 풀어 주세요.')
+    expect(en([v1, { id: 'v3', hidden: true, locked: true }])).toBe('There is no track to put the title on. Show and unlock V3.')
   })
 })

@@ -6,6 +6,19 @@ import type { VideoClip } from '@/types'
 
 type Translate = (text: string, params?: Record<string, string | number>) => string
 
+/**
+ * 문자 도구로 V1 을 눌렀는데 제목을 놓을 줄이 없을 때의 알림 — 막힌 까닭을 그대로 말한다(리드 11/14). 위 줄이 없으면 V2 를 더하라고, 있으면
+ *   가장 가까운 위 줄(풀면 제목이 그 줄에 놓인다)이 잠겼는지 · 눈이 꺼졌는지 · 둘 다인지. 약속: tests/editor/title-clips.test.ts
+ */
+export function titleNoTrackNotice(videoTracks: ReadonlyArray<{ id: string; locked?: boolean; hidden?: boolean }>, t: Translate): string {
+  const nearest = videoTracks.find((track) => track.id !== 'v1')
+  if (!nearest) return t('There is no track to put the title on. Add V2.')
+  const track = nearest.id.toUpperCase()
+  if (nearest.hidden && nearest.locked) return t('There is no track to put the title on. Show and unlock {track}.', { track })
+  if (nearest.hidden) return t('There is no track to put the title on. Show {track}.', { track })
+  return t('There is no track to put the title on. Unlock {track}.', { track })
+}
+
 /** 화면에 보이는 영상 상태 — 영상 주소가 있어도 불러오지 못했으면(404 · 막힘 · 끊김) 'unplayable'. */
 export type ClipDisplayStatus = VideoClip['status'] | 'unplayable'
 

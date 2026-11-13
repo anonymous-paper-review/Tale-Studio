@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { AiBusyCard } from '@/components/ai-busy-overlay'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
-import { editorEmptyScreen, editorPrepTitle } from '@/features/editor/editor-labels'
+import { editorEmptyScreen, editorPrepTitle, titleNoTrackNotice } from '@/features/editor/editor-labels'
 import { EDITOR_FETCH_LIMIT, finishEditorOpen, runLimited } from '@/features/editor/open-editor'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
 import { Timeline } from '@/features/editor/timeline'
@@ -656,8 +656,8 @@ export default function PostPage() {
                     onSetTransitionLength={setTransitionLength}
                     onAddTitle={(trackId, atSec) => {
                       const created = addTitleClip(trackId, atSec, defaultTitleText(projectTitle, t('New title')))
-                      // V1 위에 놓을 줄이 없으면(지웠거나 모두 잠금) 말없이 넘어가지 않는다(검토 c ⑥ 낮음).
-                      if (!created && trackId === 'v1') toast.info(t('There is no track to put the title on. Add V2 or unlock a track.'))
+                      // V1 위에 놓을 줄이 없으면(지웠거나 잠금 · 눈 꺼짐) 말없이 넘어가지 않는다 — 막힌 까닭을 그대로(검토 c ⑥ 낮음 · 리드 11/14).
+                      if (!created && trackId === 'v1') toast.info(titleNoTrackNotice(useEditorStore.getState().videoTracks, t))
                     }}
                     onPushHistory={pushHistory}
                     onRevertStep={revertLastStep}

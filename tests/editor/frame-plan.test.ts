@@ -17,6 +17,7 @@ vi.mock('@/stores/project-store', () => ({
 import { selectFrameAt, selectVideoLayout, useEditorStore, type FramePlan } from '@/stores/editor-store'
 import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
 import { canvasFilterSupported, drawPlanFrame, effectsInUse, type FrameSources } from '@/lib/editor-draft-render'
+import { syncLayerVideo } from '@/lib/editor/layer-sync'
 import { TITLE_TEXT_WIDTH, drawTitleText, titleTextLines } from '@/lib/editor/title-clip'
 import { TitleTextLayer } from '@/features/editor/title-clip-layer'
 import { translate } from '@/lib/i18n/translate'
@@ -250,12 +251,12 @@ describe('혼자 정한 것', () => {
     expect(plan(5.5, 1).preload).toEqual([{ shotId: 'B', kind: 'video', trackId: 'v1', alpha: 0, sourceSec: 1.5, held: false }])
   })
 
-  it('재생 중 모든 영상 층은 같은 방법으로 시각을 맞춘다 — 조금 어긋나면 빠르기를 살짝 바꿔 따라잡고, 0.5초 넘게 어긋나면 다시 찾는다', () => {
+  it('재생 중 모든 영상 층은 모니터 · 내보내기가 같은 함수로 시각을 맞춘다 — 조금 어긋나면 빠르기를 살짝 바꿔 따라잡는다', () => {
     // 왜: 예전에는 교차 디졸브 층만 빠르기로 따라잡고 맨 위 · 아래 줄은 0.3초 넘으면 다시 찾아, 찾는 동안 그림이 멈췄다.
     //   내보내기도 같은 함수로 맞춘다(⑦-2 — 함수를 미리 보기 파일에서 두 곳이 같이 쓰는 파일로 옮겼다).
+    //   (옛 이름: '… 조금 어긋나면 빠르기를 살짝 바꿔 따라잡고, 0.5초 넘게 어긋나면 다시 찾는다' — 다시 찾는 문턱은 리드 11/14 문장으로 맨 위 층 0.3초 · 그 밑 0.5초, 아래 시험.)
     const sync = read('src/lib/editor/layer-sync.ts')
     expect(sync).toMatch(/const rate = speed \* \(drift > 0\.04 \? 1\.25 : drift < -0\.04 \? 0\.8 : 1\)/)
-    expect(sync).toMatch(/if \(Math\.abs\(drift\) > 0\.5\) el\.currentTime = target/)
     expect(read('src/features/editor/video-previewer.tsx').match(/syncLayerVideo\(/g)).toHaveLength(1)
     expect(read('src/lib/editor-draft-render.ts').match(/syncLayerVideo\(/g)).toHaveLength(1)
   })
@@ -269,6 +270,27 @@ describe('혼자 정한 것', () => {
     const previewer = read('src/features/editor/video-previewer.tsx')
     expect(previewer).toMatch(/id === activeShotId && pane === 'title' \? \(/)
     expect(previewer).toMatch(/drawTitleCard\(ctx, canvas\.width, canvas\.height, card, /)
+  })
+})
+
+describe('검토 c ⑦-1 낮음 — 리드 11/14 같이 정한 것', () => {
+  it('보이는 맨 위 층은 예전처럼 0.3초 넘게 어긋나면 바로 다시 찾는다 — 그 밑 층은 빠르기로 따라잡는다', () => {
+    // 왜: 검토 c — 다시 찾는 문턱이 0.5초라 0.3~0.5초 어긋남을 1.25배로 1.2~2초 따라잡는 동안 그림이 소리와 그만큼 어긋났다(멈칫한 뒤 ·
+    //   무거운 장면). 맨 위 층은 예전 문턱(0.3초) — 어느 경우도 예전보다 나빠지지 않는다.
+    const video = (currentTime: number) => ({ currentTime, paused: false, playbackRate: 1, play: async () => {}, pause: () => {} }) as unknown as HTMLVideoElement
+    const top = video(1.6)
+    syncLayerVideo(top, { sourceSec: 2, held: false }, 1, true, true)
+    expect(top.currentTime).toBe(2)
+    const under = video(1.6)
+    syncLayerVideo(under, { sourceSec: 2, held: false }, 1, true, false)
+    expect(under.currentTime).toBe(1.6)
+    expect(under.playbackRate).toBe(1.25)
+    const far = video(1.4)
+    syncLayerVideo(far, { sourceSec: 2, held: false }, 1, true, false)
+    expect(far.currentTime).toBe(2)
+    // 모니터 · 내보내기가 같은 잣대로 맨 위 층을 가린다.
+    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/syncLayerVideo\(el, layer, [^\n]*, layer\.shotId === plan\.topShotId\)/)
+    expect(read('src/lib/editor-draft-render.ts')).toMatch(/syncLayerVideo\(entry\.el, layer, [^\n]*, layer\.shotId === plan\.topShotId\)/)
   })
 })
 
