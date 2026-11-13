@@ -432,3 +432,35 @@ describe('서버를 못 읽고 연 화면의 뒤처리 (검토 c, 2026-11-14)', 
   })
 })
 
+describe('소리 조각 끝 끌기와 사람 고침 표시 (2026-11-14)', () => {
+  it('사람이 소리 조각의 앞 · 뒤를 끌어 줄이면 사람 고침으로 세어 저장본에 견줌 표시를 붙인다', async () => {
+    // 왜: 소리 끝만 줄이고 저장한 브라우저의 편집이 다른 브라우저의 고침 전 저장본에 지는 경우 — 타임라인 끌기도 열 때 저절로 생긴
+    //   바뀜처럼 세어 표시(serverAware)가 붙지 않았고, 그 서버 편집이 고침 전 저장본에 가려졌다(E2b "사람이 고친 뒤에만 표시").
+    await openLikePage()
+    const audioId = useEditorStore.getState().audioClips[0].id
+    vi.useFakeTimers()
+    useEditorStore.getState().updateAudioClip(audioId, { startSec: 0.5, durationSec: 3.5, sourceOffsetSec: 0.5 })
+    await vi.advanceTimersByTimeAsync(4_000)
+    vi.useRealTimers()
+    expect(puts[puts.length - 1].serverAware).toBe(true)
+    localStorage.clear()
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(edit(['shot-2', 'shot-1'])))
+    await openLikePage()
+    expect(order()).toEqual(['shot-1', 'shot-2'])
+    expect(useEditorStore.getState().audioClips.find((a) => a.id === audioId)).toMatchObject({ startSec: 0.5, durationSec: 3.5 })
+  })
+
+  it('Editor 를 연 뒤 파형 · 원본 길이를 채우는 것은 사람 고침이 아니라 저장본에 견줌 표시를 붙이지 않는다', async () => {
+    // 왜: 열 때 뒤이어 채우는 파형(open-editor fillPeaks)까지 사람 고침으로 세면, 열기만 한 기기의 저장본이 진짜 편집을 가진
+    //   브라우저의 저장본을 이긴다(재검토 c 2/2 와 같은 까닭).
+    await openLikePage()
+    const audioId = useEditorStore.getState().audioClips[0].id
+    const before = puts.length
+    vi.useFakeTimers()
+    useEditorStore.getState().updateAudioClip(audioId, { peaks: [0.9, 0.8, 0.7], sourceDurationSec: 4 })
+    await vi.advanceTimersByTimeAsync(4_000)
+    vi.useRealTimers()
+    expect(puts.length).toBeGreaterThan(before)
+    expect(puts.some((p) => p.serverAware)).toBe(false)
+  })
+})
