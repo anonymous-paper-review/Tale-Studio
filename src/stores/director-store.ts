@@ -40,7 +40,7 @@ import {
   type DirectorVideoStatus,
   type DirectorVideoProvider,
 } from '@/types/director'
-import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
+import { isQuotaExceeded, notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import {
   isPrerequisiteMissing,
   notifyPrerequisiteResumed,
@@ -1554,6 +1554,13 @@ function withoutTakePrompt(override: VideoNodeData['override']): VideoOverride {
 
 /** 이 화면에서 멈춘 작업 — 뒤늦게 끝난 결과를 지금 그림에 쓰지 않고 기록에만 둔다(오너 2026-11-14 7번). */
 const stoppedJobIds = new Set<string>()
+
+/** 마지막으로 내 영상 동시 한도(429)에 걸려 시작하지 못한 샷 요청 — 넘기기 창이 그 줄에 진짜 까닭을 보이게(리드 재검토 a).
+ *  멈춘 Take 의 작업도 뒤에서 끝날 때까지 그 자리를 쓴다. 거절마다 새 값이라, 부른 쪽은 부르기 전 값과 달라졌는지로 이번 거절인지 안다. */
+let lastVideoLimitRefusal: { shotNodeId: string } | null = null
+export function videoLimitRefusal(): { shotNodeId: string } | null {
+  return lastVideoLimitRefusal
+}
 
 /** 테이크 목록의 made_frames(지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소) — 모양이 다르면 모른다(null). */
 function parseMadeFrames(value: unknown): VideoNodeData['madeFrames'] {
@@ -4960,6 +4967,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               return false
             }
             if (notifyIfQuotaExceeded(res.status, body)) {
+              if (shotNode && isQuotaExceeded(res.status, body) && (body as { scope?: unknown }).scope !== 'global') lastVideoLimitRefusal = { shotNodeId: shotNode.id }
               if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
               return false
             }

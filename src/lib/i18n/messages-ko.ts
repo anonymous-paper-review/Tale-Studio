@@ -3330,6 +3330,7 @@ export const KO: Record<string, string> = {
   'You can make it after the video batch finishes': '영상 일괄이 끝나면 만들 수 있어요',
   "This shot's image is being made. You can make the video once it is done.": '이 샷 이미지를 만드는 중이에요. 다 되면 영상을 만들 수 있어요.',
   "This shot's video is already being made.": '이 샷 영상을 이미 만드는 중이에요.',
+  'Too many videos are being made at once (stopped Takes keep their spot until they finish). You can make it once one is done.': '동시에 만드는 영상 수가 다 찼어요(멈춘 Take 도 끝날 때까지 자리를 써요). 하나가 끝나면 만들 수 있어요.',
   'Could not start the video. Try again in a moment.': '영상을 시작하지 못했어요. 잠시 뒤 다시 해 보세요.',
   'Go back': '돌아가기',
   'No video to hand over yet.': '넘길 영상이 아직 없어요.',

@@ -1,4 +1,4 @@
-// 샷 상세 영상 탭에서 새 Take 를 만들면 고친 모델 · 해상도 · 바꿀 점이 새 Take 에만 실리는지, 다시 만들기 요청이 단추 값과 같은 모델 · 해상도로 나가는지 (디자이너 11/13 시안 D7 · 오너 2026-11-14 · 리드 검토 a)
+// 샷 상세 영상 탭에서 새 Take 를 만들면 고친 모델 · 해상도 · 바꿀 점이 새 Take 에만 실리는지, 다시 만들기 요청이 단추 값과 같은 모델 · 해상도로 나가는지, 넘기기 창이 시작하지 못한 진짜 까닭을 보이는지 (디자이너 11/13 시안 D7 · 오너 2026-11-14 · 리드 검토 a)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -18,6 +18,8 @@ vi.mock('@/lib/shots-cache', () => ({ invalidateShots: () => Promise.resolve() }
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { latestShotTake, takeSettings } from '@/lib/director/remake-take'
+import { remakeNotice } from '@/lib/director/editor-handover'
+import { translate } from '@/lib/i18n/translate'
 import { isShotData, isVideoData, type VideoOverride } from '@/types/director'
 
 const api = () => useDirectorCanvasStore.getState()
@@ -155,5 +157,43 @@ describe('다시 만들기 단추 값과 요청', () => {
       useGlobalChatStore.setState({ handoffConfirm: null })
     }
     expect(remake).toHaveBeenCalledWith(shotId)
+  })
+})
+
+describe('넘기기 창 [영상 만들기]가 시작하지 못한 까닭', () => {
+  const image = { url: 'https://media.test/s.png', status: 'completed' as const, errorMessage: null, generatedAt: 1 }
+  const stopped = { status: 'generating' as const, lastAttemptStatus: 'generating' as const, videoUrl: null, cancelledAt: '2026-11-14T03:00:00Z' }
+  const openWindow = () => useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'project-1', via: 'button' } })
+
+  it('넘기기 창의 [영상 만들기]가 시작하지 못했을 때 멈춘 채 도는 Take 는 "이 샷 영상을 이미 만드는 중"으로 세지 않는다', async () => {
+    // 왜: 리드 재검토 a — 멈춘 Take 는 ★ 가 아니면 영상도, 만드는 중도 아니다(오너 7번). 뒤에서 돌아도 그 줄의 까닭은 "이미 만드는 중"이 아니다.
+    api().updateNodeData<'shot'>(shotId, { storyboardImage: image })
+    api().updateNodeData<'video'>(sourceId, stopped)
+    const original = api().remakeShotVideo
+    useDirectorCanvasStore.setState({ remakeShotVideo: vi.fn(async () => null) })
+    openWindow()
+    try {
+      expect(await useGlobalChatStore.getState().remakeMissingVideo(shotId)).toEqual({ started: false, reason: 'not_started' })
+    } finally {
+      useDirectorCanvasStore.setState({ remakeShotVideo: original })
+      useGlobalChatStore.setState({ handoffConfirm: null })
+    }
+  })
+
+  it('멈춘 Take 가 동시 자리를 차지해 새 Take 가 거절되면 넘기기 창 줄에 동시 생성 한도 까닭을 보인다', async () => {
+    // 왜: 리드 재검토 a — 멈춘 Take 의 작업은 뒤에서 끝날 때까지 내 영상 동시 자리를 쓴다. 거절된 줄이 "이미 만드는 중"이나 일반 실패로 보이면 무엇을 기다려야 할지 모른다.
+    api().updateNodeData<'shot'>(shotId, { storyboardImage: image })
+    api().updateNodeData<'video'>(sourceId, stopped)
+    fetcher.mockImplementation((url: string) => (url === '/api/director/generate-video'
+      ? Promise.resolve(Response.json({ code: 'quota_exceeded', scope: 'user', category: 'video', limit: 3, error: 'Video generation limit reached' }, { status: 429 }))
+      : Promise.resolve(Response.json({ ok: true }))))
+    openWindow()
+    try {
+      expect(await useGlobalChatStore.getState().remakeMissingVideo(shotId)).toEqual({ started: false, reason: 'video_limit' })
+    } finally {
+      useGlobalChatStore.setState({ handoffConfirm: null })
+    }
+    expect(remakeNotice('video_limit', (key, params) => translate('ko', key, params)))
+      .toBe('동시에 만드는 영상 수가 다 찼어요(멈춘 Take 도 끝날 때까지 자리를 써요). 하나가 끝나면 만들 수 있어요.')
   })
 })

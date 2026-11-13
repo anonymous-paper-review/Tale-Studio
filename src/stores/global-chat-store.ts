@@ -37,6 +37,7 @@ import {
 import {
   useDirectorCanvasStore,
   serializeDirectorCanvasContext,
+  videoLimitRefusal,
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
 import { isShotData, isVideoData } from '@/types/director'
@@ -1946,10 +1947,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
     // 단추 값을 센 그 Take(latestShotTake)의 배선 · 모델 · 해상도를 물려받는 새 Take(검토 b 보통 2) — 샷 상세 · Lumi 와 같은
     //   다시 만들기 하나로 부른다(두 갈래를 합친 뒤, 리드 검토 a: 따로 적어 두면 한쪽만 바뀌는 날 단추 값과 요청이 갈라진다).
+    const refusedBefore = videoLimitRefusal()
     const started = await director().remakeShotVideo(shotNodeId)
     if (started) return { started: true }
-    // 시작하지 못했다 — 그 샷 영상이 이미 도는 중이면 그 까닭, 아니면(Take · 동시 한도는 그 자리에서 따로 알린다) 일반 까닭.
-    const videoRunning = director().nodes.some((n) => isVideoData(n.data) && n.data.parentShotNodeId === shotNodeId && n.data.status === 'generating')
+    // 시작하지 못했다 — 이번 요청이 내 영상 동시 한도에 걸렸으면 그 까닭(멈춘 Take 도 뒤에서 끝날 때까지 자리를 쓴다, 리드 재검토 a),
+    //   그 샷 영상이 이미 도는 중이면 그 까닭(멈춘 Take 는 만드는 중이 아니다 — 오너 7번), 아니면(Take 부족은 그 자리에서 따로 알린다) 일반 까닭.
+    const refused = videoLimitRefusal()
+    if (refused && refused !== refusedBefore && refused.shotNodeId === shotNodeId) return { started: false, reason: 'video_limit' }
+    const videoRunning = director().nodes.some((n) => isVideoData(n.data) && n.data.parentShotNodeId === shotNodeId && n.data.status === 'generating' && !n.data.cancelledAt)
     return { started: false, reason: videoRunning ? 'video_running' : 'not_started' }
   },
 

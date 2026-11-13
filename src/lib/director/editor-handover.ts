@@ -13,7 +13,7 @@ import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 type Translate = (key: string, params?: Record<string, string | number>) => string
 
 /** [다시 만들기]를 시작하지 못한 까닭 — 창이 그 줄에 보인다(검토 b 2차 낮음 3 — 전엔 말없이 끝났다). no_window 는 보이지 않는다. */
-export type RemakeFailReason = 'no_window' | 'image_batch' | 'video_batch' | 'image_running' | 'image_failed' | 'video_running' | 'not_started'
+export type RemakeFailReason = 'no_window' | 'image_batch' | 'video_batch' | 'image_running' | 'image_failed' | 'video_running' | 'video_limit' | 'not_started'
 export type RemakeResult = { started: true } | { started: false; reason: RemakeFailReason }
 
 /** 영상이 없는 까닭 — 실패(마지막 시도가 실패) · 만드는 중 · 아직 만들지 않음. */
@@ -132,6 +132,9 @@ export function remakeNotice(reason: RemakeFailReason, t: Translate): string | n
       return t('Failed to generate the image.')
     case 'video_running':
       return t("This shot's video is already being made.")
+    // 내 영상 동시 한도 — 멈춘 Take 도 뒤에서 끝날 때까지 자리를 쓴다(리드 재검토 a).
+    case 'video_limit':
+      return t('Too many videos are being made at once (stopped Takes keep their spot until they finish). You can make it once one is done.')
     case 'not_started':
       return t('Could not start the video. Try again in a moment.')
     default:
