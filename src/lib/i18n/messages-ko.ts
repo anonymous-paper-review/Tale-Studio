@@ -3147,9 +3147,10 @@ export const KO: Record<string, string> = {
   '{label} · {seconds}s': '{label} · {seconds}초',
   'Take {number} · Final': 'Take {number} · 최종',
   'Take {number} · Auto (latest finished)': 'Take {number} · 자동 (가장 최근 완성)',
-  'Failed while making · Hand it over without this shot and piece it together in Editor': '만들다 실패했어요 · 빼고 넘기면 Editor에서 이어 붙일 수 있어요',
+  // 빼고 넘긴 샷은 나중에 영상이 생기면 다음에 Editor 를 열 때 이야기 순서 자리에 저절로 들어간다(export 갈래 확인 2026-11-14).
+  'Failed while making · If you leave it out, it joins Editor on its own once its video is made': '만들다 실패했어요 · 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요',
   'Making it now · You can hand it over from this window once it is done': '만드는 중이에요 · 끝나면 이 창에서 바로 넘길 수 있어요',
-  'Not made yet · Hand it over without this shot and piece it together in Editor': '아직 만들지 않았어요 · 빼고 넘기면 Editor에서 이어 붙일 수 있어요',
+  'Not made yet · If you leave it out, it joins Editor on its own once its video is made': '아직 만들지 않았어요 · 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요',
   'Make video · {takes} Takes': '영상 만들기 · Take {takes}',
   'Make again · {takes} Takes': '다시 만들기 · Take {takes}',
   'Go back': '돌아가기',

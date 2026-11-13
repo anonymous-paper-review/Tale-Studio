@@ -90,10 +90,10 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
                   ) : (
                     <span className="mt-0.5 block text-caption text-destructive">
                       {row.missing === 'failed'
-                        ? t('Failed while making · Hand it over without this shot and piece it together in Editor')
+                        ? t('Failed while making · If you leave it out, it joins Editor on its own once its video is made')
                         : row.missing === 'generating'
                           ? t('Making it now · You can hand it over from this window once it is done')
-                          : t('Not made yet · Hand it over without this shot and piece it together in Editor')}
+                          : t('Not made yet · If you leave it out, it joins Editor on its own once its video is made')}
                     </span>
                   )}
                 </span>
