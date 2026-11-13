@@ -87,6 +87,15 @@ describe('Director 샷 상세 화면', () => {
     expect(readFileSync('src/features/director/canvas-popups/DirectorNodePopup.tsx', 'utf8')).not.toMatch(/<DialogTitle[^>]*>\{node\.data\.label\}/)
   })
 
+  it('세로 프로젝트의 상세에서 시작 · 끝 그림과 영상 미리보기 틀은 세로(9:16)다', () => {
+    // 왜: 오너 2026-09-30 "Producer 에서 정한 화면비를 Director 화면이 그대로 따른다" — 옛 상세가 지키던 약속(project-aspect)을 새 상세도 지킨다.
+    done(1)
+    expect(render('popup').match(/aspect-ratio:9 \/ 16/g)?.length).toBeGreaterThanOrEqual(2)
+    const video = render('panel', 'video')
+    expect(video).toMatch(/<figure[^>]*style="aspect-ratio:9 \/ 16[^"]*"[^>]*data-testid="shot-detail-take-preview"/)
+    expect(video.match(/aspect-ratio:9 \/ 16/g)?.length).toBeGreaterThanOrEqual(3)
+  })
+
   it('상세에는 이미지 · 영상 탭이 있고 영상이 없으면 "영상 · 없음"이다', () => {
     // 왜: D6 — 영상이 아직 없는 샷은 탭에서 바로 알 수 있다.
     const out = render('popup')
