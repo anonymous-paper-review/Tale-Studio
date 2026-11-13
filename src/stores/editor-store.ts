@@ -1560,9 +1560,15 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   removeAudioSource: (id) => {
     const src = get().audioSources.find((s) => s.id === id)
     set((state) => ({ audioSources: state.audioSources.filter((s) => s.id !== id) }))
-    // 같은 blob을 쓰는 소스가 더 없으면 IndexedDB blob 삭제
+    // 같은 blob을 쓰는 소스 · 타임라인 소리 조각이 더 없으면 IndexedDB blob 삭제 — 조각이 쓰는 파일을 지우면 다시 열 때 그 조각의 소리가
+    //   사라진다(검토 b, 2026-11-14). 되돌리기로 다시 살릴 수 있는 조각도 센다. 조각이 다 빠질 때 지우는 것은 3단계 "내 파일"에서.
     if (src?.blobKey) {
-      const stillUsed = get().audioSources.some((s) => s.blobKey === src.blobKey)
+      const st = get()
+      const clipUses = (clips: readonly AudioTrackClip[]) => clips.some((a) => a.blobKey === src.blobKey)
+      const stillUsed =
+        st.audioSources.some((s) => s.blobKey === src.blobKey) ||
+        clipUses(st.audioClips) ||
+        [...st.past, ...st.future].some((snapshot) => clipUses(snapshot.audioClips))
       if (!stillUsed) void deleteAudioBlob(src.blobKey)
     }
   },
