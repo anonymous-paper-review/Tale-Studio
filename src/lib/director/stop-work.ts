@@ -12,6 +12,12 @@ export function stoppableJobs<T extends Pick<ActiveJob, 'kind' | 'cancelledAt'>>
   return jobs.filter((job) => STOPPABLE_JOB_KINDS.includes(job.kind) && !job.cancelledAt)
 }
 
+/** 이 작업을 지금 화면에서 멈출 수 있는가 — 지금 도는 작업 목록에 있는(서버가 준 진짜 id) 아직 멈추지 않은 작업일 때만.
+ *  요청이 오가는 동안 Take 에 든 것은 화면이 만든 요청 키라 목록에 없다 — 그때는 [멈추기]를 보이지 않는다(검토 a). */
+export function isStoppableJob(jobId: string | null | undefined, jobs: readonly Pick<ActiveJob, 'id' | 'kind' | 'cancelledAt'>[]): boolean {
+  return !!jobId && stoppableJobs(jobs).some((job) => job.id === jobId)
+}
+
 /** 영상 묶음이 아직 도는가 — 멈춘 묶음은 화면에서 멈추지 않은 작업이 남았을 때만 돈다(멈추면 바로 다시 만들 수 있다). */
 export function videoBatchLive(
   batch: { busy: boolean; cancelled: boolean; jobIds: readonly string[] },
