@@ -380,6 +380,7 @@ function CanvasInner() {
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
   const togglePickedShot = useDirectorCanvasStore((s) => s.togglePickedShot)
   const selectEdge = useDirectorCanvasStore((s) => s.selectEdge)
+  const closeShotDetail = useDirectorCanvasStore((s) => s.closeShotDetail)
   const persistNodePosition = useDirectorCanvasStore(
     (s) => s.persistNodePosition,
   )
@@ -787,6 +788,8 @@ function CanvasInner() {
         onPaneClick={() => {
           selectNode(null)
           selectEdge(null)
+          // ⤢ 로 연 샷 상세(openShotDetail)도 닫는다 — 예전 ⤢(고르기)처럼 빈 캔버스를 누르면 닫힌다(검토 c 낮음).
+          closeShotDetail()
           setContextMenu(null)
         }}
         // 우클릭(#context-menu): 노드=편집/복사/삭제 메뉴, 빈 캔버스=노드 생성 메뉴.
