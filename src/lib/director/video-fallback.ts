@@ -17,6 +17,7 @@
 // 차지(claim): 실패한 요청 id 를 들고 있는 queued 작업만 'reserved:' 로 바꿔 차지한다. 웹훅과 폴링이
 //   같은 실패를 동시에 보더라도 한 쪽만 다음 모델을 보낸다. 'reserved:' 상태는 폴링·청소가 손대지 않는
 //   "제출 중" 표시이고, 제출이 끝나면 attach 가 새 요청 id 로 바꾼다(첫 제출과 같은 순서).
+//   멈춤으로 끝낼 때도 같은 차지를 거친다 — 진 쪽은 실패로 덮지 않고 지금 작업을 돌려준다(검토 a · 리드 11/14).
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import {
   attachProviderRequestToReservedVideoJob,
@@ -197,6 +198,8 @@ export async function failDirectorVideoAttemptOrFallback(job: GenerationJob, evi
   if (plan) {
     let steps = plan.steps
     let expectedRequestId = job.request_id
+    // 행에 지금 적힌 작업 기록 — 멈춤으로 끝내려고 차지할 때는 기록을 바꾸지 않는다.
+    let storedSnapshot: Record<string, unknown> = plan.snapshot
     for (;;) {
       const triedModels = [...(plan.primaryModel ? [plan.primaryModel] : []), ...steps.map((step) => step.model)]
       const next = nextVideoFallbackModel(triedModels, plan.imageUrls.length > 0)
@@ -204,6 +207,11 @@ export async function failDirectorVideoAttemptOrFallback(job: GenerationJob, evi
       // 넘어가기 직전마다(첫 넘김 포함) 멈춤을 본다 — 앞 대체 모델이 바로 거절된 사이에도 멈출 수 있다.
       //   넘길 모델이 없으면 어차피 실패라 읽지 않는다. 멈춤 표를 읽지 못하면 멈추지 않은 것으로 본다(지금 동작).
       if (await isJobCancelled(job.id)) {
+        // 멈춤으로 끝낼 때도 대체를 내는 쪽과 같은 차지를 거친다(검토 a · 리드 11/14) — 웹훅과 폴링이 같은 실패를 함께 보는 사이
+        //   멈춤이 적히면 멈춤을 못 본 쪽이 먼저 차지해 다음 모델을 보낼 수 있다. 그 작업을 실패로 덮지 않는다.
+        if (!await claimForFallback(job, expectedRequestId, storedSnapshot, reason)) {
+          return (await getGenerationJobById(job.id)) ?? job
+        }
         console.warn('[director/video-fallback] stopped job is not moved to the next model:', job.id)
         break
       }
@@ -215,6 +223,7 @@ export async function failDirectorVideoAttemptOrFallback(job: GenerationJob, evi
         return (await getGenerationJobById(job.id)) ?? job
       }
       expectedRequestId = `reserved:${job.id}`
+      storedSnapshot = snapshot
       let submission: Awaited<ReturnType<typeof submitFalReferenceToVideo>>
       try {
         submission = await submitFalReferenceToVideo(request, resolveWebhookUrl(), job.fal_key_id, plan.moderation)

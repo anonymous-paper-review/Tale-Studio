@@ -11,6 +11,8 @@ const mocks = vi.hoisted(() => ({
   hold: vi.fn(),
   cancellation: vi.fn(),
   claims: [] as Array<Record<string, unknown>>,
+  // 작업 행 하나 — 웹훅 · reconcile 이 같은 행을 두고 차지를 다툰다.
+  row: { status: 'queued', request_id: 'seedance-request-1' },
 }))
 
 vi.mock('@/lib/fal/keys', () => ({
@@ -42,13 +44,24 @@ vi.mock('@/lib/supabase/admin', () => ({
         return read
       }
       if (table !== 'generation_jobs') throw new Error(`unexpected table ${table}`)
+      let patch: Record<string, unknown> = {}
+      const filters: Record<string, unknown> = {}
       const claim = {
-        update(patch: Record<string, unknown>) {
-          mocks.claims.push(patch)
+        update(next: Record<string, unknown>) {
+          patch = next
+          mocks.claims.push(next)
           return claim
         },
-        eq: () => claim,
-        select: () => Promise.resolve({ data: [{ id: 'job-1' }], error: null }),
+        eq(column: string, value: unknown) {
+          filters[column] = value
+          return claim
+        },
+        // 차지는 queued 이고 요청 id 가 본 값 그대로일 때만 된다 — 이긴 쪽이 요청 id 를 바꾼다.
+        select() {
+          const won = mocks.row.status === filters.status && mocks.row.request_id === filters.request_id
+          if (won) mocks.row.request_id = patch.request_id as string
+          return Promise.resolve({ data: won ? [{ id: 'job-1' }] : [], error: null })
+        },
       }
       return claim
     },
@@ -103,9 +116,13 @@ function submittedEndpoints(): string[] {
 beforeEach(() => {
   vi.resetAllMocks()
   mocks.claims.length = 0
+  mocks.row.status = 'queued'
+  mocks.row.request_id = 'seedance-request-1'
   mocks.falKeyById.mockImplementation((id: string) => ({ id, client: { queue: { submit: mocks.submit } } }))
   mocks.submit.mockResolvedValue({ request_id: 'fallback-request-1' })
-  mocks.attach.mockResolvedValue(undefined)
+  // 대체 요청을 붙이면 작업 행의 요청 id 가 새 요청 id 로 바뀐다.
+  mocks.attach.mockImplementation(async (_project: string, _job: string, taskId: string) => { mocks.row.request_id = taskId })
+  mocks.getJob.mockImplementation(async () => ({ ...(seedanceJob() as object), status: mocks.row.status, request_id: mocks.row.request_id }))
   mocks.markFailed.mockResolvedValue(undefined)
   mocks.cancellation.mockReturnValue(NOT_STOPPED)
 })
@@ -119,7 +136,10 @@ describe('같이 정한 것', () => {
     const result = await failDirectorVideoAttemptOrFallback(seedanceJob(), LIKENESS)
 
     expect(mocks.submit).not.toHaveBeenCalled()
-    expect(mocks.claims).toEqual([])
+    // 멈춤으로 끝낼 때도 대체를 내는 쪽과 같은 차지를 거친다(검토 a · 리드 11/14) — 대체 단계는 적지 않는다.
+    expect(mocks.claims).toHaveLength(1)
+    expect(mocks.claims[0]).toMatchObject({ request_id: 'reserved:job-1' })
+    expect(mocks.claims[0].input_snapshot).not.toHaveProperty('video_fallback')
     // markDirectorVideoAttemptFailed 가 실패 처리와 함께 잡아둔 Take 를 전부 돌려준다.
     expect(mocks.markFailed).toHaveBeenCalledWith('project-1', 'job-1', LIKENESS)
     expect(result).toMatchObject({ status: 'failed', error: LIKENESS })
@@ -147,6 +167,27 @@ describe('같이 정한 것', () => {
     expect(submittedEndpoints()).toEqual(['minimax/h3-max/image-to-video'])
     expect(mocks.markFailed).not.toHaveBeenCalled()
     expect(result).toMatchObject({ status: 'queued', request_id: 'fallback-request-1' })
+  })
+
+  it('멈춤으로 끝낼 때도 대체를 내는 쪽과 같은 차지를 거친다 — 다른 쪽(웹훅 · reconcile)이 이미 대체 요청을 차지했으면 그 작업을 실패로 덮지 않고 지금 작업을 다시 읽어 돌려준다', async () => {
+    // 왜: 검토 a(리드 11/14) — 웹훅과 reconcile 이 같은 거절을 함께 다루는 사이 멈춤이 적히면, 멈춤을 못 본 쪽은 차지에 이겨 대체를 내고
+    //   멈춤을 본 쪽은 차지 없이 실패로 끝내 그 작업을 실패 · Take 반환으로 덮었다 — 대체 요청은 생성처에서 그대로 돌고 결과는 어디에도 안 붙는다.
+    let answer: (value: { request_id: string }) => void = () => {}
+    mocks.submit.mockImplementationOnce(() => new Promise((resolve) => { answer = resolve }))
+    mocks.cancellation.mockReturnValueOnce(NOT_STOPPED).mockReturnValue(STOPPED)
+
+    // 한쪽(멈춤 전에 읽음)이 먼저 차지해 대체 요청을 보내는 중이다.
+    const first = failDirectorVideoAttemptOrFallback(seedanceJob(), LIKENESS)
+    await vi.waitFor(() => expect(mocks.submit).toHaveBeenCalledTimes(1))
+    expect(mocks.row.request_id).toBe('reserved:job-1')
+    // 다른 쪽은 같은 거절을 늦게 다루고, 그사이 멈춤이 적혔다.
+    const second = await failDirectorVideoAttemptOrFallback(seedanceJob(), LIKENESS)
+
+    expect(mocks.markFailed).not.toHaveBeenCalled()
+    expect(second).toMatchObject({ status: 'queued', request_id: 'reserved:job-1' })
+    answer({ request_id: 'fallback-request-1' })
+    expect(await first).toMatchObject({ status: 'queued', request_id: 'fallback-request-1' })
+    expect(mocks.attach).toHaveBeenCalledWith('project-1', 'job-1', 'fallback-request-1', expect.objectContaining({ model: 'minimax/h3-max/image-to-video' }))
   })
 })
 
