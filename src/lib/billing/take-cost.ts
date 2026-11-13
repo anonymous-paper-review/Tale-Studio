@@ -14,6 +14,7 @@
 //
 // server-only 의존성 금지 — 클라(Director 배지 등)에서도 그대로 import 하는 순수 함수·상수만 둔다.
 import { effectiveVideoResolution, type VideoModelKey, type VideoResolution } from '@/lib/video-models'
+import type { TakeBillingMode } from '@/lib/billing/take-hold'
 
 export const TAKE_COST_BY_MODEL: Record<VideoModelKey, number> = {
   'happy-horse': 1,
@@ -39,6 +40,12 @@ export function takeCostForVideo(
 ): number {
   if (!modelKey || !(modelKey in TAKE_COST_BY_MODEL)) return 1
   return TAKE_COST_BY_MODEL[modelKey] * TAKE_COST_MULTIPLIER_BY_RESOLUTION[effectiveVideoResolution(modelKey, resolution)]
+}
+
+/** 넘기기 창(D0 · D8)에 Take 값을 보일지 — 과금이 정말 꺼졌을 때만 숨긴다. 잔액을 못 읽으면(failed) 잔액 훅이 꺼짐(off)처럼
+ *  보이지만, D8 은 확인 창 없이 단추 값이 곧 동의인 자리라 센 값을 그대로 보인다(2026-11-14 검토 b 2차 낮음 1). */
+export function takeValuesShown(balance: { mode: TakeBillingMode; failed?: boolean }): boolean {
+  return balance.mode !== 'off' || balance.failed === true
 }
 
 /** 러프 previz 영상(#previz-video)은 항상 드래프트 단가 — happy-horse 고정 모델의 계수와 동일. */

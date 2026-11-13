@@ -2316,6 +2316,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // 일괄이 도는 중이면 창이 단추를 끄고 까닭을 보인다(검토 b 낮음 1) — 여기서도 Take 를 만들지 않고 까닭을 돌려준다(2차 낮음 3).
     if (director().realBatchBusy) return { started: false, reason: 'image_batch' }
     if (director().videoBatchBusy) return { started: false, reason: 'video_batch' }
+    // 잔액을 못 읽은 채 Take 를 쓰는 다시 만들기를 시작하지 않는다 — 채팅 영상 부탁과 같은 판단(검토 b 2차 낮음 1).
+    //   누를 때마다 잔액을 다시 읽어, 읽히면 그대로 시작한다. 이미지도 만들기 전에 본다(영상까지 못 가면 이미지 값만 남는다).
+    const { fetchTakeBalance } = await import('@/lib/billing/use-take-balance')
+    if ((await fetchTakeBalance()).failed) return { started: false, reason: 'takes_unknown' }
     const imageStatus = () => {
       const node = director().nodes.find((n) => n.id === shotNodeId)
       return node && isShotData(node.data) ? node.data.storyboardImage?.status ?? null : null

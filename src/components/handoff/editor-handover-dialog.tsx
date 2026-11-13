@@ -13,6 +13,7 @@ import { ThumbImage } from '@/components/thumb-image'
 import { boardNodeNames } from '@/features/director/node-label'
 import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, remakeNotice, type EditorHandoverShot } from '@/lib/director/editor-handover'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
+import { takeValuesShown } from '@/lib/billing/take-cost'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
@@ -27,9 +28,9 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
   const proceed = useGlobalChatStore((s) => s.proceedToEditorWithVideos)
   const remake = useGlobalChatStore((s) => s.remakeMissingVideo)
   const close = useGlobalChatStore((s) => s.closeHandoffConfirm)
-  // 일괄이 도는 중이면 줄 단추를 끄고 까닭을 적는다(검토 b 낮음 1). Take 값은 노드와 같은 숨김 규칙(과금이 꺼져 있으면 숨김, 낮음 5).
+  // 일괄이 도는 중이면 줄 단추를 끄고 까닭을 적는다(검토 b 낮음 1). Take 값은 과금이 꺼져 있을 때만 숨긴다 — 잔액을 못 읽으면 센 값을 보인다(2차 낮음 1).
   const batch = useDirectorCanvasStore((s) => (s.realBatchBusy ? 'images' : s.videoBatchBusy ? 'videos' : null))
-  const showTakes = useTakeBalance().mode !== 'off'
+  const showTakes = takeValuesShown(useTakeBalance())
   const [starting, setStarting] = useState<string | null>(null)
   // [다시 만들기]를 시작하지 못한 까닭 — 그 줄 아래에 보인다(검토 b 2차 낮음 3).
   const [notice, setNotice] = useState<{ shotNodeId: string; message: string } | null>(null)
