@@ -18,6 +18,7 @@ vi.mock('@/lib/chat-format', async (original) => ({
 }))
 
 import { POST } from '@/app/api/editor/chat/route'
+import { EDITOR_FEATURES, EDITOR_NOT_AVAILABLE, editorFeaturesPrompt } from '@/lib/editor/editor-features'
 
 const post = (body: Record<string, unknown>) => POST(new Request('http://localhost/api/editor/chat', { method: 'POST', body: JSON.stringify(body) }))
 
@@ -51,6 +52,20 @@ describe('Editor 조언 서버', () => {
     expect(system).toContain('explain how the user can do it in the Editor')
     expect(user).toContain('Cuts on the timeline: 2')
     expect(user).toContain('Delete the first cut')
+  })
+
+  // 왜: 영어 재점검(qa-golden d20304a6) B2 — 조언이 없는 기능("open the transitions panel … fade-out", "right-click the leftover part and delete it")을 하라고 했다.
+  //   기능 목록은 한 곳(lib/editor/editor-features)에만 있고 서버는 거기서 읽는다. 모델 답이 목록을 지키는지는 시험으로 못 본다 — 목록 · 규칙이 실리는지만 본다.
+  it('Editor 조언에는 지금 Editor 에 있는 기능 목록과 "목록 밖 기능은 말하지 말 것"이 실린다 — 없는 기능(전환 패널 · 남은 부분 지우기 메뉴 등)을 하라고 하지 않게', async () => {
+    mocks.llmChat.mockResolvedValue('Right-click the clip and choose Dissolve (dip to black).')
+    await post({ message: 'How do I fade out at the end?', projectId: 'proj-e', timelineContext: 'Cuts on the timeline: 2' })
+    const [system] = mocks.llmChat.mock.calls[0] as [string]
+    expect(system).toContain(editorFeaturesPrompt())
+    for (const line of [...EDITOR_FEATURES, ...EDITOR_NOT_AVAILABLE]) expect(system).toContain(line)
+    expect(system).toContain('Only suggest controls listed in <editor_features>')
+    // 이번에 실제로 지어낸 두 가지는 "없는 것"에 적혀 있다.
+    expect(EDITOR_NOT_AVAILABLE.some((line) => line.includes('a transitions panel'))).toBe(true)
+    expect(EDITOR_NOT_AVAILABLE.some((line) => line.includes("a delete item in a clip's right-click menu"))).toBe(true)
   })
 
   // 왜: 로그인 · 빈 메시지 검사는 다른 채팅 길과 같다 — 로그인하지 않은 사람은 조언 모델을 부르지 못한다.
