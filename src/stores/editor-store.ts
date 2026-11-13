@@ -92,6 +92,12 @@ export function isTitleCardShotId(shotId: string): boolean {
   return TITLE_CARD_RE.test(shotId)
 }
 
+/** 사람이 뺀 원본 샷 목록에 더한다 — 조각(자른 · 끼운 · 타이틀 카드)은 저절로 돌아올 일이 없어 적지 않는다(검토 c, 2026-11-14). */
+function withRemoved(removed: readonly string[], shotIds: readonly string[]): string[] {
+  const add = shotIds.filter((id) => !isSyntheticShotId(id) && !removed.includes(id))
+  return add.length ? [...removed, ...add] : (removed as string[])
+}
+
 // 고유 id 생성. 모듈 카운터는 HMR/새로고침 후 리셋되어 영속화된 id 와 충돌(audio_1 중복 등)
 // → React key 중복 + 같은 id 클립 일괄 토글 버그 유발. crypto.randomUUID 로 충돌 원천 차단.
 function uid(): string {
@@ -108,6 +114,8 @@ interface EditorState {
   selectedAudioId: string | null      // 다중 선택의 앵커/대표 (range 기준, Del 대상 구분)
   selectedAudioIds: string[]          // 다중 선택된 오디오 클립 (marquee/Ctrl/Shift)
   clipOrder: Record<string, string[]> // sceneId → shotId[]
+  // 사람이 타임라인에서 뺀 원본 샷 — 영상이 없어져 저절로 빠진 샷과 가려, 영상이 다시 생겨도 저절로 돌아오지 않게 한다(검토 c, 2026-11-14).
+  removedShotIds: string[]
   error: string | null
   // #pps-empty-states(2026-08-27): shots=0 의 세 이유(로딩/실패/정상 빈)를 화면이 구분하게 하는
   //   로드 상태. 'idle' 은 loadData 발화 전 첫 렌더 — 화면은 로딩과 동일하게 취급한다.
@@ -254,6 +262,7 @@ interface EditorState {
 interface EditorSnapshot {
   shots: Shot[]
   clipOrder: Record<string, string[]>
+  removedShotIds: string[]
   videoClips: VideoClip[]
   audioClips: AudioTrackClip[]
   audioSources: AudioSource[]
@@ -512,6 +521,49 @@ function placeInStory(order: string[], shotId: string, story: string[]): string[
   return [...order.slice(0, at), shotId, ...order.slice(at)]
 }
 
+const round3 = (sec: number) => Math.round(sec * 1000) / 1000
+
+/** 영상이 새로 생겨 들어온 샷의 클립 — 새 영상이니 전에 고친 구간 · 빠르기 · 전환 없이 처음 상태(검토 c 리드 판단, 2026-11-14). */
+function freshClip(clip: VideoClip): VideoClip {
+  const { trimStart: _start, trimEnd: _end, transitionIn: _transition, ...rest } = clip
+  return { ...rest, speed: 1 }
+}
+
+/**
+ * 사람이 보던 타임라인의 한 시각이 자리가 저절로 바뀐 뒤 어디가 되는가 — 그 시각을 품은(또는 그 앞에서 가장 가까운) 클립이 움직인 만큼.
+ *   빠진 칸 안의 시각은 그 칸이 있던 자리(앞에 남은 클립 끝)로 접힌다. 사람이 놓은 소리를 영상과 같이 옮길 때 쓴다(검토 c, 2026-11-14).
+ */
+function movedTime(
+  sec: number,
+  shown: ReadonlyArray<{ shotId: string; startSec: number; durationSec: number }>,
+  now: ReadonlyMap<string, { startSec: number; durationSec: number }>,
+): number {
+  let anchor = -1
+  for (let i = 0; i < shown.length; i++) {
+    if (shown[i].startSec <= sec + 0.0005) anchor = i
+    else break
+  }
+  if (anchor < 0) return sec
+  const placed = now.get(shown[anchor].shotId)
+  if (placed) return round3(sec + placed.startSec - shown[anchor].startSec)
+  for (let i = anchor - 1; i >= 0; i--) {
+    const kept = now.get(shown[i].shotId)
+    if (kept) return round3(kept.startSec + kept.durationSec)
+  }
+  return 0
+}
+
+/** 샷 구간 · 빠르기를 서버(DB)에서 처음으로 되돌린다(보내고 잊음) — 영상이 새로 생겨 들어온 샷(검토 c, 2026-11-14). */
+function persistShotReset(path: '/api/editor/trim' | '/api/editor/speed', body: Record<string, unknown>) {
+  const projectId = useProjectStore.getState().projectId
+  if (!projectId) return
+  fetch(path, {
+    method: 'PATCH',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ projectId, ...body }),
+  }).catch((err) => console.error('[editor-store] shot reset persist failed:', err))
+}
+
 function buildClipOrder(shots: Shot[]): Record<string, string[]> {
   const order: Record<string, string[]> = {}
   for (const shot of shots) {
@@ -528,6 +580,7 @@ function snapshotOf(state: EditorState): EditorSnapshot {
   return {
     shots: structuredClone(state.shots),
     clipOrder: structuredClone(state.clipOrder),
+    removedShotIds: [...state.removedShotIds],
     videoClips: structuredClone(state.videoClips),
     audioClips: structuredClone(state.audioClips),
     audioSources: structuredClone(state.audioSources),
@@ -572,6 +625,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   selectedAudioId: null,
   selectedAudioIds: [],
   clipOrder: {},
+  removedShotIds: [],
   error: null,
   loadStatus: 'idle',
   resetCount: 0,
@@ -1048,31 +1102,62 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       //   제자리에 들어온다. 약속: tests/editor/shots-with-video.test.ts
       const clipUrl = new Map(combinedClips.map((c) => [c.shotId, c.url]))
       const playable = (shotId: string) => isTitleCardShotId(shotId) || !!clipUrl.get(shotId)
-      const savedUrl = new Map((saved.videoClips ?? []).map((c) => [c.shotId, c.url]))
       const savedShotIds = new Set((saved.shots ?? []).map((s) => s.shotId))
+      // 사람이 뺀 원본 샷 — 새 저장본은 목록으로 적혀 있고, 고침 전 저장본은 "저장할 때 있었는데 순서에 없는 샷"이다(그때는 영상 없는
+      //   샷도 빈 칸으로 순서에 있었다). 영상이 없어져 저절로 빠진 샷은 이 목록에 없어 영상이 생기면 돌아온다(검토 c, 2026-11-14).
+      const savedOrderIds = new Set(Object.values(saved.clipOrder ?? {}).flat())
+      const removedShotIds = saved.removedShotIds
+        ?? (saved.shots ?? []).map((s) => s.shotId).filter((id) => !isSyntheticShotId(id) && !savedOrderIds.has(id))
+      const removed = new Set(removedShotIds)
       const clipOrder: Record<string, string[]> = {}
+      // 사람이 보던 자리(저장한 순서, 영상 없는 칸까지) — 자리가 저절로 바뀐 만큼 사람이 놓은 소리도 옮기려고 견준다.
+      const shownOrder: Record<string, string[]> = {}
       // 이번에 타임라인에 들어온 샷(영상이 새로 생긴 샷 · 저장 뒤 새로 생긴 샷) — 그 영상 소리를 아래에서 놓는다.
       const entered: string[] = []
+      // 그중 영상이 새로 생긴 샷 — 새 영상이라 처음 상태(구간 · 빠르기 · 조각 없이)로 들인다(검토 c 리드 판단).
+      const arrived = new Set<string>()
       for (const [sceneId, canonicalIds] of canonicalOrder) {
         const savedIds = saved.clipOrder?.[sceneId] ?? []
-        let order = savedIds.filter(
-          (shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index && playable(shotId),
-        )
+        const kept = savedIds.filter((shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index)
+        shownOrder[sceneId] = kept
+        let order = kept.filter(playable)
         const story = cur.shots.filter((s) => s.sceneId === sceneId).map((s) => s.shotId)
         for (const id of story) {
-          if (order.includes(id) || !playable(id) || !savedShotIds.has(id) || savedUrl.get(id)) continue
+          if (order.includes(id) || !playable(id) || !savedShotIds.has(id) || removed.has(id)) continue
           order = placeInStory(order, id, story)
           entered.push(id)
+          arrived.add(id)
         }
         const fresh = canonicalIds.filter((id) => !order.includes(id) && !savedShotIds.has(id) && playable(id))
         entered.push(...fresh)
         clipOrder[sceneId] = [...order, ...fresh]
       }
+      // 타임라인에 없는 조각(자른 · 끼운 조각 · 타이틀 카드)은 버린다 — 샷 목록에만 남는 유령 조각이 없게(검토 c).
+      const placedIds = new Set(Object.values(clipOrder).flat())
+      const keep = (shotId: string) => !isSyntheticShotId(shotId) || placedIds.has(shotId)
+      const timelineShots = combinedShots.filter((s) => keep(s.shotId))
+      const timelineClips = combinedClips
+        .filter((c) => keep(c.shotId))
+        .map((c) => (arrived.has(c.shotId) ? freshClip(c) : c))
       // 이음 칸이 없는 예전 저장본은 지금 영상 자리 · 처음 나눈 자리와 맞는 소리를 다시 잇고, 이어진 소리는 되살린 영상 자리에 맞춘다(결정 4).
       //   같은 소리 파일의 파형은 저장본에 한 번만 있다 — 빠진 조각은 같은 파일의 파형을 함께 쓴다(검토 b).
-      const timeline = { shots: combinedShots, videoClips: combinedClips, clipOrder }
+      const timeline = { shots: timelineShots, videoClips: timelineClips, clipOrder }
       const relinked = relinkSavedAudio(sharePeaks(dedupAudioClips), timeline, { shots: cur.shots, videoClips: cur.videoClips }, saved.videoClips ?? [])
-      let audioClips = syncLinkedAudio({ ...timeline, audioClips: relinked })
+      // ★ 최종 Take 가 바뀌어 영상 주소가 달라졌으면 이어진 소리도 새 영상에서 다시 나눈다 — 사람이 바꾼 크기 · 음소거는 남기고,
+      //   구간은 새 영상 자리에 맞추며(아래 맞추기), 파형은 편집 화면을 연 뒤 뒤에서 채운다(검토 c, 2026-11-14).
+      const retargeted = relinked.map((a) => {
+        const url = a.linkedShotId ? clipUrl.get(a.linkedShotId) : null
+        return url && a.url !== url ? { ...a, url, peaks: [], sourceDurationSec: undefined } : a
+      })
+      // 자리가 저절로 바뀌었으면(영상 없는 샷이 빠지거나 영상이 생긴 샷이 들어옴) 그 자리 뒤에서 시작하는 사람이 놓은 소리도 같은 만큼
+      //   옮긴다 — 그 자리 전부터 깔린 소리는 그대로(검토 c 리드 판단, 2단계 ㉠ 과 같은 원칙). 약속: tests/editor/shots-with-video.test.ts
+      const shownLayout = selectTimelineLayout({ shots: combinedShots, videoClips: combinedClips, clipOrder: shownOrder })
+      const nowLayout = new Map(selectTimelineLayout(timeline).map((l) => [l.shotId, l]))
+      const takenOut = new Set(shownLayout.filter((l) => !nowLayout.has(l.shotId) && !isTitleCardShotId(l.shotId)).map((l) => rootShotIdOf(l.shotId)))
+      const shifted = takenOut.size || entered.length
+        ? retargeted.map((a) => (a.linkedShotId ? a : { ...a, startSec: movedTime(a.startSec, shownLayout, nowLayout) }))
+        : retargeted
+      let audioClips = syncLinkedAudio({ ...timeline, audioClips: shifted })
       // 들어온 샷은 그 영상 소리도 오디오 칸에 이어서 놓는다 — 처음 열 때처럼(오너 2026-11-10 결정 4). 파형은 편집 화면을 연 뒤
       //   뒤에서 채운다(open-editor 의 빈 파형 채우기). 사람이 고친 것이 아니라 되돌리기 칸에는 남지 않는다(아래 past: []).
       if (entered.length) {
@@ -1083,7 +1168,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
           const item = layout.find((l) => l.shotId === shotId)
           const url = clipUrl.get(shotId)
           if (!item || !url || audioClips.some((a) => a.linkedShotId === shotId)) continue
-          const type = combinedShots.find((s) => s.shotId === shotId)?.shotType
+          const type = timelineShots.find((s) => s.shotId === shotId)?.shotType
           added.push({
             id: `audio_${uid()}`,
             name: translate(locale, '{type} audio', { type: type ?? translate(locale, 'Video') }),
@@ -1101,13 +1186,38 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
         if (added.length) audioClips = syncLinkedAudio({ ...timeline, audioClips: [...audioClips, ...added] })
       }
+      // 자리가 저절로 바뀌었으면 열 때 한 번 알린다 — 사람이 하지 않은 일로 뒤 컷 · 소리가 옮겨졌다(검토 c).
+      const moved =
+        shownLayout.some((l) => {
+          const now = nowLayout.get(l.shotId)
+          return !!now && Math.abs(now.startSec - l.startSec) > 0.0005
+        }) || shifted.some((a, i) => a !== retargeted[i] && Math.abs(a.startSec - retargeted[i].startSec) > 0.0005)
+      if (moved) {
+        const locale = useLocaleStore.getState().locale
+        const out = takenOut.size
+        const came = entered.length
+        toast.info(
+          out && came
+            ? translate(locale, 'Shots without video ({removed}) were taken out and shots that now have video ({added}) came in, so the cuts and sounds after them moved.', { removed: out, added: came })
+            : out
+              ? translate(locale, 'Shots without video ({count}) were taken out, so the cuts and sounds after them moved.', { count: out })
+              : translate(locale, 'Shots that now have video ({count}) came in, so the cuts and sounds after them moved.', { count: came }),
+        )
+      }
+      // 영상이 새로 생겨 들어온 샷의 옛 구간 · 빠르기는 서버(DB)에서도 처음으로 — 다음에 열 때 옛 구간이 다시 입혀지지 않게.
+      for (const id of arrived) {
+        const before = cur.videoClips.find((c) => c.shotId === id)
+        if (before && (before.trimStart != null || before.trimEnd != null)) persistShotReset('/api/editor/trim', { shotId: id, trimStart: null, trimEnd: null })
+        if (before && (before.speed ?? 1) !== 1) persistShotReset('/api/editor/speed', { shotId: id, speed: 1 })
+      }
       set({
         // Canonical shots/videoClips come from loadData (DB truth). Only synthetic editor
         // pieces whose base shot is still canonical are merged back in above - a local
         // snapshot must not resurrect deleted media when that DB snapshot is empty.
-        shots: combinedShots,
-        videoClips: combinedClips,
+        shots: timelineShots,
+        videoClips: timelineClips,
         clipOrder,
+        removedShotIds,
         audioClips,
         audioSources: saved.audioSources ?? [],
         audioTracks: dedupTracks,
@@ -1133,6 +1243,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       shots: [] as Shot[],
       videoClips: [] as VideoClip[],
       clipOrder: {} as Record<string, string[]>,
+      removedShotIds: [] as string[],
       selectedSceneId: null,
       selectedClipShotId: null,
       selectedShotIds: [] as string[],
@@ -1310,6 +1421,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       selectedAudioId: null,
       selectedAudioIds: [],
       clipOrder: {},
+      removedShotIds: [],
       error: null,
       loadStatus: 'idle',
       currentTime: 0,
@@ -1541,6 +1653,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       // 숨긴 클립에 이어진 소리는 함께 빠지고, 뒤 클립 소리는 영상처럼 당겨진다(결정 4).
       return withLinkedAudio(state, {
         clipOrder: newOrder,
+        removedShotIds: withRemoved(state.removedShotIds, [shotId]),
         selectedShotIds: state.selectedShotIds.filter((id) => id !== shotId),
         selectedClipShotId:
           state.selectedClipShotId === shotId ? null : state.selectedClipShotId,
@@ -1559,6 +1672,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       return withLinkedAudio(state, {
         clipOrder: newOrder,
+        removedShotIds: withRemoved(state.removedShotIds, [...ids]),
         selectedShotIds: [],
         selectedClipShotId: null,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
@@ -2046,6 +2160,7 @@ function runServerSave(projectId: string, generation: number): Promise<ServerSav
 const pickPersisted = (s: EditorState) => ({
   shots: s.shots,
   clipOrder: s.clipOrder,
+  removedShotIds: s.removedShotIds,
   videoClips: s.videoClips,
   audioClips: s.audioClips,
   audioSources: s.audioSources,
@@ -2084,6 +2199,7 @@ if (typeof window !== 'undefined') {
     if (
       cur.shots === prev.shots &&
       cur.clipOrder === prev.clipOrder &&
+      cur.removedShotIds === prev.removedShotIds &&
       cur.videoClips === prev.videoClips &&
       cur.audioClips === prev.audioClips &&
       cur.audioSources === prev.audioSources &&

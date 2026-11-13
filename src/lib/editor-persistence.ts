@@ -12,6 +12,11 @@ export interface PersistedEditor {
   serverAware?: boolean
   shots: Shot[]
   clipOrder: Record<string, string[]>
+  /**
+   * 사람이 타임라인에서 뺀 원본 샷(검토 c, 2026-11-14) — 영상이 없어져 저절로 빠진 샷은 영상이 생기면 돌아오지만 이 샷들은 돌아오지 않는다.
+   *   없으면 고침 전 저장본: 그때는 영상 없는 샷도 빈 칸으로 순서에 있었으니, 저장할 때 있었는데 순서에 없는 샷이 사람이 뺀 샷이다.
+   */
+  removedShotIds?: string[]
   videoClips: VideoClip[]
   audioClips: AudioTrackClip[]
   audioSources: AudioSource[]
