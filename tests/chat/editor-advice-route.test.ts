@@ -17,10 +17,21 @@ vi.mock('@/lib/chat-format', async (original) => ({
   resolveChatLocale: mocks.locale,
 }))
 
+import { readFileSync } from 'node:fs'
 import { POST } from '@/app/api/editor/chat/route'
-import { EDITOR_FEATURES, EDITOR_NOT_AVAILABLE, editorFeaturesPrompt } from '@/lib/editor/editor-features'
+import { EDITOR_FEATURES, EDITOR_NOT_AVAILABLE, editorFeatureLines, editorFeaturesPrompt } from '@/lib/editor/editor-features'
+import { translate } from '@/lib/i18n/translate'
 
 const post = (body: Record<string, unknown>) => POST(new Request('http://localhost/api/editor/chat', { method: 'POST', body: JSON.stringify(body) }))
+
+/** 영상 줄 클립의 오른쪽 클릭 메뉴(timeline.tsx) — [여기서 분할]이 있는 메뉴 덩어리와 그 첫 층 항목(하위 메뉴 이름 · 항목). */
+const clipMenu = readFileSync('src/features/editor/timeline.tsx', 'utf8')
+  .split('<ContextMenuContent').slice(1).map((block) => block.split('</ContextMenuContent>')[0])
+  .find((block) => block.includes("t('Split here')")) ?? ''
+const clipMenuItems = [...clipMenu.matchAll(/<ContextMenu(?:SubTrigger|Item)\b[\s\S]*?<\/ContextMenu(?:SubTrigger|Item)>/g)].map((m) => m[0])
+/** 조언 기능 목록의 영상 클립 오른쪽 클릭 줄. */
+const rightClickLine = (locale: 'en' | 'ko') =>
+  editorFeatureLines(locale).find((line) => line.startsWith(locale === 'ko' ? '영상 줄의 클립을 오른쪽 클릭' : 'Right-click a clip on a video track')) ?? ''
 
 beforeEach(() => {
   vi.clearAllMocks()
@@ -113,6 +124,40 @@ describe('Editor 조언 서버', () => {
     expect(missing).not.toMatch(/a transitions panel|no cross-dissolve|no audio fade|gaps or overlaps between video clips|extra video tracks/)
     expect(missing).toContain('Transitions other than')
     expect(missing).toContain('keyframes')
+  })
+
+  // 왜: 검토 c 8dcc6a2c 낮음 2(리드 11/14) — 오른쪽 클릭 줄을 "완전한 목록"으로 싣는데 메뉴의 [잔물결 삭제]가 빠져, "없는 것"의 지우기 줄이
+  //   쓰라는 [잔물결 삭제]를 메뉴 설명에서 찾을 수 없었다. 메뉴에 항목이 늘거나 빠지면 이 시험이 목록도 고치라고 알린다.
+  it('영상 클립 오른쪽 클릭 메뉴의 항목은 조언 기능 목록의 오른쪽 클릭 줄에 빠짐없이 한국어 · 영어로 실린다 — [잔물결 삭제]도 있다', () => {
+    // 여럿 고른 때의 이름("{count}개 숨기기")은 한 클립 이름("클립 숨기기")으로 센다.
+    const keys = clipMenuItems.flatMap((item) => [...item.matchAll(/t\('([^']+)'/g)].map((m) => m[1])).filter((key) => !key.includes('{count}'))
+    expect(keys).toEqual(['Playback speed', 'Start transition', 'End transition', 'Split here', 'Hide clip', 'Ripple delete'])
+    for (const locale of ['en', 'ko'] as const) {
+      const line = rightClickLine(locale)
+      expect(line).not.toBe('')
+      for (const key of keys) expect(line).toContain(`"${translate(locale, key)}"`)
+    }
+  })
+
+  // 왜: 검토 c 8dcc6a2c 낮음 1(리드 11/14) — "여럿 고르면 모두에 적용"이라 적었지만 [여기서 분할]은 누른 클립 하나만 나눈다(timeline.tsx).
+  //   Lumi 가 여럿 골라 한 번에 나누라고 말하지 않게, 메뉴가 실제로 하는 일과 같은 말로 싣는다. 전환 길이는 그 전환이 있는 클립만 바뀐다(검토 c (E) 3).
+  it('여러 클립을 고른 채 오른쪽 클릭하면 속도 · 전환 · 길이 · 숨기기 · 잔물결 삭제는 고른 클립 모두에, 여기서 분할은 누른 클립에만 걸린다고 조언 기능 목록이 말한다', () => {
+    // 메뉴가 실제로 그렇다 — 고른 클립 모두(targets) · 누른 클립(item.shotId).
+    expect(clipMenu).toMatch(/targets\.forEach\(\(id\) => onSetSpeed\(id,/)
+    expect(clipMenu).toMatch(/onSetTransition\(targets, edge,/)
+    expect(clipMenu).toMatch(/onSetTransitionLength\(targets, edge,/)
+    expect(clipMenu).toMatch(/targets\.length > 1 \? onDeleteSelected\(\) : onDelete\(item\.shotId\)/)
+    expect(clipMenu).toMatch(/targets\.length > 1 \? onRippleDeleteSelected\(\) : onRippleDelete\(item\.shotId\)/)
+    const split = clipMenuItems.find((item) => item.includes("t('Split here')")) ?? ''
+    expect(split).toContain('onSplitVideo(item.shotId,')
+    expect(split).not.toContain('targets')
+    // 목록 글 — 영어 · 한국어.
+    const en = rightClickLine('en')
+    expect(en).not.toContain('these apply to all of them')
+    expect(en).toContain('With several clips selected, "Playback speed", "Start transition", "End transition", "Hide clip" and "Ripple delete" apply to all of them (a transition length changes only the clips that have that transition), and "Split here" splits only the clip you right-clicked.')
+    const ko = rightClickLine('ko')
+    expect(ko).not.toContain('여러 클립을 고르면 모두에 적용됨.')
+    expect(ko).toContain('여러 클립을 고르면 "재생 속도" · "시작 전환" · "끝 전환" · "클립 숨기기" · "잔물결 삭제" 모두 고른 클립 전부에 적용됨(전환 길이는 그 전환이 있는 클립만 바뀜). "여기서 분할"만 오른쪽 클릭한 클립 하나를 나눔.')
   })
 
   // 왜: 로그인 · 빈 메시지 검사는 다른 채팅 길과 같다 — 로그인하지 않은 사람은 조언 모델을 부르지 못한다.

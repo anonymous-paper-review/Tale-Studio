@@ -28,8 +28,9 @@ export function editorFeatureLines(locale: AppLocale = 'en'): string[] {
     t("Video clips with the mouse: drag a clip to move it in time or onto another video track (gaps between clips are allowed), drag a clip's left or right edge to trim it, and click a gap between clips for {ripple}, which closes it. Delete takes the selected clips off and leaves a gap; Shift+Delete takes them off and closes the gap. Ctrl+K splits at the playhead.", {
       ripple: q('Ripple delete'),
     }),
-    t('Right-click a clip on a video track: {speed} (video clips, 0.25× to 4×), {start} and {end} ({cross}, {dipBlack} or {dipWhite}, {lengths} long, or {none}), {split} (at the playhead, or in the middle if the playhead is not on that clip) and {hide} (takes the clip off the timeline and leaves a gap). With several clips selected, these apply to all of them.', {
+    t('Right-click a clip on a video track: {speed} (video clips, 0.25× to 4×), {start} and {end} ({cross}, {dipBlack} or {dipWhite}, {lengths} long, or {none}), {split} (at the playhead, or in the middle if the playhead is not on that clip), {hide} (takes the clip off the timeline and leaves a gap) and {ripple} (takes it off and closes the gap). With several clips selected, {speed}, {start}, {end}, {hide} and {ripple} apply to all of them (a transition length changes only the clips that have that transition), and {split} splits only the clip you right-clicked.', {
       speed: q('Playback speed'), start: q('Start transition'), end: q('End transition'), ...transitions, lengths, none: q('None'), split: q('Split here'), hide: q('Hide clip'),
+      ripple: q('Ripple delete'),
     }),
     t('The {effects} tab next to {project}: drag a video transition ({cross}, {dipBlack}, {dipWhite}) onto the front half of a clip to put it at the start or the back half to put it at the end, drag {fade} onto the front or back half of an audio clip for a fade in or fade out, and drag a video effect ({bw}, {blur}, {bc}) onto a video clip.', {
       effects: q('Effects'), project: q('Project'), ...transitions, fade: q('Constant power'), ...effects,
