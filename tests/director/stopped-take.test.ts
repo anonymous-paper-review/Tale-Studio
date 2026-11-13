@@ -111,3 +111,30 @@ describe('멈춘 Take 와 실패 (리드 2026-11-14 규칙)', () => {
     expect(gridVideoView([olderFailed, stopped]).failure).toBeNull()
   })
 })
+
+describe('멈춘 Take 와 실패 — 그대로인 경우 (리드 2026-11-14 규칙)', () => {
+  const failed = { status: 'failed', lastAttemptStatus: 'failed', lastAttemptAt: '2026-11-14T00:30:00Z' }
+
+  it('앞 Take 가 실패했어도 그 뒤 Take 를 멈췄으면 뒤에서 아직 돌아도 그 샷은 이미지 완료다', () => {
+    // 왜: 가장 새 일이 멈춤이다 — 멈춘 채 도는 Take 는 만드는 중이 아니고, 앞 실패로 빨강이 되지도 않는다.
+    expect(stateOf(shotWithTakes([failed, { status: 'generating', lastAttemptStatus: 'generating', lastAttemptAt: '2026-11-14T01:00:00Z', cancelledAt: '2026-11-14T01:30:00Z' }]))).toBe('image_done')
+  })
+
+  it('앞 Take 가 실패했어도 그 뒤 멈춘 Take 가 뒤늦게 완성됐으면(★ 아님) 그 샷은 이미지 완료다', () => {
+    // 왜: 멈춘 결과는 기록에만 남는다(오너 7번) — 영상 있음도 빨강도 아니다.
+    expect(stateOf(shotWithTakes([failed, { status: 'completed', lastAttemptStatus: 'completed', lastAttemptAt: '2026-11-14T05:00:00Z', videoUrl: 'https://media.test/late.mp4', cancelledAt: '2026-11-14T01:30:00Z' }]))).toBe('image_done')
+  })
+
+  it('멈춘 Take 가 뒤늦게 완성됐어도 그 뒤에 시작해 실패한 Take 가 있으면 그 샷은 빨강이다', () => {
+    // 왜: 멈춘 뒤 다시 만든 것이 실패했다 — 늦게 끝난 멈춘 Take 가 그 실패를 덮지 않는다.
+    expect(stateOf(shotWithTakes([
+      { status: 'completed', lastAttemptStatus: 'completed', lastAttemptAt: '2026-11-14T05:00:00Z', videoUrl: 'https://media.test/late.mp4', cancelledAt: '2026-11-14T00:30:00Z' },
+      { status: 'failed', lastAttemptStatus: 'failed', lastAttemptAt: '2026-11-14T02:00:00Z' },
+    ]))).toBe('video_failed')
+  })
+
+  it('★ 로 고른 멈춘 Take 가 끝났으면 그 샷은 영상 완성이다', () => {
+    // 왜: ★ 는 사람이 이 영상을 쓰겠다고 고른 것 — 멈춘 Take 라도 영상이다(넘기기 · 노드와 같다).
+    expect(stateOf(shotWithTakes([failed, { status: 'completed', lastAttemptStatus: 'completed', lastAttemptAt: '2026-11-14T05:00:00Z', videoUrl: 'https://media.test/star.mp4', cancelledAt: '2026-11-14T01:30:00Z', final: true }]))).toBe('video_done')
+  })
+})
