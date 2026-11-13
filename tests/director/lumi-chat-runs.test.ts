@@ -624,16 +624,21 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
   //   샷마다 생성 잠금이 남으므로 시험마다 다른 샷 이름을 쓴다.
   let generated: string[] = []
   /** refuse: 이 샷 요청은 4xx 로 거절하되 몸에 jobId · status queued 를 싣는다(검토 b · entry 가 찾은 거절 꼴). */
-  function remakeServer(chatUpdates: unknown[] = [], refuse: readonly string[] = []) {
+  //   unknown: 제출 결과를 모름(503 · jobId · queued · unresolved — 서버가 실제로 내는 꼴) · error: 서버 오류(500 · jobId · failed) · network: 연결 끊김.
+  function remakeServer(chatUpdates: unknown[] = [], refuse: readonly string[] = [], other: Record<string, 'unknown' | 'error' | 'network'> = {}) {
     generated = []
     vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
       const u = String(url)
       if (u.includes('/api/director/chat')) return Response.json({ reply: 'Okay.', updates: chatUpdates })
       if (u.includes('/api/director/generate-video')) {
         const body = JSON.parse(String(init?.body ?? '{}')) as { shotId?: string }
-        generated.push(String(body.shotId))
-        if (refuse.includes(String(body.shotId))) return Response.json({ jobId: `job-${body.shotId}`, status: 'queued', error: 'Bad request' }, { status: 400 })
-        return Response.json({ jobId: `job-${body.shotId}`, status: 'queued', videoClipId: `clip-${body.shotId}`, takeNumber: 2 })
+        const id = String(body.shotId)
+        generated.push(id)
+        if (refuse.includes(id)) return Response.json({ jobId: `job-${id}`, status: 'queued', error: 'Bad request' }, { status: 400 })
+        if (other[id] === 'unknown') return Response.json({ error: 'Video provider submission outcome is unknown; retrying could duplicate paid work', jobId: `job-${id}`, videoClipId: `clip-${id}`, takeNumber: 2, status: 'queued', retryable: false, unresolved: true }, { status: 503 })
+        if (other[id] === 'error') return Response.json({ error: 'provider down', jobId: `job-${id}`, videoClipId: `clip-${id}`, takeNumber: 2, status: 'failed' }, { status: 500 })
+        if (other[id] === 'network') throw new TypeError('network down')
+        return Response.json({ jobId: `job-${id}`, status: 'queued', videoClipId: `clip-${id}`, takeNumber: 2 })
       }
       if (u.includes('/api/generation-jobs/')) return Response.json({ ok: true, data: { status: 'queued' } })
       return Response.json({})
@@ -685,6 +690,27 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
     expect(generated).toEqual(['r1', 'r2'])
     const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
     expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
+    expect(said).toContain("I couldn't start the video for Shot 2. Please ask again in a moment.")
+  })
+
+  // 왜: 리드 결정(검토 b F7) — 제출 결과를 모르는 503 은 화면이 그 Take 를 만드는 중으로 보인다. Lumi 가 "시작하지 못했어요"라고 하면 화면과 말이 갈린다.
+  it('remakeShotVideo 의 접수 알림은 제출 결과를 모르는 503(jobId · queued)에도 오고, 500 · 연결 끊김에는 오지 않는다', async () => {
+    remakeBoard(['u1', 'u2', 'u3'])
+    remakeServer([], [], { u1: 'unknown', u2: 'error', u3: 'network' })
+    const accepted = vi.fn()
+    for (const id of ['u1', 'u2', 'u3']) await director.getState().remakeShotVideo(id, { onAccepted: accepted })
+    expect(generated).toEqual(['u1', 'u2', 'u3'])
+    expect(accepted.mock.calls).toEqual([['job-u1']])
+  })
+
+  // 왜: 같은 까닭(검토 b F7 · F8) — 화면과 같은 말: 결과를 모르는 503 은 시작, 서버 오류(500)인 샷만 따로 "시작하지 못했어요".
+  it('다시 만들기에서 제출 결과를 모르는 샷(503)은 화면처럼 시작으로 세고, 서버 오류(500)인 샷은 "샷 N 영상을 시작하지 못했어요"라고 따로 말한다', async () => {
+    remakeBoard(['w1', 'w2', 'w3'])
+    remakeServer([], [], { w2: 'error', w3: 'unknown' })
+    await chat.getState().startDirectorVideos(['w1', 'w2', 'w3'], 'Make Shots 1 · 2 · 3 again', { remake: true })
+    expect(generated).toEqual(['w1', 'w2', 'w3'])
+    const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
+    expect(said).toContain('Started making videos for Shots 1 · 3 · 10 Takes. Progress shows on the line above the cards.')
     expect(said).toContain("I couldn't start the video for Shot 2. Please ask again in a moment.")
   })
 
