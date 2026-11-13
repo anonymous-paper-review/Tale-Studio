@@ -21,7 +21,8 @@ describe('혼자 정한 것', () => {
   it('영상 묶음을 멈추는 단추는 2줄의 [모두 멈추기]이고, 누르면 아직 내지 않은 영상은 내지 않고 만들고 있는 영상은 화면에서 멈춘다', () => {
     expect(t('Stop all')).toBe('모두 멈추기')
     expect(page()).toMatch(/await run\.cancelVideoBatch\(\)/)
-    expect(page()).toContain('stoppableJobs(activeJobsSnapshot(run.projectId))')
+    // 누를 때 작업 목록을 한 번 새로 읽는다(리드 검토 a 낮음, 예전 기대 'stoppableJobs(activeJobsSnapshot(run.projectId))').
+    expect(page()).toContain('stoppableJobs(await freshActiveJobs(run.projectId))')
     expect(page()).toMatch(/await run\.cancelRunningJobs\(/)
     expect(page()).not.toContain("toast.info(t('Stop after current videos finish.'))")
   })
