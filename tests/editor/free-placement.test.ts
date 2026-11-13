@@ -233,7 +233,7 @@ describe('빈 곳 재생 · 내보내기', () => {
     expect(render).toMatch(/segment\.kind === 'gap'/)
   })
 
-  it('빈 곳이 있어도 미리 보기의 진행 막대 · 시간 · 막대 눌러 옮기기는 마지막 클립 끝까지를 전체 길이로 센다', () => {
+  it('빈 곳이 있어도 미리 보기의 진행 막대 · 시간 · 막대 눌러 옮기기는 시퀀스 길이(빈 곳 · 소리 · 눈 끈 줄까지)를 전체 길이로 센다', () => {
     // 왜: 검토 c 보통 1 — 클립 길이를 더해 전체로 써서 "0:14 / 0:12"가 되고, 끝 전에 막대가 꽉 차며 막대로는 마지막 4초에 갈 수 없었다.
     api().deleteClip('B')
     expect(timelineEnd(selectTimelineLayout(api()))).toBe(16)
@@ -241,6 +241,12 @@ describe('빈 곳 재생 · 내보내기', () => {
     expect(previewer).not.toMatch(/sum \+ l\.durationSec/)
     // 전체 길이는 시퀀스 길이(모든 줄 · 소리의 끝)로 센다 — 위 둘째 줄 · 자 · 재생 끝 · 내보내기와 같은 길이(검토 c ② 낮음 4).
     expect(previewer.match(/const total = sequenceLengthSec\(selectVideoLayout\(st\), st\.audioClips\)/g)).toHaveLength(2)
+  })
+
+  it('내보낸 영상의 검은 꼬리에는 자막 · 제목이 남지 않는다', () => {
+    // 왜: 검토 c((C) 낮음 1) — 보이는 클립이 끝난 뒤 소리 · 눈 끈 줄만 남은 꼬리를 검게 칠하면서 마지막 클립의 자막은 비우지 않아, 검은
+    //   화면에 자막이 그대로 찍혔다(소리가 영상보다 길 때 예전부터 있던 꼴, 시퀀스 길이를 하나로 센 뒤로 더 자주 생긴다). 빈 곳과 같이 비운다.
+    expect(read('src/lib/editor-draft-render.ts')).toMatch(/videoActive = false\s*activeLabel = ''\s*activeTitle = null\s*activeSubtitle = null\s*inGap = true\s*await waitUntil\(total \+ TAIL_PAD_SEC\)/)
   })
 
   it('내보낸 영상의 빈 곳은 미리 보기처럼 순검정으로 칠한다', () => {

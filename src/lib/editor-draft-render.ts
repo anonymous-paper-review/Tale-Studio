@@ -445,8 +445,11 @@ export async function renderDraftTimeline(opts: {
       videoEl.pause()
     }
     // 소리 · 눈 끈 줄이 보이는 영상보다 길면 끝까지 녹음한다 — 그 사이는 빈 곳처럼 순검정(미리 보기와 같다, 검토 c ② 낮음 4).
+    //   마지막 클립의 자막 · 제목도 비운다 — 검은 꼬리에 자막이 남았다(검토 c (C) 낮음 1).
     videoActive = false
     activeLabel = ''
+    activeTitle = null
+    activeSubtitle = null
     inGap = true
     await waitUntil(total + TAIL_PAD_SEC)
   })()

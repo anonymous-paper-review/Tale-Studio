@@ -212,7 +212,7 @@ describe('시퀀스 길이', () => {
     const render = read('src/lib/editor-draft-render.ts')
     expect(render).toMatch(/const total = Math\.max\(videoTotal, audioEnd, opts\.endSec \?\? 0\)/)
     // 마지막 보이는 클립 뒤(눈 끈 줄 · 소리만 남은 끝)는 빈 곳처럼 순검정 — 미리 보기와 같다.
-    expect(render).toMatch(/videoActive = false\s*activeLabel = ''\s*inGap = true\s*await waitUntil\(total \+ TAIL_PAD_SEC\)/)
+    expect(render).toMatch(/videoActive = false\s*activeLabel = ''\s*activeTitle = null\s*activeSubtitle = null\s*inGap = true\s*await waitUntil\(total \+ TAIL_PAD_SEC\)/)
   })
 })
 
