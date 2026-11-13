@@ -50,6 +50,10 @@ import { boardShotLabels } from '@/lib/writer/board-summary'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
 import { ChatModelControls } from '@/components/layout/chat-model-controls'
+import { TopBarActions } from '@/components/layout/studio-top-bar'
+import { LumiChatPill } from '@/features/director/lumi-chat-pill'
+import { LumiBatchNotice } from '@/features/director/lumi-batch-notice'
+import { LumiNowLine } from '@/features/director/lumi-now-line'
 import {
   castMentions,
   backgroundMentions,
@@ -89,6 +93,7 @@ import {
   STAGE_FACE_COLOR,
   STAGE_PLACEHOLDER,
   STAGE_PROMPT_PRESETS,
+  DIRECTOR_QUICK_CHIPS,
   STAGE_THINKING_PHRASES,
   CHAT_SUPPORTED_STAGES,
 } from '@/lib/constants'
@@ -1310,6 +1315,8 @@ export function GlobalChat() {
     !!suggestion?.action && suggestion.action.kind !== 'choices' && !choices && !(suggestion.action.kind === 'confirmScenes' && (sceneStoryProposal || sceneStoryProposalPending?.projectId === projectId)) &&
     roughRedrawOfferHere(suggestion.action, boardProjectId)
   const showProposal = !!pendingProposal
+  // Editor 는 조언만 하는 채팅이다(오너 10번) — 다른 단계의 대기 카드는 단추 없이 보이고 그 단계 화면에서 답한다(검토 b 보통 3).
+  const proposalActionable = !!pendingProposal && currentStage !== 'editor'
   let cascadeSlots = 0
   const suggestionSlot = showSuggestion ? cascadeSlots++ : 0
   const proposalSlot = showProposal ? cascadeSlots++ : 0
@@ -1325,7 +1332,7 @@ export function GlobalChat() {
   //   넘기기"가 사실상 마우스 전용이 된다. 그래서 Enter 를 빌려준다 — 단 입력창에 쓰던 글이
   //   있으면 그건 전송이 먼저다(양보). 선택지(kind:'choices')는 자체 핸들러가 있고 showSuggestion
   //   이 이미 배제한다. 캡처 단계에서 듣고 stopPropagation 하므로 textarea 의 Enter 와 겹치지 않는다.
-  const proposalOpen = showProposal && !!pendingProposal
+  const proposalOpen = showProposal && proposalActionable
   const suggestionOpen =
     showSuggestion && !!suggestion?.action && suggestion.action.kind !== 'choices'
   useEffect(() => {
@@ -1432,6 +1439,9 @@ export function GlobalChat() {
             <CollapseIcon className="size-4" />
           </Button>
         </div>
+
+        {/* 지금 할 일 줄(11/13 시안 D5) — Director 만, 머리 바로 아래에 붙어 말이 쌓여도 밀려 올라가지 않는다. */}
+        {currentStage === 'director' && <LumiNowLine />}
 
         {/* Messages */}
         {/* 투명 덮개(AI 가 같은 단계에서 일하는 동안)가 받은 휠 · 끌기를 넘길 칸 — 실제로 스크롤하는 viewport 에 단다(검토 A2 N1). */}
@@ -1659,10 +1669,15 @@ export function GlobalChat() {
                     )}
                   </div>
                 </div>
-                {/* CTA — oiioii form 카드의 캡슐 버튼 매핑(Confirm & Continue). 승인은 전폭 캡슐. */}
+                {!proposalActionable ? (
+                  <p className="mt-2 text-caption text-muted-foreground">
+                    {t('Answer this on the {stage} screen.', { stage: STAGE_LABEL[pendingProposal.stage] })}
+                  </p>
+                ) : (
+                /* CTA — oiioii form 카드의 캡슐 버튼 매핑(Confirm & Continue). 승인은 전폭 캡슐. */
                 <div className="mt-3 flex flex-col gap-1.5">
                   <Button size="sm" className="w-full rounded-full" onClick={handlePendingProposalApprove}>
-                    {pendingProposal.kind === 'producerPreserveScript' ? t('Keep as written') : t('Approve')}
+                    {pendingProposal.kind === 'producerPreserveScript' ? t('Keep as written') : pendingProposal.kind === 'directorTextEdit' ? t('Apply') : t('Approve')}
                   </Button>
                   {/* #script-preserve: 두 번째 버튼은 "나중에"가 아니라 명시적 거절(참고 자료로 각색) — 결정 없이 넘기면 조용히 각색된다. */}
                   <Button
@@ -1678,12 +1693,13 @@ export function GlobalChat() {
                     {pendingProposal.kind === 'producerPreserveScript' ? t('Use as reference only') : t('Later')}
                   </Button>
                   <Button size="sm" variant="ghost" className="w-full rounded-full" onClick={() => dismissPendingProposal(pendingProposal.id)}>
-                    {t('Cancel request')}
+                    {pendingProposal.kind === 'directorTextEdit' ? t('Discard') : t('Cancel request')}
                   </Button>
                   <div className="flex justify-center">
                     <KeyHint dismissible />
                   </div>
                 </div>
+                )}
               </div>
             )}
             <div ref={chatEndRef} />
@@ -1891,6 +1907,23 @@ export function GlobalChat() {
           {/* 진행도 핀 (#chat-progress-pin → #f1 2026-08-26 오너: 헤더 아래→입력창 위로 이동.
               시선이 머무는 입력창 쪽에서 진행이 보인다). 도는 게 없으면 스스로 사라진다. */}
           <ChatProgressPin stage={currentStage} />
+          {/* Director 빠른 칩(11/13 시안 D5 "Suggestions", 오너 2026-11-14 "추천대로") — 입력칸 바로 위에 늘 보이고, 누르면 그 말을 바로 보낸다.
+              칩 말은 AI 를 거치지 않고 지금 보드 상태로 바로 한다(global-chat-store runDirectorQuickChip). 시안 값: 28 알약 · 바탕색 · 테두리 · 사이 6. */}
+          {currentStage === 'director' && (
+            <div className="mb-3 flex flex-col items-start gap-1.5" data-testid="director-quick-chips">
+              {DIRECTOR_QUICK_CHIPS.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  disabled={sendDisabled}
+                  onClick={() => void sendMessage(t(chip), undefined, { stageOverride: 'director' })}
+                  className="inline-flex min-h-7 items-center rounded-full border border-border bg-background px-3 py-1 text-left text-caption font-medium text-foreground transition-colors duration-100 ease-out hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                >
+                  {t(chip)}
+                </button>
+              ))}
+            </div>
+          )}
           {/* 파일 놓기 자리는 입력 알약과 아래 도구 줄을 함께 감싼다 — [+] 첨부 위에 끌어다 놓아도 첨부된다(예전처럼 입력부 전체). */}
           <div
             className="relative rounded-[26px]"
@@ -2149,8 +2182,15 @@ export function GlobalChat() {
       {/* 접힌 상태 — 오른쪽 가장자리에 붙은 슬림 레일 + 위쪽 열기 단추(v3 Chat Toggle «).
           닫기 단추(패널 머리)와 세로 위치를 맞추고, 레일이 오른쪽 44px 를 전용 점유해
           (layout.tsx 가 접힘 시 marginRight 확보) 페이지 오른쪽 위 단추들과의 겹침을 원천 차단한다. */}
-      {/* v3p2-set: D1 시안 — Director 는 접힌 레일 없이 툴바 Lumi 알약으로 연다 */}
-      {collapsed && currentStage !== 'director' && (
+      {/* Director · Editor 는 접힌 레일 없이 Lumi 아이콘으로 연다(11/13 시안 D1 · E1) — Director 는 툴바가, Editor 는 여기서 위 막대 오른쪽 끝에 놓는다. */}
+      {collapsed && currentStage === 'editor' && (
+        <TopBarActions>
+          <LumiChatPill stage="editor" className="order-last" />
+        </TopBarActions>
+      )}
+      {/* D8 Lumi 알림 카드(11/13 시안) — 채팅을 접어 둔 Director 에서 일괄이 끝나면 오른쪽 아래. 열려 있으면 채팅 줄로만 알린다. */}
+      {collapsed && currentStage === 'director' && <LumiBatchNotice />}
+      {collapsed && currentStage !== 'director' && currentStage !== 'editor' && (
         <aside
           className="z-sidebar fixed flex w-11 flex-col items-center gap-3 rounded-l-xl bg-chat-bg pt-4"
           style={{ right: 0, top: 0, bottom: 0 }}

@@ -1,4 +1,4 @@
-// Director 에 들어오면 채팅이 닫혀 있고 접힌 레일 없이 Lumi 알약으로 열며, 떠나면 채팅이 들어오기 전 모습으로 돌아가고, 닫힌 동안의 멘션 · Lumi 의 새 말을 놓치지 않는지 검사한다 (v3 D1, 2026-11-03)
+// Director · Editor 에 들어오면 채팅이 닫혀 있고 접힌 레일 없이 Lumi 아이콘으로 열며, 떠나면 채팅이 들어오기 전 모습으로 돌아가고, 닫힌 동안의 멘션 · Lumi 의 새 말을 놓치지 않는지 검사한다 (v3 D1 2026-11-03 · 11/13 시안 D1 · E1 · R, 오너 11/14)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { readFileSync, readdirSync, existsSync } from 'node:fs'
 import path from 'node:path'
@@ -65,6 +65,8 @@ import { CHAT_COLLAPSED_RAIL, CHAT_DEFAULT_WIDTH, SHELL_INSET } from '@/lib/cons
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useLocaleStore } from '@/stores/locale-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
+import { TopBarActions } from '@/components/layout/studio-top-bar'
 
 type Element = ReactElement<Record<string, unknown>>
 function elements(node: ReactNode): Element[] {
@@ -119,6 +121,8 @@ beforeEach(() => {
   localStorage.clear()
   useChatUiStore.setState({ collapsed: false, chatHolds: [], collapsedBeforeHold: null })
   useLocaleStore.setState({ locale: 'ko' })
+  useDirectorCanvasStore.setState({ projectId: '', realBatchBusy: false, videoBatchBusy: false, nodes: [] })
+  ;(globalThis as { matchMedia?: unknown }).matchMedia = undefined
 })
 
 describe('혼자 정한 것', () => {
@@ -129,8 +133,8 @@ describe('혼자 정한 것', () => {
     expect(chatClosed()).toBe(true)
   })
 
-  // 왜: 채팅이 닫혀 있을 때 여는 곳이 툴바 오른쪽 끝의 Lumi 알약이다(D1 "Lumi Chat 접힘").
-  it('Director 에서 Lumi 알약을 누르면 채팅이 열린다', () => {
+  // 왜: 채팅이 닫혀 있을 때 여는 곳이 툴바 오른쪽 끝의 Lumi 아이콘이다(D1 "Lumi Chat 접힘" → 11/13 시안 "Lumi · 접힘 (아이콘만)").
+  it('Director 에서 접힌 Lumi 아이콘을 누르면 채팅이 열린다', () => {
     expect(read('src/app/studio/director/page.tsx')).toContain('<LumiChatPill')
     enter('director')
     const pill = elements(LumiChatPill()).find((node) => node.type === 'button')
@@ -139,8 +143,8 @@ describe('혼자 정한 것', () => {
     expect(chatClosed()).toBe(false)
   })
 
-  // 왜: 채팅이 열려 있으면 패널 머리에 접기 단추가 있다 — 여는 알약이 같이 있으면 같은 일을 하는 단추가 둘이 된다.
-  it('채팅이 열려 있으면 Lumi 알약이 보이지 않는다', () => {
+  // 왜: 채팅이 열려 있으면 패널 머리에 접기 단추가 있다 — 여는 아이콘이 같이 있으면 같은 일을 하는 단추가 둘이 된다.
+  it('채팅이 열려 있으면 접힌 Lumi 아이콘이 보이지 않는다', () => {
     useChatUiStore.setState({ collapsed: false })
     expect(LumiChatPill()).toBeNull()
   })
@@ -246,13 +250,77 @@ describe('혼자 정한 것', () => {
     expect(draw(() => GlobalChat(), '/studio/director').some((node) => node.props.inert === true)).toBe(false)
   })
 
-  // 왜: 접힌 레일(v3 Chat Toggle «)은 다른 단계에서 닫힌 채팅을 여는 곳이다 — Director 밖은 바뀌지 않는다.
-  it('Director 밖의 단계에서는 채팅을 접으면 지금처럼 접힌 레일이 남는다', () => {
+  // 왜: 접힌 레일(v3 Chat Toggle «)은 다른 단계에서 닫힌 채팅을 여는 곳이다 — Director · Editor 밖은 바뀌지 않는다(오너 11/14 "Director · Editor 만").
+  it('Director · Editor 밖의 단계에서는 채팅을 접으면 지금처럼 접힌 레일이 남는다', () => {
     useChatUiStore.setState({ collapsed: true, chatWidth: CHAT_DEFAULT_WIDTH })
-    for (const pathname of ['/studio/producer', '/studio/artist', '/studio/writer', '/studio/editor']) {
+    for (const pathname of ['/studio/producer', '/studio/artist', '/studio/writer']) {
       expect(railOpenButton(pathname), pathname).toBe(true)
       expect(mainMarginRight(pathname), pathname).toBe(SHELL_INSET + CHAT_COLLAPSED_RAIL)
     }
+  })
+})
+
+describe('같이 정한 것 · 접힌 Lumi 아이콘(11/13 시안 D1 · E1 · R, 오너 11/14 "추천대로")', () => {
+  // 왜: 시안 "Lumi · 접힘 (아이콘만)" — 접힌 Lumi 는 얼굴 하나다. 예전 알약의 "Lumi" 글자 · 펼침 표시(⤢)는 없다. 이름은 화면 읽기에만 있다.
+  it('Director 에서 접힌 Lumi 아이콘에는 Lumi 얼굴만 있고 글자 · 펼침 표시가 없다', () => {
+    useChatUiStore.setState({ collapsed: true })
+    const nodes = draw(() => LumiChatPill(), '/studio/director')
+    const button = nodes.find((node) => node.type === 'button')
+    expect(button?.props['aria-label']).toBe('채팅 열기')
+    expect(nodes.some((node) => typeof node.props.persona === 'string')).toBe(true)
+    expect(elements(button!.props.children as ReactNode).flatMap((node) => [node.props.children]).some((child) => child === 'Lumi')).toBe(false)
+    expect(nodes.some((node) => typeof node.type === 'function' && /Expand/.test((node.type as { name?: string }).name ?? ''))).toBe(false)
+  })
+
+  // 왜: 시안 E1 — Editor 도 접힌 레일 없이 위 막대 오른쪽 끝의 Lumi 아이콘으로 연다. 레일이 없으니 단계 화면이 오른쪽 끝까지 간다.
+  it('Editor 에서 채팅이 닫혀 있으면 접힌 레일이 없고 위 막대 오른쪽 끝의 Lumi 아이콘으로 열며 단계 화면이 오른쪽 끝까지 간다', () => {
+    useProjectStore.setState({ currentStage: 'editor' })
+    useChatUiStore.setState({ collapsed: true, chatWidth: CHAT_DEFAULT_WIDTH })
+    expect(railOpenButton('/studio/editor')).toBe(false)
+    const chat = draw(() => GlobalChat(), '/studio/editor')
+    const slot = chat.find((node) => node.type === TopBarActions)
+    expect(slot).toBeDefined()
+    const icon = elements(slot!.props.children as ReactNode).find((node) => node.type === LumiChatPill)
+    expect(icon?.props.stage).toBe('editor')
+    expect(mainMarginRight('/studio/editor')).toBe(SHELL_INSET)
+    // 다른 단계에서는 위 막대에 Lumi 아이콘을 넣지 않는다.
+    expect(draw(() => GlobalChat(), '/studio/artist').some((node) => node.type === TopBarActions)).toBe(false)
+  })
+
+  // 왜: 시안 R "만드는 중이면 아이콘이 살짝 움직여요" — 접혀 있어도 이 프로젝트에서 그림 · 영상이 만들어지는 중인지 보인다.
+  //   Lumi 가 답을 쓰는 동안도 일하는 중이다. 다른 프로젝트의 작업은 세지 않는다(혼자 정한 것).
+  it('이 프로젝트에서 그림 · 영상을 만드는 중이거나 Lumi 가 답을 쓰는 중이면 접힌 Lumi 아이콘이 살짝 움직인다', () => {
+    useChatUiStore.setState({ collapsed: true })
+    const moving = () => draw(() => LumiChatPill(), '/studio/director').some((node) => node.props['data-making'] === true)
+    expect(moving()).toBe(false)
+    useDirectorCanvasStore.setState({ projectId: 'chat-closed-project', realBatchBusy: true })
+    expect(moving()).toBe(true)
+    useDirectorCanvasStore.setState({ realBatchBusy: false, videoBatchBusy: true })
+    expect(moving()).toBe(true)
+    useDirectorCanvasStore.setState({ videoBatchBusy: false, nodes: [{ id: 'v1', type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', status: 'generating' } } as never] })
+    expect(moving()).toBe(true)
+    useDirectorCanvasStore.setState({ nodes: [{ id: 's1', type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', storyboardImage: { status: 'generating' } } } as never] })
+    expect(moving()).toBe(true)
+    useDirectorCanvasStore.setState({ nodes: [], projectId: 'other-project', realBatchBusy: true })
+    expect(moving()).toBe(false)
+    useDirectorCanvasStore.setState({ realBatchBusy: false })
+    useGlobalChatStore.setState({ loading: true })
+    expect(moving()).toBe(true)
+  })
+
+  // 왜: 추천(오너 11/14 "추천대로") — 1100px 보다 좁은 화면에서 패널이 밀어내면 Director 카드 · Editor 배치가 너무 좁아진다. 그때는 패널이 화면 위에 덮인다.
+  //   다른 단계는 지금처럼 민다(혼자 정한 것 — "Director · Editor 만 바꾸고").
+  it('화면 폭이 1100px 보다 좁으면 Director · Editor 에서 연 채팅은 화면을 밀지 않고 위에 덮이고, 다른 단계는 지금처럼 민다', () => {
+    useChatUiStore.setState({ collapsed: false, chatWidth: CHAT_DEFAULT_WIDTH })
+    const narrow = (matches: boolean) => {
+      ;(globalThis as { matchMedia?: unknown }).matchMedia = (query: string) => ({ matches: matches && query === '(max-width: 1099px)', addEventListener() {}, removeEventListener() {} })
+    }
+    narrow(false)
+    expect(mainMarginRight('/studio/director')).toBe(SHELL_INSET + CHAT_DEFAULT_WIDTH)
+    narrow(true)
+    expect(mainMarginRight('/studio/director')).toBe(SHELL_INSET)
+    expect(mainMarginRight('/studio/editor')).toBe(SHELL_INSET)
+    expect(mainMarginRight('/studio/artist')).toBe(SHELL_INSET + CHAT_DEFAULT_WIDTH)
   })
 })
 
@@ -262,9 +330,9 @@ const pillMounted = () => LumiChatPill()
 const pill = () => draw(() => LumiChatPill(), '/studio/director')
 const lumiSays = (...ids: string[]) =>
   useGlobalChatStore.setState((state) => ({ messages: [...state.messages, ...ids.map((id) => ({ id, stage: 'director' as const, role: 'model' as const, content: id }))] }))
-const unseenBadge = () => pill().find((node) => node.props['data-testid'] === 'lumi-pill-unseen')
+const unseenBadge = () => pill().find((node) => node.props['data-testid'] === 'lumi-icon-unseen')
 
-describe('혼자 정한 것 · 닫힌 채팅의 Lumi 알약(검토 B B2, 시안 D1 알약의 파란 숫자)', () => {
+describe('혼자 정한 것 · 닫힌 채팅의 Lumi 아이콘(검토 B B2 → 11/13 시안 아이콘만, 오너 11/14 "새 말 수는 귀퉁이 작은 점")', () => {
   beforeEach(() => {
     // 앞 시험에서 본 것으로 친 말이 남지 않게 — 화면마다 처음 들어온 사람처럼 시작한다.
     useChatUiStore.setState({ closedSeen: null })
@@ -277,23 +345,24 @@ describe('혼자 정한 것 · 닫힌 채팅의 Lumi 알약(검토 B B2, 시안 
   })
 
   // 왜: Director 는 채팅을 닫은 채 시작한다 — 첫 안내 · 채워 두면 좋은 항목 · Editor 로 넘기자는 권유가 닫힌 채팅에 쌓여도 알 수 없었다.
-  //   예전 대화(불러온 기록)는 새 말이 아니다.
-  it('Director 에서 채팅이 닫혀 있는 동안 Lumi 가 새로 말하면 Lumi 알약에 그 수가 뜬다', () => {
+  //   예전 대화(불러온 기록)는 새 말이 아니다. 시안은 아이콘만이라 수는 귀퉁이 점으로 보이고 수는 화면 읽기 이름에 싣는다(오너 11/14).
+  it('Director 에서 채팅이 닫혀 있는 동안 Lumi 가 새로 말하면 접힌 Lumi 아이콘 귀퉁이에 작은 점이 뜬다', () => {
     enter('director')
     pillMounted()
     expect(unseenBadge()).toBeUndefined()
 
     lumiSays('welcome', 'gaps')
 
-    expect(unseenBadge()?.props.children).toBe(2)
+    expect(unseenBadge()).toBeDefined()
+    expect(unseenBadge()?.props.children).toBeUndefined()
   })
 
-  // 왜: 수는 "아직 안 본 말"이다 — 채팅을 열어 보았으면 다시 닫아도 0 에서 센다.
-  it('채팅을 열면 알약의 수가 사라진다', () => {
+  // 왜: 점은 "아직 안 본 말"이다 — 채팅을 열어 보았으면 다시 닫아도 0 에서 센다.
+  it('채팅을 열면 접힌 Lumi 아이콘의 새 말 점이 사라진다', () => {
     enter('director')
     pillMounted()
     lumiSays('welcome')
-    expect(unseenBadge()?.props.children).toBe(1)
+    expect(unseenBadge()).toBeDefined()
 
     useChatUiStore.getState().setCollapsed(false)
     pillMounted()
@@ -303,8 +372,8 @@ describe('혼자 정한 것 · 닫힌 채팅의 Lumi 알약(검토 B B2, 시안 
     expect(unseenBadge()).toBeUndefined()
   })
 
-  // 왜: 숫자는 눈으로만 보인다 — 화면 읽기 프로그램도 새 메시지 수를 읽는다. 영어는 하나일 때 "1 new message"(검토 C).
-  it('알약은 새 메시지 수를 화면 읽기 이름에도 싣고, 영어로는 하나일 때 단수로 읽는다', () => {
+  // 왜: 점은 눈으로만 보인다 — 화면 읽기 프로그램은 새 메시지 수를 읽는다. 영어는 하나일 때 "1 new message"(검토 C).
+  it('접힌 Lumi 아이콘은 새 메시지 수를 화면 읽기 이름에 싣고, 영어로는 하나일 때 단수로 읽는다', () => {
     enter('director')
     pillMounted()
     lumiSays('welcome')
@@ -316,8 +385,8 @@ describe('혼자 정한 것 · 닫힌 채팅의 Lumi 알약(검토 B B2, 시안 
     expect(label()).toBe('Open chat · 2 new messages')
   })
 
-  // 왜: 알약은 닫힌 채팅의 얼굴이다 — 접힌 레일의 Lumi 처럼 답을 쓰는 중 · 오류를 같은 모습으로 보인다.
-  it('Lumi 가 답을 쓰는 중이면 알약의 Lumi 도 생각 중 모습이다', () => {
+  // 왜: 아이콘은 닫힌 채팅의 얼굴이다 — 접힌 레일의 Lumi 처럼 답을 쓰는 중 · 오류를 같은 모습으로 보인다.
+  it('Lumi 가 답을 쓰는 중이면 접힌 Lumi 아이콘의 Lumi 도 생각 중 모습이다', () => {
     enter('director')
     const lumiState = () => pill().find((node) => typeof node.props.persona === 'string')?.props.state
     expect(lumiState()).toBe('idle')

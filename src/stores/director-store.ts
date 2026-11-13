@@ -1399,8 +1399,9 @@ export type DirectorCanvasUpdate =
   // #c5 (2026-08-27): 진입 자동 실사 생성을 끄면서 채팅 경로를 열었다. id 를 주면 그 샷만,
   //   생략하면 미생성 전체를 일괄로 — 버튼과 같은 경로(generateStoryboardImage / runRealBatch)를 탄다.
   | { type: 'generateImage'; id?: string }
-  // 약속 E3(2026-09-04): 미생성 샷 전체 영상 일괄 — 채팅은 승인 카드(directorGenerateVideoBatch)로만 시작한다.
-  | { type: 'generateVideos' }
+  // 영상 일괄 — shotIds 가 있으면 그 샷만, 없으면 남은 샷 전부. 채팅은 확인 카드 없이 바로 시작한다(오너 2026-11-14 9번 —
+  //   global-chat-store 의 startChatVideos 가 막이 · Take 셈 뒤 runVideoBatch 를 부른다. 이 스토어의 applyUpdates 는 돌리지 않는다).
+  | { type: 'generateVideos'; shotIds?: string[] }
   | {
       type: 'connect'
       sourceId: string
@@ -5409,8 +5410,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 break
               }
               case 'generateVideos': {
-                // 약속 E3: 일괄 영상은 승인 카드 뒤 runVideoBatch 로만 돈다 — 여기까지 오면 승인 없이 온 것이라 막는다.
-                result.skipped.push({ update: u, reason: 'video batch from chat runs only after the approval card' })
+                // 채팅의 영상은 global-chat-store(startChatVideos)가 막이 · Take 셈 뒤 runVideoBatch 로 돌린다 — 여기까지 오면 그 길을 건너뛴 것이라 막는다.
+                result.skipped.push({ update: u, reason: 'video batch from chat runs only through the chat video check' })
                 break
               }
               case 'connect': {

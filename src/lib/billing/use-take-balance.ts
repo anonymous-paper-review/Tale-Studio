@@ -14,6 +14,8 @@ export interface TakeBalanceState {
   balance: number | null
   mode: TakeBillingMode
   loading: boolean
+  /** 잔액을 읽지 못했다 — 배지는 꺼짐(mode 'off')처럼 숨기지만, Take 를 세고 시작하는 곳(채팅 영상)은 이것을 보고 시작하지 않는다. */
+  failed?: boolean
 }
 
 const INITIAL_STATE: TakeBalanceState = { balance: null, mode: 'off', loading: true }
@@ -31,10 +33,11 @@ async function fetchOnce(): Promise<void> {
     const res = await fetch('/api/billing/take-balance')
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const body = (await res.json()) as { balance: number | null; mode: TakeBillingMode }
-    cache = { balance: body.balance, mode: body.mode, loading: false }
+    cache = { balance: body.balance, mode: body.mode, loading: false, failed: false }
   } catch {
     // 조회 실패는 배지를 숨기는 쪽(mode 'off' 취급)이 안전 — 표시 실패가 생성 자체를 막지 않는다.
-    cache = { balance: null, mode: 'off', loading: false }
+    //   다만 실패라고 표시해 둔다 — 정말 꺼진 것과 같은 값이면 채팅 영상의 Take 셈이 빠진다(검토 b 낮음 4).
+    cache = { balance: null, mode: 'off', loading: false, failed: true }
   }
   notify()
 }

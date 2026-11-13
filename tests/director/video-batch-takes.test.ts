@@ -198,19 +198,20 @@ describe('약속 E — 영상 일괄 생성은 Take를 미리 센다', () => {
     expect(describeVideoBatchPlan(planVideoBatch([5, 1], null, 'enforce'), tr)).toEqual(['Takes needed: 6. This workspace has unlimited Takes.'])
   })
 
-  it('채팅에서 "영상 다 만들어줘"라고 하면 같은 확인 카드가 채팅에 뜨고, 승인하면 버튼과 똑같이 진행된다', () => {
+  // 오너 2026-11-14 9번 — 확인 카드 없이 바로. 대신 Take 를 먼저 세어 모자라면 하나도 시작하지 않고, 시작하면 쓰는 Take 를 채팅에 적는다
+  //   (행동 시험: tests/director/lumi-chat-runs.test.ts).
+  it('채팅에서 "영상 다 만들어줘"라고 하면 확인 카드 없이 버튼과 같은 일괄 실행 길로 바로 진행하고, 쓰는 Take 를 채팅에 적는다', () => {
     const route = read('src/app/api/director/chat/route.ts')
     expect(route).toMatch(/'generateVideos',/)
     expect(route).toMatch(/case 'generateVideos': \{/)
-    expect(route).toMatch(/emit exactly one \{"type":"generateVideos"\}/)
+    expect(route).toContain('Leave "shotIds" out only when the user asked for every remaining shot')
     expect(route).not.toMatch(/Chat cannot start video generation yet/)
     const store = read('src/stores/global-chat-store.ts')
-    expect(store).toMatch(/kind: 'directorGenerateVideoBatch'/)
-    expect(store).toMatch(/\.\.\.describeVideoBatchPlan\(plan, tr\)/)
-    expect(store).toMatch(/proposal\.kind === 'directorGenerateVideoBatch'/)
-    expect(store).toMatch(/runVideoBatch\(pid, \{ onJob: observeGeneration, limit \}\)/)
-    expect(read('src/lib/pending-proposal.ts')).toMatch(/\| 'directorGenerateVideoBatch'/)
-    // 승인 없이 스토어까지 온 generateVideos 는 돌지 않는다.
+    expect(store).not.toMatch(/kind: 'directorGenerateVideoBatch'/)
+    expect(store).toContain('describeVideoBatchPlan(plan, t)[0]')
+    expect(store).toContain('void runVideoBatch(pid, { onJob: input.onJob, shotIds: input.shotIds })')
+    expect(store).toContain('Started making videos for {shots} · {takes} Takes.')
+    // 채팅 막이(startChatVideos)를 건너뛰고 스토어까지 온 generateVideos 는 돌지 않는다.
     expect(read('src/stores/director-store.ts')).toMatch(/case 'generateVideos': \{[\s\S]*?result\.skipped\.push/)
   })
 
