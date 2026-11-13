@@ -149,6 +149,12 @@ function loadTitleImage(url: string | null | undefined): Promise<HTMLImageElemen
   })
 }
 
+/** 빈 곳 — 미리 보기처럼 순검정(자유 배치, 검토 c 낮음 5). 영상을 아직 못 받은 클립 자리(어두운 회색 + 이름)와 다르다. */
+export function drawGap(ctx: CanvasRenderingContext2D, W: number, H: number) {
+  ctx.fillStyle = '#000000'
+  ctx.fillRect(0, 0, W, H)
+}
+
 function drawPlaceholder(ctx: CanvasRenderingContext2D, W: number, H: number, label: string) {
   ctx.fillStyle = '#101014'
   ctx.fillRect(0, 0, W, H)
@@ -286,6 +292,7 @@ export async function renderDraftTimeline(opts: {
   // 세그먼트 러너가 갱신 — 그리기 루프는 "지금 활성인 세그먼트"만 읽는다.
   let activeLabel = ''
   let videoActive = false
+  let inGap = false
   let activeTitle: { card: TitleCardData; image: HTMLImageElement | null } | null = null
   // 약속 K6: 지금 구간의 자막 — 세그먼트 러너가 갱신하고 그리기 루프가 프레임 위에 찍는다.
   let activeSubtitle: ShotSubtitle | null = null
@@ -335,7 +342,8 @@ export async function renderDraftTimeline(opts: {
         drawCover(ctx, videoEl, W, H)
       } else if (activeTitle) {
         drawTitleCard(ctx, W, H, activeTitle.card, activeTitle.image)
-      } else if (!videoActive) {
+      } else if (inGap) drawGap(ctx, W, H)
+      else if (!videoActive) {
         drawPlaceholder(ctx, W, H, activeLabel)
       }
       if (activeSubtitle) drawSubtitle(ctx, W, H, activeSubtitle)
@@ -389,7 +397,9 @@ export async function renderDraftTimeline(opts: {
         activeTitle = null
         activeSubtitle = null
         activeLabel = ''
+        inGap = true
         await waitUntil(segment.endSec)
+        inGap = false
         continue
       }
       const item = layout.find((l) => l.shotId === segment.shotId)!

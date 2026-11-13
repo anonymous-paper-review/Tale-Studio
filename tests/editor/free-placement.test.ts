@@ -11,7 +11,8 @@ vi.mock('@/stores/project-store', () => ({
   useProjectStore: { getState: () => ({ projectId: mocks.projectId }) },
 }))
 
-import { saveEditorNow, selectTimelineLayout, timelineSegments, useEditorStore } from '@/stores/editor-store'
+import { saveEditorNow, selectTimelineLayout, timelineEnd, timelineSegments, useEditorStore } from '@/stores/editor-store'
+import { drawGap } from '@/lib/editor-draft-render'
 import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
 
@@ -168,6 +169,33 @@ describe('끼워 넣기와 자르기', () => {
     expect(layout().map((l) => l.slice(1))).toEqual([[0, 4], [4, 5], [9, 4], [13, 4]])
   })
 
+  it('맨 끝에 타이틀 카드를 넣을 때 기준은 빈 곳까지 센 영상 줄 끝이다 — 그 앞에서 시작하는 따로 둔 소리는 밀리지 않는다', () => {
+    // 왜: 검토 c 낮음 4 — 길이를 더한 끝(빈 곳이 빠짐)을 기준으로 써서, 마지막 클립 아래 깔린 음악까지 카드 길이만큼 밀렸다.
+    //   영상 줄 끝에서 시작하는 소리(끝맺음 음악)는 예전처럼 카드 뒤로 민다.
+    useEditorStore.setState({ audioClips: [...api().audioClips.filter((a) => a.id !== 'bgm'), music(13), { ...music(16), id: 'outro' }] })
+    api().deleteClip('C')
+    api().addTitleCard(30)
+    expect(layout().at(-1)?.slice(1)).toEqual([16, 5])
+    expect(bgm()).toBe(13)
+    expect(api().audioClips.find((a) => a.id === 'outro')?.startSec).toBe(21)
+  })
+
+  it('빈 곳 가운데에 타이틀 카드를 넣으면 따로 둔 소리는 뒤 클립이 실제로 밀린 만큼만 밀린다', () => {
+    // 왜: 빈 곳이 카드를 받아 뒤 클립이 덜 밀리거나 안 밀려도 소리는 카드 길이만큼 밀려, 맞춰 둔 클립과 어긋났다(낮음 4 와 같은 고장).
+    useEditorStore.setState({ audioClips: [...api().audioClips.filter((a) => a.id !== 'bgm'), music(12)] })
+    api().deleteClip('B')
+    api().deleteClip('C')
+    api().addTitleCard(4)
+    expect(layout().map((l) => l.slice(1))).toEqual([[0, 4], [4, 5], [12, 4]])
+    expect(bgm()).toBe(12)
+    seed()
+    useEditorStore.setState({ audioClips: [...api().audioClips.filter((a) => a.id !== 'bgm'), music(8)] })
+    api().deleteClip('B')
+    api().addTitleCard(4)
+    expect(layout().map((l) => l.slice(1))).toEqual([[0, 4], [4, 5], [9, 4], [13, 4]])
+    expect(bgm()).toBe(9)
+  })
+
   it('자르기는 제자리에서 둘로 나뉘고 뒤 클립은 움직이지 않는다', () => {
     // 왜: 정상 경로 고정 — 자르기는 자리를 바꾸지 않는다(빈 곳도 생기지 않는다).
     api().deleteClip('C')
@@ -189,6 +217,26 @@ describe('빈 곳 재생 · 내보내기', () => {
     const render = read('src/lib/editor-draft-render.ts')
     expect(render).toMatch(/timelineSegments\(layout\)/)
     expect(render).toMatch(/segment\.kind === 'gap'/)
+  })
+
+  it('빈 곳이 있어도 미리 보기의 진행 막대 · 시간 · 막대 눌러 옮기기는 마지막 클립 끝까지를 전체 길이로 센다', () => {
+    // 왜: 검토 c 보통 1 — 클립 길이를 더해 전체로 써서 "0:14 / 0:12"가 되고, 끝 전에 막대가 꽉 차며 막대로는 마지막 4초에 갈 수 없었다.
+    api().deleteClip('B')
+    expect(timelineEnd(selectTimelineLayout(api()))).toBe(16)
+    const previewer = read('src/features/editor/video-previewer.tsx')
+    expect(previewer).not.toMatch(/sum \+ l\.durationSec/)
+    expect(previewer.match(/const total = timelineEnd\(layout\)/g)).toHaveLength(2)
+  })
+
+  it('내보낸 영상의 빈 곳은 미리 보기처럼 순검정으로 칠한다', () => {
+    // 왜: 검토 c 낮음 5 — 내보내기는 빈 곳을 영상을 못 받은 클립 자리처럼 어두운 회색(#101014)으로 칠해 미리 보기(검정)와 달랐다.
+    const painted: string[] = []
+    const ctx = { fillStyle: '', fillRect: () => painted.push(String(ctx.fillStyle)) }
+    drawGap(ctx as unknown as CanvasRenderingContext2D, 1280, 720)
+    expect(painted).toEqual(['#000000'])
+    // 미리 보기는 영상 없는 구간에 검정 바탕(bg-black)이 그대로 보이고, 내보내기 그리기 루프는 빈 곳에서 위 칠하기를 쓴다.
+    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/flex h-full flex-col items-center justify-center bg-black/)
+    expect(read('src/lib/editor-draft-render.ts')).toMatch(/else if \(inGap\) drawGap\(ctx, W, H\)/)
   })
 })
 

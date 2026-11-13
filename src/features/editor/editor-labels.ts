@@ -2,18 +2,22 @@
 //   그리고 영상을 못 불러온 클립의 표시 규칙(QA 2026-11-03 밤 "Editor에서 무한 로딩").
 //   약속: tests/editor/header-meta.test.ts · tests/editor/load-ends.test.ts
 import { isTitleCardShotId } from '@/stores/editor-store'
+import { timelineEnd } from '@/lib/editor/timeline-segments'
 import type { VideoClip } from '@/types'
 
 type Translate = (text: string, params?: Record<string, string | number>) => string
 
-/** 화면 머리 숫자 — 타임라인 컷 수 · 전체 길이(초, 반올림) · 영상이 생긴 컷 / 영상이 필요한 컷(타이틀 카드 제외). 컷이 없으면 null. */
+/**
+ * 화면 머리 숫자 — 타임라인 컷 수 · 전체 길이(초, 반올림) · 영상이 생긴 컷 / 영상이 필요한 컷(타이틀 카드 제외). 컷이 없으면 null.
+ *   전체 길이는 빈 곳까지 센 영상 줄 끝이다(자유 배치, 검토 c 낮음 4).
+ */
 export function editorHeaderMeta(
-  layout: ReadonlyArray<{ shotId: string; durationSec: number }>,
+  layout: ReadonlyArray<{ shotId: string; startSec: number; durationSec: number }>,
   videoClips: readonly VideoClip[],
   t: Translate,
 ): string | null {
   if (layout.length === 0) return null
-  const seconds = Math.round(layout.reduce((sum, item) => sum + item.durationSec, 0))
+  const seconds = Math.round(timelineEnd(layout))
   const needVideo = layout.filter((item) => !isTitleCardShotId(item.shotId))
   const ready = needVideo.filter((item) => !!videoClips.find((c) => c.shotId === item.shotId)?.url).length
   return t('{cuts} cuts · {seconds}s · video {ready}/{total}', { cuts: layout.length, seconds, ready, total: needVideo.length })

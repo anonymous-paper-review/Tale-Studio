@@ -20,6 +20,7 @@ import {
   type PersistedEditor,
 } from '@/lib/editor-persistence'
 import { NEVER_SEEN, hasShots, readServerCopy, rememberServerSeenAt, savedLater, serverSeenAt, setAsideLocalEdit } from '@/lib/editor/server-copy'
+import { timelineEnd } from '@/lib/editor/timeline-segments'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
@@ -2109,18 +2110,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
       const sceneOrder = [...(state.clipOrder[insertSceneId] ?? [])]
       sceneOrder.splice(localIndex, 0, newId)
-      // 오디오 동행(2026-09-08 오너 지시 1번): 카드가 끼는 자리 뒤에서 시작하는 오디오는 영상처럼 카드 길이만큼 밀린다.
-      //   카드 자리는 끼어드는 영상 클립의 시작(맨 뒤면 전체 길이). 그 앞에서 시작한 오디오는 그대로.
-      const insertAtSec = g < layout.length ? layout[g].startSec : layout.reduce((sum, l) => sum + l.durationSec, 0)
-      //   영상에 이어진 소리는 그 클립을 따라 밀리고(결정 4), 따로 둔 소리만 이 규칙으로 민다.
-      const audioClips = state.audioClips.map((a) =>
-        !a.linkedShotId && a.startSec >= insertAtSec - 1e-6 ? { ...a, startSec: a.startSec + DEFAULT_DURATION } : a,
-      )
 
-      return withLayout(state, {
+      const next = withLayout(state, {
         shots: [...state.shots, { ...newShot, sceneId: insertSceneId }],
         videoClips: [...state.videoClips, newClip],
-        audioClips,
         clipOrder: { ...state.clipOrder, [insertSceneId]: sceneOrder },
         selectedClipShotId: newId,
         selectedShotIds: [newId],
@@ -2130,6 +2123,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
       })
+      // 오디오 동행(2026-09-08 오너 지시 1번): 카드가 끼는 자리 뒤에서 시작하는 따로 둔 소리는 영상처럼 민다 — 뒤 클립이 실제로 밀린 만큼만
+      //   (빈 곳이 카드를 받으면 덜 밀거나 안 민다). 맨 뒤면 빈 곳까지 센 영상 줄 끝에서 시작하는 소리를 카드 길이만큼(자유 배치, 검토 c 낮음 4).
+      //   영상에 이어진 소리는 그 클립을 따라 이미 옮겨졌다(결정 4). 약속: tests/editor/free-placement.test.ts
+      const after = g < layout.length ? layout[g] : null
+      const insertAtSec = after ? after.startSec : timelineEnd(layout)
+      const nextLayout = selectTimelineLayout({ shots: next.shots ?? state.shots, videoClips: next.videoClips ?? state.videoClips, clipOrder: next.clipOrder ?? state.clipOrder })
+      const pushBy = after ? (nextLayout.find((l) => l.shotId === after.shotId)?.startSec ?? after.startSec) - after.startSec : DEFAULT_DURATION
+      if (pushBy <= 1e-6) return next
+      return {
+        ...next,
+        audioClips: (next.audioClips ?? state.audioClips).map((a) =>
+          !a.linkedShotId && a.startSec >= insertAtSec - 1e-6 ? { ...a, startSec: a.startSec + pushBy } : a,
+        ),
+      }
     }),
 
   updateTitleCard: (shotId, patch) =>

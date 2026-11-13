@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button'
 import { TitleCardStage } from '@/features/editor/title-card-stage'
 import { SubtitleLayer } from '@/features/editor/subtitle-layer'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
-import { useEditorStore, selectTimelineLayout, isTitleCardShotId } from '@/stores/editor-store'
+import { useEditorStore, selectTimelineLayout, isTitleCardShotId, timelineEnd } from '@/stores/editor-store'
 import { cachedVideoUrl } from '@/features/editor/video-prefetch'
 import { previewPane } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
@@ -92,9 +92,9 @@ export function VideoPreviewer() {
         return
       }
 
-      // 타임라인 모드
+      // 타임라인 모드 — 전체 길이는 빈 곳까지 센 영상 줄 끝이다(자유 배치, 검토 c 보통 1).
       const layout = selectTimelineLayout(st)
-      const total = layout.reduce((sum, l) => sum + l.durationSec, 0)
+      const total = timelineEnd(layout)
       const t = st.currentTime
       // 디졸브(2026-09-08): 검은 막의 투명도만 시간에 따라 — 영상 픽셀은 손대지 않는다.
       if (dissolveRef.current) dissolveRef.current.style.opacity = String(dissolveOpacityAt(layout, st.videoClips, t))
@@ -149,7 +149,7 @@ export function VideoPreviewer() {
         return
       }
       const layout = selectTimelineLayout(st)
-      const total = layout.reduce((sum, l) => sum + l.durationSec, 0)
+      const total = timelineEnd(layout)
       seek(ratio * total)
     },
     [seek],

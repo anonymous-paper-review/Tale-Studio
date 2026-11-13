@@ -30,6 +30,13 @@ describe('혼자 정한 것', () => {
     expect(editorHeaderMeta(layout, clips, ko)).toBe('컷 3 · 10초 · 영상 1/2')
   })
 
+  // 왜: 검토 c 낮음 4(자유 배치, 2026-11-14) — 빈 곳도 영상 줄의 시간이다. 클립 길이만 더하면 머리의 "N초"가 내보낸 영상보다 짧았다.
+  it('빈 곳이 있으면 머리의 "N초"는 빈 곳까지 센 영상 줄 끝이다', () => {
+    const layout = [item('shot-1', 0, 4), item('shot-2', 8, 4)]
+    const clips = [clip('shot-1', 'https://media.test/1.mp4'), clip('shot-2', 'https://media.test/2.mp4')]
+    expect(editorHeaderMeta(layout, clips, ko)).toBe('컷 2 · 12초 · 영상 2/2')
+  })
+
   // 왜: 타임라인이 비어 있으면(모든 클립을 숨긴 경우) 숫자 대신 빈칸 — "컷 0 · 0초"는 고장처럼 읽힌다.
   it('타임라인에 컷이 없으면 머리에 숫자를 쓰지 않는다', () => {
     expect(editorHeaderMeta([], [], ko)).toBeNull()
