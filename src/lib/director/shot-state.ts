@@ -340,9 +340,19 @@ export function shotStageDots(state: DirectorShotState): { image: ShotStageDot; 
   }
 }
 
-/** [다음: Editor로] · 사이드바 Editor 가 켜지는 조건 — 완성된 영상이 하나라도 있다(시안 R, 결정 페이지 추천). */
+/** [다음: Editor로] · 사이드바 Editor · 채팅 넘김이 켜지는 조건 — 마더 샷(Writer 샷)의 완성 Take 가 하나라도 있다(시안 R, 결정 페이지 추천).
+ *  Editor 는 Writer 샷만 컷으로 받는다 — 샷 없는 독립 영상 · Director 에서 더한 샷의 영상만 있으면 빈 Editor 가 열린다
+ *  (재검토 c 낮음 2, entry D8 editorHandoverView 와 같은 기준). */
 export function directorHasFinishedVideo(nodes: readonly DirectorNode[]): boolean {
-  return nodes.some((n) => isVideoData(n.data) && n.data.status === 'completed' && hasUrl(n.data.videoUrl))
+  const writerShots = new Set(nodes.flatMap((n) => (isShotData(n.data) && n.data.writerShotId ? [n.id] : [])))
+  return nodes.some(
+    (n) =>
+      isVideoData(n.data) &&
+      n.data.parentShotNodeId !== null &&
+      writerShots.has(n.data.parentShotNodeId) &&
+      n.data.status === 'completed' &&
+      hasUrl(n.data.videoUrl),
+  )
 }
 
 /** 사이드바 Editor 칸을 [다음: Editor로]와 같은 넘김으로 열 때 — 아직 Director 까지만 왔고(넘기기 전) 완성 영상이 있을 때. */

@@ -9,6 +9,8 @@ import type { DirectorNode } from '@/types/director'
 const ko = (text: string, params?: Record<string, string | number>) => translate('ko', text, params)
 const take = (id: string, status: string, url: string | null): DirectorNode =>
   ({ id, type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: id, parentShotNodeId: 's1', status, videoUrl: url } }) as unknown as DirectorNode
+// 그 Take 의 마더 샷(Writer 샷) — Editor 는 Writer 샷만 컷으로 받는다(entry D8 과 같은 기준).
+const writerShot = { id: 's1', type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: 's1', writerShotId: 'w1' } } as unknown as DirectorNode
 
 describe('다음: Editor로', () => {
   it('다음 단계 단추 이름은 Director 에서 "다음: Editor로"다', () => {
@@ -19,9 +21,9 @@ describe('다음: Editor로', () => {
 
   it('완성 영상이 하나도 없으면 Director 의 [다음: Editor로]가 꺼지고, 하나라도 있으면 켜진다', () => {
     // 왜: 시안 R "'다음: Editor로'와 사이드바 Editor 는 같은 조건으로 켜짐" — N 보드: 영상 0개인데 넘기기만 켜져 있던 것.
-    expect(directorHasFinishedVideo([take('v1', 'generating', null), take('v2', 'failed', null)])).toBe(false)
-    expect(directorHasFinishedVideo([take('v1', 'completed', 'https://x/v.mp4')])).toBe(true)
-    expect(directorHasFinishedVideo([take('v1', 'completed', '')])).toBe(false)
+    expect(directorHasFinishedVideo([writerShot, take('v1', 'generating', null), take('v2', 'failed', null)])).toBe(false)
+    expect(directorHasFinishedVideo([writerShot, take('v1', 'completed', 'https://x/v.mp4')])).toBe(true)
+    expect(directorHasFinishedVideo([writerShot, take('v1', 'completed', '')])).toBe(false)
   })
 
   it('만드는 중에는 [다음: Editor로]를 크림으로 칠하지 않는다 — 넘기기는 켜져 있어도 지금 할 일은 기다림이다', () => {
@@ -78,9 +80,7 @@ describe('넘김 조건 한 곳', () => {
     // 왜: 위 단추는 샷 상태로, 사이드바는 완성 Take 로, 채팅은 조건 없이 넘겨 서로 달랐다
     //   ("Take1 완성 + Take2 다시 만드는 중" · "샷 없는 독립 영상만 완성", 리드 검토 a 낮음 7).
     const remaking = { ...take('v2', 'generating', null) }
-    expect(directorHasFinishedVideo([take('v1', 'completed', 'https://x/v1.mp4'), remaking])).toBe(true)
-    const standalone = { ...take('v3', 'completed', 'https://x/v3.mp4'), data: { ...take('v3', 'completed', 'https://x/v3.mp4').data, parentShotNodeId: null } } as DirectorNode
-    expect(directorHasFinishedVideo([standalone])).toBe(true)
+    expect(directorHasFinishedVideo([writerShot, take('v1', 'completed', 'https://x/v1.mp4'), remaking])).toBe(true)
     const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
     expect(page).toContain('const canHandOff = directorHasFinishedVideo(nodes)')
     expect(sidebar()).toContain('directorHasFinishedVideo(s.nodes ?? [])')
@@ -88,6 +88,16 @@ describe('넘김 조건 한 곳', () => {
     const gate = chat.slice(chat.indexOf("if (spec.from === 'director') {"), chat.indexOf("if (spec.from === 'director') {") + 900)
     expect(gate).toContain('if (!directorHasFinishedVideo(nodes))')
     expect(gate).toContain("translate(locale, 'A finished video lets you move on.')")
+  })
+
+  it('마더 샷(Writer 샷)이 없는 영상만 완성이면 넘기지 않는다 — Editor 는 Writer 샷만 컷으로 받아 빈 Editor 가 열린다', () => {
+    // 왜: 샷 없는 독립 영상 · Director 에서 더한 샷의 영상만 완성이어도 넘김이 켜져 빈 Editor 가 열렸다
+    //   (재검토 c 낮음 2) — entry D8(Writer 샷만 셈)과 같은 기준으로 센다.
+    const standalone = { ...take('v3', 'completed', 'https://x/v3.mp4'), data: { ...take('v3', 'completed', 'https://x/v3.mp4').data, parentShotNodeId: null } } as DirectorNode
+    expect(directorHasFinishedVideo([standalone])).toBe(false)
+    const handMade = { ...writerShot, data: { ...writerShot.data, writerShotId: null } } as DirectorNode
+    expect(directorHasFinishedVideo([handMade, take('v1', 'completed', 'https://x/v1.mp4')])).toBe(false)
+    expect(directorHasFinishedVideo([take('v1', 'completed', 'https://x/v1.mp4')])).toBe(false)
   })
 
   it('Director 밖에서 새로 고쳐 Director 기록이 비어 있으면 사이드바 Editor 잠금 까닭에 "완성된 영상이…"를 쓰지 않는다', () => {

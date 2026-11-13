@@ -10,7 +10,7 @@ vi.mock('@/lib/i18n', async () => {
 })
 
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { effectivePickedIds, imageButtonMode, nextPickAll, remakeImageShotIds } from '@/lib/director/toolbar-work'
+import { effectivePickedIds, imageButtonMode, nextPickAll, remakeImageShotIds, videoWorkShotIds, workScopeStates } from '@/lib/director/toolbar-work'
 import { PickAllBar } from '@/features/director/shot-status'
 import type { DirectorShotState } from '@/lib/director/shot-state'
 
@@ -93,5 +93,21 @@ describe('흐린 노드', () => {
     const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
     const click = page.slice(page.indexOf('onNodeClick={(_event, node) => {'), page.indexOf('onNodeClick={(_event, node) => {') + 700)
     expect(click).toContain('if (dimmedByStatusFilter(shotStates.get(shotId), statusFilter)) return')
+  })
+})
+
+describe('숨은 고름', () => {
+  it('고른 샷이 상태가 바뀌어 상태 고르기에서 숨어도 단추가 보드 전체로 넓어지지 않는다', () => {
+    // 왜: "영상 완성"을 고르고 a · b 를 고른 뒤 영상을 다시 만들어 숨으면 보이는 고름이 0 이 되어 단추가 보드 전체(이미지 20장)를
+    //   셌다(재검토 c 낮음 1, 탐침 HP). 상태를 골랐으면 단추는 보이는 샷만 센다(9d7f05ca, 리드 답 1) — 그 셈으로 막힌다.
+    const states = new Map<string, DirectorShotState>([
+      ['a', 'video_generating'], ['b', 'video_generating'],
+      ...Array.from({ length: 20 }, (_, i) => [`n${i}`, 'image_needed'] as [string, DirectorShotState]),
+    ])
+    const scope = workScopeStates(states, 'video_done')
+    const picked = effectivePickedIds(['a', 'b'], [...scope.keys()])
+    expect(picked.size).toBe(0)
+    expect(imageButtonMode(scope, picked).shotIds).toEqual([])
+    expect(videoWorkShotIds(scope, picked)).toEqual([])
   })
 })

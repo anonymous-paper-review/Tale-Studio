@@ -24,8 +24,10 @@ import { nextStepAction } from '@/lib/handoff-intent'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 
-// Director 에 완성 영상 하나(샷 없는 Take) — 넘기기 단추가 켜지는 상태(1단계 S6 · 리드 검토 a 낮음 7).
-const finishedVideo = { id: 'v1', type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: 'v1', parentShotNodeId: null, status: 'completed', videoUrl: 'https://media.test/v1.mp4' } }
+// Director 에 Writer 샷 하나와 그 완성 Take — 넘기기 단추가 켜지는 상태(1단계 S6 · 리드 검토 a 낮음 7 · 재검토 c 낮음 2).
+//   영상 없는 샷이 없으니 entry D8 창도 열리지 않는다.
+const writerShot = { id: 's1', type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: 's1', writerShotId: 'w1', durationSeconds: 3 } }
+const finishedVideo = { id: 'v1', type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: 'v1', parentShotNodeId: 's1', status: 'completed', videoUrl: 'https://media.test/v1.mp4', takeNumber: 1, final: false } }
 
 const settings: ProjectSettings = {
   playtime: 30, genre: 'SF 스릴러', subGenre: '사이버펑크', format: 'horizontal_16:9', tone: ['dark'], targetEmotion: [], dialogueLanguage: 'ko',
@@ -77,7 +79,7 @@ describe('Director→Editor 는 팝업 없이 넘긴다', () => {
   it('Director에서 다음 단계 버튼을 누르면 넘김 문장이 채팅에 남고 팝업 없이 Editor로 넘어간다', async () => {
     useProjectStore.setState({ currentStage: 'director', reachedStage: 'director' })
     // 단추는 완성 영상이 있을 때만 켜진다(1단계 S6) — 그 상태를 놓고 누른다. 문장 · 기대값은 그대로.
-    useDirectorCanvasStore.setState({ nodes: [finishedVideo as never] })
+    useDirectorCanvasStore.setState({ nodes: [writerShot as never, finishedVideo as never] })
     await useGlobalChatStore.getState().requestNextStep()
     expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
     expect(userLines()).toEqual(['Editor로 넘겨주세요'])
