@@ -40,9 +40,18 @@ vi.mock('@/lib/director/video-batch-inputs', () => ({
     skipped: [],
   }),
 }))
+// 묶음 끝 알림 — 채팅 끝 줄과 (채팅을 접었을 때의) Lumi 알림 카드.
+const notices = vi.hoisted(() => ({ line: vi.fn(), card: vi.fn() }))
+vi.mock('@/lib/generation-notify', async (original) => ({
+  ...await original<typeof import('@/lib/generation-notify')>(),
+  notifyBatchSummary: notices.line,
+}))
+vi.mock('@/stores/lumi-notice-store', () => ({ useLumiNoticeStore: { getState: () => ({ batchEnded: notices.card }) } }))
 
 import { runVideoBatch } from '@/lib/director/video-batch-client'
 import { _setGenerationQueueSnapshotForTests } from '@/lib/generation-queue'
+import { translate } from '@/lib/i18n/translate'
+import { useLocaleStore } from '@/stores/locale-store'
 
 const shot = (id: string) => ({ id, type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot' } }) as unknown as DirectorNode
 function summary(overrides: Partial<VideoBatchSummary>): VideoBatchSummary {
@@ -59,11 +68,58 @@ beforeEach(() => {
     videoBatchCancelled: false, videoBatchRunId: null,
   })
   mockStore.state.cancelRunningJobs.mockClear()
+  notices.line.mockClear()
+  notices.card.mockClear()
 })
 afterEach(() => {
   vi.useRealTimers()
   vi.unstubAllGlobals()
   _setGenerationQueueSnapshotForTests({ projectId: '', jobs: [] })
+})
+
+/** 서버가 닫은 묶음 — 멈춘 영상(job-1)은 생성처에서 아직 돈다. 조회는 늘 같은 답. */
+function closedBatchServer(closed: Partial<VideoBatchSummary>) {
+  let runId = ''
+  vi.stubGlobal('fetch', vi.fn(async (_input: RequestInfo | URL, init?: RequestInit) => {
+    if (init?.method === 'POST') {
+      runId = (JSON.parse(String(init.body)) as { batchId: string }).batchId
+      return json({ batch: summary({ id: runId, total: closed.total ?? 1 }), skipped: [] })
+    }
+    return json({ batches: [summary({ id: runId, status: 'cancelled', ...closed })] })
+  }))
+}
+
+describe('같이 정한 것', () => {
+  it('영상 묶음이 멈춘 영상만으로 끝나면 끝 줄("영상 0개 완료, 0개 실패")을 띄우지 않는다 — 멈춤 알림이 이미 떴다', async () => {
+    // 왜: 리드 11/14 — 하나뿐인 묶음 영상을 멈추면 "영상 0개 완료, 0개 실패"가 떴다. 멈춘 것은 이미 멈춤 알림으로 알렸다.
+    vi.useFakeTimers()
+    _setGenerationQueueSnapshotForTests({ projectId: 'project-1', jobs: [{ id: 'job-1', kind: 'shot_video', target: {}, cancelledAt: '2026-11-14T03:00:00Z' }] })
+    closedBatchServer({})
+
+    void runVideoBatch('project-1', { silent: true })
+    await vi.advanceTimersByTimeAsync(3000)
+
+    expect(mockStore.state.videoBatchBusy).toBe(false)
+    expect(notices.line).not.toHaveBeenCalled()
+    expect(notices.card).not.toHaveBeenCalled()
+  })
+
+  it('멈춘 영상 말고 완료 · 실패가 하나라도 있으면 끝 줄은 지금처럼 뜨고, 멈춘 영상은 세지 않는다', async () => {
+    // 왜: 정상 경로 고정 — 만든 영상 · 실패한 영상은 알린다. 멈춘 영상은 만든 것도 실패한 것도 아니다.
+    vi.useFakeTimers()
+    _setGenerationQueueSnapshotForTests({ projectId: 'project-1', jobs: [{ id: 'job-1', kind: 'shot_video', target: {}, cancelledAt: '2026-11-14T03:00:00Z' }] })
+    closedBatchServer({ total: 2, done: 1, started: 2, jobs: [
+      { jobId: 'job-0', status: 'completed', resultUrl: 'https://media.test/0.mp4', error: null },
+      { jobId: 'job-1', status: 'queued', resultUrl: null, error: null },
+    ] })
+
+    void runVideoBatch('project-1', { silent: true })
+    await vi.advanceTimersByTimeAsync(3000)
+
+    const line = translate(useLocaleStore.getState().locale, '{done} videos done, {failed} failed', { done: 1, failed: 0 })
+    expect(notices.line).toHaveBeenCalledExactlyOnceWith('director', `✓ ${line}`)
+    expect(notices.card).toHaveBeenCalledExactlyOnceWith({ projectId: 'project-1', kind: 'video', done: 1, failed: 0 })
+  })
 })
 
 describe('혼자 정한 것', () => {
