@@ -1109,6 +1109,10 @@ interface DirectorCanvasState {
   realBatchRemaining: number | null
   /** 지금 도는 일괄이 맡은 Writer 샷 id(고른 샷만 만들 때, 시안 D2). null = 빈 샷 전부(예전과 같음). 저장하지 않는다. */
   realBatchShotIds: string[] | null
+  /** "영상까지 이어서" 스위치(시안 D4 · R, 오너 답 6) — 화면에 들어오면 꺼져 있고 저장하지 않는다. */
+  chainVideoAfterImage: boolean
+  /** 이미지가 끝나면 영상을 이어 보낼 샷(샷 노드 id) — 이 화면(브라우저)이 지켜본다. 화면을 닫으면 사라진다. */
+  chainWaitingShotIds: string[]
   /** Explicit full-video batch progress. Ephemeral UI state; never persisted. */
   videoBatchBusy: boolean
   videoBatchProgress: { done: number; total: number; failed: number } | null
@@ -1160,6 +1164,8 @@ interface DirectorCanvasState {
   togglePickedShot: (shotNodeId: string) => void
   setPickedShots: (shotNodeIds: string[]) => void
   clearPickedShots: () => void
+  setChainVideoAfterImage: (on: boolean) => void
+  setChainWaitingShots: (shotNodeIds: string[]) => void
   /** 일괄 시작 — 중단 표시를 풀고 진행 상태를 연다. */
   beginVideoBatch: (total: number) => void
   /** 일괄 중단 — 도는 중일 때만 먹는다. 서버 DELETE로 중단을 확인한 뒤 반환한다. */
@@ -1655,6 +1661,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       realBatchBusy: false,
       realBatchRemaining: null,
       realBatchShotIds: null,
+      chainVideoAfterImage: false,
+      chainWaitingShotIds: [],
       videoBatchBusy: false,
       videoBatchProgress: null,
       videoBatchQueue: null,
@@ -1706,6 +1714,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             relationModal: null,
             statusFilter: 'all',
             pickedShotIds: [],
+            chainVideoAfterImage: false,
+            chainWaitingShotIds: [],
             videoBatchBusy: false,
             videoBatchProgress: null,
             videoBatchQueue: null,
@@ -1745,6 +1755,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         })),
       setPickedShots: (shotNodeIds) => set({ pickedShotIds: [...new Set(shotNodeIds)] }),
       clearPickedShots: () => set({ pickedShotIds: [] }),
+      setChainVideoAfterImage: (on) => set({ chainVideoAfterImage: on }),
+      setChainWaitingShots: (shotNodeIds) => set({ chainWaitingShotIds: [...new Set(shotNodeIds)] }),
 
       beginVideoBatch: (total) =>
         set({

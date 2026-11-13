@@ -3184,6 +3184,12 @@ export const KO: Record<string, string> = {
   'Open details': '상세 열기',
   'Make a real image.': '실사 이미지를 만들어요',
   'Next: Editor': '다음: Editor로',
+  'Also make videos': '영상까지 이어서',
+  'Make images + videos': '이미지+영상 만들기',
+  "If you close this screen, the videos won't start.": '이 화면을 닫으면 영상은 시작되지 않아요',
+  'Starts by itself when the image is done': '이미지가 끝나면 자동으로 시작해요',
+  'Make images, then their videos?': '이미지를 만들고 이어서 영상도 만들까요?',
+  'Makes {count} images, and each video starts by itself when its image is done.': '이미지 {count}장을 만들고, 이미지가 끝나는 샷부터 영상이 저절로 시작돼요.',
   'A finished video lets you move on.': '완성된 영상이 하나 있으면 넘어갈 수 있어요',
   'Complete previous step first': '이전 단계를 먼저 끝내세요',
   'This is the storyboard. See every shot image per scene at a glance.\n\n· Click cards to pick shots, and the buttons at the top work on the picked shots\n· "Make images" turns the rough shots into real images, then "Make videos"\n· Press ⤢ Details on a card to open its details':

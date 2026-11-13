@@ -137,3 +137,20 @@ export function workEstimateText(
     ? t('{count} videos · about {minutes} min · {takes} Takes', { count: videos, minutes, takes: input.videoTakes })
     : t('{count} videos · about {minutes} min', { count: videos, minutes })
 }
+
+/** "영상까지 이어서"(시안 D4 · 오너 답 6): 이미지를 기다리던 샷 가운데 이미지가 끝난 샷은 영상을 시작하고(start),
+ *  쓸 그림이 없거나 이미 다른 길로 영상이 있는 샷은 기다림에서 빼고(drop), 아직 그리는 샷은 기다린다(keep). */
+export function chainStep(
+  waiting: readonly string[],
+  states: ReadonlyMap<string, DirectorShotState>,
+  imageBusy: boolean,
+): { start: string[]; drop: string[]; keep: string[] } {
+  const out = { start: [] as string[], drop: [] as string[], keep: [] as string[] }
+  for (const id of waiting) {
+    const state = states.get(id)
+    if (state === 'image_done') out.start.push(id)
+    else if (state === 'image_generating' || (state === 'image_needed' && imageBusy)) out.keep.push(id)
+    else out.drop.push(id)
+  }
+  return out
+}

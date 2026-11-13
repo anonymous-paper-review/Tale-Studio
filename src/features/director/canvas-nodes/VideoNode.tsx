@@ -47,6 +47,11 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     return !!parent && (s.pickedShotIds?.includes(parent) ?? false)
   })
   const detailOpen = useDirectorCanvasStore((s) => s.selectedNodeId === id)
+  // "영상까지 이어서"로 이미지를 기다리는 샷(시안 D4) — 빈 영상 노드에 "이미지가 끝나면 자동으로 시작해요".
+  const chainWaiting = useDirectorCanvasStore((s) => {
+    const parent = isVideoData(data) ? data.parentShotNodeId : null
+    return !!parent && (s.chainWaitingShotIds?.includes(parent) ?? false)
+  })
   const playingNodeId = useDirectorCanvasStore((s) => s.playingNodeId)
   const setPlayingNode = useDirectorCanvasStore((s) => s.setPlayingNode)
   const ensureVideoThumbnail = useDirectorCanvasStore(
@@ -355,7 +360,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           </button>
         ) : data.lastAttemptStatus === 'generating' ? null : (
           // 만드는 중이면 "대기 중"을 쓰지 않는다. 아래 "영상 생성 중"과 같이 보이면 헷갈린다(11/5 시안 DG 맞춰 보기 2026-11-09).
-          <span className="text-[11px] text-subtle-foreground">{t('Waiting')}</span>
+          <span className="px-2 text-center text-[11px] text-subtle-foreground">
+            {chainWaiting ? t('Starts by itself when the image is done') : t('Waiting')}
+          </span>
         )}
 
         <GeneratingOverlay

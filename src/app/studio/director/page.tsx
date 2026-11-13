@@ -35,7 +35,7 @@ import {
 } from '@/lib/director/video-batch-client'
 import { videoBatchShotSettings } from '@/lib/director/video-batch-take'
 import { DEFAULT_VIDEO_MODEL } from '@/lib/video-models'
-import { effectivePickedIds, imageButtonMode, nextPickAll, primaryWorkAction, videoWorkShotIds, workEstimateText } from '@/lib/director/toolbar-work'
+import { chainStep, effectivePickedIds, imageButtonMode, nextPickAll, primaryWorkAction, videoWorkShotIds, workEstimateText } from '@/lib/director/toolbar-work'
 import { LumiAvatar } from '@/components/lumi/lumi'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { describeVideoBatchPlan, planVideoBatch, videoBatchTakeCosts } from '@/lib/director/video-batch-plan'
@@ -923,16 +923,26 @@ function PaletteBar() {
   //   오너 답 11: Take 는 지금 계산 그대로(모델 · 해상도마다, 1080p 두 배) 예상 칸 · 확인창에.
   const takeState = useTakeBalance()
   const videoPlan = planVideoBatch(videoBatchTakeCosts(nodes, videoWork), takeState.balance, takeState.mode)
-  const videoModels = videoWork.map((id) => videoBatchShotSettings(nodes, id)?.model ?? DEFAULT_VIDEO_MODEL)
+  const modelOf = (id: string) => videoBatchShotSettings(nodes, id)?.model ?? DEFAULT_VIDEO_MODEL
+  const videoModels = videoWork.map(modelOf)
+  // "영상까지 이어서"(시안 D4 · R, 오너 답 6): 켜면 이미지 단추가 "이미지+영상 만들기", 이미지를 만든 샷은 이 화면이 영상을 이어 보낸다.
+  const chainVideoAfterImage = useDirectorCanvasStore((s) => s.chainVideoAfterImage)
+  const setChainVideoAfterImage = useDirectorCanvasStore((s) => s.setChainVideoAfterImage)
+  const chainWaitingShotIds = useDirectorCanvasStore((s) => s.chainWaitingShotIds)
+  const setChainWaitingShots = useDirectorCanvasStore((s) => s.setChainWaitingShots)
+  const chainOn = chainVideoAfterImage && imageMode.mode === 'make' && imageWork.length > 0
+  const chainPlan = planVideoBatch(videoBatchTakeCosts(nodes, chainOn ? imageWork : []), takeState.balance, takeState.mode)
   const estimate = workEstimateText({
     images: primary === 'image' ? imageWork.length : primary !== 'video' && imageMode.mode === 'remake' ? imageMode.shotIds.length : 0,
-    videoModels: primary === 'video' ? videoModels : [],
-    videoTakes: videoPlan.requiredTakes,
+    videoModels: primary === 'video' ? videoModels : primary === 'image' && chainOn ? imageWork.map(modelOf) : [],
+    videoTakes: primary === 'image' && chainOn ? chainPlan.requiredTakes : videoPlan.requiredTakes,
     takesShown: takeState.mode !== 'off',
     making,
+    chain: primary === 'image' && chainOn,
   }, t)
   const [confirmVideoBatch, setConfirmVideoBatch] = useState(false)
   const [confirmRemake, setConfirmRemake] = useState(false)
+  const [confirmChain, setConfirmChain] = useState(false)
   // D1 "The Set" 노드 9 · 샷 4"(노드형) · "씬 2 · 샷 4 · 12초"(스토리보드형).
   const canvasMeta = viewMode === 'storyboard' ? storyboardCanvasMeta(nodes, t) : directorCanvasMeta(nodes, t)
 
@@ -947,6 +957,15 @@ function PaletteBar() {
       setConfirmRemake(true)
       return
     }
+    // 영상까지 이어서면 Take 를 쓰니 영상 확인 창부터(약속 E).
+    if (chainOn) {
+      refetchTakeBalance()
+      setConfirmChain(true)
+      return
+    }
+    startImages()
+  }
+  const startImages = () => {
     const pid = useDirectorCanvasStore.getState().projectId
     if (!pid || imageWork.length === 0) return
     const store = useDirectorCanvasStore.getState()
@@ -994,6 +1013,17 @@ function PaletteBar() {
       if (stillCurrent()) toast.error(t('Please try again in a moment.'))
     }
   }
+  // 이어 보내기 지켜보기(오너 답 6 — 이 화면이 한다): 이미지가 끝난 샷은 영상을 시작하고, 그림이 없게 된 샷은 기다림에서 뺀다.
+  const chainKey = chainWaitingShotIds.map((id) => `${id}:${shotStates.get(id) ?? '-'}`).join('|')
+  useEffect(() => {
+    if (chainWaitingShotIds.length === 0) return
+    const step = chainStep(chainWaitingShotIds, shotStates, realBatchBusy)
+    if (step.start.length === 0 && step.drop.length === 0) return
+    setChainWaitingShots(step.keep)
+    const store = useDirectorCanvasStore.getState()
+    for (const id of step.start) void store.generateVideoForShot(id).catch(() => {})
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- chainKey 가 기다리는 샷과 그 상태를 함께 담는다
+  }, [chainKey, realBatchBusy])
   const progressDone = (storyboardBatch?.done ?? 0) + (videoBatch?.done ?? (videoBatchProgress?.done ?? 0))
   const progressTotal = (storyboardBatch?.total ?? 0) + (videoBatch?.total ?? (videoBatchProgress?.total ?? 0))
   const progressLabel =
@@ -1007,7 +1037,8 @@ function PaletteBar() {
   //   1줄: 보기 · 제목 · 예상 … 상태 고르기 · Lumi / 2줄: 진행 … 이미지 만들기 · 영상 만들기.
   //   가장 밝은(크림) 단추는 지금 할 일 하나(시안 R) — 만들 게 없는 단추는 꺼진다.
   return (
-    <div className="flex shrink-0 flex-col gap-3 px-4 pb-3 pt-4">
+    // 좁아지면(작은 화면 · Lumi 패널이 화면을 밀어냄) 예상 → 진행 막대 → 스위치 글자 순으로 줄이고 단추는 끝까지 남긴다(결정 페이지 추천) — 툴바 폭 기준.
+    <div className="@container flex shrink-0 flex-col gap-3 px-4 pb-3 pt-4">
       {/* 다음 단계 단추(2026-10-01 오너 — 각 단계 오른쪽 위) — v3 위 막대 오른쪽 자리. 툴바와 같은 판정으로 켜짐 · 크림을 정한다. */}
       <TopBarActions>
         <NextStepButton
@@ -1067,7 +1098,7 @@ function PaletteBar() {
           {estimate && (
             <span
               data-testid="director-estimate"
-              className="hidden truncate rounded-full bg-background px-3 py-1 text-[12.5px] font-medium text-muted-foreground shadow-node xl:inline"
+              className="hidden truncate rounded-full bg-background px-3 py-1 text-[12.5px] font-medium text-muted-foreground shadow-node @6xl:inline"
             >
               {estimate}
             </span>
@@ -1145,7 +1176,7 @@ function PaletteBar() {
                   aria-valuemax={progressTotal}
                   aria-valuenow={progressDone}
                   aria-label={t('Finished {done} of {total}', { done: progressDone, total: progressTotal })}
-                  className="hidden h-1 w-40 shrink-0 overflow-hidden rounded-full bg-progress-track lg:block"
+                  className="hidden h-1 w-40 shrink-0 overflow-hidden rounded-full bg-progress-track @5xl:block"
                 >
                   <span
                     className={cn('block h-full transition-[width]', makingVideos > 0 || videoBatchBusy ? 'bg-state-video' : 'bg-stage-director')}
@@ -1186,6 +1217,31 @@ function PaletteBar() {
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
+          {/* 영상까지 이어서(시안 D1 · D4 · R) — 켜면 이미지 단추가 "이미지+영상 만들기". 만드는 중에는 바꿀 수 없다. */}
+          <button
+            type="button"
+            role="switch"
+            aria-checked={chainVideoAfterImage}
+            onClick={() => setChainVideoAfterImage(!chainVideoAfterImage)}
+            disabled={imageMode.mode !== 'make' || imageWork.length === 0}
+            className="flex shrink-0 items-center gap-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            <span
+              aria-hidden
+              className={cn(
+                'relative h-5 w-9 shrink-0 rounded-full transition-colors',
+                chainVideoAfterImage ? 'bg-info' : 'bg-card',
+              )}
+            >
+              <span
+                className={cn(
+                  'absolute top-0.5 size-4 rounded-full bg-foreground transition-[left]',
+                  chainVideoAfterImage ? 'left-[18px]' : 'left-0.5',
+                )}
+              />
+            </span>
+            <span className="hidden whitespace-nowrap @4xl:inline">{t('Also make videos')}</span>
+          </button>
           {/* 고른 샷이 있으면 단추가 그 샷에만(시안 D2 "고른 샷에"). */}
           {picked.size > 0 && <span className="text-[12.5px] font-semibold text-info">{t('On picked shots')}</span>}
           {/* 단추 셋은 늘 같은 자리(시안 R) — 만들 게 없으면 꺼지고, 마우스를 올리면 왜 꺼졌는지 알린다. */}
@@ -1197,7 +1253,7 @@ function PaletteBar() {
             className={workButtonClass(primary === 'image')}
           >
             <ImageIcon className="size-3.5" />
-            <span>{imageMode.mode === 'remake' ? t('Make images again') : t('Make images')}</span>
+            <span>{imageMode.mode === 'remake' ? t('Make images again') : chainVideoAfterImage ? t('Make images + videos') : t('Make images')}</span>
             <span aria-hidden className="opacity-60">·</span>
             <span className="font-num tabular-nums">{imageMode.shotIds.length}</span>
           </button>
@@ -1216,6 +1272,28 @@ function PaletteBar() {
         </div>
       </div>
 
+      <RegenerateConfirmDialog
+        open={confirmChain}
+        onOpenChange={setConfirmChain}
+        title={t('Make images, then their videos?')}
+        description={t('Makes {count} images, and each video starts by itself when its image is done.', { count: imageWork.length })}
+        impact={[
+          t('Costs money for every generated video: {count} videos.', { count: chainPlan.total }),
+          ...describeVideoBatchPlan(chainPlan, t),
+          t("If you close this screen, the videos won't start."),
+        ]}
+        confirmLabel={t('Make images + videos')}
+        onConfirm={() => {
+          setConfirmChain(false)
+          if (chainPlan.runCount === 0) {
+            toast.warning(t('No videos can be made until you add Takes.'))
+            return
+          }
+          setChainWaitingShots([...chainWaitingShotIds, ...imageWork.slice(0, chainPlan.runCount)])
+          startImages()
+          toast.info(t("If you close this screen, the videos won't start."))
+        }}
+      />
       <RegenerateConfirmDialog
         open={confirmRemake}
         onOpenChange={setConfirmRemake}
