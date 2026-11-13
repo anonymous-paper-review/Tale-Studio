@@ -36,8 +36,8 @@ export function editorFeatureLines(locale: AppLocale = 'en'): string[] {
       deleteAudio: q('Delete audio'), muteTrack: q('Mute entire track'), unmuteTrack: q('Unmute track'), addTrack: q('Add audio track'), deleteTrack: q('Delete this track'),
       plusTrack: `"+ ${t('Track')}"`,
     }),
-    t('The {videoTab} tab of the {source} panel: click a card to preview it, drag a card that has a finished video onto the video track, or right-click it and choose {preview} or {add} (adds it at the clip boundary nearest the playhead). This is also how a hidden clip comes back.', {
-      videoTab: q('Video'), source: q('Source'), preview: q('Preview'), add: q('Add to timeline'),
+    t('The {videoTab} tab of the {source} panel: click a card to preview it, drag a card that has a finished video onto the video track, or right-click it and choose {preview} or {add} (adds it at the clip boundary nearest the playhead). This is also how a hidden clip comes back, but split pieces and title cards are not in the {source} panel and come back only with {undo}, and a shot added again from the {source} panel comes in at its full length (trim and speed start over).', {
+      videoTab: q('Video'), source: q('Source'), preview: q('Preview'), add: q('Add to timeline'), undo: q('Undo (Ctrl+Z)'),
     }),
     t('Output: {draftRender} records the edited timeline in real time into one video file (keep the tab open and visible; it takes as long as the film). {shotZip} downloads the original shot videos in timeline order, without any edits.', {
       draftRender: q('Draft Render'), shotZip: q('Shot ZIP'),
@@ -52,7 +52,7 @@ export function editorMissingLines(locale: AppLocale = 'en'): string[] {
   const q = (key: string) => `"${t(key)}"`
   return [
     t('Transitions: a transitions panel, or any transition other than {dissolve} at the start of a clip. There is no cross-dissolve, no fade-out at the end and no audio fade.', { dissolve: q('Dissolve (dip to black)') }),
-    t("Deleting: a delete item in a clip's right-click menu. After {split}, take off the piece you don't want with {hide} or the Delete key.", { split: q('Split here'), hide: q('Hide clip') }),
+    t("Deleting: a delete item in a clip's right-click menu on the video track. After {split}, take off the piece you don't want with {hide} or the Delete key.", { split: q('Split here'), hide: q('Hide clip') }),
     t('Picture changes: colour grading, filters, crop, rotate, reverse, freeze frame or keyframes.'),
     t('Text styling: subtitle font, size, colour or timing, and title card font, colour or image size.'),
     t('Timeline layout: gaps or overlaps between video clips, extra video tracks, copy and paste.'),

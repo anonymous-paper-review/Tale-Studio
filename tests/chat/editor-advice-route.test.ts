@@ -79,6 +79,26 @@ describe('Editor 조언 서버', () => {
     expect(system).not.toContain('"Hide clip"')
   })
 
+  // 왜: 검토 b 낮음 둘(리드 11/14) — "없는 것"의 "클립 오른쪽 클릭 메뉴의 지우기 항목"이 오디오 클립의 "오디오 삭제"(있는 것)와 한 프롬프트에서 부딪혔고,
+  //   "숨긴 클립도 이렇게 다시 넣음"은 나눈 조각 · 타이틀 카드(소스 패널에 없음)와 다시 넣은 샷의 길이(자르기 · 속도 처음)를 빠뜨렸다.
+  it('Editor 조언 프롬프트의 "없는 것"은 영상 클립 오른쪽 클릭 메뉴의 지우기 항목으로 좁히고, 숨긴 클립을 소스 패널로 다시 넣는 줄에 나눈 조각 · 타이틀 카드와 다시 넣은 샷의 길이 단서를 한국어 · 영어로 싣는다', async () => {
+    const systemFor = async (locale: 'en' | 'ko') => {
+      mocks.llmChat.mockClear()
+      mocks.locale.mockResolvedValue({ locale, switched: null })
+      mocks.llmChat.mockResolvedValue('OK')
+      await post({ message: 'How do I bring back a hidden clip?', projectId: 'proj-e', timelineContext: 'Cuts on the timeline: 2' })
+      return (mocks.llmChat.mock.calls[0] as [string])[0]
+    }
+    const en = await systemFor('en')
+    expect(en).toContain("Deleting: a delete item in a clip's right-click menu on the video track.")
+    expect(en).toContain('split pieces and title cards are not in the "Source" panel and come back only with "Undo (Ctrl+Z)"')
+    expect(en).toContain('comes in at its full length (trim and speed start over)')
+    const ko = await systemFor('ko')
+    expect(ko).toContain('지우기: 영상 클립 오른쪽 클릭 메뉴의 지우기 항목.')
+    expect(ko).toContain('나눈 조각 · 타이틀 카드는 "소스" 패널에 없어 "실행 취소 (Ctrl+Z)"로만 돌아오고')
+    expect(ko).toContain('전체 길이(자르기 · 속도 처음)로 들어감')
+  })
+
   // 왜: 로그인 · 빈 메시지 검사는 다른 채팅 길과 같다 — 로그인하지 않은 사람은 조언 모델을 부르지 못한다.
   it('Editor 조언 서버는 로그인하지 않으면 401, 메시지가 없으면 400 이다', async () => {
     mocks.getUser.mockResolvedValue(null)
