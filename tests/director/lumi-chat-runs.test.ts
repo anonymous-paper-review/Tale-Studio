@@ -1071,4 +1071,22 @@ describe('이미지가 없는 샷의 영상 부탁(영어 재점검 B1)', () => 
     expect(before(saidSince(mark), 'The video for Shot 2 needs an image first.', 'Shall I make the video for Shot 1 (5 Takes)? Say yes to start.')).toBe(true)
     expect(chat.getState().directorVideoAsk).toMatchObject({ shotIds: ['r1'], remake: true })
   })
+
+  // 왜: 검토 a 마지막 차이(리드 11/14) — 글 카드 [적용] 줄은 이미지 없는 샷까지 세어 "샷 1 · 3 영상을 바로 만들어요 · 10 Take"라고 약속했는데,
+  //   [적용] 뒤에는 샷 3 이 "이미지가 먼저 필요해요"로 빠져 5 Take 만 썼다(B1 ③ 이 이 줄에는 닿지 않았다).
+  it('글 카드 [적용] 줄이 말하는 영상 수 · Take 수도 이미지가 있는 샷만 센다 — 이미지 없는 샷은 [적용] 뒤 "이미지가 먼저 필요해요"로 빠지니 줄에서도 뺀다', async () => {
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }, { type: 'updateShot', id: 's3', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s1', 's3'] }])
+    await chat.getState().sendMessage('Make shots 1 and 3 warmer and then make the videos for shots 1 and 3')
+    expect(mocks.run).not.toHaveBeenCalled()
+    const card = chat.getState().pendingProposal
+    expect(card?.kind).toBe('directorTextEdit')
+    expect(card?.impact).toContain('Applying also makes the video for Shot 1 right away · 5 Takes.')
+    expect((card?.impact ?? []).filter((line) => line.startsWith('Applying also makes the video'))).toEqual(['Applying also makes the video for Shot 1 right away · 5 Takes.'])
+    // [적용] 뒤 — 줄이 말한 그대로 샷 1 만 5 Take 로, 샷 3 은 "이미지가 먼저 필요해요".
+    await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
+    expect(runShots()).toEqual(['s1'])
+    const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
+    expect(said).toContain('The video for Shot 3 needs an image first.')
+    expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
+  })
 })
