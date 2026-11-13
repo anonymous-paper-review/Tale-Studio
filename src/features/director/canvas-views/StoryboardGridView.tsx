@@ -76,6 +76,8 @@ export type GridAttemptRecord = VideoTakeSelectionRecord & {
 }
 type GridVideoTakeRecord = GridAttemptRecord & {
   last_attempt_status: DirectorVideoStatus | null
+  /** 화면에서 멈춘 때(오너 2026-11-14 7번) — 멈춘 Take 는 ★ 가 아니면 만드는 중도 카드 영상도 아니다. */
+  cancelled_at: string | null
   node: DirectorNode
   url: string | null
   status: DirectorVideoStatus
@@ -100,6 +102,18 @@ export function selectGridVideoAttemptState(
         ? latestAttempt.last_attempt_error ?? t('Video generation failed')
         : null,
   }
+}
+
+/** 카드가 트는 영상 · 만드는 중 · 실패 글 — 화면에서 멈춘 Take 는 만드는 중이 아니고, ★ 가 아니면 카드 영상도 아니다
+ *  (샷 상태 shot-state.ts 와 같은 규칙, 오너 2026-11-14 7번 · 리드 S4-2 1). 약속: tests/director/stopped-take.test.ts */
+export function gridVideoView<T extends GridVideoTakeRecord>(
+  records: readonly T[],
+  t: ReturnType<typeof useT> = (text) => text,
+): { cardTake: T | null; generating: boolean; failure: string | null } {
+  // ★ 로 고른 멈춘 Take 는 영상이다 — 카드 영상 고르기에서만 멈춤을 지운다.
+  const cardTake = selectNewestSuccessfulTake(records.map((r) => (r.is_final ? { ...r, cancelled_at: null } : r)))
+  const { generating, failure } = selectGridVideoAttemptState(records.filter((r) => r.cancelled_at == null), t)
+  return { cardTake, generating, failure }
 }
 
 function isExpectedMediaPlayInterruption(error: unknown): boolean {
@@ -296,6 +310,7 @@ function ShotCell({
           last_attempt_status: n.data.lastAttemptStatus,
           last_attempt_at: n.data.lastAttemptAt,
           last_attempt_error: n.data.lastAttemptError,
+          cancelled_at: n.data.cancelledAt ?? null,
           node: n,
         }
         return [record]
@@ -303,10 +318,10 @@ function ShotCell({
     [directorNodes, node.id],
   )
   // Grid always projects the newest successful take; Final is an editor/export decision.
-  const newestSuccessful = selectNewestSuccessfulTake(takeRecords)
+  //   화면에서 멈춘 Take 는 ★ 가 아니면 카드 영상도 만드는 중도 아니다(오너 7번 — 멈춘 채 도는 Take 가 [영상 만들기]를 잠그지 않게).
+  const { cardTake: newestSuccessful, generating: childVideoGenerating, failure: childVideoFailure } =
+    gridVideoView(takeRecords, t)
   const completedVideoUrl = newestSuccessful?.url ?? null
-  const { generating: childVideoGenerating, failure: childVideoFailure } =
-    selectGridVideoAttemptState(takeRecords, t)
 
   // 화면 포맷(2026-09-30) — 훅은 조기 반환보다 앞에 둔다(React 훅 순서 규칙).
   const projectFormat = useProjectFormatStore((s) => s.format)

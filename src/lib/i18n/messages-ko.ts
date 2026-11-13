@@ -3296,6 +3296,7 @@ export const KO: Record<string, string> = {
   'Remake failed': '다시 만들기 실패',
   'Rough only': '러프만 있음',
   'No video yet': '영상 없음',
+  'Stopped by you': '멈췄어요',
   'No shots in this status': '이 상태의 샷이 없어요',
   "Couldn't make the image": '이미지를 못 만들었어요',
   'Make again': '다시 만들기',

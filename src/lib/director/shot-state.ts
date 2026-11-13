@@ -58,6 +58,22 @@ function hasUrl(value: unknown): boolean {
   return typeof value === 'string' && value.trim().length > 0
 }
 
+/** 화면에서 멈춘 Take 규칙 한 곳(오너 2026-11-14 7번, 리드 검토 a 5) — 샷 상태 · 스토리보드 카드 · 노드형 Take · 넘김 조건이 같이 쓴다.
+ *  멈춘 Take 는 뒤에서 돌아도 만드는 중이 아니다. */
+export function takeIsRunning(take: { status?: unknown; lastAttemptStatus?: unknown; cancelledAt?: unknown }): boolean {
+  return take.cancelledAt == null && (take.status === 'generating' || take.lastAttemptStatus === 'generating')
+}
+
+/** 멈춘 Take 는 ★ 로 고르지 않은 한 뒤늦게 끝나도 영상이 아니다(기록에만 남는다). */
+export function takeCountsAsVideo(take: { status?: unknown; videoUrl?: unknown; cancelledAt?: unknown; final?: unknown }): boolean {
+  return take.status === 'completed' && hasUrl(take.videoUrl) && (take.cancelledAt == null || take.final === true)
+}
+
+/** 화면에서 멈췄고 ★ 로 고르지 않은 Take — 노드 꼬리 "멈췄어요"(상태 색 없음). */
+function takeStopped(take: { cancelledAt?: unknown; final?: unknown }): boolean {
+  return take.cancelledAt != null && take.final !== true
+}
+
 /** 옛 그림이 남아 있는데 마지막 다시 만들기가 실패했다(상점은 실패해도 옛 주소를 그대로 둔다). */
 export function imageRemakeFailed(image: { status?: string | null; url?: string | null } | null | undefined): boolean {
   return image?.status === 'failed' && hasUrl(image.url)
@@ -129,7 +145,7 @@ export function shotFactsByNode(
     // 화면에서 멈춘 Take(오너 2026-11-14 7번)는 뒤에서 돌아도 만드는 중이 아니고, ★ 가 아니면 뒤늦게 끝나도 영상 완성이 아니다
     //   — 투영 · 넘기기 창 · 일괄 검사와 같은 규칙(리드 검토 a 5).
     const videoRunning =
-      records.some((r) => r.cancelled_at == null && (r.status === 'generating' || r.last_attempt_status === 'generating')) ||
+      records.some((r) => takeIsRunning({ status: r.status, lastAttemptStatus: r.last_attempt_status, cancelledAt: r.cancelled_at })) ||
       (!!writerShotId && context.queuedVideoShots.has(writerShotId))
     const videoPending = !!writerShotId && !!context.pendingVideoShots?.has(writerShotId)
     out.set(node.id, {
@@ -140,7 +156,7 @@ export function shotFactsByNode(
       imageWaiting: imagePending && !imageQueued && image?.status !== 'generating',
       videoGenerating: videoRunning || videoPending,
       videoWaiting: videoPending && !videoRunning,
-      videoDone: records.some((r) => r.status === 'completed' && hasUrl(r.url) && (r.cancelled_at == null || r.is_final === true)),
+      videoDone: records.some((r) => takeCountsAsVideo({ status: r.status, videoUrl: r.url, cancelledAt: r.cancelled_at, final: r.is_final })),
       videoLatestFailed:
         !!latest && (latest.last_attempt_status === 'failed' || (latest.last_attempt_status == null && latest.status === 'failed')),
     })
@@ -296,26 +312,33 @@ export const SHOT_DOT_RING: Record<ShotStateColor, string> = {
   destructive: 'border-destructive',
 }
 
-/** 노드형 영상 노드(Take 하나)의 테두리 — 만드는 중 보라 · 완성 초록 · 실패 빨강(시안 D4 · D7). */
+/** 노드형 영상 노드(Take 하나)의 테두리 — 만드는 중 보라 · 완성 초록 · 실패 빨강(시안 D4 · D7). 화면에서 멈춘 Take 는 색 없음. */
 export function videoTakeFrame(take: {
   status: string | null | undefined
   lastAttemptStatus: string | null | undefined
   videoUrl: string | null | undefined
+  cancelledAt?: string | null
+  final?: boolean
 }): string | null {
-  if (take.status === 'generating' || take.lastAttemptStatus === 'generating') return 'border-state-video'
+  if (takeIsRunning(take)) return 'border-state-video'
+  if (takeStopped(take)) return null
   if (take.status === 'completed' && hasUrl(take.videoUrl)) return 'border-success'
   if (take.status === 'failed' || take.lastAttemptStatus === 'failed') return 'border-destructive'
   return null
 }
 
-/** 노드형 영상 노드(Take 하나)의 꼬리(시안 D1 406:4051 "● 영상 없음"). 영상이 남은 Take 의 다시 만들기 실패는 이미지와 같은 원칙. */
+/** 노드형 영상 노드(Take 하나)의 꼬리(시안 D1 406:4051 "● 영상 없음"). 영상이 남은 Take 의 다시 만들기 실패는 이미지와 같은 원칙.
+ *  화면에서 멈춘 Take 는 ★ 가 아니면 뒤에서 돌든 끝났든 회색 "멈췄어요"(실패 빨강 · 만드는 중 보라와 구분, S4 혼자 정한 것 a). */
 export function videoTakeTail(take: {
   status: string | null | undefined
   lastAttemptStatus: string | null | undefined
   videoUrl: string | null | undefined
+  cancelledAt?: string | null
+  final?: boolean
 }): Omit<ShotTail, 'remakeFailed'> {
   const latest = take.lastAttemptStatus ?? take.status
-  if (latest === 'generating' || take.status === 'generating') return { label: 'Making video', color: 'state-video', ring: true }
+  if (takeIsRunning(take)) return { label: 'Making video', color: 'state-video', ring: true }
+  if (takeStopped(take)) return { label: 'Stopped by you', color: null, ring: false }
   const hasVideo = take.status === 'completed' && hasUrl(take.videoUrl)
   if (latest === 'failed') return { label: hasVideo ? 'Remake failed' : 'Video failed', color: 'destructive', ring: false }
   if (hasVideo) return { label: 'Video done', color: 'success', ring: false }
@@ -354,10 +377,8 @@ export function directorHasFinishedVideo(nodes: readonly DirectorNode[]): boolea
       isVideoData(n.data) &&
       n.data.parentShotNodeId !== null &&
       writerShots.has(n.data.parentShotNodeId) &&
-      n.data.status === 'completed' &&
-      hasUrl(n.data.videoUrl) &&
       // 화면에서 멈춘 Take 는 ★ 가 아니면 영상이 아니다(오너 2026-11-14 7번) — 넘기기 창 · 투영과 같은 규칙(리드 검토 a 5).
-      (!n.data.cancelledAt || n.data.final),
+      takeCountsAsVideo(n.data),
   )
 }
 
