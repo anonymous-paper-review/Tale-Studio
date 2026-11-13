@@ -1489,9 +1489,15 @@ async function holdOnTextCard(
     remakes: [...new Set([...(before.remakes ?? []), ...(more.remakes ?? [])])],
   }
   const edits = Array.isArray(card.proposal.payload.edits) ? (card.proposal.payload.edits as DirectorTextEdit[]) : []
+  const impact = [...directorTextEditLines(locale, edits, nodes, names), ...(await heldWorkLines(then, locale, names))]
+  // 묶는 사이(잔액을 읽는 동안) 사람이 그 카드를 적용하거나 버렸으면 카드를 되살리지 않는다 — 버린 글이 다시 [적용]될 수 있었다(검토 a 통합).
+  if (useGlobalChatStore.getState().pendingProposal?.id !== card.proposal.id) {
+    say(t("The text card closed in the meantime, so I didn't start what was waiting for it. Please ask again."))
+    return
+  }
   useGlobalChatStore.getState().offerPendingProposal({
     ...card.proposal,
-    impact: [...directorTextEditLines(locale, edits, nodes, names), ...(await heldWorkLines(then, locale, names))],
+    impact,
     payload: { ...card.proposal.payload, then },
   })
   const shots = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))

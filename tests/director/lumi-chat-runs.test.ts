@@ -580,6 +580,26 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', shotIds: ['s3', 's4'] })
   })
 
+  // 왜: 검토 a 통합 — 글 카드에 생성을 묶는 사이(잔액을 읽는 동안) 사람이 그 카드를 버리면, 묶기가 끝나며 버린 카드를 다시 띄웠다(버린 글이 [적용]될 수 있었다).
+  it('글 카드에 영상을 묶는 사이 그 카드를 버렸으면 카드를 되살리지 않고, 기다리던 생성은 시작하지 않았다고 말한다', async () => {
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }])
+    await chat.getState().sendMessage('Make shot 1 warm')
+    expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+    let release: () => void = () => {}
+    vi.mocked(fetchTakeBalance).mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(mocks.balance as never) }))
+    reply([{ type: 'generateVideos', shotIds: ['s1'] }])
+    const sending = chat.getState().sendMessage('샷 1 영상 만들어줘')
+    await vi.waitFor(() => expect(vi.mocked(fetchTakeBalance)).toHaveBeenCalled())
+    chat.getState().dismissPendingProposal()
+    release()
+    await sending
+    expect(chat.getState().pendingProposal).toBeNull()
+    expect(promptOf('s1')).toBeNull()
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe("The text card closed in the meantime, so I didn't start what was waiting for it. Please ask again.")
+    expect(translate('ko', "The text card closed in the meantime, so I didn't start what was waiting for it. Please ask again.")).toBe('그사이 글 카드가 닫혀 그 카드를 기다리던 생성은 시작하지 않았어요. 다시 부탁해 주세요.')
+  })
+
   // 왜: 서버 지시문도 같은 약속을 말해야 모델이 "확인 카드가 뜰 거예요"라고 하지 않는다.
   it('서버 지시문은 그림 · 영상을 바로 만든다고 알리고, 영상은 사용자가 말한 샷만 담게 한다', () => {
     const route = readFileSync(path.join(process.cwd(), 'src/app/api/director/chat/route.ts'), 'utf8')

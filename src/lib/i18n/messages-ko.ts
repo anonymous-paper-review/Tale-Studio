@@ -3420,6 +3420,8 @@ export const KO: Record<string, string> = {
   'The video for {shots} needs an image first.': '{shots} 영상은 이미지가 먼저 필요해요.',
   "Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.": '동시에 만드는 영상이 많아 {shots} 영상은 시작하지 못했어요. 하나가 끝나면 다시 부탁해 주세요.',
   "I couldn't start the video for {shots}. Please ask again in a moment.": '{shots} 영상을 시작하지 못했어요. 잠시 뒤 다시 부탁해 주세요.',
+  // 글 카드에 생성을 묶는 사이 그 카드가 닫혔다(검토 a 통합) — 카드를 되살리지 않고 다시 부탁해 달라고 한다.
+  "The text card closed in the meantime, so I didn't start what was waiting for it. Please ask again.": '그사이 글 카드가 닫혀 그 카드를 기다리던 생성은 시작하지 않았어요. 다시 부탁해 주세요.',
   '{shots} has a text change waiting for [Apply]. Apply or discard it, then make it again.': '{shots}에는 [적용]을 기다리는 글 고침이 있어요. 적용하거나 버린 뒤 다시 만들어 주세요.',
   'Go back': '돌아가기',
   'No video to hand over yet.': '넘길 영상이 아직 없어요.',
