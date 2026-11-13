@@ -13,6 +13,8 @@ import { ThumbImage } from '@/components/thumb-image'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { downscaleForUpload, needsDownscale } from '@/lib/upload/downscale'
+import { TITLE_IMAGE_MAX_BYTES } from '@/lib/editor/title-image'
 import { useT } from '@/lib/i18n'
 import { boardShotLabels } from '@/lib/writer/board-summary'
 
@@ -81,15 +83,30 @@ export function TitleImagePicker({
 
   const upload = async (file: File) => {
     if (!projectId) return
+    // 서버 규칙(그림 10MB까지)보다 큰 그림은 동의를 받기 전에 막는다 — 예전에는 동의까지 받은 뒤 "HTTP 413"만 보였다(2026-11-14).
+    if (file.size > TITLE_IMAGE_MAX_BYTES) {
+      toast.error(t('"{name}" is larger than 10MB. Please upload one of 10MB or less.', { name: file.name }))
+      return
+    }
+    // GIF 는 줄이면 움직임이 사라진다(JPEG · PNG 는 한 장) — 받은 그대로 올릴 수 있는 크기(4MB)까지만 받는다(검토 c, 2026-11-14).
+    if (file.type === 'image/gif' && needsDownscale(file.size)) {
+      toast.error(t('GIF images can be up to 4MB.'))
+      return
+    }
     if (!(await requestImageUploadConsent([file]))) return
     if (useProjectStore.getState().projectId !== projectId) return
     setUploading(true)
     try {
+      // 서버(Vercel)는 4.5MB 넘는 요청을 함수가 돌기 전에 거절한다 — 큰 그림은 줄여 보낸다. 투명한 곳이 있으면 투명을 지키고(PNG),
+      //   없으면 카드 바탕처럼 검은 바탕의 JPEG 로(검토 c — 투명 로고가 검은 네모가 되어 글자를 가렸다).
+      const sendable = await downscaleForUpload(file, { background: 'black', keepTransparency: true })
       const form = new FormData()
       form.set('projectId', projectId)
-      form.set('file', file)
+      form.set('file', sendable)
       const res = await fetch('/api/editor/title-image', { method: 'POST', body: form })
       const j = (await res.json().catch(() => null)) as { url?: string; error?: string } | null
+      // 줄이지 못한 큰 그림(브라우저가 열지 못함)이 서버 크기 한도에 걸리면 숫자 대신 할 일을 말한다.
+      if (res.status === 413) throw new Error(t('The picture is too large. Choose a smaller one.'))
       if (!res.ok || !j?.url) throw new Error(j?.error ?? `HTTP ${res.status}`)
       onPick(j.url)
       onOpenChange(false)
