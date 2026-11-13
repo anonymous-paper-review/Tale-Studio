@@ -14,42 +14,35 @@ import { cn } from '@/lib/utils'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import {
-  DEFAULT_VIDEO_RESOLUTION,
   FAL_VIDEO_MODEL_ORDER,
   VIDEO_MODELS,
   clampDuration,
   effectiveVideoResolution,
-  normalizeProvider,
   type VideoModelKey,
   type VideoResolution,
 } from '@/lib/video-models'
-import { imageChangedSinceTake, newTakeRequest, shotDetailFrames, shotDetailTakes, type ShotDetailTake } from '@/lib/director/shot-detail'
+import {
+  imageChangedSinceTake,
+  newTakeRequest,
+  shotDetailFrames,
+  shotDetailTakes,
+  takePhaseOf,
+  takeSettings,
+  type ShotDetailTake,
+  type TakePhase,
+} from '@/lib/director/shot-detail'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
-import { effectivePrompt, getEffectiveVideoConfig, getVideoNodeResolution, useDirectorCanvasStore } from '@/stores/director-store'
+import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { aspectRatioFromFormat } from '@/types/project'
-import type { DirectorNode, ShotNodeData, VideoNodeData } from '@/types/director'
+import type { ShotNodeData } from '@/types/director'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { VideoResolutionButtons } from '@/features/director/video-resolution-buttons'
 import { LockedFrame, smallFrameStyle } from './locked-frame'
 
-type TakePhase = 'done' | 'making' | 'failed' | 'idle'
-
-function takePhase(data: VideoNodeData): TakePhase {
-  if (data.lastAttemptStatus === 'generating' || data.status === 'generating') return 'making'
-  if (data.status === 'completed' && data.videoUrl) return 'done'
-  if (data.status === 'failed' || data.lastAttemptStatus === 'failed') return 'failed'
-  return 'idle'
-}
+const takePhase = takePhaseOf
 
 const PHASE_LABEL: Record<TakePhase, string> = { done: 'Done', making: 'Making', failed: 'Failed', idle: 'Not made yet' }
-
-/** 그 Take 의 모델 · 해상도 — 다음에 만들 설정. 첫 Take 는 샷 설정 그대로다. */
-function takeSetup(nodes: DirectorNode[], take: ShotDetailTake | null, shot: ShotNodeData): { model: VideoModelKey; resolution: VideoResolution } {
-  if (!take) return { model: normalizeProvider(shot.provider), resolution: DEFAULT_VIDEO_RESOLUTION }
-  const effective = getEffectiveVideoConfig({ nodes }, take.id)
-  return { model: normalizeProvider(effective?.provider ?? shot.provider), resolution: getVideoNodeResolution({ nodes }, take.id) }
-}
 
 export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
   shotNodeId: string
@@ -90,7 +83,7 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
             {takes.map((take) => {
               const phase = takePhase(take.data)
               const isFinal = final?.id === take.id
-              const setup = takeSetup(nodes, take, data)
+              const setup = takeSettings(data, take.data)
               const resolution = take.data.videoResolution ?? effectiveVideoResolution(setup.model, setup.resolution)
               return (
                 <li key={take.id} className={cn('space-y-2 rounded-[14px] border-[1.5px] p-3', isFinal ? 'border-success' : current?.id === take.id ? 'border-foreground/60' : 'border-border')}>
@@ -212,12 +205,11 @@ function FixImage({ nodeId, data }: { nodeId: string; data: ShotNodeData }) {
 /** 영상 고치기 — 늘 새 Take 를 만든다. 보고 있던 Take 의 설정을 이어받고, 여기서 바꾼 것만 새 Take 에 얹는다. */
 function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; data: ShotNodeData; current: ShotDetailTake | null; busy: boolean }) {
   const t = useT()
-  const nodes = useDirectorCanvasStore((s) => s.nodes)
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
   const generateVideoForShot = useDirectorCanvasStore((s) => s.generateVideoForShot)
   const openDeleteConfirm = useDirectorCanvasStore((s) => s.openDeleteConfirm)
   const takeBalance = useTakeBalance()
-  const base = takeSetup(nodes, current, data)
+  const base = takeSettings(data, current?.data ?? null)
   const [provider, setProvider] = useState<VideoModelKey>(base.model)
   const [resolution, setResolution] = useState<VideoResolution>(base.resolution)
   const [change, setChange] = useState('')

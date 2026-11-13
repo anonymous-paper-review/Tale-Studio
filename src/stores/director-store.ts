@@ -56,7 +56,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Json } from '@/types/database'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { parseDirectorRefs } from '@/lib/director/director-refs'
-import { promptWithChange } from '@/lib/director/shot-detail'
+import { latestShotTake, promptWithChange } from '@/lib/director/shot-detail'
 import {
   isEmptyStableFrameInputs,
   parseStableFrameInputs,
@@ -1124,6 +1124,11 @@ interface DirectorCanvasState {
 
   // popup/modal
   popupNodeId: string | null
+  /** 샷 상세(디자이너 11/13 D6 · D7)를 연 노드 — 샷 · 그 샷의 Take. 노드형은 왼쪽 패널, 스토리보드형은 팝업으로 보인다.
+   *  set 갈래의 ⤢ · entry 갈래 D8 [바꾸기]가 openShotDetail 로 연다. 그 전까지는 selectNode · openPopup 으로도 열린다. */
+  detailNodeId: string | null
+  /** 상세를 열 때 먼저 보일 탭. */
+  detailTab: 'image' | 'video'
   deleteConfirmInfo: DeleteCascadeInfo
   relationModal: RelationModalState
 
@@ -1250,6 +1255,9 @@ interface DirectorCanvasState {
 
   // video generation (ST-4, I2V/T2V) — 항상 사용자 클릭으로만 (결정 #40)
   /** Shot에 새 Video take 생성 + 영상 생성 API 호출(+폴링). storyboardImage 있으면 I2V. 생성된 Video 노드 id 반환 */
+  /** 다시 만들기 — 늘 새 Take 이고 그 샷의 가장 최근 Take(실패해도)의 설정을 이어받는다(마지막 모델 · 해상도).
+   *  Take 가 없으면 샷 설정. 상세 · entry D8 [다시 만들기] · Lumi 가 같이 쓴다. */
+  remakeShotVideo: (shotNodeId: string) => Promise<string | null>
   generateVideoForShot: (
     shotNodeId: string,
     options?: DirectorGenerationRequestOptions,
@@ -1302,6 +1310,9 @@ interface DirectorCanvasState {
   // popups / modals
   openPopup: (id: string) => void
   closePopup: () => void
+  /** 샷 상세 열기 — 영상 노드면 그 샷의 영상 탭(그 Take 먼저), 샷이면 이미지 탭. tab 을 주면 그 탭. */
+  openShotDetail: (nodeId: string, tab?: 'image' | 'video') => void
+  closeShotDetail: () => void
   openDeleteConfirm: (id: string) => void
   closeDeleteConfirm: () => void
   confirmDelete: () => Promise<void>
@@ -1651,6 +1662,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       videoBatchRunId: null,
       videoBatchCancelled: false,
       popupNodeId: null,
+      detailNodeId: null,
+      detailTab: 'image',
       deleteConfirmInfo: null,
       relationModal: null,
       generatingNodeIds: {},
@@ -1692,6 +1705,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               ? {}
               : { viewMode: 'node' as const, storyboardMediaMode: 'previz' as const }),
             popupNodeId: null,
+            detailNodeId: null,
             deleteConfirmInfo: null,
             relationModal: null,
             videoBatchBusy: false,
@@ -3030,6 +3044,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             }),
           edges: s.edges.filter((edge) => !ids.has(edge.source) && !ids.has(edge.target)),
           selectedNodeId: s.selectedNodeId && ids.has(s.selectedNodeId) ? null : s.selectedNodeId,
+          detailNodeId: s.detailNodeId && ids.has(s.detailNodeId) ? null : s.detailNodeId,
           lastSavedAt: Date.now(),
         }))
         // 삭제된 샷의 previz 체인 파생 노드 정리 (부모 없는 파생은 rebuild 가 재생성 안 함)
@@ -4322,6 +4337,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       // 연타 방어는 아래 acquireGenerationLock 이 이미 담당한다 — 1초 창이 아니라 생성 전 구간을
       //   잠그므로 더 강하다. 여기에 창을 덧대면 앞 시도가 *끝난 뒤*의 정당한 재시도까지 막힌다.
+      remakeShotVideo: (shotNodeId) => {
+        const latest = latestShotTake(get().nodes, shotNodeId)
+        return get().generateVideoForShot(shotNodeId, latest ? { inheritFromVideoNodeId: latest.id } : undefined)
+      },
+
       generateVideoForShot: async (shotNodeId, options) => {
         if (get().videoBatchBusy && options?.batch !== true) return null
         if (options?.batch === true && get().videoBatchCancelled) return null
@@ -5074,6 +5094,23 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       openPopup: (id) => set({ popupNodeId: id }),
       closePopup: () => set({ popupNodeId: null }),
+      openShotDetail: (nodeId, tab) => {
+        const node = get().nodes.find((n) => n.id === nodeId)
+        set({ detailNodeId: nodeId, detailTab: tab ?? (node && isVideoData(node.data) ? 'video' : 'image') })
+      },
+      // 지금은 selectNode · openPopup 으로 연 상세도 같은 닫기로 닫는다 — 샷 · 영상을 가리킬 때만 비운다(에셋 · 씬은 그대로).
+      closeShotDetail: () =>
+        set((s) => {
+          const isDetailTarget = (id: string | null) => {
+            const node = id ? s.nodes.find((n) => n.id === id) : undefined
+            return !!node && (isShotData(node.data) || isVideoData(node.data))
+          }
+          return {
+            detailNodeId: null,
+            ...(isDetailTarget(s.selectedNodeId) ? { selectedNodeId: null } : {}),
+            ...(isDetailTarget(s.popupNodeId) ? { popupNodeId: null } : {}),
+          }
+        }),
 
       openDeleteConfirm: (id) => {
         const node = get().nodes.find((n) => n.id === id)
@@ -5608,6 +5645,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           viewport: { x: 0, y: 0, zoom: 1 },
           viewportInitialized: get().viewportInitializedProjects[get().projectId] === true,
           popupNodeId: null,
+          detailNodeId: null,
           deleteConfirmInfo: null,
           relationModal: null,
           videoBatchBusy: false,

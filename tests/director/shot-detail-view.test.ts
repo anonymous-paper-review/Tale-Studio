@@ -14,6 +14,7 @@ vi.mock('@/lib/use-debug-prompts', () => ({ useDebugPrompts: () => false }))
 vi.mock('@/lib/billing/use-take-balance', () => ({ useTakeBalance: () => ({ balance: 100, mode: 'shadow', loading: false }) }))
 
 import { DirectorShotDetail } from '@/features/director/shot-detail/director-shot-detail'
+import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorDetailPanel'
 import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
@@ -94,6 +95,33 @@ describe('Director 샷 상세 화면', () => {
     const video = render('panel', 'video')
     expect(video).toMatch(/<figure[^>]*style="aspect-ratio:9 \/ 16[^"]*"[^>]*data-testid="shot-detail-take-preview"/)
     expect(video.match(/aspect-ratio:9 \/ 16/g)?.length).toBeGreaterThanOrEqual(3)
+  })
+
+  it('openShotDetail 로 열면 노드형은 왼쪽 패널, 스토리보드형은 팝업이 상세를 맡고, 닫기는 closeShotDetail 이다', () => {
+    // 왜: set 의 ⤢ · entry D8 의 [바꾸기]가 부르는 길 — set 이 ⤢ 를 바꿀 때까지 selectNode · openPopup 으로도 지금처럼 열린다.
+    director.getState().setViewMode('node')
+    director.getState().openShotDetail(shotId, 'video')
+    syncStores()
+    const nodeView = renderToStaticMarkup(createElement(DirectorDetailPanel))
+    expect(nodeView).toContain('data-testid="director-shot-detail"')
+    expect(nodeView).toContain('data-testid="shot-detail-video-tab"')
+    director.getState().setViewMode('storyboard')
+    syncStores()
+    expect(renderToStaticMarkup(createElement(DirectorDetailPanel))).toBe('')
+    const panel = readFileSync('src/features/director/canvas-panels/DirectorDetailPanel.tsx', 'utf8')
+    const popup = readFileSync('src/features/director/canvas-popups/DirectorNodePopup.tsx', 'utf8')
+    expect(popup).toMatch(/viewMode === 'storyboard' && detailNodeId/)
+    for (const src of [panel, popup]) expect(src).toMatch(/closeShotDetail\(\)/)
+    expect(panel).toMatch(/selectedNodeId/)
+    expect(popup).toMatch(/popupNodeId/)
+  })
+
+  it('이미지 탭 [다음: 영상 만들기 · N Take]는 그 자리에서 새 Take 를 만들고 영상 탭으로 넘어간다', () => {
+    // 왜: D6 단추 글 "다음: 영상 만들기 · 5 Take" — 누르면 영상을 만든다(조각 1은 탭만 바꿨다). 모델 · 해상도는 다시 만들기와 같다.
+    expect(render('popup')).toContain('Next: make the video · 5 Take')
+    setLocale('ko')
+    expect(render('popup')).toContain('다음: 영상 만들기 · 5 Take')
+    expect(readFileSync('src/features/director/shot-detail/director-shot-detail.tsx', 'utf8')).toMatch(/remakeShotVideo\(shotNodeId\)/)
   })
 
   it('상세에는 이미지 · 영상 탭이 있고 영상이 없으면 "영상 · 없음"이다', () => {

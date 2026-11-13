@@ -4,10 +4,12 @@ import { describe, expect, it } from 'vitest'
 import {
   detailImageModels,
   imageChangedSinceTake,
+  latestShotTake,
   newTakeRequest,
   promptWithChange,
   shotDetailFrames,
   shotDetailTakes,
+  takeSettings,
   videoTabLabelKey,
 } from '@/lib/director/shot-detail'
 import type { DirectorNode, ShotNodeData, VideoNodeData } from '@/types/director'
@@ -142,5 +144,18 @@ describe('Director 샷 상세', () => {
     expect(imageChangedSinceTake(Date.parse('2026-11-14T02:00:00.000Z'), made)).toBe(true)
     expect(imageChangedSinceTake(Date.parse('2026-11-14T00:30:00.000Z'), made)).toBe(false)
     expect(imageChangedSinceTake(undefined, made)).toBe(false)
+  })
+
+  it('다시 만들기는 가장 최근 Take 의 모델 · 해상도로 새 Take 를 만들고, Take 가 없으면 샷 설정(720p)으로 만든다', () => {
+    // 왜: 담당표 "실패 다시 만들기는 마지막 모델 · 해상도로" — D8 [다시 만들기 · Take X] · Lumi "실패한 샷 다시 만들어 줘"도 같은 규칙을 쓴다.
+    const nodes = [
+      take('v1', 1, { override: { provider: 'veo', resolution: '1080p' } as VideoNodeData['override'] }),
+      take('v2', 2, { status: 'failed', videoUrl: null, override: { provider: 'kling-o3', resolution: '720p' } as VideoNodeData['override'] }),
+    ]
+    const latest = latestShotTake(nodes, 'shot-1')
+    expect(latest?.id).toBe('v2')
+    expect(takeSettings(shot({ provider: 'seedance' }), latest!.data)).toEqual({ model: 'kling-o3', resolution: '720p' })
+    expect(latestShotTake([], 'shot-1')).toBeNull()
+    expect(takeSettings(shot({ provider: 'seedance' }), null)).toEqual({ model: 'seedance', resolution: '720p' })
   })
 })

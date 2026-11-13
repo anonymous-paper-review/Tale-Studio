@@ -53,6 +53,15 @@ export function pickActiveTake(nodes: readonly DirectorNode[], shotNodeId: strin
   return candidates[0]!
 }
 
+/** 가장 최근 테이크가 실패했으면 그 테이크가 고른 모델 · 해상도(없으면 빈 설정). */
+function lastFailedTakeSettings(nodes: readonly DirectorNode[], shotNodeId: string): VideoOverride {
+  const latest = (getChildVideos(nodes, shotNodeId) as Array<DirectorNode & { data: VideoNodeData }>)
+    .sort((a, b) => b.data.takeNumber - a.data.takeNumber || (b.data.createdAt ?? '').localeCompare(a.data.createdAt ?? ''))[0]
+  if (!latest || latest.data.parentShotNodeId === null || latest.data.status !== 'failed') return {}
+  const { provider, resolution } = latest.data.override
+  return { ...(provider ? { provider } : {}), ...(isVideoResolution(resolution) ? { resolution } : {}) }
+}
+
 /**
  * 일괄이 이 샷에 쓸 모델과 해상도. 배선한 테이크가 있으면 그 테이크의 설정, 없으면 마더 샷 설정(해상도는 720p —
  * 마더 샷에는 해상도가 없다, 오너 2026-10-31). 샷이 아니면 null.
@@ -67,7 +76,9 @@ export function videoBatchShotSettings(
   if (!shotNode || !isShotData(shotNode.data)) return null
   const take = pickActiveTake(nodes, shotNodeId)
   // 배선한 테이크는 이 샷의 자식(마더가 있는 영상)이다 — 독립 영상의 설정은 여기 오지 않는다.
-  const override: VideoOverride = take && take.data.parentShotNodeId !== null ? take.data.override : {}
+  //   배선한 테이크가 없고 가장 최근 테이크가 실패했으면 그 테이크의 모델 · 해상도로(담당표 "실패 다시 만들기는 마지막 모델 · 해상도",
+  //   디자이너 11/13 · 오너 2026-11-14). 바꿀 점(프롬프트)은 일괄 요청에 쓰이지 않으니 싣지 않는다.
+  const override: VideoOverride = take && take.data.parentShotNodeId !== null ? take.data.override : lastFailedTakeSettings(nodes, shotNodeId)
   return {
     model: normalizeProvider(override.provider ?? shotNode.data.provider),
     resolution: isVideoResolution(override.resolution) ? override.resolution : DEFAULT_VIDEO_RESOLUTION,

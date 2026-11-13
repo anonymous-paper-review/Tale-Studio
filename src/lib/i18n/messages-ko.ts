@@ -20,6 +20,7 @@ export const KO: Record<string, string> = {
   'Remake start and end images · Takes 0': '시작·끝 이미지 다시 만들기 · Takes 0',
   'Make start and end images · Takes 0': '시작·끝 이미지 만들기 · Takes 0',
   'Next: make the video': '다음: 영상 만들기',
+  'Next: make the video · {count} Take': '다음: 영상 만들기 · {count} Take',
   'No video for this shot yet.': '이 샷에는 아직 영상이 없어요.',
   'Make the video': '영상 만들기',
   '★ Final (auto)': '★ 최종 (자동)',

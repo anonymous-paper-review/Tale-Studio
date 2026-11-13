@@ -4,7 +4,7 @@
 import { storyboardImageEndFrame, storyboardImageStartFrame } from '@/lib/director/storyboard-image'
 import { IMAGE_MODEL_ORDER, imageModelSupportsSheetCanvas, type ImageModelKey } from '@/lib/image-models'
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
-import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
+import { DEFAULT_VIDEO_RESOLUTION, isVideoResolution, normalizeProvider, type VideoModelKey, type VideoResolution } from '@/lib/video-models'
 import type { DirectorNode, ShotNodeData, StoryboardImage, VideoNodeData, VideoOverride } from '@/types/director'
 
 export type ShotDetailTab = 'image' | 'video'
@@ -23,6 +23,16 @@ export function shotDetailFrames(image: StoryboardImage | null | undefined): { s
  *  시트를 그릴 수 있는 모델만 돈다(나머지는 GPT Image 2 로 바뀌었다). 캔버스에서 만든 샷은 한 장 생성이라 전부 돈다. */
 export function detailImageModels(data: Pick<ShotNodeData, 'writerShotId'>): ImageModelKey[] {
   return data.writerShotId ? IMAGE_MODEL_ORDER.filter(imageModelSupportsSheetCanvas) : [...IMAGE_MODEL_ORDER]
+}
+
+/** Take 의 지금 단계 — 만드는 중 · 완성 · 실패 · 아직 안 만듦. */
+export type TakePhase = 'done' | 'making' | 'failed' | 'idle'
+
+export function takePhaseOf(data: Pick<VideoNodeData, 'status' | 'lastAttemptStatus' | 'videoUrl'>): TakePhase {
+  if (data.lastAttemptStatus === 'generating' || data.status === 'generating') return 'making'
+  if (data.status === 'completed' && data.videoUrl) return 'done'
+  if (data.status === 'failed' || data.lastAttemptStatus === 'failed') return 'failed'
+  return 'idle'
 }
 
 export interface ShotDetailTake {
@@ -46,6 +56,20 @@ export function shotDetailTakes(nodes: readonly DirectorNode[], shotNodeId: stri
   }))
   const chosen = selectHandoffTake(records)
   return { takes, final: chosen ? { id: String(chosen.id), auto: chosen.is_final !== true } : null }
+}
+
+/** 다시 만들기가 이어받을 Take — 그 샷의 가장 최근 Take(번호 큰 것, 실패해도). 없으면 null. */
+export function latestShotTake(nodes: readonly DirectorNode[], shotNodeId: string): ShotDetailTake | null {
+  return shotDetailTakes(nodes, shotNodeId).takes[0] ?? null
+}
+
+/** 그 Take 의 모델 · 해상도 — Take 에 고른 값이 없으면 샷 설정, 해상도는 720p(마더 샷에는 해상도가 없다). Take 가 없으면 샷 설정. */
+export function takeSettings(shot: Pick<ShotNodeData, 'provider'>, take: Pick<VideoNodeData, 'override'> | null): { model: VideoModelKey; resolution: VideoResolution } {
+  const override = (take?.override ?? {}) as VideoOverride
+  return {
+    model: normalizeProvider(override.provider ?? shot.provider),
+    resolution: isVideoResolution(override.resolution) ? override.resolution : DEFAULT_VIDEO_RESOLUTION,
+  }
 }
 
 /** 바꿀 점을 붙인 이번 생성 프롬프트 — 바꿀 점은 이번 생성에만 붙고 샷 프롬프트는 바꾸지 않는다. 비워 두면 그대로. */

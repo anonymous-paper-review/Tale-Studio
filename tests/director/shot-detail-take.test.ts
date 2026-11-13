@@ -72,4 +72,27 @@ describe('샷 상세의 새 Take', () => {
     const source = api().nodes.find((node) => node.id === sourceId)!.data
     expect(isVideoData(source) && source.override).toEqual({})
   })
+
+  it('다시 만들기(remakeShotVideo)는 가장 최근 Take 가 실패했어도 그 Take 를 덮지 않고 그 모델 · 해상도로 새 Take 를 만든다', async () => {
+    // 왜: D8 [다시 만들기 · Take X] · Lumi "실패한 샷 다시 만들어 줘"(entry · board 가 부름) — 실패한 Take 는 기록으로 남고 마지막 설정으로 새 Take 가 쌓인다.
+    api().updateNodeData<'video'>(sourceId, { status: 'failed', videoUrl: null, override: { provider: 'kling-o3', resolution: '720p' } })
+    const made = await api().remakeShotVideo(shotId)
+
+    expect(made).not.toBeNull()
+    expect(made).not.toBe(sourceId)
+    const [body] = generationBodies()
+    expect(body).toMatchObject({ model: 'kling-o3', videoClipId: null, override: { provider: 'kling-o3', resolution: '720p' } })
+  })
+
+  it('상세는 openShotDetail 로 그 노드 · 탭을 열고 closeShotDetail 로 닫는다', () => {
+    // 왜: set 의 ⤢ 와 entry D8 [바꾸기]가 같은 길로 상세를 연다(set 과 정한 이름). 영상 노드에서 열면 영상 탭이 먼저다.
+    api().openShotDetail(sourceId)
+    expect(api()).toMatchObject({ detailNodeId: sourceId, detailTab: 'video' })
+    api().openShotDetail(shotId)
+    expect(api()).toMatchObject({ detailNodeId: shotId, detailTab: 'image' })
+    api().openShotDetail(shotId, 'video')
+    expect(api().detailTab).toBe('video')
+    api().closeShotDetail()
+    expect(api().detailNodeId).toBeNull()
+  })
 })

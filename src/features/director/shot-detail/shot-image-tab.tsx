@@ -23,12 +23,12 @@ import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { LockedFrame } from './locked-frame'
 
-export function ShotImageTab({ nodeId, data, layout, onMakeVideo }: {
+export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   nodeId: string
   data: ShotNodeData
   layout: 'popup' | 'panel'
-  /** [다음: 영상 만들기] — 영상 탭으로 옮겨 새 Take 를 만든다. */
-  onMakeVideo?: () => void
+  /** [다음: 영상 만들기 · N Take](D6) — 새 Take 를 만들고 영상 탭으로 간다. */
+  makeVideo?: { label: string; disabled: boolean; run: () => void }
 }) {
   const t = useT()
   const projectFormat = useProjectFormatStore((s) => s.format)
@@ -124,8 +124,8 @@ export function ShotImageTab({ nodeId, data, layout, onMakeVideo }: {
       {generationError ? <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-caption text-destructive">{generationError}</p> : null}
       <div className="flex flex-wrap items-center gap-2" data-testid="shot-detail-image-actions">
         <StoryboardImageButton nodeId={nodeId} data={data} changeNote={change} idleLabel={t(hasImage ? 'Remake start and end images · Takes 0' : 'Make start and end images · Takes 0')} />
-        {hasImage && onMakeVideo ? (
-          <Button type="button" size="sm" variant="outline" onClick={onMakeVideo}>{t('Next: make the video')}</Button>
+        {hasImage && makeVideo ? (
+          <Button type="button" size="sm" variant="outline" disabled={makeVideo.disabled} onClick={makeVideo.run}>{makeVideo.label}</Button>
         ) : null}
         <Button type="button" size="sm" variant="ghost" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => openDeleteConfirm(nodeId)}>
           <Trash2 className="size-3.5" />{t('Delete')}
