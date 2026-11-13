@@ -1290,8 +1290,10 @@ interface DirectorCanvasState {
    *  화면은 바로 바꾸고 서버 답으로 맞춘다. 서버가 바꾸지 못하면 되돌리고 false. */
   selectStoryboardImageVersion: (shotNodeId: string, versionId: string) => Promise<boolean>
   /** 다시 만들기 — 늘 새 Take 이고 그 샷의 가장 최근 Take(실패해도)의 설정을 이어받는다(마지막 모델 · 해상도).
-   *  Take 가 없으면 샷 설정. 상세 · entry D8 [다시 만들기] · Lumi 가 같이 쓴다. */
-  remakeShotVideo: (shotNodeId: string) => Promise<string | null>
+   *  Take 가 없으면 샷 설정. 상세 · entry D8 [다시 만들기] · Lumi 가 같이 쓴다.
+   *  opts.onAccepted — 접수 알림: 서버가 2xx 로 받아 jobId 를 준 때 한 번(거절 4xx 는 몸에 jobId · queued 가 실려 와도 아니다).
+   *  Lumi 는 이것으로 다음 샷을 보낸다(board 검토 b · entry D8 이 같이 쓴다). opts.onJob — 진행 알림 그대로. 둘 다 없으면 지금 그대로. */
+  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void }) => Promise<string | null>
   generateVideoForShot: (
     shotNodeId: string,
     options?: DirectorGenerationRequestOptions,
@@ -4525,9 +4527,25 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         }
       },
 
-      remakeShotVideo: (shotNodeId) => {
+      remakeShotVideo: (shotNodeId, opts) => {
         const latest = latestShotTake(get().nodes, shotNodeId)
-        return get().generateVideoForShot(shotNodeId, latest ? { inheritFromVideoNodeId: latest.id } : undefined)
+        // 알림이 없으면 지금과 같은 부름(샷 상세 · D8). 접수 알림은 2xx 로 받아 jobId 를 준 첫 알림 한 번뿐이다 —
+        //   거절 길(4xx)도 몸에 jobId · queued 가 있으면 진행 알림을 부르고, 그 뒤 실패는 부른 것이 끝나도 노드 id 를 돌려준다(board 검토 b · entry).
+        let accepted = false
+        const onJob: GenerationJobObserver | undefined = opts?.onJob || opts?.onAccepted
+          ? (receipt) => {
+              opts.onJob?.(receipt)
+              const ok = receipt.httpStatus != null && receipt.httpStatus >= 200 && receipt.httpStatus < 300
+              if (!accepted && ok && receipt.status === 'queued' && receipt.jobId) {
+                accepted = true
+                opts.onAccepted?.(receipt.jobId)
+              }
+            }
+          : undefined
+        const options = latest || onJob
+          ? { ...(latest ? { inheritFromVideoNodeId: latest.id } : {}), ...(onJob ? { onJob } : {}) }
+          : undefined
+        return get().generateVideoForShot(shotNodeId, options)
       },
 
       generateVideoForShot: async (shotNodeId, options) => {

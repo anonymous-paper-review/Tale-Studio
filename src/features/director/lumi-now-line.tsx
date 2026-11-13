@@ -5,6 +5,7 @@
 //   약속: tests/director/lumi-now-line-ui.test.ts
 import { useT } from '@/lib/i18n'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
+import { takeValuesShown } from '@/lib/billing/take-cost'
 import { withStoryboardBacklog } from '@/lib/generation-batches'
 import { useGenerationBatches } from '@/lib/generation-queue'
 import { lumiNowLine } from '@/lib/director/lumi-now-line'
@@ -44,7 +45,8 @@ export function LumiNowLine() {
     chain,
     modelOf: (id) => videoBatchShotSettings(nodes, id)?.model ?? DEFAULT_VIDEO_MODEL,
     takesFor: (ids) => videoBatchTakeCosts(nodes, ids).reduce((sum, n) => sum + n, 0),
-    takesShown: takes.mode !== 'off',
+    // 잔액을 잠깐 못 읽은 것은 과금 꺼짐이 아니다 — Take 값은 그대로 보이고, 정말 꺼졌을 때만 숨긴다(툴바 · D0 · D8 과 같은 판단).
+    takesShown: takeValuesShown(takes),
   }, t)
   if (!line) return null
   return (

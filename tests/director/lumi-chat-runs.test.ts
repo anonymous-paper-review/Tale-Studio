@@ -5,10 +5,12 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { DirectorNode } from '@/types/director'
 
-const mocks = vi.hoisted(() => ({ run: vi.fn(), balance: { balance: 40 as number | null, mode: 'enforce' as 'enforce' | 'shadow' | 'off', failed: false } }))
+const mocks = vi.hoisted(() => ({ run: vi.fn(), balance: { balance: 40 as number | null, mode: 'enforce' as 'enforce' | 'shadow' | 'off', failed: false }, refusal: vi.fn((): { shotNodeId: string } | null => null) }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 vi.mock('@/lib/billing/use-take-balance', () => ({ fetchTakeBalance: vi.fn(async () => mocks.balance), refetchTakeBalance: vi.fn() }))
 vi.mock('@/lib/director/video-batch-client', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/director/video-batch-client')>(), runVideoBatch: mocks.run }))
+// 내 영상 동시 한도(429) 거절 — 다시 만들기가 그 샷이 한도에 걸렸는지 읽는 값만 바꾼다(나머지 상점은 그대로).
+vi.mock('@/stores/director-store', async (importOriginal) => ({ ...await importOriginal<typeof import('@/stores/director-store')>(), videoLimitRefusal: () => mocks.refusal() }))
 
 import { useGlobalChatStore as chat } from '@/stores/global-chat-store'
 import { useProjectStore as project } from '@/stores/project-store'
@@ -18,9 +20,11 @@ import { useLocaleStore } from '@/stores/locale-store'
 import { translate } from '@/lib/i18n/translate'
 import { fetchTakeBalance } from '@/lib/billing/use-take-balance'
 import { remakeNotice } from '@/lib/director/editor-handover'
+import { DIRECTOR_QUICK_CHIPS } from '@/lib/constants'
 
 const originalGenerate = director.getState().generateStoryboardImage
 const originalVideo = director.getState().generateVideoForShot
+const originalRemake = director.getState().remakeShotVideo
 const IMG = (id: string) => ({ status: 'completed', url: `https://media.test/${id}.png`, jobId: null })
 function shot(id: string, image: unknown = null, provider = 'seedance'): DirectorNode {
   return { id, type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: `w-${id}`, writerShotId: `w-${id}`, derivedPrompt: `base prompt ${id}`, promptOverride: null, camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }, lighting: { position: 'front', brightness: 50, colorTemp: 5600 }, cameraPreset: { brand: 'arri', focalLength: 35, aperture: 2.8, whiteBalance: 5600 }, provider, durationSeconds: 3, storyboardImage: image, referenceImages: [], imageInputs: [] } } as unknown as DirectorNode
@@ -35,6 +39,13 @@ const lastModel = () => chat.getState().messages.filter((m) => m.role === 'model
 const saidAll = () => chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content).join('\n')
 const runShots = () => (mocks.run.mock.calls[0]?.[1] as { shotIds?: string[] } | undefined)?.shotIds
 const promptOf = (id: string) => (director.getState().nodes.find((n) => n.id === id)!.data as { promptOverride: string | null }).promptOverride
+/** 다시 만들기 가짜 — 서버가 2xx 로 받은 것처럼 접수 알림(onAccepted)을 바로 부르고 끝난다(진짜 상점의 접수 알림과 같은 뜻). */
+const acceptingRemake = (onCall?: (id: string) => void) =>
+  vi.fn(async (id: string, opts?: { onAccepted?: (jobId: string) => void }) => {
+    onCall?.(id)
+    opts?.onAccepted?.(`job-${id}`)
+    return `job-${id}`
+  })
 /** 러너처럼 — 시작하면 그 자리에서 새 묶음 표시를 단다(끝난 것으로 바로 풀어 다음 부탁을 막지 않는다). */
 async function startsBatch(_projectId: string, opts?: { shotIds?: readonly string[] }) {
   director.getState().beginVideoBatch(opts?.shotIds?.length ?? 0)
@@ -54,7 +65,9 @@ beforeEach(() => {
   mocks.run.mockImplementation(startsBatch)
 })
 afterEach(() => {
-  director.setState({ generateStoryboardImage: originalGenerate, generateVideoForShot: originalVideo })
+  director.setState({ generateStoryboardImage: originalGenerate, generateVideoForShot: originalVideo, remakeShotVideo: originalRemake })
+  mocks.refusal.mockReset()
+  mocks.refusal.mockReturnValue(null)
   vi.unstubAllGlobals()
 })
 
@@ -135,14 +148,18 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(runShots()).toEqual(['s1', 's2', 's4'])
 
     mocks.run.mockClear()
+    // "Remake"는 다시 만들기 — 넘기기 창 · 샷 상세 [다시 만들기]와 같은 다시 만들기 하나로 샷마다 보낸다(리드 낮음 6).
+    const remake = acceptingRemake()
+    director.setState({ remakeShotVideo: remake })
     reply([{ type: 'generateVideos', shotIds: ['s4', 's3'] }])
     await chat.getState().sendMessage('Remake the failed shot videos')
-    expect(runShots()).toEqual(['s4'])
+    expect(remake.mock.calls.map(([id]) => id)).toEqual(['s4'])
 
-    mocks.run.mockClear()
+    remake.mockClear()
     reply([{ type: 'generateVideos', shotIds: ['s4'] }])
     await chat.getState().sendMessage('Remake the failed shot videos')
-    expect(runShots()).toEqual(['s4'])
+    expect(remake.mock.calls.map(([id]) => id)).toEqual(['s4'])
+    expect(mocks.run).not.toHaveBeenCalled()
 
     mocks.run.mockClear()
     director.setState({ selectedNodeId: 's2' })
@@ -451,6 +468,86 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(generate).toHaveBeenCalledTimes(1)
   })
 
+  // 왜: 리드 낮음 6 — 채팅 "다시 만들어줘"가 일괄 길로 가면 넘기기 창 · 샷 상세 [다시 만들기](가장 최근 Take 의 모델 · 해상도 · 배선을 이어받음)와 다른 설정으로 만들었다.
+  it('"샷 4 영상 다시 만들어줘"는 넘기기 창 · 샷 상세와 같은 다시 만들기(그 샷의 가장 최근 Take 설정을 이어받는 새 Take)로 바로 만들고, 되짚는 Take 도 그 설정으로 센다', async () => {
+    const remake = acceptingRemake()
+    director.setState({ nodes: NODES().map((n) => (n.id === 'v4' ? { ...n, data: { ...n.data, override: { resolution: '1080p' } } } as DirectorNode : n)), remakeShotVideo: remake })
+    reply([{ type: 'generateVideos', shotIds: ['s4'] }])
+    await chat.getState().sendMessage('샷 4 영상 다시 만들어줘')
+    expect(remake.mock.calls.map(([id]) => id)).toEqual(['s4'])
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('Started making videos for Shot 4 · 10 Takes. Progress shows on the line above the cards.')
+  })
+
+  // 왜: 정상 경로 고정 — "다시"가 없는 부탁은 위쪽 [영상 만들기]와 같은 일괄 길이다(버튼 · 말이 같은 이름이면 같은 길).
+  it('"다시"가 없는 "샷 4 영상 만들어줘"는 지금처럼 위쪽 [영상 만들기]와 같은 일괄 길로 만든다', async () => {
+    const remake = acceptingRemake()
+    director.setState({ remakeShotVideo: remake })
+    reply([{ type: 'generateVideos', shotIds: ['s4'] }])
+    await chat.getState().sendMessage('샷 4 영상 만들어줘')
+    expect(runShots()).toEqual(['s4'])
+    expect(remake).not.toHaveBeenCalled()
+  })
+
+  // 왜: 리드 낮음 6 — 이미지를 다시 그리는 중에 영상을 다시 만들면 옛 그림이나 그림 없이 만들어져 Take 가 헛쓰인다(넘기기 창 [다시 만들기]와 같다).
+  it('다시 만들 샷의 이미지를 만드는 중이면 시작하지 않고 "샷 4 이미지를 만드는 중이에요. 끝나면 영상을 만들 수 있어요"라고 한다', async () => {
+    const remake = acceptingRemake()
+    director.setState({ nodes: NODES().map((n) => (n.id === 's4' ? { ...n, data: { ...n.data, storyboardImage: { status: 'generating', url: null, jobId: 'j' } } } as DirectorNode : n)), remakeShotVideo: remake })
+    reply([{ type: 'generateVideos', shotIds: ['s4'] }])
+    await chat.getState().sendMessage('샷 4 영상 다시 만들어줘')
+    expect(remake).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('The image for Shot 4 is being made. You can make the video once it is done.')
+    expect(translate('ko', 'The image for {shots} is being made. You can make the video once it is done.', { shots: '샷 4' })).toBe('샷 4 이미지를 만드는 중이에요. 끝나면 영상을 만들 수 있어요.')
+  })
+
+  // 왜(혼자 정한 것): 다시 만들기는 샷마다 따로 보내 내 영상 동시 한도에 걸릴 수 있다 — 시작한 것만 "시작했어요"로 되짚고, 못 한 샷은 까닭과 함께 말한다.
+  it('여러 샷을 다시 만들다 동시에 만드는 영상이 꽉 차면 시작한 샷만 되짚고, 못 한 샷은 "동시에 만드는 영상이 많아 샷 N 영상은 시작하지 못했어요"라고 한다', async () => {
+    const failedTake = (id: string, parent: string) => ({ id, type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: id, parentShotNodeId: parent, status: 'failed', lastAttemptStatus: 'failed', videoUrl: null, final: false, takeNumber: 1, override: {} } }) as unknown as DirectorNode
+    const started: string[] = []
+    const remake = vi.fn(async (id: string, opts?: { onAccepted?: (jobId: string) => void }) => {
+      if (id === 's1') { started.push(id); opts?.onAccepted?.(`job-${id}`); return `job-${id}` }
+      mocks.refusal.mockReturnValue({ shotNodeId: id })
+      return null
+    })
+    director.setState({ nodes: [shot('s1', IMG('s1')), failedTake('v1', 's1'), shot('s2', IMG('s2')), failedTake('v2', 's2'), shot('s4', IMG('s4')), failedTake('v4', 's4')], remakeShotVideo: remake })
+    reply([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('실패한 샷 다시 만들어줘')
+    expect(started).toEqual(['s1'])
+    // 한도에 걸린 뒤의 샷은 더 보내지 않는다(같은 한도에 또 걸린다).
+    expect(remake).toHaveBeenCalledTimes(2)
+    const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
+    expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
+    expect(said).toContain("Too many videos are being made at once, so I didn't start the video for Shots 2 · 4. Ask again once one is done.")
+    expect(translate('ko', "Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.", { shots: '샷 2·4' })).toBe('동시에 만드는 영상이 많아 샷 2·4 영상은 시작하지 못했어요. 하나가 끝나면 다시 부탁해 주세요.')
+  })
+
+  // 왜: lead_rules 3 — 글 카드가 기다리는 샷은 다시 만들기도 그 카드에 묶었다가 [적용] 뒤 새 글로 만든다(이어받는 Take 설정은 그대로).
+  it('글 카드가 기다리는 샷의 "다시 만들어줘"는 카드에 묶었다가 [적용]하면 새 글로 다시 만들기를 한다', async () => {
+    let promptAtRemake: string | null = null
+    const remake = acceptingRemake((id) => { promptAtRemake = promptOf(id) })
+    director.setState({ remakeShotVideo: remake })
+    reply([{ type: 'updateShot', id: 's4', patch: { prompt: 'Warm' } }])
+    await chat.getState().sendMessage('Make shot 4 warm')
+    reply([{ type: 'generateVideos', shotIds: ['s4'] }])
+    await chat.getState().sendMessage('샷 4 영상 다시 만들어줘')
+    expect(remake).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('Applying the text card makes the video for Shot 4 with the new text.')
+    await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
+    expect(remake.mock.calls.map(([id]) => id)).toEqual(['s4'])
+    expect(promptAtRemake).toBe('Warm')
+    expect(mocks.run).not.toHaveBeenCalled()
+  })
+
+  // 왜: 리드 (a) — 알림 카드 [샷 N 다시 만들기]가 일괄 설정으로 만들어 넘기기 창 [다시 만들기]와 설정이 갈렸다(검토 b 낮음 1). 같은 다시 만들기 하나를 부른다.
+  it('알림 카드 [샷 N 다시 만들기]는 넘기기 창 · 샷 상세와 같은 다시 만들기(가장 최근 Take 설정 이어받기)로 만든다', async () => {
+    const remake = acceptingRemake()
+    director.setState({ remakeShotVideo: remake })
+    await chat.getState().startDirectorVideos(['s4'], 'Make Shot 4 again', { remake: true })
+    expect(remake.mock.calls.map(([id]) => id)).toEqual(['s4'])
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('Started making videos for Shot 4 · 5 Takes. Progress shows on the line above the cards.')
+  })
+
   // 왜: 재재검토 b 낮음 3(C5) — Director 에서 되물은 뒤 다른 단계에서 "좋아"라고 하면 Take 가 묶인 글 카드가 승인돼 영상이 나갔다.
   it('Director 에서 되물은 뒤 다른 단계에서 "좋아"라고 해도 Take 가 묶인 글 카드는 승인되지 않고 영상도 시작하지 않는다', async () => {
     reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s1', 's2'] }])
@@ -465,6 +562,52 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
   })
 
+  // 왜: lead_rules — Take 가 걸린 카드는 낸 단계에서만 "응"으로 허락된다. 다시 만들기가 묶인 글 카드도 Take 를 쓰니 같은 규칙이다.
+  it('다시 만들기가 묶인 글 카드도 Take 가 걸린 카드라 다른 단계에서 "좋아"라고 해도 승인되지 않고 다시 만들지도 않는다', async () => {
+    const remake = acceptingRemake()
+    director.setState({ remakeShotVideo: remake })
+    reply([{ type: 'updateShot', id: 's4', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s4'] }])
+    await chat.getState().sendMessage('샷 4 를 따뜻하게 하고 영상 다시 만들어줘')
+    expect(chat.getState().pendingProposal?.payload.then).toMatchObject({ videos: [], remakes: ['s4'] })
+    project.setState({ currentStage: 'writer' })
+    reply([])
+    await chat.getState().sendMessage('좋아')
+    expect(remake).not.toHaveBeenCalled()
+    expect(promptOf('s4')).toBeNull()
+    expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+  })
+
+  // 왜: 검토 a 통합 낮음 — 번호를 물은 뒤 "3이나 4"(둘 중 하나)를 "3과 4"로 읽어 둘 다 바로 만들었다. "2?"처럼 목록으로 되묻는다.
+  it('번호를 물은 뒤 "3이나 4"처럼 고르는 말로 답하면 바로 만들지 않고 "샷 3 · 4 영상 2개를 만들까요?"로 되묻는다', async () => {
+    reply([{ type: 'generateVideos', shotIds: ['s2'] }])
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true })
+    await chat.getState().sendMessage('3이나 4')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('Shall I make 2 videos for Shots 3 · 4 (10 Takes)? Say yes to start.')
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', shotIds: ['s3', 's4'] })
+  })
+
+  // 왜: 검토 a 통합 — 글 카드에 생성을 묶는 사이(잔액을 읽는 동안) 사람이 그 카드를 버리면, 묶기가 끝나며 버린 카드를 다시 띄웠다(버린 글이 [적용]될 수 있었다).
+  it('글 카드에 영상을 묶는 사이 그 카드를 버렸으면 카드를 되살리지 않고, 기다리던 생성은 시작하지 않았다고 말한다', async () => {
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }])
+    await chat.getState().sendMessage('Make shot 1 warm')
+    expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+    let release: () => void = () => {}
+    vi.mocked(fetchTakeBalance).mockImplementationOnce(() => new Promise((resolve) => { release = () => resolve(mocks.balance as never) }))
+    reply([{ type: 'generateVideos', shotIds: ['s1'] }])
+    const sending = chat.getState().sendMessage('샷 1 영상 만들어줘')
+    await vi.waitFor(() => expect(vi.mocked(fetchTakeBalance)).toHaveBeenCalled())
+    chat.getState().dismissPendingProposal()
+    release()
+    await sending
+    expect(chat.getState().pendingProposal).toBeNull()
+    expect(promptOf('s1')).toBeNull()
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe("The text card closed in the meantime, so I didn't start what was waiting for it. Please ask again.")
+    expect(translate('ko', "The text card closed in the meantime, so I didn't start what was waiting for it. Please ask again.")).toBe('그사이 글 카드가 닫혀 그 카드를 기다리던 생성은 시작하지 않았어요. 다시 부탁해 주세요.')
+  })
+
   // 왜: 서버 지시문도 같은 약속을 말해야 모델이 "확인 카드가 뜰 거예요"라고 하지 않는다.
   it('서버 지시문은 그림 · 영상을 바로 만든다고 알리고, 영상은 사용자가 말한 샷만 담게 한다', () => {
     const route = readFileSync(path.join(process.cwd(), 'src/app/api/director/chat/route.ts'), 'utf8')
@@ -473,5 +616,112 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(route).not.toContain('approval card')
     // 재재검토 b 보통 C — 부정 · 미룸 · 질문에는 영상 부탁을 내지 않는다.
     expect(route).toContain('If the user says not to make videos, says not now or later, or only asks a question, do not emit generateVideos.')
+  })
+})
+
+describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', () => {
+  // 진짜 상점의 다시 만들기 길 — 서버는 바로 접수(queued)하고, 그 뒤 확인(5초마다)은 끝나지 않는다(시계를 멈춰 둔다).
+  //   샷마다 생성 잠금이 남으므로 시험마다 다른 샷 이름을 쓴다.
+  let generated: string[] = []
+  /** refuse: 이 샷 요청은 4xx 로 거절하되 몸에 jobId · status queued 를 싣는다(검토 b · entry 가 찾은 거절 꼴). */
+  function remakeServer(chatUpdates: unknown[] = [], refuse: readonly string[] = []) {
+    generated = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url)
+      if (u.includes('/api/director/chat')) return Response.json({ reply: 'Okay.', updates: chatUpdates })
+      if (u.includes('/api/director/generate-video')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { shotId?: string }
+        generated.push(String(body.shotId))
+        if (refuse.includes(String(body.shotId))) return Response.json({ jobId: `job-${body.shotId}`, status: 'queued', error: 'Bad request' }, { status: 400 })
+        return Response.json({ jobId: `job-${body.shotId}`, status: 'queued', videoClipId: `clip-${body.shotId}`, takeNumber: 2 })
+      }
+      if (u.includes('/api/generation-jobs/')) return Response.json({ ok: true, data: { status: 'queued' } })
+      return Response.json({})
+    }))
+  }
+  function remakeBoard(ids: string[]) {
+    writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: ids.map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1' })) as never })
+    director.setState({ nodes: ids.flatMap((id) => [shot(id, IMG(id)), failedTake(`v-${id}`, id)]) })
+  }
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval'] })
+  })
+  afterEach(() => {
+    vi.clearAllTimers()
+    vi.useRealTimers()
+  })
+
+  // 왜: 검토 b 보통 1 — 다시 만들기가 앞 영상이 끝날 때까지 기다려 둘째 샷이 늦게 나가고, 채팅이 영상이 다 끝날 때까지 "생각 중"이었다. 빠른 칩이 가장 자주 만나는 길이다.
+  it('Lumi 의 다시 만들기는 샷마다 접수되는 대로 다음 샷을 보내고, 다 접수되면 바로 시작했다고 말한다(영상이 끝나기를 기다리지 않는다)', async () => {
+    remakeBoard(['c1', 'c2'])
+    remakeServer()
+    await chat.getState().sendMessage(translate('en', DIRECTOR_QUICK_CHIPS[2]))
+    expect(generated).toEqual(['c1', 'c2'])
+    expect(chat.getState().loading).toBe(false)
+    expect(lastModel()).toBe('Started making videos for Shots 1 · 2 · 10 Takes. Progress shows on the line above the cards.')
+  })
+
+  // 왜: 검토 b · entry — 거절(4xx) 몸에도 jobId · status queued 가 실려 와, 접수 알림만 보고 세면 거절된 샷도 "시작했어요"와 Take 수에 들어갔다.
+  it('remakeShotVideo 의 접수 알림은 서버가 2xx 로 받아 jobId 를 준 때 한 번만 오고, 4xx 거절에는 jobId · queued 가 실려 와도 오지 않는다', async () => {
+    remakeBoard(['a1', 'a2'])
+    remakeServer([], ['a2'])
+    const accepted = vi.fn()
+    await new Promise<void>((resolve) => {
+      void director.getState().remakeShotVideo('a1', { onAccepted: (jobId) => { accepted(jobId); resolve() } })
+    })
+    for (let i = 0; i < 20; i++) await Promise.resolve()
+    expect(accepted.mock.calls).toEqual([['job-a1']])
+    accepted.mockClear()
+    await director.getState().remakeShotVideo('a2', { onAccepted: accepted })
+    expect(generated).toEqual(['a1', 'a2'])
+    expect(accepted).not.toHaveBeenCalled()
+  })
+
+  // 왜: 위와 같은 까닭 — Lumi 는 2xx 접수만 "시작"으로 세고, 거절된 샷은 따로 말한다(Take 수에도 넣지 않는다).
+  it('다시 만들기는 서버가 2xx 로 받아 jobId 를 준 샷만 시작으로 세고, 4xx 로 거절된 샷은 "샷 N 영상을 시작하지 못했어요"라고 따로 말한다', async () => {
+    remakeBoard(['r1', 'r2'])
+    remakeServer([], ['r2'])
+    await chat.getState().sendMessage(translate('en', DIRECTOR_QUICK_CHIPS[2]))
+    expect(generated).toEqual(['r1', 'r2'])
+    const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
+    expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
+    expect(said).toContain("I couldn't start the video for Shot 2. Please ask again in a moment.")
+  })
+
+  // 왜: 검토 b 보탬 — 채팅을 "생각 중"으로 잡던 길은 칩 말고도 셋(알림 카드 · 되묻기 "응" · 번호 대답), 모델을 거치는 채팅 부탁은 둘째 샷이 늦게 나갔다.
+  it('알림 카드 [다시 만들기] · 되묻기 "응" · 번호 대답 · 채팅 부탁의 다시 만들기도 영상이 끝나기를 기다리지 않고, 접수되면 바로 시작했다고 말한다', async () => {
+    // 알림 카드 [샷 1 다시 만들기]
+    remakeBoard(['n1'])
+    remakeServer()
+    await chat.getState().startDirectorVideos(['n1'], 'Make Shot 1 again', { remake: true })
+    expect(generated).toEqual(['n1'])
+    expect(chat.getState().loading).toBe(false)
+    expect(lastModel()).toBe('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
+
+    // 되물은 목록에 "응"
+    remakeBoard(['y1', 'y2', 'y3'])
+    remakeServer([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 다시 만들어줘')
+    expect(chat.getState().directorVideoAsk).toMatchObject({ shotIds: ['y1', 'y3'], remake: true })
+    await chat.getState().sendMessage('응')
+    expect(generated).toEqual(['y1', 'y3'])
+    expect(chat.getState().loading).toBe(false)
+    expect(lastModel()).toBe('Started making videos for Shots 1 · 3 · 10 Takes. Progress shows on the line above the cards.')
+
+    // 번호를 물은 뒤 "2번"
+    remakeBoard(['k1', 'k2'])
+    remakeServer([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('씬 1 영상 다시 만들어줘')
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true, remake: true })
+    await chat.getState().sendMessage('2번')
+    expect(generated).toEqual(['k2'])
+    expect(chat.getState().loading).toBe(false)
+
+    // 모델을 거치는 채팅 부탁
+    remakeBoard(['m1', 'm2'])
+    remakeServer([{ type: 'generateVideos', shotIds: ['m1', 'm2'] }])
+    await chat.getState().sendMessage('샷 1, 2 영상 다시 만들어줘')
+    expect(generated).toEqual(['m1', 'm2'])
+    expect(lastModel()).toBe('Started making videos for Shots 1 · 2 · 10 Takes. Progress shows on the line above the cards.')
   })
 })
