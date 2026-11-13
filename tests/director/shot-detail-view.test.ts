@@ -1,4 +1,4 @@
-// Director 샷 상세 화면(D6 · D7) — 스토리보드형 팝업 · 노드형 왼쪽 패널이 같은 상세를 보이고, 이미지 탭은 시작 · 끝 나란히 · 설정 한 화면이다 (디자이너 11/13 시안 · 오너 2026-11-14)
+// Director 샷 상세 화면(D6 · D7) — 스토리보드형 팝업 · 노드형 왼쪽 패널이 같은 상세를 보이고, 이미지 탭은 시작 · 끝 나란히 · 설정 한 화면, 영상 탭은 Take 쌓기 · 이미지 고치기 · 영상 고치기다 (디자이너 11/13 시안 · 오너 2026-11-14)
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -10,11 +10,14 @@ vi.mock('@/lib/generation-queue', async (original) => ({
   useGenerationQueueStatus: () => 'ready',
 }))
 vi.mock('@/lib/use-debug-prompts', () => ({ useDebugPrompts: () => false }))
+// 운영은 shadow(숫자는 보이되 막지 않음) — Take 표시가 켜진 상태로 본다.
+vi.mock('@/lib/billing/use-take-balance', () => ({ useTakeBalance: () => ({ balance: 100, mode: 'shadow', loading: false }) }))
 
 import { DirectorShotDetail } from '@/features/director/shot-detail/director-shot-detail'
 import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
+import type { VideoNodeData } from '@/types/director'
 
 let shotId = ''
 const IMAGE = { url: 'https://media.test/start.png', status: 'completed' as const, errorMessage: null, generatedAt: 1, frames: { start: 'https://media.test/start.png', direction: 'https://media.test/dir.png', end: 'https://media.test/end.png' } }
@@ -30,6 +33,20 @@ function syncStores() {
 const render = (layout: 'popup' | 'panel', tab: 'image' | 'video' = 'image') => {
   syncStores()
   return renderToStaticMarkup(createElement(DirectorShotDetail, { shotNodeId: shotId, initialTab: tab, layout, onClose: () => {} }))
+}
+function addTake(over: Partial<VideoNodeData>): string {
+  const id = director.getState().addVideoTake(shotId)!
+  director.getState().updateNodeData<'video'>(id, over)
+  return id
+}
+const done = (n: number, over: Partial<VideoNodeData> = {}) =>
+  addTake({ takeNumber: n, status: 'completed', lastAttemptStatus: 'completed', videoUrl: `https://media.test/take-${n}.mp4`, ...over })
+/** 글자를 담은 단추의 여는 태그 — 꺼짐(disabled)을 본다. */
+function buttonTag(out: string, label: string): string {
+  const at = out.indexOf(label)
+  expect(at, label).toBeGreaterThan(-1)
+  const start = out.lastIndexOf('<button', at)
+  return out.slice(start, out.indexOf('>', start) + 1)
 }
 
 beforeEach(() => {
@@ -107,5 +124,83 @@ describe('Director 샷 상세 화면', () => {
     expect(render('popup')).toContain('Remake start and end images · Takes 0')
     const button = readFileSync('src/features/director/storyboard-image-button.tsx', 'utf8')
     expect(button).toMatch(/changeNote\.trim\(\) \? generateStoryboardImage\(nodeId, \{ changeNote \}\) : generateStoryboardImage\(nodeId\)/)
+  })
+
+  it('영상 탭은 그 샷의 Take 를 새것부터 카드로 쌓고, 고른 ★ 가 없으면 가장 최근 완성 Take 에 "★ 최종 (자동)"을 보인다', () => {
+    // 왜: D7 · R — Take 는 덮어쓰지 않고 쌓이고, ★ 최종 Take 가 Editor 로 간다(고르지 않았으면 가장 최근 완성).
+    done(1)
+    addTake({ takeNumber: 2, status: 'generating', lastAttemptStatus: 'generating' })
+    const out = render('panel', 'video')
+    const list = out.slice(out.indexOf('data-testid="shot-detail-takes"'))
+    expect(list.indexOf('Take 2')).toBeGreaterThan(-1)
+    expect(list.indexOf('Take 2')).toBeLessThan(list.indexOf('Take 1'))
+    expect(out).toContain('★ Final (auto)')
+    expect(out).toContain('>Making<')
+    expect(out).toContain('>View<')
+    expect(out).toContain('Seedance 2.0 · 720p')
+    expect(out).toContain('data-testid="shot-detail-take-preview"')
+    expect(out).toContain('src="https://media.test/take-1.mp4"')
+    setLocale('ko')
+    const ko = render('panel', 'video')
+    expect(ko).toContain('★ 최종 (자동)')
+    expect(ko).toContain('>만드는 중<')
+    expect(ko).toContain('Take 2')
+  })
+
+  it('영상 탭은 이미지 고치기와 영상 고치기를 한 화면에 보이고, 영상 고치기에는 다섯 영상 모델 · 해상도 · 이번에 쓸 Take 를 보인다', () => {
+    // 왜: D7 — 장면 · 인물 · 구도는 이미지 고치기, 움직임 · 카메라 · 길이는 영상 고치기에서 고친다. Take 값은 지금 계산 그대로(오너 답 11번).
+    done(1)
+    const out = render('panel', 'video')
+    expect(out).toContain('data-testid="shot-detail-fix-image"')
+    expect(out).toContain('data-testid="shot-detail-fix-video"')
+    for (const label of ['Fix the image', 'Fix the video', 'Seedance 2.0', 'Seedance 2.5', 'Happy Horse', 'Kling O3 Pro', 'Veo 3.1', '720p', '1080p']) {
+      expect(out, label).toContain(label)
+    }
+    expect(out.match(/role="checkbox" aria-checked="true" aria-disabled="true"/g)?.length).toBe(2)
+    expect(out).toContain('Remake start and end images · Takes 0')
+    expect(out).toContain('Make a new Take · 5 Take')
+    expect(out).toContain('Delete this Take')
+    setLocale('ko')
+    const ko = render('panel', 'video')
+    for (const label of ['이미지 고치기', '영상 고치기', '새 Take 만들기 · 5 Take', '이 Take 삭제']) expect(ko, label).toContain(label)
+  })
+
+  it('보고 있는 Take 를 만든 뒤 시작 · 끝 이미지를 다시 만들었으면 "이미지가 바뀌었어요"를 보이고 단추는 "바뀐 이미지로 새 Take 만들기"다', () => {
+    // 왜: D7 "시작 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요" — 그 Take 는 옛 이미지로 만든 것이라 새 Take 를 만들어야 바뀐 이미지가 영상에 들어간다.
+    director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: { ...IMAGE, generatedAt: Date.parse('2026-11-14T02:00:00.000Z') } })
+    done(1, { lastAttemptAt: '2026-11-14T01:00:00.000Z' })
+    const out = render('panel', 'video')
+    expect(out).toContain('The start and end images changed · A new Take will use them')
+    expect(out).toContain('Make a new Take with the changed image · 5 Take')
+    setLocale('ko')
+    const ko = render('panel', 'video')
+    expect(ko).toContain('시작 · 끝 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요')
+    expect(ko).toContain('바뀐 이미지로 새 Take 만들기 · 5 Take')
+  })
+
+  it('영상이 없는 샷의 영상 탭은 "아직 영상이 없어요"와 "영상 만들기 · N Take"를 보인다', () => {
+    // 왜: D6 "다음: 영상 만들기 · 5 Take" — 이미지 탭에서 넘어오면 바로 첫 Take 를 만든다. 지울 Take 는 없다.
+    const out = render('popup', 'video')
+    expect(out).toContain('No video for this shot yet.')
+    expect(out).toContain('Make the video · 5 Take')
+    expect(buttonTag(out, 'Make the video · 5 Take')).not.toContain('disabled=""')
+    expect(out).not.toContain('Delete this Take')
+  })
+
+  it('시작 · 끝 이미지가 없으면 영상 단추를 끄고 이미지를 먼저 만들라고 알린다', () => {
+    // 왜: R "영상 만들기는 이미지가 먼저 있어야 해요" — 눌러도 실패하는 단추를 켜 두지 않는다.
+    director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: null })
+    const out = render('popup', 'video')
+    expect(out).toContain('Make the start and end images first.')
+    expect(buttonTag(out, 'Make the video · 5 Take')).toContain('disabled=""')
+  })
+
+  it('같은 샷에서 Take 를 만드는 중이면 새 Take 단추를 끄고 다 되면 새로 만들 수 있다고 알린다', () => {
+    // 왜: 지금은 한 샷을 한 번에 하나만 만든다(서버가 같은 샷 동시 생성을 거절) — 눌러도 거절되는 단추를 켜 두지 않는다.
+    done(1)
+    addTake({ takeNumber: 2, status: 'generating', lastAttemptStatus: 'generating' })
+    const out = render('panel', 'video')
+    expect(out).toContain('A Take is being made. You can make a new one when it is done.')
+    expect(buttonTag(out, 'Make a new Take · 5 Take')).toContain('disabled=""')
   })
 })

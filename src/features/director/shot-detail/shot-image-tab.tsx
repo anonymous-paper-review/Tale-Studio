@@ -5,7 +5,7 @@
 //   1단계 다시 만들기는 지금처럼 시작 · 끝 함께 — 고르기 표시는 둘 다 고른 채 잠가 둔다. 모델 칸은 실제로 도는 것만.
 //   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts
 import { useMemo, useState } from 'react'
-import { Check, Trash2, Upload, X } from 'lucide-react'
+import { Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ThumbImage } from '@/components/thumb-image'
@@ -21,6 +21,7 @@ import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store
 import { aspectRatioFromFormat } from '@/types/project'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
+import { LockedFrame } from './locked-frame'
 
 export function ShotImageTab({ nodeId, data, layout, onMakeVideo }: {
   nodeId: string
@@ -62,19 +63,7 @@ export function ShotImageTab({ nodeId, data, layout, onMakeVideo }: {
   const framesBlock = (
     <div className="space-y-2" data-testid="shot-detail-frames">
       <div className="grid grid-cols-2 gap-3">
-        {(['start', 'end'] as const).map((which) => {
-          const url = frames[which]
-          return (
-            <figure key={which} className="relative overflow-hidden rounded-[14px] border-2 border-info bg-art-placeholder" style={frameStyle ?? { aspectRatio: '16 / 9' }}>
-              {url ? <ThumbImage src={url} alt={t(which === 'start' ? 'Start image' : 'End image')} className="size-full object-cover" /> : null}
-              <figcaption className="absolute left-2 top-2 rounded-md bg-background/80 px-2 py-0.5 text-micro font-semibold">{t(which === 'start' ? 'Start' : 'End')}</figcaption>
-              {/* 1단계는 시작 · 끝을 함께 다시 만든다(오너 답 5번) — 둘 다 고른 채 잠근다. */}
-              <span role="checkbox" aria-checked="true" aria-disabled="true" aria-label={t(which === 'start' ? 'Start image' : 'End image')} className="absolute right-2 top-2 flex size-6 items-center justify-center rounded-md bg-info text-info-foreground">
-                <Check className="size-4" />
-              </span>
-            </figure>
-          )
-        })}
+        {(['start', 'end'] as const).map((which) => <LockedFrame key={which} which={which} url={frames[which]} style={frameStyle} />)}
       </div>
       <p className="text-caption text-subtle-foreground">{t('Start and end images are remade together for now.')}</p>
     </div>

@@ -161,6 +161,8 @@ export type DirectorGenerationRequestOptions = {
   inheritFromVideoNodeId?: string
   /** 샷 상세의 "바꾸고 싶은 점"(디자이너 11/13 D6) — 이번 이미지 다시 만들기에만 프롬프트 끝에 붙인다. 샷 프롬프트는 그대로. */
   changeNote?: string
+  /** 샷 상세의 영상 고치기(디자이너 11/13 D7) — 바꾼 모델 · 해상도 · 바꿀 점을 새 Take 설정에만 얹는다(이어받은 설정 위에). */
+  videoOverride?: VideoOverride
 }
 
 function makeSceneData(label: string): SceneNodeData {
@@ -4358,6 +4360,13 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               get().rebuildFrameEdges()
               get().rebuildVideoChainEdges()
               scheduleWiringSweepToDb(get)
+            }
+          }
+
+          if (options?.videoOverride) {
+            const created = get().nodes.find((n) => n.id === videoNodeId)
+            if (created && isVideoData(created.data)) {
+              get().updateNodeData<'video'>(videoNodeId, { override: { ...created.data.override, ...options.videoOverride } })
             }
           }
 

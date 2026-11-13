@@ -4,7 +4,8 @@
 import { storyboardImageEndFrame, storyboardImageStartFrame } from '@/lib/director/storyboard-image'
 import { IMAGE_MODEL_ORDER, imageModelSupportsSheetCanvas, type ImageModelKey } from '@/lib/image-models'
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
-import type { DirectorNode, ShotNodeData, StoryboardImage, VideoNodeData } from '@/types/director'
+import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
+import type { DirectorNode, ShotNodeData, StoryboardImage, VideoNodeData, VideoOverride } from '@/types/director'
 
 export type ShotDetailTab = 'image' | 'video'
 
@@ -48,7 +49,36 @@ export function shotDetailTakes(nodes: readonly DirectorNode[], shotNodeId: stri
 }
 
 /** 바꿀 점을 붙인 이번 생성 프롬프트 — 바꿀 점은 이번 생성에만 붙고 샷 프롬프트는 바꾸지 않는다. 비워 두면 그대로. */
-export function promptWithChange(prompt: string, change: string): string {
+export function promptWithChange(prompt: string, change: string, subject: 'image' | 'video' = 'image'): string {
   const note = change.trim()
-  return note ? `${prompt}\n\nChange from the previous image: ${note}` : prompt
+  return note ? `${prompt}\n\nChange from the previous ${subject}: ${note}` : prompt
+}
+
+/** 새 Take 요청 — 늘 새 Take 이고(덮어쓰지 않음) 보고 있던 Take 의 설정(마지막 모델 · 해상도 · 배선)을 이어받는다.
+ *  영상 고치기에서 바꾼 모델 · 해상도 · 바꿀 점은 새 Take 에만 실린다(보고 있던 Take 는 그대로).
+ *  바꿀 점은 보고 있던 Take 의 프롬프트 끝에 붙는다 — 그 Take 를 만들 때 바꾼 점도 이어진다. 첫 Take 는 이어받을 것이 없다. */
+export function newTakeRequest(input: {
+  takeId: string | null
+  take: Pick<VideoNodeData, 'override'> | null
+  shotPrompt: string
+  change: string
+  provider?: VideoModelKey
+  resolution?: VideoResolution
+}): { inheritFromVideoNodeId?: string; videoOverride?: VideoOverride } {
+  const note = input.change.trim()
+  const override: VideoOverride = {
+    ...(input.provider ? { provider: input.provider } : {}),
+    ...(input.resolution ? { resolution: input.resolution } : {}),
+    ...(note ? { prompt: promptWithChange(input.take?.override?.prompt || input.shotPrompt, note, 'video') } : {}),
+  }
+  return {
+    ...(input.takeId ? { inheritFromVideoNodeId: input.takeId } : {}),
+    ...(Object.keys(override).length ? { videoOverride: override } : {}),
+  }
+}
+
+/** 그 Take 를 만든 뒤 시작 · 끝 이미지를 다시 만들었나 — 이미지가 더 새로우면 그 Take 는 옛 이미지로 만든 것이다(D7). */
+export function imageChangedSinceTake(imageGeneratedAt: number | null | undefined, take: Pick<VideoNodeData, 'createdAt' | 'lastAttemptAt'>): boolean {
+  const madeAt = Date.parse(String(take.lastAttemptAt ?? take.createdAt ?? ''))
+  return typeof imageGeneratedAt === 'number' && Number.isFinite(madeAt) && imageGeneratedAt > madeAt
 }

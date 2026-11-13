@@ -3,6 +3,8 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   detailImageModels,
+  imageChangedSinceTake,
+  newTakeRequest,
   promptWithChange,
   shotDetailFrames,
   shotDetailTakes,
@@ -96,5 +98,49 @@ describe('Director 샷 상세', () => {
     const store = readFileSync('src/stores/director-store.ts', 'utf8')
     expect(store).toMatch(/changeNote\?: string/)
     expect(store).toMatch(/promptWithChange\(effectivePrompt\(data\) \|\| data\.label, options\?\.changeNote \?\? ''\)/)
+  })
+
+  it('영상 탭에서 Take 를 만들면 늘 새 Take 를 만들고, 보고 있던 Take 의 설정을 이어받으며 앞 Take 는 그대로 둔다', () => {
+    // 왜: 1단계 담당표 · D7 — "Take 는 덮어쓰지 않고 쌓인다", [다시 만들기]는 늘 새 Take 다(같은 Take 를 덮던 지금 상세의 다시 만들기를 쓰지 않는다).
+    const current = take('v1', 1, { override: { provider: 'seedance', resolution: '1080p' } as VideoNodeData['override'] }).data as VideoNodeData
+    expect(newTakeRequest({ takeId: 'v1', take: current, shotPrompt: 'A girl shivers.', change: '' })).toEqual({ inheritFromVideoNodeId: 'v1' })
+    const tab = readFileSync('src/features/director/shot-detail/shot-video-tab.tsx', 'utf8')
+    expect(tab).toMatch(/generateVideoForShot\(shotNodeId, newTakeRequest\(/)
+    expect(tab).not.toMatch(/regenerateVideo|VideoDetailPanel/)
+  })
+
+  it('실패한 Take 를 다시 만들면 그 Take 의 마지막 모델 · 해상도로 새 Take 를 만든다', () => {
+    // 왜: 1단계 담당표 "실패 다시 만들기는 마지막 모델 · 해상도로" — 실패한 Take 의 설정을 그대로 이어받는다.
+    const failed = take('v2', 2, { status: 'failed', videoUrl: null, override: { provider: 'kling-o3', resolution: '720p' } as VideoNodeData['override'] }).data as VideoNodeData
+    expect(newTakeRequest({ takeId: 'v2', take: failed, shotPrompt: 'A girl shivers.', change: '' })).toEqual({ inheritFromVideoNodeId: 'v2' })
+  })
+
+  it('영상 고치기에서 모델 · 해상도를 바꾸거나 바꿀 점을 적으면 새 Take 에만 실리고, 바꿀 점은 보고 있던 Take 의 프롬프트 끝에 붙는다', () => {
+    // 왜: D7 "움직임·카메라에서 바꿀 점" — 고친 것은 새 Take 의 설정이 되고 보고 있던 Take 는 바뀌지 않는다.
+    //   바꿀 점은 보고 있던 영상에서 고칠 것이라, 그 Take 를 만들 때 바꾼 점도 이어진다(혼자 정한 것).
+    const current = take('v1', 1).data as VideoNodeData
+    expect(newTakeRequest({ takeId: 'v1', take: current, shotPrompt: 'A girl shivers.', change: ' slow push in ', provider: 'veo', resolution: '1080p' })).toEqual({
+      inheritFromVideoNodeId: 'v1',
+      videoOverride: { provider: 'veo', resolution: '1080p', prompt: 'A girl shivers.\n\nChange from the previous video: slow push in' },
+    })
+    const changed = take('v2', 2, { override: { prompt: 'A girl shivers.\n\nChange from the previous video: slow push in' } as VideoNodeData['override'] }).data as VideoNodeData
+    expect(newTakeRequest({ takeId: 'v2', take: changed, shotPrompt: 'A girl shivers.', change: 'darker' })).toEqual({
+      inheritFromVideoNodeId: 'v2',
+      videoOverride: { prompt: 'A girl shivers.\n\nChange from the previous video: slow push in\n\nChange from the previous video: darker' },
+    })
+  })
+
+  it('영상이 없는 샷에서 모델 · 해상도를 골라 만들면 첫 Take 에 그 설정만 실린다', () => {
+    // 왜: 영상 탭에서 첫 Take 를 만들 때 — 이어받을 Take 가 없으니 고른 모델 · 해상도만 싣고, 고르지 않았으면 샷 설정 그대로다(혼자 정한 것).
+    expect(newTakeRequest({ takeId: null, take: null, shotPrompt: 'A girl shivers.', change: '', provider: 'happy-horse' })).toEqual({ videoOverride: { provider: 'happy-horse' } })
+    expect(newTakeRequest({ takeId: null, take: null, shotPrompt: 'A girl shivers.', change: '' })).toEqual({})
+  })
+
+  it('마지막 Take 를 만든 뒤 시작 · 끝 이미지를 다시 만들었으면 "이미지가 바뀌었어요"로 본다', () => {
+    // 왜: D7 "시작 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요" — 이미지가 Take 보다 새로우면 그 Take 는 옛 이미지로 만든 것이다.
+    const made = take('v1', 1, { createdAt: '2026-11-14T01:00:00.000Z' }).data as VideoNodeData
+    expect(imageChangedSinceTake(Date.parse('2026-11-14T02:00:00.000Z'), made)).toBe(true)
+    expect(imageChangedSinceTake(Date.parse('2026-11-14T00:30:00.000Z'), made)).toBe(false)
+    expect(imageChangedSinceTake(undefined, made)).toBe(false)
   })
 })
