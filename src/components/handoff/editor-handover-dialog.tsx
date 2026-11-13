@@ -4,7 +4,7 @@
 //   샷마다 Editor 로 가는 Take(★ 최종 먼저, 없으면 가장 최근 완성)를 보이고, 영상 없는 샷은 빨강 줄에 까닭과 [다시 만들기]를 둔다.
 //   [○ 빼고 넘기기]는 영상 있는 샷만 넘긴다(Editor 쪽 받기는 export 갈래). 목록은 Director 캔버스에서 그때그때 읽어
 //   다시 만들기로 바뀌는 상태(만드는 중 → 완성)를 따라간다. 판단 · 넘김은 global-chat-store(requestNextStep · proceedToEditorWithVideos).
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { ArrowRight, Loader2, Star } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -28,6 +28,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
   const proceed = useGlobalChatStore((s) => s.proceedToEditorWithVideos)
   const remake = useGlobalChatStore((s) => s.remakeMissingVideo)
   const close = useGlobalChatStore((s) => s.closeHandoffConfirm)
+  const changeTake = useGlobalChatStore((s) => s.changeHandoverTake)
   // 일괄이 도는 중이면 줄 단추를 끄고 까닭을 적는다(검토 b 낮음 1). Take 값은 과금이 꺼져 있을 때만 숨긴다 — 잔액을 못 읽으면 센 값을 보인다(2차 낮음 1).
   const batch = useDirectorCanvasStore((s) => (s.realBatchBusy ? 'images' : s.videoBatchBusy ? 'videos' : null))
   const showTakes = takeValuesShown(useTakeBalance())
@@ -35,6 +36,11 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
   const [starting, setStarting] = useState<ReadonlySet<string>>(() => new Set())
   // [다시 만들기]를 시작하지 못한 까닭 — 그 줄 아래에 보인다(검토 b 2차 낮음 3). 줄마다 따로 둔다 — 다른 줄을 누르거나 끝나도 남는다(검토 b 낮음).
   const [notices, setNotices] = useState<ReadonlyMap<string, string>>(() => new Map())
+  // 창을 닫았다 다시 열면 앞에서 남은 까닭은 지운다 — 이 부품은 늘 붙어 있고 open 만 바뀌어, 다시 열면 그새 바뀐 상황에
+  //   옛 까닭이 그대로 보였다(검토 a 낮음, 리드 11/14). 돌기 표시는 다시 만들기가 끝날 때(finally) 비운다.
+  useEffect(() => {
+    setNotices(new Map())
+  }, [open])
   if (!open) return null
   const view = editorHandoverView(nodes, boardNodeNames(manifest, writerShots ?? []))
 
@@ -50,11 +56,6 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
     } finally {
       setStarting((current) => withStartingRow(current, row.shotNodeId, false))
     }
-  }
-  // [바꾸기] — Take 는 그 샷 상세에서 고른다(★ 최종). 창을 닫고 상세를 연다; 고른 뒤 [다음: Editor로] 를 다시 누르면 된다.
-  const openDetail = (row: EditorHandoverShot) => {
-    close()
-    useDirectorCanvasStore.getState().openPopup(row.shotNodeId)
   }
 
   return (
@@ -114,7 +115,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
                     {button.label}
                   </Button>
                 ) : (
-                  <Button size="sm" variant="ghost" className="shrink-0" onClick={() => openDetail(row)}>
+                  <Button size="sm" variant="ghost" className="shrink-0" onClick={() => changeTake(row.shotNodeId)}>
                     {t('Change')}
                   </Button>
                 )}
