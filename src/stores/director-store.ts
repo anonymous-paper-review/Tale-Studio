@@ -1150,8 +1150,9 @@ interface DirectorCanvasState {
   detailNodeId: string | null
   /** 상세를 열 때 먼저 보일 탭. */
   detailTab: 'image' | 'video'
-  /** 상세를 연 차례 — openShotDetail 이 열 때마다 하나 올린다. 노드형 왼쪽 패널이 이것으로 다시 붙어, 이미 열린 상세를 안에서
-   *  다른 탭으로 바꿔 두었어도 [바꾸기] · ⤢ 가 고른 탭으로 다시 연다(리드 11/14, 검토 a). */
+  /** 상세를 연 차례 — openShotDetail 이 열 때마다 하나 올린다. 노드형 왼쪽 패널은 이것을 상세에 넘기고, 상세는 이것이 바뀔 때
+   *  다시 붙지 않고 탭만 고른 탭으로 맞춘다 — 이미 열린 상세를 안에서 다른 탭으로 바꿔 두었어도 [바꾸기] · ⤢ 가 고른 탭으로 열고,
+   *  탭이 그대로면 상세 안에서 적던 글도 남는다(리드 11/14, 검토 a). */
   detailOpenSeq: number
   deleteConfirmInfo: DeleteCascadeInfo
   relationModal: RelationModalState
