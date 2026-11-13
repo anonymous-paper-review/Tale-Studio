@@ -10,7 +10,7 @@ vi.mock('@/stores/project-store', () => ({
   useProjectStore: { getState: () => ({ projectId: mocks.projectId }) },
 }))
 
-import { saveEditorNow, selectProgramLayout, selectTimelineLayout, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
+import { saveEditorNow, selectFrameAt, selectProgramLayout, selectTimelineLayout, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
 import { audibleTrackIds, draftAudioClips } from '@/lib/editor-draft-render'
 import { sequenceLengthSec } from '@/lib/editor/sequence-info'
 import { zipClips } from '@/lib/editor-zip-export'
@@ -213,8 +213,10 @@ describe('시퀀스 길이', () => {
     expect(page).toMatch(/endSec: totalSec,/)
     const render = read('src/lib/editor-draft-render.ts')
     expect(render).toMatch(/const total = Math\.max\(videoTotal, audioEnd, opts\.endSec \?\? 0\)/)
-    // 마지막 보이는 클립 뒤(눈 끈 줄 · 소리만 남은 끝)는 빈 곳처럼 순검정 — 미리 보기와 같다.
-    expect(render).toMatch(/videoActive = false\s*activeLabel = ''\s*activeTitle = null\s*activeSubtitle = null\s*inGap = true\s*await waitUntil\(total \+ TAIL_PAD_SEC\)/)
+    // 마지막 보이는 클립 뒤(눈 끈 줄 · 소리만 남은 끝)는 빈 곳처럼 순검정 — 미리 보기와 같은 그릴 것 목록에 층이 없다(2단계 ⑦-2 — 옛 글자:
+    //   videoActive = false … inGap = true · await waitUntil(total + TAIL_PAD_SEC)).
+    expect(selectFrameAt(api(), 22).layers).toEqual([])
+    expect(render).toMatch(/await waitUntil\(total \+ TAIL_PAD_SEC\)/)
   })
 })
 

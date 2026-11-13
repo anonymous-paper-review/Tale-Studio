@@ -11,7 +11,8 @@ import { TitleCardStage } from '@/features/editor/title-card-stage'
 import { SubtitleLayer } from '@/features/editor/subtitle-layer'
 import { TitleTextLayer } from '@/features/editor/title-clip-layer'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
-import { useEditorStore, selectFrameAt, selectVideoLayout, isTitleCardShotId, type FrameLayer, type FrameLayerKind } from '@/stores/editor-store'
+import { useEditorStore, selectFrameAt, selectVideoLayout, isTitleCardShotId, type FrameLayerKind } from '@/stores/editor-store'
+import { syncLayerVideo } from '@/lib/editor/layer-sync'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { editPointTarget } from '@/lib/editor/timeline-segments'
 import { SEQUENCE_FPS, exportFrameSize, formatTimecode, sequenceLengthSec } from '@/lib/editor/sequence-info'
@@ -36,26 +37,6 @@ function layerStyle(clip: Pick<VideoClip, 'motion' | 'effects'> | undefined, fra
   return {
     ...(motion ? { transform: `translate(${motion.x * 100}%, ${motion.y * 100}%) scale(${motion.scale})` } : {}),
     ...(filter ? { filter } : {}),
-  }
-}
-
-/**
- * 영상 층을 그 시각 원본 자리에 맞춘다(2단계 ⑦ — 모든 층 같은 방법). 재생 중 작은 어긋남은 빠르기를 살짝 바꿔 따라잡는다 — 다시 찾으면(seek)
- *   찾는 동안 그림이 멈추고, 찾는 사이에 또 어긋난다. 0.5초 넘게 어긋나면 다시 찾는다. 멈춘 첫 장 · 끝 장은 이미 그 근처에 서 있으면 다시
- *   찾지 않는다 — 원본 끝 근처를 찾는 동안 그림이 비지 않게.
- */
-function syncLayerVideo(el: HTMLVideoElement, layer: FrameLayer, speed: number, playing: boolean) {
-  const target = layer.sourceSec ?? 0
-  if (playing && !layer.held) {
-    if (el.paused) void el.play().catch(() => {})
-    const drift = target - el.currentTime
-    if (Math.abs(drift) > 0.5) el.currentTime = target
-    const rate = speed * (drift > 0.04 ? 1.25 : drift < -0.04 ? 0.8 : 1)
-    if (el.playbackRate !== rate) el.playbackRate = rate
-  } else {
-    if (!el.paused) el.pause()
-    if (el.playbackRate !== speed) el.playbackRate = speed
-    if (Math.abs(el.currentTime - target) > (layer.held ? 0.3 : 0.02)) el.currentTime = target
   }
 }
 
@@ -261,6 +242,7 @@ export function VideoPreviewer() {
         box.style.zIndex = String(i === undefined ? 0 : i + 1)
         box.style.opacity = i === undefined ? '0' : String(plan.layers[i].alpha)
       }
+      // 영상 층 시각 맞추기 — 내보내기와 같은 함수(src/lib/editor/layer-sync.ts).
       for (const layer of all) {
         if (layer.kind !== 'video') continue
         const el = layerVideos.current.get(layer.shotId)
@@ -339,7 +321,7 @@ export function VideoPreviewer() {
     if (kind === 'title') {
       // 제목 클립(2단계 ⑥) — 글자만 얹는다. 틀 밖으로 나간 글자는 잘린다.
       const data = shots.find((s) => s.shotId === id)?.titleText
-      return data ? <TitleTextLayer data={data} frameHeight={frame.height} motion={clip?.motion} /> : null
+      return data ? <TitleTextLayer data={data} frameWidth={frame.width} frameHeight={frame.height} motion={clip?.motion} /> : null
     }
     if (kind === 'card') {
       const card = shots.find((s) => s.shotId === id)?.titleCard ?? { text: '', imageUrl: null }

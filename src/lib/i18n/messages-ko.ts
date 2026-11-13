@@ -3515,5 +3515,6 @@ export const KO: Record<string, string> = {
   'Type tool': '문자 도구',
   'Type tool · Click a V track to add a title there': '문자 도구 · V 트랙을 누르면 그 자리에 제목이 생겨요',
   'There is no track to put the title on. Add V2 or unlock a track.': '제목을 놓을 줄이 없어요. V2 를 더하거나 잠금을 풀어 주세요.',
+  "This browser can't export effects. To include effects, export in Chrome.": '이 브라우저는 효과를 내보내지 못해요. 효과까지 실으려면 Chrome 에서 내보내 주세요.',
   'Add a marker': '마커 달기',
 }

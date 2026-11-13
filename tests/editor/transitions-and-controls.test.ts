@@ -86,9 +86,12 @@ describe('2 · 디졸브 — 검은 막의 투명도만 시간에 따라 바뀐�
   })
 
   it('드래프트 렌더도 같은 검은 막을 프레임에 얹는다 — 미리보기와 내보내기가 같은 함수를 쓴다', () => {
+    // 미리 보기 · 내보내기가 같은 그릴 것 목록의 검은 막을 쓰고, 목록이 이 함수로 센다(2단계 ⑦-2 — 옛 글자: 내보내기 안의
+    //   const dip = dissolveOpacityAt(layout, videoClips, clock)).
     const render = read('src/lib/editor-draft-render.ts')
-    expect(render).toMatch(/const dip = dissolveOpacityAt\(layout, videoClips, clock\)/)
+    expect(render).toMatch(/const dip = plan\.black/)
     expect(render).toMatch(/ctx\.fillStyle = `rgba\(0,0,0,\$\{dip\}\)`/)
+    expect(read('src/stores/editor-store.ts')).toMatch(/dissolveOpacityAt\(program, input\.videoClips, t\)/)
   })
 
   it('미리보기는 검은 막의 투명도만 바꿔 디졸브를 그린다(영상 픽셀은 손대지 않는다)', () => {

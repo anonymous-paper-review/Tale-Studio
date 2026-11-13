@@ -3142,9 +3142,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   addTitleClip: (trackId, atSec, text) => {
     let created: string | null = null
     set((state) => {
-      // 제목은 영상 위 줄에 — V1 을 누르면 그 위 가장 가까운 잠기지 않은 줄(처음은 V2, 결정 페이지 "새 제목은 V2 위 2초 글자 클립").
-      //   그런 줄이 없으면 만들지 않는다 — 화면이 까닭을 알린다(검토 c ⑥ 낮음).
-      const target = trackId === 'v1' ? state.videoTracks.find((t) => t.id !== 'v1' && !t.locked)?.id : trackId
+      // 제목은 영상 위 줄에 — V1 을 누르면 그 위 가장 가까운 눈 켠 · 잠기지 않은 줄(처음은 V2, 결정 페이지 "새 제목은 V2 위 2초 글자 클립").
+      //   눈 끈 줄에 만들면 모니터에 보이지 않는다(검토 c W4). 그런 줄이 없으면 만들지 않는다 — 화면이 까닭을 알린다(검토 c ⑥ 낮음).
+      //   V2 · V3 를 직접 누르면 그 줄 그대로다.
+      const target = trackId === 'v1' ? state.videoTracks.find((t) => t.id !== 'v1' && !t.locked && !t.hidden)?.id : trackId
       if (!target || !state.videoTracks.some((t) => t.id === target) || trackLocked(state, target)) return state
       const newId = `title__g${uid()}`
       created = newId

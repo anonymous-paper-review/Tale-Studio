@@ -11,7 +11,7 @@ vi.mock('@/stores/project-store', () => ({
   useProjectStore: { getState: () => ({ projectId: mocks.projectId }) },
 }))
 
-import { saveEditorNow, selectTimelineLayout, timelineEnd, timelineSegments, useEditorStore } from '@/stores/editor-store'
+import { saveEditorNow, selectFrameAt, selectTimelineLayout, timelineEnd, timelineSegments, useEditorStore } from '@/stores/editor-store'
 import { nearestEditPoint } from '@/lib/editor/timeline-segments'
 import { drawGap } from '@/lib/editor-draft-render'
 import { rememberServerSeenAt } from '@/lib/editor/server-copy'
@@ -228,9 +228,11 @@ describe('빈 곳 재생 · 내보내기', () => {
       { kind: 'clip', shotId: 'C', startSec: 8, endSec: 12 },
       { kind: 'clip', shotId: 'D', startSec: 12, endSec: 16 },
     ])
+    // 내보내기는 모니터와 같은 그릴 것 목록으로 장마다 그린다 — 빈 곳에는 그릴 층이 없어 검정 바탕만 남는다(2단계 ⑦-2 — 옛 글자:
+    //   timelineSegments(layout) · segment.kind === 'gap').
+    expect(selectFrameAt(api(), 6).layers).toEqual([])
     const render = read('src/lib/editor-draft-render.ts')
-    expect(render).toMatch(/timelineSegments\(layout\)/)
-    expect(render).toMatch(/segment\.kind === 'gap'/)
+    expect(render).toMatch(/const plan = selectFrameAt\(input, clock, /)
   })
 
   it('빈 곳이 있어도 미리 보기의 진행 막대 · 시간 · 막대 눌러 옮기기는 시퀀스 길이(빈 곳 · 소리 · 눈 끈 줄까지)를 전체 길이로 센다', () => {
@@ -246,7 +248,11 @@ describe('빈 곳 재생 · 내보내기', () => {
   it('내보낸 영상의 검은 꼬리에는 자막 · 제목이 남지 않는다', () => {
     // 왜: 검토 c((C) 낮음 1) — 보이는 클립이 끝난 뒤 소리 · 눈 끈 줄만 남은 꼬리를 검게 칠하면서 마지막 클립의 자막은 비우지 않아, 검은
     //   화면에 자막이 그대로 찍혔다(소리가 영상보다 길 때 예전부터 있던 꼴, 시퀀스 길이를 하나로 센 뒤로 더 자주 생긴다). 빈 곳과 같이 비운다.
-    expect(read('src/lib/editor-draft-render.ts')).toMatch(/videoActive = false\s*activeLabel = ''\s*activeTitle = null\s*activeSubtitle = null\s*inGap = true\s*await waitUntil\(total \+ TAIL_PAD_SEC\)/)
+    //   그릴 것 목록이 꼬리에서 맨 위 영상이 없다고 하니 자막도 없다(2단계 ⑦-2 — 옛 글자: videoActive = false … inGap = true · await waitUntil(total + TAIL_PAD_SEC)).
+    api().moveClipToTrack('D', 'v2', 20)
+    expect(selectFrameAt(api(), 22).topShotId).toBe('D')
+    expect(selectFrameAt(api(), 26)).toMatchObject({ layers: [], topShotId: null })
+    expect(read('src/lib/editor-draft-render.ts')).toMatch(/await waitUntil\(total \+ TAIL_PAD_SEC\)/)
   })
 
   it('내보낸 영상의 빈 곳은 미리 보기처럼 순검정으로 칠한다', () => {
@@ -257,7 +263,8 @@ describe('빈 곳 재생 · 내보내기', () => {
     expect(painted).toEqual(['#000000'])
     // 미리 보기는 영상 없는 구간에 검정 바탕(bg-black)이 그대로 보이고, 내보내기 그리기 루프는 빈 곳에서 위 칠하기를 쓴다.
     expect(read('src/features/editor/video-previewer.tsx')).toMatch(/data-testid="program-picture" className="[^"]*\bbg-black\b/)
-    expect(read('src/lib/editor-draft-render.ts')).toMatch(/else if \(inGap\) drawGap\(ctx, W, H\)/)
+    //   (2단계 ⑦-2 — 장마다 검정 바탕부터 칠하고 그릴 층을 얹는다. 옛 글자: else if (inGap) drawGap(ctx, W, H))
+    expect(read('src/lib/editor-draft-render.ts')).toMatch(/export function drawPlanFrame\([^)]*\): void \{\s*drawGap\(ctx, W, H\)/)
   })
 })
 

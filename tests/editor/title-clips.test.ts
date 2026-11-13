@@ -113,13 +113,13 @@ describe('같이 정한 것', () => {
     expect(drawn(4)).toEqual([['B', 1], [id, 1]])
     // 영상 그림은 그대로 V1 클립이다.
     expect(selectProgramLayout(api()).find((l) => 4 >= l.startSec && 4 < l.startSec + l.durationSec)?.shotId).toBe('B')
-    const layer = renderToStaticMarkup(createElement(TitleTextLayer, { data: { text: '우산', size: 30, place: 'middle' }, frameHeight: 640 }))
+    const layer = renderToStaticMarkup(createElement(TitleTextLayer, { data: { text: '우산', size: 30, place: 'middle' }, frameWidth: 360, frameHeight: 640 }))
     expect(text(layer)).toBe('우산')
     expect(layer).toContain('font-size:48px')
     // 모니터는 목록의 층마다 그린다 — 제목 층은 같은 글자 층(옛 글자: data-testid="program-title-layer").
     const previewer = read('src/features/editor/video-previewer.tsx')
     expect(previewer).toMatch(/data-testid="program-layer"/)
-    expect(previewer).toMatch(/<TitleTextLayer data=\{data\} frameHeight=\{frame\.height\} motion=\{clip\?\.motion\} \/>/)
+    expect(previewer).toMatch(/<TitleTextLayer data=\{data\} frameWidth=\{frame\.width\} frameHeight=\{frame\.height\} motion=\{clip\?\.motion\} \/>/)
   })
 
   it('타임라인 제목 클립은 "T 글자" 이름으로 보인다', () => {
@@ -257,7 +257,7 @@ describe('혼자 정한 것', () => {
     api().setClipMotion([id], { x: 0.2, scale: 1.5 })
     api().setClipOpacity([id], 0.5)
     expect(clipOf(id)).toMatchObject({ motion: { x: 0.2, y: 0, scale: 1.5 }, opacity: 0.5 })
-    const layer = renderToStaticMarkup(createElement(TitleTextLayer, { data: { text: '우산', size: 30, place: 'middle' }, frameHeight: 640, motion: { x: 0.2, y: 0, scale: 1.5 } }))
+    const layer = renderToStaticMarkup(createElement(TitleTextLayer, { data: { text: '우산', size: 30, place: 'middle' }, frameWidth: 360, frameHeight: 640, motion: { x: 0.2, y: 0, scale: 1.5 } }))
     expect(layer).toContain('transform:translate(20%, 0%) scale(1.5)')
   })
 
@@ -297,11 +297,11 @@ describe('혼자 정한 것', () => {
 
   it('빈 글자의 제목은 아무것도 그리지 않는다', () => {
     // 왜: 타이틀 카드 약속 J7 과 같다 — 빈 칸이나 내부 이름을 찍지 않는다.
-    expect(renderToStaticMarkup(createElement(TitleTextLayer, { data: { text: '  ', size: 30, place: 'band' }, frameHeight: 640 }))).toBe('')
+    expect(renderToStaticMarkup(createElement(TitleTextLayer, { data: { text: '  ', size: 30, place: 'band' }, frameWidth: 360, frameHeight: 640 }))).toBe('')
   })
 
   it('제목은 화면을 다 덮지 않는다 — 아래 영상은 그대로 그리고, 화면을 다 덮는 영상이 더 위 줄에 있으면 그 아래 제목은 가려진다', () => {
-    // 왜: 프리미어처럼 위 줄이 아래 줄을 가린다(시안 E3). 제목은 영상 계산(맨 위 클립 · 전환)에 끼지 않는다 — 내보내기도 ⑦ 전까지는 건너뛴다.
+    // 왜: 프리미어처럼 위 줄이 아래 줄을 가린다(시안 E3). 제목은 맨 위 영상 셈에 끼지 않는다 — 내보내기도 같은 그릴 것 목록으로 그린다(⑦-2).
     const id = api().addTitleClip('v2', 3, '우산')!
     expect(selectProgramLayout(api()).some((l) => l.shotId === id)).toBe(false)
     api().moveClipToTrack('C', 'v3', 3)
@@ -383,3 +383,17 @@ describe('검토 c ⑥ (F) — 리드 11/14 같이 정한 것', () => {
   })
 })
 
+
+describe('검토 c W4 — 리드 11/14 같이 정한 것', () => {
+  it('문자 도구로 V1 을 누를 때 눈 끈 줄은 건너뛴다 — 위 가장 가까운 눈 켠 · 잠기지 않은 줄에 만들고, 없으면 F3 알림', () => {
+    // 왜: 검토 c W4 — V2 가 눈 끔 · 안 잠금이면 V2 에 생겨 모니터에 보이지 않았다. V2 · V3 를 직접 누른 때는 지금 그대로다.
+    api().toggleTrackVisible('v2')
+    const id = api().addTitleClip('v1', 1, '우산')!
+    expect(placeOf(id)?.trackId).toBe('v3')
+    const direct = api().addTitleClip('v2', 5, '비')!
+    expect(placeOf(direct)?.trackId).toBe('v2')
+    api().toggleTrackVisible('v3')
+    expect(api().addTitleClip('v1', 8, '눈')).toBeNull()
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/if \(!created && trackId === 'v1'\) toast\.info\(t\('There is no track to put the title on\. Add V2 or unlock a track\.'\)\)/)
+  })
+})

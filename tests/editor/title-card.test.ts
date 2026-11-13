@@ -5,7 +5,7 @@
 import { beforeEach, describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
-import { isTitleCardShotId, selectTimelineLayout, useEditorStore } from '@/stores/editor-store'
+import { isTitleCardShotId, selectFrameAt, selectTimelineLayout, useEditorStore } from '@/stores/editor-store'
 import {
   DEFAULT_TITLE_CARD_LAYOUT,
   TITLE_CARD_DEFAULT_SECONDS,
@@ -72,8 +72,10 @@ describe('약속 J — 검은 화면 클립', () => {
     expect(item.durationSec).toBe(12)
     // 타임라인 오른쪽 손잡이는 타이틀 카드에 원본 끝 상한을 두지 않는다(600초).
     expect(read('src/features/editor/timeline.tsx')).toMatch(/isTitleCardShotId\(item\.shotId\)\s*\?\s*startSec \+ 600/)
-    // 내보내기는 같은 layout(durationSec)으로 카드 구간을 기다린다.
-    expect(read('src/lib/editor-draft-render.ts')).toMatch(/await waitUntil\(item\.startSec \+ item\.durationSec\)\s*activeTitle = null/)
+    // 내보내기는 모니터와 같은 그릴 것 목록으로 장마다 그린다 — 늘린 카드 구간 내내 카드가 그 목록에 있다(2단계 ⑦-2 — 옛 글자:
+    //   await waitUntil(item.startSec + item.durationSec) · activeTitle = null).
+    expect(selectFrameAt(api(), 11.5).layers.map((l) => l.shotId)).toEqual([id])
+    expect(read('src/lib/editor-draft-render.ts')).toMatch(/const plan = selectFrameAt\(input, clock, /)
   })
 
   it('길이는 손잡이와 초 단위 숫자 입력으로 바꾼다', () => {
@@ -118,7 +120,8 @@ describe('약속 J — 검은 화면 클립', () => {
     expect(layoutTitleText('   \n  ', 500, measure)).toEqual([])
     const render = read('src/lib/editor-draft-render.ts')
     expect(render).not.toMatch(/shot\.titleCard\.text \|\| item\.shotId/)
-    expect(render).toMatch(/activeLabel = ''\s*videoActive = false/)
+    // 타이틀 카드 층은 카드 그림만 그리고 자리표시(이름 글자)는 영상 층에만 — 2단계 ⑦-2(옛 글자: activeLabel = '' · videoActive = false).
+    expect(render).toMatch(/if \(layer\.kind === 'card'\) \{\s*const activeTitle = src\.titleCards\.get\(layer\.shotId\)\s*if \(activeTitle\) drawTitleCard\(ctx, W, H, activeTitle\.card, activeTitle\.image\)/)
   })
 
   it('내보낸 영상의 글자 줄바꿈이 미리보기와 같다', () => {

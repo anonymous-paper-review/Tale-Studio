@@ -24,11 +24,11 @@ import { resetVideoPrefetchFor } from '@/features/editor/video-prefetch'
 import { useEditorStore, selectOverlayLayout, selectProgramLayout, selectTimelineLayout, selectVideoLayout, zoomStep, PANEL_SOURCE_W_MIN } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
-import { sequenceInfoLine, sequenceLengthSec } from '@/lib/editor/sequence-info'
+import { exportFrameSize, sequenceInfoLine, sequenceLengthSec } from '@/lib/editor/sequence-info'
 import { nearestEditPoint } from '@/lib/editor/timeline-segments'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
 import { downloadShotsZip, zipClips } from '@/lib/editor-zip-export'
-import { renderDraftTimeline } from '@/lib/editor-draft-render'
+import { canvasFilterSupported, effectsInUse, renderDraftTimeline } from '@/lib/editor-draft-render'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
@@ -181,6 +181,11 @@ export default function PostPage() {
     toast.info(
       t('Draft render records in real time. Keep this tab visible until it finishes.'),
     )
+    // 효과를 쓴 클립이 있는데 이 브라우저 캔버스가 효과를 못 그리면 시작할 때 먼저 알린다 — 긴 녹화가 끝난 뒤에 알면 늦다. 막지는 않는다
+    //   (리드 11/14, 지원 여부는 넣어 보고 읽는 기능 검사).
+    if (effectsInUse(st) && !canvasFilterSupported(document.createElement('canvas').getContext('2d'))) {
+      toast.warning(t("This browser can't export effects. To include effects, export in Chrome."))
+    }
     try {
       const base = (projectTitle || 'draft').replace(/[\\/:*?"<>|]+/g, '_').slice(0, 60)
       const stats = await renderDraftTimeline({
@@ -190,6 +195,11 @@ export default function PostPage() {
         endSec: totalSec,
         shots: st.shots,
         videoClips: st.videoClips,
+        // 모니터와 같은 그릴 것 목록의 바탕 · 시퀀스 크기(2단계 ⑦).
+        clipOrder: st.clipOrder,
+        overlay: st.overlay,
+        videoTracks: st.videoTracks,
+        frameSize: exportFrameSize(useProjectFormatStore.getState().format),
         audioClips: st.audioClips,
         audioTracks: st.audioTracks,
         signal: ctrl.signal,

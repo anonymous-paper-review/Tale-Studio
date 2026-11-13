@@ -1,5 +1,7 @@
 // 모니터 · 내보내기가 같이 쓰는 그릴 것 목록 — 시각마다 아래부터 그릴 영상 · 타이틀 카드 · 제목과 그 세기 · 원본 시각, 물들이기 막, 미리 불러 둘 층을 검사한다 (2단계 ⑦, 2026-11-14)
 import { readFileSync } from 'node:fs'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => {
@@ -14,6 +16,10 @@ vi.mock('@/stores/project-store', () => ({
 
 import { selectFrameAt, selectVideoLayout, useEditorStore, type FramePlan } from '@/stores/editor-store'
 import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
+import { canvasFilterSupported, drawPlanFrame, effectsInUse, type FrameSources } from '@/lib/editor-draft-render'
+import { TITLE_TEXT_WIDTH, drawTitleText, titleTextLines } from '@/lib/editor/title-clip'
+import { TitleTextLayer } from '@/features/editor/title-clip-layer'
+import { translate } from '@/lib/i18n/translate'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
 
 const api = () => useEditorStore.getState()
@@ -52,6 +58,45 @@ function seen(p: FramePlan): Record<string, number> {
   return out
 }
 const titleCardId = () => api().shots.find((s) => s.shotId.includes('__t'))!.shotId
+/** 내보내기가 그릴 바탕 — 영상은 이름표만 단 가짜 그림(1280×720), 제목 · 카드 · 클립은 지금 스토어 값. */
+function sources(): FrameSources {
+  const st = api()
+  return {
+    video: (shotId) => (st.videoClips.find((c) => c.shotId === shotId)?.url ? ({ id: `vid-${shotId}`, videoWidth: 1280, videoHeight: 720 } as unknown as HTMLVideoElement) : null),
+    titleCards: new Map(st.shots.filter((x) => x.titleCard).map((x) => [x.shotId, { card: x.titleCard!, image: null }])),
+    shots: new Map(st.shots.map((x) => [x.shotId, x])),
+    clips: new Map(st.videoClips.map((c) => [c.shotId, c])),
+    filterOk: true,
+  }
+}
+/** 그리기 기록 — 캔버스 대신 부른 차례를 글로 남긴다(숫자는 셋째 자리까지, 글자 폭은 글자 수 × 10). */
+function recordingCanvas() {
+  const calls: string[] = []
+  const fmt = (v: unknown) =>
+    typeof v === 'number' ? String(Math.round(v * 1000) / 1000) : v && typeof v === 'object' ? String((v as { id?: string }).id ?? 'obj') : String(v)
+  const state: Record<string, unknown> = { globalAlpha: 1, filter: 'none', fillStyle: '#000000', strokeStyle: '#000000', font: '', textAlign: 'start', textBaseline: 'alphabetic', lineJoin: 'miter', lineWidth: 1 }
+  const ctx = new Proxy(state, {
+    get(target, key) {
+      if (typeof key !== 'string') return undefined
+      if (key in target) return target[key]
+      return (...args: unknown[]) => {
+        if (key === 'measureText') return { width: String(args[0]).length * 10 }
+        calls.push(`${key}(${args.map(fmt).join(',')})`)
+        return undefined
+      }
+    },
+    set(target, key, value) {
+      if (typeof key === 'string') {
+        target[key] = value
+        calls.push(`${key}=${fmt(value)}`)
+      }
+      return true
+    },
+  })
+  return { ctx: ctx as unknown as CanvasRenderingContext2D, calls }
+}
+/** 그림 · 세기 · 모션 · 효과만 — 칠하기 준비 글(fillStyle · font 등)은 뺀다. */
+const drawn = (calls: string[]) => calls.filter((c) => /^(globalAlpha=|filter=|translate\(|scale\(|drawImage\(|fillText\()/.test(c))
 const placeOf = (id: string) => selectVideoLayout(api()).find((l) => l.shotId === id)!
 
 beforeEach(() => {
@@ -69,7 +114,7 @@ afterEach(() => {
 describe('같이 정한 것 — ⑦ 계획(리드 11/14)', () => {
   it('모니터는 시각마다 그릴 것 목록 하나를 아래 줄부터 그린다 — 영상 · 타이틀 카드 · 제목이 같은 목록에 줄 차례로 있다', () => {
     // 왜: 오너 답 3 "미리 보기의 모든 것"(R7) — 모니터와 내보낸 파일이 같은 목록으로 그려야 같은 그림이 나온다. 정상 경로 고정.
-    //   내보내기도 같은 목록을 쓰는 것은 ⑦-2 에서 이 파일에 더한다.
+    //   내보내기도 같은 목록을 쓴다 — 아래 '⑦-2 내보내기' 묶음.
     const title = api().addTitleClip('v2', 5, '우산')!
     api().moveClipToTrack('C', 'v3', 5)
     api().setClipMotion(['C'], { scale: 0.5 })
@@ -207,10 +252,12 @@ describe('혼자 정한 것', () => {
 
   it('재생 중 모든 영상 층은 같은 방법으로 시각을 맞춘다 — 조금 어긋나면 빠르기를 살짝 바꿔 따라잡고, 0.5초 넘게 어긋나면 다시 찾는다', () => {
     // 왜: 예전에는 교차 디졸브 층만 빠르기로 따라잡고 맨 위 · 아래 줄은 0.3초 넘으면 다시 찾아, 찾는 동안 그림이 멈췄다.
-    const previewer = read('src/features/editor/video-previewer.tsx')
-    expect(previewer).toMatch(/const rate = speed \* \(drift > 0\.04 \? 1\.25 : drift < -0\.04 \? 0\.8 : 1\)/)
-    expect(previewer).toMatch(/if \(Math\.abs\(drift\) > 0\.5\) el\.currentTime = target/)
-    expect(previewer.match(/syncLayerVideo\(/g)).toHaveLength(2)
+    //   내보내기도 같은 함수로 맞춘다(⑦-2 — 함수를 미리 보기 파일에서 두 곳이 같이 쓰는 파일로 옮겼다).
+    const sync = read('src/lib/editor/layer-sync.ts')
+    expect(sync).toMatch(/const rate = speed \* \(drift > 0\.04 \? 1\.25 : drift < -0\.04 \? 0\.8 : 1\)/)
+    expect(sync).toMatch(/if \(Math\.abs\(drift\) > 0\.5\) el\.currentTime = target/)
+    expect(read('src/features/editor/video-previewer.tsx').match(/syncLayerVideo\(/g)).toHaveLength(1)
+    expect(read('src/lib/editor-draft-render.ts').match(/syncLayerVideo\(/g)).toHaveLength(1)
   })
 
   it('타이틀 카드 무대는 시퀀스 틀을 채운다 — 세로 시퀀스면 세로 카드이고, 고치는 무대는 그 시각 맨 위 타이틀 카드 하나다', () => {
@@ -222,5 +269,165 @@ describe('혼자 정한 것', () => {
     const previewer = read('src/features/editor/video-previewer.tsx')
     expect(previewer).toMatch(/id === activeShotId && pane === 'title' \? \(/)
     expect(previewer).toMatch(/drawTitleCard\(ctx, canvas\.width, canvas\.height, card, /)
+  })
+})
+
+describe('⑦-2 내보내기 — 같이 정한 것(⑦ 계획 · 리드 11/14)', () => {
+  it('내보낸 파일도 모니터와 같은 그릴 것 목록으로 그린다 — 목록의 층을 아래부터 그 세기 · 모션으로 그린다', () => {
+    // 왜: 오너 답 3 "미리 보기의 모든 것"(R7) — 예전 내보내기는 맨 위 클립 하나만 녹화해 겹침 · 제목 · 모션이 빠졌다.
+    const title = api().addTitleClip('v2', 5, '우산')!
+    api().moveClipToTrack('C', 'v3', 5)
+    api().setClipMotion(['C'], { scale: 0.5 })
+    api().setClipOpacity(['C'], 0.5)
+    const rec = recordingCanvas()
+    drawPlanFrame(rec.ctx, 1280, 720, plan(5.5), sources())
+    expect(drawn(rec.calls)).toEqual([
+      'globalAlpha=1',
+      'drawImage(vid-B,0,0,1280,720,0,0,1280,720)',
+      'globalAlpha=1',
+      'fillText(우산,640,360)',
+      'globalAlpha=0.5',
+      'translate(640,360)',
+      'scale(0.5,0.5)',
+      'translate(-640,-360)',
+      'drawImage(vid-C,0,0,1280,720,0,0,1280,720)',
+    ])
+    expect(plan(5.5).layers.map((l) => l.shotId)).toEqual(['B', title, 'C'])
+    const render = read('src/lib/editor-draft-render.ts')
+    expect(render).toMatch(/const plan = selectFrameAt\(input, clock, \{ prerollSec: PRELOAD_SEC \}\)/)
+    expect(render).toMatch(/if \(!waiting\) drawPlanFrame\(ctx, W, H, plan, sources\)/)
+  })
+
+  it('내보낸 파일의 크기는 시퀀스 크기다(긴 변 1280, 위 둘째 줄과 같은 값) — 첫 영상 크기를 따르지 않는다', () => {
+    // 왜: ⑦ 계획 a — "비율 100%"의 기준을 모니터와 같게. 예전에는 첫 영상의 실제 비율을 따라 세로 시퀀스도 첫 영상이 가로면 가로 파일이 됐다.
+    const render = read('src/lib/editor-draft-render.ts')
+    expect(render).toMatch(/const \{ width: W, height: H \} = opts\.frameSize/)
+    expect(render).not.toMatch(/resolveCanvasSize/)
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/frameSize: exportFrameSize\(useProjectFormatStore\.getState\(\)\.format\)/)
+  })
+
+  it('내보낸 파일에도 교차 디졸브 · 물들이기 · 영상 효과가 모니터와 같은 값으로 실린다', () => {
+    // 왜: ⑤ 는 모니터에만 실었다(리드 승인) — 내보낸 파일에는 시작 검은 디졸브만 있었다.
+    api().addVideoEffect('B', 'blackWhite')
+    api().dropTransition('B', 'start', 'cross')
+    api().dropTransition('C', 'start', 'white')
+    let rec = recordingCanvas()
+    drawPlanFrame(rec.ctx, 1280, 720, plan(4.25), sources())
+    expect(drawn(rec.calls)).toEqual(['globalAlpha=1', 'drawImage(vid-A,0,0,1280,720,0,0,1280,720)', 'globalAlpha=0.75', 'filter=grayscale(1)', 'drawImage(vid-B,0,0,1280,720,0,0,1280,720)'])
+    rec = recordingCanvas()
+    drawPlanFrame(rec.ctx, 1280, 720, plan(8), sources())
+    expect(rec.calls.slice(-2)).toEqual(['fillStyle=rgba(255,255,255,1)', 'fillRect(0,0,1280,720)'])
+    // 줄인 클립의 흐림은 그 비율만큼 작다 — 모니터는 흐린 그림을 줄인다(흐림 반지름 = 틀 폭 × 4% × 세기 × 비율).
+    api().addVideoEffect('B', 'blur')
+    api().setClipMotion(['B'], { scale: 0.5 })
+    rec = recordingCanvas()
+    drawPlanFrame(rec.ctx, 1280, 720, plan(7), sources())
+    expect(rec.calls).toContain('filter=grayscale(1) blur(7.68px)')
+  })
+
+  it('내보낸 파일에도 제목 클립이 모니터와 같은 글꼴 · 크기 · 줄 · 자리로 실린다 — 배경 띠도 같다', () => {
+    // 왜: ⑥ 은 모니터에만 실었다 — 예전 내보내기 · 샷 ZIP 은 제목을 건너뛰었다. 줄은 같은 셈(글꼴로 잰 폭)으로 나눠 모니터와 같은 줄이 된다.
+    const data = { text: '비가 그친 오후 우산을 접었다 그리고 천천히 걸어서 집으로 돌아왔다', size: 30, place: 'band' as const }
+    const lines = titleTextLines(data.text, 320 * TITLE_TEXT_WIDTH, (s) => s.length * 10)
+    expect(lines.length).toBeGreaterThan(1)
+    // 모니터 글자 층(테스트에서는 같은 잣대 — 글자 수 × 10). 시퀀스 틀 320×180 과 같은 크기의 캔버스로 견준다.
+    const markup = renderToStaticMarkup(createElement(TitleTextLayer, { data, frameWidth: 320, frameHeight: 180 }))
+    expect([...markup.matchAll(/whitespace-pre[^>]*>([^<]*)<\/div>/g)].map((m) => m[1])).toEqual(lines)
+    // 내보내기
+    const rec = recordingCanvas()
+    drawTitleText(rec.ctx, 320, 180, data)
+    expect(rec.calls.filter((c) => c.startsWith('fillText(')).map((c) => c.slice('fillText('.length).split(',')[0])).toEqual(lines)
+    // 띠 자리도 같다 — 아래 8%, 위아래 여백 글자 크기의 0.4배.
+    const band = rec.calls.find((c) => c.startsWith('fillRect('))!
+    const [, top, , height] = band.slice('fillRect('.length, -1).split(',').map(Number)
+    expect(markup).toContain(`top:${top}px;height:${height}px`)
+  })
+
+  it('소리 페이드는 내보낸 파일에도 장마다 소리 크기 × 페이드 세기로 실린다', () => {
+    // 왜: ⑤ 페이드는 미리 보기 소리에만 실었다 — 내보낸 파일은 소리 크기만 구웠다.
+    expect(read('src/lib/editor-draft-render.ts')).toMatch(/a\.volume \* audioFadeGain\(a\.clip, clock\)/)
+  })
+
+  it('캔버스가 효과를 못 그리는 브라우저면, 효과를 쓴 클립이 있을 때만 내보내기를 시작할 때 먼저 알린다 — 내보내기는 막지 않는다', () => {
+    // 왜: 리드 11/14 — 긴 녹화가 끝난 뒤에 알면 늦다. 지원 여부는 추측하지 않고 넣어 보고 읽는다.
+    expect(canvasFilterSupported({ filter: 'none' } as unknown as CanvasRenderingContext2D)).toBe(true)
+    expect(canvasFilterSupported({} as unknown as CanvasRenderingContext2D)).toBe(false)
+    const ignores = { get filter() { return 'none' }, set filter(_v: string) {} }
+    expect(canvasFilterSupported(ignores as unknown as CanvasRenderingContext2D)).toBe(false)
+    expect(canvasFilterSupported(null)).toBe(false)
+    expect(effectsInUse(api())).toBe(false)
+    api().addVideoEffect('B', 'blur')
+    expect(effectsInUse(api())).toBe(true)
+    // 눈 끈 줄의 클립은 내보내지 않으니 세지 않는다.
+    api().toggleTrackVisible('v1')
+    expect(effectsInUse(api())).toBe(false)
+    const page = read('src/app/studio/editor/page.tsx')
+    expect(page).toMatch(/if \(effectsInUse\(st\) && !canvasFilterSupported\(document\.createElement\('canvas'\)\.getContext\('2d'\)\)\) \{\s*toast\.warning\(t\("This browser can't export effects\. To include effects, export in Chrome\."\)\)\s*\}/)
+    expect(page.indexOf('effectsInUse(st)')).toBeLessThan(page.indexOf('await renderDraftTimeline('))
+    expect(translate('ko', "This browser can't export effects. To include effects, export in Chrome.")).toBe('이 브라우저는 효과를 내보내지 못해요. 효과까지 실으려면 Chrome 에서 내보내 주세요.')
+    // 그리기는 효과 없이 이어 간다.
+    const rec = recordingCanvas()
+    api().toggleTrackVisible('v1')
+    drawPlanFrame(rec.ctx, 1280, 720, plan(5), { ...sources(), filterOk: false })
+    expect(rec.calls.some((c) => c.startsWith('filter='))).toBe(false)
+    expect(rec.calls).toContain('drawImage(vid-B,0,0,1280,720,0,0,1280,720)')
+  })
+
+  it('자막은 그 시각 맨 위 영상의 자막을 층 위 · 물들이기 막 아래에 그린다', () => {
+    // 왜: ⑦ 계획 h — 예전 내보내기와 같은 차례. 정상 경로 고정.
+    useEditorStore.setState({ shots: api().shots.map((x) => (x.shotId === 'B' ? ({ ...x, dialogueLines: [{ text: '비가 온다' }] } as unknown as Shot) : x)) })
+    api().dropTransition('B', 'start', 'dissolve')
+    const rec = recordingCanvas()
+    drawPlanFrame(rec.ctx, 1280, 720, plan(4.25), sources())
+    const picture = rec.calls.findIndex((c) => c.startsWith('drawImage(vid-B'))
+    const subtitle = rec.calls.findIndex((c) => c.startsWith('fillText(비가 온다'))
+    const dip = rec.calls.indexOf('fillStyle=rgba(0,0,0,0.5)')
+    expect(picture).toBeGreaterThan(-1)
+    expect(picture).toBeLessThan(subtitle)
+    expect(subtitle).toBeLessThan(dip)
+  })
+})
+
+describe('⑦-2 내보내기 — 혼자 정한 것', () => {
+  it('보이는 영상 층이 아직 그림을 내지 못한 장은 직전 장 그대로 둔다 — 8초 넘게 못 내면 그 내보내기에서는 못 불러온 클립으로 친다', () => {
+    // 왜: 예전 내보내기와 같은 방법(로드 공백은 멈춤으로 흡수, 8초 넘으면 자리표시). 층이 여럿이라 하나라도 비면 그 장 전체를 미룬다.
+    const render = read('src/lib/editor-draft-render.ts')
+    expect(render).toMatch(/const LOAD_TIMEOUT_MS = 8000/)
+    expect(render).toMatch(/if \(!waiting\) drawPlanFrame\(ctx, W, H, plan, sources\)/)
+  })
+
+  it('곧 그릴 층은 1.5초 먼저 불러 둔다 — 그냥 컷 · 교차 디졸브 짝 · 드러날 아래 클립', () => {
+    // 왜: ⑦ 계획 d — 내보내기는 다시 할 수 없어 모니터(1초)보다 넉넉히. ⑦-3 에서 끊김을 재며 맞춘다.
+    expect(read('src/lib/editor-draft-render.ts')).toMatch(/const PRELOAD_SEC = 1\.5/)
+    expect(plan(3, 1.5).preload.map((l) => l.shotId)).toEqual(['B'])
+  })
+
+  it('맨 위 영상이 없거나 못 불러오면 자리표시(어두운 회색 + 이름)를 그리고, 아래 줄이면 건너뛴다 — 빈 타이틀 카드는 아무 글자도 찍지 않는다', () => {
+    // 왜: 모니터와 같다(맨 위만 안내 판). 예전 내보내기도 맨 위 클립만 자리표시였다.
+    useEditorStore.setState({ videoClips: api().videoClips.map((c) => (c.shotId === 'B' ? { ...c, url: null } : c)) })
+    let rec = recordingCanvas()
+    drawPlanFrame(rec.ctx, 1280, 720, plan(5), sources())
+    expect(drawn(rec.calls)).toEqual(['globalAlpha=1', 'fillText(B · MS,640,360)'])
+    api().moveClipToTrack('C', 'v2', 4)
+    api().setClipMotion(['C'], { scale: 0.5 })
+    rec = recordingCanvas()
+    drawPlanFrame(rec.ctx, 1280, 720, plan(5), sources())
+    expect(rec.calls.some((c) => c.startsWith('fillText('))).toBe(false)
+    expect(rec.calls).toContain('drawImage(vid-C,0,0,1280,720,0,0,1280,720)')
+    // 빈 타이틀 카드
+    seed()
+    api().addTitleCard(0)
+    rec = recordingCanvas()
+    drawPlanFrame(rec.ctx, 1280, 720, plan(1), sources())
+    expect(rec.calls.some((c) => c.startsWith('fillText('))).toBe(false)
+  })
+
+  it('제목 줄바꿈은 문단마다 줄 길이를 고르게(6줄까지) 하는 같은 셈을 모니터와 내보내기가 쓴다', () => {
+    // 왜: 모니터는 브라우저의 고른 줄바꿈(text-wrap: balance)을, 내보내기는 캔버스를 써서 줄이 달라질 수 있었다 — 한 셈으로 같게.
+    const m = (s: string) => s.length * 10
+    expect(titleTextLines('aaa bbb ccc ddd e', 160, m)).toEqual(['aaa bbb', 'ccc ddd e'])
+    expect(titleTextLines('하나\n\n둘', 160, m)).toEqual(['하나', '', '둘'])
+    expect(titleTextLines('   ', 160, m)).toEqual([])
+    expect(read('src/features/editor/title-clip-layer.tsx')).toMatch(/titleTextLines\(data\.text, frameWidth \* TITLE_TEXT_WIDTH, /)
   })
 })
