@@ -185,6 +185,23 @@ describe('Director 샷 상세 화면', () => {
     expect(button).not.toContain('Replaces the existing shooting image')
   })
 
+  it('샷 상세의 이미지 다시 만들기 확인 창도 툴바와 같은 말이다 — 제목 "이미지를 다시 만들까요?" · 본문 "새 이미지가 지금 이미지가 되고, 지금 이미지는 버전으로 남아요." · [다시 만들기]', () => {
+    // 왜: 영어 재점검(리드 11/14) — 영어 상세에 옛 말 "Regenerate the image? Generates a new shooting image for this shot."가 떴다(툴바는 "Make 2 images again?").
+    //   한국어 제목은 이미 같은 말이었고, 옛 설명 줄("이 샷의 촬영용 이미지를 새로 생성해요.")은 뺀다. 직접 추가한 이미지의 "다시 생성" 창은 그대로.
+    const button = readFileSync('src/features/director/storyboard-image-button.tsx', 'utf8')
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    expect(button).toContain("t('Make the image again?')")
+    expect(button).not.toContain("t('Generates a new shooting image for this shot.')")
+    expect(translate('ko', 'Make the image again?')).toBe('이미지를 다시 만들까요?')
+    // 본문 · 단추는 툴바 확인 창과 같은 글이다.
+    for (const src of [button, page]) {
+      expect(src).toContain("'The new image becomes the current one. The current image stays in the versions.'")
+      expect(src).toContain("t('Make again')")
+    }
+    expect(translate('ko', 'The new image becomes the current one. The current image stays in the versions.')).toBe('새 이미지가 지금 이미지가 되고, 지금 이미지는 버전으로 남아요.')
+    expect(translate('ko', 'Make again')).toBe('다시 만들기')
+  })
+
   it('Take 를 만드는 중이면 그 카드에 [멈추기]가 있고, 멈춘 Take 는 "멈췄어요"로 보이며 새 Take 단추가 켜진다', () => {
     // 왜: 오너 7번 "이미 생성이 진행 중인 것들은 UI로는 취소된걸로 보이게 해서 유저가 수정해서 다시 생성 요청할 수 있게" — Take 는 돌려주지 않는다.
     done(1)
