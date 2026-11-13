@@ -17,7 +17,7 @@ vi.mock('@/stores/project-store', () => ({
 import { saveEditorNow, selectTimelineLayout, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { editPointTarget } from '@/lib/editor/timeline-segments'
-import { draggedIds, makeSnapper, snapTargets } from '@/lib/editor/snap'
+import { draggedIds, makeSnapper, snapDrop, snapTargets } from '@/lib/editor/snap'
 import { handleEditorKey } from '@/features/editor/use-editor-playback'
 import { RulerMarkers, SnapMarkerButtons } from '@/features/editor/timeline-markers'
 import { EDITOR_SHORTCUTS, ShortcutsList } from '@/features/editor/editor-workbar'
@@ -274,6 +274,30 @@ describe('혼자 정한 것 — 스냅', () => {
     expect(all).toContain(7)
     expect(moving).not.toContain(3)
     expect(moving).not.toContain(7)
+  })
+
+  it('이어진 소리의 가장자리를 끌었다가 원래 자리에 놓으면 영상에서 떨어지지 않는다', () => {
+    // 왜: 검토 c(③ 낮음 1) — 조금 끌었다가 원래 자리 8px 안에 놓으면 스냅이 원래 자리에 붙이는데, 길이가 같아도 영상에서 떨어졌다.
+    //   소리 옮기기의 "제자리" 규칙과 같다 — 바뀐 것이 없으면 떼지 않고 되돌리기 칸도 쌓지 않는다.
+    const steps = api().past.length
+    api().updateAudioClip('a_B', { durationSec: 4 })
+    api().updateAudioClip('a_B', { startSec: 4, durationSec: 4, sourceOffsetSec: 0 })
+    expect(api().audioClips.find((a) => a.id === 'a_B')?.linkedShotId).toBe('B')
+    expect(read('src/features/editor/timeline.tsx')).toMatch(/if \(Math\.abs\(rgt - end\) > 1e-6\) \{\s*onPushHistory\(\)/)
+    expect(api().past).toHaveLength(steps)
+    api().updateAudioClip('a_B', { durationSec: 3 })
+    expect(api().audioClips.find((a) => a.id === 'a_B')?.linkedShotId).toBeNull()
+  })
+
+  it('프로젝트 판에서 끌어 놓을 때도 스냅이 켜져 있으면 경계 · 플레이헤드 · 마커에 붙는다 — 끄면 놓은 자리 그대로', () => {
+    // 왜: 리드 11/14(검토 c ③ 낮음 2) — 타임라인 안에서 끌 때만 붙어, 프로젝트 판에서 끌어 온 샷 · 음악은 경계에 맞추기 어려웠다. 프리미어와 같다.
+    const input = { snapEnabled: true, pxPerSec: 40, currentTime: 5, markers: [10.5], videoLayout: selectVideoLayout(api()), audioClips: api().audioClips }
+    expect(snapDrop(input, 11.9, 2)).toBe(12)
+    expect(snapDrop(input, 10.6, 3)).toBe(10.5)
+    expect(snapDrop({ ...input, snapEnabled: false }, 11.9, 2)).toBe(11.9)
+    const panel = read('src/features/editor/video-source-panel.tsx')
+    expect(panel).toMatch(/onAddClip\(shot\.shotId, snappedDropSec\(target, clientX, lengthSec\)/)
+    expect(panel).toMatch(/onAddAudioFromSource\(src\.id, snappedDropSec\(target, clientX, src\.durationSec\)/)
   })
 
   it('스냅 켬/끔은 저장하지 않는다. 다시 열면 켜져 있다', async () => {

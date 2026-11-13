@@ -41,6 +41,14 @@ export interface Snapper {
   start: (startSec: number, durationSec: number) => number
 }
 
+/**
+ * 프로젝트 판에서 끌어 놓을 때 — 스냅이 켜져 있으면 놓는 것(샷 · 소리 파일)의 시작이나 끝이 0초 · 플레이헤드 · 모든 줄 클립의 경계 ·
+ *   마커에 붙는다(리드 11/14, 프리미어와 같다).
+ */
+export function snapDrop(input: SnapInput & { snapEnabled: boolean; pxPerSec: number }, startSec: number, durationSec: number): number {
+  return makeSnapper(input.snapEnabled, snapTargets(input), input.pxPerSec).start(startSec, durationSec)
+}
+
 /** 스냅을 끄면 그대로 돌려준다. */
 export function makeSnapper(enabled: boolean, targets: readonly number[], pxPerSec: number): Snapper {
   const reach = SNAP_PX / pxPerSec

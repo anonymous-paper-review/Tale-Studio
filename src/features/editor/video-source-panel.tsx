@@ -17,11 +17,25 @@ import type { Shot, VideoClip, AudioSource } from '@/types'
 import { ingestAudioFile } from '@/lib/audio-waveform'
 import { startBinDrag, dropTargetSec } from '@/lib/pointer-drag'
 import { formatClipLength } from '@/lib/editor/sequence-info'
+import { snapDrop } from '@/lib/editor/snap'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { clipDisplayStatus, clipStatusLabel, shotLabel } from '@/features/editor/editor-labels'
-import { useEditorStore } from '@/stores/editor-store'
+import { selectVideoLayout, useEditorStore } from '@/stores/editor-store'
+
+/**
+ * 끌어 놓은 자리(초) — 스냅이 켜져 있으면 놓는 것의 시작이나 끝이 0초 · 플레이헤드 · 모든 줄 클립의 경계 · 마커에 붙는다
+ *   (리드 11/14, 프리미어와 같다). 약속: tests/editor/split-snap-markers.test.ts
+ */
+function snappedDropSec(target: Element, clientX: number, durationSec: number): number {
+  const st = useEditorStore.getState()
+  return snapDrop(
+    { snapEnabled: st.snapEnabled, pxPerSec: st.pxPerSec, currentTime: st.currentTime, markers: st.markers, videoLayout: selectVideoLayout(st), audioClips: st.audioClips },
+    dropTargetSec(target, clientX),
+    durationSec,
+  )
+}
 
 interface ProjectPanelProps {
   shots: Shot[]
@@ -155,8 +169,8 @@ export function ProjectPanel({
                         onDragStart: () => onBinDragStart('video'),
                         onDragEnd: onBinDragEnd,
                         onDragOver: (target, clientX) =>
-                          onSetBinDropSec(target ? dropTargetSec(target, clientX) : null),
-                        onDrop: ({ target, clientX }) => onAddClip(shot.shotId, dropTargetSec(target, clientX), (target as HTMLElement).dataset.trackId),
+                          onSetBinDropSec(target ? snappedDropSec(target, clientX, lengthSec) : null),
+                        onDrop: ({ target, clientX }) => onAddClip(shot.shotId, snappedDropSec(target, clientX, lengthSec), (target as HTMLElement).dataset.trackId),
                       }) : undefined
                     }
                     title={`${resolveEntityNames(shot.actionDescription, entityNames)}\n${hasVideo ? t('(Click: preview / drag·right-click: add to timeline)') : t('(No video yet. Only shots with video go into the timeline.)')}`}
@@ -226,7 +240,7 @@ export function ProjectPanel({
                         onDragStart: () => onBinDragStart('audio'),
                         onDragEnd: onBinDragEnd,
                         onDrop: ({ target, clientX }) =>
-                          onAddAudioFromSource(src.id, dropTargetSec(target, clientX), (target as HTMLElement).dataset.trackId),
+                          onAddAudioFromSource(src.id, snappedDropSec(target, clientX, src.durationSec), (target as HTMLElement).dataset.trackId),
                       })
                     }
                     title={`${src.name}\n${t('(Drag: add to audio track / right-click: menu)')}`}

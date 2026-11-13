@@ -1415,10 +1415,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     const reshaped = 'startSec' in patch || 'durationSec' in patch || 'sourceOffsetSec' in patch
     const apply = () =>
       set((state) => {
-        if (reshaped && audioLocked(state, state.audioClips.find((a) => a.id === id))) return state
+        const clip = state.audioClips.find((a) => a.id === id)
+        if (reshaped && audioLocked(state, clip)) return state
+        // 끌어 줄인 가장자리를 원래 자리에 놓으면(스냅이 제자리에 붙임) 바뀐 것이 없다 — 영상에서 떼지 않는다(검토 c ③ 낮음 1, 옮기기의 제자리와 같다).
+        const RESHAPE_KEYS = ['startSec', 'durationSec', 'sourceOffsetSec'] as const
+        const unchanged = !!clip && RESHAPE_KEYS.every((key) => !(key in patch) || Math.abs((patch[key] ?? 0) - (clip[key] ?? 0)) < SAME_SPOT_SEC)
+        if (reshaped && unchanged && Object.keys(patch).every((key) => (RESHAPE_KEYS as readonly string[]).includes(key))) return state
+        const detach = reshaped && !unchanged
         return {
           audioClips: state.audioClips.map((a) =>
-            a.id === id ? { ...a, ...patch, ...(reshaped ? { linkedShotId: null } : {}) } : a,
+            a.id === id ? { ...a, ...patch, ...(detach ? { linkedShotId: null } : {}) } : a,
           ),
         }
       })

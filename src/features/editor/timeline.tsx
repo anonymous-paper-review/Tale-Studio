@@ -315,14 +315,20 @@ function AudioClipBlock({
         window.removeEventListener('pointermove', move)
         window.removeEventListener('pointerup', up)
         if (moved) {
-          onPushHistory()
+          // 원래 자리에 놓으면(스냅이 제자리에 붙임) 고치지 않는다 — 되돌리기 칸도 쌓지 않는다(검토 c ③ 낮음 1).
           if (edge === 'l') {
             const lft = Math.max(minLeft, Math.min(snapPoint(clientXToSec(ev.clientX), clip.id), maxLeft))
             const dd = lft - start
-            onUpdate({ startSec: Math.max(0, start + dd), durationSec: dur - dd, sourceOffsetSec: Math.max(0, off + dd * rate) })
+            if (Math.abs(dd) > 1e-6) {
+              onPushHistory()
+              onUpdate({ startSec: Math.max(0, start + dd), durationSec: dur - dd, sourceOffsetSec: Math.max(0, off + dd * rate) })
+            }
           } else {
             const rgt = Math.max(minRight, Math.min(snapPoint(clientXToSec(ev.clientX), clip.id), maxRight))
-            onUpdate({ durationSec: rgt - start })
+            if (Math.abs(rgt - end) > 1e-6) {
+              onPushHistory()
+              onUpdate({ durationSec: rgt - start })
+            }
           }
         }
         onTrimPreview(null)
