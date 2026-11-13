@@ -5,6 +5,8 @@ import { usePathname, useRouter } from 'next/navigation'
 import { useProjectStore } from '@/stores/project-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useNarrowScreen } from '@/hooks/use-narrow-screen'
+import { useViewportWidth } from '@/hooks/use-viewport-width'
+import { editorChatOverlays } from '@/lib/editor/workspace-fit'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { markStageSeen } from '@/lib/stage-seen'
 import { useProducerStore } from '@/stores/producer-store'
@@ -58,6 +60,7 @@ export default function StudioLayout({
   const chatWidth = useChatUiStore((s) => s.chatWidth)
   const chatCollapsed = useChatUiStore((s) => s.collapsed)
   const narrowScreen = useNarrowScreen()
+  const viewportWidth = useViewportWidth()
   useIdleTimeout()
   useArtistLockPoll()
 
@@ -178,6 +181,8 @@ export default function StudioLayout({
   // 지금 단계 색 하나(v3) — 화면 이름(Lumi 옷 이름)으로 셸과 <html> 에 붙인다. <html> 에도 붙이는 까닭: 팝업 · 메뉴(포털)는 body 아래에 열린다.
   const storeStage = useProjectStore((s) => s.currentStage)
   const shownStage = (STAGES.find((s) => pathname.startsWith(s.path))?.id as StageId | undefined) ?? storeStage
+  // Editor 는 작업 영역 기준 — 연 채팅이 밀어 작업 영역이 최소 폭보다 좁아지면 1100px 보다 넓어도 위에 덮는다(검토 c ① 낮음 1).
+  const editorChatOverlay = shownStage === 'editor' && editorChatOverlays(viewportWidth, chatWidth)
   const stageTheme = STAGE_PERSONA[shownStage]
   useEffect(() => {
     const root = document.documentElement
@@ -200,7 +205,8 @@ export default function StudioLayout({
           marginRight: onEntry
             ? SHELL_INSET
             // Director · Editor 는 접힌 레일 없이 Lumi 아이콘으로 열고(11/13 시안 D1 · E1), 좁은 화면에서는 연 채팅이 화면 위에 덮인다(오너 11/14).
-            : (shownStage === 'director' || shownStage === 'editor') && (chatCollapsed || narrowScreen) ? SHELL_INSET
+            //   Editor 는 작업 영역이 최소 폭보다 좁아질 때도 덮는다(검토 c ① 낮음 1).
+            : (shownStage === 'director' || shownStage === 'editor') && (chatCollapsed || narrowScreen || editorChatOverlay) ? SHELL_INSET
             : SHELL_INSET + (chatCollapsed ? CHAT_COLLAPSED_RAIL : chatWidth),
         }}
       >

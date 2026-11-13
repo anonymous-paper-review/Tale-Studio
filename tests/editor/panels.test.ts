@@ -23,6 +23,8 @@ import { ProjectPanel } from '@/features/editor/video-source-panel'
 import { EditorTopActions, ExportTab, ShortcutsList, EDITOR_SHORTCUTS } from '@/features/editor/editor-workbar'
 import { finishEditorOpen } from '@/features/editor/open-editor'
 import { handleEditorKey } from '@/features/editor/use-editor-playback'
+import { EDITOR_MIN_WORK_WIDTH, editorChatOverlays } from '@/lib/editor/workspace-fit'
+import { CHAT_DEFAULT_WIDTH } from '@/lib/constants'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
 
 const read = (file: string) => readFileSync(file, 'utf8')
@@ -230,6 +232,22 @@ describe('내보내기 탭 · 단축키', () => {
     expect(api().toolMode).toBe('cut')
     press('ㅍ', 'KeyV')
     expect(api().toolMode).toBe('select')
+  })
+})
+
+describe('좁은 화면', () => {
+  it('Lumi 를 열어 작업 영역이 최소 폭보다 좁아지면 Editor 에서 연 Lumi 는 화면을 밀지 않고 위에 덮인다 — 1280 화면 · 기본 채팅 폭이면 덮는다', () => {
+    // 왜: 검토 c(① 낮음 1) — 1100~1350px(1280 노트북 포함)에서 Lumi 를 열면 작업 영역 최소 폭 때문에 오른쪽(되돌리기 · 단축키 · 모니터 끝 단추 ·
+    //   확대 · 미터)이 화면 밖으로 갔고 가로 스크롤 표시도 없었다. board 의 "1100px 아래 덮기"를 Editor 는 작업 영역 기준으로 넓힌다.
+    expect(editorChatOverlays(1280, CHAT_DEFAULT_WIDTH)).toBe(true)
+    expect(editorChatOverlays(1440, CHAT_DEFAULT_WIDTH)).toBe(false)
+    expect(editorChatOverlays(1440, 560)).toBe(true)
+    // 창 폭을 모르면(서버 그리기) 지금처럼 민다.
+    expect(editorChatOverlays(0, CHAT_DEFAULT_WIDTH)).toBe(false)
+    expect(read('src/app/studio/layout.tsx')).toMatch(/shownStage === 'editor' && editorChatOverlays\(viewportWidth, chatWidth\)/)
+    // 최소 폭은 page.tsx 작업 영역(min-w-[900px] · 양옆 px-7)과 같다.
+    expect(EDITOR_MIN_WORK_WIDTH).toBe(956)
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/px-7 pb-7 pt-4">\s*<div className="flex min-h-0 min-w-\[900px\]/)
   })
 })
 
