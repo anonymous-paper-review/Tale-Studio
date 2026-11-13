@@ -121,6 +121,10 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const takeBalance = useTakeBalance()
   // 잔액을 못 읽어 시작하지 않았다 — 노드 안에 까닭(리드 11/14). 잔액이 읽히면 저절로 사라진다.
   const [takesUnknown, setTakesUnknown] = useState(false)
+  // 잔액을 다시 읽는 동안 [영상 리테이크]를 끈다 — 두 번 눌러 새 Take 가 두 번 나가지 않게(검토 b 낮음 2, prose 이미지 탭과 같은 꼴).
+  //   상태는 단추를 끄고, ref 는 같은 화면에서 빠르게 두 번 불려도 한 번만 시작하게 한다.
+  const [retakeReading, setRetakeReading] = useState(false)
+  const retakeReadingRef = useRef(false)
 
   // effect 입력은 early-return 전에 안전 추출 (훅은 무조건 호출돼야 함).
   const vStatus = isVideoData(data) ? data.status : null
@@ -223,21 +227,29 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           <Button
             size="sm"
             className="h-7 gap-1 rounded-full px-3 text-xs"
-            disabled={ownerGenerating || generating}
+            disabled={ownerGenerating || generating || retakeReading}
             onClick={async (e) => {
               e.stopPropagation()
-              // 단추 값이 곧 동의인 자리 — 잔액을 다시 읽고, 못 읽으면 시작하지 않는다(리드 11/14).
-              if (!(await takesReadable())) {
-                setTakesUnknown(true)
-                return
+              if (retakeReadingRef.current) return
+              retakeReadingRef.current = true
+              setRetakeReading(true)
+              try {
+                // 단추 값이 곧 동의인 자리 — 잔액을 다시 읽고, 못 읽으면 시작하지 않는다(리드 11/14).
+                if (!(await takesReadable())) {
+                  setTakesUnknown(true)
+                  return
+                }
+                setTakesUnknown(false)
+                // #retake-inherit: 이 테이크의 체인·프레임 배선을 새 테이크가 물려받는다.
+                if (parentShotId)
+                  void generateVideoForShot(parentShotId, {
+                    inheritFromVideoNodeId: id,
+                  })
+                else void regenerateVideo(id)
+              } finally {
+                retakeReadingRef.current = false
+                setRetakeReading(false)
               }
-              setTakesUnknown(false)
-              // #retake-inherit: 이 테이크의 체인·프레임 배선을 새 테이크가 물려받는다.
-              if (parentShotId)
-                void generateVideoForShot(parentShotId, {
-                  inheritFromVideoNodeId: id,
-                })
-              else void regenerateVideo(id)
             }}
           >
             <RefreshCw className="size-3" />
