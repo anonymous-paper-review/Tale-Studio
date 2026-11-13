@@ -1,6 +1,7 @@
 // Editor 화면 글 — 화면 머리 숫자(v3 ED1 "컷 7 · 33초 · 영상 0/7", 2026-11-03)와 영상 상태 낱말,
 //   그리고 영상을 못 불러온 클립의 표시 규칙(QA 2026-11-03 밤 "Editor에서 무한 로딩").
 //   약속: tests/editor/header-meta.test.ts · tests/editor/load-ends.test.ts
+import { countText } from '@/lib/i18n/count-text'
 import { isTitleCardShotId } from '@/stores/editor-store'
 import type { VideoClip } from '@/types'
 
@@ -16,7 +17,8 @@ export function editorHeaderMeta(
   const seconds = Math.round(layout.reduce((sum, item) => sum + item.durationSec, 0))
   const needVideo = layout.filter((item) => !isTitleCardShotId(item.shotId))
   const ready = needVideo.filter((item) => !!videoClips.find((c) => c.shotId === item.shotId)?.url).length
-  return t('{cuts} cuts · {seconds}s · video {ready}/{total}', { cuts: layout.length, seconds, ready, total: needVideo.length })
+  // 영어는 컷이 하나면 단수 문장(리드 11/14 — 영어 재점검 "1 cuts"). 한국어 "컷 1 · 9초 · 영상 1/1"은 같은 꼴이다.
+  return countText(t, layout.length, '1 cut · {seconds}s · video {ready}/{total}', '{cuts} cuts · {seconds}s · video {ready}/{total}', { cuts: layout.length, seconds, ready, total: needVideo.length })
 }
 
 /** 화면에 보이는 영상 상태 — 영상 주소가 있어도 불러오지 못했으면(404 · 막힘 · 끊김) 'unplayable'. */

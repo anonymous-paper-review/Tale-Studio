@@ -8,6 +8,7 @@ import { isStoppedTake, selectHandoffTake, selectLatestShotAttempt } from '@/lib
 import { directorFullLabel, sortByBoard, type BoardNodeNames } from '@/features/director/node-label'
 import { latestShotTake, takeSettings } from '@/lib/director/remake-take'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
+import { countText } from '@/lib/i18n/count-text'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 
 type Translate = (key: string, params?: Record<string, string | number>) => string
@@ -177,9 +178,11 @@ export function handoverHeaderLine(view: EditorHandoverView, t: Translate): stri
 }
 
 /** 넘기기 단추 — 빠질 샷이 있으면 "… 빼고 넘기기", 없으면(창을 연 채 다 만들어졌다) 시안 D8 의 "Editor로 넘기기 · 컷 N · 약 N초"(낮음 3). */
+//   영어는 컷이 하나면 단수 문장(리드 11/14 — 영어 재점검 "1 cuts").
 export function proceedButtonLabel(view: EditorHandoverView, t: Translate): string {
-  if (view.missing.length === 0) return t('Hand over to Editor · {cuts} cuts · about {seconds}s', { cuts: view.cuts, seconds: view.seconds })
+  const cuts = { cuts: view.cuts, seconds: view.seconds }
+  if (view.missing.length === 0) return countText(t, view.cuts, 'Hand over to Editor · 1 cut · about {seconds}s', 'Hand over to Editor · {cuts} cuts · about {seconds}s', cuts)
   return view.missing.length === 1
-    ? t('Hand over without {label} · {cuts} cuts · about {seconds}s', { label: view.missing[0].label, cuts: view.cuts, seconds: view.seconds })
-    : t('Hand over without {count} shots · {cuts} cuts · about {seconds}s', { count: view.missing.length, cuts: view.cuts, seconds: view.seconds })
+    ? countText(t, view.cuts, 'Hand over without {label} · 1 cut · about {seconds}s', 'Hand over without {label} · {cuts} cuts · about {seconds}s', { ...cuts, label: view.missing[0].label })
+    : countText(t, view.cuts, 'Hand over without {count} shots · 1 cut · about {seconds}s', 'Hand over without {count} shots · {cuts} cuts · about {seconds}s', { ...cuts, count: view.missing.length })
 }

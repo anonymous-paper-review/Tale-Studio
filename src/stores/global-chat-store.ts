@@ -263,6 +263,9 @@ interface GlobalChatState {
   remakeMissingVideo: (shotNodeId: string) => Promise<RemakeResult>
   /** 확인 창 닫기("더 고칠게요"·"채우러 가기") — 아무것도 넘기지 않는다. */
   closeHandoffConfirm: () => void
+  /** Editor 넘기기 창(D8)의 [바꾸기] — 창을 닫고 그 샷 상세를 영상 탭(Take 고르기, ★ 최종)으로 연다. 노드 보기는 왼쪽 패널,
+   *  스토리보드 보기는 팝업이 같은 샷 상세를 따른다. 고른 뒤 [다음: Editor로]를 다시 누르면 된다. */
+  changeHandoverTake: (shotNodeId: string) => void
   /** 씬 스토리 확정(2026-10-01 오너 — 확정 단계는 Producer 메인). 성공하면 나머지 생성이 이어지고 Writer 화면으로 간다.
    *  null = 이미 보내는 중(두 번 누름) — 아무 안내도 하지 않는다. */
   confirmSceneGate: () => Promise<boolean | null>
@@ -2448,6 +2451,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   },
 
   closeHandoffConfirm: () => set({ handoffConfirm: null }),
+
+  // 샷 팝업(openPopup)으로 열면 노드 보기에서는 아무것도 열리지 않고(노드 보기의 팝업은 씬만) 스토리보드 보기에서는 이미지 탭이었다(리드 11/14).
+  changeHandoverTake: (shotNodeId) => {
+    set({ handoffConfirm: null })
+    useDirectorCanvasStore.getState().openShotDetail(shotNodeId, 'video')
+  },
 
   confirmSceneGate: async () => {
     const projectId = useProjectStore.getState().projectId

@@ -1412,6 +1412,7 @@ export const KO: Record<string, string> = {
   // v3 ED1 Editor(2026-11-03) — 화면 머리 · 소스 판 · 트랙 이름 · 빈 컷
   'Final edit': '최종 편집',
   '{cuts} cuts · {seconds}s · video {ready}/{total}': '컷 {cuts} · {seconds}초 · 영상 {ready}/{total}',
+  '1 cut · {seconds}s · video {ready}/{total}': '컷 1 · {seconds}초 · 영상 {ready}/{total}',
   Source: '소스',
   'Audio {n}': '오디오 {n}',
   'No video made yet': '아직 만든 영상이 없어요',
@@ -3042,6 +3043,7 @@ export const KO: Record<string, string> = {
   'Scenes {scenes} · Shots {shots} · {seconds}s': '씬 {scenes} · 샷 {shots} · {seconds}초',
   // Storyboard v3(2026-11-03 오너 "v3로 적용") — 씬 머리 · 카드 칩(무대 설계 값) · 지금 보이는 장 이름표 · 카드 메뉴
   '{count} cuts · {seconds}s': '{count}컷 · {seconds}초',
+  '1 cut · {seconds}s': '1컷 · {seconds}초',
   'Eye-level': '아이레벨',
   'High angle': '하이 앵글',
   'Low angle': '로우 앵글',
@@ -3413,6 +3415,7 @@ export const KO: Record<string, string> = {
   // Take 과금이 꺼져 있으면 값 없이(낮음 5) · 빠질 샷이 없으면 넘기기 단추(낮음 3)
   'Make video': '영상 만들기',
   'Hand over to Editor · {cuts} cuts · about {seconds}s': 'Editor로 넘기기 · 컷 {cuts} · 약\u00a0{seconds}초',
+  'Hand over to Editor · 1 cut · about {seconds}s': 'Editor로 넘기기 · 컷 1 · 약\u00a0{seconds}초',
   // 일괄 중 꺼진 만들기 단추 · [다시 만들기]를 시작하지 못한 까닭(검토 b 2차 낮음 2 · 3)
   'You can make it after the image batch finishes': '이미지 일괄이 끝나면 만들 수 있어요',
   'You can make it after the video batch finishes': '영상 일괄이 끝나면 만들 수 있어요',
@@ -3439,7 +3442,9 @@ export const KO: Record<string, string> = {
   'Go back': '돌아가기',
   'No video to hand over yet.': '넘길 영상이 아직 없어요.',
   'Hand over without {label} · {cuts} cuts · about {seconds}s': '{label} 빼고 넘기기 · 컷 {cuts} · 약\u00a0{seconds}초',
+  'Hand over without {label} · 1 cut · about {seconds}s': '{label} 빼고 넘기기 · 컷 1 · 약\u00a0{seconds}초',
   'Hand over without {count} shots · {cuts} cuts · about {seconds}s': '영상 없는 샷 {count}개 빼고 넘기기 · 컷 {cuts} · 약\u00a0{seconds}초',
+  'Hand over without {count} shots · 1 cut · about {seconds}s': '영상 없는 샷 {count}개 빼고 넘기기 · 컷 1 · 약\u00a0{seconds}초',
   'Some shots have no video yet. Check the list in the window, then hand over the shots with video or make the rest again first.': '아직 영상이 없는 샷이 있어요. 창에서 목록을 보고 영상 있는 샷만 넘기거나, 나머지를 먼저 다시 만들어 주세요.',
   // Storyboard → Director 넘기기 창(D0, 2026-11-14 디자이너 1110 확정 · 페이지 추천)
   'Move on to Director?': 'Director로 넘어갈까요?',

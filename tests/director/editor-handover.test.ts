@@ -183,6 +183,16 @@ describe('Editor 넘기기 창의 단추 글', () => {
     expect(dialog).toMatch(/withRowNotice\(current, row\.shotNodeId, message\)/)
     expect(dialog).toMatch(/const rowNotice = notices\.get\(row\.shotNodeId\)/)
   })
+
+  // 왜(검토 a 낮음, 리드 11/14): 넘기기 창 부품은 늘 붙어 있고 open 만 바뀌어, 까닭 모음이 닫기 · 다시 열기를 건너 살아남았다 —
+  //   나중에 다시 열면 그새 상황이 바뀌었어도 옛 까닭("동시에 만드는 영상 수가 다 찼어요" 등)이 줄 아래 그대로 보였다.
+  //   화면을 눌러 볼 시험 도구가 없어 창의 쓰임(소스 글자)을 본다. 돌기 표시는 다시 만들기가 끝날 때(finally) 비우니 그대로다.
+  it('넘기기 창을 닫았다 다시 열면 앞에서 남은 까닭 줄은 모두 지워진다', () => {
+    const host = readFileSync('src/components/handoff/handoff-confirm-dialogs.tsx', 'utf8')
+    expect(host).toMatch(/<EditorHandoverDialog open=\{/)
+    const dialog = readFileSync('src/components/handoff/editor-handover-dialog.tsx', 'utf8')
+    expect(dialog).toMatch(/useEffect\(\(\) => \{\n\s*setNotices\(new Map\(\)\)\n\s*\}, \[open\]\)/)
+  })
 })
 
 const userLines = () => useGlobalChatStore.getState().messages.filter((m) => m.role === 'user').map((m) => m.content)
@@ -453,6 +463,26 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
       const row = editorHandoverView(useDirectorCanvasStore.getState().nodes, names).shots.find((r) => r.shotNodeId === 'n_a2')
       expect(row?.missing).toBe('generating')
     }
+  })
+
+  // 왜(리드 11/14, entry 브라우저 확인): [바꾸기]가 샷 팝업(openPopup)으로 열어, 노드 보기에서는 창만 닫히고 아무것도 열리지 않았고
+  //   (노드 보기의 팝업은 씬만) 스토리보드 보기에서는 이미지 탭으로 열렸다. Take 는 영상 탭에서 고른다 — 두 보기 모두 샷 상세(detailNodeId · detailTab)를 따른다.
+  it('넘기기 창의 [바꾸기]는 창을 닫고 그 샷 상세를 영상 탭(Take 고르기)으로 연다 — 노드 보기 · 스토리보드 보기 모두', () => {
+    const { viewMode } = useDirectorCanvasStore.getState()
+    try {
+      for (const view of ['node', 'storyboard'] as const) {
+        useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a3', 1, 'completed')), viewMode: view, popupNodeId: null, detailNodeId: null })
+        useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
+        useGlobalChatStore.getState().changeHandoverTake('n_a1')
+        expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
+        expect(useDirectorCanvasStore.getState()).toMatchObject({ viewMode: view, detailNodeId: 'n_a1', detailTab: 'video', popupNodeId: null })
+      }
+    } finally {
+      useDirectorCanvasStore.setState({ viewMode, popupNodeId: null, detailNodeId: null })
+    }
+    const dialog = readFileSync('src/components/handoff/editor-handover-dialog.tsx', 'utf8')
+    expect(dialog).toMatch(/changeTake\(row\.shotNodeId\)/)
+    expect(dialog).not.toMatch(/openPopup\(/)
   })
 
   // 왜(혼자 정한 것): 채팅으로 넘겨 달라고 해도 같은 판단을 탄다 — Director 준비 창이 채팅에서도 열리는 것과 같게.
