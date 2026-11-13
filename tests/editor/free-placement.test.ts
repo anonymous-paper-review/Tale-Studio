@@ -12,6 +12,7 @@ vi.mock('@/stores/project-store', () => ({
 }))
 
 import { saveEditorNow, selectTimelineLayout, timelineEnd, timelineSegments, useEditorStore } from '@/stores/editor-store'
+import { nearestEditPoint } from '@/lib/editor/timeline-segments'
 import { drawGap } from '@/lib/editor-draft-render'
 import { rememberServerSeenAt } from '@/lib/editor/server-copy'
 import { finishEditorOpen } from '@/features/editor/open-editor'
@@ -69,6 +70,18 @@ describe('빼기와 잔물결 삭제', () => {
     expect(layout()).toEqual([['A', 0, 4], ['C', 8, 4], ['D', 12, 4]])
     expect(audioAt('B')).toBeUndefined()
     expect(audioAt('C')).toBe(8)
+  })
+
+  it('플레이헤드 자리에 타이틀 카드 · 샷을 넣을 때는 가장 가까운 편집점에 들어간다 — 빈 곳 뒤 클립의 시작도 편집점이다', () => {
+    // 왜: 검토 c(① 낮음 2) — 클립 끝들만 보고 붙어, 빈 곳 뒤 클립 바로 앞에서 눌러도 빈 곳 앞(앞 클립 끝)에 들어갔다.
+    //   [새 항목 ▾] 타이틀 카드와 프로젝트 판 [타임라인에 추가]가 같은 편집점 목록(앞 · 다음 편집점 단추와 같다)을 쓴다.
+    api().deleteClip('B')
+    expect(nearestEditPoint(selectTimelineLayout(api()), 7.5)).toBe(8)
+    expect(nearestEditPoint(selectTimelineLayout(api()), 5)).toBe(4)
+    api().seek(7.5)
+    const id = api().addClipAtPlayhead('A')
+    expect(layout().find(([shotId]) => shotId === id)?.[1]).toBe(8)
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/addTitleCard\(nearestEditPoint\(selectTimelineLayout\(st\), st\.currentTime\)\)/)
   })
 
   it('빈 곳의 잔물결 삭제를 누르면 빈 곳이 없어지고 그 줄의 뒤 클립과 이어진 소리만 당겨진다 — 사람이 놓은 소리는 그대로다', () => {

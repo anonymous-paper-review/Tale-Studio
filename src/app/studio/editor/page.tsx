@@ -24,6 +24,7 @@ import { useEditorStore, selectOverlayLayout, selectProgramLayout, selectTimelin
 import { useProjectStore } from '@/stores/project-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { sequenceInfoLine, sequenceLengthSec } from '@/lib/editor/sequence-info'
+import { nearestEditPoint } from '@/lib/editor/timeline-segments'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
 import { downloadShotsZip, zipClips } from '@/lib/editor-zip-export'
 import { renderDraftTimeline } from '@/lib/editor-draft-render'
@@ -394,20 +395,8 @@ export default function PostPage() {
   //   가장 가까운 클립 경계에 삽입 — 검은 배경 + 텍스트(+선택 이미지) synthetic 클립.
   const handleAddTitleCard = useCallback(() => {
     const st = useEditorStore.getState()
-    const layout = selectTimelineLayout(st)
-    const boundaries = [0]
-    for (const it of layout) boundaries.push(it.startSec + it.durationSec)
-    const cur = st.currentTime
-    let nearest = 0
-    let best = Infinity
-    for (const b of boundaries) {
-      const d = Math.abs(b - cur)
-      if (d < best) {
-        best = d
-        nearest = b
-      }
-    }
-    addTitleCard(nearest)
+    // 빈 곳 뒤 클립의 시작도 편집점이다(앞 · 다음 편집점 단추와 같은 목록, 검토 c ① 낮음 2).
+    addTitleCard(nearestEditPoint(selectTimelineLayout(st), st.currentTime))
   }, [addTitleCard])
 
   // #pps-empty-states(2026-08-27 오너 확정): shots=0 의 세 이유(로딩/실패/정상 빈)를 한 화면으로

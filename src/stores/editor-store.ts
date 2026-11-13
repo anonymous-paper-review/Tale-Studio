@@ -24,6 +24,7 @@ import { timelineEnd } from '@/lib/editor/timeline-segments'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
+import { nearestEditPoint } from '@/lib/editor/timeline-segments'
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -535,6 +536,18 @@ function regap(input: TimelineInput, desired: ReadonlyMap<string, number>): Vide
 /** 지금 타임라인 자리(시작 초) — 영상 자리를 바꾸는 동작이 "그대로 두기"를 바랄 때 쓴다. */
 function startsOf(state: TimelineInput): Map<string, number> {
   return new Map(selectTimelineLayout(state).map((item) => [item.shotId, item.startSec]))
+}
+
+/**
+ * 새로 끼우는 클립(V1)이 바라는 자리 — 그 시각이 편집점(0초 · 클립 시작 · 끝)이면 그 시각에서 시작한다. 빈 곳 뒤 클립의 시작에 끼우면
+ *   빈 곳 끝에서 시작하고 뒤를 민다(검토 c ① 낮음 2). 편집점이 아니면(끌어 놓은 자리) 지금처럼 앞 클립 바로 뒤(빈 곳부터 쓴다).
+ */
+function startsWithInsert(state: TimelineInput, newId: string, atSec: number): Map<string, number> {
+  const layout = selectTimelineLayout(state)
+  const desired = new Map(layout.map((item) => [item.shotId, item.startSec]))
+  const onEditPoint = atSec <= 1e-3 || layout.some((l) => Math.abs(l.startSec - atSec) < 1e-3 || Math.abs(l.startSec + l.durationSec - atSec) < 1e-3)
+  if (onEditPoint) desired.set(newId, round3(Math.max(0, atSec)))
+  return desired
 }
 
 // 빈 곳까지 셈한 영상 줄 끝 · 클립과 빈 곳 나누기 — 미리 보기 · 재생 · 내보내기가 같이 쓴다(src/lib/editor/timeline-segments.ts).
@@ -2528,28 +2541,16 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         previewSourceShotId: null,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      })
+      }, startsWithInsert(state, newId, atGlobalSec))
     })
     return created
   },
 
   // 소스 → 현재 플레이헤드에 가장 가까운 클립 경계에 추가 + 포커스 (요청 4)
+  // 플레이헤드에서 가장 가까운 V1 편집점(빈 곳 뒤 클립의 시작 포함, 검토 c ① 낮음 2)에 끼운다.
   addClipAtPlayhead: (sourceShotId) => {
     const state = get()
-    const layout = selectTimelineLayout(state)
-    const boundaries = [0]
-    for (const it of layout) boundaries.push(it.startSec + it.durationSec)
-    const t = state.currentTime
-    let nearest = 0
-    let best = Infinity
-    for (const b of boundaries) {
-      const d = Math.abs(b - t)
-      if (d < best) {
-        best = d
-        nearest = b
-      }
-    }
-    return get().addClipInstanceAt(sourceShotId, nearest)
+    return get().addClipInstanceAt(sourceShotId, nearestEditPoint(selectTimelineLayout(state), state.currentTime))
   },
 
   // 타이틀 카드(#owner-title-card) — addClipInstanceAt 과 동일한 삽입 문법, 단 원본 shot 없이 독립 생성.
@@ -2618,7 +2619,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         previewSourceShotId: null,
         past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
         future: [],
-      })
+      }, startsWithInsert(state, newId, atGlobalSec))
       // 오디오 동행(2026-09-08 오너 지시 1번): 카드가 끼는 자리 뒤에서 시작하는 따로 둔 소리는 영상처럼 민다 — 뒤 클립이 실제로 밀린 만큼만
       //   (빈 곳이 카드를 받으면 덜 밀거나 안 민다). 맨 뒤면 빈 곳까지 센 영상 줄 끝에서 시작하는 소리를 카드 길이만큼(자유 배치, 검토 c 낮음 4).
       //   영상에 이어진 소리는 그 클립을 따라 이미 옮겨졌다(결정 4). 약속: tests/editor/free-placement.test.ts

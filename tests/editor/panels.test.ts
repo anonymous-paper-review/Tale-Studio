@@ -99,6 +99,16 @@ describe('효과 컨트롤', () => {
     expect(text(markup)).toContain('V1 · 00:00:03:00 → 00:00:06:00 · 3.00초')
   })
 
+  it('V2 · V3 클립을 골라도 효과 컨트롤에 그 클립이 보이고, 자리 줄은 "V2 · 시작 → 끝 · 길이"다', () => {
+    // 왜: 검토 c(② 낮음 2, R7) — 효과 컨트롤이 V1 만 보아 V2 클립을 고르면 "클립을 고르면…" 안내가 떴다.
+    api().moveClipToTrack('B', 'v2', 10)
+    api().selectClip('B')
+    const markup = text(html(createElement(EffectControls)))
+    expect(markup).toContain('샷 2 · MS · Take 3')
+    expect(markup).toContain('V2 · 00:00:10:00 → 00:00:13:00 · 3.00초')
+    expect(markup).toMatch(/50% 100% 150% 200%/)
+  })
+
   it('효과 컨트롤의 속도는 50 · 100 · 150 · 200% 칸이고 지금 빠르기가 골라져 있다 — 그 밖의 빠르기면 그 값 칸이 하나 더 붙는다', () => {
     // 왜: 시안 E1 409:4703–4713. 우클릭 메뉴는 0.25~4배를 고를 수 있어, 그 값으로 바꾼 클립도 지금 값을 보여야 한다.
     api().selectClip('B')

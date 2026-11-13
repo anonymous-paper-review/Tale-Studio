@@ -10,7 +10,7 @@ import { Slider } from '@/components/ui/slider'
 import { DISSOLVE_CHOICES } from '@/lib/editor/transition'
 import { clipSpanLine, shotLabel } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
-import { isSyntheticShotId, isTitleCardShotId, rootShotIdOf, selectTimelineLayout, useEditorStore } from '@/stores/editor-store'
+import { isSyntheticShotId, isTitleCardShotId, rootShotIdOf, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
 
 /** 효과 컨트롤의 속도 칸(시안 E1 409:4707–4713). 지금 빠르기가 그 밖이면(우클릭으로 0.25~4배) 그 값 칸을 하나 더 붙인다. */
 export const SPEED_CHOICES = [0.5, 1, 1.5, 2] as const
@@ -41,6 +41,7 @@ export function EffectControls() {
   const shots = useEditorStore((s) => s.shots)
   const videoClips = useEditorStore((s) => s.videoClips)
   const clipOrder = useEditorStore((s) => s.clipOrder)
+  const overlay = useEditorStore((s) => s.overlay)
   const selectedShotIds = useEditorStore((s) => s.selectedShotIds)
   const anchorShotId = useEditorStore((s) => s.selectedClipShotId)
   const selectedAudioIds = useEditorStore((s) => s.selectedAudioIds)
@@ -84,8 +85,8 @@ export function EffectControls() {
     )
   }
 
-  // ── 영상 클립 ──
-  const layout = selectTimelineLayout({ shots, videoClips, clipOrder })
+  // ── 영상 클립 — 모든 줄(V2 · V3 포함, 검토 c ② 낮음 2) ──
+  const layout = selectVideoLayout({ shots, videoClips, clipOrder, overlay })
   const targets = selectedShotIds.filter((id) => layout.some((l) => l.shotId === id))
   const anchor = targets.includes(anchorShotId ?? '') ? (anchorShotId as string) : targets[0]
   const item = anchor ? layout.find((l) => l.shotId === anchor) : undefined
@@ -122,7 +123,7 @@ export function EffectControls() {
         <p className="truncate text-body font-semibold text-foreground">{title}</p>
         {targets.length === 1 ? (
           <p className="mt-0.5 font-num text-meta text-subtle-foreground tabular-nums">
-            {clipSpanLine({ track: 'V1', startSec: item.startSec, durationSec: item.durationSec }, t)}
+            {clipSpanLine({ track: item.trackId.toUpperCase(), startSec: item.startSec, durationSec: item.durationSec }, t)}
           </p>
         ) : null}
       </div>
