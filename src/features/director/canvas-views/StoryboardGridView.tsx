@@ -62,7 +62,7 @@ import { useT } from '@/lib/i18n'
 import { Lumi } from '@/components/lumi/lumi'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { useWriterStore } from '@/stores/writer-store'
-import { filterShotsByStatus, imageRemakeFailed, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
+import { detailTabForShot, filterShotsByStatus, imageRemakeFailed, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
 import { RemakeRetryButton } from '@/features/director/remake-retry-button'
 import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
@@ -247,6 +247,7 @@ function ShotCell({
     (s) => s.generateVideoForShot,
   )
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
+  const openShotDetail = useDirectorCanvasStore((s) => s.openShotDetail)
   // 카드 몸통 = 고르기(시안 D2 · R). 훅이라 조기 반환보다 앞에 둔다.
   const togglePickedShot = useDirectorCanvasStore((s) => s.togglePickedShot)
   const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
@@ -355,7 +356,8 @@ function ShotCell({
   // ⤢ 상세(시안 R "⤢ = 상세 열기", 오너 2026-11-14): 실사 보기는 샷 상세 팝업, 러프 보기는 지금 연출(화살표) 편집 창(결정 페이지 추천).
   const openDetail = () => {
     if (mediaMode === 'real') {
-      openPopup(node.id)
+      // prose 의 샷 상세 팝업(openShotDetail) — 영상 단계 샷은 영상 탭으로(리드 S4-2 8).
+      openShotDetail(node.id, detailTabForShot(shotState))
       return
     }
     if (writerShotId) setPrevizOpen(true)
@@ -840,7 +842,8 @@ function ShotCell({
               // 다시 만들어도 지금 이미지는 버전으로 남는다(오너 답 5번 · prose 상세 단추와 같은 말).
               : [t('The new image becomes the current one. The current image stays in the versions.')]
         }
-        confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Regenerate')}
+        // 다시 만들기 단추는 툴바 확인 창과 같은 "다시 만들기"(리드 11/14). 실패 뒤 "다시 생성"은 출시 시험이 그 글자를 박고 있어 그대로.
+        confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Make again')}
         busy={confirm === 'manual-retry' ? !manualUncertain || realBatchBusy : confirm === 'image' && imageGeneration.disabled}
         onConfirm={() => {
           const which = confirm

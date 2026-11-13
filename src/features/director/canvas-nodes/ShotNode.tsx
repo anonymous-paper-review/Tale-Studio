@@ -55,7 +55,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
   // 몸통을 누르면 고르기(시안 D2 · R), 상세는 ⤢ — 상세가 열린 노드만 단계 색 테두리 · 위 단추.
   const picked = useDirectorCanvasStore((s) => s.pickedShotIds?.includes(id) ?? false)
-  const detailOpen = useDirectorCanvasStore((s) => s.selectedNodeId === id)
+  const detailOpen = useDirectorCanvasStore((s) => (s.detailNodeId ?? s.selectedNodeId) === id)
   // 노드 제목은 보드와 같은 전체 번호("Shot 8", 오너 2026-11-02 "전체 번호로 통일").
   const boardNames = useBoardNodeNames()
   const generation = useStoryboardImageGeneration(isShotData(data) ? data : null)

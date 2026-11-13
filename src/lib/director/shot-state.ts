@@ -186,6 +186,11 @@ export const SHOT_STATUS_FILTERS: readonly ShotStatusFilter[] = [
   'video_failed',
 ]
 
+/** 스토리보드 카드의 ⤢ 상세가 먼저 보일 탭 — 영상 단계(만드는 중 · 완성 · 실패)면 영상, 아니면 이미지(리드 S4-2 8). */
+export function detailTabForShot(state: DirectorShotState): 'image' | 'video' {
+  return state === 'video_generating' || state === 'video_done' || state === 'video_failed' ? 'video' : 'image'
+}
+
 export function statusFilterOf(state: DirectorShotState): Exclude<ShotStatusFilter, 'all'> {
   return state === 'image_failed' ? 'image_needed' : state
 }
