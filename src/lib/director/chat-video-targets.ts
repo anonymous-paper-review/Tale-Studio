@@ -16,7 +16,9 @@ export interface ChatShotRef {
 /** 숫자 하나 — 바로 뒤에 단위(초 · s · sec · % · 배 · x · fps · 분)가 붙으면 샷 번호가 아니다("샷 3, 5초짜리로"의 5). */
 const UNIT = String.raw`(?:초|s\b|secs?\b|seconds?\b|%|배|x\b|fps\b|분|mins?\b|minutes?\b)` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const NUM = String.raw`\d+(?!\d)(?!\s*${UNIT})`
-const NUMBER_LIST = String.raw`${NUM}(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및)\s*${NUM})*` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+const NUMBER_LIST = String.raw`${NUM}(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및|이나|또는|혹은)\s*${NUM})*` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+/** 고르는 말("샷 3이나 4" · "또는" · "or") — 둘 중 하나를 고르라는 말이라 바로 만들지 않고 센 목록으로 되묻는다(검토 a 통합 낮음). */
+const CHOICE = /(이나|거나|또는|혹은|아니면|\bor\b|\beither\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 /** "샷 3" · "Shot 3" · "@Real Shot 3" — 낱말 가운데("Screenshots 2" · "스크린샷 2")는 샷이 아니다. */
 const SHOT_LIST = new RegExp(String.raw`(?<![A-Za-z가-힣])(?:샷|shots?)\s*#?\s*(${NUMBER_LIST})`, 'gi') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const NUMBERED_SHOT = new RegExp(String.raw`(${NUM})\s*번\s*샷`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
@@ -97,15 +99,23 @@ export function mentionedShotNumbers(text: string): Set<number> {
 }
 
 /** Lumi 가 번호를 물은 바로 다음 말 — 번호만으로 된 대답("3번" · "3번이랑 4번" · "1, 2" · "샷 3")이면 그 번호들, 아니면 null. */
-const NUMBER_ANSWER = new RegExp(String.raw`^(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및|랑|이랑|하고)\s*(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?)*\s*(?:샷|shots?)?\s*(?:영상|videos?)?\s*(?:을|를)?\s*(?:만들어\s*(?:줘|주세요)?|해\s*(?:줘|주세요)|please)?$`, 'i') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-export function answeredShotNumbers(text: string): Set<number> | null {
-  // "2?"는 대답이 아니라 되묻는 말이다(물음표 규칙 — 재재검토 b).
-  if (/[?？]/.test(text)) return null
-  const said = text.trim().replace(/[.!]+$/, '').trim()
+const NUMBER_ANSWER = new RegExp(String.raw`^(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및|랑|이랑|하고|이나|또는|혹은)\s*(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?)*\s*(?:샷|shots?)?\s*(?:영상|videos?)?\s*(?:을|를)?\s*(?:만들어\s*(?:줘|주세요)?|해\s*(?:줘|주세요)|please)?$`, 'i') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+function numbersOfAnswer(text: string): Set<number> | null {
+  const said = text.replace(/[?？]+/g, '').trim().replace(/[.!]+$/, '').trim()
   if (!NUMBER_ANSWER.test(said)) return null
   const numbers = new Set<number>()
   expandNumbers(said, numbers)
   return numbers.size > 0 ? numbers : null
+}
+export function answeredShotNumbers(text: string): Set<number> | null {
+  // "2?"(되묻는 말 — 재재검토 b) · "3이나 4"(고르는 말 — 검토 a 통합)는 대답이 아니다 — askedBackShotNumbers 가 그 목록으로 되묻는다.
+  if (/[?？]/.test(text) || CHOICE.test(text)) return null
+  return numbersOfAnswer(text)
+}
+/** 번호를 물은 뒤 "2?" · "3이나 4"처럼 되묻거나 고르는 말로 답했으면 그 번호들 — 바로 만들지 않고 그 샷 목록으로 되묻는다. 아니면 null. */
+export function askedBackShotNumbers(text: string): Set<number> | null {
+  if (!/[?？]/.test(text) && !CHOICE.test(text)) return null
+  return numbersOfAnswer(text)
 }
 
 /** 절 — 문장 부호(번호 목록 안의 쉼표는 빼고) · 접속 말 · "말고 · 빼고 · 아니고" 뒤에서 자른다("다 만드는 건 아니고 샷 3 만"의 샷 3 은 뒤 절). */
@@ -134,7 +144,8 @@ function groupsOf(clause: string): { wanted: Set<Group>; excluded: Set<Group> } 
 
 /** 허락하는 꼴 — 물음표가 없고, 샷 번호 · 묶음 말을 지운 나머지가 시키는 말 하나와 조각 · 문장 부호뿐이다. */
 function plainCommand(text: string): boolean {
-  if (/[?？]/.test(text)) return false
+  // 물음표(묻는 말) · 고르는 말("3이나 4" · or)이 있으면 허락하는 꼴이 아니다.
+  if (/[?？]/.test(text) || CHOICE.test(text)) return false
   let rest = text.replace(SHOT_LIST, ' ').replace(NUMBERED_SHOT, ' ')
   for (const patterns of Object.values(GROUPS)) {
     for (const pattern of patterns) rest = rest.replace(new RegExp(pattern.source, pattern.flags.replace('g', '') + 'g'), ' ')

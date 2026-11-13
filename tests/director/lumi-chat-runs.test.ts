@@ -569,6 +569,17 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
   })
 
+  // 왜: 검토 a 통합 낮음 — 번호를 물은 뒤 "3이나 4"(둘 중 하나)를 "3과 4"로 읽어 둘 다 바로 만들었다. "2?"처럼 목록으로 되묻는다.
+  it('번호를 물은 뒤 "3이나 4"처럼 고르는 말로 답하면 바로 만들지 않고 "샷 3 · 4 영상 2개를 만들까요?"로 되묻는다', async () => {
+    reply([{ type: 'generateVideos', shotIds: ['s2'] }])
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true })
+    await chat.getState().sendMessage('3이나 4')
+    expect(mocks.run).not.toHaveBeenCalled()
+    expect(lastModel()).toBe('Shall I make 2 videos for Shots 3 · 4 (10 Takes)? Say yes to start.')
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', shotIds: ['s3', 's4'] })
+  })
+
   // 왜: 서버 지시문도 같은 약속을 말해야 모델이 "확인 카드가 뜰 거예요"라고 하지 않는다.
   it('서버 지시문은 그림 · 영상을 바로 만든다고 알리고, 영상은 사용자가 말한 샷만 담게 한다', () => {
     const route = readFileSync(path.join(process.cwd(), 'src/app/api/director/chat/route.ts'), 'utf8')

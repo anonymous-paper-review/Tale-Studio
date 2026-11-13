@@ -68,7 +68,7 @@ import { roughRedrawCandidates, roughRedrawChangedScenes, roughRedrawOfferHere, 
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
 import { currentDirectorText, directorShotRefs, directorTextEditLines, remakeTakeCosts, shotLabelOf, shotListLabel, splitDirectorTextEdits, textBoundShotIds, type DirectorTextEdit } from '@/lib/director/lumi-chat-runs'
-import { answeredShotNumbers, asksRemake, groundVideoRequest, type VideoGrounding } from '@/lib/director/chat-video-targets'
+import { answeredShotNumbers, askedBackShotNumbers, asksRemake, groundVideoRequest, type VideoGrounding } from '@/lib/director/chat-video-targets'
 import { directorPendingContext, directorProgressLine, directorQuickChipOf, directorShotStatesNow, quickChipTargets, type DirectorQuickChip } from '@/lib/director/lumi-quick-chips'
 import { activeJobsSnapshot } from '@/lib/generation-queue'
 import { handoffToStage } from '@/lib/stage-nav'
@@ -2917,8 +2917,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (videoAsk && !opts?.silentUser) {
       set({ directorVideoAsk: null })
       if (stage === 'director' && projectId && videoAsk.projectId === projectId) {
-        // 번호를 물었는데 "2?"처럼 물음표로 답했다 — 바로 만들지 않고 그 샷 목록으로 되묻는다(물음표 규칙 — 재검토 b 낮음 2).
-        const askedBack = 'numbers' in videoAsk && /[?？]/.test(trimmed) ? answeredShotNumbers(trimmed.replace(/[?？]+/g, '')) : null
+        // 번호를 물었는데 "2?"처럼 물음표로 · "3이나 4"처럼 고르는 말로 답했다 — 바로 만들지 않고 그 샷 목록으로 되묻는다(물음표 규칙 — 재검토 b 낮음 2, 검토 a 통합 낮음).
+        const askedBack = 'numbers' in videoAsk ? askedBackShotNumbers(trimmed) : null
         if (askedBack) {
           const { eligibleVideoBatchShotIds } = await import('@/lib/director/video-batch-client')
           const nodes = useDirectorCanvasStore.getState().nodes
