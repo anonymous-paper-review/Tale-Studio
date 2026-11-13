@@ -1,4 +1,4 @@
-// 채팅 머리가 지금 단계에 맞춰 "Lumi와 산문 이야기"처럼 그 단계에서 하는 일과 그 단계 옷을 입은 Lumi를 보이는지 검사한다 (2026-11-03 v3 디자인)
+// 채팅 머리가 지금 단계에 맞춰 "Lumi와 산문 이야기"처럼(Director · Editor 는 "Lumi · Director"처럼) 그 단계 제목과 그 단계 옷을 입은 Lumi를 보이는지 검사한다 (2026-11-03 v3 디자인 · 11/13 시안 D5, 오너 11/14)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 import type { StateCreator } from 'zustand/vanilla'
@@ -70,8 +70,8 @@ const CASES: Array<[string, StageId, string, string, string]> = [
   ['/studio/producer', 'producer', 'Lumi와 산문 이야기', 'Prose with Lumi', 'writer'],
   ['/studio/artist', 'artist', 'Lumi와 그림 이야기', 'Art with Lumi', 'artist'],
   ['/studio/writer', 'writer', 'Lumi와 연출 이야기', 'Directing with Lumi', 'storyboard'],
-  ['/studio/director', 'director', 'Lumi와 촬영 이야기', 'Shooting with Lumi', 'director'],
-  ['/studio/editor', 'editor', 'Lumi와 편집 이야기', 'Editing with Lumi', 'editor'],
+  ['/studio/director', 'director', 'Lumi · Director', 'Lumi · Director', 'director'],
+  ['/studio/editor', 'editor', 'Lumi · Editor', 'Lumi · Editor', 'editor'],
 ]
 
 beforeEach(() => {
@@ -81,8 +81,9 @@ beforeEach(() => {
 })
 
 describe('채팅 머리', () => {
-  it('채팅 머리 제목은 지금 단계에서 하는 일로 "Lumi와 산문 이야기"처럼 적는다', () => {
-    // 왜: v3 시안 — 채팅은 단계마다 "Lumi와 산문 · 그림 · 연출 · 편집 이야기"로 바뀐다. Producer · Director 는 시안에 없어 기획 · 촬영으로 정했다.
+  it('채팅 머리 제목은 지금 단계에서 하는 일로 "Lumi와 산문 이야기"처럼 적고, Director · Editor 는 "Lumi · Director"처럼 단계 이름을 적는다', () => {
+    // 왜: v3 시안 — 채팅은 단계마다 "Lumi와 산문 · 그림 · 연출 이야기"로 바뀐다. Producer 는 시안에 없어 기획으로 정했다.
+    //   11/13 시안 D5 는 Director 패널 머리를 "Lumi · Director"로 적었다 — Director · Editor 만 그렇게 바꾼다(오너 11/14 "추천대로").
     for (const [, stage, ko, en] of CASES) {
       expect(translate('ko', STAGE_CHAT_TITLE[stage])).toBe(ko)
       expect(translate('en', STAGE_CHAT_TITLE[stage])).toBe(en)

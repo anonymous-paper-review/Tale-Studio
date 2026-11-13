@@ -116,8 +116,9 @@ export const STAGE_CHAT_TITLE: Record<StageId, string> = {
   producer: 'Prose with Lumi',
   artist: 'Art with Lumi',
   writer: 'Directing with Lumi',
-  director: 'Shooting with Lumi',
-  editor: 'Editing with Lumi',
+  // Director · Editor 는 11/13 시안 D5 대로 단계 이름을 적는다(오너 11/14 "추천대로") — 다른 단계는 v3 그대로.
+  director: 'Lumi · Director',
+  editor: 'Lumi · Editor',
 }
 
 // 값은 영어 원문 = i18n 키(#i18n-s5-batch4). 렌더 지점(global-chat.tsx)이 t() 로 번역한다.

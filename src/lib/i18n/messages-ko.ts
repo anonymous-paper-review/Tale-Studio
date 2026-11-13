@@ -3139,6 +3139,4 @@ export const KO: Record<string, string> = {
   'Prose with Lumi': 'Lumi와 산문 이야기',
   'Art with Lumi': 'Lumi와 그림 이야기',
   'Directing with Lumi': 'Lumi와 연출 이야기',
-  'Shooting with Lumi': 'Lumi와 촬영 이야기',
-  'Editing with Lumi': 'Lumi와 편집 이야기',
 }

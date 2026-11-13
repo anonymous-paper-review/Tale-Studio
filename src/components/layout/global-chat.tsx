@@ -50,6 +50,8 @@ import { boardShotLabels } from '@/lib/writer/board-summary'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
 import { ChatModelControls } from '@/components/layout/chat-model-controls'
+import { TopBarActions } from '@/components/layout/studio-top-bar'
+import { LumiChatPill } from '@/features/director/lumi-chat-pill'
 import {
   castMentions,
   backgroundMentions,
@@ -2149,8 +2151,13 @@ export function GlobalChat() {
       {/* 접힌 상태 — 오른쪽 가장자리에 붙은 슬림 레일 + 위쪽 열기 단추(v3 Chat Toggle «).
           닫기 단추(패널 머리)와 세로 위치를 맞추고, 레일이 오른쪽 44px 를 전용 점유해
           (layout.tsx 가 접힘 시 marginRight 확보) 페이지 오른쪽 위 단추들과의 겹침을 원천 차단한다. */}
-      {/* v3p2-set: D1 시안 — Director 는 접힌 레일 없이 툴바 Lumi 알약으로 연다 */}
-      {collapsed && currentStage !== 'director' && (
+      {/* Director · Editor 는 접힌 레일 없이 Lumi 아이콘으로 연다(11/13 시안 D1 · E1) — Director 는 툴바가, Editor 는 여기서 위 막대 오른쪽 끝에 놓는다. */}
+      {collapsed && currentStage === 'editor' && (
+        <TopBarActions>
+          <LumiChatPill stage="editor" className="order-last" />
+        </TopBarActions>
+      )}
+      {collapsed && currentStage !== 'director' && currentStage !== 'editor' && (
         <aside
           className="z-sidebar fixed flex w-11 flex-col items-center gap-3 rounded-l-xl bg-chat-bg pt-4"
           style={{ right: 0, top: 0, bottom: 0 }}

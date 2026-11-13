@@ -605,6 +605,26 @@
   }
 }
 
+/* ── 접힌 Lumi 아이콘 — 만드는 중이면 살짝 위아래로(11/13 시안 R "만드는 중이면 아이콘이 살짝 움직여요") ──
+   작은 아이콘이라 2px 만, 천천히. transform-only. 동작 줄이기 설정이면 멈춘다. */
+@keyframes lumi-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-2px);
+  }
+}
+.animate-lumi-bob {
+  animation: lumi-bob 2.4s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .animate-lumi-bob {
+    animation: none;
+  }
+}
+
 /* ── React Flow — Director 캔버스 컨트롤/미니맵 ──
    xyflow 기본 컨트롤은 흰 배경 + 흰 아이콘이라 dark 테마에서 화이트온화이트로 안 보인다.
    xyflow 기본(.react-flow__controls-button, specificity 0,1,0)이 page.tsx의 style.css import로
