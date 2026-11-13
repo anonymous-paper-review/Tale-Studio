@@ -1,7 +1,7 @@
 // Director 위쪽 단추 셋이 세는 일 · 가장 밝은 단추 · 예상 칸 글(시안 D1 406:3717 · D2 406:4588 · R 416:4941, 오너 2026-11-14).
 //   순수 함수만 둔다. 샷 상태 판정은 shot-state.ts. 약속: tests/director/toolbar-work.test.ts
 import { realImageBatchMinutes } from '@/lib/director/generation-estimate'
-import type { DirectorShotState } from '@/lib/director/shot-state'
+import { matchesStatusFilter, type DirectorShotState, type ShotStatusFilter } from '@/lib/director/shot-state'
 import type { VideoModelKey } from '@/lib/video-models'
 
 type Translate = (text: string, params?: Record<string, string | number>) => string
@@ -33,6 +33,15 @@ export function videoWorkShotIds(
   picked: ReadonlySet<string> | null | undefined,
 ): string[] {
   return pick(states, picked, ['image_done', 'video_failed'])
+}
+
+/** 단추 · 예상이 세는 샷 — 상태를 골랐으면 보이는 샷만(리드 11/14 답 1). 전체면 그대로. */
+export function workScopeStates(
+  states: ReadonlyMap<string, DirectorShotState>,
+  filter: ShotStatusFilter,
+): ReadonlyMap<string, DirectorShotState> {
+  if (filter === 'all') return states
+  return new Map([...states].filter(([, state]) => matchesStatusFilter(state, filter)))
 }
 
 /** 상태 고르기로 보이는 샷 안의 고름만 센다(숨긴 샷은 빠진다). */
@@ -68,7 +77,7 @@ export function imageButtonMode(
 }
 
 /** 꺼진 만들기 단추의 까닭(결정 페이지 "꺼진 단추 아래 이유 한 줄", 리드 검토 a 낮음 4). */
-export type WorkBlock = 'busy' | 'no_shots' | 'all_making' | 'all_have_images' | 'need_images' | 'all_have_videos'
+export type WorkBlock = 'busy' | 'no_shots' | 'none_in_status' | 'all_making' | 'all_have_images' | 'need_images' | 'all_have_videos'
 
 function scopedStates(
   states: ReadonlyMap<string, DirectorShotState>,
@@ -79,15 +88,17 @@ function scopedStates(
   return out
 }
 
-/** [이미지 만들기]가 꺼진 까닭 — 켜져 있으면 null. busy = 이미지 일괄이 도는 중(눌러도 새 판이 서지 않는다). */
+/** [이미지 만들기]가 꺼진 까닭 — 켜져 있으면 null. busy = 이미지 일괄이 도는 중(눌러도 새 판이 서지 않는다).
+ *  filtered = 상태를 골라 states 가 보이는 샷만이다(그 상태 샷이 없으면 "이 상태의 샷이 없어요"). */
 export function imageWorkBlock(
   states: ReadonlyMap<string, DirectorShotState>,
   picked: ReadonlySet<string> | null | undefined,
   busy: boolean,
+  filtered = false,
 ): WorkBlock | null {
   if (busy) return 'busy'
   const pool = scopedStates(states, picked)
-  if (pool.length === 0) return 'no_shots'
+  if (pool.length === 0) return filtered ? 'none_in_status' : 'no_shots'
   if (imageButtonMode(states, picked ?? new Set()).shotIds.length > 0) return null
   return pool.some((s) => s === 'image_generating') ? 'all_making' : 'all_have_images'
 }
@@ -97,10 +108,11 @@ export function videoWorkBlock(
   states: ReadonlyMap<string, DirectorShotState>,
   picked: ReadonlySet<string> | null | undefined,
   busy: boolean,
+  filtered = false,
 ): WorkBlock | null {
   if (busy) return 'busy'
   const pool = scopedStates(states, picked)
-  if (pool.length === 0) return 'no_shots'
+  if (pool.length === 0) return filtered ? 'none_in_status' : 'no_shots'
   if (videoWorkShotIds(states, picked).length > 0) return null
   if (pool.some((s) => s === 'image_needed' || s === 'image_failed' || s === 'image_generating')) return 'need_images'
   return pool.some((s) => s === 'video_generating') ? 'all_making' : 'all_have_videos'
@@ -110,6 +122,7 @@ const BLOCK_TEXT: Record<'image' | 'video', Record<WorkBlock, string>> = {
   image: {
     busy: 'Making images now. You can press again when it finishes.',
     no_shots: 'No shots yet.',
+    none_in_status: 'No shots in this status',
     all_making: 'The rest are being made now.',
     all_have_images: 'Every shot here already has an image.',
     need_images: 'Videos need an image first.',
@@ -118,6 +131,7 @@ const BLOCK_TEXT: Record<'image' | 'video', Record<WorkBlock, string>> = {
   video: {
     busy: 'Making videos now. You can press again when it finishes.',
     no_shots: 'No shots yet.',
+    none_in_status: 'No shots in this status',
     all_making: 'The rest are being made now.',
     all_have_images: 'Every shot here already has an image.',
     need_images: 'Videos need an image first.',

@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import { readFileSync } from 'node:fs'
 import { KO as ko } from '@/lib/i18n/messages-ko'
+import { imageWorkBlock } from '@/lib/director/toolbar-work'
 
 // #c3 (2026-08-27 오너) — "하나씩 하는 거 짜쳐서 전체 재생성 누르려는데 X표로 막힘".
 //
@@ -49,7 +50,9 @@ describe('C3 — 막힐 때 이유를 말한다', () => {
   it('생성 중에는 다시 누를 수 없는 이유를 알려준다', () => {
     const work = readFileSync('src/lib/director/toolbar-work.ts', 'utf8')
     expect(work).toContain("'Making images now. You can press again when it finishes.'")
-    expect(page).toContain('imageWorkBlock(shotStates, picked, realBatchBusy)')
+    // 이미지 일괄이 도는 동안(realBatchBusy) 이미지 단추의 까닭은 '만드는 중'이고, 그 까닭이 단추 아래 한 줄로 보인다.
+    expect(imageWorkBlock(new Map([['a', 'image_needed']]), new Set(), true)).toBe('busy')
+    expect(page).toMatch(/imageWorkBlock\([^)]*realBatchBusy/)
     expect(page).toContain('{blockLine}')
   })
 

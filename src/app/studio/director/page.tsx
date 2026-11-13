@@ -47,6 +47,7 @@ import {
   videoWorkShotIds,
   workBlockLine,
   workEstimateText,
+  workScopeStates,
 } from '@/lib/director/toolbar-work'
 import { LumiAvatar } from '@/components/lumi/lumi'
 import { STAGE_PERSONA } from '@/lib/lumi'
@@ -944,10 +945,12 @@ function PaletteBar() {
   const clearPickedShots = useDirectorCanvasStore((s) => s.clearPickedShots)
   const visibleShotIds = [...shotStates.entries()].filter(([, state]) => matchesStatusFilter(state, statusFilter)).map(([id]) => id)
   const picked = effectivePickedIds(pickedShotIds, visibleShotIds)
+  // 상태를 골랐으면 단추 · 예상도 보이는 샷만 센다(리드 11/14 답 1).
+  const workStates = workScopeStates(shotStates, statusFilter)
   // [이미지 만들기 · N]: 이미지 없는 샷. 고른 샷이 모두 이미지가 있으면 [이미지 다시 만들기 · N](8/27 오너 "전체 재생성" 길).
-  const imageMode = imageButtonMode(shotStates, picked)
+  const imageMode = imageButtonMode(workStates, picked)
   const imageWork = imageMode.mode === 'make' ? imageMode.shotIds : []
-  const videoWork = videoWorkShotIds(shotStates, picked)
+  const videoWork = videoWorkShotIds(workStates, picked)
   const stateList = [...shotStates.values()]
   const makingImages = stateList.filter((s) => s === 'image_generating').length
   const makingVideos = stateList.filter((s) => s === 'video_generating').length
@@ -955,8 +958,8 @@ function PaletteBar() {
   // [다음: Editor로] · 사이드바 Editor · 채팅 넘김은 같은 조건 — 완성 영상이 하나라도 있으면 켜진다(시안 R, 결정 페이지 추천, 리드 검토 a 낮음 7).
   const canHandOff = directorHasFinishedVideo(nodes)
   // 꺼진 단추와 까닭(결정 페이지 "꺼진 단추 아래 이유 한 줄", 리드 검토 a 보통 1 · 낮음 4) — 일괄이 도는 동안은 눌러도 새 판이 서지 않으니 끈다.
-  const imageBlock = imageWorkBlock(shotStates, picked, realBatchBusy)
-  const videoBlock = videoWorkBlock(shotStates, picked, videoBatchBusy)
+  const imageBlock = imageWorkBlock(workStates, picked, realBatchBusy, statusFilter !== 'all')
+  const videoBlock = videoWorkBlock(workStates, picked, videoBatchBusy, statusFilter !== 'all')
   const blockLine = workBlockLine(imageBlock, videoBlock, t)
   const primary = primaryWorkAction({
     imageCount: imageBlock === null ? imageWork.length : 0,

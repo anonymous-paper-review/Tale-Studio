@@ -12,6 +12,7 @@ import {
   videoWorkShotIds,
   workBlockLine,
   workEstimateText,
+  workScopeStates,
 } from '@/lib/director/toolbar-work'
 import type { DirectorShotState } from '@/lib/director/shot-state'
 
@@ -37,6 +38,23 @@ describe('단추가 세는 일', () => {
   it('[영상 만들기 · N]의 N 은 이미지가 있고 완성 영상이 없는 샷(이미지 완료 · 영상 실패) 수다', () => {
     // 왜: 이미지가 없는 샷을 영상 숫자에 넣으면 서버가 말없이 빼던 고장이 생긴다.
     expect(videoWorkShotIds(states, null)).toEqual(['d', 'e'])
+  })
+
+  it('상태를 골랐으면 아무것도 고르지 않아도 두 단추 숫자 · 예상은 보이는 샷만 센다', () => {
+    // 왜: "전체 0개" 옆에 [이미지 만들기 · 4]가 보이면 보이지 않는 샷을 만든다(리드 11/14 답 1 "보이는 샷만").
+    const visible = workScopeStates(states, 'image_done')
+    expect([...visible.keys()]).toEqual(['d'])
+    expect(imageWorkShotIds(visible, null)).toEqual([])
+    expect(videoWorkShotIds(visible, null)).toEqual(['d'])
+    expect(workScopeStates(states, 'all')).toBe(states)
+    // 고른 상태 샷이 하나도 없으면 꺼진 까닭은 "이 상태의 샷이 없어요".
+    expect(imageWorkBlock(new Map(), new Set(), false, true)).toBe('none_in_status')
+    expect(videoWorkBlock(new Map(), new Set(), false, true)).toBe('none_in_status')
+    expect(workBlockLine('none_in_status', 'none_in_status', ko)).toBe('이 상태의 샷이 없어요')
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    expect(page).toContain('const workStates = workScopeStates(shotStates, statusFilter)')
+    expect(page).toContain('imageButtonMode(workStates, picked)')
+    expect(page).toContain('videoWorkShotIds(workStates, picked)')
   })
 
   it('고른 샷이 있으면 두 단추 숫자는 고른 샷 안에서만 센다', () => {
