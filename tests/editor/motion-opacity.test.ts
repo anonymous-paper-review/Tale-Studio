@@ -17,6 +17,7 @@ vi.mock('@/stores/project-store', () => ({
 import { saveEditorNow, selectStackAt, selectTimelineLayout, useEditorStore } from '@/stores/editor-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { EffectControls } from '@/features/editor/effect-controls'
+import { Slider } from '@/components/ui/slider'
 import { handleEditorKey } from '@/features/editor/use-editor-playback'
 import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
@@ -214,5 +215,18 @@ describe('혼자 정한 것', () => {
     const slider = { tagName: 'SPAN', isContentEditable: false, getAttribute: (name: string) => (name === 'role' ? 'slider' : null) }
     handleEditorKey({ key: 'ArrowRight', code: 'ArrowRight', ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, target: slider, preventDefault: () => {} } as unknown as KeyboardEvent)
     expect(api().currentTime).toBe(2)
+  })
+})
+
+describe('슬라이더 이름', () => {
+  it('슬라이더 손잡이는 화면 읽기에 이름이 들린다', () => {
+    // 왜: 리드 11/14(혼자 정한 것 · 쉬움) — 공용 슬라이더가 이름(aria-label)을 바깥 틀에만 붙여, 손잡이(role=slider)에 손을 두어도 무슨
+    //   슬라이더인지 들리지 않았다. 효과 컨트롤 · Writer 굵기 · 밝기 · Artist 보드 축척 · 생성 틀이 같은 부품을 쓴다.
+    const thumbNamed = (markup: string, name: string) =>
+      [...markup.matchAll(/<span[^>]*role="slider"[^>]*>/g)].some((m) => m[0].includes(`aria-label="${name}"`))
+    expect(thumbNamed(renderToStaticMarkup(createElement(Slider, { 'aria-label': '볼륨', value: [50] })), '볼륨')).toBe(true)
+    api().selectClip('B')
+    const markup = html(createElement(EffectControls))
+    for (const name of ['위치 X', '위치 Y', '비율', '불투명도']) expect(thumbNamed(markup, name)).toBe(true)
   })
 })
