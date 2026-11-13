@@ -14,7 +14,7 @@ vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTra
 const nav = vi.hoisted(() => ({ handoffToStage: vi.fn(async (stage: string) => `/studio/${stage}`) }))
 vi.mock('@/lib/stage-nav', () => ({ handoffToStage: nav.handoffToStage }))
 
-import { editorHandoverView, proceedButtonLabel, remakeButton } from '@/lib/director/editor-handover'
+import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton } from '@/lib/director/editor-handover'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { translate } from '@/lib/i18n/translate'
 import { boardNodeNames } from '@/features/director/node-label'
@@ -120,12 +120,19 @@ describe('Editor 넘기기 창의 단추 글', () => {
     expect(remakeButton(nodes, failedRow, { showTakes: true, batch: null }, ko).disabled).toBe(false)
   })
 
-  // 왜(검토 b 낮음 3): 창을 연 채 다시 만들기가 다 끝나면 "영상 없는 샷 0개 빼고 넘기기"가 됐다 — 빠질 샷이 없으면 시안 D8 의 "Editor로 넘기기 · 컷 N · N초".
-  it('넘기기 창이 열린 채 빠질 샷이 없어지면 넘기기 단추는 "Editor로 넘기기 · 컷 N · N초"가 된다', () => {
+  // 왜(검토 b 낮음 3): 창을 연 채 다시 만들기가 다 끝나면 "영상 없는 샷 0개 빼고 넘기기"가 됐다 — 빠질 샷이 없으면 시안 D8 의 "Editor로 넘기기 · 컷 N · 약 N초".
+  it('넘기기 창이 열린 채 빠질 샷이 없어지면 넘기기 단추는 "Editor로 넘기기 · 컷 N · 약 N초"가 된다', () => {
     const done = editorHandoverView(canvas(take('a1', 1, 'completed'), take('a2', 1, 'completed'), take('a3', 1, 'completed')), names)
-    expect(proceedButtonLabel(done, ko)).toBe('Editor로 넘기기 · 컷 3 · 9초')
+    expect(proceedButtonLabel(done, ko)).toBe('Editor로 넘기기 · 컷 3 · 약 9초')
     const oneLeft = editorHandoverView(canvas(take('a1', 1, 'completed'), take('a2', 1, 'completed')), names)
-    expect(proceedButtonLabel(oneLeft, ko)).toBe('Scene 1 · Shot 3 빼고 넘기기 · 컷 2 · 7초')
+    expect(proceedButtonLabel(oneLeft, ko)).toBe('Scene 1 · Shot 3 빼고 넘기기 · 컷 2 · 약 7초')
+  })
+
+  // 왜(리드 2026-11-14 · export 확인): 창의 길이는 샷 계획 길이의 합이고, Editor 는 클립마다 실제 영상 파일 길이로 줄일 수 있다 — 사실대로 어림으로 보인다.
+  it('Editor 넘기기 창의 합계 길이는 "약 N초"로 보인다', () => {
+    const view = editorHandoverView(canvas(take('a1', 1, 'completed'), take('a2', 1, 'completed')), names)
+    expect(handoverHeaderLine(view, ko)).toBe('영상 2/3 · 약 7초 · 영상이 없는 샷은 타임라인에 빈 칸으로 들어가지 않아요.')
+    expect(handoverHeaderLine(view, (key, params) => translate('en', key, params))).toBe('2/3 videos · about 7s · Shots without video do not go into the timeline as empty slots.')
   })
 })
 

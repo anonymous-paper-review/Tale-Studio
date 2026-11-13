@@ -43,15 +43,16 @@ describe('Director 넘기기 창 — 넘어가면서 이미지 만들기', () =>
     expect(view.rows).toEqual([
       { label: '넘어가는 것', value: '샷 3 · 10초 · 인물 2 · 배경 1 · 러프 3장' },
       { label: '다음', value: '러프 → 실사 이미지 3장 · 약 2분 · Takes 안 써요' },
-      { label: '그다음', value: '이미지를 확인하고 영상을 만들어요 · 샷마다 Takes 5' },
+      { label: '그다음', value: '이미지를 확인하고 영상을 만들어요 · 샷마다 5 Take' },
     ])
   })
 
-  // 왜(혼자 정한 것): 실사가 이미 다 있으면 넘어가며 만들 것이 없다 — 0장 만들기를 추천하지 않는다.
-  it('만들 실사 이미지가 없으면 넘어가면서 만들기를 끄고 직접 고르기를 골라 둔다', () => {
+  // 왜(리드 2026-11-14, 시안 없음): 실사가 이미 다 있으면 넘어가며 만들 것이 없다 — 꺼진 "0장 만들기"에 "추천"을 달아 두지 않고 칸째 숨긴다.
+  it('만들 실사 이미지가 없으면 넘어가면서 만들기 칸과 추천을 숨기고 직접 고르기만 둔다', () => {
     const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, imagesToMake: 0 })
-    expect(view.makeImages.disabled).toBe(true)
+    expect(view.makeImages).toBeNull()
     expect(view.defaultChoice).toBe('pickYourself')
+    expect(view.rows[1].value).toBe('실사 이미지는 이미 다 있어요')
   })
 
   // 왜(검토 b 낮음 5): Take 과금이 꺼진 때는 노드의 Take 값도 숨긴다(#payments-phase-2) — 넘기기 창도 같은 규칙. 꺼진 때 보이라는 오너 답은 없다.
@@ -71,7 +72,7 @@ describe('Director 넘기기 창 — 넘어가면서 이미지 만들기', () =>
     expect(counting.description).toBeNull()
     const unknown = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, imagesToMake: { atMost: 3 } })
     expect(unknown.rows[1].value).toBe('러프 → 실사 이미지 최대 3장 · 약 2분 · Takes 안 써요')
-    expect(unknown.makeImages.label).toBe('넘어가면서 이미지 최대 3장 만들기')
+    expect(unknown.makeImages?.label).toBe('넘어가면서 이미지 최대 3장 만들기')
     expect(unknown.defaultChoice).toBe('makeImages')
   })
 

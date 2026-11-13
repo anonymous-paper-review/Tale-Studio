@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
 import { boardNodeNames } from '@/features/director/node-label'
-import { editorHandoverView, proceedButtonLabel, remakeButton, type EditorHandoverShot } from '@/lib/director/editor-handover'
+import { editorHandoverView, handoverHeaderLine, proceedButtonLabel, remakeButton, type EditorHandoverShot } from '@/lib/director/editor-handover'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -55,9 +55,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
       <DialogContent size="wide" className="max-h-[90vh] grid-rows-[auto_minmax(0,1fr)_auto]" data-testid="editor-handover-dialog">
         <DialogHeader>
           <DialogTitle>{t('Hand over to Editor')}</DialogTitle>
-          <DialogDescription>
-            {t('{done}/{total} videos · {seconds}s · Shots without video do not go into the timeline as empty slots.', { done: view.cuts, total: view.total, seconds: view.seconds })}
-          </DialogDescription>
+          <DialogDescription>{handoverHeaderLine(view, t)}</DialogDescription>
         </DialogHeader>
 
         <ul className="min-h-0 space-y-2 overflow-y-auto pr-1">
@@ -67,7 +65,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
             return (
               <li
                 key={row.shotNodeId}
-                className={cn('flex items-center gap-3 rounded-xl bg-card px-4 py-3', row.missing && 'border border-destructive')}
+                className={cn('flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl bg-card px-4 py-3 sm:flex-nowrap', row.missing && 'border border-destructive')}
                 data-testid={row.missing ? 'editor-handover-missing' : 'editor-handover-shot'}
               >
                 {row.thumbUrl && !row.missing ? (
@@ -75,8 +73,9 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
                 ) : !row.missing ? (
                   <span className="h-11 w-8 shrink-0 rounded-md bg-art-placeholder" aria-hidden />
                 ) : null}
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-label font-semibold text-foreground">
+                {/* 좁은 화면(시안 없음)에서는 단추가 줄 아래로 내려가 샷 이름이 잘리지 않는다(리드 2026-11-14). */}
+                <span className="min-w-0 flex-1 basis-48">
+                  <span className="block break-words text-label font-semibold text-foreground sm:truncate">
                     {row.missing ? t('{label} · No video', { label: row.label }) : t('{label} · {seconds}s', { label: row.label, seconds: row.seconds })}
                   </span>
                   {row.take ? (
@@ -89,10 +88,10 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
                   ) : (
                     <span className="mt-0.5 block text-caption text-destructive">
                       {row.missing === 'failed'
-                        ? t('Failed while making · If you leave it out, it joins Editor on its own once its video is made')
+                        ? t('Failed. Leave it out and it joins Editor once its video is ready')
                         : row.missing === 'generating'
                           ? t('Making it now · You can hand it over from this window once it is done')
-                          : t('Not made yet · If you leave it out, it joins Editor on its own once its video is made')}
+                          : t('Not made yet. Leave it out and it joins Editor once its video is ready')}
                     </span>
                   )}
                 </span>
