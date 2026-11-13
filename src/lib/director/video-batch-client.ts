@@ -12,6 +12,7 @@ import { useLumiNoticeStore } from '@/stores/lumi-notice-store'
 import { notifyQuotaExceeded } from '@/lib/generation-quota-toast'
 import { buildVideoBatchInputs } from '@/lib/director/video-batch-inputs'
 import type { VideoBatchStartResponse, VideoBatchSummary } from '@/lib/director/video-batch-types'
+import { videoBatchQueueOf } from '@/lib/director/video-batch-queue'
 import { invalidateShots } from '@/lib/shots-cache'
 
 const EMPTY_RESULT = { total: 0, started: 0, failed: 0 }
@@ -78,16 +79,8 @@ function isBatchActive(summary: VideoBatchSummary): boolean {
   return summary.status === 'running' || summary.active > 0
 }
 
-/**
- * 묶음의 차례(11/5 시안 DG, 2026-11-09): 지금 만드는 작업과 아직 안 낸 샷. 멈췄거나 쉬는 묶음의 남은 샷은 만들지 않으므로
- * 차례에 두지 않는다(계속 기다리는 것처럼 보이면 안 된다).
- */
-function queueOf(summary: VideoBatchSummary): { jobIds: string[]; pendingShotIds: string[] } {
-  return {
-    jobIds: summary.jobs.flatMap((job) => (job.jobId && job.status === 'queued' ? [job.jobId] : [])),
-    pendingShotIds: summary.status === 'running' ? summary.pendingShotIds ?? [] : [],
-  }
-}
+/** 묶음의 차례 — 지금 만드는 작업과 아직 안 낸 샷(video-batch-queue.ts, [먼저 하기]와 같이 쓴다). */
+const queueOf = videoBatchQueueOf
 
 /**
  * 서버가 이어가는 배치를 GET 으로 계속 읽어 store 진행 상태를 반영한다. 이 함수는 저장된

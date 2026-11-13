@@ -35,6 +35,7 @@ import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { useActiveGenerationJobs, activeShotIds, useGenerationQueueStatus, type ActiveJob, type GenerationQueueStatus } from '@/lib/generation-queue'
 import { shotStopTarget } from '@/lib/director/stop-work'
 import { StopMakingButton } from '@/features/director/stop-making-button'
+import { MoveFirstButton } from '@/features/director/move-first-button'
 import { checkStoryboardImageStatus, storyboardImageGenerationState } from '@/features/director/hooks/use-storyboard-image-generation'
 import { useRoughStoryboard, useShotActionDescription } from '@/features/director/hooks/use-rough-storyboard'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
@@ -265,6 +266,12 @@ function ShotCell({
   const [videoBusy, setVideoBusy] = useState(false)
   // 같은 화면에서 빠르게 두 번 불려도 한 번만 시작한다(videoBusy 는 다음 그리기에야 보인다, 검토 b 낮음 2).
   const videoStartingRef = useRef(false)
+  // 영상 묶음에서 이 샷의 차례(0 = 다음 차례, -1 = 기다리지 않음) — 꼬리 "순서 기다리는 중 · N번째" · [먼저 하기](시안 D4, 리드 S4-2 7).
+  //   멈추는 중이면 남은 샷은 만들지 않는다(차례에 두지 않는다).
+  const linePosition = useDirectorCanvasStore((s) => {
+    const id = isShotData(node.data) ? node.data.writerShotId : null
+    return id && !s.videoBatchCancelled ? s.videoBatchQueue?.pendingShotIds.indexOf(id) ?? -1 : -1
+  })
   const [videoError, setVideoError] = useState<string | null>(null)
   // 재생성 확인 팝업(#regen-confirm) / Previz 편집 팝업(#e6)
   const [confirm, setConfirm] = useState<null | 'image' | 'video' | 'previz' | 'manual-retry'>(null)
@@ -802,6 +809,9 @@ function ShotCell({
             remakeFailed={remakeFailed}
             retry={<RemakeRetryButton nodeId={node.id} data={data} />}
             stop={stopTarget ? <StopMakingButton target={stopTarget} kind={stopKind} /> : null}
+            label={linePosition >= 0 ? 'Waiting in line · #{n}' : undefined}
+            labelParams={{ n: linePosition + 1 }}
+            lineAction={linePosition > 0 && writerShotId ? <MoveFirstButton shotId={writerShotId} /> : null}
             className="absolute bottom-2 left-2 z-10"
           />
         )}

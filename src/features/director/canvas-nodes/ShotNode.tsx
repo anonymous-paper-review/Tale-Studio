@@ -35,6 +35,7 @@ import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { dimmedByStatusFilter, shotStateTone } from '@/lib/director/shot-state'
 import { shotStopTarget } from '@/lib/director/stop-work'
 import { StopMakingButton } from '@/features/director/stop-making-button'
+import { MoveFirstButton } from '@/features/director/move-first-button'
 import { NodeWaitCard } from '@/components/feedback/node-wait'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { useWriterStore } from '@/stores/writer-store'
@@ -85,9 +86,11 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // 노드 위 기다림 카드의 둘째 줄 "샷 3 · CU"(시안 D4) — 샷 크기는 Writer 샷 기록에서.
   const shotType = useWriterStore((s) => (writerShotId ? s.shots.find((x) => x.shotId === writerShotId)?.shotType ?? null : null))
   // 영상 묶음에서 아직 차례를 기다리는 샷(서버 조회의 낼 순서, 11/5 시안 DG · 리드 2026-11-09). 멈추는 중이면 남은 샷은 만들지 않는다.
-  const waitingInLine = useDirectorCanvasStore(
-    (s) => !!writerShotId && !s.videoBatchCancelled && !!s.videoBatchQueue?.pendingShotIds.includes(writerShotId),
+  //   N번째와 [먼저 하기](시안 D4, 리드 S4-2 7) — 0 = 다음 차례, -1 = 기다리지 않음.
+  const linePosition = useDirectorCanvasStore(
+    (s) => (writerShotId && !s.videoBatchCancelled ? s.videoBatchQueue?.pendingShotIds.indexOf(writerShotId) ?? -1 : -1),
   )
+  const waitingInLine = linePosition >= 0
   // #payments-phase-2 v4 #2: 생성 전 소모량 표시 — mode==='off'면 배지를 숨긴다(현재 기본값).
 
   if (!isShotData(data)) return null
@@ -109,7 +112,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const failed = !isGenerating && data.storyboardImage?.status === 'failed' && !realImage
   // 꼬리 글을 바꾸는 때: 묶음에서 영상 차례를 기다리면 "순서 기다리는 중"(11/5 시안 DG), 접수 · 확인 중이면 그 글.
   const tailLabel = waitingInLine
-    ? 'Waiting in line'
+    ? 'Waiting in line · #{n}'
     : isGenerating && (generation.phase === 'submitting' || generation.phase === 'uncertain')
       ? generation.label ?? undefined
       : undefined
@@ -269,6 +272,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             waiting={shotStatus.facts.imageWaiting}
             remakeFailed={shotStatus.facts.imageRemakeFailed}
             label={tailLabel}
+            labelParams={{ n: linePosition + 1 }}
+            lineAction={linePosition > 0 && writerShotId ? <MoveFirstButton shotId={writerShotId} place="node" /> : null}
             className="mt-2.5"
             retry={<RemakeRetryButton nodeId={id} data={data} place="node" />}
             note={
