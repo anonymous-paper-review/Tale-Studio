@@ -459,3 +459,55 @@ describe('구현하며 더한 것', () => {
     expect(read('src/features/editor/effects-panel.tsx')).toMatch(/dataset\.effectDrop = /)
   })
 })
+
+describe('검토 c (E) — 리드 11/14 같이 정한 것', () => {
+  it('짧은 클립 양끝 교차 디졸브가 겹쳐도 한 장에 튀지 않는다 — 양끝에 교차 디졸브가 있으면 한쪽에 클립 길이의 반까지만 쓴다', () => {
+    // 왜: 검토 c (E) 1(R6) — 1초 클립 B 양끝에 2초 교차 디졸브를 넣으면 두 구간이 겹쳐 앞 구간만 그려졌다(4.99초 "B 위 A 0.005" → 5초 "C 위 B 0.5").
+    useEditorStore.setState({ shots: [shot('A'), { ...shot('B'), durationSeconds: 1 }, shot('C')] })
+    useEditorStore.setState({ videoClips: api().videoClips.map((c) => (c.shotId === 'B' || c.shotId === 'C' ? { ...c, transitionIn: { type: 'cross' as const, durationSec: 2 } } : c)) })
+    expect(windows().map((w) => [w.fromSec, w.toSec])).toEqual([[3.5, 4.5], [4.5, 5.5]])
+    // 한 장(1/30초)마다 클립마다 보이는 몫이 0.1 넘게 튀지 않는다.
+    const weights = (t: number) => {
+      const top = program().find((p) => t >= p.startSec && t < p.startSec + p.durationSec)!.shotId
+      const over = crossOverlayAt(windows(), program(), t)
+      const out: Record<string, number> = { A: 0, B: 0, C: 0 }
+      out[top] += over ? 1 - over.opacity : 1
+      if (over) out[over.shotId] += over.opacity
+      return out
+    }
+    let prev = weights(3.4)
+    for (let t = 3.4 + 1 / 30; t < 5.6; t += 1 / 30) {
+      const now = weights(t)
+      for (const id of ['A', 'B', 'C']) expect(Math.abs(now[id] - prev[id])).toBeLessThan(0.1)
+      prev = now
+    }
+  })
+
+  it('Lumi 타임라인 요약은 맞닿아 가려진 끝 전환을 말하지 않는다 — 그림과 같은 판단으로 컷 하나에 전환 하나만 말한다', () => {
+    // 왜: 검토 c (E) 2(R3) — 그림은 뒤 클립 전환만 쓰는데 요약은 앞 클립의 끝 전환까지 말해 한 컷을 전환 둘로 말했다.
+    const line = (n: number) => editorChatContext(api()).split('\n').find((l) => l.startsWith(`${n}. `)) ?? ''
+    useEditorStore.setState({
+      videoClips: api().videoClips.map((c) =>
+        c.shotId === 'A' ? { ...c, transitionOut: { type: 'cross' as const, durationSec: 1 } } : c.shotId === 'B' ? { ...c, transitionIn: { type: 'white' as const, durationSec: 1 } } : c,
+      ),
+    })
+    expect(line(1)).not.toContain('at its end')
+    expect(line(2)).toContain('fades through white from the cut before (1s)')
+    // 뒤 클립 시작 전환이 없으면 그 컷은 앞 클립 끝 전환으로 그린다 — 요약도 그 하나를 컷의 전환으로 말한다.
+    useEditorStore.setState({ videoClips: api().videoClips.map((c) => (c.shotId === 'B' ? { ...c, transitionIn: null } : c)) })
+    expect(line(1)).not.toContain('at its end')
+    expect(line(2)).toContain('cross dissolves from the cut before (1s)')
+  })
+
+  it('여럿 고른 채 우클릭 메뉴의 길이 칸은 전환이 있는 클립의 길이만 바꾼다 — 효과 컨트롤 길이 칸과 같다', () => {
+    // 왜: 검토 c (E) 3(R5) — 전환이 없던 클립에도 우클릭한 클립의 종류 · 길이가 들어갔다.
+    api().dropTransition('C', 'start', 'white')
+    api().setTransitionLength(['B', 'C'], 'start', 2)
+    expect(clipOf('B')?.transitionIn ?? null).toBeNull()
+    expect(clipOf('C')?.transitionIn).toEqual({ type: 'white', durationSec: 2 })
+    const timeline = read('src/features/editor/timeline.tsx')
+    expect(timeline).toMatch(/onValueChange=\{\(v\) => onSetTransitionLength\(targets, edge, Number\(v\)\)\}/)
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/onSetTransitionLength=\{setTransitionLength\}/)
+  })
+})
+

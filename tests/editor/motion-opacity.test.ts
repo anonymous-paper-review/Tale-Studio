@@ -16,7 +16,7 @@ vi.mock('@/stores/project-store', () => ({
 
 import { saveEditorNow, selectStackAt, selectTimelineLayout, useEditorStore } from '@/stores/editor-store'
 import { useLocaleStore } from '@/stores/locale-store'
-import { EffectControls, sliderHistory } from '@/features/editor/effect-controls'
+import { EffectControls, armOnStepKey, sliderHistory } from '@/features/editor/effect-controls'
 import { Slider } from '@/components/ui/slider'
 import { handleEditorKey } from '@/features/editor/use-editor-playback'
 import type { PersistedEditor } from '@/lib/editor-persistence'
@@ -134,7 +134,7 @@ describe('혼자 정한 것', () => {
   })
 
   it('끄는 동안 모니터에 바로 보이고, 놓으면 되돌리기 한 칸이다', () => {
-    // 왜: 지금 볼륨 슬라이더와 같다 — 끌기 시작에 한 번 칸을 쌓고, 끄는 동안의 값은 칸을 쌓지 않는다.
+    // 왜: 지금 볼륨 슬라이더와 같다 — 값이 처음 바뀔 때 한 칸, 끄는 동안의 값은 칸을 쌓지 않는다.
     const steps = api().past.length
     api().pushHistory()
     for (const scale of [0.9, 0.7, 0.5]) api().setClipMotion(['B'], { scale })
@@ -170,8 +170,39 @@ describe('혼자 정한 것', () => {
     // 왜: 구현하며 더한 것(검토 c (D) 낮음 2 와 같은 고장) — 소리 조각을 눌러 고르기만 해도, 볼륨 선을 누르기만 해도 빈 되돌리기 칸이 생겼다.
     const timeline = read('src/features/editor/timeline.tsx')
     expect(timeline).not.toMatch(/onSelect\(\)\s+onPushHistory\(\)/)
-    expect(timeline).toMatch(/if \(!moved\) onPushHistory\(\)/)
+    // 소리 조각 끌기는 자리 · 줄이 실제로 바뀔 때 한 칸(검토 c (E) 6 — 예전 글자: if (!moved) onPushHistory()).
+    expect(timeline).toMatch(/if \(!pushed && \(Math\.abs\(snapped - origStart\) > 1e-6 \|\| tid !== rowTrackId\)\) \{\s*pushed = true\s*onPushHistory\(\)/)
     expect(timeline).toMatch(/pushed = true\s+onPushHistory\(\)/)
+  })
+
+  it('슬라이더에서 ← → 를 누르고 있어도(키 반복) 되돌리기는 한 칸이다', () => {
+    // 왜: 검토 c (E) 5 — 키를 누르고 있으면 반복되는 키마다 다시 준비돼 한 걸음마다 한 칸이 쌓였다. 2초쯤 누르면 되돌리기 50칸이 차서
+    //   그 앞 편집을 되돌릴 수 없었다(모션 · 불투명도는 ④부터, 소리 볼륨은 (D) 낮음 2 부터).
+    let pushes = 0
+    const history = sliderHistory(() => {
+      pushes += 1
+    })
+    armOnStepKey(history, { key: 'ArrowRight', repeat: false })
+    history.change(() => {})
+    for (let i = 0; i < 20; i++) {
+      armOnStepKey(history, { key: 'ArrowRight', repeat: true })
+      history.change(() => {})
+    }
+    expect(pushes).toBe(1)
+    armOnStepKey(history, { key: 'ArrowLeft', repeat: false })
+    history.change(() => {})
+    expect(pushes).toBe(2)
+    expect(read('src/features/editor/effect-controls.tsx').match(/onKeyDown=\{\(e\) => armOnStepKey\((history|volumeHistory), e\)\}/g)).toHaveLength(2)
+  })
+
+  it('이어진 소리 조각을 끌었다가 제자리에 놓으면(값 그대로) 되돌리기 칸이 쌓이지 않는다', () => {
+    // 왜: 검토 c (E) 6 — 2px 넘게 끌었다 붙는 자리로 돌아오면 아무것도 안 바뀌었는데 한 칸이 쌓였다. 자리 · 줄이 실제로 바뀔 때만 쌓는다.
+    const timeline = read('src/features/editor/timeline.tsx')
+    expect(timeline).toMatch(/if \(!pushed && \(Math\.abs\(snapped - origStart\) > 1e-6 \|\| tid !== rowTrackId\)\) \{\s*pushed = true\s*onPushHistory\(\)\s*\}\s*if \(pushed\) onMove\(snapped, tid\)/)
+    // 같은 자리로 옮기기는 저장 쪽도 아무것도 바꾸지 않는다(소리를 영상에서 떼지 않는다).
+    const before = api().audioClips.find((a) => a.id === 'a_B')
+    api().moveAudioClip('a_B', before!.startSec, before!.trackId)
+    expect(api().audioClips.find((a) => a.id === 'a_B')).toEqual(before)
   })
 
   it('% 글자를 두 번 누르면 처음 값으로 돌아간다', () => {

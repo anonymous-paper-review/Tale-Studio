@@ -100,6 +100,8 @@ interface TimelineProps {
   onSetSpeed: (shotId: string, speed: number) => void
   /** 화면 전환 — 고른 클립들의 시작 · 끝 전환을 넣고 바꾸고 뺀다(우클릭 메뉴, 2단계 ⑤). */
   onSetTransition: (shotIds: string[], edge: TransitionEdge, transition: ClipTransition | null) => void
+  /** 그 끝에 전환이 있는 클립의 길이만 바꾼다 — 효과 컨트롤 길이 칸과 같다(검토 c (E) 3). */
+  onSetTransitionLength: (shotIds: string[], edge: TransitionEdge, durationSec: number) => void
   /** 문자 도구로 V 줄을 누름 — 그 줄 그 시각에 제목 클립(2단계 ⑥). */
   onAddTitle: (trackId: string, atSec: number) => void
   onAddAudioTrack: () => void
@@ -245,17 +247,23 @@ function AudioClipBlock({
       const startY = e.clientY
       const origStart = clip.startSec
       let moved = false
+      let pushed = false
       const move = (ev: PointerEvent) => {
         // 누르기만 해도 손이 몇 px 흔들린다 — 손잡이처럼 2px 를 넘겨야 옮기기로 본다(옮기면 영상에서 떨어진다, 2026-11-10 검토 b).
         if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) <= 2) return
-        // 되돌리기 칸은 옮기기 시작할 때 한 칸 — 눌러 고르기만 하면 쌓지 않는다(검토 c (D) 낮음 2 와 같은 고장).
-        if (!moved) onPushHistory()
         moved = true
         const raw = Math.max(0, origStart + (ev.clientX - startX) / pxPerSec)
         const snapped = snapStart(raw, clip.durationSec, clip.id)
         const overTrack = document.elementFromPoint(ev.clientX, ev.clientY)?.closest('[data-drop="audio-track"]')
-        const tid = overTrack?.getAttribute('data-track-id') ?? clip.trackId
-        onMove(snapped, tid)
+        // 줄 밖으로 끌면 그려진 줄(rowTrackId) 그대로 — 줄 칸이 비어 있던 예전 조각도 같은 줄로 본다.
+        const tid = overTrack?.getAttribute('data-track-id') ?? rowTrackId
+        // 되돌리기 칸은 자리 · 줄이 실제로 바뀔 때 한 칸 — 눌러 고르기만 하거나, 끌었다 붙는 제자리로 돌아오면 쌓지 않는다
+        //   (검토 c (D) 낮음 2 · (E) 6). 바뀌기 전에는 옮기지도 않는다 — 영상에서 떼지 않게.
+        if (!pushed && (Math.abs(snapped - origStart) > 1e-6 || tid !== rowTrackId)) {
+          pushed = true
+          onPushHistory()
+        }
+        if (pushed) onMove(snapped, tid)
       }
       const up = () => {
         blockEl.style.pointerEvents = ''
@@ -265,7 +273,7 @@ function AudioClipBlock({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, onSplit, onSelect, onToggleSelect, onRangeSelect, onPushHistory, clip.startSec, clip.durationSec, clip.id, clip.trackId, pxPerSec, onMove, snapStart],
+    [cutMode, clientXToSec, onSplit, onSelect, onToggleSelect, onRangeSelect, onPushHistory, clip.startSec, clip.durationSec, clip.id, rowTrackId, pxPerSec, onMove, snapStart],
   )
 
   // 게인(음량) 러버밴드 드래그 (요청 6) — 위/아래로 끌어 음량 조절
@@ -467,6 +475,7 @@ export function Timeline({
   onSplitVideo,
   onSetSpeed,
   onSetTransition,
+  onSetTransitionLength,
   onAddTitle,
   onAddAudioTrack,
   onRemoveAudioTrack,
@@ -1078,9 +1087,10 @@ export function Timeline({
                     ))}
                   </ContextMenuRadioGroup>
                   <ContextMenuSeparator />
+                  {/* 길이는 전환이 있는 클립만 바꾼다 — 여럿 고른 채여도 전환이 없던 클립에 이 클립의 전환을 넣지 않는다(검토 c (E) 3). */}
                   <ContextMenuRadioGroup
                     value={current ? String(current.durationSec) : ''}
-                    onValueChange={(v) => current && onSetTransition(targets, edge, { type: current.type, durationSec: Number(v) })}
+                    onValueChange={(v) => onSetTransitionLength(targets, edge, Number(v))}
                   >
                     {TRANSITION_CHOICES.map((sec) => (
                       <ContextMenuRadioItem key={sec} value={String(sec)} disabled={!current} className="text-xs">{t('{seconds}s', { seconds: sec })}</ContextMenuRadioItem>

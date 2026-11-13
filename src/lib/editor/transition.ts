@@ -157,7 +157,10 @@ function placeWindow(transition: ClipTransition, trackId: string, atSec: number,
   }
 }
 
-/** 모든 줄의 전환 구간 — 맞닿은 컷마다 하나, 빈 끝마다 그 클립 것. 경계 시각 차례. */
+/**
+ * 모든 줄의 전환 구간 — 맞닿은 컷마다 하나, 빈 끝마다 그 클립 것. 경계 시각 차례. 양끝이 모두 교차 디졸브인 클립은 한쪽에 길이의 반까지만
+ *   내준다 — 짧은 클립 양끝의 두 구간이 겹치면 한쪽만 그려져 한 장에 튀었다(검토 c (E) 1).
+ */
 export function transitionWindows(layout: readonly TrackItem[], clips: readonly TransitionClip[]): TransitionWindow[] {
   const byId = new Map(clips.map((c) => [c.shotId, c]))
   const tracks = new Map<string, TrackItem[]>()
@@ -165,15 +168,18 @@ export function transitionWindows(layout: readonly TrackItem[], clips: readonly 
   const out: TransitionWindow[] = []
   for (const [trackId, items] of tracks) {
     items.sort((a, b) => a.startSec - b.startSec)
+    const joined = (a: TrackItem | undefined, b: TrackItem | undefined) => !!a && !!b && Math.abs(a.startSec + a.durationSec - b.startSec) < EDGE_EPS
+    const prevOf = items.map((item, i) => (joined(items[i - 1], item) ? items[i - 1] : null))
+    const nextOf = items.map((item, i) => (joined(item, items[i + 1]) ? items[i + 1] : null))
+    const startOf = items.map((item, i) => byId.get(item.shotId)?.transitionIn ?? (prevOf[i] ? byId.get(prevOf[i]!.shotId)?.transitionOut : null) ?? null)
+    const endOf = items.map((item, i) => (nextOf[i] ? startOf[i + 1] : (byId.get(item.shotId)?.transitionOut ?? null)))
+    // 교차 디졸브가 이 클립에 걸칠 수 있는 길이 — 양끝이 모두 교차 디졸브면 반씩.
+    const share = items.map((item, i) => ({ ...item, durationSec: startOf[i]?.type === 'cross' && endOf[i]?.type === 'cross' ? item.durationSec / 2 : item.durationSec }))
     items.forEach((item, i) => {
-      const clip = byId.get(item.shotId)
-      const before = items[i - 1]
-      const after = items[i + 1]
-      const prev = before && Math.abs(before.startSec + before.durationSec - item.startSec) < EDGE_EPS ? before : null
-      const next = after && Math.abs(item.startSec + item.durationSec - after.startSec) < EDGE_EPS ? after : null
-      const start = clip?.transitionIn ?? (prev ? byId.get(prev.shotId)?.transitionOut : null) ?? null
-      if (start) out.push(placeWindow(start, trackId, item.startSec, prev, item))
-      if (!next && clip?.transitionOut) out.push(placeWindow(clip.transitionOut, trackId, item.startSec + item.durationSec, item, null))
+      const start = startOf[i]
+      if (start) out.push(placeWindow(start, trackId, item.startSec, prevOf[i] ? share[i - 1] : null, share[i]))
+      const end = endOf[i]
+      if (!nextOf[i] && end) out.push(placeWindow(end, trackId, item.startSec + item.durationSec, share[i], null))
     })
   }
   return out.sort((a, b) => a.atSec - b.atSec)

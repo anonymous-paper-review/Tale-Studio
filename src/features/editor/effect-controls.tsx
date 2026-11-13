@@ -56,6 +56,14 @@ export function sliderHistory(push: () => void) {
 /** 슬라이더 값을 한 칸씩 움직이는 키(화살표 · Page · Home · End). */
 const isStepKey = (key: string) => key.startsWith('Arrow') || key.startsWith('Page') || key === 'Home' || key === 'End'
 
+/**
+ * 값을 움직이는 키를 처음 누를 때만 되돌리기를 준비한다 — 누르고 있어 저절로 반복되는 키는 같은 한 번이라, 한 걸음마다 칸이 쌓여 되돌리기
+ *   50칸이 차지 않게(검토 c (E) 5). 약속: tests/editor/motion-opacity.test.ts
+ */
+export function armOnStepKey(history: { arm: () => void }, e: { key: string; repeat?: boolean }) {
+  if (isStepKey(e.key) && !e.repeat) history.arm()
+}
+
 /** 슬라이더 한 줄 — 끄기 · 화살표로 값이 처음 바뀔 때 되돌리기 칸 하나(onStart), % 글자를 두 번 누르면 처음 값. */
 function SliderRow({
   label,
@@ -89,9 +97,7 @@ function SliderRow({
         step={1}
         value={[value]}
         onPointerDown={history.arm}
-        onKeyDown={(e) => {
-          if (isStepKey(e.key)) history.arm()
-        }}
+        onKeyDown={(e) => armOnStepKey(history, e)}
         onValueChange={([v]) => history.change(() => onChange(v))}
         aria-label={label}
       />
@@ -209,9 +215,7 @@ export function EffectControls() {
               step={1}
               value={[Math.round(volume * 100)]}
               onPointerDown={volumeHistory.arm}
-              onKeyDown={(e) => {
-                if (isStepKey(e.key)) volumeHistory.arm()
-              }}
+              onKeyDown={(e) => armOnStepKey(volumeHistory, e)}
               onValueChange={([v]) => volumeHistory.change(() => setAudioVolume(audio.id, v / 100))}
               aria-label={t('Volume')}
             />

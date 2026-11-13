@@ -108,6 +108,7 @@ export default function PostPage() {
     seek,
     setPxPerSec,
     setClipTransition,
+    setTransitionLength,
     setPanelSize,
     toggleAudioMute,
     toggleAudioTrackMute,
@@ -641,6 +642,7 @@ export default function PostPage() {
                     onSetTrim={setTrim}
                     onSetTitleCardDuration={setTitleCardDuration}
                     onSetTransition={setClipTransition}
+                    onSetTransitionLength={setTransitionLength}
                     onAddTitle={(trackId, atSec) => addTitleClip(trackId, atSec, defaultTitleText(projectTitle, t('New title')))}
                     onPushHistory={pushHistory}
                     videoTracks={videoTracks}

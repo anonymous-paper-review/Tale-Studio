@@ -2,8 +2,9 @@
 //   편집 상태를 읽기만 한다 — 컷 수 · 전체 길이 · 순서(자리 · 길이 · 샷 종류 · 설명 · 빠르기 · 전환 · 자막) · 제목 카드 · 제목 클립 · 소리 줄.
 //   내부 번호(샷 id)는 싣지 않는다(채팅 답 규칙 — 사용자는 컷 순서 · 설명으로 부른다).
 //   약속: tests/chat/editor-advice-chat.test.ts · tests/editor/title-clips.test.ts
-import { isTitleClipShotId, selectOverlayLayout, selectTimelineLayout, type OverlayPlacements } from '@/stores/editor-store'
-import type { AudioTrackClip, ClipTransitionType, Shot, VideoClip } from '@/types/shot'
+import { isTitleClipShotId, selectOverlayLayout, selectTimelineLayout, selectVideoLayout, type OverlayPlacements } from '@/stores/editor-store'
+import { edgeTransition, type TrackItem } from '@/lib/editor/transition'
+import type { AudioTrackClip, ClipTransition, ClipTransitionType, Shot, VideoClip } from '@/types/shot'
 
 export interface EditorChatContextInput {
   shots: Shot[]
@@ -24,13 +25,22 @@ const TRANSITION_PHRASE: Record<ClipTransitionType, string> = {
 const short = (text: string) => (text.length > 120 ? `${text.slice(0, 117)}...` : text)
 const percent = (value: number) => `${Math.round(value * 100)}%`
 
+/**
+ * 그림과 같은 판단으로 본 클립 양끝의 전환(src/lib/editor/transition.ts edgeTransition) — 맞닿은 컷의 전환은 뒤 클립의 시작으로만 말하고,
+ *   빈 끝만 그 클립의 끝으로 말한다. 컷 하나를 전환 둘로 말하지 않는다(검토 c (E) 2).
+ */
+function edgesOf(layout: readonly TrackItem[], clips: readonly VideoClip[], shotId: string): { start: ClipTransition | null; end: ClipTransition | null } {
+  const end = edgeTransition(layout, clips, shotId, 'end')
+  return { start: edgeTransition(layout, clips, shotId, 'start').transition, end: end.joined ? null : end.transition }
+}
+
 /** 클립에 붙은 것 — 빠르기 · 전환 · 모션 · 불투명도 · 자막. 영상 컷과 제목 클립이 같은 꼴로 쓴다(2단계 ④ · ⑥). */
-function clipExtras(shot: Shot | undefined, clip: VideoClip | undefined): string[] {
+function clipExtras(shot: Shot | undefined, clip: VideoClip | undefined, edges: { start: ClipTransition | null; end: ClipTransition | null }): string[] {
   const motion = clip?.motion
   return [
     clip?.speed && clip.speed !== 1 ? `speed ${clip.speed}×` : null,
-    clip?.transitionIn ? `${TRANSITION_PHRASE[clip.transitionIn.type] ?? TRANSITION_PHRASE.dissolve} from the cut before (${clip.transitionIn.durationSec}s)` : null,
-    clip?.transitionOut ? `${TRANSITION_PHRASE[clip.transitionOut.type] ?? TRANSITION_PHRASE.dissolve} at its end (${clip.transitionOut.durationSec}s)` : null,
+    edges.start ? `${TRANSITION_PHRASE[edges.start.type] ?? TRANSITION_PHRASE.dissolve} from the cut before (${edges.start.durationSec}s)` : null,
+    edges.end ? `${TRANSITION_PHRASE[edges.end.type] ?? TRANSITION_PHRASE.dissolve} at its end (${edges.end.durationSec}s)` : null,
     motion && (motion.x !== 0 || motion.y !== 0) ? `position ${percent(motion.x)} ${percent(motion.y)}` : null,
     motion && motion.scale !== 1 ? `scale ${percent(motion.scale)}` : null,
     clip?.opacity !== undefined && clip.opacity !== 1 ? `opacity ${percent(clip.opacity)}` : null,
@@ -40,6 +50,8 @@ function clipExtras(shot: Shot | undefined, clip: VideoClip | undefined): string
 
 export function editorChatContext(input: EditorChatContextInput): string {
   const layout = selectTimelineLayout(input)
+  // 전환은 줄마다 맞닿은 이웃으로 판단한다 — 모든 영상 줄의 자리.
+  const videoLayout = selectVideoLayout(input)
   const total = layout.reduce((sum, item) => sum + item.durationSec, 0)
   const titleCount = layout.filter((item) => input.shots.find((shot) => shot.shotId === item.shotId)?.titleCard).length
   const lines = [
@@ -59,7 +71,7 @@ export function editorChatContext(input: EditorChatContextInput): string {
         : `${shot?.shotType ?? 'Shot'} · "${short(shot?.actionDescription ?? '')}"`
     const extras = [
       ...(clip && !shot?.titleCard && !shot?.titleText && (clip.status !== 'completed' || !clip.url) ? ['no video yet'] : []),
-      ...clipExtras(shot, clip),
+      ...clipExtras(shot, clip, edgesOf(videoLayout, input.videoClips, item.shotId)),
     ]
     lines.push(`${index + 1}. ${range} ${what}${extras.length ? ` · ${extras.join(' · ')}` : ''}`)
   })
@@ -70,7 +82,7 @@ export function editorChatContext(input: EditorChatContextInput): string {
       `Titles over the video: ${titles
         .map((item) => {
           const shot = input.shots.find((s) => s.shotId === item.shotId)
-          const extras = clipExtras(shot, input.videoClips.find((c) => c.shotId === item.shotId))
+          const extras = clipExtras(shot, input.videoClips.find((c) => c.shotId === item.shotId), edgesOf(videoLayout, input.videoClips, item.shotId))
           const what = `${item.trackId.toUpperCase()} title "${short(shot?.titleText?.text ?? '')}" ${secs(item.startSec)}–${secs(item.startSec + item.durationSec)}`
           return `${what}${extras.length ? ` · ${extras.join(' · ')}` : ''}`
         })
