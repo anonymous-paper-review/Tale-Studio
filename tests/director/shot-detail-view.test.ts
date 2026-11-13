@@ -19,6 +19,7 @@ import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import type { VideoNodeData } from '@/types/director'
+import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 
 let shotId = ''
 const IMAGE = { url: 'https://media.test/start.png', status: 'completed' as const, errorMessage: null, generatedAt: 1, frames: { start: 'https://media.test/start.png', direction: 'https://media.test/dir.png', end: 'https://media.test/end.png' } }
@@ -122,6 +123,35 @@ describe('Director 샷 상세 화면', () => {
     setLocale('ko')
     expect(render('popup')).toContain('다음: 영상 만들기 · 5 Take')
     expect(readFileSync('src/features/director/shot-detail/director-shot-detail.tsx', 'utf8')).toMatch(/remakeShotVideo\(shotNodeId\)/)
+  })
+
+  it('이미지 탭은 시작 · 끝 그림 아래 버전 줄(v1 · v2 …)을 하나 보이고, 지금 그림인 버전이 눌린 채 보인다', () => {
+    // 왜: D6 "v1 · v2를 누르면 그 버전으로 돌아가요" — 1단계는 시작 · 끝이 함께라 줄은 하나(혼자 정한 것), 많으면 옆으로 넘긴다(리드 답).
+    const version = (id: string, tag: string, at: number) => ({ id, url: `https://media.test/${tag}-s.png`, frames: { start: `https://media.test/${tag}-s.png`, direction: `https://media.test/${tag}-d.png`, end: `https://media.test/${tag}-e.png` }, generatedAt: at, source: 'generated' as const })
+    const two = withStoryboardVersion(withStoryboardVersion(null, version('job-1', 'a', 1), { select: true }), version('job-2', 'b', 2), { select: true })
+    director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: two })
+    const out = render('popup')
+    expect(out).toContain('data-testid="shot-detail-versions"')
+    expect(out).toMatch(/aria-pressed="false"[^>]*>v1</)
+    expect(out).toMatch(/aria-pressed="true"[^>]*>v2</)
+    expect(out).toMatch(/class="[^"]*overflow-x-auto[^"]*" data-testid="shot-detail-versions"/)
+    expect(out).toContain('Click v1 or v2 to go back to that version.')
+    setLocale('ko')
+    expect(render('popup')).toContain('버전(v1 · v2)을 누르면 그 버전으로 돌아가요.')
+    expect(readFileSync('src/features/director/shot-detail/shot-image-tab.tsx', 'utf8')).toMatch(/selectStoryboardImageVersion\(nodeId, version\.id\)/)
+  })
+
+  it('Take 카드는 그 Take 가 쓴 이미지 버전을 "시작 v1 + 끝 v1 · 모델 · 해상도"로 보이고, 지금 버전과 다르면 "이미지가 바뀌었어요"를 보인다', () => {
+    // 왜: D7 Take 카드 "시작 v1 + 끝 v1 · Seedance 2.0" — 어느 그림으로 만든 영상인지 보인다(리드 B). 지금 그림이 v2 면 그 Take 는 옛 그림이다.
+    const version = (id: string, tag: string, at: number) => ({ id, url: `https://media.test/${tag}-s.png`, frames: { start: `https://media.test/${tag}-s.png`, direction: `https://media.test/${tag}-d.png`, end: `https://media.test/${tag}-e.png` }, generatedAt: at, source: 'generated' as const })
+    const two = withStoryboardVersion(withStoryboardVersion(null, version('job-1', 'a', 1), { select: true }), version('job-2', 'b', 2), { select: true })
+    director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: two })
+    done(1, { madeFrames: { start: 'https://media.test/a-s.png?v=1', end: 'https://media.test/a-e.png' } })
+    const out = render('panel', 'video')
+    expect(out).toContain('Start v1 + End v1 · Seedance 2.0 · 720p')
+    expect(out).toContain('The start and end images changed · A new Take will use them')
+    setLocale('ko')
+    expect(render('panel', 'video')).toContain('시작 v1 + 끝 v1 · Seedance 2.0 · 720p')
   })
 
   it('상세에는 이미지 · 영상 탭이 있고 영상이 없으면 "영상 · 없음"이다', () => {

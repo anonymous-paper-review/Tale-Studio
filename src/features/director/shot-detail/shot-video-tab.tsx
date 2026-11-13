@@ -22,10 +22,11 @@ import {
   type VideoResolution,
 } from '@/lib/video-models'
 import {
-  imageChangedSinceTake,
+  imageChangedForTake,
   newTakeRequest,
   shotDetailFrames,
   shotDetailTakes,
+  takeImageVersions,
   takePhaseOf,
   takeSettings,
   type ShotDetailTake,
@@ -62,6 +63,13 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
   const [w, h] = aspectRatioFromFormat(projectFormat ?? 'horizontal_16:9').split(':').map(Number)
   const portrait = !!w && !!h && w < h
 
+  // "시작 v1 + 끝 v1"(D7 · 리드 B) — 그 Take 를 만든 작업이 쓴 그림을 지금 버전 목록과 맞춘다. 모르면 비운다.
+  const madeWith = (take: ShotDetailTake): string | null => {
+    const used = takeImageVersions(data.storyboardImage, take.data)
+    if (!used?.start) return null
+    return t('Start v{start} + End v{end}', { start: used.start, end: used.end ?? used.start })
+  }
+
   const markFinal = async (take: ShotDetailTake, next: boolean) => {
     setFinalError(null)
     try {
@@ -96,7 +104,9 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                       </span>
                     </div>
                   ) : phase === 'done' ? (
-                    <p className="text-caption text-subtle-foreground">{`${VIDEO_MODELS[setup.model].label} · ${resolution}`}</p>
+                    <p className="text-caption text-subtle-foreground">
+                      {[madeWith(take), VIDEO_MODELS[setup.model].label, resolution].filter(Boolean).join(' · ')}
+                    </p>
                   ) : phase === 'failed' ? (
                     <p className="line-clamp-2 text-caption text-destructive">
                       {t('Failed')}{take.data.lastAttemptError || take.data.errorMessage ? ` · ${(take.data.lastAttemptError || take.data.errorMessage || '').split('\n')[0]}` : ''}
@@ -215,8 +225,7 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
   const [change, setChange] = useState('')
   const [sending, setSending] = useState(false)
   const hasImage = !!shotDetailFrames(data.storyboardImage).start
-  const image = data.storyboardImage
-  const imageChanged = !!current && image?.status === 'completed' && imageChangedSinceTake(image.generatedAt, current.data)
+  const imageChanged = !!current && imageChangedForTake(data.storyboardImage, current.data)
   const showCost = takeBalance.mode !== 'off'
   const count = takeCostForVideo(provider, resolution)
   const label = !current

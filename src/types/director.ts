@@ -82,6 +82,27 @@ export type StoryboardImage = {
   stripUrl?: string
   /** 약속 I4(2026-09-04): 이 실사가 참조한 러프의 generatedAt. 지금 러프와 다르면 "러프 바뀜". 옛 행은 없음(판정 안 함). */
   roughGeneratedAt?: number | null
+  /** 버전 기록(디자이너 11/13 D6 · 오너 2026-11-14 답 5번) — 만들 때마다 하나씩 쌓이고 저절로 지우지 않는다.
+   *  위 칸(url · frames · generatedAt)은 고른 버전(versionId)을 그대로 비춘다 — 읽는 쪽은 바뀌지 않는다. 없으면 옛 행(지금 그림 = v1). */
+  versions?: StoryboardImageVersion[]
+  versionId?: string | null
+  /** 쓰기 차례 — 두 쓰기가 겹치면 뒤 쓰기가 다시 읽고 쓴다(버전을 잃지 않게). */
+  rev?: number
+}
+
+/** 실사 이미지 버전 하나 — 그림 파일은 작업마다 새 이름이라 덮어쓰지 않는다. */
+export type StoryboardImageVersion = {
+  /** 만든 작업 id · 올린 그림 'upload-…' · 버전 기록 전 그림 'legacy'. */
+  id: string
+  /** v1 · v2 … — 한 번 붙인 번호는 다시 쓰지 않는다. */
+  n: number
+  url: string
+  frames?: { start: string; direction: string; end: string }
+  generatedAt: number
+  source: 'generated' | 'upload'
+  roughGeneratedAt?: number | null
+  /** 화면에서 멈춘 작업이 뒤늦게 끝난 그림 — 기록에만 있고 저절로 지금 그림이 되지 않는다(오너 7번). */
+  cancelled?: true
 }
 
 // ─── Scene Node ────────────────────────────────────────────────────────────
@@ -204,6 +225,9 @@ type VideoNodeCommonData = {
   /** 지금 영상이 실제로 만들어진 해상도(그 영상을 낸 작업 기록 기준, 2026-10-31 리뷰). null/없음 = 모름 · 1080p 아님.
    *  다음에 만들 해상도(설정)는 override.resolution — 둘은 다를 수 있다. */
   videoResolution?: VideoResolution | null
+  /** 지금 영상을 낸 작업이 실제로 쓴 시작 · 끝 그림 주소(작업 기록 기준, 디자이너 11/13 D7 · 리드 B). 모르면 null/없음.
+   *  화면이 샷의 이미지 버전과 맞춰 "시작 v1 + 끝 v1"을 낸다. */
+  madeFrames?: { start: string | null; end: string | null } | null
   [key: string]: unknown
 }
 

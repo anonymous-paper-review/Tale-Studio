@@ -4,6 +4,7 @@
 import { storyboardImageEndFrame, storyboardImageStartFrame } from '@/lib/director/storyboard-image'
 import { IMAGE_MODEL_ORDER, imageModelSupportsSheetCanvas, type ImageModelKey } from '@/lib/image-models'
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
+import { currentStoryboardVersion, versionOfFrames } from '@/lib/director/storyboard-image-versions'
 import { DEFAULT_VIDEO_RESOLUTION, isVideoResolution, normalizeProvider, type VideoModelKey, type VideoResolution } from '@/lib/video-models'
 import type { DirectorNode, ShotNodeData, StoryboardImage, VideoNodeData, VideoOverride } from '@/types/director'
 
@@ -105,4 +106,19 @@ export function newTakeRequest(input: {
 export function imageChangedSinceTake(imageGeneratedAt: number | null | undefined, take: Pick<VideoNodeData, 'createdAt' | 'lastAttemptAt'>): boolean {
   const madeAt = Date.parse(String(take.lastAttemptAt ?? take.createdAt ?? ''))
   return typeof imageGeneratedAt === 'number' && Number.isFinite(madeAt) && imageGeneratedAt > madeAt
+}
+
+/** Take 가 쓴 이미지 버전("시작 v1 + 끝 v1", D7 · 리드 B) — 작업 기록의 그림 주소를 샷의 버전 목록과 맞춘다. 모르면 null. */
+export function takeImageVersions(image: StoryboardImage | null | undefined, take: Pick<VideoNodeData, 'madeFrames'>): { start: number | null; end: number | null } | null {
+  return versionOfFrames(image, take.madeFrames ?? null)
+}
+
+/** 보던 Take 와 지금 이미지가 다른가 — Take 가 쓴 버전을 알면 버전으로(되돌린 옛 버전도 "바뀜"), 모르면 만든 때와 그린 때로. */
+export function imageChangedForTake(image: StoryboardImage | null | undefined, take: Pick<VideoNodeData, 'madeFrames' | 'createdAt' | 'lastAttemptAt'>): boolean {
+  if (!image) return false
+  const used = takeImageVersions(image, take)
+  const current = currentStoryboardVersion(image)
+  if (used?.start != null && current) return used.start !== current.n
+  if (image.status !== 'completed') return false
+  return imageChangedSinceTake(image.generatedAt, take)
 }

@@ -57,6 +57,7 @@ import type { Json } from '@/types/database'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { parseDirectorRefs } from '@/lib/director/director-refs'
 import { latestShotTake, promptWithChange } from '@/lib/director/shot-detail'
+import { keptStoryboardImage, selectStoryboardVersion, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import {
   isEmptyStableFrameInputs,
   parseStableFrameInputs,
@@ -230,6 +231,8 @@ type HydratedVideoTake = {
   video_chain?: unknown
   /** 지금 영상이 1080p 로 만들어졌으면 '1080p' — video-takes 목록이 그 영상을 낸 작업 기록으로 정한다. 모르면 null. */
   video_resolution?: string | null
+  /** 지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소(디자이너 11/13 D7 · 리드 B). 모르면 null. */
+  made_frames?: unknown
 }
 type VideoGenerationResponse = {
   error?: string
@@ -1255,6 +1258,9 @@ interface DirectorCanvasState {
 
   // video generation (ST-4, I2V/T2V) — 항상 사용자 클릭으로만 (결정 #40)
   /** Shot에 새 Video take 생성 + 영상 생성 API 호출(+폴링). storyboardImage 있으면 I2V. 생성된 Video 노드 id 반환 */
+  /** 실사 이미지 버전 고르기(디자이너 11/13 D6 · 리드 A) — 다시 만들지 않고(Take 0) 그 버전이 지금 그림이 된다.
+   *  화면은 바로 바꾸고 서버 답으로 맞춘다. 서버가 바꾸지 못하면 되돌리고 false. */
+  selectStoryboardImageVersion: (shotNodeId: string, versionId: string) => Promise<boolean>
   /** 다시 만들기 — 늘 새 Take 이고 그 샷의 가장 최근 Take(실패해도)의 설정을 이어받는다(마지막 모델 · 해상도).
    *  Take 가 없으면 샷 설정. 상세 · entry D8 [다시 만들기] · Lumi 가 같이 쓴다. */
   remakeShotVideo: (shotNodeId: string) => Promise<string | null>
@@ -1510,6 +1516,14 @@ export function getVideoNodeResolution(
   if (!video || !isVideoData(video.data) || video.data.parentShotNodeId === null) return DEFAULT_VIDEO_RESOLUTION
   const chosen = video.data.override.resolution
   return isVideoResolution(chosen) ? chosen : DEFAULT_VIDEO_RESOLUTION
+}
+
+/** 테이크 목록의 made_frames(지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소) — 모양이 다르면 모른다(null). */
+function parseMadeFrames(value: unknown): VideoNodeData['madeFrames'] {
+  if (!value || typeof value !== 'object') return null
+  const { start, end } = value as { start?: unknown; end?: unknown }
+  const text = (v: unknown) => (typeof v === 'string' && v ? v : null)
+  return text(start) || text(end) ? { start: text(start), end: text(end) } : null
 }
 
 function videoOwnerKey(data: VideoNodeData): string {
@@ -2053,6 +2067,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                       : row.url && row.url === existingNode.data.videoUrl
                         ? existingNode.data.videoResolution ?? null
                         : null,
+                    // 지금 영상을 낸 작업이 쓴 그림(리드 B) — 해상도와 같은 규칙: 서버가 모를 때도 같은 영상이면 아는 값을 둔다.
+                    madeFrames: parseMadeFrames(row.made_frames)
+                      ?? (row.url && row.url === existingNode.data.videoUrl ? existingNode.data.madeFrames ?? null : null),
                   },
                 } as DirectorNode
                 if (standaloneConfig) {
@@ -2088,6 +2105,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               data.status = hydratedVideoStatus(row)
               data.adherence = (row.adherence as VideoAdherence | null) ?? null
               data.videoResolution = isVideoResolution(row.video_resolution) ? row.video_resolution : null
+              data.madeFrames = parseMadeFrames(row.made_frames)
               const id = newDirectorId('dn')
               nodes = [...nodes, {
                 id,
@@ -4037,6 +4055,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           return { jobId: null, status: 'deduped' }
         }
         const prevUrl = data.storyboardImage?.url ?? ''
+        // 만드는 중 · 실패 · 기다림 표시에도 지금 그림의 프레임 · 버전은 그대로(디자이너 11/13 D6 — 버전 줄 · 끝 그림이 사라지지 않게).
+        const kept = keptStoryboardImage(data.storyboardImage)
         const prompt = promptWithChange(effectivePrompt(data) || data.label, options?.changeNote ?? '')
 
         const storyboardAlreadyGenerating = api.nodes.some(
@@ -4052,6 +4072,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // status → generating (storyboardImage는 shotConfigKeys 아님 → stale 전파 없음)
         api.updateNodeData<'shot'>(shotNodeId, {
           storyboardImage: {
+            ...kept,
             url: prevUrl,
             status: 'generating',
             errorMessage: null,
@@ -4078,7 +4099,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           refreshGenerationQueue()
           const notice = translate(useLocaleStore.getState().locale, 'Checking the image request. It may still be running.')
           get().updateNodeData<'shot'>(shotNodeId, {
-            storyboardImage: { url: prevUrl, status: 'generating', errorMessage: notice, generatedAt: data.storyboardImage?.generatedAt ?? 0 },
+            storyboardImage: { ...kept, url: prevUrl, status: 'generating', errorMessage: notice, generatedAt: data.storyboardImage?.generatedAt ?? 0 },
           })
         }
         if (writerShotId && projectId) {
@@ -4124,13 +4145,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 if (outcome === 'ready' && depth < 3) {
                   notifyPrerequisiteResumed(body)
                   get().updateNodeData<'shot'>(shotNodeId, {
-                    storyboardImage: { ...data.storyboardImage, url: prevUrl, status: 'pending', errorMessage: null, generatedAt: data.storyboardImage?.generatedAt ?? 0 },
+                    storyboardImage: { ...data.storyboardImage, ...kept, url: prevUrl, status: 'pending', errorMessage: null, generatedAt: data.storyboardImage?.generatedAt ?? 0 },
                   })
                   return get().generateStoryboardImage(shotNodeId, { ...options, resumeDepth: depth + 1 })
                 }
                 if (outcome === 'timeout') notifyPrerequisiteTimeout('director', body)
                 get().updateNodeData<'shot'>(shotNodeId, {
                   storyboardImage: {
+                    ...kept,
                     url: prevUrl,
                     status: 'pending',
                     errorMessage: null,
@@ -4142,6 +4164,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               if (notifyIfQuotaExceeded(res.status, body)) {
                 get().updateNodeData<'shot'>(shotNodeId, {
                   storyboardImage: {
+                    ...kept,
                     url: prevUrl,
                     status: 'pending',
                     errorMessage: null,
@@ -4204,6 +4227,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             }
             get().updateNodeData<'shot'>(shotNodeId, {
               storyboardImage: {
+                ...kept,
                 url: prevUrl,
                 status: 'failed',
                 errorMessage: message,
@@ -4262,13 +4286,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             )) ?? blobUrl
 
           if (get().projectId !== projectId) return { jobId: null, status: 'completed', resultUrl: publicUrl }
+          // 캔버스에서 만든 샷은 화면이 그림을 들고 있다 — 버전도 여기서 쌓는다(Writer 샷은 서버가 쌓는다).
           get().updateNodeData<'shot'>(shotNodeId, {
-            storyboardImage: {
+            storyboardImage: withStoryboardVersion(data.storyboardImage, {
+              id: `local-${crypto.randomUUID()}`,
               url: publicUrl,
-              status: 'completed',
-              errorMessage: null,
               generatedAt: Date.now(),
-            },
+              source: 'generated',
+            }, { select: true }),
           })
           return { jobId: null, status: 'completed', resultUrl: publicUrl }
         } catch (err) {
@@ -4286,6 +4311,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               : 'Unknown error'
           get().updateNodeData<'shot'>(shotNodeId, {
             storyboardImage: {
+              ...kept,
               url: prevUrl,
               status: 'failed',
               errorMessage: message,
@@ -4337,6 +4363,35 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       // 연타 방어는 아래 acquireGenerationLock 이 이미 담당한다 — 1초 창이 아니라 생성 전 구간을
       //   잠그므로 더 강하다. 여기에 창을 덧대면 앞 시도가 *끝난 뒤*의 정당한 재시도까지 막힌다.
+      selectStoryboardImageVersion: async (shotNodeId, versionId) => {
+        const node = get().nodes.find((n) => n.id === shotNodeId)
+        if (!node || !isShotData(node.data)) return false
+        const before = node.data.storyboardImage
+        const next = selectStoryboardVersion(before, versionId)
+        if (!next) return false
+        get().updateNodeData<'shot'>(shotNodeId, { storyboardImage: next })
+        const writerShotId = node.data.writerShotId
+        const projectId = get().projectId
+        // 캔버스에서 만든 샷은 화면이 그림을 들고 있다 — 화면에서만 바꾼다.
+        if (!writerShotId || !projectId) return true
+        try {
+          const res = await fetch('/api/director/storyboard-image/version', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ projectId, writerShotId, versionId }),
+          })
+          if (!res.ok) throw new Error(`HTTP ${res.status}`)
+          const { image } = (await res.json()) as { image: NonNullable<ShotNodeData['storyboardImage']> }
+          if (get().projectId === projectId) get().updateNodeData<'shot'>(shotNodeId, { storyboardImage: image })
+          void invalidateShots(projectId)
+          return true
+        } catch (error) {
+          console.error('[director] image version select failed:', error instanceof Error ? error.message : error)
+          if (get().projectId === projectId) get().updateNodeData<'shot'>(shotNodeId, { storyboardImage: before })
+          return false
+        }
+      },
+
       remakeShotVideo: (shotNodeId) => {
         const latest = latestShotTake(get().nodes, shotNodeId)
         return get().generateVideoForShot(shotNodeId, latest ? { inheritFromVideoNodeId: latest.id } : undefined)

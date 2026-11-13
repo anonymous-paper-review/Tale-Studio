@@ -14,6 +14,7 @@ import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
 import { detailImageModels, shotDetailFrames } from '@/lib/director/shot-detail'
+import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/director/storyboard-image-versions'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -41,8 +42,11 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   const worldRecords = useAssetStorageStore((s) => s.worlds)
   const characters = useMemo(() => Object.values(characterRecords).filter((c) => c.projectId === projectId), [characterRecords, projectId])
   const worlds = useMemo(() => Object.values(worldRecords).filter((w) => w.projectId === projectId), [worldRecords, projectId])
+  const selectStoryboardImageVersion = useDirectorCanvasStore((s) => s.selectStoryboardImageVersion)
   const [change, setChange] = useState('')
   const frames = shotDetailFrames(data.storyboardImage)
+  const versions = storyboardImageVersions(data.storyboardImage)
+  const current = currentStoryboardVersion(data.storyboardImage)
   const hasImage = !!frames.start
   const frameStyle = mediaFrameStyle(projectFormat, layout === 'popup' ? 360 : 200)
   const model = normalizeImageModelKey(data.imageModel)
@@ -65,7 +69,26 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
       <div className="grid grid-cols-2 gap-3">
         {(['start', 'end'] as const).map((which) => <LockedFrame key={which} which={which} url={frames[which]} style={frameStyle} />)}
       </div>
-      <p className="text-caption text-subtle-foreground">{t('Start and end images are remade together for now.')}</p>
+      {/* 버전 줄(D6) — 1단계는 시작 · 끝이 함께라 줄은 하나. 저절로 지우지 않으니 많으면 옆으로 넘긴다(리드 답). 고르기는 Take 0. */}
+      {versions.length ? (
+        <div className="flex gap-1.5 overflow-x-auto pb-1" data-testid="shot-detail-versions" role="group" aria-label={t('Image versions')}>
+          {versions.map((version) => {
+            const active = version.id === current?.id
+            return (
+              <button key={version.id} type="button" aria-pressed={active}
+                title={version.source === 'upload' ? t('Uploaded image') : version.cancelled ? t('Finished after it was stopped') : undefined}
+                onClick={() => { if (!active) void selectStoryboardImageVersion(nodeId, version.id) }}
+                className={cn('shrink-0 rounded-full border px-2.5 py-0.5 font-num text-caption transition-colors', active ? 'border-info bg-info/15 text-foreground' : 'border-border text-muted-foreground hover:bg-accent')}>
+                {`v${version.n}`}
+              </button>
+            )
+          })}
+        </div>
+      ) : null}
+      <p className="text-caption text-subtle-foreground">
+        {t('Start and end images are remade together for now.')}
+        {versions.length > 1 ? ` ${t('Click v1 or v2 to go back to that version.')}` : null}
+      </p>
     </div>
   )
 

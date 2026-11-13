@@ -3,15 +3,18 @@ import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
   detailImageModels,
+  imageChangedForTake,
   imageChangedSinceTake,
   latestShotTake,
   newTakeRequest,
   promptWithChange,
   shotDetailFrames,
   shotDetailTakes,
+  takeImageVersions,
   takeSettings,
   videoTabLabelKey,
 } from '@/lib/director/shot-detail'
+import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import type { DirectorNode, ShotNodeData, VideoNodeData } from '@/types/director'
 
 const shot = (over: Partial<ShotNodeData> = {}): ShotNodeData => ({
@@ -157,5 +160,19 @@ describe('Director 샷 상세', () => {
     expect(takeSettings(shot({ provider: 'seedance' }), latest!.data)).toEqual({ model: 'kling-o3', resolution: '720p' })
     expect(latestShotTake([], 'shot-1')).toBeNull()
     expect(takeSettings(shot({ provider: 'seedance' }), null)).toEqual({ model: 'seedance', resolution: '720p' })
+  })
+
+  it('Take 가 쓴 이미지 버전이 지금 버전과 다르면 "이미지가 바뀌었어요"로 보고, 그 버전으로 되돌리면 바뀌지 않은 것으로 본다', () => {
+    // 왜: D7 · 리드 B — v2 로 만든 Take 를 보다가 v1 로 되돌리면 시각으로는 "안 바뀜"이지만 실제로는 다른 그림이다. 버전이 시각보다 먼저다.
+    const v = (id: string, tag: string, at: number) => ({ id, url: `https://media.test/${tag}-s.png`, frames: { start: `https://media.test/${tag}-s.png`, direction: `https://media.test/${tag}-d.png`, end: `https://media.test/${tag}-e.png` }, generatedAt: at, source: 'generated' as const })
+    const two = withStoryboardVersion(withStoryboardVersion(null, v('job-1', 'a', Date.parse('2026-11-14T00:00:00Z')), { select: true }), v('job-2', 'b', Date.parse('2026-11-14T01:00:00Z')), { select: true })
+    const madeWithV2 = take('t1', 1, { createdAt: '2026-11-14T02:00:00Z', madeFrames: { start: 'https://media.test/b-s.png?v=1', end: 'https://media.test/b-e.png' } }).data as VideoNodeData
+    expect(takeImageVersions(two, madeWithV2)).toEqual({ start: 2, end: 2 })
+    expect(imageChangedForTake(two, madeWithV2)).toBe(false)
+    const backToV1 = withStoryboardVersion(two, v('job-1', 'a', Date.parse('2026-11-14T00:00:00Z')), { select: true })
+    expect(imageChangedForTake(backToV1, madeWithV2)).toBe(true)
+    // 버전을 모르는 옛 Take 는 시각으로 본다.
+    const legacyTake = take('t0', 1, { createdAt: '2026-11-14T00:30:00Z' }).data as VideoNodeData
+    expect(imageChangedForTake(two, legacyTake)).toBe(true)
   })
 })
