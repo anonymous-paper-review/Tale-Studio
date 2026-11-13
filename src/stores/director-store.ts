@@ -5002,6 +5002,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             generationJobId: jobId,
             lastAttemptStatus: body.status === 'queued' ? 'generating' : body.status ?? 'generating',
           })
+          // 진짜 작업 id 를 적었으니 도는 작업 목록을 바로 다시 읽는다 — [멈추기]는 그 목록에 든 작업에만 보여(검토 a), 다음 조회까지 늦게 뜨지 않게.
+          //   이미지 길과 같다.
+          refreshGenerationQueue()
           activeJobId = jobId
           options?.onJob?.({ jobId, status: 'queued', httpStatus: res.status })
           const isCurrentAttempt = () => {
