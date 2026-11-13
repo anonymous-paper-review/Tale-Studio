@@ -13,9 +13,9 @@ import { Slider } from '@/components/ui/slider'
 import { AUDIO_FADE_LABEL, TRANSITION_CHOICES, TRANSITION_LABEL, edgeTransition, type TransitionEdge } from '@/lib/editor/transition'
 import { VIDEO_EFFECTS, VIDEO_EFFECT_DEFAULT, VIDEO_EFFECT_LABEL } from '@/lib/editor/video-effects'
 import { TITLE_PLACES, TITLE_PLACE_LABEL, TITLE_SIZE_DEFAULT, TITLE_SIZE_MAX, TITLE_SIZE_MIN } from '@/lib/editor/title-clip'
-import { clipSpanLine, shotLabel } from '@/features/editor/editor-labels'
+import { clipDisplayName, clipSpanLine } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
-import { isSyntheticShotId, isTitleCardShotId, isTitleClipShotId, rootShotIdOf, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
+import { isTitleCardShotId, isTitleClipShotId, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
 
 /** 효과 컨트롤의 속도 칸(시안 E1 409:4707–4713). 지금 빠르기가 그 밖이면(우클릭으로 0.25~4배) 그 값 칸을 하나 더 붙인다. */
 export const SPEED_CHOICES = [0.5, 1, 1.5, 2] as const
@@ -264,13 +264,8 @@ export function EffectControls() {
   // 크기 · 위치는 고른 제목 클립 모두에 — 글자는 머리 클립 하나만(여러 제목에 같은 글자를 쓸 일이 없다).
   const titleTargets = targets.filter((id) => isTitleClipShotId(id))
   const clip = videoClips.find((c) => c.shotId === item.shotId)
-  const rootId = rootShotIdOf(item.shotId)
-  const number = shots.filter((s) => !isSyntheticShotId(s.shotId)).findIndex((s) => s.shotId === rootId)
-  const rootClip = videoClips.find((c) => c.shotId === rootId)
-  const title =
-    targets.length > 1
-      ? t('{count} clips', { count: targets.length })
-      : shotLabel({ number: number >= 0 ? number + 1 : null, shotType: shot?.shotType, takeNumber: rootClip?.takeNumber, isTitleCard, titleText: titleText?.text ?? null }, t)
+  // 머리 이름 — 내보낸 파일의 자리표시와 같은 화면 이름(clipDisplayName).
+  const title = targets.length > 1 ? t('{count} clips', { count: targets.length }) : clipDisplayName({ shots, videoClips }, item.shotId, t)
   const speed = clip?.speed ?? 1
   const motion = clip?.motion ?? { x: 0, y: 0, scale: 1 }
   const opacity = clip?.opacity ?? 1

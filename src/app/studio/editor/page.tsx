@@ -7,7 +7,7 @@ import { Button } from '@/components/ui/button'
 import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { AiBusyCard } from '@/components/ai-busy-overlay'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
-import { editorEmptyScreen, editorPrepTitle, titleNoTrackNotice } from '@/features/editor/editor-labels'
+import { clipDisplayName, editorEmptyScreen, editorPrepTitle, titleNoTrackNotice } from '@/features/editor/editor-labels'
 import { EDITOR_FETCH_LIMIT, finishEditorOpen, runLimited } from '@/features/editor/open-editor'
 import { VideoPreviewer } from '@/features/editor/video-previewer'
 import { Timeline } from '@/features/editor/timeline'
@@ -200,6 +200,8 @@ export default function PostPage() {
         overlay: st.overlay,
         videoTracks: st.videoTracks,
         frameSize: exportFrameSize(useProjectFormatStore.getState().format),
+        // 영상이 없는 클립 자리표시에는 화면 이름(효과 컨트롤 머리와 같다) — 내부 샷 id 를 찍지 않는다(리드 11/14 L2).
+        clipLabel: (shotId) => clipDisplayName(st, shotId, t),
         audioClips: st.audioClips,
         audioTracks: st.audioTracks,
         signal: ctrl.signal,

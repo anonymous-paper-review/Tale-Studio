@@ -29,7 +29,7 @@ import { audioSourceTime } from '@/lib/editor/audio-time'
 import { timelineEnd } from '@/lib/editor/timeline-segments'
 import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
 import { syncLayerVideo } from '@/lib/editor/layer-sync'
-import { DEFAULT_VIDEO_TRACKS, selectFrameAt, selectVideoLayout, type FramePlan, type OverlayPlacements, type VideoTrackState } from '@/stores/editor-store'
+import { DEFAULT_VIDEO_TRACKS, coversFrame, selectFrameAt, selectVideoLayout, type FramePlan, type OverlayPlacements, type VideoTrackState } from '@/stores/editor-store'
 
 /** 그릴 것 목록의 바탕 — 샷 · 클립 · V1 차례 · V1 밖 자리 · 줄. */
 type FrameInput = Parameters<typeof selectFrameAt>[0]
@@ -63,13 +63,14 @@ export interface DraftRenderStats {
   /** 영상이 없거나 불러오지 못해 자리표시 화면으로 들어간 클립 수(그 시각 맨 위였던 클립). */
   skippedClips: number
   /**
-   * 끊김 재기(개발용 — 화면 글 없음, 2단계 ⑦-3): 녹화하는 동안 돈 장 수 · 보이는 영상 층이 그림을 못 내 그리지 않은(직전 장이 남은) 장 수 ·
-   *   가장 긴 멈춤(밀리초) · 장마다 그림을 못 낸 보이는 영상 층 수의 합.
+   * 끊김 재기(개발용 — 화면 글 없음, 2단계 ⑦-3): 녹화하는 동안 돈 장 수 · 기다릴 층(맨 위 · 화면을 다 덮는 층)이 그림을 못 내 그리지 않은
+   *   (직전 장이 남은) 장 수 · 가장 긴 멈춤(밀리초) · 장마다 그림을 못 낸 기다릴 층 수의 합 · 장마다 늦어 빼고 그린 층 수의 합.
    */
   frames: number
   stalledFrames: number
   longestStallMs: number
   waitingLayers: number
+  droppedLayers: number
 }
 
 /** 맨 위 클립 차례(selectProgramLayout) — 영상 줄 끝을 셀 때. */
@@ -79,8 +80,12 @@ interface LayoutItem {
   durationSec: number
 }
 
-/** 그릴 것 목록 한 장을 그릴 바탕 — 클립마다 그림을 낸 영상, 미리 받은 타이틀 카드 그림, 샷 · 클립 값, 캔버스가 filter 를 그릴 줄 아는지. */
+/**
+ * 그릴 것 목록 한 장을 그릴 바탕 — 클립마다 그림을 낸 영상, 미리 받은 타이틀 카드 그림, 샷 · 클립 값, 캔버스가 filter 를 그릴 줄 아는지,
+ *   자리표시에 쓸 클립 화면 이름(Editor 와 같은 이름).
+ */
 export interface FrameSources {
+  label: (shotId: string) => string
   /** 그 클립의 그림을 낸 영상 — 영상이 없거나 불러오지 못했으면 null. */
   video: (shotId: string) => HTMLVideoElement | null
   titleCards: ReadonlyMap<string, { card: TitleCardData; image: HTMLImageElement | null }>
@@ -210,6 +215,22 @@ export function effectsInUse(input: FrameInput): boolean {
 }
 
 /**
+ * 그림을 늦게 내는 보이는 영상 층 가운데 그 장을 기다릴 층 수(wait)와 빼고 그릴 층 수(drop) — 맨 위 층(plan.topShotId)과 화면을 다 덮는
+ *   층(불투명 · 꽉 참 · 옅지 않음)만 기다리고, 그 밖의 층(줄인 아래 줄 · 옅은 교차 디졸브 짝)은 그 장에서 빼고 그린다(리드 11/14 L1 —
+ *   하나라도 늦으면 화면 전체가 최대 8초 직전 장에 멈췄다). late: 영상은 있는데 아직 그림을 못 낸 클립인가.
+ */
+export function lateLayers(plan: FramePlan, late: (shotId: string) => boolean, clips: ReadonlyMap<string, VideoClip>): { wait: number; drop: number } {
+  let wait = 0
+  let drop = 0
+  for (const layer of plan.layers) {
+    if (layer.kind !== 'video' || layer.alpha <= 0 || !late(layer.shotId)) continue
+    if (layer.shotId === plan.topShotId || (layer.alpha >= 1 && coversFrame(clips.get(layer.shotId)))) wait += 1
+    else drop += 1
+  }
+  return { wait, drop }
+}
+
+/**
  * 그릴 것 목록 한 장을 캔버스에 — 검정 바탕 위에 층을 아래부터 그 세기 · 모션 · 효과로, 맨 위 영상의 자막, 물들이기 막(자막 위). 모니터가 같은
  *   목록을 같은 셈으로 그린다(2단계 ⑦). 맨 위 영상이 없거나 못 불러오면 자리표시를 그리고, 아래 줄이면 건너뛴다(모니터는 안내 판).
  */
@@ -243,8 +264,8 @@ export function drawPlanFrame(ctx: CanvasRenderingContext2D, W: number, H: numbe
           if (filter) ctx.filter = filter
           drawCover(ctx, video, W, H)
         } else if (layer.shotId === plan.topShotId) {
-          const shot = src.shots.get(layer.shotId)
-          drawPlaceholder(ctx, W, H, shot?.shotType ? `${layer.shotId} · ${shot.shotType}` : layer.shotId)
+          // 자리표시 이름은 화면에 보이는 클립 이름(효과 컨트롤 머리와 같다) — 내부 샷 id 를 찍지 않는다(리드 11/14 L2).
+          drawPlaceholder(ctx, W, H, src.label(layer.shotId))
         }
       }
     }
@@ -286,6 +307,8 @@ export async function renderDraftTimeline(opts: {
   videoTracks: readonly VideoTrackState[]
   /** 내보내기 크기 — 시퀀스 크기(exportFrameSize, 위 둘째 줄과 같은 값). */
   frameSize: { width: number; height: number }
+  /** 클립의 화면 이름(Editor 와 같은 이름) — 영상이 없는 맨 위 클립의 자리표시에 쓴다. */
+  clipLabel: (shotId: string) => string
   audioClips: AudioTrackClip[]
   audioTracks: Array<{ id: string; muted?: boolean; solo?: boolean }>
   /** phase: 'prefetch'(클립 선다운로드) → 'record'(실시간 녹화). frac 0~1. */
@@ -389,22 +412,25 @@ export async function renderDraftTimeline(opts: {
     el.load()
   }
   const hasPicture = (el: HTMLVideoElement) => el.readyState >= 2 && !el.seeking && el.videoWidth > 0
+  const clipsById = new Map(videoClips.map((c) => [c.shotId, c]))
   const sources: FrameSources = {
+    label: opts.clipLabel,
     video: (shotId) => {
       const entry = pool.get(shotId)
       return entry && !failed(shotId) && hasPicture(entry.el) ? entry.el : null
     },
     titleCards,
     shots: new Map(shots.map((s) => [s.shotId, s])),
-    clips: new Map(videoClips.map((c) => [c.shotId, c])),
+    clips: clipsById,
     filterOk,
   }
 
   /**
    * 그 시각 목록의 영상 층(곧 그릴 층 포함)을 붙이고 모니터와 같은 함수로 시각을 맞춘다 — 목록에서 빠진 영상은 거둔다. 아직 그림을 못 낸
-   *   보이는 영상 층 수를 돌려준다(1 이상이면 그 장은 그리지 않는다). 8초 넘게 못 내면 그 클립은 못 불러온 것으로 친다.
+   *   보이는 영상 층 가운데 기다릴 층(맨 위 · 화면을 다 덮는 층) 수와 빼고 그릴 층 수를 돌려준다(기다릴 층이 있으면 그 장은 그리지 않는다).
+   *   8초 넘게 못 내면 그 클립은 못 불러온 것으로 친다.
    */
-  const prepare = (plan: FramePlan, playing: boolean): number => {
+  const prepare = (plan: FramePlan, playing: boolean): { wait: number; drop: number } => {
     const wanted = new Set<string>()
     for (const layer of [...plan.layers, ...plan.preload]) {
       if (layer.kind !== 'video') continue
@@ -418,7 +444,6 @@ export async function renderDraftTimeline(opts: {
       release(entry.el)
       pool.delete(id)
     }
-    let waiting = 0
     const now = performance.now()
     for (const layer of plan.layers) {
       if (layer.kind !== 'video' || layer.alpha <= 0) continue
@@ -430,12 +455,16 @@ export async function renderDraftTimeline(opts: {
       }
       entry.waitingSince ??= now
       if (now - entry.waitingSince > LOAD_TIMEOUT_MS) failedUrls.add(clipUrl(layer.shotId) as string)
-      else waiting += 1
     }
+    // 늦은 층 — 영상은 있는데(못 불러온 것으로 치지 않은) 아직 그림을 못 냈다.
+    const late = lateLayers(plan, (shotId) => {
+      const entry = pool.get(shotId)
+      return !!entry && !failed(shotId) && !hasPicture(entry.el)
+    }, clipsById)
     // 맨 위 영상이 없거나 못 불러오면 자리표시로 들어간다 — 끝에 그 클립 수를 알린다.
     const top = plan.layers.find((l) => l.shotId === plan.topShotId)
     if (top?.kind === 'video' && top.alpha > 0 && failed(top.shotId)) placeholderIds.add(top.shotId)
-    return waiting
+    return late
   }
 
   const mimeType = pickMimeType()
@@ -461,6 +490,7 @@ export async function renderDraftTimeline(opts: {
   let stalledFrames = 0
   let longestStallMs = 0
   let waitingLayers = 0
+  let droppedLayers = 0
   let stallSince: number | null = null
 
   const cleanup = () => {
@@ -504,8 +534,10 @@ export async function renderDraftTimeline(opts: {
       onPhase?.('record', Math.min(1, clock / total))
       // 그릴 것 목록(2단계 ⑦) — 모니터와 같은 목록. 곧 그릴 층은 1.5초 먼저 불러 둔다.
       const plan = selectFrameAt(input, clock, { prerollSec: PRELOAD_SEC })
-      const waiting = prepare(plan, true)
+      const { wait: waiting, drop: dropped } = prepare(plan, true)
       frames += 1
+      // 맨 위 · 화면을 다 덮는 층이 아닌 늦은 층은 그 장에서 빼고 그린다 — 몇 층을 뺐는지 남긴다.
+      droppedLayers += dropped
       if (waiting) {
         stalledFrames += 1
         waitingLayers += waiting
@@ -589,5 +621,5 @@ export async function renderDraftTimeline(opts: {
   // 다운로드 시작 후 회수 — 즉시 revoke 하면 일부 브라우저에서 저장이 빈 파일이 된다.
   setTimeout(() => URL.revokeObjectURL(objectUrl), 30_000)
 
-  return { durationSec: total, bytes: blob.size, mimeType, skippedClips: placeholderIds.size, frames, stalledFrames, longestStallMs: Math.round(longestStallMs), waitingLayers }
+  return { durationSec: total, bytes: blob.size, mimeType, skippedClips: placeholderIds.size, frames, stalledFrames, longestStallMs: Math.round(longestStallMs), waitingLayers, droppedLayers }
 }

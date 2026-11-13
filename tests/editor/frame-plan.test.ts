@@ -16,7 +16,8 @@ vi.mock('@/stores/project-store', () => ({
 
 import { selectFrameAt, selectVideoLayout, useEditorStore, type FramePlan } from '@/stores/editor-store'
 import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
-import { canvasFilterSupported, drawPlanFrame, effectsInUse, type FrameSources } from '@/lib/editor-draft-render'
+import { canvasFilterSupported, drawPlanFrame, effectsInUse, lateLayers, type FrameSources } from '@/lib/editor-draft-render'
+import { clipDisplayName } from '@/features/editor/editor-labels'
 import { syncLayerVideo } from '@/lib/editor/layer-sync'
 import { TITLE_TEXT_WIDTH, drawTitleText, titleTextLines } from '@/lib/editor/title-clip'
 import { TitleTextLayer } from '@/features/editor/title-clip-layer'
@@ -59,10 +60,12 @@ function seen(p: FramePlan): Record<string, number> {
   return out
 }
 const titleCardId = () => api().shots.find((s) => s.shotId.includes('__t'))!.shotId
-/** 내보내기가 그릴 바탕 — 영상은 이름표만 단 가짜 그림(1280×720), 제목 · 카드 · 클립은 지금 스토어 값. */
+const ko = (text: string, params?: Record<string, string | number>) => translate('ko', text, params)
+/** 내보내기가 그릴 바탕 — 영상은 이름표만 단 가짜 그림(1280×720), 제목 · 카드 · 클립은 지금 스토어 값, 자리표시 이름은 Editor 와 같은 이름. */
 function sources(): FrameSources {
   const st = api()
   return {
+    label: (shotId) => clipDisplayName(st, shotId, ko),
     video: (shotId) => (st.videoClips.find((c) => c.shotId === shotId)?.url ? ({ id: `vid-${shotId}`, videoWidth: 1280, videoHeight: 720 } as unknown as HTMLVideoElement) : null),
     titleCards: new Map(st.shots.filter((x) => x.titleCard).map((x) => [x.shotId, { card: x.titleCard!, image: null }])),
     shots: new Map(st.shots.map((x) => [x.shotId, x])),
@@ -429,7 +432,8 @@ describe('⑦-2 내보내기 — 혼자 정한 것', () => {
     useEditorStore.setState({ videoClips: api().videoClips.map((c) => (c.shotId === 'B' ? { ...c, url: null } : c)) })
     let rec = recordingCanvas()
     drawPlanFrame(rec.ctx, 1280, 720, plan(5), sources())
-    expect(drawn(rec.calls)).toEqual(['globalAlpha=1', 'fillText(B · MS,640,360)'])
+    // 이름은 Editor 와 같은 화면 이름(리드 11/14 L2 — 옛 기대: 'fillText(B · MS,640,360)', 내부 샷 id).
+    expect(drawn(rec.calls)).toEqual(['globalAlpha=1', 'fillText(샷 2 · MS,640,360)'])
     api().moveClipToTrack('C', 'v2', 4)
     api().setClipMotion(['C'], { scale: 0.5 })
     rec = recordingCanvas()
@@ -459,9 +463,64 @@ describe('⑦-3 끊김 재기 — 같이 정한 것(⑦ 계획 i · 리드 11/14
     // 왜: ⑦ 계획 3 · i — 실시간 녹화라 줄이 많고 기기가 느리면 그 장은 직전 장으로 찍힌다. e2e 가 2 · 3줄 · 교차 디졸브 시퀀스를 내보내며 이
     //   숫자를 읽어 보고한다. 손님 화면에는 숫자를 보이지 않는다.
     const render = read('src/lib/editor-draft-render.ts')
-    expect(render).toMatch(/const waiting = prepare\(plan, true\)/)
+    // 기다릴 층 · 빼고 그릴 층을 따로 센다(리드 11/14 L1 — 옛 기대: const waiting = prepare(plan, true)).
+    expect(render).toMatch(/const \{ wait: waiting, drop: dropped \} = prepare\(plan, true\)/)
     expect(render).toMatch(/if \(waiting\) \{\s*stalledFrames \+= 1\s*waitingLayers \+= waiting/)
-    expect(render).toMatch(/return \{ durationSec: total, bytes: blob\.size, mimeType, skippedClips: placeholderIds\.size, frames, stalledFrames, longestStallMs: Math\.round\(longestStallMs\), waitingLayers \}/)
+    // 늦은 층을 빼고 그린 수도 남긴다(리드 11/14 L1 — 옛 기대: droppedLayers 없는 return).
+    expect(render).toMatch(/return \{ durationSec: total, bytes: blob\.size, mimeType, skippedClips: placeholderIds\.size, frames, stalledFrames, longestStallMs: Math\.round\(longestStallMs\), waitingLayers, droppedLayers \}/)
     expect(read('src/app/studio/editor/page.tsx')).toMatch(/if \(process\.env\.NODE_ENV !== 'production'\) console\.info\('\[draft-render\]', JSON\.stringify\(stats\)\)/)
+  })
+})
+
+describe('⑦-3 더함 — 리드 11/14 같이 정한 것(검토 c ⑦-2 · e853f360)', () => {
+  it('내보낼 때 그림을 늦게 내는 층은 맨 위 · 화면을 다 덮는 층만 기다리고, 그 밖의 층(줄인 아래 줄 · 옅은 교차 디졸브 짝)은 그 장에서 빼고 그린다', () => {
+    // 왜: 검토 c L1 — 보이는 층 하나라도 그림이 없으면 화면 전체가 최대 8초 직전 장에 멈췄다(예전에는 맨 위 클립만 기다렸다).
+    //   빼고 그린 층 수는 끊김 숫자(droppedLayers)에 남는다.
+    const top = api().addClipInstanceAt('A', 4, 'v3')!
+    api().moveClipToTrack('C', 'v2', 4)
+    api().setClipMotion(['C'], { scale: 0.5 })
+    api().setClipMotion([top], { scale: 0.4 })
+    const clips = new Map(api().videoClips.map((c) => [c.shotId, c]))
+    const p = plan(5)
+    expect(p.layers.map((l) => l.shotId)).toEqual(['B', 'C', top])
+    expect(lateLayers(p, (id) => id === 'C', clips)).toEqual({ wait: 0, drop: 1 })
+    expect(lateLayers(p, (id) => id === 'B', clips)).toEqual({ wait: 1, drop: 0 })
+    expect(lateLayers(p, (id) => id === top, clips)).toEqual({ wait: 1, drop: 0 })
+    // 교차 디졸브 경계 앞 — 옅은 뒤 클립이 늦으면 빼고, 그림을 다 덮는 앞 클립이 늦으면 기다린다.
+    seed()
+    api().dropTransition('B', 'start', 'cross')
+    const cross = new Map(api().videoClips.map((c) => [c.shotId, c]))
+    expect(lateLayers(plan(3.75), (id) => id === 'B', cross)).toEqual({ wait: 0, drop: 1 })
+    expect(lateLayers(plan(3.75), (id) => id === 'A', cross)).toEqual({ wait: 1, drop: 0 })
+    const render = read('src/lib/editor-draft-render.ts')
+    expect(render).toMatch(/const late = lateLayers\(plan, /)
+    expect(render).toMatch(/droppedLayers \+= dropped/)
+  })
+
+  it('내보낸 파일의 영상 자리표시에는 내부 샷 id 대신 화면에 보이는 샷 이름(Editor 와 같은 이름)을 쓴다', () => {
+    // 왜: 검토 c L2 — 예전 activeLabel 부터 '<샷 id> · <샷 종류>'가 파일에 찍혔다. 효과 컨트롤 머리와 같은 이름(샷 번호 · 종류 · Take).
+    useEditorStore.setState({ videoClips: api().videoClips.map((c) => (c.shotId === 'C' ? { ...c, url: null } : c)) })
+    const rec = recordingCanvas()
+    drawPlanFrame(rec.ctx, 1280, 720, plan(9), sources())
+    expect(rec.calls).toContain('fillText(샷 3 · MS,640,360)')
+    expect(rec.calls.some((c) => c.includes('C · MS'))).toBe(false)
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/clipLabel: \(shotId\) => clipDisplayName\(st, shotId, t\)/)
+    expect(read('src/features/editor/effect-controls.tsx')).toMatch(/clipDisplayName\(\{ shots, videoClips \}, item\.shotId, t\)/)
+  })
+
+  it('다시 찾는 중인 층은 다시 찾지 않는다 — 찾기가 0.3초보다 오래 걸려도 찾기를 겹쳐 걸어 멈칫하지 않는다', () => {
+    // 왜: 검토 c(e853f360) — 느린 원본(네트워크)에서 찾기가 문턱보다 오래 걸리면 장마다 새 찾기가 앞 찾기를 끊어 그림이 서 있었다(⑦-1 전부터 같은 위험).
+    const video = (currentTime: number, seeking: boolean) =>
+      ({ currentTime, seeking, paused: false, playbackRate: 1, play: async () => {}, pause: () => {} }) as unknown as HTMLVideoElement
+    const busy = video(1, true)
+    syncLayerVideo(busy, { sourceSec: 2, held: false }, 1, true, true)
+    expect(busy.currentTime).toBe(1)
+    const idle = video(1, false)
+    syncLayerVideo(idle, { sourceSec: 2, held: false }, 1, true, true)
+    expect(idle.currentTime).toBe(2)
+    // 멈춘 동안(고르기 · 끌기)도 같다 — 찾기가 끝나면 그때의 자리로 다시 찾는다.
+    const paused = { ...video(1, true), paused: true } as unknown as HTMLVideoElement
+    syncLayerVideo(paused, { sourceSec: 2, held: false }, 1, false)
+    expect(paused.currentTime).toBe(1)
   })
 })

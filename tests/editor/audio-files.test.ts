@@ -63,3 +63,15 @@ describe('혼자 정한 것', () => {
     expect(api().audioClips.find((a) => a.id === clip)?.blobKey).toBe('blob-music')
   })
 })
+
+describe('같이 정한 것 — 리드 11/14(검토 c Z2)', () => {
+  it('되돌리기 · 다시 하기 칸에 든 오디오 목록이 그 파일을 쓰면 빼도 지우지 않는다 — 앞 편집을 되돌려 목록에 돌아온 파일도 소리가 있다', () => {
+    // 왜: 검토 c Z2 — 목록 빼기는 되돌리기 칸을 쌓지 않아, 빼고 나서 앞 편집을 되돌리면 뺀 파일이 목록에 돌아오는데 저장소에서는 이미 지워져 있었다.
+    api().addAudioSource(source('music', 'blob-music'))
+    api().addMarker()
+    api().removeAudioSource('music')
+    expect(mocks.deleteAudioBlob).not.toHaveBeenCalled()
+    api().undo()
+    expect(api().audioSources.map((s) => s.blobKey)).toEqual(['blob-music'])
+  })
+})

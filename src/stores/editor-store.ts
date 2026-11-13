@@ -544,8 +544,11 @@ export function selectProgramLayout(input: TimelineInput & { videoTracks?: reado
   return out
 }
 
-/** 클립이 화면을 다 덮는가 — 불투명도 100% · 비율 100% 이상 · 가운데(2단계 ④). 타이틀 카드는 모션이 없어 늘 덮는다. */
-function coversFrame(clip: Pick<VideoClip, 'motion' | 'opacity'> | undefined): boolean {
+/**
+ * 클립이 화면을 다 덮는가 — 불투명도 100% · 비율 100% 이상 · 가운데(2단계 ④). 타이틀 카드는 모션이 없어 늘 덮는다. 내보내기는 늦은
+ *   영상 층 가운데 화면을 다 덮는 층만 기다린다(리드 11/14).
+ */
+export function coversFrame(clip: Pick<VideoClip, 'motion' | 'opacity'> | undefined): boolean {
   const motion = clip?.motion
   return (clip?.opacity ?? 1) >= 1 && (!motion || (motion.scale >= 1 && motion.x === 0 && motion.y === 0))
 }
@@ -1565,10 +1568,12 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     if (src?.blobKey) {
       const st = get()
       const clipUses = (clips: readonly AudioTrackClip[]) => clips.some((a) => a.blobKey === src.blobKey)
+      const sourceUses = (sources: readonly AudioSource[]) => sources.some((s) => s.blobKey === src.blobKey)
+      // 되돌리기 · 다시 하기 칸에 든 목록도 센다 — 목록 빼기는 칸을 쌓지 않아, 앞 편집을 되돌리면 뺀 파일이 목록에 돌아온다(검토 c Z2).
       const stillUsed =
-        st.audioSources.some((s) => s.blobKey === src.blobKey) ||
+        sourceUses(st.audioSources) ||
         clipUses(st.audioClips) ||
-        [...st.past, ...st.future].some((snapshot) => clipUses(snapshot.audioClips))
+        [...st.past, ...st.future].some((snapshot) => clipUses(snapshot.audioClips) || sourceUses(snapshot.audioSources))
       if (!stillUsed) void deleteAudioBlob(src.blobKey)
     }
   },
