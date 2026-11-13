@@ -287,6 +287,8 @@ interface GlobalChatState {
   appendLocalExchange: (stage: StageId, userText: string, modelText: string) => void
   /** 사람이 한 말만 남긴다(답은 나중에 — 예: 산문 수정안이 오면 Writer 화면이 "고쳐 봤어요"를 남긴다). */
   appendLocalUser: (stage: StageId, userText: string) => void
+  /** D8 Lumi 알림 카드 단추(11/13 시안, 오너 2026-11-14 "추천대로") — 누른 단추 글을 채팅에 남기고 그 샷들 영상을 바로 만든다(Take 셈 · 말로 부탁한 영상과 같은 길). */
+  startDirectorVideos: (shotIds: string[], userText: string) => Promise<void>
   /** preempt: 떠 있는 제안(선택지 등)을 밀어내고 이 제안을 세운다 — 핸드오프처럼 "지금이 그 순간"인 것만. */
   offerSuggestion: (suggestion: ChatSuggestion, opts?: { preempt?: boolean }) => void
   /** implicit: 유저가 다른 말을 해서 내려간 것 — id 를 기록하지 않아 나중에 다시 뜰 수 있다. */
@@ -1489,6 +1491,34 @@ async function runDirectorQuickChip(input: {
   if (targets.videos.length > 0) await startVideosFor({ shotIds: targets.videos, say: input.say, isCurrent: input.isCurrent })
 }
 
+/**
+ * Director 에서 AI 를 거치지 않고 바로 하는 한 턴(빠른 칩 · 알림 카드 단추) — 누른 말을 채팅에 남기고, 하는 동안 입력을 잠그고,
+ *   Lumi 답을 남긴다(같은 세션 · 같은 프로젝트일 때만).
+ */
+async function runDirectorTurn(
+  projectId: string,
+  userText: string,
+  isCurrent: () => boolean,
+  work: (say: (content: string) => void) => Promise<void>,
+): Promise<void> {
+  useGlobalChatStore.setState((state) => ({
+    messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'user' as const, content: userText }],
+    loading: true,
+    error: null,
+  }))
+  saveChatMessage(projectId, 'director', 'user', userText)
+  const say = (content: string) => {
+    if (!isCurrent()) return
+    useGlobalChatStore.setState((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'model' as const, content }] }))
+    saveChatMessage(projectId, 'director', 'model', content)
+  }
+  try {
+    await work(say)
+  } finally {
+    if (isCurrent()) useGlobalChatStore.setState({ loading: false })
+  }
+}
+
 /** 리뉴얼 1차 Writer(id producer) 산문을 고칠 수 있는 때 — 확정 전 산문 초안이 있고 지금 Writer 화면이다. */
 function writerProseLive(): boolean {
   const project = useProjectStore.getState()
@@ -2551,18 +2581,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // Director 빠른 칩(11/13 시안 D5, 오너 2026-11-14) — 칩 말은 AI 를 거치지 않고 지금 보드 상태로 바로 한다. 보낸 말 · Lumi 답은 채팅에 남는다.
     const quickChip = stage === 'director' && !opts?.silentUser ? directorQuickChipOf(trimmed) : null
     if (quickChip && projectId) {
-      set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }], loading: true, error: null }))
-      saveChatMessage(projectId, stage, 'user', trimmed)
-      const lumiSays = (content: string) => {
-        if (!isCurrentSession()) return
-        set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'model' as const, content }] }))
-        saveChatMessage(projectId, stage, 'model', content)
-      }
-      try {
-        await runDirectorQuickChip({ chip: quickChip, projectId, say: lumiSays, isCurrent: isCurrentSession })
-      } finally {
-        if (isCurrentSession()) set({ loading: false })
-      }
+      await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => runDirectorQuickChip({ chip: quickChip, projectId, say, isCurrent: isCurrentSession }))
       return
     }
 
@@ -4290,6 +4309,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       saveChatMessage(projectId, stage, 'user', userText)
       saveChatMessage(projectId, stage, 'model', modelText)
     }
+  },
+
+  startDirectorVideos: async (shotIds, userText) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId || shotIds.length === 0 || get().loading) return
+    const session = chatSession
+    const isCurrent = () => session === chatSession && projectId === useProjectStore.getState().projectId
+    await runDirectorTurn(projectId, userText, isCurrent, (say) => startVideosFor({ shotIds, say, isCurrent }))
   },
 
   // 프로액티브 제안 띄우기 — 한 번에 하나만(이미 떠 있으면 무시), 이미 dismiss/승인한 id 도 무시.

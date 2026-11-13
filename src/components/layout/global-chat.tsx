@@ -52,6 +52,7 @@ import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
 import { ChatModelControls } from '@/components/layout/chat-model-controls'
 import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
+import { LumiBatchNotice } from '@/features/director/lumi-batch-notice'
 import {
   castMentions,
   backgroundMentions,
@@ -2175,6 +2176,8 @@ export function GlobalChat() {
           <LumiChatPill stage="editor" className="order-last" />
         </TopBarActions>
       )}
+      {/* D8 Lumi 알림 카드(11/13 시안) — 채팅을 접어 둔 Director 에서 일괄이 끝나면 오른쪽 아래. 열려 있으면 채팅 줄로만 알린다. */}
+      {collapsed && currentStage === 'director' && <LumiBatchNotice />}
       {collapsed && currentStage !== 'director' && currentStage !== 'editor' && (
         <aside
           className="z-sidebar fixed flex w-11 flex-col items-center gap-3 rounded-l-xl bg-chat-bg pt-4"

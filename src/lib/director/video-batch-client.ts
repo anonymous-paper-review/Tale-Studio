@@ -8,6 +8,7 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { notifyBatchSummary } from '@/lib/generation-notify'
+import { useLumiNoticeStore } from '@/stores/lumi-notice-store'
 import { notifyQuotaExceeded } from '@/lib/generation-quota-toast'
 import { buildVideoBatchInputs } from '@/lib/director/video-batch-inputs'
 import type { VideoBatchStartResponse, VideoBatchSummary } from '@/lib/director/video-batch-types'
@@ -253,6 +254,8 @@ export async function runVideoBatch(
       failed: completedFailures,
     })
     notifyBatchSummary('director', `${done > 0 ? '✓' : '⚠'} ${line}`)
+    // 채팅을 접어 둔 Director 면 오른쪽 아래 Lumi 알림 카드도(11/13 시안 D8).
+    useLumiNoticeStore.getState().batchEnded({ projectId, kind: 'video', done, failed: completedFailures })
   }
 
   if (ownsRun() && !opts?.silent && total > 0 && finalSummary.status !== 'cancelled') {
