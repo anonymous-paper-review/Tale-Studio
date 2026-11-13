@@ -1025,8 +1025,9 @@ function placeTransition(state: EditorState, clips: VideoClip[], shotId: string,
 }
 
 /**
- * 영상이 새로 생겨 들어온 샷의 클립 — 새 영상이니 전에 고친 구간 · 빠르기 · 전환 · 모션 · 불투명도 · 영상 효과 없이 처음 상태
- *   (검토 c 리드 판단 · (D) 낮음 1, 2026-11-14). 약속: tests/editor/shots-with-video.test.ts
+ * 영상이 새로 생겨 들어온 샷의 클립 — 새 영상이니 옛 영상에 맞춘 꾸밈을 다 비운 처음 상태: 전체 길이 · 빠르기 1 · 전환 없음(시작 · 끝) ·
+ *   모션 없음 · 불투명도 100% · 효과 없음(리드 결정 · 검토 c (D) 낮음 1, 2026-11-14). 이어진 소리는 영상이 빠질 때 같이 빠지고 들어올 때
+ *   새로 놓여 페이드가 없다. 약속: tests/editor/shots-with-video.test.ts
  */
 function freshClip(clip: VideoClip): VideoClip {
   const { trimStart: _start, trimEnd: _end, transitionIn: _in, transitionOut: _out, motion: _motion, opacity: _opacity, effects: _effects, ...rest } = clip

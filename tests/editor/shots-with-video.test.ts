@@ -299,6 +299,30 @@ describe('저절로 빠지고 들어오는 샷 (검토 c, 2026-11-14)', () => {
     for (const key of ['motion', 'opacity', 'effects']) expect(clipOf('s2')).not.toHaveProperty(key)
   })
 
+  it('영상이 새로 생겨 들어온 샷의 이어진 소리는 페이드 없이 처음 상태로 놓이고, 계속 영상이 있던 샷의 소리 페이드는 그대로다', async () => {
+    // 왜: 리드 결정(11/14) — 새 영상으로 다시 들어온 샷은 옛 영상에 맞춘 꾸밈을 다 비운다: 전체 길이 · 빠르기 1 · 전환 없음 · 모션 없음 ·
+    //   불투명도 100% · 효과 없음 · 소리 페이드 없음. 고장이 나는 때: 페이드를 넣은 샷의 Take 를 지웠다가 새로 만들고 Editor 로 돌아올 때.
+    db(['s1', 's2'], ['s1', 's2'])
+    await open()
+    for (const id of ['s1', 's2']) {
+      const audio = audioOf(id)!
+      api().dropAudioFade(audio.id, 'start')
+      api().dropAudioFade(audio.id, 'end')
+    }
+    // 처음에는 두 샷 소리 모두 페이드가 있다(헛통과가 아니게).
+    expect(audioOf('s2')).toMatchObject({ fadeInSec: 1, fadeOutSec: 1 })
+    await save()
+    db(['s1', 's2'], ['s1'])
+    await open()
+    await save()
+    db(['s1', 's2'], ['s1', 's2'], 2)
+    await open()
+    expect(audioOf('s1')).toMatchObject({ fadeInSec: 1, fadeOutSec: 1 })
+    expect(audioOf('s2')?.url).toBe('https://video.test/s2-v2.mp4')
+    expect(audioOf('s2')).not.toHaveProperty('fadeInSec')
+    expect(audioOf('s2')).not.toHaveProperty('fadeOutSec')
+  })
+
   it('영상 자리가 저절로 바뀌면 그 자리 뒤에서 시작하는 사람이 놓은 소리도 같은 만큼 옮기고, 그 자리 전부터 깔린 소리는 그대로 둔다', async () => {
     // 왜: 검토 c — 고침 전 저장본을 처음 열 때 빈 칸이 빠지며 뒤 컷만 당겨지고 효과음 · 음악은 제자리라 어긋났다(되돌리기 칸도 비어 되돌릴 수 없다).
     //   영상이 생긴 샷이 들어올 때는 반대로 어긋났다. 리드 판단: 2단계 ㉠ "뒤 모든 줄을 같이 민다"와 같은 원칙.
