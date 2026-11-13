@@ -3,7 +3,7 @@
 // Director 샷 상세(디자이너 11/13 시안 D6 · D7, 오너 2026-11-14) — 샷 하나에 이미지 · 영상 탭.
 //   스토리보드형은 팝업(DirectorNodePopup), 노드형은 왼쪽 패널(DirectorDetailPanel)이 이 부품을 같은 내용으로 연다.
 //   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useT } from '@/lib/i18n'
@@ -19,16 +19,23 @@ import { directorNodeLabel } from '@/features/director/node-label'
 import { ShotImageTab } from './shot-image-tab'
 import { ShotVideoTab } from './shot-video-tab'
 
-export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTakeId = null, layout, onClose }: {
+export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTakeId = null, openSeq, layout, onClose }: {
   shotNodeId: string
   initialTab?: ShotDetailTab
   /** 영상 노드에서 열었으면 그 Take 를 먼저 보인다. */
   initialTakeId?: string | null
+  /** 상세를 연 차례(노드형 패널, openShotDetail) — 바뀌면 다시 붙이지 않고 탭만 initialTab 으로 맞춘다. */
+  openSeq?: number
   layout: 'popup' | 'panel'
   onClose: () => void
 }) {
   const t = useT()
   const [tab, setTab] = useState<ShotDetailTab>(initialTab)
+  // 이미 열린 상세를 [바꾸기] · ⤢ 로 다시 열면 탭만 고른 탭으로 맞춘다 — 다시 붙이면 상세 안에서 보내기 전에 적던 글이 지워졌다(리드 11/14).
+  useEffect(() => {
+    if (openSeq !== undefined) setTab(initialTab)
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- 여는 차례가 바뀔 때만 맞춘다(사람이 안에서 바꾼 탭은 그대로 둔다)
+  }, [openSeq])
   // [다음: 영상 만들기]가 Take 를 확인하지 못해 시작하지 않은 까닭 — 이미지 탭 단추 아래에 보이고, 다음에 누를 때 지운다.
   const [nextNotice, setNextNotice] = useState<string | null>(null)
   // 잔액을 다시 읽는 동안 [다음: 영상 만들기]를 끈다 — 두 번 눌러 새 Take 가 두 번 나가지 않게(검토 b 탐침 D4, 영상 탭 단추와 같은 꼴).

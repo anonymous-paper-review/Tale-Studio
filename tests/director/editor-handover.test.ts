@@ -486,8 +486,8 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
   })
 
   // 왜(검토 a 참고, 리드 11/14): 노드 보기에서 그 샷 상세가 이미 열려 있으면 openShotDetail 이 같은 샷 · 같은 탭을 다시 넣어 상점 값이 그대로라,
-  //   왼쪽 패널이 다시 붙지 않고 사람이 안에서 바꿔 둔 이미지 탭에 머물렀다. 열 때마다 여는 차례를 올리고 패널이 그 차례로 다시 붙는다.
-  //   탭은 상세 안의 화면 상태라 화면 시험 도구 없이 볼 수 없어 — 상점의 여는 차례와 패널의 쓰임(소스 글자)을 본다.
+  //   왼쪽 패널이 사람이 안에서 바꿔 둔 이미지 탭에 머물렀다. 열 때마다 여는 차례를 올리고, 상세는 그 차례가 바뀔 때 탭만 맞춘다(다시 붙이지 않는다).
+  //   탭은 상세 안의 화면 상태라 화면 시험 도구 없이 볼 수 없어 — 상점의 여는 차례와 탭을 맞추는 효과(소스 글자)를 본다.
   it('노드 보기에서 그 샷 상세가 이미 열려 사람이 안에서 이미지 탭으로 바꿔 두었어도, [바꾸기] · ⤢ 는 영상 탭(⤢ 는 그 버튼의 탭)으로 다시 연다', () => {
     const { viewMode } = useDirectorCanvasStore.getState()
     const openWindow = () => useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
@@ -507,7 +507,23 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
       useDirectorCanvasStore.setState({ viewMode, detailNodeId: null })
     }
     const panel = readFileSync('src/features/director/canvas-panels/DirectorDetailPanel.tsx', 'utf8')
-    expect(panel).toMatch(/key=\{`\$\{node\.id\}:\$\{detailNodeId \? `\$\{detailTab\}:\$\{detailOpenSeq\}` : ''\}`\}/)
+    expect(panel).toMatch(/openSeq=\{detailNodeId \? detailOpenSeq : undefined\}/)
+    const detail = readFileSync('src/features/director/shot-detail/director-shot-detail.tsx', 'utf8')
+    expect(detail).toMatch(/if \(openSeq !== undefined\) setTab\(initialTab\)[\s\S]{0,200}\}, \[openSeq\]\)/)
+  })
+
+  // 왜(리드 11/14): 2d646380 은 열 때마다 패널을 새로 붙여(key 에 여는 차례), 상세 안에서 보내기 전에 적던 글(이미지 · 영상 고치기 칸, 화면에만 있음)이
+  //   탭이 그대로여도 지워졌다. 패널은 노드 기준으로 붙어 있고, 여는 차례가 바뀔 때 탭만 맞춘다 — 탭이 바뀌면 떠난 탭의 글이 지워지는 것은
+  //   손으로 탭을 바꿀 때와 같은 예전부터의 동작이다. 화면 시험 도구가 없어 패널 · 상세의 쓰임(소스 글자)을 본다.
+  it('노드 보기에서 그 샷 상세가 이미 열려 있으면 [바꾸기] · ⤢ 는 패널을 새로 붙이지 않고 탭만 바꾼다 — 탭이 그대로면 적던 글도 남는다', () => {
+    const panel = readFileSync('src/features/director/canvas-panels/DirectorDetailPanel.tsx', 'utf8')
+    // 패널은 노드 기준으로만 붙는다 — 여는 차례 · 탭이 바뀌어도 다시 붙지 않는다.
+    expect(panel).toMatch(/<DirectorShotDetail\s+key=\{node\.id\}/)
+    expect(panel).not.toMatch(/key=\{[^\n]*detailOpenSeq/)
+    // 상세는 여는 차례가 바뀔 때 탭만 고른 탭으로 맞춘다.
+    expect(panel).toMatch(/openSeq=\{detailNodeId \? detailOpenSeq : undefined\}/)
+    const detail = readFileSync('src/features/director/shot-detail/director-shot-detail.tsx', 'utf8')
+    expect(detail).toMatch(/if \(openSeq !== undefined\) setTab\(initialTab\)[\s\S]{0,200}\}, \[openSeq\]\)/)
   })
 
   // 왜(혼자 정한 것): 채팅으로 넘겨 달라고 해도 같은 판단을 탄다 — Director 준비 창이 채팅에서도 열리는 것과 같게.
