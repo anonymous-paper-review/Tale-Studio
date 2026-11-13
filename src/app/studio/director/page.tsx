@@ -1398,6 +1398,11 @@ function PaletteBar() {
         confirmLabel={t('Make images + videos')}
         onConfirm={() => {
           setConfirmChain(false)
+          // 창을 연 뒤 잔액을 못 읽게 됐으면 이미지도 영상도 시작하지 않고 단추 아래 까닭(리드 검토 a 재확인).
+          if (takeState.failed) {
+            setTakesUnknown(true)
+            return
+          }
           // Take 가 없으면 영상은 못 만들어도 이미지는 만든다 — 이미지는 Take 를 쓰지 않는다(리드 검토 a 낮음 9).
           if (chainPlan.runCount === 0) {
             toast.warning(t('No videos can be made until you add Takes.'))
@@ -1437,6 +1442,11 @@ function PaletteBar() {
         busy={videoBatchBusy}
         onConfirm={() => {
           setConfirmVideoBatch(false)
+          // 창을 연 뒤 잔액을 못 읽게 됐으면 시작하지 않고 단추 아래 까닭(리드 검토 a 재확인) — 열린 창의 계획은 Take 줄이 빠져 있다.
+          if (takeState.failed) {
+            setTakesUnknown(true)
+            return
+          }
           if (videoPlan.runCount === 0) {
             toast.warning(t('No videos can be made until you add Takes.'))
             return
