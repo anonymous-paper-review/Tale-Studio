@@ -16,12 +16,13 @@ export interface ChatShotRef {
 /** 숫자 하나 — 바로 뒤에 단위(초 · s · sec · % · 배 · x · fps · 분)가 붙으면 샷 번호가 아니다("샷 3, 5초짜리로"의 5). */
 const UNIT = String.raw`(?:초|s\b|secs?\b|seconds?\b|%|배|x\b|fps\b|분|mins?\b|minutes?\b)` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const NUM = String.raw`\d+(?!\d)(?!\s*${UNIT})`
-const NUMBER_LIST = String.raw`${NUM}(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및|이나|또는|혹은)\s*${NUM})*` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-/** 고르는 말("샷 3이나 4" · "또는" · "or") — 둘 중 하나를 고르라는 말이라 바로 만들지 않고 센 목록으로 되묻는다(검토 a 통합 낮음). */
-const CHOICE = /(이나|거나|또는|혹은|아니면|\bor\b|\beither\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+const NUMBER_LIST = String.raw`${NUM}(?:\s*(?:[·,、&~\-–/]|to|and|or|vs|와|과|및|이랑|랑|하고|이나|또는|혹은|이든|아니면)\s*${NUM})*` // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+/** 고르는 말("샷 3이나 4" · "또는" · "이든" · "3/4" · "or" · "vs") — 둘 중 하나를 고르라는 말이라 바로 만들지 않고 센 목록으로 되묻는다(검토 a 통합 · 검토 b 낮음). */
+const CHOICE = /(이나|거나|또는|혹은|아니면|이든|\/|\bor\b|\beither\b|\bvs\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 /** "샷 3" · "Shot 3" · "@Real Shot 3" — 낱말 가운데("Screenshots 2" · "스크린샷 2")는 샷이 아니다. */
 const SHOT_LIST = new RegExp(String.raw`(?<![A-Za-z가-힣])(?:샷|shots?)\s*#?\s*(${NUMBER_LIST})`, 'gi') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-const NUMBERED_SHOT = new RegExp(String.raw`(${NUM})\s*번\s*샷`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+/** "3번 샷" · "3이나 4번 샷" — "번 샷" 앞의 번호 목록 전부(고르는 말 앞의 번호도 놓치지 않게, 검토 b 탐침 C1). */
+const NUMBERED_SHOT = new RegExp(String.raw`(${NUMBER_LIST})\s*번\s*샷`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 /** 바로 앞 번호를 빼는 말("2 빼고" · "샷 4 말고") · 바로 뒤 번호를 빼는 말("except shot 2" · "not shot 4" · "leave out shot 2").
  *   "빼지 말고" · "don't skip" · "without skipping"은 빼는 말이 아니다(검토 b efac9881). */
 const EXCLUDED_BEFORE = new RegExp(String.raw`(${NUMBER_LIST})\s*(?:번)?\s*(?:샷)?\s*(?:은|는|을|를|이|가)?\s*(?:영상\s*(?:은|는)?\s*)?(?:말고|빼고|제외|그대로\s*두|됐고|됐어|필요\s*없)`, 'g') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
@@ -94,12 +95,12 @@ function expandNumbers(list: string, into: Set<number>): void {
 export function mentionedShotNumbers(text: string): Set<number> {
   const numbers = new Set<number>()
   for (const match of text.matchAll(SHOT_LIST)) expandNumbers(match[1], numbers)
-  for (const match of text.matchAll(NUMBERED_SHOT)) numbers.add(Number(match[1]))
+  for (const match of text.matchAll(NUMBERED_SHOT)) expandNumbers(match[1], numbers)
   return numbers
 }
 
 /** Lumi 가 번호를 물은 바로 다음 말 — 번호만으로 된 대답("3번" · "3번이랑 4번" · "1, 2" · "샷 3")이면 그 번호들, 아니면 null. */
-const NUMBER_ANSWER = new RegExp(String.raw`^(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?(?:\s*(?:[·,、&~\-–]|to|and|or|와|과|및|랑|이랑|하고|이나|또는|혹은)\s*(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?)*\s*(?:샷|shots?)?\s*(?:영상|videos?)?\s*(?:을|를)?\s*(?:만들어\s*(?:줘|주세요)?|해\s*(?:줘|주세요)|please)?$`, 'i') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+const NUMBER_ANSWER = new RegExp(String.raw`^(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?(?:\s*(?:[·,、&~\-–/]|to|and|or|vs|와|과|및|랑|이랑|하고|이나|또는|혹은|이든|아니면)\s*(?:(?:샷|shots?)\s*)?${NUM}\s*(?:번)?(?:든)?)*\s*(?:샷|shots?)?\s*(?:영상|videos?)?\s*(?:을|를)?\s*(?:만들어\s*(?:줘|주세요)?|해\s*(?:줘|주세요)|please)?$`, 'i') // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 function numbersOfAnswer(text: string): Set<number> | null {
   const said = text.replace(/[?？]+/g, '').trim().replace(/[.!]+$/, '').trim()
   if (!NUMBER_ANSWER.test(said)) return null
