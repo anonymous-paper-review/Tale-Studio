@@ -87,12 +87,12 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
 
     mocks.run.mockClear()
     reply([{ type: 'generateVideos', shotIds: ['s4', 's3'] }])
-    await chat.getState().sendMessage('Remake the failed shots')
+    await chat.getState().sendMessage('Remake the failed shot videos')
     expect(mocks.run).not.toHaveBeenCalled()
 
     mocks.run.mockClear()
     reply([{ type: 'generateVideos', shotIds: ['s4'] }])
-    await chat.getState().sendMessage('Remake the failed shots')
+    await chat.getState().sendMessage('Remake the failed shot videos')
     expect(runShots()).toEqual(['s4'])
 
     mocks.run.mockClear()

@@ -91,6 +91,7 @@ import {
   STAGE_FACE_COLOR,
   STAGE_PLACEHOLDER,
   STAGE_PROMPT_PRESETS,
+  DIRECTOR_QUICK_CHIPS,
   STAGE_THINKING_PHRASES,
   CHAT_SUPPORTED_STAGES,
 } from '@/lib/constants'
@@ -1893,6 +1894,23 @@ export function GlobalChat() {
           {/* 진행도 핀 (#chat-progress-pin → #f1 2026-08-26 오너: 헤더 아래→입력창 위로 이동.
               시선이 머무는 입력창 쪽에서 진행이 보인다). 도는 게 없으면 스스로 사라진다. */}
           <ChatProgressPin stage={currentStage} />
+          {/* Director 빠른 칩(11/13 시안 D5 "Suggestions", 오너 2026-11-14 "추천대로") — 입력칸 바로 위에 늘 보이고, 누르면 그 말을 바로 보낸다.
+              칩 말은 AI 를 거치지 않고 지금 보드 상태로 바로 한다(global-chat-store runDirectorQuickChip). 시안 값: 28 알약 · 바탕색 · 테두리 · 사이 6. */}
+          {currentStage === 'director' && (
+            <div className="mb-3 flex flex-col items-start gap-1.5" data-testid="director-quick-chips">
+              {DIRECTOR_QUICK_CHIPS.map((chip) => (
+                <button
+                  key={chip}
+                  type="button"
+                  disabled={sendDisabled}
+                  onClick={() => void sendMessage(t(chip), undefined, { stageOverride: 'director' })}
+                  className="inline-flex min-h-7 items-center rounded-full border border-border bg-background px-3 py-1 text-left text-caption font-medium text-foreground transition-colors duration-100 ease-out hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
+                >
+                  {t(chip)}
+                </button>
+              ))}
+            </div>
+          )}
           {/* 파일 놓기 자리는 입력 알약과 아래 도구 줄을 함께 감싼다 — [+] 첨부 위에 끌어다 놓아도 첨부된다(예전처럼 입력부 전체). */}
           <div
             className="relative rounded-[26px]"

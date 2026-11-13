@@ -209,7 +209,7 @@ describe('약속 E — 영상 일괄 생성은 Take를 미리 센다', () => {
     const store = read('src/stores/global-chat-store.ts')
     expect(store).not.toMatch(/kind: 'directorGenerateVideoBatch'/)
     expect(store).toContain('describeVideoBatchPlan(plan, t)[0]')
-    expect(store).toContain('void runVideoBatch(pid, { onJob: input.onJob, shotIds: grounded.shotIds })')
+    expect(store).toContain('void runVideoBatch(pid, { onJob: input.onJob, shotIds: input.shotIds })')
     expect(store).toContain('Started making videos for {shots} · {takes} Takes.')
     // 채팅 막이(startChatVideos)를 건너뛰고 스토어까지 온 generateVideos 는 돌지 않는다.
     expect(read('src/stores/director-store.ts')).toMatch(/case 'generateVideos': \{[\s\S]*?result\.skipped\.push/)

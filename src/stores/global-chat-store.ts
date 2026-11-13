@@ -65,6 +65,8 @@ import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
 import { currentDirectorText, directorShotRefs, directorTextEditLines, shotLabelOf, shotListLabel, splitDirectorTextEdits, type DirectorTextEdit } from '@/lib/director/lumi-chat-runs'
 import { groundVideoRequest } from '@/lib/director/chat-video-targets'
+import { directorProgressLine, directorQuickChipOf, directorShotStatesNow, quickChipTargets, type DirectorQuickChip } from '@/lib/director/lumi-quick-chips'
+import { activeJobsSnapshot } from '@/lib/generation-queue'
 import { handoffToStage } from '@/lib/stage-nav'
 import {
   loadLatestChatTrace,
@@ -1347,8 +1349,7 @@ function selectedShotNodeIds(): string[] {
 /**
  * 채팅의 영상 부탁을 바로 시작한다(오너 2026-11-14 9번 "루미에게 부탁하면 바로 실행해줘") — 확인 카드가 없다.
  *   막이: 사용자 말에 있는 샷(번호 · 남은 전부 · 실패한 · 이미지 나온 · 고른)만 만들고, 벗어나면 번호로 다시 묻는다(lib/director/chat-video-targets).
- *   이미 영상이 있거나 만드는 중인 샷은 뺀다. 버튼과 같은 일괄 실행 길(runVideoBatch)을 타고, 그 전에 Take 를 센다 — 모자라면 하나도
- *   시작하지 않고 필요한 Take · 가진 Take 를 말한다. 시작하면 무엇을 몇 Take 로 시작했는지 되짚는다.
+ *   이미 영상이 있거나 만드는 중인 샷은 뺀다. 시작은 startVideosFor(Take 셈 뒤 버튼과 같은 일괄 실행 길).
  */
 async function startChatVideos(input: {
   userText: string
@@ -1364,21 +1365,14 @@ async function startChatVideos(input: {
     input.say(t('A video batch is already running. Ask again when it finishes.'))
     return
   }
-  // 러너 · 잔액 훅은 지연 로드 — video-batch-client 가 이 스토어를 import 하므로 정적 import 는 순환이 된다.
-  const [{ runVideoBatch, eligibleVideoBatchShotIds }, { buildVideoBatchInputs }, { fetchTakeBalance }, { planVideoBatch, videoBatchTakeCosts, describeVideoBatchPlan }] =
-    await Promise.all([
-      import('@/lib/director/video-batch-client'),
-      import('@/lib/director/video-batch-inputs'),
-      import('@/lib/billing/use-take-balance'),
-      import('@/lib/director/video-batch-plan'),
-    ])
+  // 러너는 지연 로드 — video-batch-client 가 이 스토어를 import 하므로 정적 import 는 순환이 된다.
+  const { eligibleVideoBatchShotIds } = await import('@/lib/director/video-batch-client')
   if (!input.isCurrent()) return
-  const { projectId: pid, nodes } = useDirectorCanvasStore.getState()
-  const names = directorBoardNames()
+  const { nodes } = useDirectorCanvasStore.getState()
   const grounded = groundVideoRequest({
     text: input.userText,
     requested: input.requested,
-    shots: directorShotRefs(nodes, names),
+    shots: directorShotRefs(nodes, directorBoardNames()),
     eligible: eligibleVideoBatchShotIds(nodes),
     selected: selectedShotNodeIds(),
   })
@@ -1390,7 +1384,38 @@ async function startChatVideos(input: {
     input.say(t('There are no such shots right now.'))
     return
   }
-  const inputs = buildVideoBatchInputs(pid, nodes, grounded.shotIds)
+  await startVideosFor({ shotIds: grounded.shotIds, say: input.say, onJob: input.onJob, isCurrent: input.isCurrent })
+}
+
+/**
+ * 고른 샷(노드 id)의 영상을 바로 시작한다 — 말로 부탁한 영상(startChatVideos)과 빠른 칩이 같이 쓴다.
+ *   버튼과 같은 일괄 실행 길(runVideoBatch)을 타고, 그 전에 Take 를 센다 — 모자라면 하나도 시작하지 않고 필요한 Take · 가진 Take 를 말한다.
+ *   시작하면 무엇을 몇 Take 로 시작했는지 되짚는다.
+ */
+async function startVideosFor(input: {
+  shotIds: string[]
+  say: (content: string) => void
+  onJob?: GenerationJobObserver
+  isCurrent: () => boolean
+}): Promise<void> {
+  const locale = contentLocale()
+  const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  if (!useDirectorCanvasStore.getState().projectId) return
+  if (useDirectorCanvasStore.getState().videoBatchBusy) {
+    input.say(t('A video batch is already running. Ask again when it finishes.'))
+    return
+  }
+  // 러너 · 잔액 훅은 지연 로드 — video-batch-client 가 이 스토어를 import 하므로 정적 import 는 순환이 된다.
+  const [{ runVideoBatch }, { buildVideoBatchInputs }, { fetchTakeBalance }, { planVideoBatch, videoBatchTakeCosts, describeVideoBatchPlan }] =
+    await Promise.all([
+      import('@/lib/director/video-batch-client'),
+      import('@/lib/director/video-batch-inputs'),
+      import('@/lib/billing/use-take-balance'),
+      import('@/lib/director/video-batch-plan'),
+    ])
+  if (!input.isCurrent()) return
+  const { projectId: pid, nodes } = useDirectorCanvasStore.getState()
+  const inputs = buildVideoBatchInputs(pid, nodes, input.shotIds)
   if (inputs.skipped.length > 0) {
     const reason = inputs.skipped[0].reason
     input.say(t(reason === 'missing_writer_shot_id'
@@ -1402,16 +1427,66 @@ async function startChatVideos(input: {
   }
   const takes = await fetchTakeBalance()
   if (!input.isCurrent()) return
-  const plan = planVideoBatch(videoBatchTakeCosts(nodes, grounded.shotIds), takes.balance, takes.mode)
+  const plan = planVideoBatch(videoBatchTakeCosts(nodes, input.shotIds), takes.balance, takes.mode)
   if (plan.mode === 'enforce' && plan.short) {
     input.say(`${describeVideoBatchPlan(plan, t)[0]} ${t('I did not start any videos. Add Takes or ask for fewer shots.')}`)
     return
   }
-  void runVideoBatch(pid, { onJob: input.onJob, shotIds: grounded.shotIds })
-  const shots = shotListLabel(locale, grounded.shotIds.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
+  void runVideoBatch(pid, { onJob: input.onJob, shotIds: input.shotIds })
+  const names = directorBoardNames()
+  const shots = shotListLabel(locale, input.shotIds.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
   input.say(plan.mode === 'off'
     ? t('Started making videos for {shots}. Progress shows on the line above the cards.', { shots })
     : t('Started making videos for {shots} · {takes} Takes. Progress shows on the line above the cards.', { shots, takes: plan.requiredTakes }))
+}
+
+/**
+ * Director 빠른 칩(11/13 시안 D5, 오너 2026-11-14 "추천대로") — AI 를 거치지 않고 지금 보드 상태로 바로 한다(잘못 읽을 일 · 채팅 비용이 없다).
+ *   이미지는 버튼과 같은 길로 Take 없이(빈 샷 전부 = runRealBatch, 실패한 샷 = 샷마다 generateStoryboardImage), 영상은 startVideosFor
+ *   (Take 셈 뒤 runVideoBatch). 해당 샷이 없으면 아무것도 만들지 않고 그렇다고 말한다. 약속: tests/director/lumi-quick-chips.test.ts
+ */
+async function runDirectorQuickChip(input: {
+  chip: DirectorQuickChip
+  projectId: string
+  say: (content: string) => void
+  isCurrent: () => boolean
+}): Promise<void> {
+  const locale = contentLocale()
+  const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  const canvas = useDirectorCanvasStore.getState()
+  // 보드를 아직 안 읽었거나 다른 프로젝트 보드면 샷이 없는 것으로 본다(엉뚱한 보드의 샷을 만들지 않는다).
+  const nodes = canvas.projectId === input.projectId ? canvas.nodes : []
+  const names = directorBoardNames()
+  const labelOf = (id: string) => shotLabelOf(nodes.find((node) => node.id === id), names)
+  const states = directorShotStatesNow(nodes, activeJobsSnapshot(input.projectId))
+  if (input.chip === 'status') {
+    input.say(directorProgressLine(locale, states, labelOf))
+    return
+  }
+  const targets = quickChipTargets(input.chip, states)
+  if (targets.images.length === 0 && targets.videos.length === 0) {
+    input.say(t('There are no such shots right now.'))
+    return
+  }
+  if (targets.images.length > 0) {
+    if (canvas.realBatchBusy) {
+      input.say(t('Batch live-action generation is running. Try again after it finishes.'))
+    } else {
+      if (input.chip === 'images') {
+        // 빈 샷 전부 — 위쪽 [이미지 만들기]와 같은 일괄 길. 러너는 지연 로드(이 스토어를 import 해 정적 import 는 순환).
+        const { runRealBatch } = await import('@/lib/director/real-batch-client')
+        if (!input.isCurrent()) return
+        void runRealBatch(input.projectId)
+      } else {
+        // 실패한 샷만 — 카드의 [다시 만들기]와 같은 샷 하나 길.
+        for (const id of targets.images) void canvas.generateStoryboardImage(id)
+      }
+      input.say(targets.images.length === 1
+        ? t('Started making live-action images for {shots} · No Takes used. Progress shows on the line above the cards.', { shots: shotListLabel(locale, targets.images.map(labelOf)) })
+        : t('Started making live-action images for {count} shots · No Takes used. Progress shows on the line above the cards.', { count: targets.images.length }))
+    }
+  }
+  if (targets.videos.length > 0) await startVideosFor({ shotIds: targets.videos, say: input.say, isCurrent: input.isCurrent })
 }
 
 /** 리뉴얼 1차 Writer(id producer) 산문을 고칠 수 있는 때 — 확정 전 산문 초안이 있고 지금 Writer 화면이다. */
@@ -2471,6 +2546,24 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       (activeSuggestion.stage === stage || activeSuggestion.dismissible === false)
     ) {
       get().dismissSuggestion({ implicit: true })
+    }
+
+    // Director 빠른 칩(11/13 시안 D5, 오너 2026-11-14) — 칩 말은 AI 를 거치지 않고 지금 보드 상태로 바로 한다. 보낸 말 · Lumi 답은 채팅에 남는다.
+    const quickChip = stage === 'director' && !opts?.silentUser ? directorQuickChipOf(trimmed) : null
+    if (quickChip && projectId) {
+      set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: trimmed }], loading: true, error: null }))
+      saveChatMessage(projectId, stage, 'user', trimmed)
+      const lumiSays = (content: string) => {
+        if (!isCurrentSession()) return
+        set((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'model' as const, content }] }))
+        saveChatMessage(projectId, stage, 'model', content)
+      }
+      try {
+        await runDirectorQuickChip({ chip: quickChip, projectId, say: lumiSays, isCurrent: isCurrentSession })
+      } finally {
+        if (isCurrentSession()) set({ loading: false })
+      }
+      return
     }
 
     // 채팅 모델이 첨부 그림을 그림체로 쓰자고 해 묻는 중(2026-10-10 오너 결정) — 그림체 · 참고 자료(예 · 아니오)로 답하면 그대로 하고,

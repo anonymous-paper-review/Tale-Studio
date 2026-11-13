@@ -1398,7 +1398,6 @@ export const KO: Record<string, string> = {
   'Tell us about your story…': '스토리에 대해 말해주세요…',
   'E.g. make shot 8 darker': '예: 샷 8을 더 어둡게 바꿔줘',
   "E.g. make the main character's hair shorter": '예: 주인공 머리를 더 짧게 해 줘',
-  'Try generating the rough storyboard into shooting-ready images.': '러프 스토리보드를 실제 촬영 이미지로 생성해보세요.',
   "Chat isn't available at this stage yet.": '아직 이 단계에서는 채팅을 쓸 수 없어요.',
   'E.g. how do I connect two cuts smoothly?': '예: 컷 사이를 부드럽게 이으려면?',
   'How do I connect two cuts smoothly?': '컷 사이를 부드럽게 이으려면?',
@@ -1429,6 +1428,16 @@ export const KO: Record<string, string> = {
   'description': '설명', // copy-ok: fragment
   'The text changed since Lumi suggested this. Please ask again.': '그새 글이 바뀌었어요. 다시 부탁해 주세요.',
   'Applied the text.': '글을 적용했어요.',
+  // Director 빠른 칩 · 입력칸 안내(11/13 시안 D5, 오너 2026-11-14)
+  "E.g. make shot 1's lighting neon blue": '예: 샷 1 조명을 네온 블루로',
+  'Make images for every shot that needs one': '이미지 필요한 샷 모두 만들어 줘',
+  'Make videos for shots with images': '이미지 나온 샷 영상 만들어 줘',
+  'Remake the failed shots': '실패한 샷 다시 만들어 줘',
+  'How far along is it?': '지금 어디까지 됐어?',
+  'Images {images}/{total} · videos {videos}/{total} done': '이미지 {images}/{total} · 영상 {videos}/{total} 완성',
+  'making {count}': '만드는 중 {count}', // copy-ok: fragment
+  'failed {count} ({shots})': '실패 {count}({shots})', // copy-ok: fragment
+  'There are no shots on the board yet.': '아직 보드에 샷이 없어요.',
   'Pinpointing the heart of the story': '이야기의 핵심을 짚어보는 중',
   'Finding gaps in the settings': '설정에서 빈칸을 찾는 중',
   'Looking over the cast cards': '캐스트 카드를 살피는 중',
