@@ -147,6 +147,9 @@ interface EditorState {
   // 처음 여는 동안 영상 실제 길이를 재는 중 — 그동안 잰 길이는 붙은 줄 그대로 맞추고(빈 곳 없이), 다 놓은 뒤에는 뒤 클립이 제자리에
   //   머문다(자유 배치, 2026-11-14). 저장하지 않는다.
   firstOpenMeasuring: boolean
+  // 되살린 저장본이 옛 형식(1판, 자리 없음)이었다 — 이번 열기의 길이 재기도 붙은 줄 그대로 맞춘다. 옛 화면은 잰 길이대로 붙여 보였다
+  //   (보이던 자리 그대로, 오너 답 1 · 검토 c 낮음 2). 저장하지 않는다.
+  restoredOldFormat: boolean
 
   // Video Source 패널 (프리미어2 좌상단 카드 그리드) — 토글로 접기
   sourcePanelOpen: boolean
@@ -762,6 +765,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   unplayableVideoUrls: [],
   editorPrep: null,
   firstOpenMeasuring: false,
+  restoredOldFormat: false,
   sourcePanelOpen: true,
   currentTime: 0,
   pxPerSec: PX_PER_SEC_DEFAULT,
@@ -1097,9 +1101,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     //   다만 고침 뒤 화면이 쓴 서버 저장본(serverAware)은 누군가 고침 뒤에 고친 것이라 고침 전 저장본보다 먼저다(검토 c, A6 다듬기) —
     //   이 규칙은 고침 전 저장본이 남아 있는 동안(옮겨 가는 동안)만 쓰인다.
     const seen = serverSeenAt(projectId)
+    // 서버를 본 이 브라우저의 저장본이 서버 것보다 낮은 판이면 서버 것이 먼저다 — 본 뒤로 서버가 그대로인데 판이 낮으면, 같은 브라우저의
+    //   옛 탭(1판 화면)이 이 브라우저 저장본만 덮은 것이다(서버 쓰기는 409 로 막힘). 옛 탭 편집은 아래에서 따로 칸에 남는다(검토 c 낮음 1).
+    //   본 시각이 없는 고침 전 저장본은 위 표시 규칙 그대로다 — 다른 기기가 처음 상태로 연 2판에 밀리지 않게(재검토 c 2/2).
+    //   약속: tests/editor/free-placement.test.ts · tests/editor/other-browser.test.ts
+    const olderHere = seen !== undefined && !!localEdit && !!serverEdit && (localEdit.version ?? 1) < (serverEdit.version ?? 1)
     const serverFirst =
       !!serverEdit &&
-      (!localEdit || (seen === undefined ? serverEdit.serverAware === true : savedLater(server.updatedAt, seen)))
+      (!localEdit || olderHere || (seen === undefined ? serverEdit.serverAware === true : savedLater(server.updatedAt, seen)))
     for (const candidate of serverFirst ? [serverEdit, localEdit] : [localEdit, serverEdit]) {
       if (!candidate) continue
       const fromServer = candidate === serverEdit
@@ -1376,6 +1385,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         clipOrder,
         removedShotIds,
         serverAware: saved.serverAware === true,
+        restoredOldFormat: !saved.placements,
         audioClips,
         audioSources: saved.audioSources ?? [],
         audioTracks: dedupTracks,
@@ -1575,6 +1585,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       unplayableVideoUrls: [],
       editorPrep: null,
       firstOpenMeasuring: false,
+      restoredOldFormat: false,
       shots: [],
       videoClips: [],
       selectedSceneId: null,

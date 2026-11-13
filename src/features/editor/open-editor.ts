@@ -82,7 +82,14 @@ async function openSteps(input: FinishEditorOpenInput): Promise<'opened' | 'spli
   if (input.restored || !projectId || store.getState().shots.length === 0) {
     // 다시 들어옴(저장한 편집을 되살림) · 샷 없음: 바로 연다. 실제 길이 재기는 화면 뒤에서(예전 그대로).
     store.getState().setEditorPrep(null)
-    void input.measureClips()
+    // 옛 형식(1판) 저장본을 처음 새 형식으로 옮기는 열기는 잰 길이를 붙은 줄 그대로 맞춘다 — 옛 화면이 보이던 자리 그대로(검토 c 낮음 2).
+    //   그사이 사람이 만든 빈 곳은 그대로 둔다. 새 형식 저장본은 잰 길이가 달라도 뒤 클립이 제자리에 머문다.
+    if (store.getState().restoredOldFormat) {
+      store.setState({ firstOpenMeasuring: true })
+      void input.measureClips().finally(() => store.setState({ firstOpenMeasuring: false }))
+    } else {
+      void input.measureClips()
+    }
     // 30초를 넘겨 먼저 연 뒤 파형이 덜 찬 채 떠난 오디오는 열고 나서 뒤에서 채운다(검토 A E5).
     const bare = store.getState().audioClips.filter((a) => a.url && !a.peaks?.length).map((a) => ({ id: a.id, url: a.url }))
     if (bare.length) void fillPeaks(bare, input)

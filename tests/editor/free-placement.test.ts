@@ -13,6 +13,8 @@ vi.mock('@/stores/project-store', () => ({
 
 import { saveEditorNow, selectTimelineLayout, timelineEnd, timelineSegments, useEditorStore } from '@/stores/editor-store'
 import { drawGap } from '@/lib/editor-draft-render'
+import { rememberServerSeenAt } from '@/lib/editor/server-copy'
+import { finishEditorOpen } from '@/features/editor/open-editor'
 import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
 
@@ -292,6 +294,53 @@ describe('저장하고 다시 열기', () => {
     expect(layout()).toEqual([['A', 0, 4], ['B', 4, 3], ['D', 12, 4]])
     api().updateVideoClip('A', { actualDurationSec: 3 })
     expect(layout()).toEqual([['A', 0, 3], ['B', 4, 3], ['D', 12, 4]])
+  })
+
+  it('같은 브라우저의 옛 탭이 이 브라우저 저장본을 옛 형식으로 덮어도, 다시 열면 서버의 새 형식 저장본을 연다 — 빈 곳이 그대로다', async () => {
+    // 왜: 검토 c 낮음 1 — 옛 탭의 서버 쓰기는 409 로 막히지만 이 브라우저 저장본은 1판으로 덮였고, 본 시각이 서버 시각과 같아 1판이
+    //   열려 다음 저장이 빈 곳을 지웠다. 이 브라우저 것이 서버 것보다 낮은 판이면 서버 것을 먼저 연다 — 옛 탭 편집은 따로 칸에 남는다.
+    api().deleteClip('B')
+    await saveEditorNow('project-free')
+    const v2 = JSON.parse(localStorage.getItem(LOCAL_KEY) ?? 'null') as PersistedEditor
+    const savedAt = '2026-11-14T03:00:00.000Z'
+    rememberServerSeenAt('project-free', savedAt)
+    const oldTab = { ...v2, version: 1, videoClips: v2.videoClips.map(({ gapBefore: _gap, ...rest }) => rest) }
+    delete oldTab.placements
+    localStorage.setItem(LOCAL_KEY, JSON.stringify(oldTab))
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) =>
+      (init?.method ?? 'GET') === 'GET' ? new Response(JSON.stringify({ state: v2, updatedAt: savedAt }), { status: 200 }) : new Response('{}', { status: 200 })))
+    canonical()
+    await api().loadPersisted()
+    expect(layout()).toEqual([['A', 0, 4], ['C', 8, 4], ['D', 12, 4]])
+    expect(JSON.parse(localStorage.getItem('tale:editor:v1:set-aside:project-free') ?? 'null')?.version).toBe(1)
+  })
+
+  it('옛 형식 저장본을 처음 새 형식으로 옮기는 열기에서는, 잰 길이가 짧아도 뒤 클립이 붙은 줄 그대로 당겨진다 — 빈 곳이 생기지 않는다', async () => {
+    // 왜: 검토 c 낮음 2 — 잰 길이 없이 저장된(또는 ★ 가 바뀐) 1판을 처음 2판으로 옮길 때 다시 잰 길이가 짧으면 뒤 클립이 제자리에 남아
+    //   빈 곳이 생겼다. 옛 화면은 잰 길이대로 붙여 보였으니 "보이던 자리 그대로"(오너 답 1)와 어긋난다. 새 형식 저장본은 그대로 제자리다.
+    const legacy = (clips: VideoClip[]) => JSON.stringify({
+      version: 1, shots: ['A', 'B', 'C', 'D'].map((id) => shot(id)), clipOrder: { sc_1: ['A', 'B', 'C', 'D'] }, videoClips: clips,
+      audioClips: [], audioSources: [], audioTracks: [{ id: 'atrack_1' }], panelSizes: { sourceW: 256, previewH: 360 },
+    })
+    const openMeasuring = async (shotId: string) => {
+      canonical()
+      const restored = await api().loadPersisted()
+      await finishEditorOpen({
+        projectId: 'project-free', restored, isCancelled: () => false, audioName: () => 'audio',
+        measureClips: async () => api().updateVideoClip(shotId, { actualDurationSec: 3 }),
+        decodeAudio: async () => ({ durationSec: 4, peaks: [] }),
+      })
+      await Promise.resolve()
+    }
+    // 잰 길이 없이 저장된 1판
+    localStorage.setItem(LOCAL_KEY, legacy(['A', 'B', 'C', 'D'].map((id) => clip(id))))
+    await openMeasuring('A')
+    expect(layout()).toEqual([['A', 0, 3], ['B', 3, 4], ['C', 7, 4], ['D', 11, 4]])
+    // ★ 가 바뀌어 저장한 잰 길이가 옛 영상 것인 1판
+    localStorage.setItem(LOCAL_KEY, legacy(['A', 'B', 'C', 'D'].map((id) => clip(id, id === 'B' ? { url: 'https://video.test/B-old.mp4', actualDurationSec: 4 } : {}))))
+    await openMeasuring('B')
+    expect(layout()).toEqual([['A', 0, 4], ['B', 4, 3], ['C', 7, 4], ['D', 11, 4]])
+    expect(api().firstOpenMeasuring).toBe(false)
   })
 
   it('예전 저장본을 새 형식으로 옮겨도 이 브라우저의 옛 형식 저장본은 따로 칸에 그대로 남는다', async () => {
