@@ -3350,6 +3350,8 @@ export const KO: Record<string, string> = {
   'Open details': '상세 열기',
   'Make a real image.': '실사 이미지를 만들어요',
   'Next: Editor': '다음: Editor로',
+  // Director 채팅 맨 위 "지금 할 일" 줄(11/13 시안 D5) — {work} 는 툴바 예상 칸 글 · 만드는 중 · 다음: Editor로.
+  'Up next · {work}': '지금 할 일 · {work}',
   'Also make videos': '영상까지 이어서',
   'Make images + videos': '이미지+영상 만들기',
   "If you close this screen, the videos won't start.": '이 화면을 닫으면 영상은 시작되지 않아요',

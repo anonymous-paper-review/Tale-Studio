@@ -53,6 +53,7 @@ import { ChatModelControls } from '@/components/layout/chat-model-controls'
 import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
 import { LumiBatchNotice } from '@/features/director/lumi-batch-notice'
+import { LumiNowLine } from '@/features/director/lumi-now-line'
 import {
   castMentions,
   backgroundMentions,
@@ -1438,6 +1439,9 @@ export function GlobalChat() {
             <CollapseIcon className="size-4" />
           </Button>
         </div>
+
+        {/* 지금 할 일 줄(11/13 시안 D5) — Director 만, 머리 바로 아래에 붙어 말이 쌓여도 밀려 올라가지 않는다. */}
+        {currentStage === 'director' && <LumiNowLine />}
 
         {/* Messages */}
         {/* 투명 덮개(AI 가 같은 단계에서 일하는 동안)가 받은 휠 · 끌기를 넘길 칸 — 실제로 스크롤하는 viewport 에 단다(검토 A2 N1). */}
