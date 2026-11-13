@@ -15,6 +15,11 @@ export function notifyGenerationComplete(stage: StageId, label: string): void {
   useGlobalChatStore.getState().notifyCompletion(stage, label)
 }
 
+/** 화면에서 멈춘 작업이 뒤늦게 끝나 기록(버전 · Take 목록)에만 남았을 때 한 줄(오너 2026-11-14 7번 · 리드 d) — 왜 새 버전이 생겼는지 알게. */
+export function notifyStoppedResultKept(stage: StageId, content: string): void {
+  useGlobalChatStore.getState().notifyIssue(stage, content)
+}
+
 /**
  * 생성 트리거 실패 → 사유를 채팅에 남긴다 (#double-fire 2026-07-31).
  *   실패를 삼키고 노드/카드 상태로만 표시하던 store 액션들이 쓴다 — 카드의 작은 빨간 글씨는

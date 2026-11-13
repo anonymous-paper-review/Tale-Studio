@@ -57,7 +57,7 @@ import type { Json } from '@/types/database'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { parseDirectorRefs } from '@/lib/director/director-refs'
 import { latestShotTake, promptWithChange } from '@/lib/director/shot-detail'
-import { keptStoryboardImage, selectStoryboardVersion, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { currentStoryboardVersion, keptStoryboardImage, selectStoryboardVersion, storyboardImageVersions, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import {
   isEmptyStableFrameInputs,
   parseStableFrameInputs,
@@ -82,11 +82,11 @@ import {
   type GenerationJobObserver,
   type GenerationJobReceipt,
 } from '@/lib/generation-jobs-client'
-import { notifyGenerationComplete, notifyGenerationFailure } from '@/lib/generation-notify'
+import { notifyGenerationComplete, notifyGenerationFailure, notifyStoppedResultKept } from '@/lib/generation-notify'
 import { claimAction, releaseAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
-import { directorBoardLabel, type BoardNodeNames } from '@/features/director/node-label'
+import { directorBoardLabel, prettyNodeLabel, type BoardNodeNames } from '@/features/director/node-label'
 import {
   arrangeDirectorCanvas,
   ASSET_TO_SHOT_GAP,
@@ -233,6 +233,8 @@ type HydratedVideoTake = {
   video_resolution?: string | null
   /** 지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소(디자이너 11/13 D7 · 리드 B). 모르면 null. */
   made_frames?: unknown
+  /** 그 Take 의 마지막 작업을 화면에서 멈춘 때(오너 2026-11-14 7번). 없으면 멈추지 않음. */
+  cancelled_at?: string | null
 }
 type VideoGenerationResponse = {
   error?: string
@@ -1258,6 +1260,9 @@ interface DirectorCanvasState {
 
   // video generation (ST-4, I2V/T2V) — 항상 사용자 클릭으로만 (결정 #40)
   /** Shot에 새 Video take 생성 + 영상 생성 API 호출(+폴링). storyboardImage 있으면 I2V. 생성된 Video 노드 id 반환 */
+  /** 이미 보낸 이미지 · 영상 작업을 화면에서 멈춘다(오너 2026-11-14 7번 · 리드 C) — fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다.
+   *  멈춘 Take 는 "멈춤"으로, 이미지를 만들던 샷은 지금 그림으로 돌아가 바로 다시 만들 수 있다. 멈춘 작업 id 를 돌려준다. */
+  cancelRunningJobs: (jobIds: string[]) => Promise<string[]>
   /** 실사 이미지 버전 고르기(디자이너 11/13 D6 · 리드 A) — 다시 만들지 않고(Take 0) 그 버전이 지금 그림이 된다.
    *  화면은 바로 바꾸고 서버 답으로 맞춘다. 서버가 바꾸지 못하면 되돌리고 false. */
   selectStoryboardImageVersion: (shotNodeId: string, versionId: string) => Promise<boolean>
@@ -1517,6 +1522,9 @@ export function getVideoNodeResolution(
   const chosen = video.data.override.resolution
   return isVideoResolution(chosen) ? chosen : DEFAULT_VIDEO_RESOLUTION
 }
+
+/** 이 화면에서 멈춘 작업 — 뒤늦게 끝난 결과를 지금 그림에 쓰지 않고 기록에만 둔다(오너 2026-11-14 7번). */
+const stoppedJobIds = new Set<string>()
 
 /** 테이크 목록의 made_frames(지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소) — 모양이 다르면 모른다(null). */
 function parseMadeFrames(value: unknown): VideoNodeData['madeFrames'] {
@@ -2070,6 +2078,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     // 지금 영상을 낸 작업이 쓴 그림(리드 B) — 해상도와 같은 규칙: 서버가 모를 때도 같은 영상이면 아는 값을 둔다.
                     madeFrames: parseMadeFrames(row.made_frames)
                       ?? (row.url && row.url === existingNode.data.videoUrl ? existingNode.data.madeFrames ?? null : null),
+                    // 화면에서 멈춘 Take(오너 7번) — 서버가 마지막 작업의 멈춤으로 정한다. 방금 멈춰 서버가 아직 모르면 아는 값을 둔다.
+                    cancelledAt: typeof row.cancelled_at === 'string'
+                      ? row.cancelled_at
+                      : existingNode.data.generationJobId && stoppedJobIds.has(existingNode.data.generationJobId) ? existingNode.data.cancelledAt ?? null : null,
                   },
                 } as DirectorNode
                 if (standaloneConfig) {
@@ -2106,6 +2118,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               data.adherence = (row.adherence as VideoAdherence | null) ?? null
               data.videoResolution = isVideoResolution(row.video_resolution) ? row.video_resolution : null
               data.madeFrames = parseMadeFrames(row.made_frames)
+              data.cancelledAt = typeof row.cancelled_at === 'string' ? row.cancelled_at : null
               const id = newDirectorId('dn')
               nodes = [...nodes, {
                 id,
@@ -4189,6 +4202,19 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               options?.onJob?.(receipt)
             } })
             if (get().projectId !== projectId) return { jobId, status: 'skipped' }
+            if (stoppedJobIds.has(jobId)) {
+              // 화면에서 멈춘 작업이 뒤늦게 끝났다(오너 7번) — 서버가 기록(버전)에만 넣었다. 지금 그림은 바꾸지 않고 다시 읽어 버전 줄만 맞춘다.
+              await invalidateShots(projectId)
+              await get().hydrateFromDb(projectId).catch(() => {})
+              const shot = get().nodes.find((n) => n.id === shotNodeId)
+              const version = shot && isShotData(shot.data) ? storyboardImageVersions(shot.data.storyboardImage).find((v) => v.id === jobId) : undefined
+              const locale = useLocaleStore.getState().locale
+              const name = shot ? prettyNodeLabel(shot.data.label) : ''
+              notifyStoppedResultKept('director', version
+                ? translate(locale, 'The image you stopped for {shot} finished later and was kept as version v{n}. The current image did not change.', { shot: name, n: version.n })
+                : translate(locale, 'The image you stopped for {shot} finished later and was kept in the versions. The current image did not change.', { shot: name }))
+              return { jobId, status: 'cancelled', resultUrl: url }
+            }
             let completedImage: NonNullable<ShotNodeData['storyboardImage']> = {
               url, status: 'completed', errorMessage: null, generatedAt: Date.now(),
             }
@@ -4363,6 +4389,47 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       // 연타 방어는 아래 acquireGenerationLock 이 이미 담당한다 — 1초 창이 아니라 생성 전 구간을
       //   잠그므로 더 강하다. 여기에 창을 덧대면 앞 시도가 *끝난 뒤*의 정당한 재시도까지 막힌다.
+      cancelRunningJobs: async (jobIds) => {
+        const projectId = get().projectId
+        const ids = [...new Set(jobIds.filter(Boolean))]
+        if (!projectId || !ids.length || isDemoSession()) return []
+        const res = await fetch('/api/director/jobs/cancel', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ projectId, jobIds: ids }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const body = (await res.json()) as { data?: { cancelled?: Array<{ jobId: string; kind: string; writerShotIds: string[]; videoClipId: string | null; cancelledAt: string }> } }
+        const cancelled = body.data?.cancelled ?? []
+        if (get().projectId !== projectId) return cancelled.map((c) => c.jobId)
+        for (const c of cancelled) stoppedJobIds.add(c.jobId)
+        const imageShots = new Set(cancelled.filter((c) => c.kind !== 'shot_video').flatMap((c) => c.writerShotIds))
+        const released: string[] = []
+        set((s) => ({
+          nodes: s.nodes.map((n) => {
+            if (isVideoData(n.data)) {
+              const data = n.data
+              const hit = cancelled.find((c) => c.jobId === data.generationJobId || (!!c.videoClipId && c.videoClipId === data.videoClipId))
+              return hit ? ({ ...n, data: { ...data, cancelledAt: hit.cancelledAt } } as DirectorNode) : n
+            }
+            if (isShotData(n.data) && n.data.writerShotId && imageShots.has(n.data.writerShotId) && n.data.storyboardImage?.status === 'generating') {
+              // 지금 그림은 그대로다 — 만드는 중 표시만 내리고 지금 버전(없으면 아직 없음)으로 돌린다.
+              const image = n.data.storyboardImage
+              const current = currentStoryboardVersion(image)
+              released.push(n.id)
+              return {
+                ...n,
+                data: { ...n.data, storyboardImage: current ? { ...image, status: 'completed', errorMessage: null } : { ...image, status: 'pending', errorMessage: null } },
+              } as DirectorNode
+            }
+            return n
+          }),
+        }))
+        for (const shotNodeId of released) releaseAction(`director:storyboard:${shotNodeId}`)
+        refreshGenerationQueue()
+        return cancelled.map((c) => c.jobId)
+      },
+
       selectStoryboardImageVersion: async (shotNodeId, versionId) => {
         const node = get().nodes.find((n) => n.id === shotNodeId)
         if (!node || !isShotData(node.data)) return false
@@ -4910,6 +4977,15 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 console.error(`[director-store] ${message} for accepted job ${acceptedJobId}`)
               }
               if (!isCurrentAttempt()) return true
+              if (status === 'completed' && stoppedJobIds.has(jobId)) {
+                // 화면에서 멈춘 Take 가 뒤늦게 끝났다(오너 7번 · 리드 d) — Take 목록에만 있고 Editor 로 가는 Take 는 그대로다.
+                const doneNode = get().nodes.find((n) => n.id === videoNodeId)
+                const shot = doneNode && isVideoData(doneNode.data) ? get().nodes.find((n) => n.id === (doneNode.data as VideoNodeData).parentShotNodeId) : undefined
+                notifyStoppedResultKept('director', translate(useLocaleStore.getState().locale, 'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.', {
+                  shot: shot ? prettyNodeLabel(shot.data.label) : '',
+                }))
+                return true
+              }
               if (status === 'completed') {
                 // 약속 E4(2026-09-04): 일괄은 러너가 "N개 완료, M개 실패" 한 줄로 남긴다 — 건별 알림은 단건만.
                 if (options?.batch !== true) notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Video'))

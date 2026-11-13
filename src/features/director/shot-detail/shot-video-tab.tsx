@@ -43,7 +43,7 @@ import { LockedFrame, smallFrameStyle } from './locked-frame'
 
 const takePhase = takePhaseOf
 
-const PHASE_LABEL: Record<TakePhase, string> = { done: 'Done', making: 'Making', failed: 'Failed', idle: 'Not made yet' }
+const PHASE_LABEL: Record<TakePhase, string> = { done: 'Done', making: 'Making', stopped: 'Stopped', failed: 'Failed', idle: 'Not made yet' }
 
 export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
   shotNodeId: string
@@ -54,6 +54,8 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
   const t = useT()
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const setVideoFinal = useDirectorCanvasStore((s) => s.setVideoFinal)
+  const cancelRunningJobs = useDirectorCanvasStore((s) => s.cancelRunningJobs)
+  const [stopError, setStopError] = useState<string | null>(null)
   const projectFormat = useProjectFormatStore((s) => s.format)
   const { takes, final } = shotDetailTakes(nodes, shotNodeId)
   const [picked, setPicked] = useState<string | null>(initialTakeId ?? null)
@@ -103,9 +105,12 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                         <span className="block h-full w-1/3 animate-pulse rounded-full bg-state-video" />
                       </span>
                     </div>
+                  ) : phase === 'stopped' ? (
+                    <p className="text-caption text-subtle-foreground">{t('Stopped · The Take is not refunded. If it finishes later, it stays in this list.')}</p>
                   ) : phase === 'done' ? (
                     <p className="text-caption text-subtle-foreground">
                       {[madeWith(take), VIDEO_MODELS[setup.model].label, resolution].filter(Boolean).join(' · ')}
+                      {take.data.cancelledAt ? <span className="ml-1.5 rounded-full border border-border px-1.5 text-micro">{t('Finished after it was stopped')}</span> : null}
                     </p>
                   ) : phase === 'failed' ? (
                     <p className="line-clamp-2 text-caption text-destructive">
@@ -116,6 +121,13 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                   )}
                   <div className="flex flex-wrap gap-1.5">
                     <Button type="button" size="pill" variant="secondary" aria-pressed={current?.id === take.id} onClick={() => setPicked(take.id)}>{t('View')}</Button>
+                    {/* 멈추기(오너 7번) — 화면에서만 멈춘다. fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다. */}
+                    {phase === 'making' && take.data.generationJobId ? (
+                      <Button type="button" size="pill" variant="ghost" onClick={() => {
+                        setStopError(null)
+                        void cancelRunningJobs([take.data.generationJobId!]).catch(() => setStopError(t('Could not stop it. Try again.')))
+                      }}>{t('Stop')}</Button>
+                    ) : null}
                     {phase === 'done' ? (
                       isFinal ? (
                         <Button type="button" size="pill" variant="outline" aria-pressed={!final?.auto} className="border-success text-success hover:text-success"
@@ -133,6 +145,7 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
           </ol>
         )}
         {finalError ? <p className="text-caption text-destructive">{finalError}</p> : null}
+        {stopError ? <p className="text-caption text-destructive">{stopError}</p> : null}
       </section>
     </div>
   )

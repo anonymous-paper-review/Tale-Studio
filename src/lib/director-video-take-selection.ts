@@ -8,6 +8,8 @@ export interface VideoTakeSelectionRecord {
   created_at?: unknown
   last_attempt_at?: unknown
   deleted_at?: unknown
+  /** 화면에서 멈춘 Take(오너 2026-11-14 7번) — 뒤늦게 끝나도 ★ 로 고르지 않은 한 저절로 고르지 않는다. */
+  cancelled_at?: unknown
 }
 
 function isLive(take: VideoTakeSelectionRecord): boolean {
@@ -54,9 +56,9 @@ export function compareDirectorVideoTakeOrder(a: VideoTakeSelectionRecord, b: Vi
   return compareDescending(stringValue(a.id), stringValue(b.id))
 }
 
-/** The grid default: newest live completed take with a nonblank URL. */
+/** The grid default: newest live completed take with a nonblank URL. 화면에서 멈춘 Take 는 기록에만 있다(저절로 고르지 않는다). */
 export function selectNewestSuccessfulTake<T extends VideoTakeSelectionRecord>(takes: readonly T[]): T | null {
-  return takes.filter(hasUsableUrl).sort(compareDirectorVideoTakeOrder)[0] ?? null
+  return takes.filter((take) => hasUsableUrl(take) && take.cancelled_at == null).sort(compareDirectorVideoTakeOrder)[0] ?? null
 }
 
 /** Export/handoff default: usable Final first, otherwise the grid default. */

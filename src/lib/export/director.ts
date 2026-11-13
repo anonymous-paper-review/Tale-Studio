@@ -7,6 +7,7 @@ import { bulletList, escapeMd, h1, h2, isRecord, kvSection, labelPart, nativeTex
 import { PathAllocator } from './sanitize'
 import type { ArtifactFile } from './types'
 import { loadShotsResult } from '@/lib/shots-cache'
+import { withCancelledTakes } from '@/lib/director/take-cancellations'
 
 export interface DirectorExportData {
   scenes: SceneRow[]
@@ -80,7 +81,7 @@ function clipOmittedNote(locale: AppLocale): string {
 export const DIRECTOR_SCENES_SELECT =
   'id,project_id,scene_id,narrative_summary,narrative_summary_native,location,time_of_day,mood,mood_native,sort_order,created_at,updated_at'
 export const DIRECTOR_VIDEO_CLIPS_SELECT =
-  'id,project_id,shot_id,url,status,created_at,updated_at,is_final,take_number,deleted_at,take_label'
+  'id,project_id,shot_id,url,status,created_at,updated_at,is_final,take_number,deleted_at,take_label,last_attempt_job_id'
 
 export function collectDirectorArtifacts(
   data: DirectorExportData,
@@ -157,10 +158,12 @@ export async function loadDirectorData(projectId: string): Promise<DirectorExpor
   if (shotsRes.error) throw new Error(`director shots load failed: ${shotsRes.error.message}`)
   if (clipsRes.error) throw new Error(`director video clips load failed: ${clipsRes.error.message}`)
 
+  // 화면에서 멈춘 Take(오너 2026-11-14 7번)는 ★ 로 고르지 않은 한 내보내지 않는다 — 멈춤을 붙여 고른다.
+  const videoClips = await withCancelledTakes(supabase, ((clipsRes.data ?? []) as unknown[]).filter(isRecord) as ClipRow[])
   return {
     scenes: ((scenesRes.data ?? []) as unknown[]).filter(isRecord) as SceneRow[],
     shots: ((shotsRes.data ?? []) as unknown[]).filter(isRecord) as ShotRow[],
-    videoClips: ((clipsRes.data ?? []) as unknown[]).filter(isRecord) as ClipRow[],
+    videoClips,
   }
 }
 

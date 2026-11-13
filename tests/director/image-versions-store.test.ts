@@ -116,6 +116,29 @@ describe('실사 이미지 버전 저장', () => {
     expect(image.frames?.start).toMatch(/_gjob-77_storyboard_start\.png/)
   })
 
+  it('화면에서 멈춘 작업의 그림이 뒤늦게 끝나면 버전 목록에만 넣고 지금 그림은 그대로 둔다', async () => {
+    // 왜: 오너 7번 "백그라운드에서 끝나면 히스토리로" — 멈춘 뒤 다시 만든 그림이 있을 수 있어 늦은 그림이 지금 그림을 덮으면 안 된다.
+    const table = shotsTable({ url: 'https://media.test/now.png', frames: { start: 'https://media.test/now.png', direction: 'https://media.test/now-d.png', end: 'https://media.test/now-e.png' }, status: 'completed', errorMessage: null, generatedAt: 9 })
+    const cancelled = { select: () => cancelled, eq: () => cancelled, maybeSingle: async () => ({ data: { job_id: 'job-late' }, error: null }) }
+    mocks.from.mockImplementation((name: string) => (name === 'director_job_cancellations' ? cancelled : table.from()))
+    const sharp = (await import('sharp')).default
+    const raw = Buffer.alloc(512 * 342 * 3)
+    for (let i = 0; i < raw.length; i++) raw[i] = (Math.random() * 256) | 0
+    const png = await sharp(raw, { raw: { width: 512, height: 342, channels: 3 } }).png().toBuffer()
+    vi.stubGlobal('fetch', vi.fn().mockResolvedValue(new Response(png.buffer.slice(png.byteOffset, png.byteOffset + png.byteLength) as ArrayBuffer)))
+    mocks.crop.mockResolvedValue([frames('late')])
+
+    await finalizeGenerationJob({
+      id: 'job-late', project_id: 'project-1', kind: 'storyboard_real_grid',
+      target: { workspaceId: 'ws-1', writerShotIds: ['shot-1'], gridVariant: 'grid4' }, input_snapshot: {},
+    } as never, { media: 'image', url: 'https://fal.media/grid.png' })
+
+    const image = table.row.storyboard_image!
+    expect(image.url).toBe('https://media.test/now.png')
+    expect(storyboardImageVersions(image).map((v) => [v.n, v.id, v.cancelled === true])).toEqual([[1, 'legacy', false], [2, 'job-late', true]])
+    expect(image.versionId).toBe('legacy')
+  })
+
   it('직접 올린 실사 그림도 새 파일 이름으로 저장하고 버전 하나가 되어 지금 그림이 된다', async () => {
     // 왜: 리드 답 e — 올린 그림도 같은 목록에서 되돌릴 수 있다. 같은 자리에 덮어쓰면 앞 버전 그림이 사라진다.
     const table = shotsTable({ url: 'https://media.test/a.png', status: 'completed', errorMessage: null, generatedAt: 1 })

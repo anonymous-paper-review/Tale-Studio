@@ -161,6 +161,32 @@ describe('Director 샷 상세 화면', () => {
     expect(button).not.toContain('Replaces the existing shooting image')
   })
 
+  it('Take 를 만드는 중이면 그 카드에 [멈추기]가 있고, 멈춘 Take 는 "멈췄어요"로 보이며 새 Take 단추가 켜진다', () => {
+    // 왜: 오너 7번 "이미 생성이 진행 중인 것들은 UI로는 취소된걸로 보이게 해서 유저가 수정해서 다시 생성 요청할 수 있게" — Take 는 돌려주지 않는다.
+    done(1)
+    const making = addTake({ takeNumber: 2, status: 'generating', lastAttemptStatus: 'generating', generationJobId: '11111111-1111-4111-8111-111111111111' })
+    const out = render('panel', 'video')
+    expect(out).toContain('>Stop<')
+    expect(readFileSync('src/features/director/shot-detail/shot-video-tab.tsx', 'utf8')).toMatch(/cancelRunningJobs\(\[take\.data\.generationJobId!?\]\)/)
+    director.getState().updateNodeData<'video'>(making, { cancelledAt: '2026-11-14T03:00:00Z' })
+    const stopped = render('panel', 'video')
+    expect(stopped).toContain('Stopped · The Take is not refunded. If it finishes later, it stays in this list.')
+    expect(stopped).not.toContain('A Take is being made. You can make a new one when it is done.')
+    expect(buttonTag(stopped, 'Make a new Take · 5 Take')).not.toContain('disabled=""')
+    setLocale('ko')
+    expect(render('panel', 'video')).toContain('멈췄어요 · Take 는 돌려드리지 않아요. 뒤늦게 끝나면 이 목록에 남아요.')
+  })
+
+  it('멈춘 뒤 끝난 Take 는 목록에 남아 "멈춘 뒤 끝났어요"를 보이고 ★ 최종(자동)이 되지 않는다', () => {
+    // 왜: 오너 7번 "백그라운드에서 끝나면 히스토리로" — 늦게 끝난 영상은 볼 수 있지만 Editor 로 가는 것을 저절로 바꾸지 않는다.
+    done(1)
+    done(2, { cancelledAt: '2026-11-14T03:00:00Z' })
+    const out = render('panel', 'video')
+    expect(out).toContain('Finished after it was stopped')
+    const list = out.slice(out.indexOf('data-testid="shot-detail-takes"'))
+    expect(list.indexOf('★ Final (auto)')).toBeGreaterThan(list.indexOf('Take 1'))
+  })
+
   it('상세에는 이미지 · 영상 탭이 있고 영상이 없으면 "영상 · 없음"이다', () => {
     // 왜: D6 — 영상이 아직 없는 샷은 탭에서 바로 알 수 있다.
     const out = render('popup')

@@ -39,6 +39,7 @@ import {
 } from '@/lib/storage/immutable-object'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { updateStoryboardImage } from '@/lib/director/storyboard-image-store'
+import { isJobCancelled } from '@/lib/director/job-cancellations'
 import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
@@ -1038,6 +1039,8 @@ async function finalizeStoryboardStripJob(
   ])
 
   // 버전 하나를 쌓고 지금 그림으로 — 위 칸(url = start 하위 호환 대표 프레임 · frames)은 이 버전을 비춘다.
+  //   화면에서 멈춘 작업(오너 7번)이면 기록에만 넣고 지금 그림은 그대로 둔다.
+  const stopped = await isJobCancelled(job.id)
   await updateStoryboardImage(job.project_id, writerShotId, (current) => withStoryboardVersion(current, {
     id: job.id,
     url: startUrl,
@@ -1046,7 +1049,8 @@ async function finalizeStoryboardStripJob(
     source: 'generated',
     // 약속 I4: 참조한 러프의 시각 — 러프가 바뀌면 "러프 바뀜"(자동 재생성은 하지 않는다, 오너 I5).
     roughGeneratedAt: job.target.roughGeneratedAt ?? null,
-  }, { select: true }))
+    ...(stopped ? { cancelled: true as const } : {}),
+  }, { select: !stopped }))
 
   await completeGenerationJob(job.id, startUrl)
   await cleanupRefSheet(job) // #ref-sheet-ttl — 일회용 합성 레퍼런스 회수(성공 후, 무해 실패)
@@ -1072,14 +1076,16 @@ export async function finalizeShotStoryboardJob(
   const path = `${workspaceId}/${job.project_id}/shots/${storageKeySegment(writerShotId)}_g${job.id}_storyboard_image.png`
   const publicUrl = await uploadImageFromUrl(falImageUrl, path)
 
-  // upload-image 라우트와 같은 모양 + 버전 하나(ShotNode/StoryboardGridView 는 위 칸만 읽는다).
+  // upload-image 라우트와 같은 모양 + 버전 하나(ShotNode/StoryboardGridView 는 위 칸만 읽는다). 멈춘 작업이면 기록에만.
+  const stopped = await isJobCancelled(job.id)
   await updateStoryboardImage(job.project_id, writerShotId, (current) => withStoryboardVersion(current, {
     id: job.id,
     url: publicUrl,
     generatedAt: Date.now(),
     source: 'generated',
     roughGeneratedAt: job.target.roughGeneratedAt ?? null,
-  }, { select: true }))
+    ...(stopped ? { cancelled: true as const } : {}),
+  }, { select: !stopped }))
 
   await completeGenerationJob(job.id, publicUrl)
   return publicUrl
@@ -1141,6 +1147,7 @@ async function finalizeRealGridJob(
     sheetFormatOfJob(job),
     'repaint', // #repaint-crop: 실사 표면 — 스펙 셀 고정+인셋
   )
+  const stoppedSheet = await isJobCancelled(job.id)
   let representativeUrl = ''
   for (let i = 0; i < writerShotIds.length; i++) {
     const shotId = writerShotIds[i]
@@ -1164,6 +1171,7 @@ async function finalizeRealGridJob(
     ])
 
     // 샷마다 버전 하나를 쌓고 지금 그림으로 — url 은 하위 호환 대표 프레임(start) [#real-grid-final].
+    //   화면에서 멈춘 장(오너 7번)이면 넷 다 기록에만 넣고 지금 그림은 그대로 둔다.
     await updateStoryboardImage(job.project_id, shotId, (current) => withStoryboardVersion(current, {
       id: job.id,
       url: startUrl,
@@ -1171,7 +1179,8 @@ async function finalizeRealGridJob(
       generatedAt: Date.now(),
       source: 'generated',
       roughGeneratedAt: job.target.roughGeneratedAtByShot?.[shotId] ?? null,
-    }, { select: true }))
+      ...(stoppedSheet ? { cancelled: true as const } : {}),
+    }, { select: !stoppedSheet }))
   }
 
   await completeGenerationJob(job.id, representativeUrl)

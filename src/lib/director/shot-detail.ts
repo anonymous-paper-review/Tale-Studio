@@ -29,11 +29,12 @@ export function detailImageModels(data: Pick<ShotNodeData, 'writerShotId'>): Ima
   return data.writerShotId ? IMAGE_MODEL_ORDER.filter(imageModelSupportsSheetCanvas) : [...IMAGE_MODEL_ORDER]
 }
 
-/** Take 의 지금 단계 — 만드는 중 · 완성 · 실패 · 아직 안 만듦. */
-export type TakePhase = 'done' | 'making' | 'failed' | 'idle'
+/** Take 의 지금 단계 — 만드는 중 · 멈춤(화면에서 멈췄고 아직 안 끝남) · 완성 · 실패 · 아직 안 만듦. */
+export type TakePhase = 'done' | 'making' | 'stopped' | 'failed' | 'idle'
 
-export function takePhaseOf(data: Pick<VideoNodeData, 'status' | 'lastAttemptStatus' | 'videoUrl'>): TakePhase {
-  if (data.lastAttemptStatus === 'generating' || data.status === 'generating') return 'making'
+export function takePhaseOf(data: Pick<VideoNodeData, 'status' | 'lastAttemptStatus' | 'videoUrl' | 'cancelledAt'>): TakePhase {
+  // 화면에서 멈춘 Take 는 만드는 중으로 세지 않는다 — 그 샷의 새 Take 를 바로 만들 수 있다(오너 2026-11-14 7번).
+  if (data.lastAttemptStatus === 'generating' || data.status === 'generating') return data.cancelledAt ? 'stopped' : 'making'
   if (data.status === 'completed' && data.videoUrl) return 'done'
   if (data.status === 'failed' || data.lastAttemptStatus === 'failed') return 'failed'
   return 'idle'
@@ -57,6 +58,7 @@ export function shotDetailTakes(nodes: readonly DirectorNode[], shotNodeId: stri
     is_final: take.data.final,
     take_number: take.data.takeNumber,
     created_at: take.data.createdAt,
+    cancelled_at: take.data.cancelledAt ?? null,
   }))
   const chosen = selectHandoffTake(records)
   return { takes, final: chosen ? { id: String(chosen.id), auto: chosen.is_final !== true } : null }

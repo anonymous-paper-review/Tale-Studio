@@ -11,6 +11,7 @@ import {
   shotDetailFrames,
   shotDetailTakes,
   takeImageVersions,
+  takePhaseOf,
   takeSettings,
   videoTabLabelKey,
 } from '@/lib/director/shot-detail'
@@ -181,5 +182,15 @@ describe('Director 샷 상세', () => {
     const frames = { start: 'https://media.test/s.png', direction: 'https://media.test/d.png', end: 'https://media.test/e.png' }
     const making = { url: frames.start, frames, status: 'generating', errorMessage: null, generatedAt: 1, versions: [{ id: 'legacy', n: 1, url: frames.start, frames, generatedAt: 1, source: 'generated' }], versionId: 'legacy' }
     expect(shotDetailFrames(making as ShotNodeData['storyboardImage'])).toEqual({ start: frames.start, end: frames.end })
+  })
+
+  it('화면에서 멈춘 Take 는 만드는 중이 아니라 "멈춤"이고, 뒤늦게 끝나도 ★ 자동으로 고르지 않는다', () => {
+    // 왜: 오너 7번 — 멈춘 Take 는 만드는 중으로 세지 않아 새 Take 를 바로 만들 수 있고, 늦게 끝난 영상은 기록에만 있다(★ 로 고르면 간다).
+    expect(takePhaseOf({ status: 'generating', lastAttemptStatus: 'generating', videoUrl: null, cancelledAt: '2026-11-14T03:00:00Z' })).toBe('stopped')
+    const nodes = [take('v1', 1), take('v2', 2, { cancelledAt: '2026-11-14T03:00:00Z' })]
+    expect(takePhaseOf(nodes[1]!.data as VideoNodeData)).toBe('done')
+    expect(shotDetailTakes(nodes, 'shot-1').final).toEqual({ id: 'v1', auto: true })
+    const picked = [take('v1', 1), take('v2', 2, { cancelledAt: '2026-11-14T03:00:00Z', final: true })]
+    expect(shotDetailTakes(picked, 'shot-1').final).toEqual({ id: 'v2', auto: false })
   })
 })

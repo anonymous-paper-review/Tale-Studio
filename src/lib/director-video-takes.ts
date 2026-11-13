@@ -1,5 +1,6 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { classifyJobError } from '@/lib/generation-jobs'
+import { cancelledJobsById } from '@/lib/director/job-cancellations'
 import { releaseTakesForJob } from '@/lib/billing/take-hold'
 import type { Json, Tables } from '@/types/database'
 export {
@@ -156,6 +157,8 @@ export type LiveDirectorVideoTake = DirectorVideoTake & {
   video_resolution: '1080p' | null
   /** 지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소(리드 B). 모르면 null. */
   made_frames: { start: string | null; end: string | null } | null
+  /** 그 Take 의 마지막 작업을 화면에서 멈춘 때(오너 2026-11-14 7번). 멈추지 않았으면 없음. */
+  cancelled_at?: string
 }
 
 /** 테이크의 마지막 시도 작업 — video_clips.last_attempt_job_id 외래 키로 같은 조회에서 함께 읽는다(지난 기록 전체는 읽지 않는다). */
@@ -223,14 +226,26 @@ async function selectLiveTakes(projectId: string, columns: string) {
 export async function listLiveDirectorVideoTakes(projectId: string): Promise<LiveDirectorVideoTake[]> {
   const withJob = await selectLiveTakes(projectId, LIVE_TAKE_WITH_LAST_JOB)
   if (!withJob.error) {
-    return ((withJob.data ?? []) as unknown as Array<DirectorVideoTake & { last_attempt_job?: LastAttemptJob | null }>)
+    const takes = ((withJob.data ?? []) as unknown as Array<DirectorVideoTake & { last_attempt_job?: LastAttemptJob | null }>)
       .map(({ last_attempt_job: job, ...take }) => ({ ...take, video_resolution: madeVideoResolution(take, job), made_frames: madeFrames(take, job) }))
+    return withCancellations(takes)
   }
   // 작업 기록을 함께 읽지 못해도 캔버스의 영상 테이크는 떠야 한다 — 해상도 표시만 빠진다.
   console.error('[director-video-takes] last attempt job embed failed:', withJob.error.message)
   const { data, error } = await selectLiveTakes(projectId, '*')
   if (error) throw error
-  return ((data ?? []) as unknown as DirectorVideoTake[]).map((take) => ({ ...take, video_resolution: null, made_frames: null }))
+  return withCancellations(((data ?? []) as unknown as DirectorVideoTake[]).map((take) => ({ ...take, video_resolution: null, made_frames: null })))
+}
+
+/** 화면에서 멈춘 Take(마지막 작업이 멈춤 표에 있음)에 멈춘 때를 붙인다 — 읽지 못하면 그대로(종전 동작). */
+async function withCancellations(takes: LiveDirectorVideoTake[]): Promise<LiveDirectorVideoTake[]> {
+  const jobIds = takes.map((take) => (take as { last_attempt_job_id?: string | null }).last_attempt_job_id ?? '').filter(Boolean)
+  const cancelled = await cancelledJobsById(jobIds)
+  if (!cancelled.size) return takes
+  return takes.map((take) => {
+    const at = cancelled.get((take as { last_attempt_job_id?: string | null }).last_attempt_job_id ?? '')
+    return at ? { ...take, cancelled_at: at } : take
+  })
 }
 
 export async function createStandaloneDirectorVideoTake(input: {

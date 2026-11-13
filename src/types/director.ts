@@ -228,6 +228,8 @@ type VideoNodeCommonData = {
   /** 지금 영상을 낸 작업이 실제로 쓴 시작 · 끝 그림 주소(작업 기록 기준, 디자이너 11/13 D7 · 리드 B). 모르면 null/없음.
    *  화면이 샷의 이미지 버전과 맞춰 "시작 v1 + 끝 v1"을 낸다. */
   madeFrames?: { start: string | null; end: string | null } | null
+  /** 화면에서 멈춘 때(오너 2026-11-14 7번) — 그 Take 의 마지막 작업을 멈췄다. 뒤늦게 끝나도 기록에만 있다. */
+  cancelledAt?: string | null
   [key: string]: unknown
 }
 

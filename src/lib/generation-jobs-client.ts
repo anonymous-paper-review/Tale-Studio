@@ -15,6 +15,8 @@ export type GenerationJobLifecycle =
   | 'deduped'
   | 'skipped'
   | 'timed_out'
+  /** 화면에서 멈춘 작업(오너 2026-11-14 7번) — 뒤늦게 끝나도 지금 그림을 바꾸지 않고 기록에만 남았다. */
+  | 'cancelled'
 
 export interface GenerationJobReceipt {
   jobId: string | null
