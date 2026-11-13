@@ -103,8 +103,8 @@ describe('이어 보내기가 약속한 만큼 · 이 화면에서만', () => {
   it('Director 화면을 떠나면 이어 보내기 기다림을 비우고 스위치를 끈다', () => {
     // 왜: 기다림이 남아 있다가 나중에 돌아오면 그사이 끝난 이미지의 영상이 확인 없이 시작됐다 —
     //   "이 화면을 닫으면 영상은 시작되지 않아요"와 어긋났다(리드 검토 a S5 보통 4).
-    // 페이지 함수 전체(맨 바깥 닫는 괄호까지).
-    const cleanup = between(page(), 'export default function DirectorCanvasPage', '\n}\n')
+    // 화면을 떠날 때 정리하는 effect 하나(Esc 로 고름 풀기와 같은 effect — 닫는 "}, [" 까지, 검토 c 낮음: 페이지 전체는 너무 넓었다).
+    const cleanup = between(page(), 'useEffect(() => {\n    const onKey = (event: KeyboardEvent) => {', '\n  }, [')
     expect(cleanup).toContain('useDirectorCanvasStore.getState().setChainVideoAfterImage(false)')
   })
 
