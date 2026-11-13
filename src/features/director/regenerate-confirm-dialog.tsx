@@ -45,17 +45,21 @@ export function RegenerateConfirmDialog({
   onConfirm: () => void
 }) {
   const t = useT()
+  // 설명 줄이 비면 바뀌는 것 첫 줄이 곧 설명이다 — 빈 설명 줄을 그리지 않고, 화면 읽기도 그 줄을 설명으로 읽는다(검토 a · 리드 11/14).
+  //   설명도 바뀌는 것도 없으면 설명 연결을 걸지 않는다(빈 설명을 가리키지 않게).
+  const lead = description || impact[0] || ''
+  const rest = description ? impact : impact.slice(1)
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent>
+      <DialogContent {...(lead ? {} : { 'aria-describedby': undefined })}>
         <ConfirmLumi stage="director" />
         <DialogHeader className="items-center text-center sm:text-center">
           <DialogTitle>{title}</DialogTitle>
-          <DialogDescription>{description}</DialogDescription>
+          {lead ? <DialogDescription>{lead}</DialogDescription> : null}
         </DialogHeader>
-        {impact.length > 0 && (
+        {rest.length > 0 && (
           <ul className="list-disc space-y-1 pl-5 text-sm text-muted-foreground">
-            {impact.map((line) => (
+            {rest.map((line) => (
               <li key={line}>{line}</li>
             ))}
           </ul>
