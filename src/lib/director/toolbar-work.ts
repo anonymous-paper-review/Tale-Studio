@@ -206,19 +206,29 @@ export function workEstimateText(
 
 /** "영상까지 이어서"(시안 D4 · 오너 답 6): 이미지를 기다리던 샷 가운데 이미지가 끝난 샷은 영상을 시작하고(start),
  *  쓸 그림이 없거나 이미 다른 길로 영상이 있는 샷은 기다림에서 빼고(drop), 아직 그리는 샷은 기다린다(keep).
- *  resumeWaiting: 러프 · 시트를 기다려 일괄이 다시 돌기를 기다리는 샷(노드 id) — 이 샷도 놓지 않는다(리드 검토 a 낮음 9). */
+ *  resumeWaiting: 러프 · 시트를 기다려 일괄이 다시 돌기를 기다리는 샷(노드 id) — 이 샷도 놓지 않는다(리드 검토 a 낮음 9).
+ *  videoBusy: 영상 묶음이 이미 도는 중이면 이미지가 끝난 샷도 기다림에 남긴다 — 묶음이 끝나면 보낸다(리드 검토 a 보통 3). */
 export function chainStep(
   waiting: readonly string[],
   states: ReadonlyMap<string, DirectorShotState>,
   imageBusy: boolean,
   resumeWaiting?: ReadonlySet<string>,
+  videoBusy = false,
 ): { start: string[]; drop: string[]; keep: string[] } {
   const out = { start: [] as string[], drop: [] as string[], keep: [] as string[] }
   for (const id of waiting) {
     const state = states.get(id)
-    if (state === 'image_done') out.start.push(id)
+    if (state === 'image_done') (videoBusy ? out.keep : out.start).push(id)
     else if (state === 'image_generating' || (state === 'image_needed' && (imageBusy || !!resumeWaiting?.has(id)))) out.keep.push(id)
     else out.drop.push(id)
   }
   return out
+}
+
+/** 기다림에서 뺀 샷 가운데 그림을 못 만들어 영상을 시작하지 못한 샷 — 다른 길로 영상이 생긴 샷은 넣지 않는다. */
+export function chainMissed(drop: readonly string[], states: ReadonlyMap<string, DirectorShotState>): string[] {
+  return drop.filter((id) => {
+    const state = states.get(id)
+    return state === 'image_needed' || state === 'image_failed'
+  })
 }

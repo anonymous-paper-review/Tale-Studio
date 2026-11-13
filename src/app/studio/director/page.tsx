@@ -36,6 +36,7 @@ import {
 import { videoBatchShotSettings } from '@/lib/director/video-batch-take'
 import { DEFAULT_VIDEO_MODEL } from '@/lib/video-models'
 import {
+  chainMissed,
   chainStep,
   effectivePickedIds,
   imageButtonMode,
@@ -1045,6 +1046,8 @@ function PaletteBar() {
     const run = useDirectorCanvasStore.getState()
     // 걸어 둔 다시 돌기(러프 · 시트를 기다린 샷)도 거둔다 — 멈춘 뒤 저절로 다시 돌지 않게(리드 검토 a 보통 5).
     cancelRealBatchResume(run.projectId)
+    // 이어 보내기 기다림도 비운다 — 이미 보낸 이미지가 끝나도 영상은 시작하지 않는다(오너 답 7, 리드 검토 a 보통 6).
+    run.setChainWaitingShots([])
     if (realBatchBusy && !realBatchCancelled) run.cancelRealBatch()
     if (!videoBatchBusy || videoBatchCancelled) {
       if (realBatchBusy) toast.info(t('Stop after the images being made now finish.'))
@@ -1073,13 +1076,16 @@ function PaletteBar() {
     .join('|')
   useEffect(() => {
     if (chainWaitingShotIds.length === 0) return
-    const step = chainStep(chainWaitingShotIds, shotStates, realBatchBusy, resumeWaitingNodeIds)
+    const step = chainStep(chainWaitingShotIds, shotStates, realBatchBusy, resumeWaitingNodeIds, videoBatchBusy)
     if (step.start.length === 0 && step.drop.length === 0) return
     setChainWaitingShots(step.keep)
-    const store = useDirectorCanvasStore.getState()
-    for (const id of step.start) void store.generateVideoForShot(id).catch(() => {})
+    const missed = chainMissed(step.drop, shotStates)
+    if (missed.length > 0) toast.info(t("{count} videos didn't start because their images weren't made.", { count: missed.length }))
+    // 이미지가 끝난 샷은 서버 영상 묶음으로 — 사람당 동시 한도를 넘는 샷도 묶음이 차례로 낸다(리드 검토 a 보통 3).
+    const pid = useDirectorCanvasStore.getState().projectId
+    if (pid && step.start.length > 0) void runVideoBatch(pid, { shotIds: step.start })
     // eslint-disable-next-line react-hooks/exhaustive-deps -- chainKey 가 기다리는 샷과 그 상태를 함께 담는다
-  }, [chainKey, realBatchBusy])
+  }, [chainKey, realBatchBusy, videoBatchBusy])
   const progressDone = (storyboardBatch?.done ?? 0) + (videoBatch?.done ?? (videoBatchProgress?.done ?? 0))
   const progressTotal = (storyboardBatch?.total ?? 0) + (videoBatch?.total ?? (videoBatchProgress?.total ?? 0))
   const progressLabel =
@@ -1279,8 +1285,9 @@ function PaletteBar() {
             type="button"
             role="switch"
             aria-checked={chainVideoAfterImage}
+            aria-label={t('Also make videos')}
             onClick={() => setChainVideoAfterImage(!chainVideoAfterImage)}
-            disabled={imageMode.mode !== 'make' || imageWork.length === 0}
+            disabled={(imageMode.mode !== 'make' || imageWork.length === 0) && chainWaitingShotIds.length === 0}
             className="flex shrink-0 items-center gap-2 text-[13px] font-medium text-muted-foreground transition-colors hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50"
           >
             <span
@@ -1349,8 +1356,10 @@ function PaletteBar() {
         confirmLabel={t('Make images + videos')}
         onConfirm={() => {
           setConfirmChain(false)
+          // Take 가 없으면 영상은 못 만들어도 이미지는 만든다 — 이미지는 Take 를 쓰지 않는다(리드 검토 a 낮음 9).
           if (chainPlan.runCount === 0) {
             toast.warning(t('No videos can be made until you add Takes.'))
+            startImages()
             return
           }
           setChainWaitingShots([...chainWaitingShotIds, ...imageWork.slice(0, chainPlan.runCount)])
@@ -1422,6 +1431,8 @@ export default function DirectorCanvasPage() {
     return () => {
       window.removeEventListener('keydown', onKey)
       useDirectorCanvasStore.getState().clearPickedShots()
+      // 화면을 떠나면 "영상까지 이어서"를 끄고 기다림을 비운다 — "이 화면을 닫으면 영상은 시작되지 않아요"(리드 검토 a S5 보통 4).
+      useDirectorCanvasStore.getState().setChainVideoAfterImage(false)
     }
   }, [])
   const handoffProjectId = useProjectStore((s) => s.projectId)

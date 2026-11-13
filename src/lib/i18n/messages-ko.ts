@@ -3186,6 +3186,7 @@ export const KO: Record<string, string> = {
   'No shots yet.': '아직 샷이 없어요.',
   'The rest are being made now.': '남은 샷은 지금 만드는 중이에요.',
   'Every shot here already has a video.': '여기 있는 샷은 모두 영상이 있어요.',
+  "{count} videos didn't start because their images weren't made.": '이미지를 못 만들어 영상 {count}개는 시작하지 않았어요',
   'Make {count} images again?': '이미지 {count}장을 다시 만들까요?',
   'Remakes the image for the {count} picked shots. No Takes are used.': '고른 샷 {count}개의 이미지를 다시 만들어요. Takes 는 쓰지 않아요.',
   'Replaces the current images in the picked shots.': '고른 샷의 지금 이미지가 새 이미지로 바뀌어요.',

@@ -1763,7 +1763,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         })),
       setPickedShots: (shotNodeIds) => set({ pickedShotIds: [...new Set(shotNodeIds)] }),
       clearPickedShots: () => set({ pickedShotIds: [] }),
-      setChainVideoAfterImage: (on) => set({ chainVideoAfterImage: on }),
+      // 스위치를 끄면 기다림도 비운다 — 꺼 둔 뒤에 영상이 시작되지 않게(리드 검토 a S5 보통 4).
+      setChainVideoAfterImage: (on) => set(on ? { chainVideoAfterImage: true } : { chainVideoAfterImage: false, chainWaitingShotIds: [] }),
       setChainWaitingShots: (shotNodeIds) => set({ chainWaitingShotIds: [...new Set(shotNodeIds)] }),
       cancelRealBatch: () => {
         if (get().realBatchBusy) set({ realBatchCancelled: true })
