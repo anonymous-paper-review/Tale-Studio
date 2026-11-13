@@ -28,8 +28,8 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   nodeId: string
   data: ShotNodeData
   layout: 'popup' | 'panel'
-  /** [다음: 영상 만들기 · N Take](D6) — 새 Take 를 만들고 영상 탭으로 간다. */
-  makeVideo?: { label: string; disabled: boolean; run: () => void }
+  /** [다음: 영상 만들기 · N Take](D6) — 새 Take 를 만들고 영상 탭으로 간다. notice = 시작하지 않은 까닭(단추 아래). */
+  makeVideo?: { label: string; disabled: boolean; run: () => void; notice?: string | null }
 }) {
   const t = useT()
   const projectFormat = useProjectFormatStore((s) => s.format)
@@ -155,6 +155,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
           <Trash2 className="size-3.5" />{t('Delete')}
         </Button>
       </div>
+      {hasImage && makeVideo?.notice ? <p className="text-caption text-destructive">{makeVideo.notice}</p> : null}
     </div>
   )
 

@@ -9,9 +9,9 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { latestShotTake, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings, videoTabLabelKey, type ShotDetailTab } from '@/lib/director/shot-detail'
-import { useTakeBalance } from '@/lib/billing/use-take-balance'
+import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
-import { takeCostForVideo } from '@/lib/billing/take-cost'
+import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { isShotData } from '@/types/director'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
@@ -29,6 +29,8 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
 }) {
   const t = useT()
   const [tab, setTab] = useState<ShotDetailTab>(initialTab)
+  // [다음: 영상 만들기]가 Take 를 확인하지 못해 시작하지 않은 까닭 — 이미지 탭 단추 아래에 보이고, 다음에 누를 때 지운다.
+  const [nextNotice, setNextNotice] = useState<string | null>(null)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const remakeShotVideo = useDirectorCanvasStore((s) => s.remakeShotVideo)
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
@@ -46,14 +48,22 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   const settings = takeSettings(data, latestShotTake(nodes, shotNodeId)?.data ?? null)
   const count = takeCostForVideo(settings.model, settings.resolution)
   const makeVideo = {
-    label: takeBalance.mode === 'off' ? t('Next: make the video') : t('Next: make the video · {count} Takes', { count }),
+    // 단추 값이 곧 동의인 자리 — 잔액을 못 읽어도 값을 보인다(영상 탭 단추 · entry D8 과 같은 말, 리드 2026-11-14).
+    label: takeValuesShown(takeBalance) ? t('Next: make the video · {count} Takes', { count }) : t('Next: make the video'),
     // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
     disabled: !shotDetailFrames(data.storyboardImage).start || videoBatchBusy || takes.some((take) => takePhaseOf(take.data) === 'making')
       || imageGeneration.generating || data.storyboardImage?.status === 'pending',
-    run: () => {
+    // 누를 때 잔액을 다시 읽고, 못 읽으면 시작하지 않고 이미지 탭에 남아 까닭을 보인다.
+    run: async () => {
+      setNextNotice(null)
+      if ((await fetchTakeBalance()).failed) {
+        setNextNotice(t("I couldn't check your Takes, so I didn't start. Please try again in a moment."))
+        return
+      }
       void remakeShotVideo(shotNodeId)
       setTab('video')
     },
+    notice: nextNotice,
   }
   const meta = [scene ? directorNodeLabel(scene.data, boardNames) : null, t('{seconds}s', { seconds: data.durationSeconds }), effectivePrompt(data)].filter(Boolean).join(' · ')
 
