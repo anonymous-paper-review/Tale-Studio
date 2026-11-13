@@ -175,7 +175,8 @@ describe('꺼진 단추와 그 까닭', () => {
   it('꺼진 단추의 까닭은 마우스를 올리지 않아도 단추 아래 한 줄로 보이고, 단추가 꺼지면 크림은 다음 할 일로 간다', () => {
     // 왜: 결정 페이지 추천 "꺼진 단추 아래 이유 한 줄"(오너 "나머지는 추천대로") — 마우스 글(title)은 키보드 · 터치로 안 보였다(리드 검토 a 낮음 4).
     const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
-    expect(page).toContain('const blockLine = workBlockLine(imageBlock, videoBlock, t)')
+    expect(page).toContain('workBlockLine(imageBlock, videoBlock, t)')
+    expect(page).toMatch(/const blockLine = [^\n]*workBlockLine\(imageBlock, videoBlock, t\)/)
     expect(page).toMatch(/<p id="director-work-block"[^>]*>\s*\{blockLine\}/)
     expect(page).toContain('disabled={imageBlock !== null}')
     expect(page).toContain('disabled={videoBlock !== null}')

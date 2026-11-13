@@ -49,3 +49,18 @@ describe('이름 맞추기', () => {
     expect(page).not.toContain('Image generation needed')
   })
 })
+
+describe('다시 만들기 확인 창의 말', () => {
+  it('스토리보드 카드 · 꼬리 [다시 만들기]의 확인 창과 단추 풀이는 지금 이미지가 버전으로 남는다고 알린다', () => {
+    // 왜: 오너 답 5번 "히스토리 관리" — 다시 만들어도 앞 그림은 버전으로 남는데 "교체됩니다"라고 했다(prose 상세 단추와 같은 말, 리드 S4-2 3).
+    const retry = read('src/features/director/remake-retry-button.tsx')
+    for (const src of [grid, retry]) {
+      expect(src).toContain("t('The new image becomes the current one. The current image stays in the versions.')")
+      expect(src).not.toContain('Replaces the existing shooting image')
+    }
+    expect(grid).toContain("t('Create a new shooting image (the current one stays in the versions)')")
+    expect(grid).not.toContain('replaces the existing one')
+    expect(ko).toContain("'Create a new shooting image (the current one stays in the versions)': '촬영용 이미지를 새로 만들어요 (지금 이미지는 버전으로 남아요)'")
+    expect(ko).toContain("'The new images become the current ones. The current images stay in the versions.': '새 이미지가 지금 이미지가 되고, 지금 이미지는 버전으로 남아요.'")
+  })
+})

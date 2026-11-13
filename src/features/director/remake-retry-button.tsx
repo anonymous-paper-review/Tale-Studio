@@ -54,7 +54,7 @@ export function RemakeRetryButton({
         }}
         title={t('Regenerate the image?')}
         description={t('Generates a new shooting image for this shot.')}
-        impact={[t('Replaces the existing shooting image with the new result.')]}
+        impact={[t('The new image becomes the current one. The current image stays in the versions.')]}
         confirmLabel={t('Regenerate')}
         busy={generation.disabled}
         onConfirm={() => {
