@@ -79,10 +79,11 @@ export function VideoDetailPanel({
   } | null>(null)
   const finalOperationRef = useRef(0)
   const regenerationOperationRef = useRef(0)
-  // 잔액을 다시 읽는 중인 노드 · 못 읽어 시작하지 않은 노드 — 단추를 끄고, 단추 아래에 까닭을 보인다(노드가 바뀌면 그 노드 것만).
-  const [checkingNodeId, setCheckingNodeId] = useState<string | null>(null)
-  const [takesUnknownNodeId, setTakesUnknownNodeId] = useState<string | null>(null)
-  const checkingRef = useRef<string | null>(null)
+  // 잔액을 다시 읽는 중인 영상 · 못 읽어 시작하지 않은 영상 — 단추를 끄고, 단추 아래에 까닭을 보인다. 영상마다 따로 둔다:
+  //   패널 · 팝업은 영상을 바꿔도 열린 채라, 앞 영상 읽기가 끝나며 뒤 영상 단추를 켜거나 까닭을 지우지 않게(검토 b 탐침 R1 · R4).
+  const [checkingIds, setCheckingIds] = useState<ReadonlySet<string>>(() => new Set())
+  const [takesUnknownIds, setTakesUnknownIds] = useState<ReadonlySet<string>>(() => new Set())
+  const checkingRef = useRef<Set<string>>(new Set())
   const activeNodeIdRef = useRef(nodeId)
   const nodeSessionRef = useRef(0)
   const canMarkFinal =
@@ -194,7 +195,7 @@ export function VideoDetailPanel({
   }
 
   const handleRegenerate = async () => {
-    if (isGenerating || checkingRef.current === nodeId) return
+    if (isGenerating || checkingRef.current.has(nodeId)) return
     if (standalonePromptMissing) {
       setRegenerationState({
         nodeId,
@@ -205,20 +206,20 @@ export function VideoDetailPanel({
     const operation = ++regenerationOperationRef.current
     const session = nodeSessionRef.current
     setRegenerationState({ nodeId, error: null })
-    setTakesUnknownNodeId(null)
+    setTakesUnknownIds((ids) => new Set([...ids].filter((id) => id !== nodeId)))
     // 단추 값이 곧 동의인 자리 — 누를 때 잔액을 다시 읽고, 못 읽으면 시작하지 않고 단추 아래에 까닭을 보인다(샷 상세 · 넘기기 창과 같은 말,
     //   리드 2026-11-14). 읽는 동안 단추를 꺼, 두 번 눌러도 한 번만 시작한다(검토 b 탐침 D4 와 같은 꼴).
-    checkingRef.current = nodeId
-    setCheckingNodeId(nodeId)
+    checkingRef.current.add(nodeId)
+    setCheckingIds((ids) => new Set([...ids, nodeId]))
     let readable = false
     try {
       readable = await takesReadable()
     } finally {
-      checkingRef.current = null
-      setCheckingNodeId(null)
+      checkingRef.current.delete(nodeId)
+      setCheckingIds((ids) => new Set([...ids].filter((id) => id !== nodeId)))
     }
     if (!readable) {
-      setTakesUnknownNodeId(nodeId)
+      setTakesUnknownIds((ids) => new Set([...ids, nodeId]))
       return
     }
     try {
@@ -441,7 +442,7 @@ export function VideoDetailPanel({
         <Button
           size="sm"
           onClick={() => void handleRegenerate()}
-          disabled={isGenerating || standalonePromptMissing || checkingNodeId === nodeId}
+          disabled={isGenerating || standalonePromptMissing || checkingIds.has(nodeId)}
           className="gap-1.5"
         >
           {isGenerating ? (
@@ -467,7 +468,7 @@ export function VideoDetailPanel({
           <Trash2 className="size-3.5" />
           {t('Delete')}
         </Button>
-        {takesUnknownNodeId === nodeId ? <p className="basis-full text-xs text-destructive">{t(TAKES_UNKNOWN_TEXT)}</p> : null}
+        {takesUnknownIds.has(nodeId) ? <p className="basis-full text-xs text-destructive">{t(TAKES_UNKNOWN_TEXT)}</p> : null}
       </footer>
     </div>
   )
