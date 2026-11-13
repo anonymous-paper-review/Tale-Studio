@@ -58,7 +58,8 @@ import { useT } from '@/lib/i18n'
 import { Lumi } from '@/components/lumi/lumi'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { useWriterStore } from '@/stores/writer-store'
-import { filterShotsByStatus, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
+import { filterShotsByStatus, imageRemakeFailed, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
+import { RemakeRetryButton } from '@/features/director/remake-retry-button'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
 import { ImageFailedPanel, ImageNeededTag, PickBox, ShotPipelineRow, ShotStateTail } from '@/features/director/shot-status'
 
@@ -277,6 +278,8 @@ function ShotCell({
   //   무너뜨린다(rules-of-hooks).
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const realBatchShotIds = useDirectorCanvasStore((s) => s.realBatchShotIds ?? null)
+  // [모두 멈추기] 뒤에는 일괄이 남은 샷을 그리지 않는다 — 기다림 표시도 바로 푼다(리드 검토 c ④d).
+  const realBatchCancelled = useDirectorCanvasStore((s) => s.realBatchCancelled ?? false)
   const takeRecords = useMemo(
     () =>
       directorNodes.flatMap((n) => {
@@ -313,6 +316,8 @@ function ShotCell({
   const img = data.storyboardImage
   const status = img?.status ?? null
   const hasImage = !!img?.url
+  // 다시 만들기가 실패해도 옛 그림이 남는다 — 그림은 그대로 보이고 꼬리가 "다시 만들기 실패" + [다시 만들기](리드 검토 c ①).
+  const remakeFailed = imageRemakeFailed(img)
   const roughUrl = rough?.status === 'completed' ? rough.url : null
   const roughStartUrl = rough?.frames?.start ?? roughUrl
   // 약속 I4(2026-09-04): 러프 3장 중 하나라도 바뀌면 실사 카드에 "러프 바뀜" — 자동 재생성은 하지 않는다(오너 I5).
@@ -335,16 +340,13 @@ function ShotCell({
   //   2026-08-11: 라벨에서 "단계"를 걷어내고(중복어) 호버 없이 처음부터 문구까지 보이게 했다 —
   //   한눈에 읽으라고 만든 배지가 호버해야 읽히면 배지가 아니라 툴팁이다.
   //   v3(2026-11-03): 그림 위 어두운 꼬리표(검정 45%) — 영상은 지금 단계 색 글자, 아직 필요한 것은 경고 색 글자.
+  //   실사 보기는 1110 확정(시안 R)부터 주황 "이미지 필요" 태그 · 상태 꼬리가 맡는다 — 배지는 러프 보기에만(리드 검토 c ③).
   const stageBadge =
     mediaMode === 'previz'
       ? roughStartUrl
         ? { label: 'Previz', cls: 'text-foreground', video: false }
         : { label: t('Rough needed'), cls: 'text-warning', video: false }
-      : completedVideoUrl
-        ? { label: t('Video'), cls: 'text-stage', video: true }
-        : hasImage
-          ? { label: t('Image'), cls: 'text-foreground', video: false }
-          : { label: t('Image needed'), cls: 'text-stage-producer', video: false }
+      : null
 
   const runImage = async () => {
     if (imageGeneration.disabled) return
@@ -400,7 +402,7 @@ function ShotCell({
   //   (곧 자동으로 생성된다) 이 구간도 생성 중으로 취급해 스피너를 돌린다.
   //   고른 샷만 만드는 일괄(시안 D2)이면 그 샷만 기다림으로 본다.
   const autoFillPending =
-    mediaMode === 'real' && realBatchBusy && !hasImage && status !== 'failed' && !!roughUrl &&
+    mediaMode === 'real' && realBatchBusy && !realBatchCancelled && !hasImage && status !== 'failed' && !!roughUrl &&
     (realBatchShotIds === null || (!!writerShotId && realBatchShotIds.includes(writerShotId)))
   const imageGenerating = imageGeneration.generating || autoFillPending
   const generating = imageGenerating || videoBusy || childVideoGenerating || queuedVideo
@@ -748,9 +750,16 @@ function ShotCell({
           </span>
         )}
 
-        {/* 꼬리(시안 D1 "● 대기" · D3 "● 이미지 만드는 중") — 실사 보기, 만드는 중 덮개가 없을 때. */}
+        {/* 꼬리(시안 D1 "● 대기" · D3 "● 이미지 만드는 중") — 실사 보기. 일괄이 맡아 차례를 기다리면 "대기 중",
+            다시 만들기가 실패했으면 "다시 만들기 실패" + [다시 만들기](리드 검토 c ① · ④d). */}
         {mediaMode === 'real' && !videoError && (
-          <ShotStateTail state={shotState} className="absolute bottom-2 left-2 z-10" />
+          <ShotStateTail
+            state={shotState}
+            waiting={imageWaitingOnly}
+            remakeFailed={remakeFailed}
+            retry={<RemakeRetryButton nodeId={node.id} data={data} />}
+            className="absolute bottom-2 left-2 z-10"
+          />
         )}
 
         {/* 액션 스택은 좌상단 배지 아래로 이사(#e4 2026-08-11) — 우하단 스택 제거. */}
@@ -1020,6 +1029,10 @@ export function StoryboardGridView({
           mediaMode === 'real' ? 'slide-in-from-right-6' : 'slide-in-from-left-6',
         )}
       >
+        {/* 상태를 골랐는데 그 상태 샷이 없으면(시안 없음, 리드 검토 c ④c) — 빈 판만 보이면 고장으로 보인다. */}
+        {visibleGroups.length === 0 && statusFilter !== 'all' && (
+          <p className="py-16 text-center text-label text-muted-foreground">{t('No shots in this status')}</p>
+        )}
         {visibleGroups.map((group) => (
           <section key={group.key} className="flex flex-col gap-3">
             {/* v3 S1 씬 머리: 씬 이름(15px 600) · 흐린 장소 · 시간 */}

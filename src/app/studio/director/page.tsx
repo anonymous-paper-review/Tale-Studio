@@ -49,6 +49,7 @@ import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
 import { PickAllBar, ShotStatusFilterMenu } from '@/features/director/shot-status'
+import { StoryboardZoomPill } from '@/features/director/storyboard-zoom-pill'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
 import { countStatusFilters, matchesStatusFilter } from '@/lib/director/shot-state'
 import { HIDDEN_ON_CANVAS, directorCanvasMeta, storyboardCanvasMeta } from '@/features/director/canvas-meta'
@@ -78,7 +79,7 @@ import {
   SNAP_GRID,
 } from '@/types/director'
 import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
-import { StoryboardZoomControls, useStoryboardZoom } from '@/components/generating-frame'
+import { useStoryboardZoom } from '@/components/generating-frame'
 import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
 
@@ -300,6 +301,23 @@ function CanvasZoomPill() {
         </button>
       </div>
     </Panel>
+  )
+}
+
+// 상태를 골랐는데 그 상태 샷이 하나도 없으면 캔버스 위에 한 줄(시안 없음, 리드 검토 c ④c) — 노드형은 다른 상태를 흐리게만 둬서
+//   모두 흐린 캔버스만 보이면 고장으로 보인다.
+function NodeStatusEmptyNote() {
+  const t = useT()
+  const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
+  const shotStates = useDirectorShotStates()
+  if (statusFilter === 'all' || shotStates.size === 0) return null
+  if ([...shotStates.values()].some((state) => matchesStatusFilter(state, statusFilter))) return null
+  return (
+    <div className="pointer-events-none absolute inset-x-0 top-4 z-10 flex justify-center">
+      <span className="rounded-full bg-background px-3.5 py-1.5 text-label text-muted-foreground shadow-node">
+        {t('No shots in this status')}
+      </span>
+    </div>
   )
 }
 
@@ -838,6 +856,8 @@ function CanvasInner() {
         </div>
       )}
 
+      <NodeStatusEmptyNote />
+
       <CanvasContextMenu
         state={contextMenu}
         onClose={() => setContextMenu(null)}
@@ -1060,8 +1080,8 @@ function PaletteBar() {
           <AltArrowHint>
             <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'node' | 'storyboard')}>
               <TabsList className="h-9 rounded-full bg-background p-1 shadow-node">
-                <TabsTrigger value="node" className="rounded-full px-3.5 text-[13px]">{t('Node')}</TabsTrigger>
                 <TabsTrigger value="storyboard" className="rounded-full px-3.5 text-[13px]">{t('Storyboard')}</TabsTrigger>
+                <TabsTrigger value="node" className="rounded-full px-3.5 text-[13px]">{t('Node')}</TabsTrigger>
               </TabsList>
             </Tabs>
           </AltArrowHint>
@@ -1378,11 +1398,11 @@ export default function DirectorCanvasPage() {
   const [storyboardZoom, setStoryboardZoom] = useStoryboardZoom('director:storyboard:zoomLevel')
   const guideProjectId = useDirectorCanvasStore((s) => s.projectId)
   // Node↔Storyboard 전환 슬라이드(#e2 2026-08-03) — 두 뷰는 조건 렌더(원래 remount)라
-  //   mount 애니메이션이 곧 전환 연출. 방향은 토글 순서(Node 왼쪽·Storyboard 오른쪽).
+  //   mount 애니메이션이 곧 전환 연출. 방향은 토글 순서(시안 D1: Storyboard 왼쪽·Node 오른쪽, 리드 11/14).
   const [prevViewMode, setPrevViewMode] = useState(viewMode)
   const [viewSlide, setViewSlide] = useState<'forward' | 'back' | 'none'>('none')
   if (viewMode !== prevViewMode) {
-    setViewSlide(viewMode === 'storyboard' ? 'forward' : 'back')
+    setViewSlide(viewMode === 'node' ? 'forward' : 'back')
     setPrevViewMode(viewMode)
   }
   const viewSlideClass =
@@ -1496,16 +1516,17 @@ export default function DirectorCanvasPage() {
           <div key={viewMode} className={cn('flex h-full min-h-0 flex-col', viewSlideClass)}>
             {viewMode === 'storyboard' ? (
               <>
-                <StoryboardGridView
-                  zoomLevel={storyboardZoom}
-                  onZoomLevelChange={setStoryboardZoom}
-                />
-                {/* 축척은 시안 D1 처럼 판 왼쪽 아래 알약(노드형 축척과 같은 자리). Ctrl+wheel 단축은 보드가 그대로 처리한다. */}
-                <StoryboardZoomControls
-                  zoomLevel={storyboardZoom}
-                  onZoomLevelChange={setStoryboardZoom}
-                  className="absolute bottom-4 left-4 z-10 h-[34px] rounded-full bg-background px-1.5 shadow-node"
-                />
+                <div className="min-h-0 flex-1">
+                  <StoryboardGridView
+                    zoomLevel={storyboardZoom}
+                    onZoomLevelChange={setStoryboardZoom}
+                  />
+                </div>
+                {/* 축척은 시안 D1 처럼 판 왼쪽 아래 "− 100% + ⤢" 알약(노드형 축척과 같은 생김새). 카드가 스크롤돼 들어가지 않는
+                    아래 띠에 둬 어느 카드도 덮지 않는다(리드 11/14). Ctrl+wheel 단축은 보드가 그대로 처리한다. */}
+                <div className="flex shrink-0 items-center px-4 pb-4 pt-2">
+                  <StoryboardZoomPill zoomLevel={storyboardZoom} onZoomLevelChange={setStoryboardZoom} />
+                </div>
               </>
             ) : (
               <ReactFlowProvider>

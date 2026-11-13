@@ -27,7 +27,8 @@ import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { normalizeProvider } from '@/lib/video-models'
 import { useShotState } from '@/features/director/hooks/use-shot-states'
-import { dimmedByStatusFilter, videoTakeFrame } from '@/lib/director/shot-state'
+import { dimmedByStatusFilter, videoTakeFrame, videoTakeTail } from '@/lib/director/shot-state'
+import { StateTailLine } from '@/features/director/shot-status'
 
 /** 영상 노드 틀의 높이 상한(세로·정사각 포맷) — 테이크 간격(VIDEO_OFFSET_Y 260px) 안에서 겹치지 않게. */
 const VIDEO_NODE_MEDIA_MAX_H = 150
@@ -387,7 +388,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
 
       {/* 약속 H(2026-09-04, 오너 1안): 작은 영문 "take 1 · completed" 대신 큰 상태 글자. take 번호는 카드에서 빼고
           마우스를 올리면(title)·왼쪽 상세·팝업에서 작게 보인다. */}
-      {/* v3 D1 꼬리: 상태 점(완료 초록 · 실패 빨강) + 상태 글자, 오른쪽에 1080p · FINAL. */}
+      {/* 꼬리(시안 D1 노드형 406:4051 "● 영상 없음", 리드 검토 c ②): 이 Take 상태 점 + 글 — 영상 없음 · 영상 만드는 중 · 영상 실패 ·
+          영상이 남은 Take 의 다시 만들기 실패. 오른쪽에 1080p · FINAL. */}
       <div
         className="mt-2.5 flex items-center justify-between gap-2"
         title={t('Take {n}', { n: data.takeNumber })}
@@ -397,20 +399,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         {completed ? (
           <DoneBadge lumi={STAGE_PERSONA.director} />
         ) : (
-          <span className="flex items-center gap-1.5 text-[11.5px] font-semibold">
-            {(data.lastAttemptStatus ?? data.status) === 'failed' && <span className="size-1.5 rounded-full bg-destructive" />}
-            <span
-              className={cn(
-                (data.lastAttemptStatus ?? data.status) === 'failed'
-                  ? 'text-destructive'
-                  : (data.lastAttemptStatus ?? data.status) === 'generating'
-                    ? 'text-foreground'
-                    : 'text-subtle-foreground',
-              )}
-            >
-              {videoStatusLabel(data.lastAttemptStatus ?? data.status, t)}
-            </span>
-          </span>
+          <StateTailLine {...videoTakeTail(data)} />
         )}
         <span className="flex items-center gap-1.5">
           {madeAt1080p && <span className="font-num text-[11px] text-subtle-foreground">1080p</span>}
@@ -458,11 +447,3 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
 }
 
 export const VideoNode = memo(VideoNodeImpl)
-
-/** 약속 H1: 상태 한 단어 — 완료 / 생성 중 / 실패 / 대기 중 (사전의 식별자 키). */
-function videoStatusLabel(status: string | null | undefined, t: (key: string) => string): string {
-  if (status === 'completed') return t('Completed')
-  if (status === 'generating') return t('Generating')
-  if (status === 'failed') return t('Failed')
-  return t('Waiting')
-}
