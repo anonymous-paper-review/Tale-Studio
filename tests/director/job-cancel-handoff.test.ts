@@ -1,10 +1,11 @@
-// 화면에서 멈춘 Take 는 ★ 가 아니면 영상 없음 — Editor 로 넘기기 · 넘기기 창 · 내보내기 · 샷 상태가 같은 규칙이고, 멈춤은 그 Take 의 마지막 작업에 적혀 있다 (오너 2026-11-14 7번 · 리드 C · 검토 a 5)
+// 화면에서 멈춘 Take 는 ★ 가 아니면 영상 없음 — Editor 로 넘기기 · 넘기기 창 · 넘김 조건 · 내보내기 · 샷 상태 · 영상 일괄이 같은 규칙이고, 멈춤은 그 Take 의 마지막 작업에 적혀 있다 (오너 2026-11-14 7번 · 리드 C · 검토 a 5)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { withCancelledTakes } from '@/lib/director/take-cancellations'
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
 import { editorHandoverView } from '@/lib/director/editor-handover'
-import { shotFactsByNode, shotState } from '@/lib/director/shot-state'
+import { directorHasFinishedVideo, shotFactsByNode, shotState } from '@/lib/director/shot-state'
+import { eligibleVideoBatchShotIds } from '@/lib/director/video-batch-client'
 import type { DirectorNode } from '@/types/director'
 
 /** 샷 하나와 그 Take 들 — 멈춘 Take 규칙을 넘기기 창 · 샷 상태에 똑같이 거는지 본다. */
@@ -74,5 +75,21 @@ describe('넘기기 창 · 샷 상태의 멈춘 Take', () => {
     expect(pickedDone.videoDone).toBe(true)
     const stoppedRunning = shotFactsByNode(shotWithTakes([{ status: 'generating', lastAttemptStatus: 'generating', videoUrl: null, cancelledAt: '2026-11-14T03:00:00Z' }]), NO_QUEUE).get('shot-1')!
     expect(stoppedRunning.videoGenerating).toBe(false)
+  })
+})
+
+describe('넘김 조건 · 영상 일괄의 멈춘 Take', () => {
+  it('Editor 로 넘길 완성 영상이 있는지 셀 때도 멈춘 Take 는 ★ 가 아니면 세지 않는다', () => {
+    // 왜: [다음: Editor로] · 사이드바 Editor · 채팅 넘김 · 넘기기 창 열기가 이 판정 하나를 쓴다 — 멈춘 Take 만 있는데 컷 0개로 넘어가지 않게.
+    expect(directorHasFinishedVideo(shotWithTakes([{ cancelledAt: '2026-11-14T03:00:00Z' }]))).toBe(false)
+    expect(directorHasFinishedVideo(shotWithTakes([{ cancelledAt: '2026-11-14T03:00:00Z', final: true }]))).toBe(true)
+  })
+
+  it('영상 일괄은 멈춘 Take 만 있는 샷도 아직 영상이 없는 샷으로 보고 보낸다', () => {
+    // 왜: 위 [영상 만들기 · N] 숫자(샷 상태)와 실제로 보내는 샷이 같아야 한다 — 서버 일괄의 "다 만든 샷" · 같은 샷 검사도 멈춘 Take 를 뺀다.
+    expect(eligibleVideoBatchShotIds(shotWithTakes([{ cancelledAt: '2026-11-14T03:00:00Z' }]))).toEqual(['shot-1'])
+    const running = shotWithTakes([{ status: 'generating', lastAttemptStatus: 'generating', videoUrl: null, cancelledAt: '2026-11-14T03:00:00Z' }])
+    expect(eligibleVideoBatchShotIds(running)).toEqual(['shot-1'])
+    expect(eligibleVideoBatchShotIds(shotWithTakes([{ cancelledAt: '2026-11-14T03:00:00Z', final: true }]))).toEqual([])
   })
 })

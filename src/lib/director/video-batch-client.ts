@@ -36,6 +36,8 @@ export function eligibleVideoBatchShotIds(nodes: DirectorNode[]): string[] {
       const children = videosByShot.get(shot.id) ?? []
       return !children.some((video) => {
         if (!isVideoData(video.data)) return false
+        // 화면에서 멈춘 Take(오너 2026-11-14 7번)는 ★ 가 아니면 영상도, 만드는 중도 아니다 — 샷 상태 · 서버 일괄 검사와 같은 규칙.
+        if (video.data.cancelledAt && !video.data.final) return false
         const playable =
           video.data.status === 'completed' &&
           typeof video.data.videoUrl === 'string' &&

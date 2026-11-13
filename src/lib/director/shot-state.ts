@@ -355,7 +355,9 @@ export function directorHasFinishedVideo(nodes: readonly DirectorNode[]): boolea
       n.data.parentShotNodeId !== null &&
       writerShots.has(n.data.parentShotNodeId) &&
       n.data.status === 'completed' &&
-      hasUrl(n.data.videoUrl),
+      hasUrl(n.data.videoUrl) &&
+      // 화면에서 멈춘 Take 는 ★ 가 아니면 영상이 아니다(오너 2026-11-14 7번) — 넘기기 창 · 투영과 같은 규칙(리드 검토 a 5).
+      (!n.data.cancelledAt || n.data.final),
   )
 }
 
