@@ -56,6 +56,7 @@ describe('C3 — 막힐 때 이유를 말한다', () => {
     expect(page).toContain('{blockLine}')
   })
 
+  // 왜: 한국어 화면에서 다시 만들기 확인 창 · 꺼진 단추 아래 까닭이 영어 원문 그대로 보이지 않게(새 문구는 두 말, 약속 A).
   it('다시 만들기 · 꺼진 단추 안내 문구를 한국어로 보여준다', () => {
     for (const key of [
       'Make {count} images again?',
