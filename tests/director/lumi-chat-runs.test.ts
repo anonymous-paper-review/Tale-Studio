@@ -20,6 +20,7 @@ import { useLocaleStore } from '@/stores/locale-store'
 import { translate } from '@/lib/i18n/translate'
 import { fetchTakeBalance } from '@/lib/billing/use-take-balance'
 import { remakeNotice } from '@/lib/director/editor-handover'
+import { DIRECTOR_QUICK_CHIPS } from '@/lib/constants'
 
 const originalGenerate = director.getState().generateStoryboardImage
 const originalVideo = director.getState().generateVideoForShot
@@ -466,7 +467,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     director.setState({ nodes: NODES().map((n) => (n.id === 'v4' ? { ...n, data: { ...n.data, override: { resolution: '1080p' } } } as DirectorNode : n)), remakeShotVideo: remake })
     reply([{ type: 'generateVideos', shotIds: ['s4'] }])
     await chat.getState().sendMessage('샷 4 영상 다시 만들어줘')
-    expect(remake).toHaveBeenCalledWith('s4')
+    expect(remake.mock.calls.map(([id]) => id)).toEqual(['s4'])
     expect(mocks.run).not.toHaveBeenCalled()
     expect(lastModel()).toBe('Started making videos for Shot 4 · 10 Takes. Progress shows on the line above the cards.')
   })
@@ -525,7 +526,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(remake).not.toHaveBeenCalled()
     expect(lastModel()).toBe('Applying the text card makes the video for Shot 4 with the new text.')
     await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
-    expect(remake).toHaveBeenCalledWith('s4')
+    expect(remake.mock.calls.map(([id]) => id)).toEqual(['s4'])
     expect(promptAtRemake).toBe('Warm')
     expect(mocks.run).not.toHaveBeenCalled()
   })
@@ -535,7 +536,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     const remake = vi.fn(async (id: string) => `job-${id}`)
     director.setState({ remakeShotVideo: remake })
     await chat.getState().startDirectorVideos(['s4'], 'Make Shot 4 again', { remake: true })
-    expect(remake).toHaveBeenCalledWith('s4')
+    expect(remake.mock.calls.map(([id]) => id)).toEqual(['s4'])
     expect(mocks.run).not.toHaveBeenCalled()
     expect(lastModel()).toBe('Started making videos for Shot 4 · 5 Takes. Progress shows on the line above the cards.')
   })
@@ -608,5 +609,83 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(route).not.toContain('approval card')
     // 재재검토 b 보통 C — 부정 · 미룸 · 질문에는 영상 부탁을 내지 않는다.
     expect(route).toContain('If the user says not to make videos, says not now or later, or only asks a question, do not emit generateVideos.')
+  })
+})
+
+describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', () => {
+  // 진짜 상점의 다시 만들기 길 — 서버는 바로 접수(queued)하고, 그 뒤 확인(5초마다)은 끝나지 않는다(시계를 멈춰 둔다).
+  //   샷마다 생성 잠금이 남으므로 시험마다 다른 샷 이름을 쓴다.
+  let generated: string[] = []
+  function remakeServer(chatUpdates: unknown[] = []) {
+    generated = []
+    vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+      const u = String(url)
+      if (u.includes('/api/director/chat')) return Response.json({ reply: 'Okay.', updates: chatUpdates })
+      if (u.includes('/api/director/generate-video')) {
+        const body = JSON.parse(String(init?.body ?? '{}')) as { shotId?: string }
+        generated.push(String(body.shotId))
+        return Response.json({ jobId: `job-${body.shotId}`, status: 'queued', videoClipId: `clip-${body.shotId}`, takeNumber: 2 })
+      }
+      if (u.includes('/api/generation-jobs/')) return Response.json({ ok: true, data: { status: 'queued' } })
+      return Response.json({})
+    }))
+  }
+  function remakeBoard(ids: string[]) {
+    writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: ids.map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1' })) as never })
+    director.setState({ nodes: ids.flatMap((id) => [shot(id, IMG(id)), failedTake(`v-${id}`, id)]) })
+  }
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'setInterval'] })
+  })
+  afterEach(() => {
+    vi.clearAllTimers()
+    vi.useRealTimers()
+  })
+
+  // 왜: 검토 b 보통 1 — 다시 만들기가 앞 영상이 끝날 때까지 기다려 둘째 샷이 늦게 나가고, 채팅이 영상이 다 끝날 때까지 "생각 중"이었다. 빠른 칩이 가장 자주 만나는 길이다.
+  it('Lumi 의 다시 만들기는 샷마다 접수되는 대로 다음 샷을 보내고, 다 접수되면 바로 시작했다고 말한다(영상이 끝나기를 기다리지 않는다)', async () => {
+    remakeBoard(['c1', 'c2'])
+    remakeServer()
+    await chat.getState().sendMessage(translate('en', DIRECTOR_QUICK_CHIPS[2]))
+    expect(generated).toEqual(['c1', 'c2'])
+    expect(chat.getState().loading).toBe(false)
+    expect(lastModel()).toBe('Started making videos for Shots 1 · 2 · 10 Takes. Progress shows on the line above the cards.')
+  })
+
+  // 왜: 검토 b 보탬 — 채팅을 "생각 중"으로 잡던 길은 칩 말고도 셋(알림 카드 · 되묻기 "응" · 번호 대답), 모델을 거치는 채팅 부탁은 둘째 샷이 늦게 나갔다.
+  it('알림 카드 [다시 만들기] · 되묻기 "응" · 번호 대답 · 채팅 부탁의 다시 만들기도 영상이 끝나기를 기다리지 않고, 접수되면 바로 시작했다고 말한다', async () => {
+    // 알림 카드 [샷 1 다시 만들기]
+    remakeBoard(['n1'])
+    remakeServer()
+    await chat.getState().startDirectorVideos(['n1'], 'Make Shot 1 again', { remake: true })
+    expect(generated).toEqual(['n1'])
+    expect(chat.getState().loading).toBe(false)
+    expect(lastModel()).toBe('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
+
+    // 되물은 목록에 "응"
+    remakeBoard(['y1', 'y2', 'y3'])
+    remakeServer([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('샷 2 빼고 영상 다 다시 만들어줘')
+    expect(chat.getState().directorVideoAsk).toMatchObject({ shotIds: ['y1', 'y3'], remake: true })
+    await chat.getState().sendMessage('응')
+    expect(generated).toEqual(['y1', 'y3'])
+    expect(chat.getState().loading).toBe(false)
+    expect(lastModel()).toBe('Started making videos for Shots 1 · 3 · 10 Takes. Progress shows on the line above the cards.')
+
+    // 번호를 물은 뒤 "2번"
+    remakeBoard(['k1', 'k2'])
+    remakeServer([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('씬 1 영상 다시 만들어줘')
+    expect(chat.getState().directorVideoAsk).toEqual({ projectId: 'p-dir', numbers: true, remake: true })
+    await chat.getState().sendMessage('2번')
+    expect(generated).toEqual(['k2'])
+    expect(chat.getState().loading).toBe(false)
+
+    // 모델을 거치는 채팅 부탁
+    remakeBoard(['m1', 'm2'])
+    remakeServer([{ type: 'generateVideos', shotIds: ['m1', 'm2'] }])
+    await chat.getState().sendMessage('샷 1, 2 영상 다시 만들어줘')
+    expect(generated).toEqual(['m1', 'm2'])
+    expect(lastModel()).toBe('Started making videos for Shots 1 · 2 · 10 Takes. Progress shows on the line above the cards.')
   })
 })

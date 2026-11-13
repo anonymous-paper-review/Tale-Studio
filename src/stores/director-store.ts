@@ -1290,8 +1290,9 @@ interface DirectorCanvasState {
    *  화면은 바로 바꾸고 서버 답으로 맞춘다. 서버가 바꾸지 못하면 되돌리고 false. */
   selectStoryboardImageVersion: (shotNodeId: string, versionId: string) => Promise<boolean>
   /** 다시 만들기 — 늘 새 Take 이고 그 샷의 가장 최근 Take(실패해도)의 설정을 이어받는다(마지막 모델 · 해상도).
-   *  Take 가 없으면 샷 설정. 상세 · entry D8 [다시 만들기] · Lumi 가 같이 쓴다. */
-  remakeShotVideo: (shotNodeId: string) => Promise<string | null>
+   *  Take 가 없으면 샷 설정. 상세 · entry D8 [다시 만들기] · Lumi 가 같이 쓴다.
+   *  opts.onJob — 접수(queued) · 진행 알림(Lumi 는 접수되면 다음 샷을 보낸다, board 검토 b). 없으면 지금 그대로. */
+  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver }) => Promise<string | null>
   generateVideoForShot: (
     shotNodeId: string,
     options?: DirectorGenerationRequestOptions,
@@ -4525,9 +4526,13 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         }
       },
 
-      remakeShotVideo: (shotNodeId) => {
+      remakeShotVideo: (shotNodeId, opts) => {
         const latest = latestShotTake(get().nodes, shotNodeId)
-        return get().generateVideoForShot(shotNodeId, latest ? { inheritFromVideoNodeId: latest.id } : undefined)
+        // onJob 이 없으면 지금과 같은 부름(샷 상세 · D8) — 있으면 접수 알림을 함께 넘긴다(Lumi 다시 만들기, board 검토 b).
+        const options = latest || opts?.onJob
+          ? { ...(latest ? { inheritFromVideoNodeId: latest.id } : {}), ...(opts?.onJob ? { onJob: opts.onJob } : {}) }
+          : undefined
+        return get().generateVideoForShot(shotNodeId, options)
       },
 
       generateVideoForShot: async (shotNodeId, options) => {

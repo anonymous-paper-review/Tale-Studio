@@ -1665,8 +1665,17 @@ async function startVideosFor(input: {
     for (const [index, id] of input.shotIds.entries()) {
       if (!input.isCurrent()) return
       const refusedBefore = videoLimitRefusal()
-      const job = await useDirectorCanvasStore.getState().remakeShotVideo(id)
-      if (job) {
+      // 접수(queued)되면 그 샷은 시작한 것으로 치고 다음 샷을 보낸다 — 영상이 끝나기를(5초마다 확인) 기다리지 않는다(검토 b (a)~(g) 보통 1).
+      //   거절 · 실패면 부른 것이 그대로 끝난다.
+      const outcome = await new Promise<'accepted' | 'ended'>((resolve) => {
+        useDirectorCanvasStore.getState().remakeShotVideo(id, {
+          onJob: (receipt) => {
+            input.onJob?.(receipt)
+            if (receipt.status === 'queued' && receipt.jobId) resolve('accepted')
+          },
+        }).then((job) => resolve(job ? 'accepted' : 'ended'), () => resolve('ended'))
+      })
+      if (outcome === 'accepted') {
         started.push(id)
         continue
       }
