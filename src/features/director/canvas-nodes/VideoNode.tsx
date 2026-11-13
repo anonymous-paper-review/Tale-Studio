@@ -41,6 +41,10 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const setVideoFinal = useDirectorCanvasStore((s) => s.setVideoFinal)
   // 상태 고르기(시안 D1): 그 샷 상태가 안 맞으면 흐리게. 테두리는 이 Take 의 상태(시안 D4 · D7).
   const parentShotState = useShotState(isVideoData(data) ? data.parentShotNodeId : null)
+  // 부모 샷에 쓸 그림이 있는가 — 빈 영상 노드의 그림 자리 글(리드 답 5a). 상태를 모르면(독립 영상) 있다고 본다.
+  const parentHasImage =
+    parentShotState === undefined ||
+    !(parentShotState === 'image_needed' || parentShotState === 'image_failed' || parentShotState === 'image_generating')
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
   // 영상 노드를 누르면 그 샷을 고른다(시안 R). 상세가 열린 노드만 단계 색 테두리 · 위 단추.
   const picked = useDirectorCanvasStore((s) => {
@@ -360,9 +364,16 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             {completed && <VideoLengthChip url={data.videoUrl} />}
           </button>
         ) : data.lastAttemptStatus === 'generating' ? null : (
-          // 만드는 중이면 "대기 중"을 쓰지 않는다. 아래 "영상 생성 중"과 같이 보이면 헷갈린다(11/5 시안 DG 맞춰 보기 2026-11-09).
-          <span className="px-2 text-center text-[11px] text-subtle-foreground">
-            {chainWaiting ? t('Starts by itself when the image is done') : t('Waiting')}
+          // 만드는 중이면 아무 글도 쓰지 않는다. 아래 "영상 생성 중"과 같이 보이면 헷갈린다(11/5 시안 DG 맞춰 보기 2026-11-09).
+          //   비어 있는 까닭(시안 D1 노드형 406:4051 · D4, 리드 답 5a): 이어 보내기를 기다리면 "이미지가 끝나면 자동으로 시작해요",
+          //   그 샷에 이미지가 없으면 "이미지가 생기면 만들 수 있어요", 있으면 "영상을 만들 수 있어요".
+          <span className="flex flex-col items-center gap-1.5 px-2 text-center text-[11px] text-subtle-foreground">
+            <Play aria-hidden className="size-4 fill-current" />
+            {chainWaiting
+              ? t('Starts by itself when the image is done')
+              : parentHasImage
+                ? t('Ready to make the video')
+                : t('Can be made once there is an image')}
           </span>
         )}
 

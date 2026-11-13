@@ -181,7 +181,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
               />
             )}
             <span className="pointer-events-none absolute left-1.5 top-1.5 rounded-[6px] bg-black/45 px-1.5 py-px text-[10px] font-semibold text-foreground">
-              {realImage ? t('Live-action') : t('Previz')}
+              {/* 시안 D1 노드형 "러프" — 스토리보드의 [러프 | 실사] 토글과 같은 말(리드 답 5b). */}
+              {realImage ? t('Live-action') : t('Rough')}
             </span>
             {/* 약속 I4: 러프 3장 중 하나라도 바뀌면 "러프 바뀜" — 자동으로 다시 만들지 않는다(오너 I5). */}
             {realImage && classifyRoughChanged(rough, data.storyboardImage) && (

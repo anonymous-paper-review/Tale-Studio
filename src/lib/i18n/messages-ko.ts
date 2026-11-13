@@ -3222,6 +3222,8 @@ export const KO: Record<string, string> = {
   'Make images + videos': '이미지+영상 만들기',
   "If you close this screen, the videos won't start.": '이 화면을 닫으면 영상은 시작되지 않아요',
   'Starts by itself when the image is done': '이미지가 끝나면 자동으로 시작해요',
+  'Can be made once there is an image': '이미지가 생기면 만들 수 있어요',
+  'Ready to make the video': '영상을 만들 수 있어요',
   'Stop after the images being made now finish.': '지금 그리고 있는 이미지까지만 마치고 멈춰요.',
   'Drawing the image': '이미지를 그리고 있어요',
   'Make images, then their videos?': '이미지를 만들고 이어서 영상도 만들까요?',

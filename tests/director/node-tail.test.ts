@@ -83,3 +83,14 @@ describe('노드형 샷 노드 꼬리', () => {
     expect(html).toContain('이미지 실패')
   })
 })
+
+describe('노드형 샷 노드 그림 꼬리표', () => {
+  it('노드형 샷 노드의 그림 꼬리표는 러프 그림이면 "러프", 실사 그림이면 "실사"다', () => {
+    // 왜: 시안 D1 노드형(406:4051)은 "러프" — 옛 "목각"(Previz 번역)은 스토리보드의 [러프 | 실사] 토글과 말이 달랐다(리드 답 5b).
+    state.rough = { status: 'completed', url: 'https://media.test/rough.jpg' }
+    const rough = shotHtml(null)
+    expect(rough).toContain('>러프<')
+    expect(rough).not.toContain('목각')
+    expect(shotHtml({ status: 'completed', url: 'https://media.test/shot-1.jpg' })).toContain('>실사<')
+  })
+})
