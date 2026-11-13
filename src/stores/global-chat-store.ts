@@ -2818,10 +2818,23 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (videoAsk && !opts?.silentUser) {
       set({ directorVideoAsk: null })
       if (stage === 'director' && projectId && videoAsk.projectId === projectId) {
-        // 번호를 물었는데 "2?"처럼 물음표로 답했다 — 번호로 받지 않고 다시 묻는다(물음표 규칙).
-        if ('numbers' in videoAsk && /[?？]/.test(trimmed) && answeredShotNumbers(trimmed.replace(/[?？]+/g, ''))) {
-          set({ directorVideoAsk: videoAsk })
-          get().appendLocalExchange('director', trimmed, translate(contentLocale(), "Which shots should get videos? Tell me the numbers, like 'shot 3'. Videos use Takes, so I only make the shots you name."))
+        // 번호를 물었는데 "2?"처럼 물음표로 답했다 — 바로 만들지 않고 그 샷 목록으로 되묻는다(물음표 규칙 — 재검토 b 낮음 2).
+        const askedBack = 'numbers' in videoAsk && /[?？]/.test(trimmed) ? answeredShotNumbers(trimmed.replace(/[?？]+/g, '')) : null
+        if (askedBack) {
+          const { eligibleVideoBatchShotIds } = await import('@/lib/director/video-batch-client')
+          const nodes = useDirectorCanvasStore.getState().nodes
+          const open = new Set(eligibleVideoBatchShotIds(nodes))
+          const shotIds = directorShotRefs(nodes, directorBoardNames()).filter((shot) => shot.shotNo !== null && askedBack.has(shot.shotNo) && open.has(shot.nodeId)).map((shot) => shot.nodeId)
+          if (shotIds.length === 0) {
+            get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'There are no such shots right now.'))
+            return
+          }
+          get().appendLocalUser('director', trimmed)
+          set({ directorVideoAsk: { projectId, shotIds } })
+          const line = await confirmVideosLine(shotIds, contentLocale())
+          if (!isCurrentSession()) return
+          set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'model' as const, content: line }] }))
+          saveChatMessage(projectId, 'director', 'model', line)
           return
         }
         // 번호를 물었다 — "3번" · "3번이랑 4번" · 맨 숫자도 샷 번호다(재검토 b 낮음 3). 그 번호의 샷만 바로 만든다(분명한 꼴 (1)).

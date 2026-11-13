@@ -28,12 +28,13 @@ const STOP = /(만들지\s*(?:는|도)?\s*(?:마|말|않아도|않을래|않을�
 /** 범위 · 수량 말(씬 · 그중 · 하나 · two of …) — 모델이 샷 칸을 비웠으면(남은 전부) 이 말이 가리키는 샷을 화면이 몰라 번호로 묻는다. */
 const SCOPE = /(씬|장면|중에|하나|한\s*개|(?:두|세|네)\s*(?:개|편|가지|장)|(?<![가-힣])둘|몇|일부|\bscenes?\b|\bof\s+the\b|\b(?:one|two|three|four|five|some|few|couple|half)\b)/i // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 /** 시키는 말 — 샷 번호 · 묶음 말을 지운 나머지가 이 동사 하나와 아래 조각 · 문장 부호뿐이면 시키는 꼴이다. */
-const COMMAND_VERB = /(?:만들어|생성해|뽑아)\s*(?:줘|주세요|줄래)?|\b(?:make|remake)\b/gi // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
+const COMMAND_VERB = /(?:만들어|생성해|뽑아)\s*(?:줘|주세요|줄래)?\s*요?|\b(?:make|remake|generate|regenerate)\b/gi // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 const COMMAND_FILLER = [
   /(?:영상|비디오)\s*(?:을|를)?/g, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
   /다시/g, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
   /(?<![가-힣])(?:의|은|는|도|만|좀)(?![가-힣])/g, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
-  /\b(?:the|a|an|videos?|for|please|again)\b/gi,
+  /\b(?:the|a|an|videos?|for|please|pls|plz|again)\b/gi,
+  /[ㅎㅋ]+/g, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
   /'s\b/gi,
   /@[A-Za-z가-힣]*/g, // i18n-ok: 사용자 말을 읽는 낱말 목록 자체
 ]
@@ -133,7 +134,7 @@ function plainCommand(text: string): boolean {
   if (!new RegExp(COMMAND_VERB.source, 'i').test(rest)) return false
   rest = rest.replace(COMMAND_VERB, ' ')
   for (const filler of COMMAND_FILLER) rest = rest.replace(filler, ' ')
-  return rest.replace(/[\s.!,·、]+/g, '') === ''
+  return rest.replace(/[\s.!,·、~…]+/g, '') === ''
 }
 
 export type VideoGrounding =

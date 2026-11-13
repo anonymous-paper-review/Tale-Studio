@@ -55,6 +55,12 @@ describe('샷 번호를 지운 나머지가 시키는 꼴("영상 만들어 줘"
     expect(ground('Make videos for shots 1 and 3', ids(1))).toEqual(run(1))
     expect(ground('샷 3 영상 만들어줘', ids(4))).toEqual(ASK)
   })
+  // 왜: 재검토 b 낮음 3 — 시키는 꼴 끝에 흔히 붙는 말(~ · … · 요 · ㅎㅎ · pls)과 "generate"까지 되묻기로 보내면 분명한 부탁도 한 번 더 묻는다.
+  it('시키는 꼴 끝말이 "~ · … · 요 · ㅎㅎ · pls"이거나 "Generate the video for shot 3"이어도 번호만 있으면 바로 만든다', () => {
+    for (const text of ['샷 3 영상 만들어줘~', '샷 3 영상 만들어줘…', '샷 3 영상 만들어 줘요', '샷 3 영상 만들어줘 ㅎㅎ', 'Make the video for shot 3 pls', 'Generate the video for shot 3', 'Regenerate the video for shot 3 please']) {
+      expect(ground(text, null), text).toEqual(run(3))
+    }
+  })
   it('시키는 꼴은 "샷 3 영상 만들어줘" · "샷 3 영상 다시 만들어 주세요" · "Make shot 3\'s video" · "Make the video for shot 3, please"처럼 번호와 시키는 말뿐이다', () => {
     for (const text of ['샷 3 영상 만들어줘', '샷 3 영상 다시 만들어 주세요', '3번 샷 영상을 만들어줄래', "Make shot 3's video", 'Make the video for shot 3, please', '@Real Shot 3 영상 만들어줘']) {
       expect(ground(text, null), text).toEqual(run(3))

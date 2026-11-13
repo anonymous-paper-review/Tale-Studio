@@ -388,15 +388,16 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(mocks.run).not.toHaveBeenCalled()
   })
 
-  // 왜: 재재검토 b — "2?"는 대답이 아니라 되묻는 말이다(같은 물음표 규칙). 번호로 받지 않고 다시 묻는다.
-  it('번호를 물은 뒤 "2?"처럼 물음표로 답하면 샷 2 로 받지 않고 다시 묻는다', async () => {
+  // 왜: 재검토 b 낮음 2 — "2?"는 대답이 아니라 되묻는 말이다(물음표 규칙). 바로 만들지 않고 그 샷 목록으로 되묻는다.
+  it('번호를 물은 뒤 "2?"처럼 물음표로 답하면 바로 만들지 않고 "샷 2 영상 1개(5 Take)를 만들까요?"로 되묻는다', async () => {
     reply([{ type: 'generateVideos', shotIds: ['s2'] }])
     await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
     await chat.getState().sendMessage('2?')
     expect(mocks.run).not.toHaveBeenCalled()
-    expect(lastModel()).toBe("Which shots should get videos? Tell me the numbers, like 'shot 3'. Videos use Takes, so I only make the shots you name.")
-    await chat.getState().sendMessage('3')
-    expect(runShots()).toEqual(['s3'])
+    expect(lastModel()).toBe('Shall I make the video for Shot 2 (5 Takes)? Say yes to start.')
+    expect(translate('ko', 'Shall I make the video for {shots} ({takes} Takes)? Say yes to start.', { shots: '샷 2', takes: 5 })).toBe('샷 2 영상 1개(5 Take)를 만들까요? "응"이라고 하면 시작해요.')
+    await chat.getState().sendMessage('응')
+    expect(runShots()).toEqual(['s2'])
   })
 
   // 왜: 재재검토 b 낮음 3(C5) — Director 에서 되물은 뒤 다른 단계에서 "좋아"라고 하면 Take 가 묶인 글 카드가 승인돼 영상이 나갔다.
