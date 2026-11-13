@@ -88,7 +88,8 @@ describe('Lumi 알림 카드의 글과 단추(시안 D8)', () => {
   it('영상이 일부 실패하면 카드는 완성된 수 · 실패한 샷 · Take 를 돌려드린 것을 알리고 [빼고 Editor로] · [샷 N 다시 만들기]를 단다', () => {
     const view = lumiBatchNoticeView({ notice: VIDEO, states: BOARD, labelOf, takesReturned: true, locale: 'ko' })
     expect(view.title).toBe('영상 5개가 완성됐어요')
-    expect(view.body).toBe('샷 4 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들거나, 빼고 Editor에서 이어 붙일 수 있어요.')
+    // 뒷말은 entry 의 Editor 넘기기 창 줄과 같다(fcadec2e) — 빼고 넘긴 샷은 나중에 영상이 생기면 Editor 에 저절로 들어간다(오너 답 8).
+    expect(view.body).toBe('샷 4 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.')
     expect(view.done).toBe(true)
     expect(view.actions).toEqual([
       { kind: 'handoff', label: '빼고 Editor로' },
@@ -108,7 +109,7 @@ describe('Lumi 알림 카드의 글과 단추(시안 D8)', () => {
   // 왜(혼자 정한 것 D): 과금이 꺼져 있거나 무제한 계정은 Take 를 쓰지 않았다 — "돌려드렸어요"는 틀린 말이다.
   it('Take 를 쓰지 않는 계정이면 "Takes 는 돌려드렸어요"를 말하지 않는다', () => {
     const view = lumiBatchNoticeView({ notice: VIDEO, states: BOARD, labelOf, takesReturned: false, locale: 'ko' })
-    expect(view.body).toBe('샷 4 영상은 만들다 실패했어요. 다시 만들거나, 빼고 Editor에서 이어 붙일 수 있어요.')
+    expect(view.body).toBe('샷 4 영상은 만들다 실패했어요. 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.')
   })
 
   // 왜(혼자 정한 것 A): 이미지 일괄 뒤 다음 할 일은 영상 — 수는 "이미지 나온 샷 영상" 칩 · 위쪽 [영상 만들기]와 같은 샷(이미지 완료 · 영상 실패).

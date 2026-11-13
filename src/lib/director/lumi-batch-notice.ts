@@ -63,11 +63,11 @@ export function lumiBatchNoticeView(input: {
   const one = failed.length === 1
   const body = takesReturned
     ? one
-      ? t('The video for {shots} failed, and your Takes were returned. Make it again, or leave it out and join the rest in Editor.', { shots })
-      : t('The videos for {shots} failed, and your Takes were returned. Make them again, or leave them out and join the rest in Editor.', { shots })
+      ? t('The video for {shots} failed, and your Takes were returned. You can make it again. If you leave it out, it joins Editor on its own once its video is made.', { shots })
+      : t('The videos for {shots} failed, and your Takes were returned. You can make them again. If you leave them out, they join Editor on their own once their videos are made.', { shots })
     : one
-      ? t('The video for {shots} failed. Make it again, or leave it out and join the rest in Editor.', { shots })
-      : t('The videos for {shots} failed. Make them again, or leave them out and join the rest in Editor.', { shots })
+      ? t('The video for {shots} failed. You can make it again. If you leave it out, it joins Editor on its own once its video is made.', { shots })
+      : t('The videos for {shots} failed. You can make them again. If you leave them out, they join Editor on their own once their videos are made.', { shots })
   return {
     title,
     body,

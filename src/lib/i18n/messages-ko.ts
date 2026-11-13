@@ -1450,10 +1450,11 @@ export const KO: Record<string, string> = {
   'One video is done': '영상 1개가 완성됐어요',
   '{count} videos are done': '영상 {count}개가 완성됐어요',
   'Join them into one video in Editor.': 'Editor에서 이어 붙이면 돼요.',
-  'The video for {shots} failed, and your Takes were returned. Make it again, or leave it out and join the rest in Editor.': '{shots} 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들거나, 빼고 Editor에서 이어 붙일 수 있어요.',
-  'The videos for {shots} failed, and your Takes were returned. Make them again, or leave them out and join the rest in Editor.': '{shots} 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들거나, 빼고 Editor에서 이어 붙일 수 있어요.',
-  'The video for {shots} failed. Make it again, or leave it out and join the rest in Editor.': '{shots} 영상은 만들다 실패했어요. 다시 만들거나, 빼고 Editor에서 이어 붙일 수 있어요.',
-  'The videos for {shots} failed. Make them again, or leave them out and join the rest in Editor.': '{shots} 영상은 만들다 실패했어요. 다시 만들거나, 빼고 Editor에서 이어 붙일 수 있어요.',
+  // 빼고 넘긴 샷의 뒷말은 entry 의 Editor 넘기기 창 줄과 같은 말(fcadec2e, 오너 답 8 — 나중에 영상이 생기면 Editor 에 저절로 들어감).
+  'The video for {shots} failed, and your Takes were returned. You can make it again. If you leave it out, it joins Editor on its own once its video is made.': '{shots} 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.',
+  'The videos for {shots} failed, and your Takes were returned. You can make them again. If you leave them out, they join Editor on their own once their videos are made.': '{shots} 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.',
+  'The video for {shots} failed. You can make it again. If you leave it out, it joins Editor on its own once its video is made.': '{shots} 영상은 만들다 실패했어요. 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.',
+  'The videos for {shots} failed. You can make them again. If you leave them out, they join Editor on their own once their videos are made.': '{shots} 영상은 만들다 실패했어요. 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.',
   'Leave out and go to Editor': '빼고 Editor로',
   'Make {shots} again': '{shots} 다시 만들기',
   // 검토 b 고침(2026-11-14) — 영상 막이 · 글 카드에 묶인 생성 · Take 확인 · 승인 단계
