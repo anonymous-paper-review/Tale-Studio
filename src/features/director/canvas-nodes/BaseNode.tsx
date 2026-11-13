@@ -51,6 +51,10 @@ type BaseNodeProps = {
   beam?: 'success' | 'primary' | null
   /** 기다리는 카드가 노드를 덮는 동안: 머리 · 제목 줄에 Tab 이 들어가지 않게 inert(검토 A C1). 구멍(핸들)은 그대로 둔다. */
   inert?: boolean
+  /** 샷 상태 테두리(시안 R 416:4941, 오너 2026-11-14) — 오래됨 · 골라 둠이 아닐 때만 보인다. */
+  stateFrame?: string | null
+  /** 상태 고르기에 안 맞는 노드 — 숨기지 않고 흐리게(선 · 자리가 흔들리지 않게). */
+  dimmed?: boolean
 }
 
 function BaseNodeImpl({
@@ -69,6 +73,8 @@ function BaseNodeImpl({
   strongStale,
   beam,
   inert = false,
+  stateFrame = null,
+  dimmed = false,
 }: BaseNodeProps) {
   const t = useT()
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
@@ -101,7 +107,8 @@ function BaseNodeImpl({
       className={cn(
         // v3 D1(2026-11-03): 작업 바탕색 판 · 모서리 14 · 그림자 하나 · 안쪽 12. 고른 노드만 지금 단계 색 1.5px 테두리.
         'group relative rounded-[14px] border-[1.5px] bg-node-bg-default p-3 shadow-node transition-[border-color] duration-100',
-        nodeFrameBorder({ strongStale, selected }),
+        stateFrame && !strongStale && !selected ? stateFrame : nodeFrameBorder({ strongStale, selected }),
+        dimmed && 'opacity-30',
       )}
       style={width ? { width: `${width}px` } : undefined}
     >

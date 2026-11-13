@@ -26,6 +26,8 @@ import { useT } from '@/lib/i18n'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { normalizeProvider } from '@/lib/video-models'
+import { useShotState } from '@/features/director/hooks/use-shot-states'
+import { dimmedByStatusFilter, videoTakeFrame } from '@/lib/director/shot-state'
 
 /** 영상 노드 틀의 높이 상한(세로·정사각 포맷) — 테이크 간격(VIDEO_OFFSET_Y 260px) 안에서 겹치지 않게. */
 const VIDEO_NODE_MEDIA_MAX_H = 150
@@ -36,6 +38,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const projectFormat = useProjectFormatStore((s) => s.format)
   const mediaFrame = mediaFrameStyle(projectFormat, VIDEO_NODE_MEDIA_MAX_H)
   const setVideoFinal = useDirectorCanvasStore((s) => s.setVideoFinal)
+  // 상태 고르기(시안 D1): 그 샷 상태가 안 맞으면 흐리게. 테두리는 이 Take 의 상태(시안 D4 · D7).
+  const parentShotState = useShotState(isVideoData(data) ? data.parentShotNodeId : null)
+  const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
   const playingNodeId = useDirectorCanvasStore((s) => s.playingNodeId)
   const setPlayingNode = useDirectorCanvasStore((s) => s.setPlayingNode)
   const ensureVideoThumbnail = useDirectorCanvasStore(
@@ -229,6 +234,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       width={240}
       stale={data.stale}
       strongStale={isStrongStale}
+      stateFrame={isVideoData(data) ? videoTakeFrame(data) : null}
+      dimmed={dimmedByStatusFilter(parentShotState, statusFilter)}
       // 만드는 중은 도는 빛 대신 노드를 덮는 기다리는 카드(아래 NodeWaitCard, 11/5 시안 DG). 덮인 동안 머리 단추는 inert(검토 A C1).
       inert={generating}
       headerExtra={parentShotId ? (
