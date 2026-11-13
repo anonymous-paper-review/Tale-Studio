@@ -9,6 +9,7 @@ import {
   createVideoBatch,
   getVideoBatchSummary,
   listVideoBatchSummaries,
+  moveVideoBatchShotFirst,
 } from '@/lib/director/batch-store'
 import { continueVideoBatch } from '@/lib/director/batch-continue'
 import type { VideoBatchSummary } from '@/lib/director/video-batch-types'
@@ -132,6 +133,31 @@ export async function GET(req: Request) {
   } catch (error) {
     console.error('[video-batches] read failed:', error instanceof Error ? error.message : error)
     return NextResponse.json({ error: 'Unable to read video batches' }, { status: 500 })
+  }
+}
+
+const moveFirstSchema = z.object({
+  projectId: idSchema,
+  batchId: idSchema,
+  shotId: z.string().trim().min(1).max(200),
+})
+
+/** [먼저 하기](시안 D4, 리드 S4-2 7) — 도는 내 묶음에서 아직 안 낸 샷 하나를 다음 차례로. 순서만 바꾸고 영상을 새로 내지 않는다
+ *  (Take 예약 · 값 그대로, 이어가기를 깨우지 않음 — 다음 영상은 자리가 나면 서버가 낸다). 약속: tests/director/video-batch-move-first-api.test.ts */
+export async function PATCH(req: Request) {
+  const blocked = demoWriteBlock(req)
+  if (blocked) return blocked
+  try {
+    const parsed = moveFirstSchema.safeParse(await req.json().catch(() => null))
+    if (!parsed.success) return NextResponse.json({ error: 'Invalid batch request' }, { status: 400 })
+    const user = await access(parsed.data.projectId)
+    if (user instanceof Response) return user
+    const moved = await moveVideoBatchShotFirst({ ...parsed.data, userId: user.id })
+    if (!moved.ok) return NextResponse.json({ error: moved.reason }, { status: moved.reason === 'not_found' ? 404 : 409 })
+    return NextResponse.json({ batch: moved.batch })
+  } catch (error) {
+    console.error('[video-batches] reorder failed:', error instanceof Error ? error.message : error)
+    return NextResponse.json({ error: 'Unable to reorder video batch' }, { status: 500 })
   }
 }
 

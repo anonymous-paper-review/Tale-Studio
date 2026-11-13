@@ -132,6 +132,42 @@ export async function cancelVideoBatch(batchId: string, projectId: string, userI
   return batch
 }
 
+export type MoveVideoBatchShotFirstResult =
+  | { ok: true; batch: VideoBatchSummary }
+  | { ok: false; reason: 'not_found' | 'not_running' | 'not_pending' }
+
+/** [먼저 하기](시안 D4 · 결정 페이지 추천, 리드 S4-2 7) — 도는 내 묶음에서 아직 안 낸 샷 하나를 다음 차례로 옮긴다.
+ *  순서(position)만 바꾼다: 준비된 입력(모델 · 해상도 · Take)과 예약은 그대로라 같은 값으로 나간다. 이어가기는 pending 항목을
+ *  position 순으로 내므로(batch-continue) 다음 이어가기부터 이 샷이 먼저다. 이미 다음 차례면 다시 쓰지 않는다(두 번 눌러도 같음). */
+export async function moveVideoBatchShotFirst(input: {
+  batchId: string
+  projectId: string
+  userId: string
+  shotId: string
+}): Promise<MoveVideoBatchShotFirstResult> {
+  const { data: batch, error } = await supabaseAdmin.from('director_video_batches')
+    .select('*').eq('id', input.batchId).eq('project_id', input.projectId).maybeSingle()
+  if (error) throw new Error(error.message)
+  // 멈추기와 같은 주인 검사 — 남이 만든 묶음은 없는 것으로 본다.
+  if (!batch || batch.user_id !== input.userId) return { ok: false, reason: 'not_found' }
+  if (batch.status !== 'running') return { ok: false, reason: 'not_running' }
+  const { data: items, error: itemError } = await supabaseAdmin.from('director_video_batch_items')
+    .select('id, shot_id, status, position').eq('batch_id', batch.id).eq('status', 'pending').order('position', { ascending: true })
+  if (itemError) throw new Error(itemError.message)
+  const pending = [...(items ?? [])].sort((a, b) => (a.position ?? 0) - (b.position ?? 0))
+  const target = pending.find((item) => item.shot_id === input.shotId)
+  if (!target) return { ok: false, reason: 'not_pending' }
+  const first = pending[0]!
+  if (first.id !== target.id) {
+    // 그사이 나갔으면(pending 아님) 바꾸지 않는다 — 나간 항목의 순서는 뜻이 없다.
+    const { error: moveError } = await supabaseAdmin.from('director_video_batch_items')
+      .update({ position: (first.position ?? 0) - 1 })
+      .eq('id', target.id).eq('batch_id', batch.id).eq('status', 'pending')
+    if (moveError) throw new Error(moveError.message)
+  }
+  return { ok: true, batch: await readSummary(batch) }
+}
+
 export async function reserveVideoBatchItem(
   itemId: string,
   leaseToken: string,
