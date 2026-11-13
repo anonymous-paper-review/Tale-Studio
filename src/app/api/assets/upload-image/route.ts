@@ -7,6 +7,8 @@ import { uploadImmutableObject } from '@/lib/storage/immutable-object'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import sharp from 'sharp'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
+import { updateStoryboardImage } from '@/lib/director/storyboard-image-store'
+import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 
 const MAX_IMAGE_BYTES = 10 * 1024 * 1024
 const MAX_IMAGE_DIMENSION = 10_000
@@ -254,16 +256,28 @@ export async function POST(req: Request) {
     if (!targetRow) return NextResponse.json({ error: 'Image target not found' }, { status: 404 })
 
     const extension = imageType.extension
-    const storagePath = `${project.workspace_id}/${projectId}/${type}s/${storageKeySegment(entityId)}_${field}.${extension}`
+    // 실사 그림은 올릴 때마다 새 이름(_u{올림 id}) — 버전 하나가 되고 옛 버전 그림을 덮지 않는다(디자이너 11/13 D6 · 리드 답 e).
+    const uploadId = field === 'storyboard_image' ? crypto.randomUUID() : null
+    const storagePath = uploadId
+      ? `${project.workspace_id}/${projectId}/${type}s/${storageKeySegment(entityId)}_u${uploadId}_${field}.${extension}`
+      : `${project.workspace_id}/${projectId}/${type}s/${storageKeySegment(entityId)}_${field}.${extension}`
     const { error: uploadError } = await mediaUpload(storagePath, buffer, { contentType: mimeType, upsert: true })
     if (uploadError) throw uploadError
     await uploadThumbnail(storagePath, buffer)
 
     const rawPublicUrl = mediaPublicUrl(storagePath)
     const publicUrl = `${rawPublicUrl}?v=${Date.now()}`
-    const value = field === 'storyboard_image'
-      ? { url: publicUrl, status: 'completed', errorMessage: null, generatedAt: Date.now() }
-      : publicUrl
+    if (uploadId) {
+      const written = await updateStoryboardImage(projectId, entityId, (current) => withStoryboardVersion(current, {
+        id: `upload-${uploadId}`,
+        url: publicUrl,
+        generatedAt: Date.now(),
+        source: 'upload',
+      }, { select: true }))
+      if (!written) return NextResponse.json({ error: 'Image target no longer exists' }, { status: 409 })
+      return NextResponse.json({ publicUrl })
+    }
+    const value = publicUrl
     const { data: updatedTarget, error: updateError } = await supabaseAdmin
       .from(target.table)
       .update({ [field]: value })

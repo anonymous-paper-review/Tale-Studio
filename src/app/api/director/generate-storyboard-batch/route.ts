@@ -4,6 +4,7 @@
 //   architecture §5: 차 있는 것 교체는 사람의 개별 재생성=단일 스트립). 검증: 실험 시트 통과(011fd4bd).
 import { NextResponse } from 'next/server'
 import { existingStoryboardJobId } from '@/lib/director/storyboard-active-job'
+import { hasStoryboardImage } from '@/lib/director/storyboard-image'
 import type { NextRequest } from 'next/server'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
@@ -192,7 +193,8 @@ export async function POST(req: NextRequest) {
       if (wanted && !wanted.has(s.shot_id as string)) continue
       // 기본은 빈칸만(교체는 개별 재생성 소관). force 면 이미 있는 것도 다시 만든다 —
       //   오너가 "하나씩 하는 거 짜쳐서" 전체 재생성을 원한 경로(#c3).
-      if (!force && s.storyboard_image) continue
+      //   지금 그림이 있는지는 칸이 있는지가 아니라 지금 그림으로 본다 — 멈춘 그림만 있는 샷은 칸이 있어도 "이미지 필요"다(오너 2026-11-14 7번).
+      if (!force && hasStoryboardImage(s.storyboard_image)) continue
       const busy = busyJobByShot.get(s.shot_id as string)
       if (busy) {
         if (busy.fresh) waitFor(busy.jobId, [s.shot_id as string], busy.sameRun)

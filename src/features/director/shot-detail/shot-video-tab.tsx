@@ -14,42 +14,37 @@ import { cn } from '@/lib/utils'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import {
-  DEFAULT_VIDEO_RESOLUTION,
   FAL_VIDEO_MODEL_ORDER,
   VIDEO_MODELS,
   clampDuration,
   effectiveVideoResolution,
-  normalizeProvider,
   type VideoModelKey,
   type VideoResolution,
 } from '@/lib/video-models'
-import { imageChangedSinceTake, newTakeRequest, shotDetailFrames, shotDetailTakes, type ShotDetailTake } from '@/lib/director/shot-detail'
+import {
+  imageChangedForTake,
+  newTakeRequest,
+  shotDetailFrames,
+  shotDetailTakes,
+  takeImageVersions,
+  takePhaseOf,
+  takeSettings,
+  type ShotDetailTake,
+  type TakePhase,
+} from '@/lib/director/shot-detail'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
-import { effectivePrompt, getEffectiveVideoConfig, getVideoNodeResolution, useDirectorCanvasStore } from '@/stores/director-store'
+import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { aspectRatioFromFormat } from '@/types/project'
-import type { DirectorNode, ShotNodeData, VideoNodeData } from '@/types/director'
+import type { ShotNodeData, VideoOverride } from '@/types/director'
+import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { VideoResolutionButtons } from '@/features/director/video-resolution-buttons'
 import { LockedFrame, smallFrameStyle } from './locked-frame'
 
-type TakePhase = 'done' | 'making' | 'failed' | 'idle'
+const takePhase = takePhaseOf
 
-function takePhase(data: VideoNodeData): TakePhase {
-  if (data.lastAttemptStatus === 'generating' || data.status === 'generating') return 'making'
-  if (data.status === 'completed' && data.videoUrl) return 'done'
-  if (data.status === 'failed' || data.lastAttemptStatus === 'failed') return 'failed'
-  return 'idle'
-}
-
-const PHASE_LABEL: Record<TakePhase, string> = { done: 'Done', making: 'Making', failed: 'Failed', idle: 'Not made yet' }
-
-/** 그 Take 의 모델 · 해상도 — 다음에 만들 설정. 첫 Take 는 샷 설정 그대로다. */
-function takeSetup(nodes: DirectorNode[], take: ShotDetailTake | null, shot: ShotNodeData): { model: VideoModelKey; resolution: VideoResolution } {
-  if (!take) return { model: normalizeProvider(shot.provider), resolution: DEFAULT_VIDEO_RESOLUTION }
-  const effective = getEffectiveVideoConfig({ nodes }, take.id)
-  return { model: normalizeProvider(effective?.provider ?? shot.provider), resolution: getVideoNodeResolution({ nodes }, take.id) }
-}
+const PHASE_LABEL: Record<TakePhase, string> = { done: 'Done', making: 'Making', stopped: 'Stopped', failed: 'Failed', idle: 'Not made yet' }
 
 export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
   shotNodeId: string
@@ -60,14 +55,25 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
   const t = useT()
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const setVideoFinal = useDirectorCanvasStore((s) => s.setVideoFinal)
+  const cancelRunningJobs = useDirectorCanvasStore((s) => s.cancelRunningJobs)
+  const [stopError, setStopError] = useState<string | null>(null)
   const projectFormat = useProjectFormatStore((s) => s.format)
   const { takes, final } = shotDetailTakes(nodes, shotNodeId)
   const [picked, setPicked] = useState<string | null>(initialTakeId ?? null)
   const [finalError, setFinalError] = useState<string | null>(null)
-  const current = takes.find((take) => take.id === picked) ?? takes.find((take) => take.id === final?.id) ?? takes[0] ?? null
+  // 가장 새 Take 가 실패했으면 그것을 먼저 보인다(리드 검토 c ②) — ★ 를 먼저 보이면 그대로 눌렀을 때 ★ 의 모델 · 해상도로 나간다.
+  const newestFailed = takes[0] && takePhase(takes[0].data) === 'failed' ? takes[0] : null
+  const current = takes.find((take) => take.id === picked) ?? newestFailed ?? takes.find((take) => take.id === final?.id) ?? takes[0] ?? null
   const busy = takes.some((take) => takePhase(take.data) === 'making')
   const [w, h] = aspectRatioFromFormat(projectFormat ?? 'horizontal_16:9').split(':').map(Number)
   const portrait = !!w && !!h && w < h
+
+  // "시작 v1 + 끝 v1"(D7 · 리드 B) — 그 Take 를 만든 작업이 쓴 그림을 지금 버전 목록과 맞춘다. 모르면 비운다.
+  const madeWith = (take: ShotDetailTake): string | null => {
+    const used = takeImageVersions(data.storyboardImage, take.data)
+    if (!used?.start) return null
+    return t('Start v{start} + End v{end}', { start: used.start, end: used.end ?? used.start })
+  }
 
   const markFinal = async (take: ShotDetailTake, next: boolean) => {
     setFinalError(null)
@@ -90,7 +96,7 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
             {takes.map((take) => {
               const phase = takePhase(take.data)
               const isFinal = final?.id === take.id
-              const setup = takeSetup(nodes, take, data)
+              const setup = takeSettings(data, take.data)
               const resolution = take.data.videoResolution ?? effectiveVideoResolution(setup.model, setup.resolution)
               return (
                 <li key={take.id} className={cn('space-y-2 rounded-[14px] border-[1.5px] p-3', isFinal ? 'border-success' : current?.id === take.id ? 'border-foreground/60' : 'border-border')}>
@@ -102,8 +108,13 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                         <span className="block h-full w-1/3 animate-pulse rounded-full bg-state-video" />
                       </span>
                     </div>
+                  ) : phase === 'stopped' ? (
+                    <p className="text-caption text-subtle-foreground">{t('Stopped · The Take is not refunded. If it finishes later, it stays in this list.')}</p>
                   ) : phase === 'done' ? (
-                    <p className="text-caption text-subtle-foreground">{`${VIDEO_MODELS[setup.model].label} · ${resolution}`}</p>
+                    <p className="text-caption text-subtle-foreground">
+                      {[madeWith(take), VIDEO_MODELS[setup.model].label, resolution].filter(Boolean).join(' · ')}
+                      {take.data.cancelledAt ? <span className="ml-1.5 rounded-full border border-border px-1.5 text-micro">{t('Finished after it was stopped')}</span> : null}
+                    </p>
                   ) : phase === 'failed' ? (
                     <p className="line-clamp-2 text-caption text-destructive">
                       {t('Failed')}{take.data.lastAttemptError || take.data.errorMessage ? ` · ${(take.data.lastAttemptError || take.data.errorMessage || '').split('\n')[0]}` : ''}
@@ -113,6 +124,13 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                   )}
                   <div className="flex flex-wrap gap-1.5">
                     <Button type="button" size="pill" variant="secondary" aria-pressed={current?.id === take.id} onClick={() => setPicked(take.id)}>{t('View')}</Button>
+                    {/* 멈추기(오너 7번) — 화면에서만 멈춘다. fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다. */}
+                    {phase === 'making' && take.data.generationJobId ? (
+                      <Button type="button" size="pill" variant="ghost" onClick={() => {
+                        setStopError(null)
+                        void cancelRunningJobs([take.data.generationJobId!]).catch(() => setStopError(t('Could not stop it. Try again.')))
+                      }}>{t('Stop making')}</Button>
+                    ) : null}
                     {phase === 'done' ? (
                       isFinal ? (
                         <Button type="button" size="pill" variant="outline" aria-pressed={!final?.auto} className="border-success text-success hover:text-success"
@@ -130,6 +148,7 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
           </ol>
         )}
         {finalError ? <p className="text-caption text-destructive">{finalError}</p> : null}
+        {stopError ? <p className="text-caption text-destructive">{stopError}</p> : null}
       </section>
     </div>
   )
@@ -212,28 +231,30 @@ function FixImage({ nodeId, data }: { nodeId: string; data: ShotNodeData }) {
 /** 영상 고치기 — 늘 새 Take 를 만든다. 보고 있던 Take 의 설정을 이어받고, 여기서 바꾼 것만 새 Take 에 얹는다. */
 function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; data: ShotNodeData; current: ShotDetailTake | null; busy: boolean }) {
   const t = useT()
-  const nodes = useDirectorCanvasStore((s) => s.nodes)
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
   const generateVideoForShot = useDirectorCanvasStore((s) => s.generateVideoForShot)
   const openDeleteConfirm = useDirectorCanvasStore((s) => s.openDeleteConfirm)
   const takeBalance = useTakeBalance()
-  const base = takeSetup(nodes, current, data)
+  const imageGeneration = useStoryboardImageGeneration(data)
+  const base = takeSettings(data, current?.data ?? null)
   const [provider, setProvider] = useState<VideoModelKey>(base.model)
   const [resolution, setResolution] = useState<VideoResolution>(base.resolution)
-  const [change, setChange] = useState('')
+  // 보고 있던 Take 의 바꿀 점을 미리 채운다(리드 검토 c ③) — 고치거나 지울 수 있고, 쌓이지 않는다.
+  const [change, setChange] = useState(((current?.data.override ?? {}) as VideoOverride).changeNote ?? '')
   const [sending, setSending] = useState(false)
   const hasImage = !!shotDetailFrames(data.storyboardImage).start
-  const image = data.storyboardImage
-  const imageChanged = !!current && image?.status === 'completed' && imageChangedSinceTake(image.generatedAt, current.data)
+  const imageChanged = !!current && imageChangedForTake(data.storyboardImage, current.data)
   const showCost = takeBalance.mode !== 'off'
   const count = takeCostForVideo(provider, resolution)
   const label = !current
-    ? (showCost ? t('Make the video · {count} Take', { count }) : t('Make the video'))
+    ? (showCost ? t('Make the video · {count} Takes', { count }) : t('Make the video'))
     : imageChanged
-      ? (showCost ? t('Make a new Take with the changed image · {count} Take', { count }) : t('Make a new Take with the changed image'))
-      : (showCost ? t('Make a new Take · {count} Take', { count }) : t('Make a new Take'))
+      ? (showCost ? t('Make a new Take with the changed image · {count} Takes', { count }) : t('Make a new Take with the changed image'))
+      : (showCost ? t('Make a new Take · {count} Takes', { count }) : t('Make a new Take'))
   const videoSeconds = clampDuration(VIDEO_MODELS[provider], data.durationSeconds)
-  const disabled = !hasImage || busy || videoBatchBusy || sending
+  // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
+  const imageBusy = hasImage && (imageGeneration.generating || data.storyboardImage?.status === 'pending')
+  const disabled = !hasImage || busy || imageBusy || videoBatchBusy || sending
 
   const make = async () => {
     if (disabled) return
@@ -247,7 +268,6 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
         provider: provider !== base.model ? provider : undefined,
         resolution: resolution !== base.resolution ? resolution : undefined,
       }))
-      if (made) setChange('')
     } finally {
       setSending(false)
     }
@@ -261,7 +281,7 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
       ) : null}
       {current ? (
         <Textarea value={change} onChange={(e) => setChange(e.target.value)} rows={2}
-          placeholder={t("What to change in the motion or camera · Leave it empty to keep this Take's prompt")} />
+          placeholder={t('What to change in the motion or camera · Leave it empty to keep the shot prompt')} />
       ) : null}
       <div className="space-y-1.5">
         <p className="text-caption text-subtle-foreground">{t('Video model')}</p>
@@ -285,6 +305,8 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
       </div>
       {!hasImage ? (
         <p className="text-caption text-subtle-foreground">{t('Make the start and end images first.')}</p>
+      ) : imageBusy ? (
+        <p className="text-caption text-subtle-foreground">{t('The start and end images are being remade. Make the Take when they are done.')}</p>
       ) : busy ? (
         <p className="text-caption text-subtle-foreground">{t('A Take is being made. You can make a new one when it is done.')}</p>
       ) : null}

@@ -132,13 +132,14 @@ function snapshotValueMatches(snapshot: Record<string, unknown>, candidate: Reco
 }
 
 // 새 테이크 기록(video_clips.override)에 남길 수 있는 칸 — 영상 노드 설정(VideoOverride)과 같다.
-const NEW_TAKE_OVERRIDE_KEYS = ['prompt', 'camera', 'lighting', 'cameraPreset', 'provider', 'resolution'] as const
+// changeNote: 샷 상세 영상 고치기의 바꿀 점 — Take 에 기록으로 남아 다음 Take 칸에 미리 채워진다(디자이너 11/13 D7 · 리드 검토 c ③).
+const NEW_TAKE_OVERRIDE_KEYS = ['prompt', 'camera', 'lighting', 'cameraPreset', 'provider', 'resolution', 'changeNote'] as const
 
 /**
  * 새 테이크에 남길 설정(2026-10-31 리뷰). 평범한 객체만 받는다(아니면 undefined → 400, video-takes PATCH 와 같은 규칙).
  * 아는 칸만 남기고, 해상도는 720p · 1080p 만 남긴다. 없거나 null 이면 빈 설정. 이 값은 기록일 뿐 Take · 요청 해상도를 정하지 않는다.
  */
-function newTakeOverride(value: unknown): Record<string, Json> | undefined {
+export function newTakeOverride(value: unknown): Record<string, Json> | undefined {
   if (value === undefined || value === null) return {}
   if (typeof value !== 'object' || Array.isArray(value)) return undefined
   const prototype = Object.getPrototypeOf(value)
@@ -148,6 +149,7 @@ function newTakeOverride(value: unknown): Record<string, Json> | undefined {
   for (const key of NEW_TAKE_OVERRIDE_KEYS) {
     if (!Object.hasOwn(source, key)) continue
     if (key === 'resolution' && !isVideoResolution(source.resolution)) continue
+    if (key === 'changeNote' && (typeof source.changeNote !== 'string' || source.changeNote.length > 2000)) continue
     if (isJsonValue(source[key])) kept[key] = source[key]
   }
   return kept

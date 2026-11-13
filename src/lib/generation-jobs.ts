@@ -705,6 +705,8 @@ export interface ActiveGenerationJob {
   target: GenerationJobTarget
   /** 제출 시각(epoch ms) — 경과시간 표시가 remount 에도 리셋되지 않게 하는 durable 기준점. */
   startedAt: number | null
+  /** 화면에서 멈춘 때(오너 2026-11-14 7번) — fal 에서는 끝날 때까지 돌아 목록에 남는다. 멈추지 않았으면 없음. */
+  cancelledAt?: string
 }
 
 /**
@@ -719,21 +721,30 @@ export interface ActiveGenerationJob {
 export async function listActiveGenerationJobs(
   projectId: string,
 ): Promise<ActiveGenerationJob[]> {
-  const { data, error } = await supabaseAdmin
+  const since = new Date(Date.now() - STALE_QUEUED_MS).toISOString()
+  const query = (columns: string) => supabaseAdmin
     .from('generation_jobs')
-    .select('id, kind, target, submitted_at, created_at')
+    .select(columns)
     .eq('project_id', projectId)
     .eq('status', 'queued')
-    .gte('created_at', new Date(Date.now() - STALE_QUEUED_MS).toISOString())
+    .gte('created_at', since)
+  // 화면에서 멈춘 작업(오너 2026-11-14 7번)은 끝날 때까지 목록에 남되 멈춘 때를 붙인다 — 화면이 "멈췄어요"로 보이고 다시 만들기를 연다.
+  //   멈춤 표를 함께 읽지 못하면(표가 아직 없는 DB 등) 종전처럼 목록만 준다.
+  let result = await query('id, kind, target, submitted_at, created_at, cancellation:director_job_cancellations(cancelled_at)')
+  if (result.error) result = await query('id, kind, target, submitted_at, created_at')
+  const { data, error } = result
   if (error) throw error
-  return (data ?? []).map((row) => {
+  return ((data ?? []) as unknown as Array<Record<string, unknown>>).map((row) => {
     const ts = (row.submitted_at ?? row.created_at) as string | null
     const parsed = ts ? Date.parse(ts) : NaN
+    const cancellation = row.cancellation as { cancelled_at?: string | null } | Array<{ cancelled_at?: string | null }> | null | undefined
+    const cancelledAt = (Array.isArray(cancellation) ? cancellation[0]?.cancelled_at : cancellation?.cancelled_at) ?? null
     return {
       id: row.id as string,
       kind: row.kind as GenerationJobKind,
       target: (row.target as GenerationJobTarget | null) ?? {},
       startedAt: Number.isNaN(parsed) ? null : parsed,
+      ...(cancelledAt ? { cancelledAt } : {}),
     }
   })
 }
