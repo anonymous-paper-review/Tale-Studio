@@ -31,6 +31,13 @@ describe('다음: Editor로', () => {
     expect(page).toContain('blocked={!canHandOff}')
   })
 
+  it('상태 고르기 · 고른 샷으로 좁혀 보여도 보드 전체에 만들 것이 남아 있으면 [다음: Editor로]는 크림이 아니다', () => {
+    // 왜: 상태를 골라 단추가 보이는 샷만 세자(리드 답 1) 그 상태에 할 일이 없으면 크림이 넘기기로 튀었다 — 할 일이 남았는데 떠나라고 민다.
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    expect(page).toContain('const boardWorkLeft = imageWorkShotIds(shotStates, null).length + videoWorkShotIds(shotStates, null).length')
+    expect(page).toContain('canHandOff: canHandOff && !making && boardWorkLeft === 0')
+  })
+
   it('다른 할 일이 있으면 [다음: Editor로]는 보조 단추이고, 만들 것이 없을 때만 크림이다', () => {
     // 왜: 시안 R "가장 밝은 버튼 = 지금 할 일 하나".
     const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
