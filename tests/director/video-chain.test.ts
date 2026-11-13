@@ -1,67 +1,224 @@
-// "영상까지 이어서"를 켜고 만들면 이미지가 끝난 샷부터 영상이 저절로 시작된다 — 이 화면(브라우저)이 이어 보낸다 (시안 D4 406:5275 · R 416:4941, 오너 답 6)
-import { readFileSync } from 'node:fs'
-import { beforeEach, describe, expect, it } from 'vitest'
-import { translate } from '@/lib/i18n/translate'
+// 앞 장면의 마지막 화면을 다음 영상의 시작으로 연결하고, 끊긴 연결은 남기지 않는다
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
+import { isVideoData } from '@/types/director'
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { chainStep } from '@/lib/director/toolbar-work'
-import type { DirectorShotState } from '@/lib/director/shot-state'
-
-const ko = (text: string, params?: Record<string, string | number>) => translate('ko', text, params)
-const page = () => readFileSync('src/app/studio/director/page.tsx', 'utf8')
 
 beforeEach(() => {
-  useDirectorCanvasStore.setState({ projectId: 'p1', chainVideoAfterImage: false, chainWaitingShotIds: [] })
+  useDirectorCanvasStore.getState().reset()
 })
 
-describe('영상까지 이어서 스위치', () => {
-  it('"영상까지 이어서"를 켜면 이미지 단추 이름이 "이미지+영상 만들기"가 된다', () => {
-    // 왜: 시안 R "'영상까지 이어서'를 켜면 이미지 버튼이 '이미지+영상 만들기'로".
-    expect(ko('Make images + videos')).toBe('이미지+영상 만들기')
-    expect(ko('Also make videos')).toBe('영상까지 이어서')
-    expect(page()).toMatch(/chainVideoAfterImage \? t\('Make images \+ videos'\)/)
-  })
-
-  it('스위치는 화면에 들어오면 꺼져 있고, 다른 프로젝트로 가면 꺼지며 기다림도 비운다', () => {
-    // 왜: 돈 드는 기본값을 남기지 않는다(혼자 정한 것 c, 오너 답 6 = 브라우저가 이어 보냄).
-    useDirectorCanvasStore.getState().setChainVideoAfterImage(true)
-    useDirectorCanvasStore.getState().setChainWaitingShots(['a'])
-    useDirectorCanvasStore.getState().setProjectId('p2')
-    expect(useDirectorCanvasStore.getState().chainVideoAfterImage).toBe(false)
-    expect(useDirectorCanvasStore.getState().chainWaitingShotIds).toEqual([])
-  })
-
-  it('켜 둔 채 [이미지+영상 만들기]를 누르면 먼저 영상 확인 창을 거치고, 확인하면 "이 화면을 닫으면 영상은 시작되지 않아요"를 알린다', () => {
-    // 왜: Take 를 쓰니 확인을 받는다(약속 E) · 오너 답 6 "브라우저가 이어 보내고 화면을 닫으면 시작되지 않음을 알린다".
-    expect(ko("If you close this screen, the videos won't start.")).toBe('이 화면을 닫으면 영상은 시작되지 않아요')
-    expect(page()).toContain('setConfirmChain(true)')
-    expect(page()).toContain(`toast.info(t("If you close this screen, the videos won't start."))`)
-  })
+afterEach(() => {
+  vi.unstubAllGlobals()
 })
 
-describe('이미지가 끝나면 영상 시작', () => {
-  const step = (waiting: string[], states: Record<string, DirectorShotState>, imageBusy: boolean) =>
-    chainStep(waiting, new Map(Object.entries(states)), imageBusy)
+function api() {
+  return useDirectorCanvasStore.getState()
+}
 
-  it('기다리던 샷의 이미지가 끝나면 그 샷 영상을 시작하고 기다림에서 뺀다', () => {
-    // 왜: 시안 D4 "이미지가 끝나면 자동으로 시작해요".
-    expect(step(['a', 'b'], { a: 'image_done', b: 'image_generating' }, true)).toEqual({ start: ['a'], drop: [], keep: ['b'] })
+function seedVideos() {
+  const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'Scene')
+  const sourceShotId = api().addShotNode(sceneId, { x: 360, y: 0 }, 'Source')
+  const targetShotId = api().addShotNode(sceneId, { x: 360, y: 560 }, 'Target')
+  const sourceVideoId = api().addVideoTake(sourceShotId)!
+  const targetVideoId = api().addVideoTake(targetShotId)!
+  return { sourceVideoId, targetVideoId }
+}
+
+function completeSource(sourceVideoId: string) {
+  api().updateNodeData<'video'>(sourceVideoId, {
+    status: 'completed',
+    videoUrl: 'https://cdn.example/source.mp4',
+    videoClipId: 'clip-source',
+    generationJobId: 'job-source',
+  })
+}
+
+describe('이전 영상의 마지막 화면을 다음 영상 시작에 연결하는 약속', () => {
+  it('완성되지 않은 이전 영상이면 연결선을 만들지 않는다', async () => {
+    const { sourceVideoId, targetVideoId } = seedVideos()
+
+    const connected = await api().wireVideoChainToVideo(
+      sourceVideoId,
+      targetVideoId,
+      'video-chain',
+    )
+
+    expect(connected).toBe(false)
+    expect(api().edges.some((edge) => edge.data?.category === 'video-chain')).toBe(false)
+    const target = api().nodes.find((node) => node.id === targetVideoId)
+    expect(target && isVideoData(target.data) ? target.data.videoChainInputId : null).toBeNull()
   })
 
-  it('이미지가 실패하거나, 일괄이 끝났는데도 이미지가 없으면 영상을 시작하지 않고 기다림에서 뺀다', () => {
-    // 왜: 쓸 그림이 없다(혼자 정한 것 b).
-    expect(step(['a', 'b', 'c'], { a: 'image_failed', b: 'image_needed', c: 'image_needed' }, false)).toEqual({ start: [], drop: ['a', 'b', 'c'], keep: [] })
-    expect(step(['b'], { b: 'image_needed' }, true)).toEqual({ start: [], drop: [], keep: ['b'] })
+  it('저장된 올바른 연결은 복원하고 순환 연결은 거부한다', () => {
+    const { sourceVideoId, targetVideoId } = seedVideos()
+    completeSource(sourceVideoId)
+    api().updateNodeData<'video'>(targetVideoId, {
+      videoChainInputId: sourceVideoId,
+      videoChainFrameUrl:
+        'https://cdn.example/workspace/project/videos/clip-source/job-source_chain-frame.jpg',
+    })
+    api().rebuildVideoChainEdges()
+
+    expect(
+      api().edges.filter(
+        (edge) =>
+          edge.data?.category === 'video-chain' &&
+          edge.source === sourceVideoId &&
+          edge.target === targetVideoId,
+      ),
+    ).toHaveLength(1)
+
+    api().updateNodeData<'video'>(sourceVideoId, {
+      videoChainInputId: targetVideoId,
+      videoChainFrameUrl:
+        'https://cdn.example/workspace/project/videos/clip-target/job-target_chain-frame.jpg',
+    })
+    api().rebuildVideoChainEdges()
+
+    expect(api().edges.some((edge) => edge.data?.category === 'video-chain')).toBe(false)
+    const source = api().nodes.find((node) => node.id === sourceVideoId)
+    const target = api().nodes.find((node) => node.id === targetVideoId)
+    expect(source && isVideoData(source.data) ? source.data.videoChainInputId : null).toBeNull()
+    expect(target && isVideoData(target.data) ? target.data.videoChainInputId : null).toBeNull()
   })
 
-  it('다른 길로 이미 영상을 만들고 있거나 영상이 있으면 다시 시작하지 않고 기다림에서 뺀다', () => {
-    // 왜: 같은 샷 영상을 두 번 만들어 Take 를 두 번 쓰지 않게.
-    expect(step(['a', 'b'], { a: 'video_generating', b: 'video_done' }, false)).toEqual({ start: [], drop: ['a', 'b'], keep: [] })
+  it('마지막 화면을 읽을 수 없으면 임시 연결을 지운다', async () => {
+    const { sourceVideoId, targetVideoId } = seedVideos()
+    completeSource(sourceVideoId)
+
+    const connected = await api().wireVideoChainToVideo(
+      sourceVideoId,
+      targetVideoId,
+      'video-chain',
+    )
+
+    expect(connected).toBe(false)
+    expect(
+      api().edges.some(
+        (edge) =>
+          edge.data?.category === 'video-chain' &&
+          edge.source === sourceVideoId &&
+          edge.target === targetVideoId,
+      ),
+    ).toBe(false)
+    const target = api().nodes.find((node) => node.id === targetVideoId)
+    expect(target && isVideoData(target.data) ? target.data.videoChainInputId : null).toBeNull()
+    expect(target && isVideoData(target.data) ? target.data.errorMessage : null).toContain(
+      'last frame',
+    )
   })
 
-  it('기다리는 영상 노드는 "이미지가 끝나면 자동으로 시작해요"를 보인다', () => {
-    // 왜: 시안 D4 의 기다리는 영상 노드 글.
-    expect(ko('Starts by itself when the image is done')).toBe('이미지가 끝나면 자동으로 시작해요')
-    const videoNode = readFileSync('src/features/director/canvas-nodes/VideoNode.tsx', 'utf8')
-    expect(videoNode).toContain("t('Starts by itself when the image is done')")
+  it('연결을 확정하기 전에 이전 영상의 마지막 화면을 저장한다', async () => {
+    const { sourceVideoId, targetVideoId } = seedVideos()
+    completeSource(sourceVideoId)
+
+    const fakeVideo = {
+      duration: 2,
+      videoWidth: 1,
+      videoHeight: 1,
+      crossOrigin: '',
+      muted: false,
+      preload: '',
+      playsInline: false,
+      onloadedmetadata: null as (() => void) | null,
+      onloadeddata: null as (() => void) | null,
+      onseeked: null as (() => void) | null,
+      onerror: null as (() => void) | null,
+      removeAttribute: vi.fn(),
+      load: vi.fn(),
+    }
+    let currentTime = 0
+    Object.defineProperty(fakeVideo, 'src', {
+      set: () => {
+        queueMicrotask(() => fakeVideo.onloadedmetadata?.())
+      },
+    })
+    Object.defineProperty(fakeVideo, 'currentTime', {
+      get: () => currentTime,
+      set: (value: number) => {
+        currentTime = value
+        queueMicrotask(() => fakeVideo.onseeked?.())
+      },
+    })
+    const fakeCanvas = {
+      width: 0,
+      height: 0,
+      getContext: vi.fn(() => ({ drawImage: vi.fn() })),
+      toBlob: (callback: BlobCallback) =>
+        callback(new Blob(['frame'], { type: 'image/jpeg' })),
+    }
+    vi.stubGlobal('document', {
+      cookie: '',
+      createElement: (tag: string) =>
+        tag === 'video' ? fakeVideo : fakeCanvas,
+    })
+    vi.stubGlobal('window', { location: { pathname: '/studio/director' } })
+    const fetch = vi.fn().mockResolvedValue({
+      ok: true,
+      json: async () => ({ publicUrl: 'https://media.example/chain-frame.jpg' }),
+    })
+    vi.stubGlobal('fetch', fetch)
+
+    const connected = await api().wireVideoChainToVideo(
+      sourceVideoId,
+      targetVideoId,
+      'video-chain',
+    )
+
+    expect(connected).toBe(true)
+    expect(fetch).toHaveBeenCalledWith(
+      '/api/assets/upload-image',
+      expect.objectContaining({ method: 'POST', body: expect.any(FormData) }),
+    )
+    const form = fetch.mock.calls[0]![1]!.body as FormData
+    expect(form.get('field')).toBe('chain_frame')
+    expect(form.get('entityId')).toBe('clip-source')
+    expect(form.get('generationJobId')).toBe('job-source')
+    const target = api().nodes.find((node) => node.id === targetVideoId)
+    expect(target && isVideoData(target.data) ? target.data.videoChainFrameUrl : null).toBe(
+      'https://media.example/chain-frame.jpg',
+    )
+  })
+
+  it('영상 연결을 요청하면 지정한 연결 방식으로 적용한다', async () => {
+    const { sourceVideoId, targetVideoId } = seedVideos()
+    completeSource(sourceVideoId)
+
+    const result = api().applyUpdates([
+      {
+        type: 'connectVideo',
+        sourceId: sourceVideoId,
+        targetId: targetVideoId,
+        targetHandle: 'video-chain',
+      },
+    ])
+
+    expect(result.applied).toBe(1)
+    expect(result.skipped).toHaveLength(0)
+    const target = api().nodes.find((node) => node.id === targetVideoId)
+    expect(target && isVideoData(target.data) ? target.data.videoChainInputId : null).toBe(
+      sourceVideoId,
+    )
+    await Promise.resolve()
+    await Promise.resolve()
+  })
+
+  it('이전 영상이 바뀌면 다음 영상의 오래된 시작 화면을 버린다', () => {
+    const { sourceVideoId, targetVideoId } = seedVideos()
+    completeSource(sourceVideoId)
+    api().updateNodeData<'video'>(targetVideoId, {
+      videoChainInputId: sourceVideoId,
+      videoChainFrameUrl:
+        'https://cdn.example/workspace/project/videos/clip-source/job-source_chain-frame.jpg',
+    })
+
+    api().updateNodeData<'video'>(sourceVideoId, {
+      generationJobId: 'job-source-new',
+      videoUrl: 'https://cdn.example/source-new.mp4',
+    })
+
+    const target = api().nodes.find((node) => node.id === targetVideoId)
+    expect(target && isVideoData(target.data) ? target.data.videoChainFrameUrl : null).toBeNull()
+    expect(target && isVideoData(target.data) ? target.data.stale : false).toBe(true)
   })
 })
