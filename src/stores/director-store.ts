@@ -56,7 +56,7 @@ import { createClient } from '@/lib/supabase/client'
 import type { Json } from '@/types/database'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { parseDirectorRefs } from '@/lib/director/director-refs'
-import { latestShotTake, promptWithChange } from '@/lib/director/shot-detail'
+import { latestShotTake, promptWithChange, takeSettings } from '@/lib/director/shot-detail'
 import { currentStoryboardVersion, keptStoryboardImage, selectStoryboardVersion, storyboardImageVersions, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import {
   isEmptyStableFrameInputs,
@@ -4801,6 +4801,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           generationJobId: idempotencyKey,
           ...(preserveSuccess ? {} : { status: 'generating', errorMessage: null }),
         })
+        // 샷 Take 의 모델 · 해상도는 [다시 만들기] 단추 값과 같은 함수(takeSettings)로 정한다 — 요청이 따로 세면
+        //   한쪽만 바뀌는 날 단추에 적은 Take 값과 실제 요청이 갈라진다(리드 검토 a). 독립 영상은 지금처럼 자기 설정.
+        const shotTake = shotNode && isShotData(shotNode.data) ? takeSettings(shotNode.data, videoNode.data) : null
         const requestPayload = {
           projectId,
           ...(shotNode && isShotData(shotNode.data)
@@ -4823,7 +4826,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           cameraPreset: eff.cameraPreset,
           // 화면비는 서버가 프로젝트 포맷에서 정한다(2026-09-30) — 여기서 16:9 를 박지 않는다.
           generationMethod: referenceImageUrl ? 'I2V' : 'T2V',
-          model: normalizeProvider(eff.provider),
+          model: shotTake?.model ?? normalizeProvider(eff.provider),
           // 제공자는 fal 하나다(2026-10-11 자체 호스팅 경로 제거).
           provider: 'fal',
           durationSeconds: eff.durationSeconds,
@@ -4833,10 +4836,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           ...(referenceImageUrls ? { referenceImageUrls } : {}),
           ...(referenceImageUrls && referenceImageRoles ? { referenceImageRoles } : {}),
           ...(options?.traceId ? { traceId: options.traceId, actor: 'chat' } : {}),
-          ...(shotNode && isShotData(shotNode.data)
+          ...(shotTake
             ? {
                 // 해상도(오너 2026-10-31): 영상 노드가 고른 값. 서버가 모델이 낼 수 있는지 다시 정하고 Take 도 그 값으로 잡는다.
-                resolution: getVideoNodeResolution(get(), videoNodeId),
+                resolution: shotTake.resolution,
                 // 아직 저장 전인 새 테이크는 이 노드의 설정(override)도 보낸다 — 리테이크가 물려받은 해상도 · 모델이
                 //   서버 테이크에도 남아, 다시 읽어 와도 같은 설정으로 보인다(#retake-inherit 의 상속을 DB 까지).
                 ...(videoNode.data.videoClipId ? {} : { override: videoNode.data.override }),

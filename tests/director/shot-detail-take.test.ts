@@ -1,4 +1,4 @@
-// 샷 상세 영상 탭에서 새 Take 를 만들면 고친 모델 · 해상도 · 바꿀 점이 새 Take 에만 실리는지 (디자이너 11/13 시안 D7 · 오너 2026-11-14)
+// 샷 상세 영상 탭에서 새 Take 를 만들면 고친 모델 · 해상도 · 바꿀 점이 새 Take 에만 실리는지, 다시 만들기 요청이 단추 값과 같은 모델 · 해상도로 나가는지 (디자이너 11/13 시안 D7 · 오너 2026-11-14 · 리드 검토 a)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -16,7 +16,9 @@ vi.mock('@/lib/generation-queue', () => ({ refreshGenerationQueue: vi.fn() }))
 vi.mock('@/lib/shots-cache', () => ({ invalidateShots: () => Promise.resolve() }))
 
 import { useDirectorCanvasStore } from '@/stores/director-store'
-import { isVideoData } from '@/types/director'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { latestShotTake, takeSettings } from '@/lib/director/remake-take'
+import { isShotData, isVideoData, type VideoOverride } from '@/types/director'
 
 const api = () => useDirectorCanvasStore.getState()
 let shotId: string
@@ -99,5 +101,56 @@ describe('샷 상세의 새 Take', () => {
     expect(api().detailTab).toBe('video')
     api().closeShotDetail()
     expect(api().detailNodeId).toBeNull()
+  })
+})
+
+describe('다시 만들기 단추 값과 요청', () => {
+  /** 샷 하나(와 그 샷의 Take 하나)를 새로 두고, 단추 값을 센 설정과 다시 만들기 요청이 보낸 모델 · 해상도를 함께 돌려준다. */
+  async function remakeCase(writerShotId: string, shotProvider: string, takeOverride: VideoOverride | null) {
+    const shot = api().addShotNode(null, { x: 0, y: 400 }, writerShotId)
+    api().updateNodeData<'shot'>(shot, { writerShotId, promptOverride: 'A girl shivers under the eaves.', provider: shotProvider as never })
+    if (takeOverride) {
+      const take = api().addVideoTake(shot)!
+      api().updateNodeData<'video'>(take, { videoClipId: `clip-${writerShotId}`, status: 'completed', videoUrl: 'https://media.test/old.mp4', override: takeOverride })
+    }
+    const shotData = api().nodes.find((node) => node.id === shot)!.data
+    if (!isShotData(shotData)) throw new Error('not a shot')
+    const button = takeSettings(shotData, latestShotTake(api().nodes, shot)?.data ?? null)
+    const before = generationBodies().length
+    await api().remakeShotVideo(shot)
+    const sent = generationBodies().slice(before)
+    expect(sent).toHaveLength(1)
+    return { button, sent: { model: sent[0].model, resolution: sent[0].resolution } }
+  }
+
+  it('다시 만들기 요청이 보내는 모델 · 해상도는 단추 값을 센 설정과 같다 — Take 없음 · 설정 없는 Take · 옛 모델 이름 · 1080p', async () => {
+    // 왜: 리드 검토 a(4a486d25 낮음) — 확인 창이 없어 단추에 적은 Take 값이 곧 동의다. 단추는 takeSettings 로 세는데 요청이 모델 · 해상도를
+    //   다른 곳에서 다시 세면, 한쪽만 바뀌는 날 단추 값과 실제로 빠지는 Take 가 갈라진다. 네 경우를 모두 같은 값으로 고정한다.
+    const none = await remakeCase('shot-none', 'veo', null)
+    expect(none.button).toEqual({ model: 'veo', resolution: '720p' })
+    expect(none.sent).toEqual(none.button)
+    const bare = await remakeCase('shot-bare', 'happy-horse', {})
+    expect(bare.button).toEqual({ model: 'happy-horse', resolution: '720p' })
+    expect(bare.sent).toEqual(bare.button)
+    const legacy = await remakeCase('shot-legacy', 'seedance', { provider: 'kling' as never })
+    expect(legacy.button).toEqual({ model: 'kling-o3', resolution: '720p' })
+    expect(legacy.sent).toEqual(legacy.button)
+    const hd = await remakeCase('shot-hd', 'seedance', { provider: 'seedance-2.5', resolution: '1080p' })
+    expect(hd.button).toEqual({ model: 'seedance-2.5', resolution: '1080p' })
+    expect(hd.sent).toEqual(hd.button)
+  })
+
+  it('Editor 넘기기 창의 [영상 만들기]도 샷 상세와 같은 다시 만들기(remakeShotVideo)로 요청한다', async () => {
+    // 왜: 리드 검토 a(4a486d25 낮음) — 넘기기 창(entry D8)이 같은 일을 따로 적어 두면 한쪽만 바뀌는 날 단추 값과 요청이 갈라진다.
+    api().updateNodeData<'shot'>(shotId, { storyboardImage: { url: 'https://media.test/s.png', status: 'completed', errorMessage: null, generatedAt: 1 } })
+    const original = api().remakeShotVideo
+    const remake = vi.fn(async () => 'take-new')
+    useDirectorCanvasStore.setState({ remakeShotVideo: remake })
+    try {
+      await useGlobalChatStore.getState().remakeMissingVideo(shotId)
+    } finally {
+      useDirectorCanvasStore.setState({ remakeShotVideo: original })
+    }
+    expect(remake).toHaveBeenCalledWith(shotId)
   })
 })

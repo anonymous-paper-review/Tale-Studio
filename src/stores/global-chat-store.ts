@@ -42,7 +42,6 @@ import {
 import { isShotData, isVideoData } from '@/types/director'
 import { directorHasFinishedVideo } from '@/lib/director/shot-state'
 import { editorHandoverView } from '@/lib/director/editor-handover'
-import { latestShotTake } from '@/lib/director/remake-take'
 import { clearImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
 import { useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
 import {
@@ -1945,10 +1944,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (!hasImage()) return
       }
     }
-    // 단추 값을 센 그 Take(latestShotTake)의 배선 · 모델 · 해상도를 물려받는 새 Take(검토 b 보통 2) — prose 의 remakeShotVideo 와
-    //   같은 식이다. 두 갈래를 합친 뒤에는 remakeShotVideo(shotNodeId) 하나로 부르면 된다.
-    const latest = latestShotTake(useDirectorCanvasStore.getState().nodes, shotNodeId)
-    await useDirectorCanvasStore.getState().generateVideoForShot(shotNodeId, latest ? { inheritFromVideoNodeId: latest.id } : undefined)
+    // 단추 값을 센 그 Take(latestShotTake)의 배선 · 모델 · 해상도를 물려받는 새 Take(검토 b 보통 2) — 샷 상세 · Lumi 와 같은
+    //   다시 만들기 하나로 부른다(두 갈래를 합친 뒤, 리드 검토 a: 따로 적어 두면 한쪽만 바뀌는 날 단추 값과 요청이 갈라진다).
+    await useDirectorCanvasStore.getState().remakeShotVideo(shotNodeId)
   },
 
   closeHandoffConfirm: () => set({ handoffConfirm: null }),
