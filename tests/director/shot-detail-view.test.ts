@@ -154,6 +154,13 @@ describe('Director 샷 상세 화면', () => {
     expect(render('panel', 'video')).toContain('시작 v1 + 끝 v1 · Seedance 2.0 · 720p')
   })
 
+  it('이미지를 다시 만들기 전 확인 창은 지금 이미지가 버전으로 남는다고 알린다', () => {
+    // 왜: 버전이 생겨(오너 답 5번) "기존 이미지가 새 결과로 교체됩니다"는 이제 틀린 말이다 — 앞 그림은 v1 로 남는다.
+    const button = readFileSync('src/features/director/storyboard-image-button.tsx', 'utf8')
+    expect(button).toContain("t('The new image becomes the current one. The current image stays in the versions.')")
+    expect(button).not.toContain('Replaces the existing shooting image')
+  })
+
   it('상세에는 이미지 · 영상 탭이 있고 영상이 없으면 "영상 · 없음"이다', () => {
     // 왜: D6 — 영상이 아직 없는 샷은 탭에서 바로 알 수 있다.
     const out = render('popup')

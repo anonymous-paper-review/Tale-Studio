@@ -77,7 +77,8 @@ export function StoryboardImageButton({ nodeId, data, className, idleLabel, chan
         description={confirm === 'manual-retry'
           ? t('The previous request may still be running. Generating again sends a new request.')
           : t('Generates a new shooting image for this shot.')}
-        impact={confirm === 'manual-retry' ? [] : [t('Replaces the existing shooting image with the new result.')]}
+        // 버전(디자이너 11/13 D6 · 오너 2026-11-14 답 5번) — 앞 그림은 덮이지 않고 버전으로 남는다.
+        impact={confirm === 'manual-retry' ? [] : [t('The new image becomes the current one. The current image stays in the versions.')]}
         confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Regenerate')}
         busy={confirm === 'manual-retry' ? !manualUncertain || generation.batchBusy : generation.disabled}
         onConfirm={() => {

@@ -117,7 +117,8 @@ it('서버에 이미지 작업이 남아 있으면 다시 들어온 화면에서
   expect(textOf(button)).toContain('이미지 생성 중')
 })
 
-it('기존 이미지를 다시 만들면 교체 확인 후 생성한다', () => {
+it('기존 이미지를 다시 만들면 확인 후 생성하고, 확인 창은 지금 이미지가 버전으로 남는다고 알린다', () => {
+  // 왜: 오너 2026-11-14 답 5번 · 리드 A — 이미지 버전이 생겨 앞 그림은 덮이지 않고 v1 로 남는다(옛 이름 "교체 확인 후 생성한다").
   const generate = vi.fn().mockResolvedValue(null)
   director.setState({ generateStoryboardImage: generate })
   director.getState().updateNodeData<'shot'>(shotId, {
@@ -128,7 +129,7 @@ it('기존 이미지를 다시 만들면 교체 확인 후 생성한다', () => 
   const dialog = render().find(node => node.type === RegenerateConfirmDialog)!
   expect(dialog).toBeDefined()
   expect(dialog.props.open).toBe(true)
-  expect(dialog.props.impact).toEqual(['기존 촬영용 이미지가 새 결과로 교체됩니다.'])
+  expect(dialog.props.impact).toEqual(['새 이미지가 지금 이미지가 되고, 지금 이미지는 버전으로 남아요.'])
   ;(dialog.props.onConfirm as () => void)()
   expect(generate).toHaveBeenCalledExactlyOnceWith(shotId)
 })
