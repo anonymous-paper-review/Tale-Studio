@@ -3228,6 +3228,8 @@ export const KO: Record<string, string> = {
   '{count} videos': '영상 {count}개',
   '1 image · about {minutes} min · No Takes used': '이미지 1장 · 약 {minutes}분 · Takes 안 써요',
   '{count} images · about {minutes} min · No Takes used': '이미지 {count}장 · 약 {minutes}분 · Takes 안 써요',
+  '1 image · about {minutes} min': '이미지 1장 · 약 {minutes}분',
+  '{count} images · about {minutes} min': '이미지 {count}장 · 약 {minutes}분',
   '1 video · about {minutes} min': '영상 1개 · 약 {minutes}분',
   '{count} videos · about {minutes} min': '영상 {count}개 · 약 {minutes}분',
   '1 video · about {minutes} min · 1 Take': '영상 1개 · 약 {minutes}분 · Takes 1',
