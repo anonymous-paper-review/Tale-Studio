@@ -237,7 +237,7 @@ describe('빈 곳 재생 · 내보내기', () => {
     drawGap(ctx as unknown as CanvasRenderingContext2D, 1280, 720)
     expect(painted).toEqual(['#000000'])
     // 미리 보기는 영상 없는 구간에 검정 바탕(bg-black)이 그대로 보이고, 내보내기 그리기 루프는 빈 곳에서 위 칠하기를 쓴다.
-    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/flex h-full flex-col items-center justify-center bg-black/)
+    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/data-testid="program-picture" className="[^"]*\bbg-black\b/)
     expect(read('src/lib/editor-draft-render.ts')).toMatch(/else if \(inGap\) drawGap\(ctx, W, H\)/)
   })
 })

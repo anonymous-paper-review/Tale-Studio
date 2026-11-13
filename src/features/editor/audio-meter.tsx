@@ -4,6 +4,7 @@ import { useEffect, useRef } from 'react'
 import type { AudioTrackClip } from '@/types'
 import { audioSourceTime } from '@/lib/editor/audio-time'
 import { useEditorStore } from '@/stores/editor-store'
+import { cn } from '@/lib/utils'
 
 /**
  * 오디오 재생 + VU 레벨 미터 (프리미어 우측 dB 미터).
@@ -11,7 +12,7 @@ import { useEditorStore } from '@/stores/editor-store'
  *   - 전체 출력을 AnalyserNode로 모아 RMS 레벨 → 세로 dB 바.
  *   - 비디오는 muted라 오디오 트랙만 소리 남 (요청 방침).
  */
-export function AudioMeter({ audioClips }: { audioClips: AudioTrackClip[] }) {
+export function AudioMeter({ audioClips, className }: { audioClips: AudioTrackClip[]; className?: string }) {
   const barRef = useRef<HTMLDivElement>(null)
   const ctxRef = useRef<AudioContext | null>(null)
   const analyserRef = useRef<AnalyserNode | null>(null)
@@ -120,7 +121,7 @@ export function AudioMeter({ audioClips }: { audioClips: AudioTrackClip[] }) {
   }, [audioClips])
 
   return (
-    <div className="flex h-full w-8 shrink-0 flex-col items-center gap-1 border-l border-border-subtle py-2">
+    <div className={cn('flex h-full w-8 shrink-0 flex-col items-center gap-1 border-l border-border-subtle py-2', className)}>
       <span className="font-num text-[8px] text-subtle-foreground">dB</span>
       <div className="relative w-2 flex-1 overflow-hidden rounded-full bg-card">
         <div

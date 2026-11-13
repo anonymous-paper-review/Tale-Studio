@@ -161,6 +161,8 @@ export interface VideoClip {
   url: string | null
   status: 'pending' | 'generating' | 'completed' | 'failed'
   thumbnailUrl: string | null
+  /** Editor 로 온 ★ 최종 Take 번호 — 프로젝트 판 · 효과 컨트롤의 "샷 N · 종류 · Take N"(2단계 ① 새 배치). DB 에서 읽는다. */
+  takeNumber?: number
   /** 이 클립 앞 경계의 전환. 없으면 컷. 편집기 스냅샷(editor_states)에 저장된다. */
   transitionIn?: ClipTransition | null
   trimStart?: number  // seconds, client-only for P5 crop

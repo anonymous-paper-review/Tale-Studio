@@ -36,7 +36,7 @@ vi.mock('@/features/director/canvas-nodes/LabeledHandle', () => ({ LabeledTarget
 import { DialogueView } from '@/features/writer/dialogue-view'
 import { WriterStoryStream } from '@/features/writer/writer-story-stream'
 import { WriterCharacterPanel } from '@/features/writer/writer-character-panel'
-import { VideoSourcePanel } from '@/features/editor/video-source-panel'
+import { ProjectPanel } from '@/features/editor/video-source-panel'
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
 
 describe('실제 표시 컴포넌트의 본문을 확인한다', () => {
@@ -63,10 +63,12 @@ describe('실제 표시 컴포넌트의 본문을 확인한다', () => {
     expect(html).toContain('쿄타로가 자판기 앞에서 코마츠를 기다린다.')
   })
 
-  it('Editor 소스 패널도 등록된 장소와 인물 이름을 보여준다.', () => {
+  it('Editor 프로젝트 판도 샷 줄에 마우스를 올리면 보이는 설명에 등록된 장소와 인물 이름을 보여준다.', () => {
+    // 왜: 시안 E1(2단계 ① 새 배치, 2026-11-14) — 소스 판의 카드가 프로젝트 판의 줄("샷 N · 종류 · Take N")로 바뀌어, 샷 설명은 줄의 안내 글로 옮겼다.
+    //   (옛 이름: Editor 소스 패널도 등록된 장소와 인물 이름을 보여준다.)
     const noop = () => undefined
-    const html = renderToStaticMarkup(createElement(VideoSourcePanel, {
-      open: true, shots: data.writer.shots as never, videoClips: [], audioSources: [], onToggle: noop, onPreview: noop, onAddClip: noop,
+    const html = renderToStaticMarkup(createElement(ProjectPanel, {
+      shots: data.writer.shots as never, videoClips: [], audioSources: [], newItems: [], onOpenSource: noop, onAddClip: noop,
       onAddClipAtPlayhead: noop, onAddAudioFromSource: noop, onAddAudioSource: noop, onRemoveAudioSource: noop, onBinDragStart: noop,
       onBinDragEnd: noop, onSetBinDropSec: noop,
     }))

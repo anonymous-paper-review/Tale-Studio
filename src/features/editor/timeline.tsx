@@ -1,16 +1,17 @@
 'use client'
 
-import { useRef, useCallback, useMemo, useEffect, useState } from 'react'
+import { useRef, useCallback, useMemo, useEffect, useState, type ReactNode } from 'react'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { AlertCircle, Trash2, Plus, Volume2, VolumeX, Scissors, Gauge, Type, Blend } from 'lucide-react'
 import { DISSOLVE_CHOICES } from '@/lib/editor/transition'
 import type { ClipTransition } from '@/types'
-import type { Shot, VideoClip, AudioTrackClip, AudioSource } from '@/types'
+import type { Shot, VideoClip, AudioTrackClip } from '@/types'
 import { cn } from '@/lib/utils'
-import { ingestAudioFile, drawWaveform } from '@/lib/audio-waveform'
+import { drawWaveform } from '@/lib/audio-waveform'
 import { PX_PER_SEC_MIN, PX_PER_SEC_MAX, isTitleCardShotId, useEditorStore } from '@/stores/editor-store'
 import { timelineEnd, timelineSegments } from '@/lib/editor/timeline-segments'
+import { formatTimecode } from '@/lib/editor/sequence-info'
 import {
   ContextMenu,
   ContextMenuTrigger,
@@ -81,8 +82,6 @@ interface TimelineProps {
   onSetSpeed: (shotId: string, speed: number) => void
   /** 화면 전환(2026-09-08): 클립 앞 경계의 디졸브 넣기·빼기 */
   onSetTransitionIn: (shotId: string, transition: ClipTransition | null) => void
-  onAddAudioSource: (source: AudioSource) => void
-  onAddAudioFromSource: (sourceId: string, atGlobalSec: number, trackId?: string) => void
   onAddAudioTrack: () => void
   onRemoveAudioTrack: (trackId: string) => void
   onToggleAudioTrackMute: (trackId: string) => void
@@ -103,16 +102,8 @@ interface TimelineProps {
   /** 약속 J4: 타이틀 카드 길이를 초 단위 숫자로(라벨 클릭·더블클릭). */
   onSetTitleCardDuration: (shotId: string, seconds: number) => void
   onPushHistory: () => void
-}
-
-function formatTimecode(sec: number, fps = 24): string {
-  const total = Math.max(0, sec)
-  const h = Math.floor(total / 3600)
-  const m = Math.floor((total % 3600) / 60)
-  const s = Math.floor(total % 60)
-  const f = Math.floor((total - Math.floor(total)) * fps)
-  const p = (n: number) => n.toString().padStart(2, '0')
-  return `${p(h)}:${p(m)}:${p(s)}:${p(f)}`
+  /** 타임라인 머리 가운데 자리(시안 E1 409:4796–4808) — 화면이 [+ A 트랙] · 도구 설명 · 확대 −·+ 를 넣는다. */
+  toolbar?: ReactNode
 }
 
 function pickTickInterval(pxPerSec: number): number {
@@ -420,8 +411,6 @@ export function Timeline({
   onSplitVideo,
   onSetSpeed,
   onSetTransitionIn,
-  onAddAudioSource,
-  onAddAudioFromSource,
   onAddAudioTrack,
   onRemoveAudioTrack,
   onToggleAudioTrackMute,
@@ -440,6 +429,7 @@ export function Timeline({
   onSetTrim,
   onSetTitleCardDuration,
   onPushHistory,
+  toolbar,
 }: TimelineProps) {
   const entityNames = useEntityNames()
   const t = useT()
@@ -448,7 +438,6 @@ export function Timeline({
   const scrollRef = useRef<HTMLDivElement>(null)
   const videoTrackRef = useRef<HTMLDivElement>(null)
   const headerInnerRef = useRef<HTMLDivElement>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
 
   const [marquee, setMarquee] = useState<{ x1: number; y1: number; x2: number; y2: number } | null>(null)
   // 오디오 마퀴 — 콘텐츠 좌표(눈금자 좌상단 기준). 여러 레인을 가로지르는 드래그 선택.
@@ -535,19 +524,6 @@ export function Timeline({
       })
     },
     [pxPerSec, onZoom],
-  )
-
-  const handleAudioFile = useCallback(
-    async (file: File) => {
-      try {
-        const source = await ingestAudioFile(file, 'audio')
-        onAddAudioSource(source)
-        onAddAudioFromSource(source.id, currentTime, audioTracks[0]?.id)
-      } catch (err) {
-        console.error('[timeline] audio ingest failed:', err)
-      }
-    },
-    [onAddAudioSource, onAddAudioFromSource, currentTime, audioTracks],
   )
 
   const tickInterval = pickTickInterval(pxPerSec)
@@ -762,29 +738,20 @@ export function Timeline({
   const firstTrackId = audioTracks[0]?.id
 
   return (
-    // v3 ED1(2026-11-03): 타임라인 판(bg-panel) 안 — 지금 시각(Inter 13 600) · [+ 오디오] 알약 · 전체 길이.
+    // 시안 E1 409:4793–4808(2단계 ① 새 배치): 타임라인 머리 — "시퀀스 01" · 지금 시각(시:분:초:장) · 화면이 넣는 단추 자리 · 고른 수.
+    //   소리 파일 올리기는 프로젝트 판 [가져오기…] 로 옮겼다(내 파일에 올린 뒤 끌어 놓기).
     <div className="flex h-full flex-col select-none">
       {/* 상단 바 */}
-      <div className="flex items-center justify-between px-4 py-1.5">
-        <span className="font-num text-label font-semibold tabular-nums text-foreground">{formatTimecode(currentTime)}</span>
-        <div className="flex items-center gap-2">
-          {selectedShotIds.length > 1 && (
-            <span className="rounded-full bg-stage/18 px-2 py-0.5 text-[11px] font-medium text-foreground">{t('{count} selected', { count: selectedShotIds.length })}</span>
-          )}
-          {selectedAudioIds.length > 1 && (
-            <span className="rounded-full bg-stage/18 px-2 py-0.5 text-[11px] font-medium text-foreground">{t('{count} audio selected', { count: selectedAudioIds.length })}</span>
-          )}
-          <button
-            type="button"
-            onClick={() => fileInputRef.current?.click()}
-            className="flex h-8 items-center gap-1 rounded-full bg-card px-3.5 text-label font-medium text-foreground transition-colors hover:bg-accent"
-            title={t('Upload external audio (inserts at the playhead)')}
-          >
-            <Plus className="size-3.5" /> {t('Audio')}
-          </button>
-          <span className="font-num text-meta font-medium tabular-nums text-subtle-foreground">{formatTimecode(totalSec)}</span>
-        </div>
-        <input ref={fileInputRef} type="file" accept="audio/*" className="hidden" onChange={(e) => { const f = e.target.files?.[0]; if (f) void handleAudioFile(f); e.target.value = '' }} />
+      <div className="flex min-h-11 flex-wrap items-center gap-x-3 gap-y-1 px-4 py-1.5">
+        <span className="text-label font-semibold text-foreground">{t('Sequence 01')}</span>
+        <span className="font-num text-body font-semibold tabular-nums text-foreground">{formatTimecode(currentTime)}</span>
+        {selectedShotIds.length > 1 && (
+          <span className="rounded-full bg-stage/18 px-2 py-0.5 text-[11px] font-medium text-foreground">{t('{count} selected', { count: selectedShotIds.length })}</span>
+        )}
+        {selectedAudioIds.length > 1 && (
+          <span className="rounded-full bg-stage/18 px-2 py-0.5 text-[11px] font-medium text-foreground">{t('{count} audio selected', { count: selectedAudioIds.length })}</span>
+        )}
+        {toolbar}
       </div>
 
       {/* 본문: 좌측 헤더 컬럼 + 우측 트랙(가로 스크롤) */}
@@ -845,14 +812,6 @@ export function Timeline({
                 </ContextMenuContent>
               </ContextMenu>
             ))}
-            <button
-              type="button"
-              onClick={() => onAddAudioTrack()}
-              className="flex h-8 w-full items-center gap-1 pl-4 text-meta font-medium text-subtle-foreground transition-colors hover:text-foreground"
-              title={t('Add audio track')}
-            >
-              <Plus className="size-3" /> {t('Track')}
-            </button>
           </div>
         </div>
 

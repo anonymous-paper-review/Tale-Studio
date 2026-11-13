@@ -49,7 +49,7 @@ vi.mock('@/lib/editor-persistence', () => ({
   saveEditorState: vi.fn(),
 }))
 
-import { scheduleServerSave, useEditorStore } from '@/stores/editor-store'
+import { DEFAULT_PANEL_SIZES, scheduleServerSave, useEditorStore } from '@/stores/editor-store'
 
 type DbShot = Record<string, unknown>
 type DbClip = Record<string, unknown>
@@ -310,9 +310,10 @@ describe('편집 화면이 영상 결과를 안전하게 이어받는다', () =>
     })
     await persistedLoad
 
+    // 처음 값 그대로다 — 기본 폭은 새 배치(시안 E1, 2단계 ①)에서 위 왼쪽 판 폭으로 바뀌어 숫자 대신 기본값과 견준다.
     expect(useEditorStore.getState()).toMatchObject({
       audioClips: [],
-      panelSizes: { sourceW: 256, previewH: 360 },
+      panelSizes: { ...DEFAULT_PANEL_SIZES },
     })
   })
   it('새 프로젝트를 불러온 뒤 이전 프로젝트 결과가 늦게 와도 새 프로젝트 내용을 지킨다', async () => {

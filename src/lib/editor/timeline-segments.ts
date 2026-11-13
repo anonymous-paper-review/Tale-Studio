@@ -8,6 +8,18 @@ export function timelineEnd(layout: ReadonlyArray<{ startSec: number; durationSe
   return layout.reduce((end, item) => Math.max(end, item.startSec + item.durationSec), 0)
 }
 
+/**
+ * 앞 · 다음 편집점 — 0초와 클립마다 시작 · 끝(빈 곳의 양 끝 포함) 가운데 지금 시각 바로 앞 · 뒤. 다음이 없으면 마지막 편집점, 앞이 없으면 0초.
+ *   Ctrl+← · Ctrl+→ 와 모니터의 앞 · 다음 편집점 단추가 같이 쓴다(2단계 ① 새 배치, 시안 E1 409:4729 · 409:4737).
+ *   약속: tests/editor/panels.test.ts
+ */
+export function editPointTarget(layout: ReadonlyArray<{ startSec: number; durationSec: number }>, currentSec: number, dir: 1 | -1): number {
+  const bounds = [...new Set([0, ...layout.flatMap((l) => [l.startSec, l.startSec + l.durationSec])])].sort((a, b) => a - b)
+  if (dir > 0) return bounds.find((b) => b > currentSec + 1e-3) ?? bounds[bounds.length - 1] ?? currentSec
+  const before = bounds.filter((b) => b < currentSec - 1e-3)
+  return before.length ? before[before.length - 1] : 0
+}
+
 export type TimelineSegment =
   | { kind: 'clip'; shotId: string; startSec: number; endSec: number }
   | { kind: 'gap'; startSec: number; endSec: number }

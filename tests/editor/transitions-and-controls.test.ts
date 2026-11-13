@@ -124,16 +124,16 @@ describe('5 · 축척 지표와 +/− 버튼', () => {
     expect(api().pxPerSec).toBeGreaterThan(PX_PER_SEC_MIN)
   })
 
-  it('전체 보기 왼쪽에 −·지표·+ 가 있고 지표는 "1초 = N px" 를 보여 준다', () => {
+  it('타임라인 머리의 −·+ 는 축척을 한 단계씩 바꾸고, 축척 숫자("1초 = N px")와 [전체 보기]는 없다', () => {
+    // 왜: 결정 페이지 추천(2026-11-14 오너 "나머지는 추천대로") — "전체 보기는 모니터 재생으로", "1초 = N px 는 없앰".
+    //   축척 −·+ 는 시안 E1 409:4806 · 409:4808 타임라인 머리에 남는다. (옛 이름: 전체 보기 왼쪽에 −·지표·+ 가 있고 지표는 "1초 = N px" 를 보여 준다)
     const page = read('src/app/studio/editor/page.tsx')
-    const zoomAt = page.indexOf("t('Zoom out timeline')")
-    const watchAt = page.indexOf("t('Watch all')")
-    expect(zoomAt).toBeGreaterThan(0)
-    expect(zoomAt).toBeLessThan(watchAt)
-    expect(page).toMatch(/t\('1s = \{px\}px', \{ px: Math\.round\(pxPerSec\) \}\)/)
+    expect(page).toMatch(/t\('Zoom out timeline'\)/)
     expect(page).toMatch(/zoomStep\(pxPerSec, 'in'\)/)
     expect(page).toMatch(/zoomStep\(pxPerSec, 'out'\)/)
+    expect(page).not.toMatch(/1s = \{px\}px/)
+    expect(page).not.toMatch(/t\('Watch all'\)/)
     const ko = read('src/lib/i18n/messages-ko.ts')
-    expect(ko).toMatch(/'1s = \{px\}px': '1초 = \{px\}px'/)
+    expect(ko).not.toMatch(/'1s = \{px\}px'/)
   })
 })

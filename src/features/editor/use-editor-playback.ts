@@ -2,8 +2,11 @@
 
 import { useEffect, useRef } from 'react'
 import { useEditorStore, selectTimelineLayout, timelineEnd } from '@/stores/editor-store'
+import { editPointTarget } from '@/lib/editor/timeline-segments'
+import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
 
-const FRAME = 1 / 24 // 24fps 기준 한 프레임 (화살표 nudge)
+// 한 장 — 시:분:초:장 · 내보내기와 같은 초당 장 수(2단계 ① 새 배치).
+const FRAME = 1 / SEQUENCE_FPS
 
 /**
  * Editor 재생 엔진 + 전역 단축키.
@@ -89,17 +92,9 @@ export function useEditorPlayback() {
         e.preventDefault()
         const dir = e.key === 'ArrowRight' ? 1 : -1
         if (meta) {
+          // 클립의 시작과 끝이 컷 경계다 — 빈 곳이 있으면 빈 곳의 양 끝도 멈춘다(자유 배치). 모니터의 편집점 단추와 같은 자리.
           const layout = selectTimelineLayout(s)
-          // 클립의 시작과 끝이 컷 경계다 — 빈 곳이 있으면 빈 곳의 양 끝도 멈춘다(자유 배치, 2026-11-14).
-          const bounds = [...new Set([0, ...layout.flatMap((l) => [l.startSec, l.startSec + l.durationSec])])].sort((a, b) => a - b)
-          const cur = s.currentTime
-          let target: number
-          if (dir > 0) target = bounds.find((b) => b > cur + 1e-3) ?? bounds[bounds.length - 1] ?? cur
-          else {
-            const prevs = bounds.filter((b) => b < cur - 1e-3)
-            target = prevs.length ? prevs[prevs.length - 1] : 0
-          }
-          s.nudge(target - cur)
+          s.nudge(editPointTarget(layout, s.currentTime, dir) - s.currentTime)
         } else {
           s.nudge((e.shiftKey ? 5 : 1) * dir * FRAME)
         }

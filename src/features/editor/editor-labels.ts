@@ -3,6 +3,7 @@
 //   약속: tests/editor/header-meta.test.ts · tests/editor/load-ends.test.ts
 import { isTitleCardShotId } from '@/stores/editor-store'
 import { timelineEnd } from '@/lib/editor/timeline-segments'
+import { formatTimecode } from '@/lib/editor/sequence-info'
 import type { VideoClip } from '@/types'
 
 type Translate = (text: string, params?: Record<string, string | number>) => string
@@ -80,4 +81,25 @@ export function previewPane(input: {
  */
 export function clipMenuTitle(input: { isTitleCard: boolean; shotType: string; durationSec: number }, t: Translate): string {
   return `${input.isTitleCard ? t('Title card') : input.shotType} · ${input.durationSec.toFixed(1)}s`
+}
+
+/**
+ * 샷 이름 — "샷 2 · MS · Take 1"(시안 E1 409:4656). 번호는 이야기 순서, Take 는 Editor 로 온 ★ 최종 Take(모르면 뺀다).
+ *   타이틀 카드는 "타이틀 카드". 프로젝트 판 줄 · 효과 컨트롤 머리가 같이 쓴다(2단계 ① 새 배치). 약속: tests/editor/panels.test.ts
+ */
+export function shotLabel(input: { number: number | null; shotType?: string | null; takeNumber?: number | null; isTitleCard?: boolean }, t: Translate): string {
+  if (input.isTitleCard) return t('Title card')
+  return [
+    input.number != null ? t('Shot {number}', { number: input.number }) : null,
+    input.shotType || null,
+    input.takeNumber ? t('Take {number}', { number: input.takeNumber }) : null,
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
+/** 효과 컨트롤 둘째 줄 — "V1 · 00:00:03:00 → 00:00:06:00 · 3.00초"(시안 E1 409:4657). */
+export function clipSpanLine(input: { track: string; startSec: number; durationSec: number }, t: Translate): string {
+  const end = input.startSec + input.durationSec
+  return `${input.track} · ${formatTimecode(input.startSec)} → ${formatTimecode(end)} · ${t('{seconds}s', { seconds: input.durationSec.toFixed(2) })}`
 }

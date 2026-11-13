@@ -20,6 +20,7 @@ import { drawSubtitle, resolveSubtitle } from '@/lib/editor/subtitle'
 import { cachedVideoUrl, prefetchVideos } from '@/features/editor/video-prefetch'
 import { audioSourceTime } from '@/lib/editor/audio-time'
 import { timelineEnd, timelineSegments } from '@/lib/editor/timeline-segments'
+import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
 
 /** 내보내기에 넣는 소리 조각 — 음소거 · 소리 0 · 음소거한 줄 · 주소 없는 것을 뺀다. 편집 상태의 자리 그대로 재생한다(2026-11-10 결정 4). */
 export function draftAudioClips(audioClips: AudioTrackClip[], audioTracks: Array<{ id: string; muted?: boolean }>): AudioTrackClip[] {
@@ -67,7 +68,6 @@ interface ShotLike {
   dialogueLines?: readonly { text: string }[]
 }
 
-const RECORD_FPS = 30
 const TAIL_PAD_SEC = 0.05 // 마지막 프레임 유실 방지 꼬리
 
 function pickMimeType(): string {
@@ -272,7 +272,8 @@ export async function renderDraftTimeline(opts: {
   videoEl.preload = 'auto'
 
   const mimeType = pickMimeType()
-  const stream = canvas.captureStream(RECORD_FPS)
+  // 녹화 장 수 — Editor 의 시:분:초:장 · 시퀀스 정보와 같은 값(2단계 ① 새 배치).
+  const stream = canvas.captureStream(SEQUENCE_FPS)
   const audioTrack = dest.stream.getAudioTracks()[0]
   if (audioTrack) stream.addTrack(audioTrack)
   const recorder = new MediaRecorder(stream, {

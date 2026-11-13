@@ -1,6 +1,6 @@
 'use client'
 
-import { AlertCircle, Play, Pause, Volume2, VolumeX } from 'lucide-react'
+import { AlertCircle, ArrowLeftToLine, ArrowRightToLine, ChevronLeft, ChevronRight, Play, Pause, SkipBack, SkipForward, Volume2, VolumeX } from 'lucide-react'
 import { dissolveOpacityAt } from '@/lib/editor/transition'
 import { useEntityNames } from '@/lib/writer/use-entity-names'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
@@ -10,16 +10,13 @@ import { TitleCardStage } from '@/features/editor/title-card-stage'
 import { SubtitleLayer } from '@/features/editor/subtitle-layer'
 import { resolveSubtitle } from '@/lib/editor/subtitle'
 import { useEditorStore, selectTimelineLayout, isTitleCardShotId, timelineEnd } from '@/stores/editor-store'
+import { editPointTarget } from '@/lib/editor/timeline-segments'
+import { SEQUENCE_FPS, formatTimecode } from '@/lib/editor/sequence-info'
 import { cachedVideoUrl } from '@/features/editor/video-prefetch'
 import { previewPane } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
 
-function formatTime(sec: number) {
-  const t = Math.max(0, Number.isFinite(sec) ? sec : 0)
-  const m = Math.floor(t / 60)
-  const s = Math.floor(t % 60)
-  return `${m}:${s.toString().padStart(2, '0')}`
-}
+const FRAME = 1 / SEQUENCE_FPS
 
 /**
  * Editor 프리뷰. 두 모드:
@@ -34,7 +31,10 @@ export function VideoPreviewer() {
   const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
   const fillRef = useRef<HTMLDivElement>(null)
-  const timeRef = useRef<HTMLSpanElement>(null)
+  // 지금 시각 · 전체 길이(시:분:초:장) — 시안 E1 409:4721 · 409:4722.
+  const currentRef = useRef<HTMLSpanElement>(null)
+  const totalRef = useRef<HTMLSpanElement>(null)
+  const holdRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const dissolveRef = useRef<HTMLDivElement>(null)
   const activeIdRef = useRef<string | null>(null)
 
@@ -86,7 +86,8 @@ export function VideoPreviewer() {
           }
           const dur = v.duration || 0
           if (fillRef.current) fillRef.current.style.width = dur > 0 ? `${Math.min(100, (v.currentTime / dur) * 100)}%` : '0%'
-          if (timeRef.current) timeRef.current.textContent = `${formatTime(v.currentTime)} / ${formatTime(dur)}`
+          if (currentRef.current) currentRef.current.textContent = formatTimecode(v.currentTime)
+          if (totalRef.current) totalRef.current.textContent = formatTimecode(dur)
         }
         raf = requestAnimationFrame(tick)
         return
@@ -110,7 +111,8 @@ export function VideoPreviewer() {
       }
 
       if (fillRef.current) fillRef.current.style.width = total > 0 ? `${Math.min(100, (t / total) * 100)}%` : '0%'
-      if (timeRef.current) timeRef.current.textContent = `${formatTime(t)} / ${formatTime(total)}`
+      if (currentRef.current) currentRef.current.textContent = formatTimecode(t)
+      if (totalRef.current) totalRef.current.textContent = formatTimecode(total)
 
       if (v && item) {
         const clip = st.videoClips.find((c) => c.shotId === item.shotId)
@@ -155,6 +157,25 @@ export function VideoPreviewer() {
     [seek],
   )
 
+  // 모니터 재생 단추 줄(시안 E1 409:4727–4739) — 처음으로 · 앞 편집점 · 한 장 뒤 · 재생 · 한 장 앞 · 다음 편집점 · 끝으로.
+  //   편집점은 Ctrl+← · Ctrl+→ 와 같은 자리, 한 장 단추는 꾹 누르면 이어서 움직인다(예전 도구 줄의 프레임 단추).
+  const nudge = useEditorStore((s) => s.nudge)
+  const goTo = useCallback((target: (st: ReturnType<typeof useEditorStore.getState>, layout: ReturnType<typeof selectTimelineLayout>) => number) => {
+    const st = useEditorStore.getState()
+    const layout = selectTimelineLayout(st)
+    nudge(target(st, layout) - st.currentTime)
+  }, [nudge])
+  const stopFrameHold = useCallback(() => {
+    if (holdRef.current) clearInterval(holdRef.current)
+    holdRef.current = null
+  }, [])
+  const startFrameHold = useCallback((delta: number) => {
+    nudge(delta)
+    stopFrameHold()
+    holdRef.current = setInterval(() => nudge(delta), 70)
+  }, [nudge, stopFrameHold])
+  useEffect(() => stopFrameHold, [stopFrameHold])
+
   const activeShot = shots.find((s) => s.shotId === activeShotId)
   const activeClip = videoClips.find((c) => c.shotId === activeShotId)
   // 타이틀 카드(#owner-title-card) 구간 — 영상 없이 검은 배경 + 중앙 텍스트(+선택 이미지)만 렌더.
@@ -162,138 +183,177 @@ export function VideoPreviewer() {
   const pane = previewPane({ isTitleCard, hasShot: !!activeShot, clip: activeClip, unplayable })
 
   return (
-    <div className="relative flex h-full flex-col items-center justify-center bg-black">
-      {pane === 'title' && activeShotId ? (
-        // 약속 J(2026-09-04): 글자·이미지 자유 배치 무대 — 내보내기와 같은 배치·줄바꿈(src/lib/editor/title-card.ts).
-        <TitleCardStage
-          key={activeShotId}
-          card={activeShot?.titleCard ?? { text: '', imageUrl: null }}
-          editing={editingTitleCard}
-          onStartEdit={() => {
-            if (!editingTitleCard) pushHistory()
-            setEditingTitleCard(true)
-          }}
-          onStopEdit={() => setEditingTitleCard(false)}
-          onChange={(patch) => updateTitleCard(activeShotId, patch)}
-          onBeforeChange={pushHistory}
-          overlay={
-            activeShot ? (
+    <div className="flex h-full flex-col">
+      <div data-testid="program-picture" className="relative flex min-h-0 flex-1 flex-col items-center justify-center bg-black">
+        {pane === 'title' && activeShotId ? (
+          // 약속 J(2026-09-04): 글자·이미지 자유 배치 무대 — 내보내기와 같은 배치·줄바꿈(src/lib/editor/title-card.ts).
+          <TitleCardStage
+            key={activeShotId}
+            card={activeShot?.titleCard ?? { text: '', imageUrl: null }}
+            editing={editingTitleCard}
+            onStartEdit={() => {
+              if (!editingTitleCard) pushHistory()
+              setEditingTitleCard(true)
+            }}
+            onStopEdit={() => setEditingTitleCard(false)}
+            onChange={(patch) => updateTitleCard(activeShotId, patch)}
+            onBeforeChange={pushHistory}
+            overlay={
+              activeShot ? (
+                <SubtitleLayer
+                  key={`sub-${activeShotId}`}
+                  subtitle={resolveSubtitle(activeShot)}
+                  onChange={(patch) => setSubtitle(activeShotId, patch)}
+                  onBeforeChange={pushHistory}
+                />
+              ) : null
+            }
+          />
+        ) : pane === 'video' && activeClip?.url ? (
+          // 약속 K: 자막은 영상 그림 위에 얹힌다 — 상자가 영상 크기를 따라가므로 자리 비율이 내보내기와 같다.
+          <div className="relative max-h-full max-w-full">
+            <video
+              key={activeShotId ?? 'none'}
+              ref={videoRef}
+              // "전체 보기" 프리패치가 받아둔 blob 이 있으면 그걸로 — 클립 경계 전환이 즉시가 된다(#watch-all).
+              src={cachedVideoUrl(activeClip.url) ?? activeClip.url}
+              muted
+              playsInline
+              preload="auto"
+              className="block max-h-full max-w-full rounded"
+              onLoadedMetadata={() => {
+                if (videoRef.current) setActualDuration(videoRef.current.duration)
+              }}
+              onError={() => markVideoUnplayable(activeClip.url)}
+            />
+            {activeShot && activeShotId && (
               <SubtitleLayer
                 key={`sub-${activeShotId}`}
                 subtitle={resolveSubtitle(activeShot)}
                 onChange={(patch) => setSubtitle(activeShotId, patch)}
                 onBeforeChange={pushHistory}
               />
-            ) : null
-          }
-        />
-      ) : pane === 'video' && activeClip?.url ? (
-        // 약속 K: 자막은 영상 그림 위에 얹힌다 — 상자가 영상 크기를 따라가므로 자리 비율이 내보내기와 같다.
-        <div className="relative max-h-full max-w-full">
-          <video
-            key={activeShotId ?? 'none'}
-            ref={videoRef}
-            // "전체 보기" 프리패치가 받아둔 blob 이 있으면 그걸로 — 클립 경계 전환이 즉시가 된다(#watch-all).
-            src={cachedVideoUrl(activeClip.url) ?? activeClip.url}
-            muted
-            playsInline
-            preload="auto"
-            className="block max-h-full max-w-full rounded"
-            onLoadedMetadata={() => {
-              if (videoRef.current) setActualDuration(videoRef.current.duration)
-            }}
-            onError={() => markVideoUnplayable(activeClip.url)}
-          />
-          {activeShot && activeShotId && (
-            <SubtitleLayer
-              key={`sub-${activeShotId}`}
-              subtitle={resolveSubtitle(activeShot)}
-              onChange={(patch) => setSubtitle(activeShotId, patch)}
-              onBeforeChange={pushHistory}
-            />
+            )}
+          </div>
+        ) : pane === 'unplayable' && activeShot ? (
+          // 영상을 불러오지 못한 컷 — 아직 영상이 없는 컷과 같은 작은 판에 그 까닭(다른 컷은 그대로 재생된다).
+          <div className="flex w-[380px] max-w-[calc(100%-2rem)] flex-col items-center rounded-2xl bg-panel px-7 py-5 text-center" data-testid="preview-unplayable">
+            <p className="font-num text-[20px] font-semibold text-foreground">{activeShot.shotType}</p>
+            <p className="mt-2 line-clamp-3 text-[12.5px] leading-[1.5] text-muted-foreground">{resolveEntityNames(activeShot.actionDescription, entityNames)}</p>
+            <p className="mt-4 flex items-center gap-1.5 text-[11px] font-medium text-destructive">
+              <AlertCircle className="size-3.5 shrink-0" aria-hidden />
+              {t("Couldn't load this cut's video.")}
+            </p>
+          </div>
+        ) : activeShot ? (
+          // v3 ED1(2026-11-03): 아직 영상이 없는 컷 — 큰 판 안 작은 판(샷 크기 · 설명 · 상태).
+          <div className="flex w-[380px] max-w-[calc(100%-2rem)] flex-col items-center rounded-2xl bg-panel px-7 py-5 text-center">
+            <p className="font-num text-[20px] font-semibold text-foreground">{activeShot.shotType}</p>
+            <p className="mt-2 line-clamp-3 text-[12.5px] leading-[1.5] text-muted-foreground">{resolveEntityNames(activeShot.actionDescription, entityNames)}</p>
+            <p className="mt-4 text-[11px] font-medium text-subtle-foreground">
+              {activeClip?.status === 'generating' ? t('Generating') : t('No video made yet')}
+            </p>
+          </div>
+        ) : (
+          // 영상 없는 구간 = 검은 화면. 타임라인이 비었을 때만 안내 문구.
+          !hasClips && <p className="text-label text-subtle-foreground">{t('No clips in the timeline')}</p>
+        )}
+
+        {/* 디졸브 막(2026-09-08): 검은 화면의 투명도만 바뀐다 — 클릭은 통과 */}
+        <div ref={dissolveRef} data-testid="dissolve-overlay" className="pointer-events-none absolute inset-0 z-20 bg-black" style={{ opacity: 0 }} />
+
+        {/* 모드 뱃지 + 길이 뱃지 (활성 클립 있을 때만) */}
+        <div className="absolute right-4 top-3.5 flex items-center gap-1.5">
+          {previewSourceShotId && (
+            <span className="rounded-full bg-stage px-2.5 py-0.5 text-[11.5px] font-semibold text-on-stage">{t('Source preview')}</span>
+          )}
+          {activeShot && (
+            <span className="rounded-full bg-black/45 px-2 py-0.5 font-num text-meta font-medium text-muted-foreground">
+              {t('{seconds}s', { seconds: (actualDuration ?? activeShot.durationSeconds).toFixed(1) })}
+            </span>
           )}
         </div>
-      ) : pane === 'unplayable' && activeShot ? (
-        // 영상을 불러오지 못한 컷 — 아직 영상이 없는 컷과 같은 작은 판에 그 까닭(다른 컷은 그대로 재생된다).
-        <div className="flex w-[380px] max-w-[calc(100%-2rem)] flex-col items-center rounded-2xl bg-panel px-7 py-5 text-center" data-testid="preview-unplayable">
-          <p className="font-num text-[20px] font-semibold text-foreground">{activeShot.shotType}</p>
-          <p className="mt-2 line-clamp-3 text-[12.5px] leading-[1.5] text-muted-foreground">{resolveEntityNames(activeShot.actionDescription, entityNames)}</p>
-          <p className="mt-4 flex items-center gap-1.5 text-[11px] font-medium text-destructive">
-            <AlertCircle className="size-3.5 shrink-0" aria-hidden />
-            {t("Couldn't load this cut's video.")}
-          </p>
-        </div>
-      ) : activeShot ? (
-        // v3 ED1(2026-11-03): 아직 영상이 없는 컷 — 큰 판 안 작은 판(샷 크기 · 설명 · 상태).
-        <div className="flex w-[380px] max-w-[calc(100%-2rem)] flex-col items-center rounded-2xl bg-panel px-7 py-5 text-center">
-          <p className="font-num text-[20px] font-semibold text-foreground">{activeShot.shotType}</p>
-          <p className="mt-2 line-clamp-3 text-[12.5px] leading-[1.5] text-muted-foreground">{resolveEntityNames(activeShot.actionDescription, entityNames)}</p>
-          <p className="mt-4 text-[11px] font-medium text-subtle-foreground">
-            {activeClip?.status === 'generating' ? t('Generating') : t('No video made yet')}
-          </p>
-        </div>
-      ) : (
-        // 영상 없는 구간 = 검은 화면. 타임라인이 비었을 때만 안내 문구.
-        !hasClips && <p className="text-label text-subtle-foreground">{t('No clips in the timeline')}</p>
-      )}
+      </div>
 
-      {/* 디졸브 막(2026-09-08): 검은 화면의 투명도만 바뀐다 — 클릭은 통과 */}
-      <div ref={dissolveRef} data-testid="dissolve-overlay" className="pointer-events-none absolute inset-0 z-20 bg-black" style={{ opacity: 0 }} />
-
-      {/* 재생 컨트롤 (항상 표시 — 검은 구간에서도 스크럽 가능) */}
-      <div className="absolute bottom-0 left-0 right-0 flex items-center gap-3 bg-gradient-to-t from-black/80 to-transparent px-5 pb-4 pt-8">
-        <Button
-          size="icon"
-          variant="ghost"
-          className="size-8 shrink-0 rounded-full text-foreground hover:bg-white/15 hover:text-foreground"
-          onClick={togglePlay}
-        >
-          {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
-        </Button>
-
-        <div className="group relative flex h-5 flex-1 cursor-pointer items-center" onClick={onProgressClick}>
+      {/* 재생 막대 · 지금 시각 / 전체 길이 · 재생 단추 줄 · 모니터 음량(시안 E1 409:4721–4739, 음량은 결정 페이지 추천으로 남김) */}
+      <div className="shrink-0 px-4 pb-3 pt-2">
+        <div className="group relative flex h-4 cursor-pointer items-center" onClick={onProgressClick}>
           <div className="h-1 w-full rounded-full bg-white/15 transition-all group-hover:h-1.5">
             <div ref={fillRef} className="h-full rounded-full bg-foreground" style={{ width: '0%' }} />
           </div>
         </div>
-
-        <span ref={timeRef} className="shrink-0 font-num text-meta font-medium tabular-nums text-muted-foreground">
-          0:00 / 0:00
-        </span>
-
-        {/* 전역 재생 볼륨 (재생 전용) */}
-        <div className="flex shrink-0 items-center gap-1.5">
-          <button
-            type="button"
-            onClick={() => setMasterVolume(masterVolume > 0 ? 0 : 1)}
-            className="text-muted-foreground hover:text-foreground"
-            title={masterVolume > 0 ? t('Mute') : t('Unmute')}
-          >
-            {masterVolume > 0 ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
-          </button>
-          <input
-            type="range"
-            min={0}
-            max={1}
-            step={0.01}
-            value={masterVolume}
-            onChange={(e) => setMasterVolume(Number(e.target.value))}
-            className="h-1 w-20 cursor-pointer accent-primary"
-            title={t('Overall volume {percent}%', { percent: Math.round(masterVolume * 100) })}
-          />
-        </div>
-      </div>
-
-      {/* 모드 뱃지 + 길이 뱃지 (활성 클립 있을 때만) */}
-      <div className="absolute right-4 top-3.5 flex items-center gap-1.5">
-        {previewSourceShotId && (
-          <span className="rounded-full bg-stage px-2.5 py-0.5 text-[11.5px] font-semibold text-on-stage">{t('Source preview')}</span>
-        )}
-        {activeShot && (
-          <span className="rounded-full bg-black/45 px-2 py-0.5 font-num text-meta font-medium text-muted-foreground">
-            {t('{seconds}s', { seconds: (actualDuration ?? activeShot.durationSeconds).toFixed(1) })}
+        <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-1">
+          <span ref={currentRef} className="w-[92px] shrink-0 font-num text-label font-semibold tabular-nums text-foreground">
+            00:00:00:00
           </span>
-        )}
+          <div className="mx-auto flex items-center gap-0.5">
+            <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo(() => 0)} title={t('Go to start')} aria-label={t('Go to start')}>
+              <ArrowLeftToLine className="size-4" />
+            </Button>
+            <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((st, layout) => editPointTarget(layout, st.currentTime, -1))} title={t('Previous edit point (Ctrl+←)')} aria-label={t('Previous edit point (Ctrl+←)')}>
+              <SkipBack className="size-4" />
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8 rounded-full text-muted-foreground hover:text-foreground"
+              onPointerDown={() => startFrameHold(-FRAME)}
+              onPointerUp={stopFrameHold}
+              onPointerLeave={stopFrameHold}
+              onPointerCancel={stopFrameHold}
+              title={t('Previous frame (←) · hold for continuous')}
+              aria-label={t('Previous frame (←) · hold for continuous')}
+            >
+              <ChevronLeft className="size-4" />
+            </Button>
+            <Button size="icon" variant="secondary" className="mx-1 size-9 rounded-full" onClick={togglePlay} title={t('Play/pause (Space)')} aria-label={t('Play/pause (Space)')}>
+              {isPlaying ? <Pause className="size-4" /> : <Play className="size-4" />}
+            </Button>
+            <Button
+              size="icon"
+              variant="ghost"
+              className="size-8 rounded-full text-muted-foreground hover:text-foreground"
+              onPointerDown={() => startFrameHold(FRAME)}
+              onPointerUp={stopFrameHold}
+              onPointerLeave={stopFrameHold}
+              onPointerCancel={stopFrameHold}
+              title={t('Next frame (→) · hold for continuous')}
+              aria-label={t('Next frame (→) · hold for continuous')}
+            >
+              <ChevronRight className="size-4" />
+            </Button>
+            <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((st, layout) => editPointTarget(layout, st.currentTime, 1))} title={t('Next edit point (Ctrl+→)')} aria-label={t('Next edit point (Ctrl+→)')}>
+              <SkipForward className="size-4" />
+            </Button>
+            <Button size="icon" variant="ghost" className="size-8 rounded-full text-muted-foreground hover:text-foreground" onClick={() => goTo((_st, layout) => timelineEnd(layout))} title={t('Go to end')} aria-label={t('Go to end')}>
+              <ArrowRightToLine className="size-4" />
+            </Button>
+          </div>
+          <span ref={totalRef} className="w-[92px] shrink-0 text-right font-num text-meta font-medium tabular-nums text-subtle-foreground">
+            00:00:00:00
+          </span>
+          {/* 전역 재생 볼륨 (재생 전용) */}
+          <div className="flex shrink-0 items-center gap-1.5">
+            <button
+              type="button"
+              onClick={() => setMasterVolume(masterVolume > 0 ? 0 : 1)}
+              className="text-muted-foreground hover:text-foreground"
+              title={masterVolume > 0 ? t('Mute') : t('Unmute')}
+            >
+              {masterVolume > 0 ? <Volume2 className="size-4" /> : <VolumeX className="size-4" />}
+            </button>
+            <input
+              type="range"
+              min={0}
+              max={1}
+              step={0.01}
+              value={masterVolume}
+              onChange={(e) => setMasterVolume(Number(e.target.value))}
+              className="h-1 w-16 cursor-pointer accent-primary"
+              title={t('Overall volume {percent}%', { percent: Math.round(masterVolume * 100) })}
+            />
+          </div>
+        </div>
       </div>
     </div>
   )

@@ -91,7 +91,7 @@ export function baseShotIdOf(shotId: string): string {
 }
 // 조각을 또 자른 조각(`원본__cA__cB`)도 맨 처음 원본 샷까지 거슬러 간다 — 한 겹만 벗기면 원본을 못 찾아
 //   다시 열 때 셋째 조각을 버렸다(2026-11-10). 약속: tests/editor/reopen-edits.test.ts
-function rootShotIdOf(shotId: string): string {
+export function rootShotIdOf(shotId: string): string {
   let id = shotId
   while (isSyntheticShotId(id)) id = baseShotIdOf(id)
   return id
@@ -297,9 +297,11 @@ interface EditorSnapshot {
 }
 
 // 리사이즈 섹션 기본 크기 (px)
-export const DEFAULT_PANEL_SIZES = { sourceW: 256, previewH: 360 }
-export const PANEL_SOURCE_W_MIN = 180
-export const PANEL_SOURCE_W_MAX = 480
+// sourceW = 위 왼쪽 판([소스 | 효과 컨트롤]) 폭 — 새 배치(시안 E1, 2단계 ①)에서 예전 소스 보관함 폭을 이어 쓴다. 효과 컨트롤 칸이
+//   한 줄에 들도록 최소 · 기본을 넓혔다(시안 1440 화면에서 약 600).
+export const DEFAULT_PANEL_SIZES = { sourceW: 560, previewH: 360 }
+export const PANEL_SOURCE_W_MIN = 400
+export const PANEL_SOURCE_W_MAX = 760
 export const PANEL_PREVIEW_H_MIN = 160
 export const PANEL_PREVIEW_H_MAX = 760
 
@@ -1529,6 +1531,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
               url,
               status,
               thumbnailUrl,
+              takeNumber: url && typeof handoff?.take_number === 'number' ? handoff.take_number : undefined,
               trimStart: s.trim_start ?? undefined,
               trimEnd: s.trim_end ?? undefined,
               speed: s.speed ?? 1.0,
