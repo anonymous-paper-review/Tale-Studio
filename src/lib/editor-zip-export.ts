@@ -9,10 +9,6 @@ import { translate } from '@/lib/i18n/translate'
 import type { AppLocale } from '@/lib/locale'
 import { useLocaleStore } from '@/stores/locale-store'
 
-interface ShotLike {
-  shotId: string
-  sceneId: string
-}
 interface ClipLike {
   shotId: string
   url: string | null
@@ -33,28 +29,32 @@ function extOf(url: string): string {
 }
 
 /**
- * 타임라인 순서(씬 순 × clipOrder)대로 샷 영상을 받아 zip 다운로드.
- * 파일명: `NN_<shotId>.<ext>` (NN = 01부터 0패딩). url 없는 샷은 제외.
+ * 샷 ZIP 에 담을 클립 — 모든 영상 줄의 클립을 시작 초 차례로, 같은 초면 아래 줄 먼저(2단계 ② V2 · V3, 검토 c ② 낮음 5).
+ *   영상이 없는 클립(타이틀 카드 등)은 뺀다. 약속: tests/editor/tracks.test.ts
+ */
+export function zipClips(
+  layout: ReadonlyArray<{ shotId: string; startSec: number; trackId: string }>,
+  tracks: ReadonlyArray<{ id: string }>,
+  videoClips: readonly ClipLike[],
+): { shotId: string; url: string }[] {
+  const rank = new Map(tracks.map((t, i) => [t.id, i]))
+  return [...layout]
+    .sort((a, b) => a.startSec - b.startSec || (rank.get(a.trackId) ?? 0) - (rank.get(b.trackId) ?? 0))
+    .flatMap((item) => {
+      const url = videoClips.find((c) => c.shotId === item.shotId)?.url
+      return url ? [{ shotId: item.shotId, url }] : []
+    })
+}
+
+/**
+ * 타임라인 차례(zipClips)대로 샷 영상을 받아 zip 다운로드.
+ * 파일명: `NN_<shotId>.<ext>` (NN = 01부터 0패딩).
  */
 export async function downloadShotsZip(opts: {
-  shots: ShotLike[]
-  videoClips: ClipLike[]
-  clipOrder: Record<string, string[]>
+  clips: { shotId: string; url: string }[]
   fileBaseName?: string
 }): Promise<ZipExportResult> {
-  const { shots, videoClips, clipOrder } = opts
-
-  // 씬 순서 = shots(정렬됨)에서 처음 등장 순.
-  const sceneOrder: string[] = []
-  for (const s of shots) if (!sceneOrder.includes(s.sceneId)) sceneOrder.push(s.sceneId)
-
-  const ordered: { shotId: string; url: string }[] = []
-  for (const sceneId of sceneOrder) {
-    for (const shotId of clipOrder[sceneId] ?? []) {
-      const clip = videoClips.find((c) => c.shotId === shotId)
-      if (clip?.url) ordered.push({ shotId, url: clip.url })
-    }
-  }
+  const ordered = opts.clips
 
   if (ordered.length === 0) return { total: 0, downloaded: 0, failed: 0 }
 

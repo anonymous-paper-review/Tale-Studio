@@ -632,7 +632,8 @@ export function Timeline({
           // 컷과 컷 사이 빈 곳을 누르면 그 자리에 [잔물결 삭제]가 뜬다(시안 E4 · 규칙 R).
           const at = segments.findIndex((seg) => seg.kind === 'gap' && sec >= seg.startSec && sec < seg.endSec)
           const next = at >= 0 ? segments[at + 1] : undefined
-          setGapChip(at >= 0 && next?.kind === 'clip' ? { shotId: next.shotId, centerSec: (segments[at].startSec + segments[at].endSec) / 2 } : null)
+          // 잠근 V1 에서는 띄우지 않는다 — 눌러도 당기지 않는다(검토 c ② 낮음).
+          setGapChip(at >= 0 && next?.kind === 'clip' && !v1Track?.locked ? { shotId: next.shotId, centerSec: (segments[at].startSec + segments[at].endSec) / 2 } : null)
         } else {
           setGapChip(null)
         }
@@ -640,7 +641,7 @@ export function Timeline({
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, onSeek, onSetSelection, onClearSelection, layout, segments],
+    [cutMode, clientXToSec, onSeek, onSetSelection, onClearSelection, layout, segments, v1Track],
   )
 
   // Audio 레인 빈 영역: 마퀴 드래그(여러 레인 가로지르며 다중 선택) 또는 클릭-seek.
@@ -1383,7 +1384,7 @@ export function Timeline({
         </div>
         <TimelineScrollbars
           targetRef={scrollRef}
-          revision={`${Math.round(totalWidth)}-${audioTracks.length}-${Math.round(pxPerSec)}`}
+          revision={`${Math.round(totalWidth)}-${audioTracks.length}-${videoTracks.length}-${Math.round(pxPerSec)}`}
         />
         </div>
       </div>

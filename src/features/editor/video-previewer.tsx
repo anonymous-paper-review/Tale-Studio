@@ -48,7 +48,8 @@ export function VideoPreviewer() {
   const isPlaying = useEditorStore((s) => s.isPlaying)
   const previewSourceShotId = useEditorStore((s) => s.previewSourceShotId)
   const masterVolume = useEditorStore((s) => s.masterVolume)
-  const hasClips = useEditorStore((s) => Object.values(s.clipOrder).some((ids) => ids.length > 0))
+  // V1 이 비어도 V2 · V3 에 클립이 있으면 빈 타임라인이 아니다(검토 c ② 낮음 5).
+  const hasClips = useEditorStore((s) => Object.values(s.clipOrder).some((ids) => ids.length > 0) || Object.keys(s.overlay).length > 0)
   const togglePlay = useEditorStore((s) => s.togglePlay)
   const seek = useEditorStore((s) => s.seek)
   const setMasterVolume = useEditorStore((s) => s.setMasterVolume)

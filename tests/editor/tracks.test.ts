@@ -13,6 +13,7 @@ vi.mock('@/stores/project-store', () => ({
 import { saveEditorNow, selectProgramLayout, selectTimelineLayout, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
 import { audibleTrackIds, draftAudioClips } from '@/lib/editor-draft-render'
 import { sequenceLengthSec } from '@/lib/editor/sequence-info'
+import { zipClips } from '@/lib/editor-zip-export'
 import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { AudioTrackClip, Shot, VideoClip } from '@/types'
 
@@ -89,6 +90,22 @@ describe('줄', () => {
     expect(on('v4')).toEqual([['B', 10, 4]])
     api().removeVideoTrack('v1')
     expect(api().videoTracks[0].id).toBe('v1')
+    // 마지막 소리 줄(검토 c — 이름에 있는 약속을 몸에서도 본다).
+    api().removeAudioTrack('atrack_2')
+    api().removeAudioTrack('atrack_3')
+    api().removeAudioTrack('atrack_1')
+    expect(api().audioTracks.map((t) => t.id)).toEqual(['atrack_1'])
+  })
+
+  it('지운 줄은 저장하고 다시 열어도 돌아오지 않는다 — 줄 칸이 없는 예전 저장본만 V3 · A3 까지 채운다', async () => {
+    // 왜: 검토 c(② 낮음 3, R3) — 열 때마다 V1–V3 · A1–A3 까지 채워 지운 줄이 돌아왔다. 예전 저장본(줄 칸 없음)만 시안 기본으로 채운다.
+    api().removeVideoTrack('v3')
+    api().removeAudioTrack('atrack_2')
+    await saveEditorNow('project-tracks')
+    canonical()
+    await api().loadPersisted()
+    expect(api().videoTracks.map((t) => t.id)).toEqual(['v1', 'v2'])
+    expect(api().audioTracks.map((t) => t.id)).toEqual(['atrack_1', 'atrack_3'])
   })
 })
 
@@ -158,6 +175,25 @@ describe('미리 보기 · 내보내기', () => {
   })
 })
 
+describe('V2 · V3 클립이 있을 때 다른 곳', () => {
+  it('[+ V 트랙]으로 줄이 늘면 타임라인 세로 스크롤 막대를 다시 잰다', () => {
+    // 왜: 검토 c(② 낮음 6) — 소리 줄 수 · 폭 · 확대만 보고 다시 재어, 영상 줄을 더해도 세로 막대가 옛 높이 그대로였다.
+    expect(read('src/features/editor/timeline.tsx')).toMatch(/revision=\{`\$\{Math\.round\(totalWidth\)\}-\$\{audioTracks\.length\}-\$\{videoTracks\.length\}-\$\{Math\.round\(pxPerSec\)\}`\}/)
+  })
+
+  it('샷 ZIP 은 V2 · V3 클립도 시작 초 차례로 담는다 — 같은 초면 아래 줄 먼저', () => {
+    // 왜: 검토 c(② 낮음 5) — 샷 ZIP 이 V1 만 담아, V2 로 올린 샷이 ZIP 에서 빠졌다.
+    api().moveClipToTrack('B', 'v2', 10)
+    expect(zipClips(selectVideoLayout(api()), api().videoTracks, api().videoClips).map((c) => c.shotId)).toEqual(['A', 'C', 'B', 'D'])
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/clips: zipClips\(selectVideoLayout\(st\), st\.videoTracks, st\.videoClips\)/)
+  })
+
+  it('V1 이 비어도 V2 · V3 에 클립이 있으면 모니터는 "타임라인에 클립이 없어요"를 띄우지 않는다', () => {
+    // 왜: 검토 c(② 낮음 5) — 모니터가 V1 만 보고 빈 타임라인 안내를 띄웠다.
+    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/const hasClips = useEditorStore\(\(s\) => Object\.values\(s\.clipOrder\)\.some\(\(ids\) => ids\.length > 0\) \|\| Object\.keys\(s\.overlay\)\.length > 0\)/)
+  })
+})
+
 describe('시퀀스 길이', () => {
   it('눈을 끈 줄 · V2 의 클립도 시퀀스 길이에 든다 — 위 둘째 줄 · 자 · 모니터 전체 길이 · 재생 끝 · 내보낸 영상이 같은 길이를 쓴다', () => {
     // 왜: 검토 c(② 낮음 4) — 위 둘째 줄은 눈 끈 줄까지, 내보내기 · 재생 끝은 보이는 클립까지, 자는 V1 만 세어 길이가 셋으로 갈렸다.
@@ -216,6 +252,23 @@ describe('자물쇠', () => {
     api().toggleTrackLock('v1')
     expect(api().addClipAtPlayhead('C')).toBeNull()
     expect(read('src/app/studio/editor/page.tsx')).toMatch(/const id = addClipAtPlayhead\(shotId\)\s*if \(id\) void attachVideoAudio\(shotId, id\)/)
+  })
+
+  it('잠근 소리 줄의 조각은 끌어 고르는 네모 · Shift 로 골라도 골라지지 않는다', () => {
+    // 왜: 검토 c(② 낮음 자잘한 것) — 잠근 줄의 조각은 누를 수 없는데 끌어 고르는 네모에는 골라져 Delete 로 지울 수 있었다(지우기는 막히지만
+    //   고른 표시 · 효과 컨트롤에 떴다). 영상 줄의 끌어 고르기와 같은 규칙.
+    useEditorStore.setState({ audioClips: [...api().audioClips, { ...linked('A', 0), id: 'bgm', trackId: 'atrack_2', linkedShotId: null }] })
+    api().toggleTrackLock('atrack_1')
+    api().setAudioSelection(['a_A', 'a_B', 'bgm'])
+    expect(api().selectedAudioIds).toEqual(['bgm'])
+    api().selectAudioClip('bgm')
+    api().selectAudioRange('a_B')
+    expect(api().selectedAudioIds).not.toContain('a_B')
+  })
+
+  it('잠근 V1 의 빈 곳을 눌러도 [잔물결 삭제]가 뜨지 않는다', () => {
+    // 왜: 검토 c(② 낮음 자잘한 것) — 눌러도 아무 일이 없는 단추가 떴다(잠근 줄은 당기지 않는다).
+    expect(read('src/features/editor/timeline.tsx')).toMatch(/setGapChip\(at >= 0 && next\?\.kind === 'clip' && !v1Track\?\.locked \?/)
   })
 
   it('잠근 소리 줄의 조각은 앞 · 뒤를 끌어 줄여도 바뀌지 않는다 — 열 때 채우는 파형 · 원본 길이는 잠가도 채운다', () => {

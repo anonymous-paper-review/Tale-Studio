@@ -25,7 +25,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { sequenceInfoLine, sequenceLengthSec } from '@/lib/editor/sequence-info'
 import { decodeAudioPeaks } from '@/lib/audio-waveform'
-import { downloadShotsZip } from '@/lib/editor-zip-export'
+import { downloadShotsZip, zipClips } from '@/lib/editor-zip-export'
 import { renderDraftTimeline } from '@/lib/editor-draft-render'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
@@ -232,9 +232,8 @@ export default function PostPage() {
     try {
       const st = useEditorStore.getState()
       const r = await downloadShotsZip({
-        shots: st.shots,
-        videoClips: st.videoClips,
-        clipOrder: st.clipOrder,
+        // V2 · V3 클립도 시작 초 차례로(검토 c ② 낮음 5).
+        clips: zipClips(selectVideoLayout(st), st.videoTracks, st.videoClips),
         fileBaseName: 'draft_shots',
       })
       if (r.total === 0) {

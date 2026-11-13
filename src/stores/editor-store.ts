@@ -1638,7 +1638,14 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         keptByScene.set(sceneId, savedIds.filter((shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index))
       }
       // V1 밖 줄(V2 · V3 …)에 놓인 클립 — 저장한 줄 · 시작 초 그대로(2단계 ②). 없는 줄 · 영상이 없어진 클립은 두지 않는다.
-      const videoTracks = padTracks(saved.videoTracks ?? [], DEFAULT_VIDEO_TRACKS)
+      //   줄 칸이 없는 예전 저장본만 시안 기본(V1–V3 · A1–A3)까지 채운다 — 사람이 지운 줄이 다시 열 때 돌아오지 않게(검토 c ② 낮음 3).
+      const savedVideoTracks = saved.videoTracks
+      const oldTrackSave = savedVideoTracks === undefined
+      const videoTracks = !savedVideoTracks
+        ? padTracks([], DEFAULT_VIDEO_TRACKS)
+        : savedVideoTracks.some((t) => t.id === 'v1')
+          ? savedVideoTracks.map((t) => ({ ...t }))
+          : [{ id: 'v1' }, ...savedVideoTracks.map((t) => ({ ...t }))]
       const savedOverlay = Object.entries(saved.placements ?? {}).filter(([, p]) => p.trackId !== 'v1')
       const restoredOverlay: OverlayPlacements = {}
       for (const [id, p] of savedOverlay) {
@@ -1761,7 +1768,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         restoredOldFormat: !saved.placements,
         audioClips,
         audioSources: saved.audioSources ?? [],
-        audioTracks: padTracks(dedupTracks, DEFAULT_AUDIO_TRACKS),
+        audioTracks: oldTrackSave ? padTracks(dedupTracks, DEFAULT_AUDIO_TRACKS) : dedupTracks,
         videoTracks,
         overlay: restoredOverlay,
         markers: cleanMarkers(saved.markers),
@@ -2110,20 +2117,24 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       const [lo, hi] = ai <= bi ? [ai, bi] : [bi, ai]
       return {
-        selectedAudioIds: order.slice(lo, hi + 1),
+        // 잠근 줄의 조각은 고르지 않는다(검토 c ② 낮음 — 영상 줄의 고르기와 같은 규칙).
+        selectedAudioIds: order.slice(lo, hi + 1).filter((x) => !audioLocked(state, state.audioClips.find((a) => a.id === x))),
         selectedAudioId: id,
         selectedShotIds: [],
         selectedClipShotId: null,
       }
     }),
 
-  // 마퀴 드래그 선택
+  // 마퀴 드래그 선택 — 잠근 줄의 조각은 고르지 않는다(검토 c ② 낮음, 영상 줄 setClipSelection 과 같은 규칙).
   setAudioSelection: (ids) =>
-    set({
-      selectedAudioIds: ids,
-      selectedAudioId: ids[ids.length - 1] ?? null,
-      selectedShotIds: [],
-      selectedClipShotId: null,
+    set((state) => {
+      const free = ids.filter((id) => !audioLocked(state, state.audioClips.find((a) => a.id === id)))
+      return {
+        selectedAudioIds: free,
+        selectedAudioId: free[free.length - 1] ?? null,
+        selectedShotIds: [],
+        selectedClipShotId: null,
+      }
     }),
 
   clearAudioSelection: () => set({ selectedAudioIds: [], selectedAudioId: null }),
