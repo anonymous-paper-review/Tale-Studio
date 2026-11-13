@@ -17,6 +17,7 @@ import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useWriterStore as writer } from '@/stores/writer-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { lumiBatchNoticeView } from '@/lib/director/lumi-batch-notice'
+import { translate } from '@/lib/i18n/translate'
 
 const VIDEO = { projectId: 'p-dir', kind: 'video' as const, done: 5, failed: 1 }
 const states = (...list: Array<[string, DirectorShotState]>) => new Map(list)
@@ -95,6 +96,15 @@ describe('Lumi 알림 카드의 글과 단추(시안 D8)', () => {
       { kind: 'handoff', label: '빼고 Editor로' },
       { kind: 'videos', label: '샷 4 다시 만들기', shotIds: ['s4'] },
     ])
+  })
+
+  // 왜: entry 3bf3898c — 넘기기 창(D8)의 영어 줄이 좁은 화면 때문에 짧아졌다. 같은 일을 카드와 창이 다른 말로 하면 다른 규칙처럼 읽힌다(한국어는 그대로).
+  it('실패한 영상 카드의 영어 뒷말은 넘기기 창 줄과 같은 "Leave it out and it joins Editor once its video is ready."다', () => {
+    const one = lumiBatchNoticeView({ notice: VIDEO, states: BOARD, labelOf, takesReturned: true, locale: 'en' })
+    expect(one.body).toBe('The video for Shot 4 failed, and your Takes were returned. You can make it again. Leave it out and it joins Editor once its video is ready.')
+    const two = lumiBatchNoticeView({ notice: { ...VIDEO, failed: 2 }, states: states(['s1', 'video_done'], ['s4', 'video_failed'], ['s5', 'video_failed']), labelOf, takesReturned: false, locale: 'en' })
+    expect(two.body).toMatch(/You can make them again\. Leave them out and they join Editor once their videos are ready\.$/)
+    expect(translate('en', 'Failed. Leave it out and it joins Editor once its video is ready')).toContain('Leave it out and it joins Editor once its video is ready')
   })
 
   // 왜: 다 됐으면 다음은 Editor 다 — 다음 단계 단추와 같은 이름 · 같은 길.
