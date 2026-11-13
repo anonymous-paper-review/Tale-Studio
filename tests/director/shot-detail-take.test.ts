@@ -55,22 +55,27 @@ afterEach(async () => {
 })
 
 describe('샷 상세의 새 Take', () => {
-  it('영상 고치기에서 고친 모델 · 해상도 · 바꿀 점은 새 Take 의 생성 요청과 설정에 실리고, 보고 있던 Take 의 설정은 그대로다', async () => {
-    // 왜: D7 — Take 는 덮어쓰지 않고 쌓인다. 영상 고치기에서 바꾼 것은 이번에 만드는 새 Take 의 것이고, 보고 있던 Take 는 그대로 다시 볼 수 있어야 한다.
-    const prompt = 'A girl shivers under the eaves.\n\nChange from the previous video: slow push in'
+  it('영상 고치기에서 고친 모델 · 해상도 · 바꿀 점은 새 Take 에만 실리고, 바꿀 점은 지금 샷 프롬프트 끝에 그 한 번만 붙어 Take 에 기록으로 남는다', async () => {
+    // 왜: D7 — Take 는 덮어쓰지 않고 쌓인다. 리드 검토 c ③ — 새 Take 의 바탕은 늘 지금 샷 프롬프트다(앞 Take 의 프롬프트 줄기를 잇지 않는다).
+    //   (옛 이름: "… 새 Take 의 생성 요청과 설정에 실리고, 보고 있던 Take 의 설정은 그대로다")
+    api().updateNodeData<'video'>(sourceId, { override: { prompt: 'An old prompt.\n\nChange from the previous video: faster' } })
     const newTakeId = await api().generateVideoForShot(shotId, {
       inheritFromVideoNodeId: sourceId,
-      videoOverride: { provider: 'veo', resolution: '1080p', prompt },
+      videoOverride: { provider: 'veo', resolution: '1080p', changeNote: 'slow push in' },
     })
 
     expect(newTakeId).not.toBeNull()
     expect(newTakeId).not.toBe(sourceId)
     const [body] = generationBodies()
-    expect(body).toMatchObject({ model: 'veo', resolution: '1080p', prompt, videoClipId: null, override: { provider: 'veo', resolution: '1080p', prompt } })
+    expect(body).toMatchObject({
+      model: 'veo', resolution: '1080p', videoClipId: null,
+      prompt: 'A girl shivers under the eaves.\n\nChange from the previous video: slow push in',
+      override: { provider: 'veo', resolution: '1080p', changeNote: 'slow push in' },
+    })
     const created = api().nodes.find((node) => node.id === newTakeId)!.data
-    expect(isVideoData(created) && created.override).toEqual({ provider: 'veo', resolution: '1080p', prompt })
+    expect(isVideoData(created) && created.override).toEqual({ provider: 'veo', resolution: '1080p', changeNote: 'slow push in' })
     const source = api().nodes.find((node) => node.id === sourceId)!.data
-    expect(isVideoData(source) && source.override).toEqual({})
+    expect(isVideoData(source) && source.override).toEqual({ prompt: 'An old prompt.\n\nChange from the previous video: faster' })
   })
 
   it('다시 만들기(remakeShotVideo)는 가장 최근 Take 가 실패했어도 그 Take 를 덮지 않고 그 모델 · 해상도로 새 Take 를 만든다', async () => {

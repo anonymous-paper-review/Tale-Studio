@@ -36,7 +36,8 @@ import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { aspectRatioFromFormat } from '@/types/project'
-import type { ShotNodeData } from '@/types/director'
+import type { ShotNodeData, VideoOverride } from '@/types/director'
+import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { VideoResolutionButtons } from '@/features/director/video-resolution-buttons'
 import { LockedFrame, smallFrameStyle } from './locked-frame'
@@ -60,7 +61,9 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
   const { takes, final } = shotDetailTakes(nodes, shotNodeId)
   const [picked, setPicked] = useState<string | null>(initialTakeId ?? null)
   const [finalError, setFinalError] = useState<string | null>(null)
-  const current = takes.find((take) => take.id === picked) ?? takes.find((take) => take.id === final?.id) ?? takes[0] ?? null
+  // 가장 새 Take 가 실패했으면 그것을 먼저 보인다(리드 검토 c ②) — ★ 를 먼저 보이면 그대로 눌렀을 때 ★ 의 모델 · 해상도로 나간다.
+  const newestFailed = takes[0] && takePhase(takes[0].data) === 'failed' ? takes[0] : null
+  const current = takes.find((take) => take.id === picked) ?? newestFailed ?? takes.find((take) => take.id === final?.id) ?? takes[0] ?? null
   const busy = takes.some((take) => takePhase(take.data) === 'making')
   const [w, h] = aspectRatioFromFormat(projectFormat ?? 'horizontal_16:9').split(':').map(Number)
   const portrait = !!w && !!h && w < h
@@ -232,10 +235,12 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
   const generateVideoForShot = useDirectorCanvasStore((s) => s.generateVideoForShot)
   const openDeleteConfirm = useDirectorCanvasStore((s) => s.openDeleteConfirm)
   const takeBalance = useTakeBalance()
+  const imageGeneration = useStoryboardImageGeneration(data)
   const base = takeSettings(data, current?.data ?? null)
   const [provider, setProvider] = useState<VideoModelKey>(base.model)
   const [resolution, setResolution] = useState<VideoResolution>(base.resolution)
-  const [change, setChange] = useState('')
+  // 보고 있던 Take 의 바꿀 점을 미리 채운다(리드 검토 c ③) — 고치거나 지울 수 있고, 쌓이지 않는다.
+  const [change, setChange] = useState(((current?.data.override ?? {}) as VideoOverride).changeNote ?? '')
   const [sending, setSending] = useState(false)
   const hasImage = !!shotDetailFrames(data.storyboardImage).start
   const imageChanged = !!current && imageChangedForTake(data.storyboardImage, current.data)
@@ -247,7 +252,9 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
       ? (showCost ? t('Make a new Take with the changed image · {count} Take', { count }) : t('Make a new Take with the changed image'))
       : (showCost ? t('Make a new Take · {count} Take', { count }) : t('Make a new Take'))
   const videoSeconds = clampDuration(VIDEO_MODELS[provider], data.durationSeconds)
-  const disabled = !hasImage || busy || videoBatchBusy || sending
+  // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
+  const imageBusy = hasImage && (imageGeneration.generating || data.storyboardImage?.status === 'pending')
+  const disabled = !hasImage || busy || imageBusy || videoBatchBusy || sending
 
   const make = async () => {
     if (disabled) return
@@ -261,7 +268,6 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
         provider: provider !== base.model ? provider : undefined,
         resolution: resolution !== base.resolution ? resolution : undefined,
       }))
-      if (made) setChange('')
     } finally {
       setSending(false)
     }
@@ -275,7 +281,7 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
       ) : null}
       {current ? (
         <Textarea value={change} onChange={(e) => setChange(e.target.value)} rows={2}
-          placeholder={t("What to change in the motion or camera · Leave it empty to keep this Take's prompt")} />
+          placeholder={t('What to change in the motion or camera · Leave it empty to keep the shot prompt')} />
       ) : null}
       <div className="space-y-1.5">
         <p className="text-caption text-subtle-foreground">{t('Video model')}</p>
@@ -299,6 +305,8 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
       </div>
       {!hasImage ? (
         <p className="text-caption text-subtle-foreground">{t('Make the start and end images first.')}</p>
+      ) : imageBusy ? (
+        <p className="text-caption text-subtle-foreground">{t('The start and end images are being remade. Make the Take when they are done.')}</p>
       ) : busy ? (
         <p className="text-caption text-subtle-foreground">{t('A Take is being made. You can make a new one when it is done.')}</p>
       ) : null}

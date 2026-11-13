@@ -19,7 +19,7 @@ import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import type { VideoNodeData } from '@/types/director'
-import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { keptStoryboardImage, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 
 let shotId = ''
 const IMAGE = { url: 'https://media.test/start.png', status: 'completed' as const, errorMessage: null, generatedAt: 1, frames: { start: 'https://media.test/start.png', direction: 'https://media.test/dir.png', end: 'https://media.test/end.png' } }
@@ -185,6 +185,44 @@ describe('Director 샷 상세 화면', () => {
     expect(out).toContain('Finished after it was stopped')
     const list = out.slice(out.indexOf('data-testid="shot-detail-takes"'))
     expect(list.indexOf('★ Final (auto)')).toBeGreaterThan(list.indexOf('Take 1'))
+  })
+
+  it('시작 · 끝 이미지를 다시 만드는 중이면 새 Take 단추와 [다음: 영상 만들기]를 끄고, 다 되면 만들라고 한 줄로 알린다', () => {
+    // 왜: 리드 검토 c ① — 다시 만드는 동안 누르면 옛 그림으로 Take 가 나간다(Take 를 쓴다).
+    done(1)
+    // 상점이 다시 만들기를 시작할 때와 같은 모양 — 지금 그림의 프레임 · 버전은 그대로, 상태만 만드는 중.
+    director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: { ...IMAGE, ...keptStoryboardImage(IMAGE), status: 'generating' } })
+    const video = render('panel', 'video')
+    expect(video).toContain('The start and end images are being remade. Make the Take when they are done.')
+    expect(buttonTag(video, 'Make a new Take · 5 Take')).toContain('disabled=""')
+    expect(buttonTag(render('popup'), 'Next: make the video · 5 Take')).toContain('disabled=""')
+    setLocale('ko')
+    expect(render('panel', 'video')).toContain('시작 · 끝 이미지를 다시 만드는 중이에요. 다 되면 Take 를 만들어요.')
+  })
+
+  it('가장 새 Take 가 실패했으면 상세는 그 Take 를 먼저 보이고, 다시 만들기는 그 Take 의 모델 · 해상도를 이어받는다', () => {
+    // 왜: 리드 검토 c ② — ★(또는 가장 최근 완성)를 먼저 보이면 그대로 눌렀을 때 ★ 의 모델 · 해상도로 나간다. 담당표 "실패 다시 만들기는 마지막 모델 · 해상도".
+    done(1, { final: true })
+    addTake({ takeNumber: 2, status: 'failed', lastAttemptStatus: 'failed', override: { provider: 'kling-o3', resolution: '720p' }, lastAttemptError: 'provider failed' })
+    const out = render('panel', 'video')
+    const preview = out.slice(out.indexOf('data-testid="shot-detail-take-preview"'), out.indexOf('data-testid="shot-detail-takes"'))
+    expect(preview).toContain('Take 2')
+    expect(out).toMatch(/aria-pressed="true"[^>]*>Kling O3 Pro</)
+  })
+
+  it('영상 고치기 칸에는 보고 있던 Take 의 바꿀 점이 미리 채워져 있고, 안내는 "비워 두면 샷 프롬프트 그대로"다', () => {
+    // 왜: 리드 검토 c ③ — 바꿀 점은 쌓지 않는 대신 이어서 고치기 쉽게 미리 채운다(고치거나 지울 수 있다). 안내 글은 시안 D7 그대로.
+    done(1, { override: { changeNote: 'slow push in' } as VideoNodeData['override'] })
+    const out = render('panel', 'video')
+    expect(out).toMatch(/<textarea[^>]*placeholder="What to change in the motion or camera · Leave it empty to keep the shot prompt"[^>]*>slow push in<\/textarea>/)
+    setLocale('ko')
+    expect(render('panel', 'video')).toContain('placeholder="움직임·카메라에서 바꿀 점 · 비워 두면 샷 프롬프트 그대로"')
+  })
+
+  it('Writer 샷에 예전 모델이 저장돼 있으면 이미지 모델 칸은 실제로 도는 GPT Image 2 를 고른 것으로 보인다', () => {
+    // 왜: 리드 검토 c ④ — 아무 칸도 안 골라져 보이면 무엇으로 도는지 모른다.
+    director.getState().updateNodeData<'shot'>(shotId, { imageModel: 'nano-banana-2' })
+    expect(render('popup')).toMatch(/aria-pressed="true"[^>]*>GPT Image 2</)
   })
 
   it('상세에는 이미지 · 영상 탭이 있고 영상이 없으면 "영상 · 없음"이다', () => {

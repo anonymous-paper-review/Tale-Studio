@@ -2,7 +2,7 @@
 //   상세는 샷 하나에 이미지 · 영상 탭이다(스토리보드형 = 팝업, 노드형 = 왼쪽 패널, 내용 같음).
 //   약속: tests/director/shot-detail.test.ts
 import { storyboardImageEndFrame, storyboardImageStartFrame } from '@/lib/director/storyboard-image'
-import { IMAGE_MODEL_ORDER, imageModelSupportsSheetCanvas, type ImageModelKey } from '@/lib/image-models'
+import { IMAGE_MODEL_ORDER, imageModelSupportsSheetCanvas, normalizeImageModelKey, resolveSheetImageModel, type ImageModelKey } from '@/lib/image-models'
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
 import { currentStoryboardVersion, versionOfFrames } from '@/lib/director/storyboard-image-versions'
 import { DEFAULT_VIDEO_RESOLUTION, isVideoResolution, normalizeProvider, type VideoModelKey, type VideoResolution } from '@/lib/video-models'
@@ -38,6 +38,12 @@ export function takePhaseOf(data: Pick<VideoNodeData, 'status' | 'lastAttemptSta
   if (data.status === 'completed' && data.videoUrl) return 'done'
   if (data.status === 'failed' || data.lastAttemptStatus === 'failed') return 'failed'
   return 'idle'
+}
+
+/** 이미지 모델 칸에서 골라져 보일 모델 — 서버가 실제로 돌리는 것. Writer 샷은 시트를 못 그리는 모델을 GPT Image 2 로 바꿔 돈다(리드 검토 c ④). */
+export function detailImageModel(data: Pick<ShotNodeData, 'writerShotId' | 'imageModel'>): ImageModelKey {
+  const saved = normalizeImageModelKey(data.imageModel)
+  return data.writerShotId ? resolveSheetImageModel(saved) : saved
 }
 
 export interface ShotDetailTake {
@@ -84,9 +90,11 @@ export function promptWithChange(prompt: string, change: string, subject: 'image
   return note ? `${prompt}\n\nChange from the previous ${subject}: ${note}` : prompt
 }
 
-/** 새 Take 요청 — 늘 새 Take 이고(덮어쓰지 않음) 보고 있던 Take 의 설정(마지막 모델 · 해상도 · 배선)을 이어받는다.
+/** 새 Take 요청 — 늘 새 Take 이고(덮어쓰지 않음) 보고 있던 Take 의 설정(마지막 모델 · 해상도 · 배선 · 바꿀 점)을 이어받는다.
  *  영상 고치기에서 바꾼 모델 · 해상도 · 바꿀 점은 새 Take 에만 실린다(보고 있던 Take 는 그대로).
- *  바꿀 점은 보고 있던 Take 의 프롬프트 끝에 붙는다 — 그 Take 를 만들 때 바꾼 점도 이어진다. 첫 Take 는 이어받을 것이 없다. */
+ *  바꿀 점은 쌓이지 않는다(리드 검토 c ③): 새 Take 의 바탕은 늘 지금 샷 프롬프트이고, 바꿀 점은 그 Take 에 기록으로 남아
+ *  만들 때 한 번만 붙는다(상점이 붙인다). 칸에 적은 것이 이어받을 바꿀 점과 같으면 그대로 두고, 다르면(지움 포함) 바꾼다.
+ *  첫 Take 는 이어받을 것이 없다. shotPrompt 는 옛 호출을 위해 남겨 둔 값이다. */
 export function newTakeRequest(input: {
   takeId: string | null
   take: Pick<VideoNodeData, 'override'> | null
@@ -96,10 +104,11 @@ export function newTakeRequest(input: {
   resolution?: VideoResolution
 }): { inheritFromVideoNodeId?: string; videoOverride?: VideoOverride } {
   const note = input.change.trim()
+  const inherited = ((input.take?.override ?? {}) as VideoOverride).changeNote?.trim() ?? ''
   const override: VideoOverride = {
     ...(input.provider ? { provider: input.provider } : {}),
     ...(input.resolution ? { resolution: input.resolution } : {}),
-    ...(note ? { prompt: promptWithChange(input.take?.override?.prompt || input.shotPrompt, note, 'video') } : {}),
+    ...(note !== inherited ? { changeNote: note } : {}),
   }
   return {
     ...(input.takeId ? { inheritFromVideoNodeId: input.takeId } : {}),

@@ -10,6 +10,7 @@ import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { latestShotTake, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings, videoTabLabelKey, type ShotDetailTab } from '@/lib/director/shot-detail'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
+import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { isShotData } from '@/types/director'
@@ -35,6 +36,7 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   // 이름은 캔버스 · 보드와 같은 것("Shot 4" · "Scene 1") — Writer 의 원래 id(sh_01_04)를 보이지 않는다.
   const boardNames = useBoardNodeNames()
   const node = nodes.find((n) => n.id === shotNodeId)
+  const imageGeneration = useStoryboardImageGeneration(node && isShotData(node.data) ? node.data : null)
   if (!node || !isShotData(node.data)) return null
   const data = node.data
   const scene = data.parentSceneNodeId ? nodes.find((n) => n.id === data.parentSceneNodeId) : undefined
@@ -45,7 +47,9 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   const count = takeCostForVideo(settings.model, settings.resolution)
   const makeVideo = {
     label: takeBalance.mode === 'off' ? t('Next: make the video') : t('Next: make the video · {count} Take', { count }),
-    disabled: !shotDetailFrames(data.storyboardImage).start || videoBatchBusy || takes.some((take) => takePhaseOf(take.data) === 'making'),
+    // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
+    disabled: !shotDetailFrames(data.storyboardImage).start || videoBatchBusy || takes.some((take) => takePhaseOf(take.data) === 'making')
+      || imageGeneration.generating || data.storyboardImage?.status === 'pending',
     run: () => {
       void remakeShotVideo(shotNodeId)
       setTab('video')

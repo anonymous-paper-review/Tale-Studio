@@ -12,8 +12,8 @@ import { ThumbImage } from '@/components/thumb-image'
 import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
-import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
-import { detailImageModels, shotDetailFrames } from '@/lib/director/shot-detail'
+import { IMAGE_MODELS } from '@/lib/image-models'
+import { detailImageModel, detailImageModels, shotDetailFrames } from '@/lib/director/shot-detail'
 import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/director/storyboard-image-versions'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
@@ -49,7 +49,8 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   const current = currentStoryboardVersion(data.storyboardImage)
   const hasImage = !!frames.start
   const frameStyle = mediaFrameStyle(projectFormat, layout === 'popup' ? 360 : 200)
-  const model = normalizeImageModelKey(data.imageModel)
+  // 실제로 도는 모델을 골라진 칸으로(리드 검토 c ④) — Writer 샷에 시트를 못 그리는 옛 모델이 저장돼 있으면 GPT Image 2.
+  const model = detailImageModel(data)
 
   const toggle = (field: 'characterAssetIds' | 'worldAssetIds', id: string) => {
     const list = data[field]

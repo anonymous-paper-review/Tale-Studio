@@ -175,6 +175,9 @@ export type VideoOverride = Partial<{
   provider: DirectorVideoProvider
   /** 영상 노드가 고른 해상도(오너 2026-10-31). 마더 Shot 에는 없는 값 — 없으면 720p. */
   resolution: VideoResolution
+  /** 샷 상세 영상 고치기의 바꿀 점(디자이너 11/13 D7 · 리드 검토 c ③) — 이 Take 를 만들 때 지금 샷 프롬프트 끝에 한 번 붙인다.
+   *  기록으로 남아 다음 Take 의 칸에 미리 채워질 뿐 쌓이지 않는다. 빈 글 = 바꿀 점 없음. */
+  changeNote: string
 }>
 
 /** 부모 Shot 없이 독립 생성한 Video가 직접 소유하는 완전한 생성 설정. */

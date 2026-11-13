@@ -2,6 +2,7 @@
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
+  detailImageModel,
   detailImageModels,
   imageChangedForTake,
   imageChangedSinceTake,
@@ -121,19 +122,19 @@ describe('Director 샷 상세', () => {
     expect(newTakeRequest({ takeId: 'v2', take: failed, shotPrompt: 'A girl shivers.', change: '' })).toEqual({ inheritFromVideoNodeId: 'v2' })
   })
 
-  it('영상 고치기에서 모델 · 해상도를 바꾸거나 바꿀 점을 적으면 새 Take 에만 실리고, 바꿀 점은 보고 있던 Take 의 프롬프트 끝에 붙는다', () => {
-    // 왜: D7 "움직임·카메라에서 바꿀 점" — 고친 것은 새 Take 의 설정이 되고 보고 있던 Take 는 바뀌지 않는다.
-    //   바꿀 점은 보고 있던 영상에서 고칠 것이라, 그 Take 를 만들 때 바꾼 점도 이어진다(혼자 정한 것).
+  it('영상 고치기에서 바꾼 모델 · 해상도 · 바꿀 점은 새 Take 에만 실리고, 바꿀 점은 쌓이지 않고 그 Take 에 기록으로 남는다', () => {
+    // 왜: 리드 검토 c ③(혼자 정한 것 되돌림, 시안 D7 글 "비워 두면 샷 프롬프트 그대로") — 새 Take 의 바탕은 늘 지금 샷 프롬프트이고
+    //   바꿀 점은 그 한 번에만 붙는다. 앞 Take 의 바꿀 점은 칸에 미리 채워 이어서 고치게 할 뿐, 저절로 쌓이지 않는다.
+    //   (옛 이름: "… 바꿀 점은 보고 있던 Take 의 프롬프트 끝에 붙는다")
     const current = take('v1', 1).data as VideoNodeData
     expect(newTakeRequest({ takeId: 'v1', take: current, shotPrompt: 'A girl shivers.', change: ' slow push in ', provider: 'veo', resolution: '1080p' })).toEqual({
       inheritFromVideoNodeId: 'v1',
-      videoOverride: { provider: 'veo', resolution: '1080p', prompt: 'A girl shivers.\n\nChange from the previous video: slow push in' },
+      videoOverride: { provider: 'veo', resolution: '1080p', changeNote: 'slow push in' },
     })
-    const changed = take('v2', 2, { override: { prompt: 'A girl shivers.\n\nChange from the previous video: slow push in' } as VideoNodeData['override'] }).data as VideoNodeData
-    expect(newTakeRequest({ takeId: 'v2', take: changed, shotPrompt: 'A girl shivers.', change: 'darker' })).toEqual({
-      inheritFromVideoNodeId: 'v2',
-      videoOverride: { prompt: 'A girl shivers.\n\nChange from the previous video: slow push in\n\nChange from the previous video: darker' },
-    })
+    const noted = take('v2', 2, { override: { changeNote: 'slow push in' } as VideoNodeData['override'] }).data as VideoNodeData
+    expect(newTakeRequest({ takeId: 'v2', take: noted, shotPrompt: 'A girl shivers.', change: 'darker' })).toEqual({ inheritFromVideoNodeId: 'v2', videoOverride: { changeNote: 'darker' } })
+    expect(newTakeRequest({ takeId: 'v2', take: noted, shotPrompt: 'A girl shivers.', change: 'slow push in' })).toEqual({ inheritFromVideoNodeId: 'v2' })
+    expect(newTakeRequest({ takeId: 'v2', take: noted, shotPrompt: 'A girl shivers.', change: '  ' })).toEqual({ inheritFromVideoNodeId: 'v2', videoOverride: { changeNote: '' } })
   })
 
   it('영상이 없는 샷에서 모델 · 해상도를 골라 만들면 첫 Take 에 그 설정만 실린다', () => {
@@ -182,6 +183,13 @@ describe('Director 샷 상세', () => {
     const frames = { start: 'https://media.test/s.png', direction: 'https://media.test/d.png', end: 'https://media.test/e.png' }
     const making = { url: frames.start, frames, status: 'generating', errorMessage: null, generatedAt: 1, versions: [{ id: 'legacy', n: 1, url: frames.start, frames, generatedAt: 1, source: 'generated' }], versionId: 'legacy' }
     expect(shotDetailFrames(making as ShotNodeData['storyboardImage'])).toEqual({ start: frames.start, end: frames.end })
+  })
+
+  it('Writer 샷에 예전 모델(Nano Banana 2)이 저장돼 있으면 이미지 모델 칸은 실제로 도는 GPT Image 2 를 고른 것으로 보인다', () => {
+    // 왜: 리드 검토 c ④ — 서버는 시트를 못 그리는 모델을 GPT Image 2 로 바꿔 돌린다(resolveSheetImageModel). 아무 칸도 안 골라지면 무엇으로 도는지 모른다.
+    expect(detailImageModel(shot({ imageModel: 'nano-banana-2' } as Partial<ShotNodeData>))).toBe('gpt-image-2')
+    expect(detailImageModel(shot({ imageModel: 'seedream-4' } as Partial<ShotNodeData>))).toBe('seedream-4')
+    expect(detailImageModel(shot({ writerShotId: null, imageModel: 'nano-banana-2' } as Partial<ShotNodeData>))).toBe('nano-banana-2')
   })
 
   it('화면에서 멈춘 Take 는 만드는 중이 아니라 "멈춤"이고, 뒤늦게 끝나도 ★ 자동으로 고르지 않는다', () => {

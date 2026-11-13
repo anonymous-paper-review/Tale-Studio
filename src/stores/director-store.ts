@@ -1523,6 +1523,12 @@ export function getVideoNodeResolution(
   return isVideoResolution(chosen) ? chosen : DEFAULT_VIDEO_RESOLUTION
 }
 
+/** 이어받는 Take 설정에서 프롬프트만 뺀다 — 새 Take 의 바탕은 늘 지금 샷 프롬프트(리드 검토 c ③). */
+function withoutTakePrompt(override: VideoNodeData['override']): VideoOverride {
+  const { prompt: _prompt, ...rest } = override as VideoOverride
+  return rest
+}
+
 /** 이 화면에서 멈춘 작업 — 뒤늦게 끝난 결과를 지금 그림에 쓰지 않고 기록에만 둔다(오너 2026-11-14 7번). */
 const stoppedJobIds = new Set<string>()
 
@@ -4497,7 +4503,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 },
                 videoChainInputId: src.videoChainInputId,
                 videoChainFrameUrl: src.videoChainFrameUrl,
-                override: { ...src.override },
+                // 새 Take 의 바탕은 늘 지금 샷 프롬프트(리드 검토 c ③) — 앞 Take 의 프롬프트(옛 바꿀 점이 붙은 것)는 잇지 않는다.
+                //   바꿀 점(changeNote)은 기록으로 이어받아 이번에 한 번 붙는다(상세는 칸에서 고치거나 지운다).
+                override: withoutTakePrompt(src.override),
               })
               // 상속된 배선을 엣지로 복원 + DB write-through.
               get().rebuildFrameEdges()
@@ -4758,7 +4766,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           takeLabel: videoNode.data.label,
           canvasPosition: videoNode.position,
           idempotencyKey,
-          prompt: eff.prompt,
+          // 샷의 Take 는 바꿀 점(상세 영상 고치기 · 리드 검토 c ③)을 지금 프롬프트 끝에 이번 한 번만 붙인다.
+          prompt: shotNode ? promptWithChange(eff.prompt, (videoNode.data.override as VideoOverride).changeNote ?? '', 'video') : eff.prompt,
           camera: eff.camera,
           cameraPreset: eff.cameraPreset,
           // 화면비는 서버가 프로젝트 포맷에서 정한다(2026-09-30) — 여기서 16:9 를 박지 않는다.
