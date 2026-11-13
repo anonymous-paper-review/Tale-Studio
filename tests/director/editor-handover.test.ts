@@ -216,6 +216,7 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     const nodes = [shot('a1', 3), ready, shot('a3', 2), take('a1', 1, 'completed'), wired]
     useDirectorCanvasStore.setState({ projectId: 'proj-1', nodes })
     const label = remakeButton(nodes, { shotNodeId: 'n_a2', missing: 'failed' }, { showTakes: true, batch: null }, (key, params) => translate('en', key, params)).label
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
     const bodies: Array<Record<string, unknown>> = []
     vi.spyOn(globalThis, 'fetch').mockImplementation(async (input, init) => {
       if (String(input).includes('/api/director/generate-video')) bodies.push(JSON.parse(String(init?.body)))
@@ -237,6 +238,7 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     const makeImage = vi.fn(async () => undefined)
     const makeVideo = vi.fn(async () => 'v_new')
     useDirectorCanvasStore.setState({ hydrateFreshFromDb: hydrate, generateStoryboardImage: makeImage, generateVideoForShot: makeVideo } as never)
+    useGlobalChatStore.setState({ handoffConfirm: { kind: 'editorMissingVideos', projectId: 'proj-1', via: 'button' } })
     await useGlobalChatStore.getState().remakeMissingVideo('n_a3')
     expect(hydrate).toHaveBeenCalledTimes(1)
     expect(makeImage).not.toHaveBeenCalled()
@@ -250,26 +252,6 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     await useGlobalChatStore.getState().requestNextStep()
     expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
     expect(nav.handoffToStage).toHaveBeenCalledWith('editor')
-  })
-
-  // 왜: Storyboard 카드(board 갈래)의 [빼고 Editor로] 는 넘기기 창을 열지 않고 이 넘김을 바로 부른다(2026-11-14 board 와 약속).
-  it('넘기기 창을 열지 않고 [빼고 Editor로]를 눌러도 넘김 문장이 채팅에 남고 영상 있는 샷만 Editor로 넘어간다', async () => {
-    useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed')) })
-    await useGlobalChatStore.getState().proceedToEditorWithVideos()
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(userLines()).toEqual(['Editor로 넘겨주세요'])
-    expect(nav.handoffToStage).toHaveBeenCalledWith('editor')
-  })
-
-  // 왜: Storyboard 카드(board 갈래)의 [다시 만들기] 도 창 없이 부른다 — 단추에 Take 값이 적혀 있어 그 단추가 곧 확인이다(리드 2026-11-14).
-  it('넘기기 창을 열지 않고 영상 없는 샷의 [다시 만들기]를 눌러도 그 샷의 영상을 만들기 시작한다', async () => {
-    useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed'), take('a2', 1, 'failed'), take('a3', 1, 'completed')) })
-    const makeVideo = vi.fn(async () => 'v_new')
-    useDirectorCanvasStore.setState({ generateVideoForShot: makeVideo } as never)
-    await useGlobalChatStore.getState().remakeMissingVideo('n_a2')
-    expect(makeVideo).toHaveBeenCalledWith('n_a2', { inheritFromVideoNodeId: 'v_a2_1' })
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(nav.handoffToStage).not.toHaveBeenCalled()
   })
 
   // 왜(혼자 정한 것): 채팅으로 넘겨 달라고 해도 같은 판단을 탄다 — Director 준비 창이 채팅에서도 열리는 것과 같게.

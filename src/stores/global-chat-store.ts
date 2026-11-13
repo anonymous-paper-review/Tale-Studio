@@ -246,11 +246,9 @@ interface GlobalChatState {
   confirmProducerLock: () => Promise<void>
   /** Director 준비 창의 "그래도 진행" — 준비가 덜 된 샷이 있어도 Director 로 넘긴다. */
   proceedToDirectorAnyway: () => Promise<void>
-  /** Editor 넘기기 창(D8)의 [○ 빼고 넘기기] — 영상 있는 샷만 Editor 로 넘긴다(Editor 는 영상 있는 샷만 컷으로 만든다).
-   *  창 없이도 부른다(Storyboard 카드의 [빼고 Editor로]). */
+  /** Editor 넘기기 창(D8)의 [○ 빼고 넘기기] — 영상 있는 샷만 Editor 로 넘긴다(Editor 는 영상 있는 샷만 컷으로 만든다). */
   proceedToEditorWithVideos: () => Promise<void>
-  /** Editor 넘기기 창(D8)의 [다시 만들기] — 그 샷의 영상을 만들기 시작하고 창은 그대로 둔다(이미지가 없으면 이미지부터).
-   *  창 없이도 부른다(Storyboard 카드의 [다시 만들기]). */
+  /** Editor 넘기기 창(D8)의 [다시 만들기] — 그 샷의 영상을 만들기 시작하고 창은 그대로 둔다(이미지가 없으면 이미지부터). */
   remakeMissingVideo: (shotNodeId: string) => Promise<void>
   /** 확인 창 닫기("더 고칠게요"·"채우러 가기") — 아무것도 넘기지 않는다. */
   closeHandoffConfirm: () => void
@@ -1908,24 +1906,20 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   },
 
   proceedToEditorWithVideos: async () => {
-    const projectId = useProjectStore.getState().projectId
-    if (!projectId) return
-    // 창 없이도 부른다 — Storyboard 카드(board 갈래)의 [빼고 Editor로](2026-11-14). 창이 열려 있으면 그 창의 프로젝트일 때만.
     const confirm = get().handoffConfirm
-    const fromWindow = confirm?.kind === 'editorMissingVideos' ? confirm : null
-    if (fromWindow && fromWindow.projectId !== projectId) return
-    if (fromWindow) set({ handoffConfirm: null })
+    if (confirm?.kind !== 'editorMissingVideos' || confirm.projectId !== useProjectStore.getState().projectId) return
+    set({ handoffConfirm: null })
     await get().sendMessage(translate(useLocaleStore.getState().locale, 'Please hand over to Editor'), undefined, {
       consentedHandoff: true,
       acceptMissingVideos: true,
       // 채팅에서 연 창이면 사용자의 넘김 말이 이미 스레드에 있다 — 다시 남기지 않는다.
-      silentUser: fromWindow?.via === 'chat',
+      silentUser: confirm.via === 'chat',
       stageOverride: 'director',
     })
   },
 
   remakeMissingVideo: async (shotNodeId) => {
-    // 창 없이도 부른다 — Storyboard 카드(board 갈래)의 [다시 만들기](2026-11-14). 창이 열려 있으면 그대로 둔다.
+    if (get().handoffConfirm?.kind !== 'editorMissingVideos') return
     // 일괄이 도는 중이면 창이 단추를 끄고 까닭을 보인다(검토 b 낮음 1) — 여기서도 말없이 Take 를 만들지 않는다.
     if (useDirectorCanvasStore.getState().realBatchBusy || useDirectorCanvasStore.getState().videoBatchBusy) return
     // 이미지가 없으면 영상이 이미지 없이(T2V) 만들어진다 — 그리드의 [영상 만들기]처럼 이미지부터 만든다(Director 배선 5).
