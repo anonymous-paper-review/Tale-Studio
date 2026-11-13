@@ -1150,6 +1150,9 @@ interface DirectorCanvasState {
   detailNodeId: string | null
   /** 상세를 열 때 먼저 보일 탭. */
   detailTab: 'image' | 'video'
+  /** 상세를 연 차례 — openShotDetail 이 열 때마다 하나 올린다. 노드형 왼쪽 패널이 이것으로 다시 붙어, 이미 열린 상세를 안에서
+   *  다른 탭으로 바꿔 두었어도 [바꾸기] · ⤢ 가 고른 탭으로 다시 연다(리드 11/14, 검토 a). */
+  detailOpenSeq: number
   deleteConfirmInfo: DeleteCascadeInfo
   relationModal: RelationModalState
 
@@ -1733,6 +1736,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       popupNodeId: null,
       detailNodeId: null,
       detailTab: 'image',
+      detailOpenSeq: 0,
       deleteConfirmInfo: null,
       relationModal: null,
       generatingNodeIds: {},
@@ -5326,7 +5330,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       closePopup: () => set({ popupNodeId: null }),
       openShotDetail: (nodeId, tab) => {
         const node = get().nodes.find((n) => n.id === nodeId)
-        set({ detailNodeId: nodeId, detailTab: tab ?? (node && isVideoData(node.data) ? 'video' : 'image') })
+        set((s) => ({ detailNodeId: nodeId, detailTab: tab ?? (node && isVideoData(node.data) ? 'video' : 'image'), detailOpenSeq: s.detailOpenSeq + 1 }))
       },
       // 지금은 selectNode · openPopup 으로 연 상세도 같은 닫기로 닫는다 — 샷 · 영상을 가리킬 때만 비운다(에셋 · 씬은 그대로).
       closeShotDetail: () =>
