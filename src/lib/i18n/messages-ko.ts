@@ -1135,6 +1135,8 @@ export const KO: Record<string, string> = {
   'Collapse panel': '패널 접기',
   'Click=preview · drag/right-click=add to timeline': '클릭=미리보기 · 드래그/우클릭=타임라인 추가',
   '(Click: preview / drag·right-click: add to timeline)': '(클릭: 미리보기 / 드래그·우클릭: 타임라인 추가)',
+  // 오너 답 8(2026-11-14): 영상 없는 샷 카드는 타임라인에 넣지 못한다.
+  '(No video yet. Only shots with video go into the timeline.)': '(아직 영상이 없어요. 영상이 있는 샷만 타임라인에 들어가요.)',
   Preview: '미리보기',
   'Add to timeline': '타임라인 추가',
   'No clips generated yet': '생성된 클립이 없습니다',

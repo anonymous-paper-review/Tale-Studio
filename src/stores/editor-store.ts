@@ -497,6 +497,21 @@ function relinkSavedAudio(
   return out
 }
 
+/**
+ * 영상이 새로 생겨 들어오는 샷의 자리 — 이야기 순서의 제자리(오너 답 8, 2026-11-14). 같은 장면에서 바로 앞 샷(그 샷을 잘라 낸 조각까지)
+ *   뒤, 앞 샷이 타임라인에 없으면 장면의 첫 샷 앞(맨 앞의 타이틀 카드는 그대로 맨 앞), 샷이 없으면 끝. 약속: tests/editor/shots-with-video.test.ts
+ */
+function placeInStory(order: string[], shotId: string, story: string[]): string[] {
+  const roots = order.map(rootShotIdOf)
+  for (let i = story.indexOf(shotId) - 1; i >= 0; i--) {
+    const last = roots.lastIndexOf(story[i])
+    if (last >= 0) return [...order.slice(0, last + 1), shotId, ...order.slice(last + 1)]
+  }
+  const firstShot = roots.findIndex((root) => story.includes(root))
+  const at = firstShot >= 0 ? firstShot : order.length
+  return [...order.slice(0, at), shotId, ...order.slice(at)]
+}
+
 function buildClipOrder(shots: Shot[]): Record<string, string[]> {
   const order: Record<string, string[]> = {}
   for (const shot of shots) {
@@ -1020,20 +1035,64 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       }
       // 저장할 때 있던 샷이 저장한 순서에 없으면 사람이 타임라인에서 지운 것이다 — 되살리지 않는다.
       //   저장한 뒤에 새로 생긴 샷만 씬 끝에 붙인다(2026-11-10, 약속: tests/editor/reopen-edits.test.ts).
+      // 영상이 있는 샷만 타임라인 컷이다(오너 답 8, 2026-11-14) — 영상이 없어진 샷(잘라 낸 조각 포함)과 예전 저장본의 빈 칸은 두지
+      //   않는다. 타이틀 카드는 영상 없이 그리는 클립이라 그대로 둔다. 저장할 때 영상이 없어 빠져 있던 샷에 영상이 생기면 이야기 순서의
+      //   제자리에 들어온다. 약속: tests/editor/shots-with-video.test.ts
+      const clipUrl = new Map(combinedClips.map((c) => [c.shotId, c.url]))
+      const playable = (shotId: string) => isTitleCardShotId(shotId) || !!clipUrl.get(shotId)
+      const savedUrl = new Map((saved.videoClips ?? []).map((c) => [c.shotId, c.url]))
       const savedShotIds = new Set((saved.shots ?? []).map((s) => s.shotId))
       const clipOrder: Record<string, string[]> = {}
+      // 이번에 타임라인에 들어온 샷(영상이 새로 생긴 샷 · 저장 뒤 새로 생긴 샷) — 그 영상 소리를 아래에서 놓는다.
+      const entered: string[] = []
       for (const [sceneId, canonicalIds] of canonicalOrder) {
         const savedIds = saved.clipOrder?.[sceneId] ?? []
-        const retained = savedIds.filter(
-          (shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index,
+        let order = savedIds.filter(
+          (shotId, index) => canonicalShotIds.has(shotId) && savedIds.indexOf(shotId) === index && playable(shotId),
         )
-        clipOrder[sceneId] = [...retained, ...canonicalIds.filter((id) => !retained.includes(id) && !savedShotIds.has(id))]
+        const story = cur.shots.filter((s) => s.sceneId === sceneId).map((s) => s.shotId)
+        for (const id of story) {
+          if (order.includes(id) || !playable(id) || !savedShotIds.has(id) || savedUrl.get(id)) continue
+          order = placeInStory(order, id, story)
+          entered.push(id)
+        }
+        const fresh = canonicalIds.filter((id) => !order.includes(id) && !savedShotIds.has(id) && playable(id))
+        entered.push(...fresh)
+        clipOrder[sceneId] = [...order, ...fresh]
       }
       // 이음 칸이 없는 예전 저장본은 지금 영상 자리 · 처음 나눈 자리와 맞는 소리를 다시 잇고, 이어진 소리는 되살린 영상 자리에 맞춘다(결정 4).
       //   같은 소리 파일의 파형은 저장본에 한 번만 있다 — 빠진 조각은 같은 파일의 파형을 함께 쓴다(검토 b).
       const timeline = { shots: combinedShots, videoClips: combinedClips, clipOrder }
       const relinked = relinkSavedAudio(sharePeaks(dedupAudioClips), timeline, { shots: cur.shots, videoClips: cur.videoClips }, saved.videoClips ?? [])
-      const audioClips = syncLinkedAudio({ ...timeline, audioClips: relinked })
+      let audioClips = syncLinkedAudio({ ...timeline, audioClips: relinked })
+      // 들어온 샷은 그 영상 소리도 오디오 칸에 이어서 놓는다 — 처음 열 때처럼(오너 2026-11-10 결정 4). 파형은 편집 화면을 연 뒤
+      //   뒤에서 채운다(open-editor 의 빈 파형 채우기). 사람이 고친 것이 아니라 되돌리기 칸에는 남지 않는다(아래 past: []).
+      if (entered.length) {
+        const layout = selectTimelineLayout(timeline)
+        const locale = useLocaleStore.getState().locale
+        const added: AudioTrackClip[] = []
+        for (const shotId of entered) {
+          const item = layout.find((l) => l.shotId === shotId)
+          const url = clipUrl.get(shotId)
+          if (!item || !url || audioClips.some((a) => a.linkedShotId === shotId)) continue
+          const type = combinedShots.find((s) => s.shotId === shotId)?.shotType
+          added.push({
+            id: `audio_${uid()}`,
+            name: translate(locale, '{type} audio', { type: type ?? translate(locale, 'Video') }),
+            url,
+            startSec: item.startSec,
+            durationSec: item.durationSec,
+            volume: 1,
+            muted: false,
+            peaks: [],
+            sourceOffsetSec: 0,
+            sourceDurationSec: item.durationSec,
+            trackId: dedupTracks[0].id,
+            linkedShotId: shotId,
+          })
+        }
+        if (added.length) audioClips = syncLinkedAudio({ ...timeline, audioClips: [...audioClips, ...added] })
+      }
       set({
         // Canonical shots/videoClips come from loadData (DB truth). Only synthetic editor
         // pieces whose base shot is still canonical are merged back in above - a local
@@ -1188,7 +1247,10 @@ export const useEditorStore = create<EditorState>((set, get) => ({
             }
           })
 
-          const order = buildClipOrder(shots)
+          // 영상이 있는 샷만 타임라인 컷이 된다 — 영상 없는 샷은 빈 칸으로 깔리지 않고 소스 칸에만 있다(오너 답 8, 2026-11-14).
+          //   약속: tests/editor/shots-with-video.test.ts
+          const withVideo = new Set(videoClips.filter((c) => c.url).map((c) => c.shotId))
+          const order = buildClipOrder(shots.filter((s) => withVideo.has(s.shotId)))
           const firstSceneId = shots[0]?.sceneId ?? null
 
           set({
@@ -1602,8 +1664,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
     let created: string | null = null
     set((state) => {
       const srcShot = state.shots.find((s) => s.shotId === sourceShotId)
-      if (!srcShot) return state
       const srcClip = state.videoClips.find((c) => c.shotId === sourceShotId)
+      // 영상이 없는 샷은 타임라인에 들이지 않는다 — 빈 칸이 생긴다(오너 답 8, 2026-11-14).
+      if (!srcShot || !srcClip?.url) return state
 
       const newId = `${sourceShotId}__i${uid()}`
       created = newId
