@@ -22,6 +22,7 @@ import { handleEditorKey } from '@/features/editor/use-editor-playback'
 import { TitleClipFace, TitleTextLayer } from '@/features/editor/title-clip-layer'
 import { defaultTitleText, titleLayersAt, titleTextBox } from '@/lib/editor/title-clip'
 import { transitionWindows } from '@/lib/editor/transition'
+import { editorChatContext } from '@/lib/editor/chat-context'
 import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { Shot, VideoClip } from '@/types'
 
@@ -130,6 +131,42 @@ describe('같이 정한 것', () => {
     const page = read('src/app/studio/editor/page.tsx')
     expect(page.match(/className=\{toolButton\(/g)).toHaveLength(3)
     expect(page).toMatch(/title=\{t\('Type tool \(T\)'\)\}/)
+  })
+})
+
+describe('같이 정한 것 — 리드 11/14 더함', () => {
+  it('제목 글자 칸에 치는 동안에는 단축키가 듣지 않는다 — T · V · C · M 은 도구 · 마커를 바꾸지 않고, Backspace · Delete 는 글자만 지우고 골라 둔 클립을 지우지 않는다(Ctrl+Z 도 글자 칸 안에서는 글자 되돌리기)', () => {
+    // 왜: 리드 11/14 — 제목 글자에 "t · v · c · m"이 들어 있으면 치는 도중 도구가 바뀌거나 마커가 달리고, 지우기 키가 제목 클립을 지웠다간
+    //   글자를 고칠 수 없다. 한글 조합 중(Process · ㅅ)인 키도 같다. 칸은 효과 컨트롤이 그린 제목 글자 칸 그대로다.
+    const id = api().addTitleClip('v2', 3, '우산')!
+    api().selectClip(id)
+    const markup = html(createElement(EffectControls))
+    const tag = /<(input)\b([^>]*)value="우산"/.exec(markup)
+    expect(tag).not.toBeNull()
+    const field = { tagName: tag![1].toUpperCase(), type: /\btype="([^"]+)"/.exec(tag![2])?.[1] ?? 'text', isContentEditable: false, getAttribute: () => null }
+    const press = (k: string, code: string, extra: Partial<KeyboardEvent> = {}, target: unknown = field) =>
+      handleEditorKey({ key: k, code, ctrlKey: false, metaKey: false, altKey: false, shiftKey: false, isComposing: false, target, preventDefault: () => {}, ...extra } as unknown as KeyboardEvent)
+    const before = { tool: api().toolMode, markers: [...api().markers], past: api().past.length, selected: [...api().selectedShotIds] }
+    for (const [k, code] of [['t', 'KeyT'], ['v', 'KeyV'], ['c', 'KeyC'], ['m', 'KeyM'], ['ㅅ', 'KeyT'], ['Backspace', 'Backspace'], ['Delete', 'Delete']]) press(k, code)
+    press('Process', 'KeyT', { isComposing: true })
+    press('z', 'KeyZ', { ctrlKey: true })
+    expect({ tool: api().toolMode, markers: api().markers, past: api().past.length, selected: api().selectedShotIds }).toEqual(before)
+    expect(placeOf(id)).toBeDefined()
+    // 글자 칸 밖에서는 같은 키가 듣는다(헛통과가 아니게).
+    press('t', 'KeyT', {}, null)
+    expect(api().toolMode).toBe('text')
+  })
+
+  it('Lumi 조언의 타임라인 요약은 제목 클립을 "V2 제목 \'글자\' · 시작 → 끝"처럼 말한다 — 영상 클립으로 잘못 말하지 않는다', () => {
+    // 왜: 리드 11/14 — 요약이 제목을 모르면 조언 채팅이 제목을 영상 컷으로 알고 말한다. V1 로 옮긴 제목도 제목으로 말한다.
+    const id = api().addTitleClip('v2', 3, '우산')!
+    const context = editorChatContext(api())
+    expect(context).toContain('Cuts on the timeline: 3')
+    expect(context).toContain('Titles over the video: V2 title "우산" 3.0s–5.0s')
+    api().moveClipToTrack(id, 'v1', 12)
+    const moved = editorChatContext(api())
+    expect(moved).toMatch(/4\. 12\.0s–14\.0s \(2\.0s\) Title "우산"/)
+    expect(moved).not.toMatch(/Title "우산"[^\n]*no video yet/)
   })
 })
 
