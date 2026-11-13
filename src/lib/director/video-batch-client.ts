@@ -105,6 +105,22 @@ async function pollVideoBatch(
 ): Promise<VideoBatchSummary | null> {
   const store = useDirectorCanvasStore
   let summary = initial
+  /** 화면에서 멈추라고 이미 부탁한 작업 — 같은 작업은 한 번만 멈춘다. */
+  const stopAsked = new Set<string>()
+  // 사람이 묶음을 멈췄다(cancelled) — 그 묶음이 이미 낸 영상도 화면에서 멈춘다(오너 2026-11-14 7번). [모두 멈추기]와 서버의
+  //   다음 영상 내기가 엇갈려 막 낸 영상도 놓치지 않는다. 진행 표시와는 따로 돌고, 실패하면 다음 조회 때 다시 부탁한다.
+  const stopStartedVideos = () => {
+    if (summary.status !== 'cancelled') return
+    const toStop = summary.jobs.flatMap((job) => (job.jobId && job.status === 'queued' && !stopAsked.has(job.jobId) ? [job.jobId] : []))
+    if (toStop.length === 0) return
+    for (const id of toStop) stopAsked.add(id)
+    void Promise.resolve()
+      .then(() => store.getState().cancelRunningJobs(toStop))
+      .catch((error) => {
+        for (const id of toStop) stopAsked.delete(id)
+        console.error('[video-batches] stopping started videos failed:', error)
+      })
+  }
   const apply = () => {
     if (!ownsRun()) return
     store.setState({
@@ -116,6 +132,7 @@ async function pollVideoBatch(
       },
       videoBatchQueue: queueOf(summary),
     })
+    stopStartedVideos()
     let sawNewTerminalJob = false
     let sawNewRunningJob = false
     for (const job of summary.jobs) {
@@ -184,7 +201,9 @@ export async function runVideoBatch(
 ): Promise<VideoBatchResult> {
   const store = useDirectorCanvasStore
   const current = store.getState()
-  if (!projectId || current.projectId !== projectId || current.videoBatchBusy) {
+  // 멈춘 묶음이 뒤에서 아직 돌아도(화면에서 멈춘 영상이 fal 에서 끝나기를 기다림) 새 묶음은 바로 시작한다(오너 7번) —
+  //   새 실행 id 가 옛 조회를 조용히 끝낸다.
+  if (!projectId || current.projectId !== projectId || (current.videoBatchBusy && !current.videoBatchCancelled)) {
     return { ...EMPTY_RESULT }
   }
 

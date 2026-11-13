@@ -87,7 +87,8 @@ import { isVideoData } from '@/types/director'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
-import { useGenerationBatches } from '@/lib/generation-queue'
+import { activeJobsSnapshot, useActiveGenerationJobs, useGenerationBatches } from '@/lib/generation-queue'
+import { stoppableJobs, stopNotice, videoBatchLive } from '@/lib/director/stop-work'
 import { withStoryboardBacklog } from '@/lib/generation-batches'
 import { getDirectorGaps, ledgerGapLabels, summarizeGaps } from '@/lib/completeness'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -960,12 +961,20 @@ function PaletteBar() {
   const stateList = [...shotStates.values()]
   const makingImages = stateList.filter((s) => s === 'image_generating').length
   const makingVideos = stateList.filter((s) => s === 'video_generating').length
-  const making = makingImages + makingVideos > 0 || realBatchBusy || videoBatchBusy
+  // 멈춘 일괄은 도는 것으로 세지 않는다(오너 7번 — 멈추면 바로 다시 만들 수 있다). 멈춘 영상 묶음은 화면에서 멈추지 않은 영상이 남았을 때만 돈다.
+  const activeJobs = useActiveGenerationJobs(projectId ?? null)
+  const videoQueueJobKey = useDirectorCanvasStore((s) => (s.videoBatchQueue?.jobIds ?? []).join('|'))
+  const imageBatchLive = realBatchBusy && !realBatchCancelled
+  const videoLive = videoBatchLive(
+    { busy: videoBatchBusy, cancelled: videoBatchCancelled, jobIds: videoQueueJobKey ? videoQueueJobKey.split('|') : [] },
+    activeJobs,
+  )
+  const making = makingImages + makingVideos > 0 || imageBatchLive || videoLive
   // [다음: Editor로] · 사이드바 Editor · 채팅 넘김은 같은 조건 — 완성 영상이 하나라도 있으면 켜진다(시안 R, 결정 페이지 추천, 리드 검토 a 낮음 7).
   const canHandOff = directorHasFinishedVideo(nodes)
   // 꺼진 단추와 까닭(결정 페이지 "꺼진 단추 아래 이유 한 줄", 리드 검토 a 보통 1 · 낮음 4) — 일괄이 도는 동안은 눌러도 새 판이 서지 않으니 끈다.
   const imageBlock = imageWorkBlock(workStates, picked, realBatchBusy, statusFilter !== 'all')
-  const videoBlock = videoWorkBlock(workStates, picked, videoBatchBusy, statusFilter !== 'all')
+  const videoBlock = videoWorkBlock(workStates, picked, videoLive, statusFilter !== 'all')
   // Take 잔액(오너 답 11) — 못 읽었으면 Take 를 쓰는 단추가 시작하지 않고 단추 아래 까닭을 보인다(리드 11/14, D8 과 같은 말).
   const takeState = useTakeBalance()
   const [takesUnknown, setTakesUnknown] = useState(false)
@@ -1068,9 +1077,10 @@ function PaletteBar() {
     refetchTakeBalance()
     setConfirmVideoBatch(true)
   }
-  // [모두 멈추기](시안 D3 · D4, 오너 답 7) — 아직 보내지 않은 것만 멈춘다: 이미지 일괄은 다음 장을 보내지 않고,
-  //   영상 묶음은 지금 만들고 있는 영상까지만 마친다(#batch-resume 2026-09-09 오너 결정 ①).
-  const stopping = (!realBatchBusy || realBatchCancelled) && (!videoBatchBusy || videoBatchCancelled)
+  // [모두 멈추기](시안 D3 · D4, 오너 답 7) — 아직 보내지 않은 것은 보내지 않고(이미지 일괄은 다음 장 · 영상 묶음은 다음 영상),
+  //   이미 만들고 있는 이미지 · 영상은 화면에서 멈춘다(fal 에서는 끝까지 돌고 Take 는 돌려주지 않는다 · 뒤늦게 끝나면 기록에만).
+  const [stopRequested, setStopRequested] = useState(false)
+  const stopping = stopRequested
   const stopAll = async () => {
     const run = useDirectorCanvasStore.getState()
     // 걸어 둔 다시 돌기(러프 · 시트를 기다린 샷)도 거둔다 — 멈춘 뒤 저절로 다시 돌지 않게(리드 검토 a 보통 5).
@@ -1078,20 +1088,21 @@ function PaletteBar() {
     // 이어 보내기 기다림도 비운다 — 이미 보낸 이미지가 끝나도 영상은 시작하지 않는다(오너 답 7, 리드 검토 a 보통 6).
     run.setChainWaitingShots([])
     if (realBatchBusy && !realBatchCancelled) run.cancelRealBatch()
-    if (!videoBatchBusy || videoBatchCancelled) {
-      if (realBatchBusy) toast.info(t('Stop after the images being made now finish.'))
-      return
-    }
-    const stillCurrent = () => {
-      const current = useDirectorCanvasStore.getState()
-      return current.projectId === run.projectId && current.videoBatchRunId === run.videoBatchRunId
-    }
+    const stillCurrent = () => useDirectorCanvasStore.getState().projectId === run.projectId
+    setStopRequested(true)
     try {
-      await run.cancelVideoBatch()
-      if (stillCurrent()) toast.info(t('Stop after current videos finish.'))
+      // 묶음을 먼저 멈춰 서버가 새 영상을 더 내지 않게 한 뒤, 지금 만드는 것을 멈춘다(그사이 낸 영상은 묶음 조회가 멈춘다).
+      if (videoBatchBusy && !videoBatchCancelled) await run.cancelVideoBatch()
+      const asked = stoppableJobs(activeJobsSnapshot(run.projectId))
+      const stopped = new Set(asked.length > 0 ? await run.cancelRunningJobs(asked.map((job) => job.id)) : [])
+      const stoppedJobs = asked.filter((job) => stopped.has(job.id))
+      const videos = stoppedJobs.filter((job) => job.kind === 'shot_video').length
+      if (stillCurrent()) toast.info(t(stopNotice({ images: stoppedJobs.length - videos, videos })))
     } catch (error) {
-      console.error('[video-batches] cancel failed:', error)
-      if (stillCurrent()) toast.error(t('Please try again in a moment.'))
+      console.error('[director] stop all failed:', error)
+      if (stillCurrent()) toast.error(t('Could not stop it. Try again.'))
+    } finally {
+      setStopRequested(false)
     }
   }
   // 이어 보내기 지켜보기(오너 답 6 — 이 화면이 한다): 이미지가 끝난 샷은 영상을 시작하고, 그림이 없게 된 샷은 기다림에서 뺀다.
@@ -1123,7 +1134,7 @@ function PaletteBar() {
   const progressLabel =
     makingImages > 0 && makingVideos > 0
       ? makingLabel(makingImages, makingVideos, t)
-      : makingVideos > 0 || videoBatchBusy
+      : makingVideos > 0 || videoLive
         ? makingVideos > 1 ? t('Making {count} videos', { count: makingVideos }) : t('Making 1 video')
         : makingImages > 1 ? t('Making {count} images', { count: makingImages }) : t('Making 1 image')
 
@@ -1295,17 +1306,16 @@ function PaletteBar() {
                   )}
                 </span>
               )}
-              {(realBatchBusy || videoBatchBusy) && (
-                <button
-                  type="button"
-                  onClick={() => void stopAll()}
-                  disabled={stopping}
-                  className={cn(TOOLBAR_PILL, 'h-8 px-3 disabled:cursor-not-allowed disabled:opacity-60')}
-                >
-                  {stopping ? <Loader2 className="size-3.5 animate-spin" /> : <Square className="size-3 fill-current" />}
-                  <span>{stopping ? t('Stopping') : t('Stop all')}</span>
-                </button>
-              )}
+              {/* 만드는 것이 무엇이든(일괄 · 카드 · 상세 · 채팅) 여기서 모두 멈춘다(오너 7번). */}
+              <button
+                type="button"
+                onClick={() => void stopAll()}
+                disabled={stopping}
+                className={cn(TOOLBAR_PILL, 'h-8 px-3 disabled:cursor-not-allowed disabled:opacity-60')}
+              >
+                {stopping ? <Loader2 className="size-3.5 animate-spin" /> : <Square className="size-3 fill-current" />}
+                <span>{stopping ? t('Stopping') : t('Stop all')}</span>
+              </button>
             </div>
           )}
         </div>
