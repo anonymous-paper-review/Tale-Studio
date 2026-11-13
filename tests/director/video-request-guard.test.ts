@@ -30,18 +30,23 @@ describe('샷 번호를 지운 나머지가 시키는 꼴("영상 만들어 줘"
     expect(ground('샷 1~3 영상 만들어줘', ids(1, 2, 3, 4))).toEqual(run(1, 2, 3))
     expect(ground('샷 1~3 영상 만들어줘', ids(1, 2, 3))).toEqual(run(1, 2, 3))
   })
+  // 왜: 검토 b 보통 C 의 예 — 영상 내용 바람("모두 손 흔들기")이 붙은 부탁이라 시키는 꼴 밖이다. 바로 쓴 Take 는 못 돌리니 한 번 묻는다.
   it('"Make a video for shot 3 where all the characters wave."는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
     expect(ground('Make a video for shot 3 where all the characters wave.', ALL)).toEqual(confirm(3))
   })
+  // 왜: 검토 b 보통 C 의 예 — 시키는 꼴 밖의 말(완료 알림 부탁)이 붙은 부탁. 모델이 더 담은 샷 3 · 4 는 목록에도 넣지 않는다.
   it('"샷 2 영상 만들어줘. 다 만들면 알려줘"는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 2 목록으로 되묻는다', () => {
     expect(ground('샷 2 영상 만들어줘. 다 만들면 알려줘', ids(2, 3, 4))).toEqual(confirm(2))
   })
+  // 왜: 검토 b 보통 C 의 예 — 꾸밈 바람("전체적으로 밝게")이 붙은 부탁. 바람이 영상에 들어갔는지 모른 채 바로 만들지 않는다.
   it('"샷 3 영상 만들어줘, 전체적으로 밝게"는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
     expect(ground('샷 3 영상 만들어줘, 전체적으로 밝게', ALL)).toEqual(confirm(3))
   })
+  // 왜: 검토 b 보통 C 의 예 — 조건("실패하지 않게")이 붙은 부탁. 모델이 더 담은 실패 샷 5 · 6 은 목록에도 넣지 않는다.
   it('"샷 2 영상 만들어줘, 실패하지 않게"는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 2 목록으로 되묻는다', () => {
     expect(ground('샷 2 영상 만들어줘, 실패하지 않게', ids(2, 5, 6))).toEqual(confirm(2))
   })
+  // 왜: 검토 b 보통 C 의 예 — 까닭 · 조건("이미지가 있으니 그걸로")이 붙은 부탁. 모델이 더 담은 샷 2~4 는 목록에도 넣지 않는다.
   it('"샷 1 은 이미지가 있는 상태니까 그걸로 영상 만들어줘"는 시키는 꼴 밖의 말이 남아 바로 만들지 않고 샷 1 목록으로 되묻는다', () => {
     expect(ground('샷 1 은 이미지가 있는 상태니까 그걸로 영상 만들어줘', ids(1, 2, 3, 4))).toEqual(confirm(1))
   })
@@ -61,6 +66,7 @@ describe('샷 번호를 지운 나머지가 시키는 꼴("영상 만들어 줘"
       expect(ground(text, null), text).toEqual(run(3))
     }
   })
+  // 왜: 정상 경로 고정 — 번호와 시키는 말뿐인 부탁(존댓말 · "다시" · "3번 샷" · @멘션 · please)은 묻지 않고 바로 만든다(오너 9번 "말로 부탁하면 바로 실행").
   it('시키는 꼴은 "샷 3 영상 만들어줘" · "샷 3 영상 다시 만들어 주세요" · "Make shot 3\'s video" · "Make the video for shot 3, please"처럼 번호와 시키는 말뿐이다', () => {
     for (const text of ['샷 3 영상 만들어줘', '샷 3 영상 다시 만들어 주세요', '3번 샷 영상을 만들어줄래', "Make shot 3's video", 'Make the video for shot 3, please', '@Real Shot 3 영상 만들어줘']) {
       expect(ground(text, null), text).toEqual(run(3))
@@ -69,15 +75,18 @@ describe('샷 번호를 지운 나머지가 시키는 꼴("영상 만들어 줘"
 })
 
 describe('생성 말과 붙은 묶음 말만 있으면 그 묶음만 바로 만든다', () => {
+  // 왜: 정상 경로 고정 — 묶음 말과 시키는 말뿐인 부탁("영상 다 만들어줘")은 그 묶음(남은 샷 전부)을 묻지 않고 바로 만든다(오너 9번).
   it('"영상 다 만들어줘" · "Make all the videos" · "남은 샷 영상 만들어줘" · "Make videos for the remaining shots"는 남은 샷 전부를 바로 만든다', () => {
     for (const text of ['영상 다 만들어줘', 'Make all the videos', '남은 샷 영상 만들어줘', 'Make videos for the remaining shots']) {
       expect(ground(text, null), text).toEqual(run(1, 2, 3, 4, 5, 6))
     }
   })
+  // 왜: 정상 경로 고정 — 실패한 샷 다시 만들기는 영상 말이 없어도 분명하다. 모델이 더 담은 샷 1 처럼 묶음 밖 샷에는 Take 를 쓰지 않는다.
   it('"실패한 샷 다시 만들어줘"는 영상이 실패한 샷만 바로 만들고, 모델이 더 담아도 더하지 않는다', () => {
     expect(ground('실패한 샷 다시 만들어줘', null)).toEqual(run(5, 6))
     expect(ground('Remake the failed shots', ids(5, 1))).toEqual(run(5))
   })
+  // 왜: 정상 경로 고정 — "이미지 나온 샷" · "고른 샷" 부탁은 화면이 센 그 묶음 안에서만 만든다(모델이 더 담은 샷 5 · 3 은 뺀다).
   it('"이미지 나온 샷 영상 만들어줘"는 이미지가 나온 샷만, "고른 샷 영상 만들어줘"는 지금 고른 샷만 바로 만든다', () => {
     expect(ground('이미지 나온 샷 영상 만들어줘', null)).toEqual(run(1, 2, 3, 4))
     expect(ground('Make videos for the shots with images', ids(1, 5))).toEqual(run(1))
@@ -87,51 +96,66 @@ describe('생성 말과 붙은 묶음 말만 있으면 그 묶음만 바로 만�
 })
 
 describe('그 밖이면 바로 만들지 않고 화면이 센 목록으로 되묻는다(재검토 b 예)', () => {
+  // 왜: 재검토 b 의 예 — 빼는 말("샷 2 빼고")이 섞인 부탁. 바로 만들지 않고 샷 2 를 뺀 목록을 보여 "응"을 받는다.
   it('"샷 2 빼고 영상 다 만들어줘"는 바로 만들지 않고 샷 2 를 뺀 목록으로 되묻는다', () => {
     expect(ground('샷 2 빼고 영상 다 만들어줘', null)).toEqual(confirm(1, 3, 4, 5, 6))
   })
+  // 왜: 재검토 b 의 예 — 영어로 빼는 말("except shot 2")이 섞인 부탁. 샷 2 를 뺀 목록으로 묻는다.
   it('"Make all the videos except shot 2"는 바로 만들지 않고 샷 2 를 뺀 목록으로 되묻는다', () => {
     expect(ground('Make all the videos except shot 2', null)).toEqual(confirm(1, 3, 4, 5, 6))
   })
+  // 왜: 재검토 b 의 예 — 묶음을 빼는 말("실패한 샷 빼고")이 섞인 부탁. 실패한 샷 5 · 6 을 뺀 목록으로 묻는다.
   it('"실패한 샷 빼고 영상 다 만들어줘"는 바로 만들지 않고 실패한 샷을 뺀 목록으로 되묻는다', () => {
     expect(ground('실패한 샷 빼고 영상 다 만들어줘', null)).toEqual(confirm(1, 2, 3, 4))
   })
+  // 왜: 재검토 b 의 예 — 고른 샷을 빼는 말("이 샷 말고")이 섞인 부탁. 지금 고른 샷 3 을 뺀 목록으로 묻는다.
   it('"이 샷 말고 영상 다 만들어줘"는 바로 만들지 않고 고른 샷을 뺀 목록으로 되묻는다', () => {
     expect(ground('이 샷 말고 영상 다 만들어줘', null, ids(3))).toEqual(confirm(1, 2, 4, 5, 6))
   })
+  // 왜: 재검토 b 의 예 — 씬 범위("씬 2")는 화면이 샷으로 바꾸지 못한다. 모델이 고른 샷 5 · 6 을 목록으로 보여 맞는지 묻는다.
   it('"씬 2 영상 다 만들어줘"는 바로 만들지 않고 모델이 고른 샷 목록으로 되묻는다', () => {
     expect(ground('씬 2 영상 다 만들어줘', ids(5, 6))).toEqual(confirm(5, 6))
   })
+  // 왜: 재검토 b 의 예 — 수량 말("하나만")은 어느 샷인지 말하지 않았다. 모델이 고른 샷을 목록으로 보여 맞는지 묻는다.
   it('"영상 하나만 만들어줘"는 바로 만들지 않고 모델이 고른 샷 목록으로 되묻는다', () => {
     expect(ground('영상 하나만 만들어줘', ids(1))).toEqual(confirm(1))
   })
+  // 왜: 재검토 b 의 예 — 영어 수량 말("two of")도 어느 샷인지 말하지 않았다. 모델이 고른 샷 1 · 2 를 목록으로 묻는다.
   it('"Make two of the remaining videos"는 바로 만들지 않고 모델이 고른 샷 목록으로 되묻는다', () => {
     expect(ground('Make two of the remaining videos', ids(1, 2))).toEqual(confirm(1, 2))
   })
+  // 왜: 재검토 b 의 예 — "만들기 전에 물어봐"는 먼저 묻기를 바란 말이다. 바로 만들지 않고 목록으로 묻는다.
   it('"영상 다 만들기 전에 물어봐"는 바로 만들지 않고 목록으로 되묻는다', () => {
     expect(ground('영상 다 만들기 전에 물어봐', null)).toEqual(confirm(1, 2, 3, 4, 5, 6))
   })
+  // 왜: 재검토 b 의 예 — "전부 말고 3번만"은 좁히는 말이다. 모델이 전부를 담아도 샷 3 만 묻는다.
   it('"전부 말고 3번 샷만 영상 만들어줘"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
     expect(ground('전부 말고 3번 샷만 영상 만들어줘', ALL)).toEqual(confirm(3))
   })
+  // 왜: 재검토 b 의 예 — 고른 샷은 빼고 번호로 다른 샷을 고른 부탁. 모델이 담은 고른 샷 3 은 빼고 샷 5 만 묻는다.
   it('"이 샷 말고 샷 5 영상"은 바로 만들지 않고 샷 5 목록으로 되묻는다', () => {
     expect(ground('이 샷 말고 샷 5 영상', ids(3, 5), ids(3))).toEqual(confirm(5))
   })
+  // 왜: 재검토 b 의 예 — 번호 구간 뒤에 빼는 번호가 붙은 부탁(한국어 · 영어). 샷 2 를 뺀 샷 1 · 3 목록으로 묻는다.
   it('"샷 1~3 영상 만들어줘, 2 빼고" · "Make videos for shots 1 to 3 except shot 2"는 바로 만들지 않고 샷 1 · 3 목록으로 되묻는다', () => {
     expect(ground('샷 1~3 영상 만들어줘, 2 빼고', ids(1, 2, 3))).toEqual(confirm(1, 3))
     expect(ground('Make videos for shots 1 to 3 except shot 2', ids(1, 3))).toEqual(confirm(1, 3))
   })
+  // 왜: 재검토 b 의 예 — 다른 번호를 함께 말하며 뺀 부탁("샷 4 말고" · "not shot 4"). 뺀 샷 4 는 목록에도 넣지 않는다.
   it('"샷 4 말고 샷 1 영상 만들어줘" · "Make shot 1, not shot 4"는 바로 만들지 않고 샷 1 목록으로 되묻는다', () => {
     expect(ground('샷 4 말고 샷 1 영상 만들어줘', ids(1))).toEqual(confirm(1))
     expect(ground('Make shot 1, not shot 4', ids(1, 4))).toEqual(confirm(1))
   })
+  // 왜: 재검토 b 의 예 — 한 문장에 "만들지 마" 절과 부탁 절이 같이 있다. 만들지 말라고 한 샷 2 는 빼고 샷 3 만 묻는다.
   it('"샷 2 는 만들지 말고 샷 3 만 영상 만들어줘"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
     expect(ground('샷 2 는 만들지 말고 샷 3 만 영상 만들어줘', ids(3))).toEqual(confirm(3))
   })
+  // 왜: 재검토 b 의 예 — 몇 번째("세 번째")는 보드 번호와 다를 수 있다. 번호로 바로 만들지 않고 모델이 고른 샷을 목록으로 묻는다.
   it('"세 번째 샷 영상 만들어줘"처럼 몇 번째로 말하면 바로 만들지 않고 그 샷 목록으로 되묻는다', () => {
     expect(ground('세 번째 샷 영상 만들어줘', ids(3))).toEqual(confirm(3))
     expect(ground('Make a video for the third shot', ids(3))).toEqual(confirm(3))
   })
+  // 왜: 재검토 b 의 예 — 대상 샷을 말하지 않은 부탁("영상 만들어줘")이나 묶음 말이 생성 말과 떨어진 부탁. 모델이 고른 샷을 목록으로 묻는다.
   it('번호도 묶음 말도 없거나 묶음 말이 생성 말과 붙지 않았으면 바로 만들지 않고 모델이 고른 샷 목록으로 되묻는다', () => {
     expect(ground('영상 만들어줘', ids(1))).toEqual(confirm(1))
     expect(ground('영상 만들어줘. 다 만들면 알려줘', ALL)).toEqual(confirm(1, 2, 3, 4, 5, 6))
@@ -144,18 +168,23 @@ describe('그 밖이면 바로 만들지 않고 화면이 센 목록으로 되�
 })
 
 describe('번호 길의 틈 — 그대로 두기 · 단위 · 서수 · 비슷한 낱말(재검토 b 낮음 2)', () => {
+  // 왜: 재검토 b 낮음 2 의 예 — "그대로 두고"로 샷 2 를 뺀 부탁. 바로 만들지 않고 샷 3 만 목록으로 묻는다.
   it('"샷 2 는 그대로 두고 샷 3 영상 만들어줘"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
     expect(ground('샷 2 는 그대로 두고 샷 3 영상 만들어줘', ids(3))).toEqual(confirm(3))
   })
+  // 왜: 재검토 b 낮음 2 의 예 — 영어로 샷 2 를 그대로 두라는 부탁("Leave shot 2 as it is"). 샷 3 만 목록으로 묻는다.
   it('"Leave shot 2 as it is and make the video for shot 3"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
     expect(ground('Leave shot 2 as it is and make the video for shot 3', ids(3))).toEqual(confirm(3))
   })
+  // 왜: 재검토 b 낮음 2 의 예 — "Don't bother with shot 2"로 샷 2 를 뺀 부탁. 샷 3 만 목록으로 묻는다.
   it('"Don\'t bother with shot 2, make the video for shot 3"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
     expect(ground("Don't bother with shot 2, make the video for shot 3", ids(3))).toEqual(confirm(3))
   })
+  // 왜: 재검토 b 낮음 2 의 예 — "No video for shot 2"로 샷 2 를 뺀 부탁. 샷 3 만 목록으로 묻는다.
   it('"No video for shot 2, make the video for shot 3"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
     expect(ground('No video for shot 2, make the video for shot 3', ids(3))).toEqual(confirm(3))
   })
+  // 왜: 재검토 b 낮음 2 의 예 — 번호가 있어도 "만들기 전에 물어봐"는 먼저 묻기를 바란 말이다. 바로 만들지 않는다.
   it('"샷 3 영상 만들기 전에 물어봐"는 바로 만들지 않고 샷 3 목록으로 되묻는다', () => {
     expect(ground('샷 3 영상 만들기 전에 물어봐', ids(3))).toEqual(confirm(3))
   })
@@ -174,6 +203,7 @@ describe('번호 길의 틈 — 그대로 두기 · 단위 · 서수 · 비슷�
     expect(ground('Make videos like the screenshots 2 and 3', ids(2, 3))).toEqual(confirm(2, 3))
     expect(ground('스크린샷 2 처럼 영상 만들어줘', ids(2))).toEqual(confirm(2))
   })
+  // 왜: 재검토 b 낮음 2 의 예 — 씬 안의 몇 번째 샷은 보드 번호(전체 번호)와 다르다. 번호로 읽지 않고 모델이 고른 샷을 목록으로 묻는다.
   it('"씬 2의 세 번째 샷 영상 만들어줘"는 바로 만들지 않고 모델이 고른 샷 목록으로 되묻는다', () => {
     expect(ground('씬 2의 세 번째 샷 영상 만들어줘', ids(5))).toEqual(confirm(5))
   })
@@ -196,11 +226,13 @@ describe('시키는 꼴이 아닌 말(재재검토 b 보통 C)', () => {
     ]
     for (const [text, picks] of cases) expect(ground(text, picks).kind, text).not.toBe('run')
   })
+  // 왜: 재재검토 b 보통 C 의 예 — "만들진 마 · 만들면 안 돼 · 싫어 · stop · cancel"은 만들지 말라는 말이다. 목록으로도 묻지 않고 아무것도 만들지 않는다.
   it('"영상 다 만들진 마" · "만들면 안 돼" · "만들기 싫어" · "Stop making …" · "Cancel …"이면 아무 영상도 만들지 않는다', () => {
     for (const text of ['영상 다 만들진 마', '샷 3 영상 만들면 안 돼', '영상 만들기 싫어', 'Stop making all the videos', 'Cancel all the videos']) {
       expect(ground(text, null), text).toEqual(NONE)
     }
   })
+  // 왜: 재재검토 b 보통 C 의 예 — "만들어도 될까?" · "Take 얼마나 들어?"는 묻는 말이지 부탁이 아니다. 바로 만들지 않고 목록으로 되묻는다.
   it('묻는 말("샷 3 영상 만들어도 될까?" · "Should I make …?" · "Take 얼마나 들어?")은 바로 만들지 않고 목록으로 되묻는다', () => {
     expect(ground('샷 3 영상 만들어도 될까?', ids(3))).toEqual(confirm(3))
     expect(ground('Should I make the video for shot 3?', ids(3))).toEqual(confirm(3))
@@ -229,9 +261,11 @@ describe('되묻는 목록에서 빼는 말(검토자 탐침 revb22)', () => {
       expect(ground(text, ids(2, 3)), text).toEqual(confirm(3))
     }
   })
+  // 왜: 검토자 탐침 revb22 의 예 — 영어로 묶음을 빼는 말("except the failed ones")을 놓치면 실패한 샷이 되묻는 목록에 남아 "응" 한 번에 Take 를 쓴다.
   it('"Make all the remaining videos except the failed ones"는 실패한 샷을 뺀 목록으로 되묻는다', () => {
     expect(ground('Make all the remaining videos except the failed ones', null)).toEqual(confirm(1, 2, 3, 4))
   })
+  // 왜: 검토자 탐침 revb22 의 예 — "다 만드는 건 아니야" · "만들지 않을래"는 만들지 말라는 말이다. "아직 만들지 않은 샷"은 그 말이 아니라 부탁으로 둔다.
   it('"영상 다 만드는 건 아니야" · "샷 3 영상 만들지 않을래"면 아무 영상도 만들지 않는다', () => {
     expect(ground('영상 다 만드는 건 아니야', null)).toEqual(NONE)
     expect(ground('샷 3 영상 만들지 않을래', ids(3))).toEqual(NONE)
@@ -280,10 +314,12 @@ describe('반대로 걸리던 말(검토 b efac9881 탐침)', () => {
 })
 
 describe('만들지 말라는 말이면 만들지 않는다', () => {
+  // 왜: 정상 경로 고정 — 번호를 대고 만들지 말라고 하면(한국어 · 영어) 모델이 그 샷 영상을 담아도 만들지 않는다.
   it('"샷 2 는 영상 만들지 마" · "Don\'t make a video for shot 4"면 아무 영상도 만들지 않는다', () => {
     expect(ground('샷 2 는 영상 만들지 마', ids(2))).toEqual(NONE)
     expect(ground("Don't make a video for shot 4", ids(4))).toEqual(NONE)
   })
+  // 왜: 정상 경로 고정 — 미루는 말("만들지는 마" · "Hold off" · "later, not now")이면 모델이 영상 부탁을 담아도 만들지 않는다.
   it('"영상 다 만들지는 마" · "Hold off on the videos" · "Make the videos later, not now"면 아무 영상도 만들지 않는다', () => {
     expect(ground('영상 다 만들지는 마', null)).toEqual(NONE)
     expect(ground('Hold off on the videos', null)).toEqual(NONE)
