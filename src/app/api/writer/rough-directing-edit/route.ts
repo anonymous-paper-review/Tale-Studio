@@ -10,6 +10,7 @@ import { capacityReservationRejection } from '@/lib/api/quota'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
 import {
   ForeignMediaPathError,
+  StaleDirectionError,
   separateArrowLayer,
   saveDirectingFrame,
   regenerateEndFrame,
@@ -24,6 +25,8 @@ const BodySchema = z.discriminatedUnion('action', [
     action: z.literal('separate'),
     projectId: z.string().uuid(),
     shotId: z.string().min(1),
+    // 화면이 보고 있는 연출 그림 주소 — 서버 그림과 다르면 그림 값을 쓰기 전에 409(검토 2026-11-14 낮음 2 ②). 옛 화면은 안 보낸다.
+    direction: z.string().max(4000).optional(),
   }),
   z.object({
     action: z.literal('save'),
@@ -62,7 +65,7 @@ export async function POST(req: Request) {
 
     // 덮어쓸 그림은 늘 이 프로젝트 폴더 안이어야 한다 — 주소가 브라우저가 고칠 수 있는 rough_storyboard 에서 온다(2026-11-01 리뷰 M5).
     if (body.action === 'separate') {
-      const data = await separateArrowLayer(body.projectId, body.shotId, undefined, { projectFolderOnly: true })
+      const data = await separateArrowLayer(body.projectId, body.shotId, undefined, { projectFolderOnly: true, expectDirection: body.direction })
       return NextResponse.json({ data })
     }
     if (body.action === 'regenerate-end') {
@@ -77,6 +80,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ data })
   } catch (e) {
     if (e instanceof ForeignMediaPathError) return NextResponse.json({ error: e.message }, { status: 403 })
+    if (e instanceof StaleDirectionError) return NextResponse.json({ error: e.message, code: 'stale_direction' }, { status: 409 })
     // 내용 규칙 거절·검사 장애도 자리 부족과 같은 자리에서 표준 상황코드로 바꾼다(#creem-moderation).
     const blocked = capacityContext && moderationRejectionResponse(e, capacityContext)
     if (blocked) return blocked

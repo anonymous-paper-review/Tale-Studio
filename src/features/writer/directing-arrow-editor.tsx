@@ -7,7 +7,7 @@
 //   위층 = 원본 DIRECTING 프레임을 올린 캔버스
 // 지우개(destination-out)로 위층을 긁으면 밑층이 드러난다 = 기존 화살표 삭제.
 // 펜으로 위층에 새 화살표를 그리고, 저장 시 두 층을 평탄화해 direction 프레임에 upsert.
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState } from 'react'
 import { Eraser, Layers, Loader2, Pen, RotateCcw, Save, Trash2, Undo2, Wand2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -47,28 +47,79 @@ function loadImage(src: string): Promise<HTMLImageElement> {
   })
 }
 
+/** 이 편집기에서 분리한 밑층 — 서버가 화살표를 지운 연출 그림 주소(?v= 포함)와 함께 둔다. */
+export type SeparatedPlate = { url: string; direction: string }
+
+/** 편집기 밑층(화살표를 지운 그림) — 지금 연출 그림에서 만든 것만 쓴다. 서버 캐시(cleanDirection)가 지금 그림(generatedAt)의 것이면
+ *  그것, 아니면 이 편집기에서 지금 연출 그림(주소)을 분리한 것. 팝업을 연 채로 연출 그림을 다시 만들면 둘 다 옛 그림의 것이라 밑층이 없다 —
+ *  옛 밑층을 그대로 쓰면 지우개로 긁을 때 바뀌기 전 그림이 드러나고 저장하면 새 연출 그림에 박혔다(2026-11-14 미들 프레임 고장).
+ *  분리값은 그림 시각이 아니라 연출 그림 주소로 묶는다 — 분리하는 동안 시작 · 끝만 다시 그려도 연출 그림은 그대로다(검토 낮음 2 ①).
+ *  순수 함수 — 테스트 대상(tests/writer/directing-clean-plate.test.ts). */
+export function cleanPlateFor(
+  panel: Pick<RoughStoryboardImage, 'generatedAt' | 'cleanDirection' | 'frames'>,
+  separated: SeparatedPlate | null,
+): string | null {
+  if (panel.cleanDirection && panel.cleanDirection.for === panel.generatedAt) return panel.cleanDirection.url
+  if (separated && !!panel.frames?.direction && separated.direction === panel.frames.direction) return separated.url
+  return null
+}
+
+/** 밑층이 없으면 지우개는 그릴 수 없다 — 펜으로 돌린다(검토 낮음 1: 지우개가 눌린 채 금지 커서로 남았다). 순수 함수 — 테스트 대상. */
+export function toolWithPlate(tool: Tool, hasPlate: boolean): Tool {
+  return tool === 'eraser' && !hasPlate ? 'pen' : tool
+}
+
+/** 위층(원본 + 그리던 자국 · 되돌리기)을 다시 깔지 — 연출 그림(주소, ?v= 포함)이 바뀔 때만. 시작 · 끝만 다시 그리면
+ *  그림 시각만 바뀌므로 그리던 화살표를 그대로 둔다(재검토 c 3 — 예전엔 그림 시각으로 다시 깔아 저장 전 자국이 사라졌다). 순수 함수 — 테스트 대상. */
+export function reloadsTopLayer(loaded: string | null, direction: string | null | undefined): boolean {
+  return !!direction && direction !== loaded
+}
+
+/** 분리 답 읽기 — 409(stale_direction)면 화면이 서버보다 낡았다: 알리고 지금 그림을 다시 읽는다(위층도 맞춘다). 테스트 대상. */
+export async function readSeparateResponse(
+  res: Response,
+  onStale: { notify: () => void; reload: () => Promise<void> },
+): Promise<{ cleanUrl: string; cached: boolean } | null> {
+  const j = await res.json().catch(() => null)
+  if (res.status === 409 && j?.code === 'stale_direction') {
+    onStale.notify()
+    await onStale.reload()
+    return null
+  }
+  if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
+  return { cleanUrl: j.data.cleanUrl as string, cached: !!j.data.cached }
+}
+
+/** 편집기를 연 창이 부르는 것 — 창 아래 [적용] · 물음 창 [저장하고 닫기]가 그린 것을 저장한다(2026-11-14 리드 ①②). */
+export interface DirectingArrowEditorHandle {
+  /** 그린 것을 저장한다(편집기 [저장]과 같다) — 저장했으면 true, 안 됐으면 알리고 false. */
+  save: () => Promise<boolean>
+}
+
 export function DirectingArrowEditor({
   projectId,
   shotId,
   panel,
   onSaved,
+  onDirtyChange,
+  ref,
 }: {
   projectId: string
   shotId: string
   panel: RoughStoryboardImage
   onSaved: () => void
+  /** 저장하지 않은 화살표(되돌리기 칸)가 생기거나 없어질 때 — 창이 [적용]을 켜고 닫기 전에 묻는다. */
+  onDirtyChange?: (dirty: boolean) => void
+  ref?: React.Ref<DirectingArrowEditorHandle>
 }) {
   const t = useT()
   const directionUrl = panel.frames?.direction
     ? withCacheBust(panel.frames.direction, panel.generatedAt)
     : null
-  // 서버 캐시가 현 generatedAt 파생이면 재분리 없이 바로 밑층으로 쓴다(재과금 방지).
-  const freshClean =
-    panel.cleanDirection && panel.cleanDirection.for === panel.generatedAt
-      ? panel.cleanDirection.url
-      : null
-  const [cleanUrl, setCleanUrl] = useState<string | null>(freshClean)
-  const effectiveClean = cleanUrl ?? freshClean
+  // 서버 캐시가 현 generatedAt 파생이면 재분리 없이 바로 밑층으로 쓴다(재과금 방지). 이 편집기에서 분리한 밑층은
+  //   어느 연출 그림(주소)에서 지운 것인지 함께 두어, 연출 그림이 다시 만들어지면 버린다(cleanPlateFor).
+  const [separated, setSeparated] = useState<SeparatedPlate | null>(null)
+  const effectiveClean = cleanPlateFor(panel, separated)
 
   const topCanvasRef = useRef<HTMLCanvasElement>(null)
   const drawingRef = useRef(false)
@@ -86,15 +137,22 @@ export function DirectingArrowEditor({
   //   좌표는 표시 크기(CSS px), 굵기는 캔버스 내부 픽셀이라 배율(displayScale)로 환산한다.
   const [hoverPt, setHoverPt] = useState<Pt | null>(null)
   const [displayScale, setDisplayScale] = useState(1)
+  // 밑층이 없어지면(연출 그림을 다시 만듦) 지우개 대신 펜 — 안내("펜은 바로 써요")대로 바로 그린다(검토 낮음 1).
+  useEffect(() => {
+    const next = toolWithPlate(tool, !!effectiveClean)
+    if (next !== tool) setTool(next)
+  }, [tool, effectiveClean])
 
   // effect 의 .catch() 안에서 쓸 문자열은 미리 번역해 둔다 — t 자체를 deps 에 넣으면 매 렌더
   //   재실행되므로, 값(문자열)만 deps 에 넣어 로케일이 실제로 바뀔 때만 재실행되게 한다.
   const failedToLoadFrameMsg = t('Could not load the DIRECTING frame')
 
-  // 원본 DIRECTING 프레임 → 위층 캔버스. directionUrl 은 generatedAt 캐시버스트를 포함하므로
-  //   저장 후(loadProject 로 generatedAt 갱신) 이 effect 가 저장본을 새 "원본"으로 다시 깐다.
+  // 원본 DIRECTING 프레임 → 위층 캔버스. 저장하거나 연출 그림을 다시 만들면 연출 그림 주소가 바뀌어 이 effect 가
+  //   그 그림을 새 "원본"으로 다시 깐다. 시작 · 끝만 다시 그리면(그림 시각만 바뀜) 그리던 자국 · 되돌리기를 남긴다(재검토 c 3).
+  const loadedDirectionRef = useRef<string | null>(null)
+  const directionKey = panel.frames?.direction ?? null
   useEffect(() => {
-    if (!directionUrl) return
+    if (!directionUrl || !reloadsTopLayer(loadedDirectionRef.current, directionKey)) return
     let cancelled = false
     void loadImage(directionUrl)
       .then((img) => {
@@ -107,6 +165,7 @@ export function DirectingArrowEditor({
         undoStackRef.current = []
         setUndoCount(0)
         setDims({ w: img.naturalWidth, h: img.naturalHeight })
+        loadedDirectionRef.current = directionKey
       })
       .catch(() => {
         if (!cancelled) toast.error(failedToLoadFrameMsg)
@@ -114,7 +173,14 @@ export function DirectingArrowEditor({
     return () => {
       cancelled = true
     }
-  }, [directionUrl, failedToLoadFrameMsg])
+  }, [directionUrl, directionKey, failedToLoadFrameMsg])
+
+  // 저장하지 않은 화살표 = 되돌리기 칸이 하나라도 있음(불러오기 · 저장 뒤에는 비워진다). 사라지면(탭을 바꿈) 없는 것으로 알린다.
+  const dirty = undoCount > 0
+  useEffect(() => {
+    onDirtyChange?.(dirty)
+  }, [dirty, onDirtyChange])
+  useEffect(() => () => onDirtyChange?.(false), [onDirtyChange])
 
   const busy = separating || saving
   const ready = !!dims
@@ -232,17 +298,24 @@ export function DirectingArrowEditor({
   const handleSeparate = async () => {
     setSeparating(true)
     try {
+      // 화면이 보고 있는 연출 그림(주소)을 같이 보낸다 — 서버 그림이 그사이 바뀌었으면 서버가 그림 값을 쓰기 전에 거절한다(검토 낮음 2 ②).
+      const direction = panel.frames?.direction ?? ''
       const res = await fetch('/api/writer/rough-directing-edit', {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'separate', projectId, shotId }),
+        body: JSON.stringify({ action: 'separate', projectId, shotId, direction }),
       })
-      const j = await res.json().catch(() => null)
-      if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
-      setCleanUrl(j.data.cleanUrl as string)
+      // 낡은 화면 위에 새 그림의 밑층을 섞지 않는다 — 409 면 알리고 화면을 다시 읽어 위층도 지금 그림으로 맞춘다.
+      const separatedPlate = await readSeparateResponse(res, {
+        notify: () => toast.info(t('The directing frame changed in the meantime, so we loaded it again. Separate the layer again.')),
+        // 감싼 까닭: 출시 시험 rough-frame-edit-refresh 가 두 저장 길의 다시 읽기 줄을 글자 그대로 세어 2개여야 한다 — 이 길은 그 셈 밖에 둔다.
+        reload: () => reloadAfterRoughFrameEdit(projectId, () => onSaved()),
+      })
+      if (!separatedPlate) return
+      setSeparated({ url: separatedPlate.cleanUrl, direction })
       setTool('eraser') // 분리 직후 자연스러운 다음 동작 = 긁어보기
       toast.success(
-        j.data.cached
+        separatedPlate.cached
           ? t('Loaded the previously separated layer')
           : t('Separated the arrow layer. Scrape with the eraser to reveal the layer underneath'),
       )
@@ -259,9 +332,9 @@ export function DirectingArrowEditor({
    *   안 그러면 편집이 DIRECTING 한 장에만 남고 3프레임 세트가 서로 다른 이야기를 한다.
    *   과금이 걸리므로 기본 [저장]과 갈라 놓고, 누른 사람만 i2i 를 태운다.
    */
-  const handleSave = async (regenerateEnd = false) => {
+  const handleSave = async (regenerateEnd = false): Promise<boolean> => {
     const top = topCanvasRef.current
-    if (!top || !ready) return
+    if (!top || !ready) return false
     setSaving(true)
     try {
       // 평탄화: 밑층(클린 플레이트) → 위층 순서로 합성. 분리 전이면 위층 단독(원본+펜, 전면 불투명).
@@ -287,10 +360,13 @@ export function DirectingArrowEditor({
       })
       const j = await res.json().catch(() => null)
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
+      // 저장했으면 저장하지 않은 화살표는 없다 — 다시 불러오기(새 주소)를 기다리지 않고 바로 비운다(닫을 때 묻지 않게).
+      undoStackRef.current = []
+      setUndoCount(0)
       if (!regenerateEnd) {
         toast.success(t('Saved the DIRECTING frame'))
         await reloadAfterRoughFrameEdit(projectId, onSaved)
-        return
+        return true
       }
       // 저장이 끝난 뒤(= 서버가 새 DIRECTING 을 갖고 있는 상태) END 를 그 그림 기준으로 다시 그린다.
       toast.info(t('Redrawing the END frame, about 30 seconds'))
@@ -303,12 +379,15 @@ export function DirectingArrowEditor({
       if (!endRes.ok) throw new Error(endJson?.error ?? `HTTP ${endRes.status}`)
       toast.success(t('Saved DIRECTING and regenerated the END frame'))
       await reloadAfterRoughFrameEdit(projectId, onSaved)
+      return true
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('Save failed'))
+      return false
     } finally {
       setSaving(false)
     }
   }
+  useImperativeHandle(ref, () => ({ save: () => handleSave() }))
 
   if (!directionUrl) {
     return (
@@ -479,7 +558,8 @@ export function DirectingArrowEditor({
         )}
       </div>
 
-      <div className="flex items-center gap-3">
+      {/* 저장 줄 · 안내 줄은 그림 크기와 상관없이 늘 보인다 — 세로 그림이면 그림 아래 화면 밖이라 저장을 못 찾았다(리드 ③). */}
+      <div className="sticky bottom-0 z-20 flex items-center gap-3 bg-side py-2" data-testid="directing-editor-save-row">
         <p className="min-w-0 flex-1 text-xs text-muted-foreground">
           {effectiveClean
             ? t(
