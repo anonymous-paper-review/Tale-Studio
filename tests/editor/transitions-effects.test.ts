@@ -14,7 +14,7 @@ vi.mock('@/stores/project-store', () => ({
   }),
 }))
 
-import { saveEditorNow, selectProgramLayout, selectStackAt, selectTimelineLayout, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
+import { saveEditorNow, selectFrameAt, selectProgramLayout, selectTimelineLayout, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { EffectControls } from '@/features/editor/effect-controls'
 import { EffectsPanel } from '@/features/editor/effects-panel'
@@ -22,7 +22,6 @@ import { ProjectPanel } from '@/features/editor/video-source-panel'
 import { AudioFadeMarks, FxBadge, TransitionMarks } from '@/features/editor/timeline-transitions'
 import {
   audioFadeGain,
-  crossOverlayAt,
   crossSourceSec,
   dipOpacityAt,
   dissolveOpacityAt,
@@ -69,6 +68,19 @@ const clipOf = (shotId: string) => api().videoClips.find((c) => c.shotId === sho
 const audioOf = (id: string) => api().audioClips.find((a) => a.id === id)
 const windows = () => transitionWindows(selectVideoLayout(api()), api().videoClips)
 const program = () => selectProgramLayout(api())
+/**
+ * 그 시각 화면에 보이는 클립마다의 몫 — 모니터가 그리는 그릴 것 목록(2단계 ⑦)을 위 층부터, 화면을 다 덮는 층이 그 세기만큼 아래를 가린다
+ *   (이 파일의 영상은 모두 화면을 다 덮는다). 옛 셈 crossOverlayAt(맨 위 클립 위 겹침 하나)을 목록으로 옮겼다(2단계 ⑦-1).
+ */
+function seenAt(t: number): Record<string, number> {
+  const out: Record<string, number> = {}
+  let left = 1
+  for (const layer of [...selectFrameAt(api(), t).layers].reverse()) {
+    out[layer.shotId] = Math.round(left * layer.alpha * 1000) / 1000
+    left *= 1 - layer.alpha
+  }
+  return out
+}
 /** 정적 렌더는 스토어의 처음 값을 읽는다 — 지금 값을 처음 값으로 옮겨 그린다(tests/editor/panels.test.ts 와 같은 방법). */
 function html(el: ReturnType<typeof createElement>) {
   for (const store of [useLocaleStore, useEditorStore] as Array<{ getState: () => object; getInitialState: () => object }>) Object.assign(store.getInitialState(), store.getState())
@@ -151,16 +163,18 @@ describe('같이 정한 것', () => {
   it('교차 디졸브는 앞 클립과 뒤 클립을 섞는다 — 경계 앞에서는 뒤 클립이 점점 짙어지며 겹치고, 경계 뒤에서는 앞 클립이 점점 옅어진다', () => {
     // 왜: 오너 결정 4(교차 디졸브 = 앞뒤 클립을 섞는다). 1초 교차 디졸브는 경계(4초) 앞뒤 0.5초씩.
     api().dropTransition('B', 'start', 'cross')
-    expect(crossOverlayAt(windows(), program(), 3.75)).toEqual({ shotId: 'B', opacity: 0.25 })
-    expect(crossOverlayAt(windows(), program(), 4)).toEqual({ shotId: 'A', opacity: 0.5 })
-    expect(crossOverlayAt(windows(), program(), 4.25)).toEqual({ shotId: 'A', opacity: 0.25 })
-    expect(crossOverlayAt(windows(), program(), 3.4)).toBeNull()
-    expect(crossOverlayAt(windows(), program(), 4.5)).toBeNull()
+    // 보이는 몫(그릴 것 목록, 2단계 ⑦-1 — 옛 셈: crossOverlayAt 의 겹침 클립 · 불투명도 B 0.25 · A 0.5 · A 0.25 · 없음 · 없음).
+    expect(seenAt(3.75)).toEqual({ A: 0.75, B: 0.25 })
+    expect(seenAt(4)).toEqual({ A: 0.5, B: 0.5 })
+    expect(seenAt(4.25)).toEqual({ A: 0.25, B: 0.75 })
+    expect(seenAt(3.4)).toEqual({ A: 1 })
+    expect(seenAt(4.5)).toEqual({ B: 1 })
     // 검은 막은 없다.
     expect(dipOpacityAt(windows(), program(), 4)).toEqual({ black: 0, white: 0 })
+    // 모니터는 그 목록의 층을 그린다(옛 글자: crossOverlayAt(windows, layout, t · data-testid="program-cross-layer").
     const previewer = read('src/features/editor/video-previewer.tsx')
-    expect(previewer).toMatch(/crossOverlayAt\(windows, layout, t/)
-    expect(previewer).toMatch(/data-testid="program-cross-layer"/)
+    expect(previewer).toMatch(/selectFrameAt\(st, t, /)
+    expect(previewer).toMatch(/data-testid="program-layer"/)
   })
 
   it('예전 디졸브는 "검정으로 물들이기"로 읽힌다 — 옛 저장본의 디졸브는 검은 막 그대로다', async () => {
@@ -224,8 +238,9 @@ describe('혼자 정한 것', () => {
     api().moveClipToTrack('C', 'v2', 1)
     api().dropTransition('C', 'start', 'cross')
     expect(edgeFadeAt(windows(), 'C', 1.25)).toBe(0.25)
-    expect(selectStackAt(api(), 1.25).map((l) => l.shotId)).toEqual(['A', 'C'])
-    expect(selectStackAt(api(), 2.5).map((l) => l.shotId)).toEqual(['C'])
+    // 모니터가 그리는 층(그릴 것 목록 — 옛 셈: selectStackAt).
+    expect(selectFrameAt(api(), 1.25).layers.map((l) => [l.shotId, l.alpha])).toEqual([['A', 1], ['C', 0.25]])
+    expect(selectFrameAt(api(), 2.5).layers.map((l) => l.shotId)).toEqual(['C'])
   })
 
   it('흰색으로 물들이기는 검정으로 물들이기와 같은 자리에서 흰 막으로 그린다', () => {
@@ -321,10 +336,14 @@ describe('혼자 정한 것', () => {
     // 왜: 내보낸 영상에는 ⑦에서 싣는다 — 이 조각은 미리 보기만(리드 승인).
     const previewer = read('src/features/editor/video-previewer.tsx')
     expect(previewer).toMatch(/videoEffectFilter\(/)
-    expect(previewer).toMatch(/dipOpacityAt\(windows, layout, t\)/)
-    expect(previewer).toMatch(/edgeFadeAt\(windows, /)
+    // 전환 셈은 그릴 것 목록(selectFrameAt)이 하고 모니터는 그 목록으로 그린다(2단계 ⑦-1 — 옛 글자: 미리 보기 안의
+    //   dipOpacityAt(windows, layout, t) · edgeFadeAt(windows, · dissolveOpacityAt(layout, st.videoClips, t)).
+    expect(previewer).toMatch(/selectFrameAt\(st, t, /)
+    const store = read('src/stores/editor-store.ts')
+    expect(store).toMatch(/const dips = dipOpacityAt\(windows, program, t\)/)
+    expect(store).toMatch(/edgeFadeAt\(windows, item\.shotId, t\)/)
     // 예전 검은 막 함수는 내보내기와 같이 그대로 쓴다.
-    expect(previewer).toMatch(/dissolveOpacityAt\(layout, st\.videoClips, t\)/)
+    expect(store).toMatch(/dissolveOpacityAt\(program, input\.videoClips, t\)/)
   })
 
   it('끌어 놓기 · 빼기 · 길이 바꾸기는 되돌리기 한 번에 하나씩 돌아간다', () => {
@@ -467,14 +486,8 @@ describe('검토 c (E) — 리드 11/14 같이 정한 것', () => {
     useEditorStore.setState({ videoClips: api().videoClips.map((c) => (c.shotId === 'B' || c.shotId === 'C' ? { ...c, transitionIn: { type: 'cross' as const, durationSec: 2 } } : c)) })
     expect(windows().map((w) => [w.fromSec, w.toSec])).toEqual([[3.5, 4.5], [4.5, 5.5]])
     // 한 장(1/30초)마다 클립마다 보이는 몫이 0.1 넘게 튀지 않는다.
-    const weights = (t: number) => {
-      const top = program().find((p) => t >= p.startSec && t < p.startSec + p.durationSec)!.shotId
-      const over = crossOverlayAt(windows(), program(), t)
-      const out: Record<string, number> = { A: 0, B: 0, C: 0 }
-      out[top] += over ? 1 - over.opacity : 1
-      if (over) out[over.shotId] += over.opacity
-      return out
-    }
+    //   보이는 몫은 모니터가 그리는 그릴 것 목록으로 센다(2단계 ⑦-1 — 옛 셈: 맨 위 클립 + crossOverlayAt 겹침 하나).
+    const weights = (t: number): Record<string, number> => ({ A: 0, B: 0, C: 0, ...seenAt(t) })
     let prev = weights(3.4)
     for (let t = 3.4 + 1 / 30; t < 5.6; t += 1 / 30) {
       const now = weights(t)

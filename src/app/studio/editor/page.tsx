@@ -116,6 +116,7 @@ export default function PostPage() {
     moveAudioClip,
     splitAudioClipAt,
     pushHistory,
+    revertLastStep,
     setToolMode,
     undo,
     redo,
@@ -649,6 +650,7 @@ export default function PostPage() {
                       if (!created && trackId === 'v1') toast.info(t('There is no track to put the title on. Add V2 or unlock a track.'))
                     }}
                     onPushHistory={pushHistory}
+                    onRevertStep={revertLastStep}
                     videoTracks={videoTracks}
                     overlayLayout={overlayLayout}
                     onMoveClipToTrack={moveClipToTrack}

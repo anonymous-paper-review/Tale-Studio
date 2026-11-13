@@ -92,8 +92,11 @@ describe('2 · 디졸브 — 검은 막의 투명도만 시간에 따라 바뀐�
   })
 
   it('미리보기는 검은 막의 투명도만 바꿔 디졸브를 그린다(영상 픽셀은 손대지 않는다)', () => {
+    // 검은 막의 투명도는 그릴 것 목록(selectFrameAt)이 같은 함수로 센다 — 2단계 ⑦-1 에서 모니터의 셈을 목록 한 곳으로 옮겼다
+    //   (옛 글자: 미리보기 안의 dissolveOpacityAt(layout, st.videoClips, t)).
+    expect(read('src/stores/editor-store.ts')).toMatch(/dissolveOpacityAt\(program, input\.videoClips, t\)/)
     const previewer = read('src/features/editor/video-previewer.tsx')
-    expect(previewer).toMatch(/dissolveOpacityAt\(layout, st\.videoClips, t\)/)
+    expect(previewer).toMatch(/dissolveRef\.current\.style\.opacity = String\(plan\.black\)/)
     expect(previewer).toMatch(/data-testid="dissolve-overlay"/)
     expect(previewer).toMatch(/bg-black/)
   })

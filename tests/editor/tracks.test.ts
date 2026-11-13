@@ -150,7 +150,9 @@ describe('미리 보기 · 내보내기', () => {
     // 왜: 시안 E3 — 위 줄이 아래 줄을 가린다. 아래 클립은 가려진 동안에도 시간이 흐른다(다시 보일 때 그 자리부터).
     api().moveClipToTrack('D', 'v2', 6)
     expect(program()).toEqual([['A', 0, 4, 0], ['B', 4, 6, 4], ['D', 6, 10, 6], ['C', 10, 12, 8]])
-    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/selectProgramLayout\(st\)/)
+    // 미리 보기는 그릴 것 목록(selectFrameAt)으로 그리고, 목록의 맨 위 영상이 이 셈이다(2단계 ⑦-1 — 옛 글자: 미리 보기 안의 selectProgramLayout(st)).
+    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/selectFrameAt\(st, t, /)
+    expect(read('src/stores/editor-store.ts')).toMatch(/const program = selectProgramLayout\(input\)/)
     expect(read('src/app/studio/editor/page.tsx')).toMatch(/const layout = selectProgramLayout\(st\)/)
   })
 

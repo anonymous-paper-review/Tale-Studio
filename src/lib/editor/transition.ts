@@ -1,10 +1,11 @@
 // 화면 전환 — 검정으로 물들이기(예전 디졸브, 2026-09-08 오너 지시 2번) · 흰색으로 물들이기 · 교차 디졸브 · 소리 페이드(2단계 ⑤, 오너 결정 4).
 //
 //   물들이기는 브라우저에서 두 영상을 섞어 그리는 부담을 피해 검은(흰) 막 하나를 영상 위에 두고 시간에 따라 투명도만 바꾼다(오너 결정).
-//   교차 디졸브는 앞뒤 클립을 섞는다 — 맨 위 클립 위에 다른 클립 하나를 더 겹쳐 그 투명도를 바꾼다(모자란 원본은 첫 장 · 끝 장에 멈춤).
+//   교차 디졸브는 앞뒤 클립을 섞는다 — 두 클립을 겹쳐 한쪽의 투명도를 바꾼다(모자란 원본은 첫 장 · 끝 장에 멈춤, 차례는 그릴 것 목록).
 //   컷 하나에 전환 하나 — 앞 클립 끝과 뒤 클립 시작이 맞닿은 컷의 전환은 뒤 클립의 transitionIn 이다. 맞닿지 않은 끝(빈 끝)만 그 클립 것이다.
 //   자리: 맞닿은 컷은 경계 앞뒤로 반씩. 빈 끝의 교차 디졸브는 클립 안쪽(아래 줄 · 검정에서 나타나고 사라진다), 물들이기는 예전처럼 경계 가운데.
-//   미리 보기가 이 순수 함수들로 그린다. 내보내기는 아직 예전 검은 막(dissolveOpacityAt)만 싣는다 — 나머지는 ⑦에서.
+//   그릴 것 목록(selectFrameAt, 2단계 ⑦)이 이 순수 함수들로 시각마다 층 · 막을 정하고 모니터가 그 목록으로 그린다. 내보내기는 아직 예전
+//   검은 막(dissolveOpacityAt)만 싣는다 — 같은 목록으로 그리는 것은 ⑦-2 에서.
 //   약속: tests/editor/transitions-and-controls.test.ts · tests/editor/transitions-effects.test.ts
 import { SEQUENCE_FPS } from '@/lib/editor/sequence-info'
 import type { AudioTrackClip, ClipTransition, ClipTransitionType, VideoClip } from '@/types/shot'
@@ -208,28 +209,7 @@ export function dipOpacityAt(windows: readonly TransitionWindow[], program: read
   return { black: round3(clamp01(black)), white: round3(clamp01(white)) }
 }
 
-/**
- * 교차 디졸브 — 시각 t 에 맨 위 클립 위로 겹쳐 그릴 다른 클립과 그 불투명도. 경계 앞에서는 뒤 클립이 0 → ½, 경계 뒤에서는 앞 클립이
- *   ½ → 0(맨 위 클립 위에 겹치므로 둘이 섞인 그림이 된다). prerollSec 만큼 미리 불투명도 0 으로 돌려준다 — 영상을 먼저 불러 두게.
- */
-export function crossOverlayAt(
-  windows: readonly TransitionWindow[],
-  program: readonly LayoutItem[],
-  t: number,
-  prerollSec = 0,
-): { shotId: string; opacity: number } | null {
-  const top = topAt(program, t)
-  if (!top) return null
-  for (const w of windows) {
-    if (w.type !== 'cross' || !w.outgoing || !w.incoming || t < w.fromSec - prerollSec || t >= w.toSec) continue
-    const progress = clamp01((t - w.fromSec) / (w.toSec - w.fromSec))
-    if (t < w.atSec && top === w.outgoing) return { shotId: w.incoming, opacity: round3(progress) }
-    if (t >= w.atSec && top === w.incoming) return { shotId: w.outgoing, opacity: round3(1 - progress) }
-  }
-  return null
-}
-
-/** 겹쳐 그리는 클립의 원본 시각(초) — 경계 너머에 남은 원본이 없으면 첫 장 · 끝 장에 멈춘다(held). */
+/** 영상 층의 원본 시각(초) — 클립 밖(교차 디졸브 짝 · 미리 불러 둔 층)에서 경계 너머에 남은 원본이 없으면 첫 장 · 끝 장에 멈춘다(held). */
 export function crossSourceSec(
   item: { startSec: number },
   clip: Pick<VideoClip, 'trimStart' | 'speed'>,

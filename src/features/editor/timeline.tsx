@@ -124,6 +124,8 @@ interface TimelineProps {
   /** 약속 J4: 타이틀 카드 길이를 초 단위 숫자로(라벨 클릭·더블클릭). */
   onSetTitleCardDuration: (shotId: string, seconds: number) => void
   onPushHistory: () => void
+  /** 마지막 되돌리기 칸의 상태로 돌아가고 그 칸을 거둔다 — 끌기가 처음 자리로 돌아와 놓였을 때(검토 c (E) 낮음). */
+  onRevertStep: () => void
   /** 타임라인 머리 가운데 자리(시안 E1 409:4796–4808) — 화면이 [+ A 트랙] · 도구 설명 · 확대 −·+ 를 넣는다. */
   toolbar?: ReactNode
   /** 영상 줄(아래부터 V1 · V2 …)과 V1 밖 줄의 클립 · 줄 머리 단추(2단계 ②, 시안 E1 Track Header). */
@@ -169,6 +171,7 @@ function AudioClipBlock({
   onTrimPreview,
   rowTrackId,
   onPushHistory,
+  onRevertStep,
 }: {
   clip: AudioTrackClip
   pxPerSec: number
@@ -190,6 +193,7 @@ function AudioClipBlock({
   onTrimPreview: (p: { scope: string; leftSec: number; rightSec: number; label: string; clientX: number; clientY: number } | null) => void
   rowTrackId: string
   onPushHistory: () => void
+  onRevertStep: () => void
 }) {
   const t = useT()
   const canvasRef = useRef<HTMLCanvasElement>(null)
@@ -248,6 +252,8 @@ function AudioClipBlock({
       const origStart = clip.startSec
       let moved = false
       let pushed = false
+      // 마지막으로 옮긴 자리 · 줄 — 놓을 때 처음 자리로 돌아와 있는지 본다.
+      const last = { start: origStart, tid: rowTrackId }
       const move = (ev: PointerEvent) => {
         // 누르기만 해도 손이 몇 px 흔들린다 — 손잡이처럼 2px 를 넘겨야 옮기기로 본다(옮기면 영상에서 떨어진다, 2026-11-10 검토 b).
         if (!moved && Math.hypot(ev.clientX - startX, ev.clientY - startY) <= 2) return
@@ -264,16 +270,20 @@ function AudioClipBlock({
           onPushHistory()
         }
         if (pushed) onMove(snapped, tid)
+        last.start = snapped
+        last.tid = tid
       }
       const up = () => {
         blockEl.style.pointerEvents = ''
         window.removeEventListener('pointermove', move)
         window.removeEventListener('pointerup', up)
+        // 멀리 끌었다가 처음 자리 · 줄로 돌아와 놓으면 끌기 전 상태(영상에 붙은 채, 되돌리기 칸 없음)로 — 검토 c (E) 낮음.
+        if (pushed && Math.abs(last.start - origStart) <= 1e-6 && last.tid === rowTrackId) onRevertStep()
       }
       window.addEventListener('pointermove', move)
       window.addEventListener('pointerup', up)
     },
-    [cutMode, clientXToSec, onSplit, onSelect, onToggleSelect, onRangeSelect, onPushHistory, clip.startSec, clip.durationSec, clip.id, rowTrackId, pxPerSec, onMove, snapStart],
+    [cutMode, clientXToSec, onSplit, onSelect, onToggleSelect, onRangeSelect, onPushHistory, onRevertStep, clip.startSec, clip.durationSec, clip.id, rowTrackId, pxPerSec, onMove, snapStart],
   )
 
   // 게인(음량) 러버밴드 드래그 (요청 6) — 위/아래로 끌어 음량 조절
@@ -495,6 +505,7 @@ export function Timeline({
   onSetTrim,
   onSetTitleCardDuration,
   onPushHistory,
+  onRevertStep,
   toolbar,
   videoTracks,
   overlayLayout,
@@ -1422,6 +1433,7 @@ export function Timeline({
                       onTrimPreview={setTrimPreview}
                       rowTrackId={track.id}
                       onPushHistory={onPushHistory}
+                      onRevertStep={onRevertStep}
                     />
                     </div>
                   ))}

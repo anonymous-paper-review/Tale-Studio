@@ -33,8 +33,9 @@ describe('약속 K — 클립 자막', () => {
 
   it('자막은 그 클립이 재생되는 동안만 보인다', () => {
     // 미리보기는 지금 재생 중인 샷(activeShot)의 자막만 얹고, 내보내기는 세그먼트가 바뀔 때마다 그 샷의 자막으로 바꾼다.
+    //   (옛 기대값 2 — 타이틀 카드 무대 · 영상 틀 두 판에 하나씩 있었다. 2단계 ⑦-1 에서 판을 시퀀스 틀 하나로 합쳐 자막 층도 하나다.)
     const previewer = read('src/features/editor/video-previewer.tsx')
-    expect(previewer.match(/subtitle=\{resolveSubtitle\(activeShot\)\}/g)?.length).toBe(2)
+    expect(previewer.match(/subtitle=\{resolveSubtitle\(activeShot\)\}/g)?.length).toBe(1)
     const render = read('src/lib/editor-draft-render.ts')
     expect(render).toMatch(/activeSubtitle = shot \? resolveSubtitle\(shot\) : null/)
     expect(render).toMatch(/if \(activeSubtitle\) drawSubtitle\(ctx, W, H, activeSubtitle\)/)

@@ -14,7 +14,7 @@ vi.mock('@/stores/project-store', () => ({
   }),
 }))
 
-import { saveEditorNow, selectStackAt, selectTimelineLayout, useEditorStore } from '@/stores/editor-store'
+import { saveEditorNow, selectFrameAt, selectTimelineLayout, useEditorStore } from '@/stores/editor-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { EffectControls, armOnStepKey, sliderHistory } from '@/features/editor/effect-controls'
 import { Slider } from '@/components/ui/slider'
@@ -51,7 +51,8 @@ function canonical() {
   useEditorStore.setState({ shots: ids.map(shot), videoClips: ids.map(clip), clipOrder: { sc_1: [...ids] }, loadStatus: 'ready' })
 }
 const clipOf = (shotId: string) => api().videoClips.find((c) => c.shotId === shotId)
-const stack = (t: number) => selectStackAt(api(), t).map((l) => l.shotId)
+/** 모니터가 그 시각 아래부터 그리는 층(그릴 것 목록, 2단계 ⑦ — 옛 셈: selectStackAt). */
+const stack = (t: number) => selectFrameAt(api(), t).layers.map((l) => l.shotId)
 /** 정적 렌더는 스토어의 처음 값을 읽는다 — 지금 값을 처음 값으로 옮겨 그린다(tests/editor/panels.test.ts 와 같은 방법). */
 function html(el: ReturnType<typeof createElement>) {
   for (const store of [useLocaleStore, useEditorStore] as Array<{ getState: () => object; getInitialState: () => object }>) Object.assign(store.getInitialState(), store.getState())
@@ -98,9 +99,10 @@ describe('같이 정한 것', () => {
     // 눈을 끈 줄은 비치지도 가리지도 않는다.
     api().toggleTrackVisible('v2')
     expect(stack(2)).toEqual(['A'])
+    // 모니터는 그릴 것 목록의 층을 아래부터 겹쳐 그린다(2단계 ⑦-1 — 옛 글자: selectStackAt(st, t) · data-testid="program-under-layer").
     const previewer = read('src/features/editor/video-previewer.tsx')
-    expect(previewer).toMatch(/selectStackAt\(st, t\)/)
-    expect(previewer).toMatch(/data-testid="program-under-layer"/)
+    expect(previewer).toMatch(/selectFrameAt\(st, t, /)
+    expect(previewer).toMatch(/data-testid="program-layer"/)
   })
 
   it('슬라이더 색 · 모서리는 지금 토큰을 쓴다', () => {
@@ -288,5 +290,25 @@ describe('슬라이더 이름', () => {
     api().selectClip('B')
     const markup = html(createElement(EffectControls))
     for (const name of ['위치 X', '위치 Y', '비율', '불투명도']) expect(thumbNamed(markup, name)).toBe(true)
+  })
+})
+
+describe('검토 c (E) 낮음 — 리드 11/14 같이 정한 것', () => {
+  it('한 번의 끌기에서 소리 조각을 멀리 끌었다가 처음 자리 · 줄로 돌아와 놓으면 처음 상태(영상에 붙은 채, 되돌리기 칸 없음)로 되돌린다', () => {
+    // 왜: 검토 c (E) 낮음 — 끄는 동안 자리 · 줄이 한 번 바뀌면 영상에서 떨어지고 되돌리기 칸이 쌓여, 제자리로 돌아와 놓아도 뗀 소리 · 빈 칸이 남았다.
+    const before = api().audioClips.find((a) => a.id === 'a_B')!
+    const past = api().past.length
+    // 타임라인 끌기와 같은 차례: 자리가 처음 바뀔 때 한 칸 → 옮김 → 처음 자리로 돌아옴 → 놓을 때 되돌림.
+    api().pushHistory()
+    api().moveAudioClip('a_B', 9, 'atrack_2')
+    expect(api().audioClips.find((a) => a.id === 'a_B')).toMatchObject({ startSec: 9, trackId: 'atrack_2', linkedShotId: null })
+    api().moveAudioClip('a_B', before.startSec, before.trackId)
+    api().revertLastStep()
+    expect(api().audioClips.find((a) => a.id === 'a_B')).toEqual(before)
+    expect(api().past.length).toBe(past)
+    expect(api().future).toEqual([])
+    const timeline = read('src/features/editor/timeline.tsx')
+    expect(timeline).toMatch(/if \(pushed && Math\.abs\(last\.start - origStart\) <= 1e-6 && last\.tid === rowTrackId\) onRevertStep\(\)/)
+    expect(read('src/app/studio/editor/page.tsx')).toMatch(/onRevertStep=\{revertLastStep\}/)
   })
 })

@@ -14,14 +14,13 @@ vi.mock('@/stores/project-store', () => ({
   }),
 }))
 
-import { saveEditorNow, selectProgramLayout, selectTitleDipsAt, selectTitlesAt, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
+import { saveEditorNow, selectFrameAt, selectProgramLayout, selectTitleDipsAt, selectVideoLayout, useEditorStore } from '@/stores/editor-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { EffectControls } from '@/features/editor/effect-controls'
 import { EDITOR_SHORTCUTS } from '@/features/editor/editor-workbar'
 import { handleEditorKey } from '@/features/editor/use-editor-playback'
 import { TitleClipFace, TitleTextLayer } from '@/features/editor/title-clip-layer'
-import { defaultTitleText, titleLayersAt, titleTextBox } from '@/lib/editor/title-clip'
-import { transitionWindows } from '@/lib/editor/transition'
+import { defaultTitleText, titleTextBox } from '@/lib/editor/title-clip'
 import { editorChatContext } from '@/lib/editor/chat-context'
 import { clipMenuTitle } from '@/features/editor/editor-labels'
 import { translate } from '@/lib/i18n/translate'
@@ -48,6 +47,10 @@ function canonical() {
 const shotOf = (id: string) => api().shots.find((s) => s.shotId === id)
 const clipOf = (id: string) => api().videoClips.find((c) => c.shotId === id)
 const placeOf = (id: string) => selectVideoLayout(api()).find((l) => l.shotId === id)
+/** 모니터가 그 시각 아래부터 그리는 층과 세기(그릴 것 목록, 2단계 ⑦). */
+const drawn = (t: number) => selectFrameAt(api(), t).layers.map((l) => [l.shotId, l.alpha])
+/** 그 시각 그리는 제목(아래 줄부터) — 옛 셈 selectTitlesAt 을 그릴 것 목록으로 옮겼다(2단계 ⑦-1). */
+const titlesAt = (t: number) => selectFrameAt(api(), t).layers.filter((l) => l.kind === 'title').map((l) => l.shotId)
 function html(el: ReturnType<typeof createElement>) {
   for (const store of [useLocaleStore, useEditorStore] as Array<{ getState: () => object; getInitialState: () => object }>) Object.assign(store.getInitialState(), store.getState())
   return renderToStaticMarkup(el)
@@ -106,13 +109,17 @@ describe('같이 정한 것', () => {
   it('제목 글자는 모니터에서 아래 영상 위로 겹쳐 보인다', () => {
     // 왜: 시안 E2 409:5288 — 영상 위에 글자만 얹는다(검은 바탕이 아니다).
     const id = api().addTitleClip('v2', 3, '우산')!
-    expect(selectTitlesAt(api(), 4).map((l) => l.shotId)).toEqual([id])
+    // 그 시각 그리는 층은 V1 영상 위에 제목(그릴 것 목록 — 옛 셈: selectTitlesAt).
+    expect(drawn(4)).toEqual([['B', 1], [id, 1]])
     // 영상 그림은 그대로 V1 클립이다.
     expect(selectProgramLayout(api()).find((l) => 4 >= l.startSec && 4 < l.startSec + l.durationSec)?.shotId).toBe('B')
     const layer = renderToStaticMarkup(createElement(TitleTextLayer, { data: { text: '우산', size: 30, place: 'middle' }, frameHeight: 640 }))
     expect(text(layer)).toBe('우산')
     expect(layer).toContain('font-size:48px')
-    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/data-testid="program-title-layer"/)
+    // 모니터는 목록의 층마다 그린다 — 제목 층은 같은 글자 층(옛 글자: data-testid="program-title-layer").
+    const previewer = read('src/features/editor/video-previewer.tsx')
+    expect(previewer).toMatch(/data-testid="program-layer"/)
+    expect(previewer).toMatch(/<TitleTextLayer data=\{data\} frameHeight=\{frame\.height\} motion=\{clip\?\.motion\} \/>/)
   })
 
   it('타임라인 제목 클립은 "T 글자" 이름으로 보인다', () => {
@@ -298,11 +305,11 @@ describe('혼자 정한 것', () => {
     const id = api().addTitleClip('v2', 3, '우산')!
     expect(selectProgramLayout(api()).some((l) => l.shotId === id)).toBe(false)
     api().moveClipToTrack('C', 'v3', 3)
-    expect(selectTitlesAt(api(), 4).map((l) => l.shotId)).toEqual([])
+    expect(titlesAt(4)).toEqual([])
     api().setClipMotion(['C'], { scale: 0.5 })
-    expect(selectTitlesAt(api(), 4).map((l) => l.shotId)).toEqual([id])
+    expect(titlesAt(4)).toEqual([id])
     api().toggleTrackVisible('v2')
-    expect(selectTitlesAt(api(), 4)).toEqual([])
+    expect(titlesAt(4)).toEqual([])
   })
 
   it('빈 끝의 교차 디졸브로 제목이 서서히 나타나고 사라지며, 맞닿은 두 제목 사이 교차 디졸브는 앞 제목이 옅어지는 동안 뒤 제목이 짙어진다', () => {
@@ -311,12 +318,11 @@ describe('혼자 정한 것', () => {
     const b = api().addTitleClip('v2', 4, '둘')!
     api().dropTransition(a, 'start', 'cross')
     api().dropTransition(b, 'start', 'cross')
-    const titles = selectVideoLayout(api()).filter((l) => l.trackId === 'v2')
-    const windows = transitionWindows(selectVideoLayout(api()), api().videoClips)
-    expect(titleLayersAt(titles, windows, 2.25)).toEqual([{ shotId: a, fade: 0.25 }])
-    expect(titleLayersAt(titles, windows, 3.75)).toEqual([{ shotId: a, fade: 0.75 }, { shotId: b, fade: 0.25 }])
-    expect(titleLayersAt(titles, windows, 4.25)).toEqual([{ shotId: a, fade: 0.25 }, { shotId: b, fade: 0.75 }])
-    expect(titleLayersAt(titles, windows, 5)).toEqual([{ shotId: b, fade: 1 }])
+    // 그 시각 그리는 층(아래 V1 영상 위 제목)과 세기 — 옛 셈 titleLayersAt 을 그릴 것 목록으로 옮겼다(2단계 ⑦-1).
+    expect(drawn(2.25)).toEqual([['A', 1], [a, 0.25]])
+    expect(drawn(3.75)).toEqual([['A', 1], [a, 0.75], [b, 0.25]])
+    expect(drawn(4.25)).toEqual([['B', 1], [a, 0.25], [b, 0.75]])
+    expect(drawn(5)).toEqual([['B', 1], [b, 1]])
   })
 
   it('제목 클립은 저장했다 다시 열어도 줄 · 자리 · 길이 · 글자 · 크기 · 위치 · 모션 · 불투명도 · 전환 그대로다', async () => {
@@ -350,7 +356,9 @@ describe('검토 c ⑥ (F) — 리드 11/14 같이 정한 것', () => {
     api().toggleTrackVisible('v2')
     api().moveClipToTrack('C', 'v3', 2)
     expect(selectTitleDipsAt(api(), 2.75)).toEqual({ black: 0, white: 0 })
-    expect(read('src/features/editor/video-previewer.tsx')).toMatch(/selectTitleDipsAt\(st, t\)/)
+    // 모니터는 그릴 것 목록의 막으로 그리고, 목록이 이 셈을 쓴다(2단계 ⑦-1 — 옛 글자: 미리 보기 안의 selectTitleDipsAt(st, t)).
+    expect(selectFrameAt(api(), 2.75).black).toBe(0)
+    expect(read('src/stores/editor-store.ts')).toMatch(/const titleDips = selectTitleDipsAt\(input, t\)/)
   })
 
   it('제목 클립 우클릭 메뉴 머리는 "제목 · 2.0s"(영어 "Title clip · 2.0s")다', () => {

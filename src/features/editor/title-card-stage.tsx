@@ -1,10 +1,9 @@
 'use client'
 
-// 타이틀 카드 무대 (약속 J, 2026-09-04) — 미리보기 안의 검은 카드. 글자와 이미지를 끌어 자유 배치하고(오너 결정),
+// 타이틀 카드 무대 (약속 J, 2026-09-04) — 미리보기 안의 검은 카드. 시퀀스 틀을 채운다(세로 시퀀스면 세로 카드, 2단계 ⑦). 글자와 이미지를 끌어 자유 배치하고(오너 결정),
 //   우클릭 메뉴로 겹치는 순서·이미지 넣기/빼기를 정한다. 배치는 비율(0..1)로 저장돼 내보내기(drawTitleCard)와 같은 자리에 찍힌다.
 //   줄바꿈은 layoutTitleText 가 정한다 — 내보내기와 같은 글꼴을 오프스크린 캔버스로 재서 줄이 같다(약속 J8).
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type React from 'react'
+import { useCallback, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import type { PointerEvent as ReactPointerEvent } from 'react'
 
 import { Textarea } from '@/components/ui/textarea'
@@ -46,7 +45,6 @@ export function TitleCardStage({
   onStopEdit,
   onChange,
   onBeforeChange,
-  overlay,
 }: {
   card: TitleCardData
   editing: boolean
@@ -55,8 +53,6 @@ export function TitleCardStage({
   onChange: (patch: Partial<TitleCardData>) => void
   /** 끌기·메뉴 조작 직전 한 번 — 되돌리기 스냅샷용. */
   onBeforeChange: () => void
-  /** 카드 위에 얹을 것(자막 오버레이, 약속 K). */
-  overlay?: React.ReactNode
 }) {
   const t = useT()
   const boxRef = useRef<HTMLDivElement>(null)
@@ -64,7 +60,8 @@ export function TitleCardStage({
   const [natural, setNatural] = useState<{ width: number; height: number } | null>(null)
   const [pickerOpen, setPickerOpen] = useState(false)
 
-  useEffect(() => {
+  // 화면에 내기 전에 잰다 — 교차 디졸브 경계에서 그림 ↔ 무대가 바뀔 때 처음 크기(640×360)로 한 장 그려지지 않게(2단계 ⑦).
+  useLayoutEffect(() => {
     const el = boxRef.current
     if (!el) return
     const update = () => {
@@ -191,10 +188,9 @@ export function TitleCardStage({
     <>
       <ContextMenu>
         <ContextMenuTrigger asChild>
-          <div ref={boxRef} className="relative aspect-video max-h-full w-full max-w-full overflow-hidden bg-black" data-testid="title-card-stage">
+          <div ref={boxRef} className="absolute inset-0 overflow-hidden bg-black" data-testid="title-card-stage">
             {imageLayer}
             {textLayer}
-            {overlay}
           </div>
         </ContextMenuTrigger>
         <ContextMenuContent className="w-52">

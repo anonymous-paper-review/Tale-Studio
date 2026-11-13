@@ -25,9 +25,9 @@ import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
 import { nearestEditPoint } from '@/lib/editor/timeline-segments'
-import { TRANSITION_DEFAULT_SEC, cleanTransition, dipOpacityAt, edgeFadeAt, edgeTransition, joinedNeighbor, transitionWindows, type TransitionEdge, type TransitionWindow } from '@/lib/editor/transition'
+import { TRANSITION_DEFAULT_SEC, cleanTransition, crossSourceSec, dipOpacityAt, dissolveOpacityAt, edgeFadeAt, edgeTransition, joinedNeighbor, transitionWindows, type TransitionEdge, type TransitionWindow } from '@/lib/editor/transition'
 import { VIDEO_EFFECT_DEFAULT, patchEffects, type VideoEffectKind, type VideoEffectPatch } from '@/lib/editor/video-effects'
-import { TITLE_CLIP_SECONDS, TITLE_SIZE_DEFAULT, cleanTitleText, titleLayersAt } from '@/lib/editor/title-clip'
+import { TITLE_CLIP_SECONDS, TITLE_SIZE_DEFAULT, cleanTitleText } from '@/lib/editor/title-clip'
 
 const DEFAULT_CAMERA = {
   horizontal: 0,
@@ -355,6 +355,11 @@ interface EditorState {
   setToolMode: (mode: 'select' | 'cut' | 'text') => void
   nudge: (deltaSec: number) => void   // 화살표 키 프레임 이동 (재생 중이면 정지)
   pushHistory: () => void             // 드래그 시작 등 연속 편집 직전 1회 스냅샷
+  /**
+   * 마지막 되돌리기 칸의 상태로 돌아가고 그 칸을 거둔다(다시 하기 칸은 남기지 않는다) — 한 번의 끌기가 처음 자리로 돌아와 놓였을 때
+   *   끌기 전 상태 그대로(검토 c (E) 낮음). 칸이 없으면 아무것도 하지 않는다.
+   */
+  revertLastStep: () => void
   undo: () => void
   redo: () => void
 }
@@ -514,7 +519,7 @@ export function selectProgramLayout(input: TimelineInput & { videoTracks?: reado
   const tracks = input.videoTracks ?? DEFAULT_VIDEO_TRACKS
   const rank = new Map(tracks.map((t, i) => [t.id, i]))
   const hidden = new Set(tracks.filter((t) => t.hidden).map((t) => t.id))
-  // 제목 클립은 영상 위에 따로 얹는다(selectTitlesAt) — 맨 위 그림 · 전환 셈에 끼지 않는다(2단계 ⑥).
+  // 제목 클립은 맨 위 영상 셈에 끼지 않는다 — 그릴 것 목록(selectFrameAt)이 줄 차례로 끼워 그린다(2단계 ⑥ · ⑦).
   const items = selectVideoLayout(input).filter((i) => !hidden.has(i.trackId) && i.durationSec > 0 && !isTitleClipShotId(i.shotId))
   const cuts = [...new Set(items.flatMap((i) => [i.startSec, i.startSec + i.durationSec]))].sort((a, b) => a - b)
   const out: ProgramItem[] = []
@@ -546,10 +551,10 @@ function coversFrame(clip: Pick<VideoClip, 'motion' | 'opacity'> | undefined): b
 }
 
 /**
- * 시각 t 에 모니터가 겹쳐 그릴 클립 — 눈을 켠 줄마다 그 시각의 클립을 아래 줄부터(2단계 ④, 시안 E3 "배경 위에 샷"). 위에서부터 보아
- *   화면을 다 덮는 클립(불투명도 100% · 비율 100% 이상 · 가운데)이 나오면 그 아래 줄은 그리지 않는다. 빈 끝의 교차 디졸브로 옅어지는
- *   동안은 덮지 않는다(2단계 ⑤). 맨 끝이 selectProgramLayout 의 그 시각 클립과 같다.
- *   약속: tests/editor/motion-opacity.test.ts · tests/editor/transitions-effects.test.ts
+ * 시각 t 의 영상 클립 겹침 — 눈을 켠 줄마다 그 시각의 클립을 아래 줄부터(제목 빼고, 2단계 ④, 시안 E3 "배경 위에 샷"). 위에서부터 보아
+ *   화면을 다 덮는 클립(불투명도 100% · 비율 100% 이상 · 가운데)이 나오면 그 아래 줄은 뺀다. 빈 끝의 교차 디졸브로 옅어지는 동안은 덮지
+ *   않는다(2단계 ⑤). 맨 끝이 selectProgramLayout 의 그 시각 클립과 같다. 제목 끝 물들이기가 가려진 제목을 셀 때 쓴다 — 모니터 · 내보내기가
+ *   그리는 층과 차례는 그릴 것 목록(selectFrameAt). 약속: tests/editor/title-clips.test.ts
  */
 export function selectStackAt(input: TimelineInput & { videoTracks?: readonly VideoTrackState[] }, t: number): TrackLayoutItem[] {
   const tracks = input.videoTracks ?? DEFAULT_VIDEO_TRACKS
@@ -568,18 +573,6 @@ export function selectStackAt(input: TimelineInput & { videoTracks?: readonly Vi
 }
 
 /**
- * 시각 t 에 모니터가 영상 위에 얹을 제목 클립과 그 옅기 — 눈을 켠 줄, 아래 줄부터(2단계 ⑥, 시안 E2). 제목은 화면을 다 덮지 않아 아래 영상은
- *   그대로 그린다. 더 위 줄에 화면을 다 덮는 영상이 있으면 그 아래 제목은 가려진다. 약속: tests/editor/title-clips.test.ts
- */
-export function selectTitlesAt(input: TimelineInput & { videoTracks?: readonly VideoTrackState[] }, t: number): Array<TrackLayoutItem & { fade: number }> {
-  const { titles, windows, rank, coverRank } = titleSceneAt(input, t)
-  if (titles.length === 0) return []
-  return titleLayersAt(titles, windows, t)
-    .map(({ shotId, fade }) => ({ ...titles.find((item) => item.shotId === shotId)!, fade }))
-    .filter((item) => (rank.get(item.trackId) ?? 0) > coverRank)
-}
-
-/**
  * 시각 t 의 제목 클립 끝 물들이기(검정 · 흰색) — 영상과 같은 화면 전체 막. 눈을 끈 줄의 제목과, 그 시각 더 위 줄의 화면을 다 덮는 영상에
  *   가린 제목은 그리지 않는다(검토 c ⑥ U4). 미리 보기와 ⑦ 내보내기가 같은 셈을 쓴다. 약속: tests/editor/title-clips.test.ts
  */
@@ -588,7 +581,7 @@ export function selectTitleDipsAt(input: TimelineInput & { videoTracks?: readonl
   return dipOpacityAt(windows, titles.filter((item) => (rank.get(item.trackId) ?? 0) > coverRank), t)
 }
 
-/** 제목 셈 바탕 — 눈을 켠 줄의 제목 클립(아래 줄부터), 전환 구간, 줄 차례, 그 시각 화면을 다 덮는 가장 위 영상의 줄 차례(없으면 −1). */
+/** 제목 끝 물들이기 셈 바탕 — 눈을 켠 줄의 제목 클립(아래 줄부터), 전환 구간, 줄 차례, 그 시각 화면을 다 덮는 가장 위 영상의 줄 차례(없으면 −1). */
 function titleSceneAt(
   input: TimelineInput & { videoTracks?: readonly VideoTrackState[] },
   t: number,
@@ -605,6 +598,127 @@ function titleSceneAt(
   // 화면을 다 덮는 가장 위 영상 — selectStackAt 은 그 아래를 이미 잘랐으니 남은 것 중 처음 덮는 클립이다.
   const cover = selectStackAt(input, t).find((item) => coversFrame(input.videoClips.find((c) => c.shotId === item.shotId)) && edgeFadeAt(windows, item.shotId, t) >= 1)
   return { titles, windows, rank, coverRank: cover ? rank.get(cover.trackId) ?? 0 : -1 }
+}
+
+/** 그릴 것 목록의 층 종류 — 영상 · 타이틀 카드 · 제목 클립. */
+export type FrameLayerKind = 'video' | 'card' | 'title'
+
+/** 그릴 것 목록의 한 층(2단계 ⑦). */
+export interface FrameLayer {
+  shotId: string
+  kind: FrameLayerKind
+  trackId: string
+  /** 그리는 세기(0 ~ 1) — 클립 불투명도 × 전환(빈 끝 교차 디졸브 · 맞닿은 컷 교차 디졸브의 몫). */
+  alpha: number
+  /** 영상만 — 그 시각 원본 시각(초)과, 원본이 모자라 첫 장 · 끝 장에 멈췄는지(교차 디졸브 짝 · 미리 불러 둔 층). */
+  sourceSec?: number
+  held?: boolean
+}
+
+/** 시각 t 의 그릴 것 목록 — 모니터와 내보내기가 같은 목록으로 같은 그림을 그린다(2단계 ⑦, R7). */
+export interface FramePlan {
+  /** 아래부터 그릴 층. */
+  layers: FrameLayer[]
+  /** 곧 그릴 층 — 재생 중 prerollSec 안에 나타난다. 그리지 않고(세기 0) 그 시각 원본 자리에 맞춰 불러 둔다. */
+  preload: FrameLayer[]
+  /** 그 시각 맨 위 영상 · 타이틀 카드(selectProgramLayout) — 자막 · 길이 표시 · 타이틀 카드 고치기가 따른다. 없으면 null. */
+  topShotId: string | null
+  /** 물들이기 막(0 ~ 1) — 영상 컷 · 빈 끝 · 보이는 제목 끝 · 예전 디졸브. 자막 위에 덮는다. */
+  black: number
+  white: number
+}
+
+type FrameInput = TimelineInput & { videoTracks?: readonly VideoTrackState[] }
+const clamp01 = (n: number) => Math.min(1, Math.max(0, n))
+
+/** 층 종류 — 영상이 아닌 클립(타이틀 카드 · 제목)은 shotId 꼴로 가린다. */
+function frameLayerKind(shotId: string): FrameLayerKind {
+  return isTitleClipShotId(shotId) ? 'title' : isTitleCardShotId(shotId) ? 'card' : 'video'
+}
+
+/** 클립 하나를 시각 t 의 층으로 — 세기는 불투명도 × 빈 끝 교차 디졸브, 영상은 원본 시각(모자라면 첫 장 · 끝 장). */
+function frameLayerOf(input: FrameInput, windows: readonly TransitionWindow[], item: TrackLayoutItem, t: number): FrameLayer {
+  const clip = input.videoClips.find((c) => c.shotId === item.shotId)
+  const kind = frameLayerKind(item.shotId)
+  const alpha = round3(clamp01((clip?.opacity ?? 1) * edgeFadeAt(windows, item.shotId, t)))
+  if (kind !== 'video') return { shotId: item.shotId, kind, trackId: item.trackId, alpha }
+  const shot = input.shots.find((s) => s.shotId === item.shotId)
+  const source = crossSourceSec(item, clip ?? {}, clip?.actualDurationSec ?? shot?.durationSeconds ?? 0, t)
+  return { shotId: item.shotId, kind, trackId: item.trackId, alpha, sourceSec: round3(source.sec), held: source.held }
+}
+
+/**
+ * 시각 t 에 보이는 층(아래부터) — 눈을 켠 줄을 위에서부터 보아, 그 줄 맨 아래 층이 화면을 다 덮고 옅지 않으면 그 아래 줄은 그리지 않는다.
+ *   맞닿은 두 클립 사이 교차 디졸브는 두 층을 겹친다: 화면을 다 덮는 쪽을 위에 진행만큼 짙게, 다른 쪽을 아래에 그대로(둘 다 덮지 않으면 —
+ *   제목 · 줄인 영상 — 둘 다 몫만큼). 경계에서 위아래가 바뀌지 않아 한쪽이 화면을 다 덮지 않아도 끊김 없이 섞인다.
+ */
+function visibleLayersAt(input: FrameInput, layout: readonly TrackLayoutItem[], windows: readonly TransitionWindow[], t: number): FrameLayer[] {
+  const tracks = input.videoTracks ?? DEFAULT_VIDEO_TRACKS
+  const covers = (layer: FrameLayer) => layer.kind !== 'title' && coversFrame(input.videoClips.find((c) => c.shotId === layer.shotId))
+  const stacked: FrameLayer[][] = []
+  for (let r = tracks.length - 1; r >= 0; r--) {
+    const track = tracks[r]
+    if (track.hidden) continue
+    const items = layout.filter((item) => item.trackId === track.id && item.durationSec > 0)
+    let here: FrameLayer[] = []
+    const w = windows.find((x) => x.type === 'cross' && x.trackId === track.id && !!x.outgoing && !!x.incoming && t >= x.fromSec && t < x.toSec)
+    const out = w && items.find((item) => item.shotId === w.outgoing)
+    const inc = w && items.find((item) => item.shotId === w.incoming)
+    if (w && out && inc) {
+      const p = clamp01((t - w.fromSec) / (w.toSec - w.fromSec))
+      const x = frameLayerOf(input, windows, out, t)
+      const y = frameLayerOf(input, windows, inc, t)
+      if (covers(y)) here = [x, { ...y, alpha: round3(y.alpha * p) }]
+      else if (covers(x)) here = [y, { ...x, alpha: round3(x.alpha * (1 - p)) }]
+      else here = [{ ...x, alpha: round3(x.alpha * (1 - p)) }, { ...y, alpha: round3(y.alpha * p) }]
+    } else {
+      const item = items.find((i) => t >= i.startSec && t < i.startSec + i.durationSec)
+      if (item) here = [frameLayerOf(input, windows, item, t)]
+    }
+    if (here.length === 0) continue
+    stacked.push(here)
+    if (covers(here[0]) && here[0].alpha >= 1) break
+  }
+  return stacked.reverse().flat()
+}
+
+/**
+ * 시각 t 의 그릴 것 목록(2단계 ⑦) — 모니터와 내보내기가 이 목록 하나로 같은 그림을 그린다(오너 답 3 "미리 보기의 모든 것", R7).
+ *   영상 · 타이틀 카드 · 제목이 줄 차례로 한 목록에 있고(줄인 위 영상 아래 줄의 제목은 그 영상 아래), 교차 디졸브는 모든 줄의 맞닿은 컷에서
+ *   섞인다(제목 ↔ 영상 · 타이틀 카드 ↔ 영상 포함). prerollSec 를 주면(재생 중) 그 안에 나타날 층을 미리 불러 둘 층으로 함께 준다 — 목록이
+ *   바뀌는 시각(클립 시작 · 끝, 전환 구간 시작 · 끝)마다 그 바로 뒤 목록을 본다. 약속: tests/editor/frame-plan.test.ts
+ */
+export function selectFrameAt(input: FrameInput, t: number, opts: { prerollSec?: number } = {}): FramePlan {
+  const layout = selectVideoLayout(input)
+  const program = selectProgramLayout(input)
+  const windows = transitionWindows(layout, input.videoClips)
+  const layers = visibleLayersAt(input, layout, windows, t)
+  const preroll = Math.max(0, opts.prerollSec ?? 0)
+  const preload: FrameLayer[] = []
+  if (preroll > 0) {
+    const known = new Set(layers.map((layer) => layer.shotId))
+    const changes = new Set<number>()
+    for (const item of layout) for (const at of [item.startSec, item.startSec + item.durationSec]) if (at > t && at <= t + preroll) changes.add(at)
+    for (const w of windows) for (const at of [w.fromSec, w.toSec]) if (at > t && at <= t + preroll) changes.add(at)
+    for (const at of [...changes].sort((a, b) => a - b)) {
+      for (const layer of visibleLayersAt(input, layout, windows, at + 1e-3)) {
+        if (known.has(layer.shotId)) continue
+        known.add(layer.shotId)
+        const item = layout.find((i) => i.shotId === layer.shotId)!
+        preload.push({ ...frameLayerOf(input, windows, item, t), alpha: 0 })
+      }
+    }
+  }
+  const top = program.find((p) => t >= p.startSec && t < p.startSec + p.durationSec)?.shotId ?? null
+  const dips = dipOpacityAt(windows, program, t)
+  const titleDips = selectTitleDipsAt(input, t)
+  return {
+    layers,
+    preload,
+    topShotId: top,
+    black: Math.max(dissolveOpacityAt(program, input.videoClips, t), dips.black, titleDips.black),
+    white: Math.max(dips.white, titleDips.white),
+  }
 }
 
 /** 모션 칸 — 범위 안으로(위치 −1 ~ 1, 비율 0.1 ~ 3), 처음 값(0 · 0 · 1)이면 없앤다. */
@@ -1307,6 +1421,18 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
       future: [],
     })),
+
+  revertLastStep: () =>
+    set((state) => {
+      if (state.past.length === 0) return state
+      const previous = state.past[state.past.length - 1]
+      return {
+        ...previous,
+        videoTracks: keepTrackFlags(previous.videoTracks, state.videoTracks),
+        audioTracks: keepTrackFlags(previous.audioTracks, state.audioTracks),
+        past: state.past.slice(0, -1),
+      }
+    }),
 
   undo: () =>
     set((state) => {
