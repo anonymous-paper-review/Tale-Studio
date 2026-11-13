@@ -40,6 +40,23 @@ describe('화면에서 멈춘 생성 작업 마이그레이션', () => {
     expect(sql).toContain('create or replace function public.reserve_director_video_batch_item( p_item_id uuid, p_lease_token uuid, p_args jsonb )')
   })
 
+  it('멈추기는 그 프로젝트의 도는 작업(queued — 접수 뒤 fal 에서 도는 동안의 실제 상태)만 적고, 이미 끝난(completed · failed) 작업과 다른 프로젝트 작업은 적지 않는다', () => {
+    // 왜: 리드 확인 1 · 2 — 오너 7번의 대상은 이미 보낸(진행 중) 작업이다. 작업 상태 값은 queued · completed · failed 셋뿐이고(개발 DB 11/14 실측),
+    //   보내지 않은 것은 브라우저 실행기가 멈춘다. 남의 프로젝트 작업 id 를 섞어 보내도 그 프로젝트 것만 적는다.
+    const cancel = fn(read(`supabase/migrations/${MIGRATION}`), 'cancel_director_jobs')
+    expect(cancel).toContain("where gj.project_id = p_project_id and gj.id = any(coalesce(p_job_ids, '{}'::uuid[])) and gj.status = 'queued'")
+    expect(cancel).not.toMatch(/'completed'|'failed'/)
+  })
+
+  it('멈추기 함수는 service role 만 부를 수 있고, 멈춘 작업 표는 브라우저가 쓸 수 없다', () => {
+    // 왜: 리드 확인 2 — 남의 작업을 멈추는 길이 없게. 라우트가 주인을 확인한 뒤 service role 로만 부른다. 표에는 읽기 규칙 하나뿐이다.
+    const sql = read(`supabase/migrations/${MIGRATION}`)
+    expect(sql).toContain('revoke all on function public.cancel_director_jobs(uuid, uuid[], uuid) from public, anon, authenticated')
+    expect(sql).toContain('grant execute on function public.cancel_director_jobs(uuid, uuid[], uuid) to service_role')
+    expect(sql.match(/create policy [^;]* on public\.director_job_cancellations [^;]*;/g)).toHaveLength(1)
+    expect(sql).not.toMatch(/on public\.director_job_cancellations for (insert|update|delete|all)/)
+  })
+
   it('동시 생성 자리 검사는 바꾸지 않아 멈춘 작업도 끝날 때까지 자리를 차지한다', () => {
     // 왜: 리드 c — fal 에서는 아직 돌고 있다. 자리를 비우면 한도보다 많이 돈다.
     expect(read(`supabase/migrations/${MIGRATION}`)).not.toContain('enforce_generation_capacity')

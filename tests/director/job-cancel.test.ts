@@ -13,7 +13,8 @@ import { POST } from '@/app/api/director/jobs/cancel/route'
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
 import { listActiveGenerationJobs } from '@/lib/generation-jobs'
 import { activeShotIds } from '@/lib/generation-queue'
-import { listLiveDirectorVideoTakes } from '@/lib/director-video-takes'
+import { listLiveDirectorVideoTakes, markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
+import { withCancelledJobs, type ActiveJob } from '@/lib/generation-queue'
 
 const post = (body: unknown) => POST(new Request('http://test/api/director/jobs/cancel', { method: 'POST', body: JSON.stringify(body) }))
 const JOB = '11111111-1111-4111-8111-111111111111'
@@ -33,6 +34,13 @@ describe('진행 중 작업 멈추기', () => {
     expect(res.status).toBe(200)
     expect(mocks.rpc).toHaveBeenCalledWith('cancel_director_jobs', { p_project_id: PROJECT, p_job_ids: [JOB], p_user_id: 'user-1' })
     expect(await res.json()).toEqual({ ok: true, data: { cancelled: [{ jobId: JOB, kind: 'storyboard_real_grid', writerShotIds: ['sh_01_01', 'sh_01_02'], videoClipId: null, cancelledAt: '2026-11-14T03:00:00Z' }] } })
+  })
+
+  it('로그인하지 않으면 멈출 수 없다', async () => {
+    // 왜: 리드 확인 2 — 서버가 로그인 · 주인을 먼저 본다.
+    mocks.getUser.mockResolvedValue(null)
+    expect((await post({ projectId: PROJECT, jobIds: [JOB] })).status).toBe(401)
+    expect(mocks.rpc).not.toHaveBeenCalled()
   })
 
   it('남의 프로젝트 작업은 멈출 수 없다', async () => {
@@ -66,6 +74,17 @@ describe('진행 중 작업 멈추기', () => {
     expect(jobs.map((job) => [job.id, job.cancelledAt ?? null])).toEqual([[JOB, '2026-11-14T00:05:00Z'], ['job-2', null]])
   })
 
+  it('화면에서 멈춘 작업이 뒤에서 실패해도 지금처럼 Take 를 돌려준다', async () => {
+    // 왜: 리드 확인 3 — 멈추기 자체는 Take 를 돌려주지 않지만(7번), 실패 환불 규칙은 그대로다. 실패 길은 멈춤 표를 보지 않는다.
+    mocks.rpc.mockResolvedValue({ data: 5, error: null })
+    const update = { update: vi.fn(() => update), eq: vi.fn(() => update), then: (resolve: (value: unknown) => unknown) => Promise.resolve({ error: null }).then(resolve) }
+    mocks.from.mockReturnValue(update)
+    await markDirectorVideoAttemptFailed(PROJECT, JOB, 'provider failed')
+    expect(mocks.rpc).toHaveBeenCalledWith('fail_director_video_attempt', expect.objectContaining({ p_job_id: JOB }))
+    expect(mocks.rpc).toHaveBeenCalledWith('take_release_for_job', { p_job: JOB })
+    expect(mocks.from).not.toHaveBeenCalledWith('director_job_cancellations')
+  })
+
   it('멈춘 작업은 샷 카드 · 상세 · 단추가 만드는 중으로 세지 않는다', () => {
     // 왜: 오너 7번 "UI로는 취소된걸로 보이게 해서 유저가 수정해서 다시 생성 요청할 수 있게" — 만드는 중으로 세면 다시 만들기 단추가 잠긴다.
     const jobs = [
@@ -73,6 +92,14 @@ describe('진행 중 작업 멈추기', () => {
       { id: 'b', kind: 'shot_storyboard' as const, target: { writerShotId: 'sh_01_02' } },
     ]
     expect([...activeShotIds(jobs, ['shot_storyboard'])]).toEqual(['sh_01_02'])
+  })
+
+  it('멈추면 다음 확인을 기다리지 않고 지금 도는 작업 목록에서도 바로 멈춘 것으로 보인다', () => {
+    // 왜: 실제 화면(개발 DB, 11/14)에서 멈춘 뒤 2초 넘게 단추가 "이미지 생성 중"으로 남았다 — 목록 다시 읽기를 기다렸기 때문.
+    const jobs: ActiveJob[] = [{ id: 'a', kind: 'shot_storyboard', target: { writerShotId: 'sh_01_01' } }, { id: 'b', kind: 'shot_video', target: { writerShotId: 'sh_01_02' } }]
+    const marked = withCancelledJobs(jobs, ['a'], '2026-11-14T03:00:00Z')
+    expect(marked.map((job) => [job.id, job.cancelledAt ?? null])).toEqual([['a', '2026-11-14T03:00:00Z'], ['b', null]])
+    expect([...activeShotIds(marked, ['shot_storyboard', 'shot_video'])]).toEqual(['sh_01_02'])
   })
 
   it('영상 Take 목록은 화면에서 멈춘 Take 에 멈춘 때를 붙인다', async () => {

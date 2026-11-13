@@ -9,7 +9,8 @@ vi.mock('@/lib/supabase/client', () => ({
     return chain
   },
 }))
-vi.mock('@/lib/generation-queue', async (original) => ({ ...await original<typeof import('@/lib/generation-queue')>(), refreshGenerationQueue: vi.fn() }))
+const queue = vi.hoisted(() => ({ refresh: vi.fn(), mark: vi.fn() }))
+vi.mock('@/lib/generation-queue', async (original) => ({ ...await original<typeof import('@/lib/generation-queue')>(), refreshGenerationQueue: queue.refresh, markJobsCancelled: queue.mark }))
 vi.mock('@/lib/shots-cache', () => ({ invalidateShots: () => Promise.resolve() }))
 vi.mock('@/lib/generation-notify', async (original) => ({ ...await original<typeof import('@/lib/generation-notify')>(), notifyStoppedResultKept: notify }))
 
@@ -55,6 +56,7 @@ describe('화면에서 멈추기', () => {
     expect(take.cancelledAt).toBe('2026-11-14T03:00:00Z')
     const shot = api().nodes.find((n) => n.id === shotId)!.data as { storyboardImage: StoryboardImage }
     expect(shot.storyboardImage).toMatchObject({ status: 'completed', url: 'https://media.test/now.png', versionId: 'job-0' })
+    expect(queue.mark).toHaveBeenCalledWith([JOB_V, JOB_I], '2026-11-14T03:00:00Z')
   })
 
   it('멈춘 이미지 작업의 그림이 뒤늦게 와도 화면의 지금 그림을 바꾸지 않고, 채팅에 기록에만 남겼다고 한 줄 알린다', async () => {

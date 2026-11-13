@@ -27,6 +27,12 @@ export function isCancelledJob(job: Pick<ActiveJob, 'cancelledAt'>): boolean {
   return !!job.cancelledAt
 }
 
+/** 목록에서 그 작업들을 멈춘 것으로 — 순수 함수(markJobsCancelled 가 지금 목록에 쓴다). */
+export function withCancelledJobs<T extends Pick<ActiveJob, 'id' | 'cancelledAt'>>(list: readonly T[], ids: readonly string[], at: string): T[] {
+  const stopped = new Set(ids)
+  return list.map((job) => (stopped.has(job.id) && !job.cancelledAt ? { ...job, cancelledAt: at } : job))
+}
+
 /** 도는 잡이 있을 때 / 없을 때의 폴링 간격. 없을 때 느리게 도는 이유는 "새로 시작된 잡"도
  *  이 경로로 들어오기 때문 — 다만 대부분의 시작은 refreshGenerationQueue() 로 즉시 반영된다. */
 const POLL_ACTIVE_MS = 4000
@@ -179,6 +185,16 @@ function subscribeToProject(id: string, listener: () => void): () => void {
 }
 
 /** 잡을 막 제출한 직후 호출 — 다음 폴링 틱을 기다리지 않고 진행 표시를 즉시 켠다. */
+/** 멈춘 작업을 다음 확인을 기다리지 않고 지금 목록에 바로 반영한다(실측: 2초 넘게 "만드는 중"으로 남았다). 다음 확인이 서버 값으로 맞춘다. */
+export function markJobsCancelled(ids: readonly string[], at: string): void {
+  if (!ids.length || jobs === EMPTY) return
+  const next = withCancelledJobs(jobs, ids, at)
+  if (next.every((job, i) => job === jobs[i])) return
+  jobs = next
+  signature = ''
+  emit()
+}
+
 export function refreshGenerationQueue(): void {
   void fetchOnce()
 }

@@ -74,7 +74,7 @@ import {
   type StableWiringRef,
 } from '@/lib/director/wiring-persistence'
 import { runVideoAdherence } from '@/lib/director/video-adherence-client'
-import { refreshGenerationQueue } from '@/lib/generation-queue'
+import { markJobsCancelled, refreshGenerationQueue } from '@/lib/generation-queue'
 import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
 import { isDemoSession } from '@/lib/demo/context'
 import {
@@ -4426,6 +4426,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           }),
         }))
         for (const shotNodeId of released) releaseAction(`director:storyboard:${shotNodeId}`)
+        if (cancelled.length) markJobsCancelled(cancelled.map((c) => c.jobId), cancelled[0]!.cancelledAt)
         refreshGenerationQueue()
         return cancelled.map((c) => c.jobId)
       },
