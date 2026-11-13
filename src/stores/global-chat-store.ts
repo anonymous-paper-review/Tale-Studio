@@ -69,7 +69,7 @@ import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
 import { currentDirectorText, directorShotRefs, directorTextEditLines, shotLabelOf, shotListLabel, splitDirectorTextEdits, textBoundShotIds, type DirectorTextEdit } from '@/lib/director/lumi-chat-runs'
 import { answeredShotNumbers, groundVideoRequest, type VideoGrounding } from '@/lib/director/chat-video-targets'
-import { directorProgressLine, directorQuickChipOf, directorShotStatesNow, quickChipTargets, type DirectorQuickChip } from '@/lib/director/lumi-quick-chips'
+import { directorPendingContext, directorProgressLine, directorQuickChipOf, directorShotStatesNow, quickChipTargets, type DirectorQuickChip } from '@/lib/director/lumi-quick-chips'
 import { activeJobsSnapshot } from '@/lib/generation-queue'
 import { handoffToStage } from '@/lib/stage-nav'
 import {
@@ -1638,7 +1638,16 @@ async function runDirectorQuickChip(input: {
   const nodes = canvas.projectId === input.projectId ? canvas.nodes : []
   const names = directorBoardNames()
   const labelOf = (id: string) => shotLabelOf(nodes.find((node) => node.id === id), names)
-  const states = directorShotStatesNow(nodes, activeJobsSnapshot(input.projectId))
+  // 보드처럼 일괄이 맡아 차례를 기다리는 샷 · 영상 묶음이 아직 내지 않은 샷도 만드는 중으로 센다(set c19f8008 — 칩이 그 샷을 다시 겨누지 않게).
+  const states = directorShotStatesNow(nodes, activeJobsSnapshot(input.projectId), directorPendingContext({
+    nodes,
+    realBatchBusy: canvas.realBatchBusy,
+    realBatchCancelled: canvas.realBatchCancelled,
+    realBatchShotIds: canvas.realBatchShotIds,
+    writerShots: useWriterStore.getState().shots ?? [],
+    videoBatchCancelled: canvas.videoBatchCancelled,
+    videoPendingShotIds: canvas.videoBatchQueue?.pendingShotIds ?? [],
+  }))
   if (input.chip === 'status') {
     input.say(directorProgressLine(locale, states, labelOf))
     return

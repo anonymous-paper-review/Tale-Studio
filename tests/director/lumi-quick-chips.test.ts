@@ -51,7 +51,7 @@ beforeEach(() => {
   project.setState({ currentStage: 'director', reachedStage: 'director', projectId: 'p-dir', projectLocale: 'en', projectLocaleLocked: true })
   useLocaleStore.setState({ locale: 'en' })
   writer.setState({ sceneManifest: { scenes: [{ sceneId: 'sc1' }] } as never, shots: ['s1', 's2', 's3', 's4', 's5'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1' })) as never })
-  director.setState({ projectId: 'p-dir', nodes: NODES(), edges: [], selectedNodeId: null, videoBatchBusy: false, realBatchBusy: false, generateStoryboardImage: originalGenerate })
+  director.setState({ projectId: 'p-dir', nodes: NODES(), edges: [], selectedNodeId: null, videoBatchBusy: false, realBatchBusy: false, realBatchShotIds: null, realBatchCancelled: false, videoBatchQueue: null, videoBatchCancelled: false, generateStoryboardImage: originalGenerate })
   mocks.balance = { balance: 40, mode: 'enforce' }
   mocks.run.mockImplementation(startsBatch)
   mocks.real.mockResolvedValue({ generated: 1, quotaBlocked: false })
@@ -121,6 +121,24 @@ describe('Director 빠른 칩(시안 D5)', () => {
     await chat.getState().sendMessage(chip(0))
     expect(mocks.real).not.toHaveBeenCalled()
     expect(lastModel()).toBe('Batch live-action generation is running. Try again after it finishes.')
+  })
+
+  // 왜: set c19f8008 — 보드는 실사 일괄이 맡아 차례를 기다리는 샷 · 영상 묶음이 아직 내지 않은 샷을 만드는 중으로 센다.
+  //   칩이 그 샷을 "이미지 필요 · 영상 없음"으로 세면 이미 맡은 샷을 다시 겨눈다(위쪽 단추 숫자와도 어긋난다).
+  it('실사 일괄이 맡아 차례를 기다리는 샷 · 영상 묶음이 아직 내지 않은 샷은 보드처럼 만드는 중으로 세어 빠른 칩이 다시 겨누지 않는다', async () => {
+    writer.setState({ shots: ['s1', 's2', 's3'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1', ...(id === 's3' ? { roughStoryboard: { status: 'completed', url: 'https://media.test/r3.png' } } : {}) })) as never })
+    director.setState({
+      nodes: [shot('s1', IMG('s1')), take('v1', 's1', 'completed'), shot('s2', IMG('s2')), shot('s3')],
+      realBatchBusy: true,
+      realBatchShotIds: ['w-s3'],
+      videoBatchQueue: { jobIds: [], pendingShotIds: ['w-s2'] },
+    })
+    await chat.getState().sendMessage(chip(0))
+    expect(lastModel()).toBe('There are no such shots right now.')
+    await chat.getState().sendMessage(chip(1))
+    expect(lastModel()).toBe('There are no such shots right now.')
+    expect(mocks.real).not.toHaveBeenCalled()
+    expect(mocks.run).not.toHaveBeenCalled()
   })
 
   // 왜(혼자 정한 것 F): 프로젝트를 막 바꿔 보드를 아직 안 읽었을 때 — 앞 프로젝트 보드의 샷을 만들면 안 된다.
