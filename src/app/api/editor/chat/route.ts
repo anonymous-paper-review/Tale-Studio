@@ -75,7 +75,8 @@ export async function POST(req: Request) {
     const normalizedHistory = normalizeHistory(history)
     const traceId = createChatTraceId(requestedTraceId)
     let llmUsage: ChatLlmUsage | null = null
-    const systemPrompt = `${EDITOR_ADVICE_SYSTEM}\n\n${editorFeaturesPrompt()}` + CHAT_OUTPUT_FORMAT_GUIDE + responseLanguageDirective(projectLocale)
+    // 기능 목록의 단추 · 메뉴 이름은 콘텐츠 말로 — 한국어 답이 한국어 화면 이름을 그대로 쓰게(리드 11/14).
+    const systemPrompt = `${EDITOR_ADVICE_SYSTEM}\n\n${editorFeaturesPrompt(projectLocale ?? 'en')}` + CHAT_OUTPUT_FORMAT_GUIDE + responseLanguageDirective(projectLocale)
     const context = typeof timelineContext === 'string' && timelineContext.trim() ? timelineContext.trim() : '<editor_timeline>\n(empty)\n</editor_timeline>'
     const userPrompt = `${context}\n\n---\n\n${message}`
     const text = await llmChat(systemPrompt, normalizedHistory, userPrompt, 0.7, `chat:${traceId}`, {

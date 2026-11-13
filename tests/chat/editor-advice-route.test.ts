@@ -68,6 +68,17 @@ describe('Editor 조언 서버', () => {
     expect(EDITOR_NOT_AVAILABLE.some((line) => line.includes("a delete item in a clip's right-click menu"))).toBe(true)
   })
 
+  // 왜: 리드 11/14 — 목록을 영어로만 실으면 한국어 답이 화면 이름을 제멋대로 옮긴다("Hide clip"을 "클립 감추기"로 등). 화면과 같은 i18n 키를 콘텐츠 말로 옮겨 싣는다.
+  it('한국어 프로젝트의 Editor 조언에는 기능 목록이 한국어 화면 이름("클립 숨기기" · "여기서 분할" 등) 그대로 실린다', async () => {
+    mocks.locale.mockResolvedValue({ locale: 'ko', switched: null })
+    mocks.llmChat.mockResolvedValue('클립을 오른쪽 클릭하세요.')
+    await post({ message: '끝에서 서서히 어두워지게 하려면?', projectId: 'proj-e', timelineContext: 'Cuts on the timeline: 2' })
+    const [system] = mocks.llmChat.mock.calls[0] as [string]
+    expect(system).toContain(editorFeaturesPrompt('ko'))
+    for (const label of ['"클립 숨기기"', '"여기서 분할"', '"디졸브(검은 화면 전환)"', '"재생 속도"', '"드래프트 렌더"']) expect(system).toContain(label)
+    expect(system).not.toContain('"Hide clip"')
+  })
+
   // 왜: 로그인 · 빈 메시지 검사는 다른 채팅 길과 같다 — 로그인하지 않은 사람은 조언 모델을 부르지 못한다.
   it('Editor 조언 서버는 로그인하지 않으면 401, 메시지가 없으면 400 이다', async () => {
     mocks.getUser.mockResolvedValue(null)
