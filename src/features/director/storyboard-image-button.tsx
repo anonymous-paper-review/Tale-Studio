@@ -74,10 +74,12 @@ export function StoryboardImageButton({ nodeId, data, className, idleLabel, chan
       <RegenerateConfirmDialog
         open={confirm !== null}
         onOpenChange={(open) => { if (!open) setConfirm(null) }}
-        title={t('Regenerate the image?')}
+        // 제목 · 본문 · 단추는 툴바 [이미지 다시 만들기] 확인 창과 같은 말(영어 재점검 · 리드 11/14) — 본문은 아래 버전 한 줄이라 설명 줄은 비운다.
+        //   직접 추가한 이미지의 "다시 생성" 창은 옛 글 그대로.
+        title={confirm === 'manual-retry' ? t('Regenerate the image?') : t('Make the image again?')}
         description={confirm === 'manual-retry'
           ? t('The previous request may still be running. Generating again sends a new request.')
-          : t('Generates a new shooting image for this shot.')}
+          : ''}
         // 버전(디자이너 11/13 D6 · 오너 2026-11-14 답 5번) — 앞 그림은 덮이지 않고 버전으로 남는다.
         impact={confirm === 'manual-retry' ? [] : [t('The new image becomes the current one. The current image stays in the versions.')]}
         // 단추 글은 카드 · 꼬리 · 툴바 확인 창과 같은 "다시 만들기"(리드 11/14). 직접 추가한 이미지의 "다시 생성"은 그대로.
