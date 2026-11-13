@@ -219,3 +219,75 @@ export function ShotStatusFilterMenu({
     </DropdownMenu>
   )
 }
+
+/** 2줄 왼쪽 고르기 줄(시안 D1 "☐ 전체 4개" · D2 "☑ 4개 중 4개 선택 [선택 풀기]"). */
+export function PickAllBar({
+  total,
+  picked,
+  onToggleAll,
+  onClear,
+}: {
+  total: number
+  picked: number
+  onToggleAll: () => void
+  onClear: () => void
+}) {
+  const t = useT()
+  const state: boolean | 'mixed' = picked === 0 ? false : picked >= total ? true : 'mixed'
+  return (
+    <div className="flex shrink-0 items-center gap-3">
+      <button
+        type="button"
+        role="checkbox"
+        aria-checked={state}
+        aria-label={t('Pick every shot')}
+        onClick={onToggleAll}
+        disabled={total === 0}
+        className={cn(
+          'flex size-5 shrink-0 items-center justify-center rounded-[6px] border-[1.5px] transition-colors disabled:opacity-50',
+          state === false ? 'border-muted-foreground/60 bg-transparent hover:border-foreground' : 'border-info bg-info text-info-foreground',
+        )}
+      >
+        {state === true && <Check className="size-3.5" strokeWidth={3} />}
+        {state === 'mixed' && <span className="h-0.5 w-2.5 rounded-full bg-current" />}
+      </button>
+      <span className="whitespace-nowrap text-[14px] font-semibold text-foreground">
+        {picked === 0 ? t('All {count} shots', { count: total }) : t('{picked} of {total} picked', { picked, total })}
+      </span>
+      {picked > 0 && (
+        <button
+          type="button"
+          onClick={onClear}
+          className="h-8 shrink-0 rounded-full border border-border px-3 text-[12.5px] font-semibold text-foreground transition-colors hover:bg-accent"
+        >
+          {t('Clear picks')}
+        </button>
+      )}
+    </div>
+  )
+}
+
+/** 카드 왼쪽 위 고름 상자(시안 D2) — 고르면 파랑 체크. */
+export function PickBox({ picked, onToggle, className }: { picked: boolean; onToggle: () => void; className?: string }) {
+  const t = useT()
+  return (
+    <button
+      type="button"
+      role="checkbox"
+      aria-checked={picked}
+      aria-label={t('Pick this shot')}
+      onClick={(event) => {
+        event.stopPropagation()
+        onToggle()
+      }}
+      onDoubleClick={(event) => event.stopPropagation()}
+      className={cn(
+        'flex size-[22px] shrink-0 items-center justify-center rounded-[6px] border-[1.5px] transition-colors',
+        picked ? 'border-info bg-info text-info-foreground' : 'border-white/45 bg-black/35 hover:border-white/80',
+        className,
+      )}
+    >
+      {picked && <Check className="size-3.5" strokeWidth={3} />}
+    </button>
+  )
+}

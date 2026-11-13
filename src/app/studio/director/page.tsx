@@ -25,15 +25,19 @@ import {
   type ReactFlowState,
 } from '@xyflow/react'
 import { Loader2,
-  Square, ChevronDown, ChevronUp, LayoutGrid, Boxes, Lock, Unlock, Plus, Minus, Maximize2, Play, RefreshCw } from 'lucide-react'
+  Square, ChevronDown, ChevronUp, LayoutGrid, Boxes, Lock, Unlock, Plus, Minus, Maximize2, Play, ImageIcon } from 'lucide-react'
 
 import { toast } from 'sonner'
 import { runRealBatch } from '@/lib/director/real-batch-client'
 import {
-  eligibleVideoBatchShotIds,
   runVideoBatch,
   restoreVideoBatch,
 } from '@/lib/director/video-batch-client'
+import { videoBatchShotSettings } from '@/lib/director/video-batch-take'
+import { DEFAULT_VIDEO_MODEL } from '@/lib/video-models'
+import { effectivePickedIds, imageButtonMode, nextPickAll, primaryWorkAction, videoWorkShotIds, workEstimateText } from '@/lib/director/toolbar-work'
+import { LumiAvatar } from '@/components/lumi/lumi'
+import { STAGE_PERSONA } from '@/lib/lumi'
 import { describeVideoBatchPlan, planVideoBatch, videoBatchTakeCosts } from '@/lib/director/video-batch-plan'
 import { refetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
 import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
@@ -44,10 +48,10 @@ import { NextStepButton } from '@/components/handoff/next-step-button'
 import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
-import { ShotStatusFilterMenu } from '@/features/director/shot-status'
+import { PickAllBar, ShotStatusFilterMenu } from '@/features/director/shot-status'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
-import { countStatusFilters } from '@/lib/director/shot-state'
-import { HIDDEN_ON_CANVAS, directorCanvasMeta } from '@/features/director/canvas-meta'
+import { countStatusFilters, matchesStatusFilter } from '@/lib/director/shot-state'
+import { HIDDEN_ON_CANVAS, directorCanvasMeta, storyboardCanvasMeta } from '@/features/director/canvas-meta'
 import { separateAssetCards } from '@/features/director/asset-column'
 import { arrangeOnceCardsRendered, renderedCardSizes } from '@/features/director/canvas-layout'
 
@@ -81,7 +85,6 @@ import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
 import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
 import { offerEditorHandoff } from '@/features/director/editor-handoff-nudge'
-import { RUNNING_VIDEO_PILL, videoBatchButtonText } from '@/features/director/video-batch-button'
 import { AssetNode } from '@/features/director/canvas-nodes/AssetNode'
 import { PromptNode } from '@/features/director/canvas-nodes/PromptNode'
 import { CategoryEdge } from '@/features/director/canvas-edges/CategoryEdge'
@@ -333,6 +336,7 @@ function CanvasInner() {
   )
   const addVideoTake = useDirectorCanvasStore((s) => s.addVideoTake)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
+  const togglePickedShot = useDirectorCanvasStore((s) => s.togglePickedShot)
   const selectEdge = useDirectorCanvasStore((s) => s.selectEdge)
   const persistNodePosition = useDirectorCanvasStore(
     (s) => s.persistNodePosition,
@@ -767,11 +771,19 @@ function CanvasInner() {
           })
         }}
         // 클릭=선택+좌측 패널(#panel-unify 2026-08-31) — 패널은 캔버스 조작을 안 막는다.
+        // 몸통 = 고르기(시안 D2 · R, 오너 2026-11-14) — 이미지 · 영상 노드는 그 샷을 고르고 다시 누르면 푼다. 상세는 ⤢.
+        //   에셋 노드는 지금처럼 왼쪽 패널.
         onNodeClick={(_event, node) => {
-          const kind = node.data.kind
-          if (kind === 'shot' || kind === 'video' || kind === 'asset') {
-            selectNode(node.id)
+          const data = node.data
+          if (isShotData(data)) {
+            togglePickedShot(node.id)
+            return
           }
+          if (isVideoData(data)) {
+            if (data.parentShotNodeId) togglePickedShot(data.parentShotNodeId)
+            return
+          }
+          if (data.kind === 'asset') selectNode(node.id)
         }}
         onEdgeClick={(_event, edge) => selectEdge(edge.id)}
         onNodeDoubleClick={(_event, node) => {
@@ -850,13 +862,7 @@ const TOOLBAR_PILL =
 const DIRECTOR_VIEW_CYCLE = ['node', 'previz', 'real'] as const
 type DirectorViewStep = (typeof DIRECTOR_VIEW_CYCLE)[number]
 
-function PaletteBar({
-  storyboardZoom,
-  onStoryboardZoomChange,
-}: {
-  storyboardZoom: number
-  onStoryboardZoomChange: React.Dispatch<React.SetStateAction<number>>
-}) {
+function PaletteBar() {
   const t = useT()
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
@@ -879,7 +885,7 @@ function PaletteBar({
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
   const videoBatchCancelled = useDirectorCanvasStore((s) => s.videoBatchCancelled)
   const videoBatchProgress = useDirectorCanvasStore((s) => s.videoBatchProgress)
-  // 약속 D7(2026-09-04): 버튼 숫자는 핀과 같은 서버 배치에서 온다 — 배치가 도는 동안은 그 done/total, 아니면 화면 집계.
+  // 약속 D7(2026-09-04): 진행 숫자는 핀과 같은 서버 배치에서 온다 — 배치가 도는 동안은 그 done/total.
   const projectId = useProjectStore((s) => s.projectId)
   const generationBatches = useGenerationBatches(projectId ?? null)
   const realBatchRemaining = useDirectorCanvasStore((s) => s.realBatchRemaining)
@@ -891,329 +897,324 @@ function PaletteBar({
   const addPromptNode = useDirectorCanvasStore((s) => s.addPromptNode)
   const promptCount = nodes.filter((n) => n.data.kind === 'prompt').length
 
-  const shots = nodes.filter((n) => isShotData(n.data))
-  const totalShots = shots.length
-  const completedShots = shots.filter(
-    (n) => isShotData(n.data) && n.data.storyboardImage?.status === 'completed',
-  ).length
-  // #c3: 전부 생성된 상태에서 '전체 재생성'을 누르면 확인을 거친다(과금이 크다).
-  const [confirmRegenAll, setConfirmRegenAll] = useState(false)
-  const isGenerating = shots.some(
-    (n) =>
-      isShotData(n.data) && n.data.storyboardImage?.status === 'generating',
-  )
-  const eligibleVideoCount = eligibleVideoBatchShotIds(nodes).length
-  const [confirmVideoBatch, setConfirmVideoBatch] = useState(false)
-  // 약속 E1·E2(2026-09-04): 확인창에 만들 영상 수·필요한 Take·가진 Take — 채팅 승인 카드와 같은 계산(video-batch-plan).
-  const takeState = useTakeBalance()
-  const videoPlan = planVideoBatch(videoBatchTakeCosts(nodes, eligibleVideoBatchShotIds(nodes)), takeState.balance, takeState.mode)
-  // 숫자는 예전 그대로: 서버 배치가 있으면 그 수(단추에서 바로 그린다), 없고 도는 중이면 이 화면이 받은 진행(끝난 수 / 전체).
-  //   화면 읽기 이름(도는 동안)도 단추에 보이는 숫자와 같은 수를 읽는다.
-  const shownVideoProgress = videoBatch ?? (videoBatchBusy ? videoBatchProgress : null)
-  const videoButton = videoBatchButtonText({
-    busy: videoBatchBusy,
-    cancelled: videoBatchCancelled,
-    done: shownVideoProgress?.done ?? null,
-    total: shownVideoProgress?.total ?? null,
-    failed: shownVideoProgress?.failed ?? 0,
-    available: eligibleVideoCount,
-  }, t)
-  // 단계 칠 위(도는 동안)에서는 숫자 · 실패 글을 칠 위 글자색으로: 흐린 회색 · 빨강은 파란 칠 위에서 안 읽힌다.
-  const videoCountTone = videoButton.tone === 'stage' ? 'text-stage-badge-foreground/80' : 'text-muted-foreground'
-  const videoFailTone = videoButton.tone === 'stage' ? 'text-stage-badge-foreground' : 'text-destructive'
-  // D1 "The Set 노드 9 · 샷 4" — 캔버스에 보이는 노드와 그중 샷.
-  const canvasMeta = directorCanvasMeta(nodes, t)
-  // 상태 고르기(시안 D1 406:3717 · R, 오너 2026-11-14) — 줄마다 그 상태 샷 수.
+  // 샷 상태 · 남은 일(시안 R 416:4941 · D1, 오너 2026-11-14) — 단추 숫자 · 가장 밝은 단추 · 예상 칸이 같은 판정을 쓴다.
   const shotStates = useDirectorShotStates()
   const statusCounts = countStatusFilters(shotStates.values())
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
   const setStatusFilter = useDirectorCanvasStore((s) => s.setStatusFilter)
+  // 고른 샷(시안 D2 406:4588) — 상태 고르기로 보이는 샷 안의 고름만 센다. 고른 샷이 있으면 단추 · 예상이 그 샷 기준.
+  const pickedShotIds = useDirectorCanvasStore((s) => s.pickedShotIds)
+  const setPickedShots = useDirectorCanvasStore((s) => s.setPickedShots)
+  const clearPickedShots = useDirectorCanvasStore((s) => s.clearPickedShots)
+  const visibleShotIds = [...shotStates.entries()].filter(([, state]) => matchesStatusFilter(state, statusFilter)).map(([id]) => id)
+  const picked = effectivePickedIds(pickedShotIds, visibleShotIds)
+  // [이미지 만들기 · N]: 이미지 없는 샷. 고른 샷이 모두 이미지가 있으면 [이미지 다시 만들기 · N](8/27 오너 "전체 재생성" 길).
+  const imageMode = imageButtonMode(shotStates, picked)
+  const imageWork = imageMode.mode === 'make' ? imageMode.shotIds : []
+  const videoWork = videoWorkShotIds(shotStates, picked)
+  const stateList = [...shotStates.values()]
+  const makingImages = stateList.filter((s) => s === 'image_generating').length
+  const makingVideos = stateList.filter((s) => s === 'video_generating').length
+  const making = makingImages + makingVideos > 0 || realBatchBusy || videoBatchBusy
+  const canHandOff = stateList.some((s) => s === 'video_done')
+  const primary = primaryWorkAction({ imageCount: imageWork.length, videoCount: videoWork.length, canHandOff })
+  // 약속 E1·E2(2026-09-04): 확인창에 만들 영상 수·필요한 Take·가진 Take — 채팅 승인 카드와 같은 계산(video-batch-plan).
+  //   오너 답 11: Take 는 지금 계산 그대로(모델 · 해상도마다, 1080p 두 배) 예상 칸 · 확인창에.
+  const takeState = useTakeBalance()
+  const videoPlan = planVideoBatch(videoBatchTakeCosts(nodes, videoWork), takeState.balance, takeState.mode)
+  const videoModels = videoWork.map((id) => videoBatchShotSettings(nodes, id)?.model ?? DEFAULT_VIDEO_MODEL)
+  const estimate = workEstimateText({
+    images: primary === 'image' ? imageWork.length : primary !== 'video' && imageMode.mode === 'remake' ? imageMode.shotIds.length : 0,
+    videoModels: primary === 'video' ? videoModels : [],
+    videoTakes: videoPlan.requiredTakes,
+    takesShown: takeState.mode !== 'off',
+    making,
+  }, t)
+  const [confirmVideoBatch, setConfirmVideoBatch] = useState(false)
+  const [confirmRemake, setConfirmRemake] = useState(false)
+  // D1 "The Set" 노드 9 · 샷 4"(노드형) · "씬 2 · 샷 4 · 12초"(스토리보드형).
+  const canvasMeta = viewMode === 'storyboard' ? storyboardCanvasMeta(nodes, t) : directorCanvasMeta(nodes, t)
 
-  // v3 D1 툴바(2026-11-03): 캔버스 판 안 위쪽 — 왼쪽 [노드 | 스토리보드] · 제목, 가운데 일괄 생성, 오른쪽 캔버스 도구 · Lumi 알약.
-  //   단추는 작업 바탕색 알약(그림자 하나). 좁으면(채팅을 연 화면) 다음 줄로 넘어간다.
+  // Writer 샷은 4샷 한 장 일괄로, Director 에서 손으로 더한 샷(Writer 샷 없음)은 한 장씩.
+  const writerShotIdOf = (id: string): string | null => {
+    const node = nodes.find((n) => n.id === id)
+    return node && isShotData(node.data) ? node.data.writerShotId : null
+  }
+  // [이미지 만들기 · N]: 빈 샷은 일괄(빈칸만), 실패한 샷 · 손으로 더한 샷은 한 장씩 다시. Take 는 쓰지 않아 확인 없이 바로(Takes 0).
+  const runImages = () => {
+    if (imageMode.mode === 'remake') {
+      setConfirmRemake(true)
+      return
+    }
+    const pid = useDirectorCanvasStore.getState().projectId
+    if (!pid || imageWork.length === 0) return
+    const store = useDirectorCanvasStore.getState()
+    const batch: string[] = []
+    for (const id of imageWork) {
+      const writerShotId = writerShotIdOf(id)
+      if (shotStates.get(id) === 'image_failed' || !writerShotId) void store.generateStoryboardImage(id).catch(() => {})
+      else batch.push(writerShotId)
+    }
+    if (batch.length > 0) void runRealBatch(pid, picked.size > 0 ? { shotIds: batch } : undefined)
+  }
+  // [이미지 다시 만들기 · N] 확인 뒤: 고른 샷만 다시(일괄 force + 고른 샷).
+  const remakePicked = () => {
+    setConfirmRemake(false)
+    const pid = useDirectorCanvasStore.getState().projectId
+    if (!pid || imageMode.mode !== 'remake') return
+    const store = useDirectorCanvasStore.getState()
+    const batch: string[] = []
+    for (const id of imageMode.shotIds) {
+      const writerShotId = writerShotIdOf(id)
+      if (writerShotId) batch.push(writerShotId)
+      else void store.generateStoryboardImage(id).catch(() => {})
+    }
+    if (batch.length > 0) void runRealBatch(pid, { force: true, shotIds: batch })
+  }
+  // [영상 만들기 · N]: Take 를 쓰니 지금처럼 확인창을 거친다(약속 E).
+  const runVideos = () => {
+    if (videoWork.length === 0) return
+    refetchTakeBalance()
+    setConfirmVideoBatch(true)
+  }
+  // [모두 멈추기] — 영상 묶음은 지금 만들고 있는 영상까지만 마치고 멈춘다(#batch-resume 2026-09-09 오너 결정 ①).
+  const stopAll = async () => {
+    if (!videoBatchBusy || videoBatchCancelled) return
+    const run = useDirectorCanvasStore.getState()
+    const stillCurrent = () => {
+      const current = useDirectorCanvasStore.getState()
+      return current.projectId === run.projectId && current.videoBatchRunId === run.videoBatchRunId
+    }
+    try {
+      await run.cancelVideoBatch()
+      if (stillCurrent()) toast.info(t('Stop after current videos finish.'))
+    } catch (error) {
+      console.error('[video-batches] cancel failed:', error)
+      if (stillCurrent()) toast.error(t('Please try again in a moment.'))
+    }
+  }
+  const progressDone = (storyboardBatch?.done ?? 0) + (videoBatch?.done ?? (videoBatchProgress?.done ?? 0))
+  const progressTotal = (storyboardBatch?.total ?? 0) + (videoBatch?.total ?? (videoBatchProgress?.total ?? 0))
+  const progressLabel =
+    makingImages > 0 && makingVideos > 0
+      ? t('Making {images} images · {videos} videos', { images: makingImages, videos: makingVideos })
+      : makingVideos > 0 || videoBatchBusy
+        ? t('Making {count} videos', { count: Math.max(makingVideos, 1) })
+        : t('Making {count} images', { count: Math.max(makingImages, 1) })
+
+  // v3 D1 → 1110 확정(시안 406:3717 · 406:4051): 위쪽 2줄.
+  //   1줄: 보기 · 제목 · 예상 … 상태 고르기 · Lumi / 2줄: 진행 … 이미지 만들기 · 영상 만들기.
+  //   가장 밝은(크림) 단추는 지금 할 일 하나(시안 R) — 만들 게 없는 단추는 꺼진다.
   return (
-    <div className="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-2 px-4 pb-2 pt-4">
-      <div className="flex min-w-0 items-center gap-3">
-        {/* Node / Storyboard 토글 */}
-        <AltArrowHint>
-          <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'node' | 'storyboard')}>
-            <TabsList className="h-9 rounded-full bg-background p-1 shadow-node">
-              <TabsTrigger value="node" className="rounded-full px-3.5 text-[13px]">{t('Node')}</TabsTrigger>
-              <TabsTrigger value="storyboard" className="rounded-full px-3.5 text-[13px]">{t('Storyboard')}</TabsTrigger>
-            </TabsList>
-          </Tabs>
-        </AltArrowHint>
+    <div className="flex shrink-0 flex-col gap-3 px-4 pb-3 pt-4">
+      <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
+        <div className="flex min-w-0 items-center gap-3">
+          {/* Node / Storyboard 토글 */}
+          <AltArrowHint>
+            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'node' | 'storyboard')}>
+              <TabsList className="h-9 rounded-full bg-background p-1 shadow-node">
+                <TabsTrigger value="node" className="rounded-full px-3.5 text-[13px]">{t('Node')}</TabsTrigger>
+                <TabsTrigger value="storyboard" className="rounded-full px-3.5 text-[13px]">{t('Storyboard')}</TabsTrigger>
+              </TabsList>
+            </Tabs>
+          </AltArrowHint>
 
-        {/* Previz | Real 미디어 토글(#previz-video) — Storyboard 뷰 전용, 상단바 상주(2026-07-22). */}
-        {viewMode === 'storyboard' && (
-          <div className="flex h-9 items-center gap-0.5 rounded-full bg-background p-1 shadow-node">
-            {(['previz', 'real'] as const).map((m) => (
-              <button
-                key={m}
-                type="button"
-                onClick={() => setStoryboardMediaMode(m)}
-                aria-pressed={storyboardMediaMode === m}
-                className={cn(
-                  'h-full rounded-full px-3 text-[13px] transition-colors',
-                  storyboardMediaMode === m
-                    ? 'bg-accent font-semibold text-foreground'
-                    : 'font-medium text-subtle-foreground hover:text-foreground',
-                )}
-              >
-                {m === 'previz' ? 'Previz' : 'Real'}
-              </button>
-            ))}
-          </div>
-        )}
-
-        {/* 제목(#e1 2026-07-14 스테이지 헤더 → v3 툴바 안) — 설명문은 "?" 뱃지 호버(2026-08-06). */}
-        <div className="flex min-w-0 items-center gap-2">
-          <h1 className="shrink-0 text-[15px] font-bold text-foreground">The Set</h1>
-          <StageHelpBadge
-            text={t(
-              'Start shooting real images/videos based on the rough storyboard, characters, and world.',
-            )}
-          />
-          {canvasMeta && (
-            <span className="truncate font-num text-meta font-medium text-subtle-foreground">{canvasMeta}</span>
+          {/* 러프 | 실사 미디어 토글(#previz-video) — Storyboard 뷰 전용, 상단바 상주(2026-07-22). */}
+          {viewMode === 'storyboard' && (
+            <div className="flex h-9 items-center gap-0.5 rounded-full bg-background p-1 shadow-node">
+              {(['previz', 'real'] as const).map((m) => (
+                <button
+                  key={m}
+                  type="button"
+                  onClick={() => setStoryboardMediaMode(m)}
+                  aria-pressed={storyboardMediaMode === m}
+                  className={cn(
+                    'h-full rounded-full px-3 text-[13px] transition-colors',
+                    storyboardMediaMode === m
+                      ? 'bg-accent font-semibold text-foreground'
+                      : 'font-medium text-subtle-foreground hover:text-foreground',
+                  )}
+                >
+                  {m === 'previz' ? t('Rough') : t('Real')}
+                </button>
+              ))}
+            </div>
           )}
+
+          {/* 제목(#e1 2026-07-14 스테이지 헤더 → v3 툴바 안) — 설명문은 "?" 뱃지 호버(2026-08-06). */}
+          <div className="flex min-w-0 items-center gap-2">
+            <h1 className="shrink-0 text-[15px] font-bold text-foreground">{t('The Set')}</h1>
+            <StageHelpBadge
+              text={t(
+                'Start shooting real images/videos based on the rough storyboard, characters, and world.',
+              )}
+            />
+            {canvasMeta && (
+              <span className="truncate font-num text-meta font-medium text-subtle-foreground">{canvasMeta}</span>
+            )}
+          </div>
+
+          {/* 예상 칸(시안 D1 "이미지 4장 · 약 2분 · Takes 안 써요") — 시작 전 예상만, 만드는 중에는 남은 시간을 쓰지 않는다(8/26). */}
+          {estimate && (
+            <span
+              data-testid="director-estimate"
+              className="hidden truncate rounded-full bg-background px-3 py-1 text-[12.5px] font-medium text-muted-foreground shadow-node xl:inline"
+            >
+              {estimate}
+            </span>
+          )}
+        </div>
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {/* 캔버스 전용 액션 3종 — Node 탭에서만 표시(#e2 2026-07-13) */}
+          {viewMode === 'node' && (
+            <>
+              {/* 미사용 에셋 불러오기 — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만) */}
+              <button
+                type="button"
+                onClick={() => toggleUnusedAssets()}
+                aria-pressed={showUnusedAssets}
+                title={t('Show registered assets that this scene does not reference in the left asset column too')}
+                className={cn(TOOLBAR_PILL, showUnusedAssets && 'bg-stage/18 ring-[1.5px] ring-inset ring-stage hover:bg-stage/25')}
+              >
+                <Boxes className="size-3.5" />
+                <span>{showUnusedAssets ? t('Hide unused assets') : t('Load unused assets')}</span>
+              </button>
+
+              {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
+              <button
+                type="button"
+                onClick={() => requestArrange()}
+                title={t('Arrange assets, scenes, shots, and videos in a left-to-right layout with spacing (saved to DB)')}
+                className={TOOLBAR_PILL}
+              >
+                <LayoutGrid className="size-3.5" />
+                <span>{t('Auto-arrange')}</span>
+              </button>
+
+              {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
+              <button
+                type="button"
+                onClick={() =>
+                  addPromptNode({ x: 80, y: 120 + promptCount * 180 })
+                }
+                title={t('Adds a standalone prompt node. Connect its right handle to a Shot\'s T input to sync the Shot prompt.')}
+                className={TOOLBAR_PILL}
+              >
+                <Plus className="size-3.5" />
+                <span>{t('Prompt node')}</span>
+              </button>
+            </>
+          )}
+
+          {/* 상태 고르기(시안 D1 "전체 4 ▾") — 고르면 그 상태 샷만 보인다. */}
+          <ShotStatusFilterMenu counts={statusCounts} value={statusFilter} onChange={setStatusFilter} />
+
+          {/* 채팅이 닫혀 있으면 여는 곳(v3 D1 Lumi 알약) — Director 는 채팅을 닫은 채 시작한다. */}
+          <LumiChatPill />
         </div>
       </div>
 
-      <div className="mx-auto flex shrink-0 items-center gap-2">
-          {/* 스토리보드 일괄 생성 */}
-          <button
-            type="button"
-            title={
-              isGenerating || realBatchBusy
-                ? t('Generation in progress. You can start again when it finishes.')
-                : t('Generate the rough storyboard into a real shooting-image storyboard in one go')
-            }
-            onClick={() => {
-              // #2: 이미 모두 생성됐으면 재생성 대신 알림.
-              const shots = nodes.filter((n) => isShotData(n.data))
-              const pending = shots.filter(
-                (n) =>
-                  isShotData(n.data) &&
-                  n.data.storyboardImage?.status !== 'completed',
-              )
-              // #c3 (2026-08-27 오너): "하나씩 하는 거 짜쳐서 전체 재생성 누르려는데 X표로 막힘".
-              //   전부 생성된 상태에서 안내만 띄우고 끝나 전체 재생성 경로가 아예 없었다.
-              //   과금이 큰 동작이라 바로 쏘지 않고 확인을 받는다.
-              if (shots.length > 0 && pending.length === 0) {
-                setConfirmRegenAll(true)
-                return
-              }
-              // #real-grid: 샷별 단일 잡 루프(generateAllStoryboardImages) → 4샷 시트 일괄로 교체.
-              //   미생성 샷만 채우는 멱등 경로 — 개별 재생성(고해상 단일 스트립)은 더블클릭 그대로.
-              const pid = useDirectorCanvasStore.getState().projectId
-              if (pid) void runRealBatch(pid)
-            }}
-            disabled={isGenerating || realBatchBusy || totalShots === 0}
-            aria-busy={isGenerating || realBatchBusy}
-            className={cn(
-              TOOLBAR_PILL,
-              (isGenerating || realBatchBusy || totalShots === 0) &&
-                'cursor-not-allowed opacity-50',
-              (isGenerating || realBatchBusy) && 'opacity-70',
-            )}
-          >
-            {isGenerating || realBatchBusy ? (
-              <Loader2 className="size-4 animate-spin" />
-            ) : (
-              <RefreshCw className="size-3.5" />
-            )}
-            <span>{t('Generate storyboard')}</span>
-            {storyboardBatch ? (
-              <span className="font-num tabular-nums text-muted-foreground">
-                {storyboardBatch.done}/{storyboardBatch.total}
-                {storyboardBatch.failed > 0 && (
-                  <span className="text-destructive"> · {t('{count} failed', { count: storyboardBatch.failed })}</span>
-                )}
-              </span>
-            ) : totalShots > 0 ? (
-              <span className="font-num tabular-nums text-muted-foreground">
-                {completedShots}/{totalShots}
-              </span>
-            ) : null}
-          </button>
-
-          {/* 명시적 전체 영상 생성 — 과금 동작은 확인 후에만 시작한다. */}
-          <button
-            type="button"
-            title={videoButton.title}
-            aria-label={videoButton.ariaLabel}
-            onClick={async () => {
-              // 도는 중이면 같은 자리가 중단 버튼이다(#batch-resume 2026-09-09 오너 결정 ①).
-              //   예전에는 진행 중에 비활성이라 멈출 방법이 창을 닫는 것뿐이었다.
-              if (videoBatchBusy) {
-                if (videoBatchCancelled) return
-                const run = useDirectorCanvasStore.getState()
-                const stillCurrent = () => {
-                  const current = useDirectorCanvasStore.getState()
-                  return current.projectId === run.projectId && current.videoBatchRunId === run.videoBatchRunId
-                }
-                try {
-                  await run.cancelVideoBatch()
-                  if (stillCurrent()) toast.info(t('Stop after current videos finish.'))
-                } catch (error) {
-                  console.error('[video-batches] cancel failed:', error)
-                  if (stillCurrent()) toast.error(t('Please try again in a moment.'))
-                }
-                return
-              }
-              const eligible = eligibleVideoBatchShotIds(
-                useDirectorCanvasStore.getState().nodes,
-              )
-              if (eligible.length === 0) {
-                toast.info(t('No eligible shots for video generation.'))
-                return
-              }
-              refetchTakeBalance()
-              setConfirmVideoBatch(true)
-            }}
-            disabled={videoBatchBusy && videoBatchCancelled}
-            aria-busy={videoBatchBusy}
-            className={cn(
-              TOOLBAR_PILL,
-              videoButton.tone === 'stage' && RUNNING_VIDEO_PILL,
-              videoBatchBusy && videoBatchCancelled && 'cursor-not-allowed opacity-70',
-            )}
-          >
-            {videoBatchBusy ? (
-              videoBatchCancelled ? (
-                <Loader2 className="size-4 animate-spin" />
-              ) : (
-                // v3 DG: 도는 동안은 채운 네모(■) — 누르면 멈춘다.
-                <Square className="size-3 fill-current" />
-              )
-            ) : (
-              <Play className="size-3.5 fill-current" />
-            )}
-            {/* v3 DG(2026-11-09): "영상 만드는 중 · 2/8" · "영상 생성 · 8개 가능". 누르면 멈춘다는 것은 마우스 올림 글(title). */}
-            <span>{videoButton.label}</span>
-            {videoBatch ? (
-              <>
-                <span aria-hidden className={videoCountTone}>·</span>
-                <span className={cn('font-num tabular-nums', videoCountTone)}>
-                  {videoBatch.done}/{videoBatch.total}
-                </span>
-                {videoBatch.failed > 0 && (
-                  <span className={videoFailTone}>
-                    {t('{count} failed', { count: videoBatch.failed })}
-                  </span>
-                )}
-              </>
-            ) : videoButton.count ? (
-              <>
-                <span aria-hidden className={videoCountTone}>·</span>
-                <span className={cn('font-num tabular-nums', videoCountTone)}>{videoButton.count}</span>
-              </>
-            ) : null}
-            {videoBatchBusy && videoBatchProgress && !videoBatch && (
-              <>
-                {videoBatchProgress.failed > 0 && (
-                  <span className={videoFailTone}>
-                    {t('{count} failed', { count: videoBatchProgress.failed })}
-                  </span>
-                )}
+      {/* 2줄(시안 D1 · D3 · D4): 왼쪽 진행(체크 옆) … 오른쪽 만들기 단추. */}
+      <div className="flex min-h-[52px] flex-wrap items-center gap-x-3 gap-y-2 rounded-2xl bg-background px-4 py-2 shadow-node">
+        <div className="flex min-w-0 items-center gap-3">
+          <PickAllBar
+            total={visibleShotIds.length}
+            picked={picked.size}
+            onToggleAll={() => setPickedShots(nextPickAll(visibleShotIds, [...picked]))}
+            onClear={clearPickedShots}
+          />
+          {making && <span aria-hidden className="h-5 w-px shrink-0 bg-border" />}
+          {making && (
+            <div className="flex min-w-0 items-center gap-2.5" aria-live="polite">
+              <LumiAvatar persona={STAGE_PERSONA.director} state="loading" size={22} />
+              <span className="truncate text-[13px] font-medium text-foreground">{progressLabel}</span>
+              {progressTotal > 0 && (
                 <span
                   role="progressbar"
                   aria-valuemin={0}
-                  aria-valuemax={videoBatchProgress.total}
-                  aria-valuenow={videoBatchProgress.done}
-                  className={cn('h-1 w-16 overflow-hidden rounded-full', videoButton.tone === 'stage' ? 'bg-stage-badge-foreground/25' : 'bg-card')}
+                  aria-valuemax={progressTotal}
+                  aria-valuenow={progressDone}
+                  aria-label={t('Finished {done} of {total}', { done: progressDone, total: progressTotal })}
+                  className="hidden h-1 w-40 shrink-0 overflow-hidden rounded-full bg-progress-track lg:block"
                 >
                   <span
-                    className={cn('block h-full transition-[width]', videoButton.tone === 'stage' ? 'bg-stage-badge-foreground' : 'bg-stage')}
-                    style={{
-                      width:
-                        videoBatchProgress.total > 0
-                          ? `${(videoBatchProgress.done / videoBatchProgress.total) * 100}%`
-                          : '0%',
-                    }}
+                    className={cn('block h-full transition-[width]', makingVideos > 0 || videoBatchBusy ? 'bg-state-video' : 'bg-stage-director')}
+                    style={{ width: `${(progressDone / progressTotal) * 100}%` }}
                   />
                 </span>
-              </>
-            )}
+              )}
+              {/* 끝난 수 / 전체 — 핀과 같은 서버 배치(약속 D7). 남은 시간 · % 는 쓰지 않는다(오너 8/26). */}
+              {storyboardBatch && (
+                <span className="shrink-0 font-num text-[12px] tabular-nums text-muted-foreground">
+                  {t('Image')} {storyboardBatch.done}/{storyboardBatch.total}
+                  {storyboardBatch.failed > 0 && (
+                    <span className="text-destructive"> · {t('{count} failed', { count: storyboardBatch.failed })}</span>
+                  )}
+                </span>
+              )}
+              {videoBatch && (
+                <span className="shrink-0 font-num text-[12px] tabular-nums text-muted-foreground">
+                  {t('Video')} {videoBatch.done}/{videoBatch.total}
+                  {videoBatch.failed > 0 && (
+                    <span className="text-destructive"> · {t('{count} failed', { count: videoBatch.failed })}</span>
+                  )}
+                </span>
+              )}
+              {videoBatchBusy && (
+                <button
+                  type="button"
+                  onClick={() => void stopAll()}
+                  disabled={videoBatchCancelled}
+                  className={cn(TOOLBAR_PILL, 'h-8 px-3 disabled:cursor-not-allowed disabled:opacity-60')}
+                >
+                  {videoBatchCancelled ? <Loader2 className="size-3.5 animate-spin" /> : <Square className="size-3 fill-current" />}
+                  <span>{videoBatchCancelled ? t('Stopping') : t('Stop all')}</span>
+                </button>
+              )}
+            </div>
+          )}
+        </div>
+
+        <div className="ml-auto flex shrink-0 items-center gap-2">
+          {/* 고른 샷이 있으면 단추가 그 샷에만(시안 D2 "고른 샷에"). */}
+          {picked.size > 0 && <span className="text-[12.5px] font-semibold text-info">{t('On picked shots')}</span>}
+          {/* 단추 셋은 늘 같은 자리(시안 R) — 만들 게 없으면 꺼지고, 마우스를 올리면 왜 꺼졌는지 알린다. */}
+          <button
+            type="button"
+            onClick={runImages}
+            disabled={imageMode.shotIds.length === 0}
+            title={imageMode.shotIds.length === 0 ? t('Every shot here already has an image.') : undefined}
+            className={workButtonClass(primary === 'image')}
+          >
+            <ImageIcon className="size-3.5" />
+            <span>{imageMode.mode === 'remake' ? t('Make images again') : t('Make images')}</span>
+            <span aria-hidden className="opacity-60">·</span>
+            <span className="font-num tabular-nums">{imageMode.shotIds.length}</span>
           </button>
-
+          <button
+            type="button"
+            onClick={runVideos}
+            disabled={videoWork.length === 0}
+            title={videoWork.length === 0 ? t('Videos need an image first.') : undefined}
+            className={workButtonClass(primary === 'video')}
+          >
+            <Play className="size-3.5 fill-current" />
+            <span>{t('Make videos')}</span>
+            <span aria-hidden className="opacity-60">·</span>
+            <span className="font-num tabular-nums">{videoWork.length}</span>
+          </button>
+        </div>
       </div>
 
-      <div className="ml-auto flex shrink-0 items-center gap-2">
-        {/* 축척 — Storyboard 뷰 전용(#e-zoom-merge 2026-08-20 오너 지시: 뷰 내부의 전용 바에 혼자 있던 것을
-            이 바로 합류). Ctrl+wheel 단축은 보드가 그대로 처리한다. */}
-        {viewMode === 'storyboard' && (
-          <StoryboardZoomControls
-            zoomLevel={storyboardZoom}
-            onZoomLevelChange={onStoryboardZoomChange}
-            className="h-[34px] rounded-full bg-background px-1.5 shadow-node"
-          />
-        )}
-
-        {/* 캔버스 전용 액션 3종 — Node 탭에서만 표시(#e2 2026-07-13) */}
-        {viewMode === 'node' && (
-          <>
-            {/* 미사용 에셋 불러오기 — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만) */}
-            <button
-              type="button"
-              onClick={() => toggleUnusedAssets()}
-              aria-pressed={showUnusedAssets}
-              title={t('Show registered assets that this scene does not reference in the left asset column too')}
-              className={cn(TOOLBAR_PILL, showUnusedAssets && 'bg-stage/18 ring-[1.5px] ring-inset ring-stage hover:bg-stage/25')}
-            >
-              <Boxes className="size-3.5" />
-              <span>{showUnusedAssets ? t('Hide unused assets') : t('Load unused assets')}</span>
-            </button>
-
-            {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
-            <button
-              type="button"
-              onClick={() => requestArrange()}
-              title={t('Arrange assets, scenes, shots, and videos in a left-to-right layout with spacing (saved to DB)')}
-              className={TOOLBAR_PILL}
-            >
-              <LayoutGrid className="size-3.5" />
-              <span>{t('Auto-arrange')}</span>
-            </button>
-
-            {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
-            <button
-              type="button"
-              onClick={() =>
-                addPromptNode({ x: 80, y: 120 + promptCount * 180 })
-              }
-              title={t('Adds a standalone prompt node. Connect its right handle to a Shot\'s T input to sync the Shot prompt.')}
-              className={TOOLBAR_PILL}
-            >
-              <Plus className="size-3.5" />
-              <span>{t('Prompt node')}</span>
-            </button>
-          </>
-        )}
-
-        <ShotStatusFilterMenu counts={statusCounts} value={statusFilter} onChange={setStatusFilter} />
-
-        {/* 채팅이 닫혀 있으면 여는 곳(v3 D1 Lumi 알약) — Director 는 채팅을 닫은 채 시작한다. */}
-        <LumiChatPill />
-      </div>
-
-      {/* #c3: 전체 재생성 확인 — 이미 만든 걸 전부 갈아엎으므로 과금·교체를 명시하고 받는다. */}
       <RegenerateConfirmDialog
-        open={confirmRegenAll}
-        onOpenChange={setConfirmRegenAll}
-        title={t('Regenerate every storyboard image?')}
-        description={t('Redraws the shooting image for all {count} shots.', { count: totalShots })}
-        impact={[
-          t('Costs money for every shot: {count} images.', { count: totalShots }),
-          t('Replaces the existing shooting images with the new results.'),
-        ]}
-        confirmLabel={t('Regenerate all')}
-        onConfirm={() => {
-          setConfirmRegenAll(false)
-          const pid = useDirectorCanvasStore.getState().projectId
-          if (pid) void runRealBatch(pid, { force: true })
-        }}
+        open={confirmRemake}
+        onOpenChange={setConfirmRemake}
+        title={t('Make {count} images again?', { count: imageMode.shotIds.length })}
+        description={t('Remakes the image for the {count} picked shots. No Takes are used.', { count: imageMode.shotIds.length })}
+        impact={[t('Replaces the current images in the picked shots.')]}
+        confirmLabel={t('Make again')}
+        onConfirm={remakePicked}
       />
       <RegenerateConfirmDialog
         open={confirmVideoBatch}
@@ -1238,10 +1239,18 @@ function PaletteBar({
             return
           }
           const pid = useDirectorCanvasStore.getState().projectId
-          if (pid) void runVideoBatch(pid, { limit: videoPlan.runCount })
+          if (pid) void runVideoBatch(pid, { limit: videoPlan.runCount, shotIds: videoWork })
         }}
       />
     </div>
+  )
+}
+
+/** 만들기 단추 — 지금 할 일이면 크림(메인 하나), 아니면 보조. 만들 게 없으면 꺼짐(design.md §2.7). */
+function workButtonClass(primary: boolean): string {
+  return cn(
+    'flex h-9 shrink-0 items-center gap-1.5 rounded-full px-4 text-[13px] font-semibold transition-colors duration-100 disabled:cursor-not-allowed disabled:opacity-50',
+    primary ? 'bg-primary text-primary-foreground hover:bg-primary/90' : 'bg-card text-foreground hover:bg-accent',
   )
 }
 
@@ -1250,6 +1259,20 @@ function PaletteBar({
 export default function DirectorCanvasPage() {
   // v3 D1(2026-11-03): Director 는 채팅을 닫은 채 시작하고 툴바의 Lumi 알약으로 연다 — 떠나면 들어오기 전 모습으로 돌아간다(오너 2026-11-03 확인).
   useHoldChatClosed('director')
+  // 고름은 한때 쓰는 것(시안 D2, 혼자 정한 것 d) — Esc 로 풀고, 화면을 떠나면 풀린다.
+  useEffect(() => {
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape' || event.defaultPrevented) return
+      const target = event.target
+      if (target instanceof Element && target.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]')) return
+      useDirectorCanvasStore.getState().clearPickedShots()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => {
+      window.removeEventListener('keydown', onKey)
+      useDirectorCanvasStore.getState().clearPickedShots()
+    }
+  }, [])
   const handoffProjectId = useProjectStore((s) => s.projectId)
   // 라우터 요청이 아닌 실제 Director 화면의 mount가 이동 완료를 확인한다.
   useEffect(() => {
@@ -1349,15 +1372,15 @@ export default function DirectorCanvasPage() {
         viewMode === 'storyboard'
           ? t(
               'This is the storyboard. See every shot image per scene at a glance.\n\n' +
-                '· A card marked "Image generation needed" is still in rough stage\n' +
-                '· Press "Generate video" on a card to go from image to video in one go\n' +
-                '· Double-click a card to open detailed editing',
+                '· Click cards to pick shots, and the buttons at the top work on the picked shots\n' +
+                '· "Make images" turns the rough shots into real images, then "Make videos"\n' +
+                '· Press ⤢ Details on a card to open its details',
             )
           : t(
               'This is The Set, where scenes → shots → videos connect as nodes.\n\n' +
-                '· Double-click a card to open detailed editing\n' +
-                '· Select a shot card and an image-generation button appears above it\n' +
-                '· Use "Generate storyboard" at the top to turn every shot into a real image at once',
+                '· Click a node to pick its shot, and press ⤢ Details to open its details\n' +
+                '· "Make images" at the top turns the rough shots into real images at once\n' +
+                '· When images are ready, "Make videos" makes the videos',
             ),
     })
   }, [guideProjectId, viewMode, stageReady, offerSuggestion, t])
@@ -1372,10 +1395,7 @@ export default function DirectorCanvasPage() {
       </TopBarActions>
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-canvas-bg">
         {/* Center: top Palette bar(#e1 — 하단→상단 이동) + Canvas (Node/Storyboard) */}
-        <PaletteBar
-          storyboardZoom={storyboardZoom}
-          onStoryboardZoomChange={setStoryboardZoom}
-        />
+        <PaletteBar />
 
         {/* min-h-0: flex-1이 내용 높이만큼 커져 PaletteBar(토글)를
             밀어내고 StoryboardGridView의 overflow-auto가 안 걸리던 문제 수정.
@@ -1385,10 +1405,18 @@ export default function DirectorCanvasPage() {
               렌더로 remount 되던 구조라 추가 비용 없음. */}
           <div key={viewMode} className={cn('flex h-full min-h-0 flex-col', viewSlideClass)}>
             {viewMode === 'storyboard' ? (
-              <StoryboardGridView
-                zoomLevel={storyboardZoom}
-                onZoomLevelChange={setStoryboardZoom}
-              />
+              <>
+                <StoryboardGridView
+                  zoomLevel={storyboardZoom}
+                  onZoomLevelChange={setStoryboardZoom}
+                />
+                {/* 축척은 시안 D1 처럼 판 왼쪽 아래 알약(노드형 축척과 같은 자리). Ctrl+wheel 단축은 보드가 그대로 처리한다. */}
+                <StoryboardZoomControls
+                  zoomLevel={storyboardZoom}
+                  onZoomLevelChange={setStoryboardZoom}
+                  className="absolute bottom-4 left-4 z-10 h-[34px] rounded-full bg-background px-1.5 shadow-node"
+                />
+              </>
             ) : (
               <ReactFlowProvider>
                 <CanvasInner />

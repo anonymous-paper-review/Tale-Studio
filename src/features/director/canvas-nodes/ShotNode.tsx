@@ -43,6 +43,9 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // 샷 상태 테두리 · 상태 고르기 흐림(시안 R 416:4941 · D1, 오너 2026-11-14).
   const shotStateNow = useShotState(id)
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
+  // 몸통을 누르면 고르기(시안 D2 · R), 상세는 ⤢ — 상세가 열린 노드만 단계 색 테두리 · 위 단추.
+  const picked = useDirectorCanvasStore((s) => s.pickedShotIds?.includes(id) ?? false)
+  const detailOpen = useDirectorCanvasStore((s) => s.selectedNodeId === id)
   // 노드 제목은 보드와 같은 전체 번호("Shot 8", 오너 2026-11-02 "전체 번호로 통일").
   const boardNames = useBoardNodeNames()
   const generation = useStoryboardImageGeneration(isShotData(data) ? data : null)
@@ -93,7 +96,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       {/* 선택 시 상단 플로팅 툴바(#e4 2026-07-14) — SHOT IMAGE 카드는 이미지 생성 관련만:
           러프만 보이는 상태 → '이미지 생성', 실사 이미지가 있으면 → '이미지 리터칭'(재생성).
           영상 테이크 버튼은 SHOT VIDEO 카드('영상 리테이크')로 이동. */}
-      <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
+      <NodeToolbar isVisible={detailOpen} position={Position.Top} offset={8}>
         <div className="flex items-center gap-1.5 rounded-full bg-popover p-1 pr-2.5 shadow-node">
           <StoryboardImageButton nodeId={id} data={data} className="h-7 gap-1 rounded-full px-3 text-xs" />
           {/* 선택된 이미지 모델명 — 변경은 편집 패널/팝업에서. */}
@@ -107,7 +110,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         id={id}
         theme="shot"
         title={nodeTitle}
-        selected={selected}
+        selected={detailOpen}
+        picked={picked}
         width={280}
         stale={data.stale}
         beam={isGenerating ? 'success' : null}

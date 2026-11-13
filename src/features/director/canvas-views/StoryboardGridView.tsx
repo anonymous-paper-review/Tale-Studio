@@ -1,7 +1,7 @@
 'use client'
 
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ImageIcon, MapPin, Clock, Pause, Play } from 'lucide-react'
+import { ImageIcon, MapPin, Clock, Maximize2, Pause, Play } from 'lucide-react'
 
 import { cn } from '@/lib/utils'
 import { mediaFrameStyle } from '@/lib/project-aspect'
@@ -58,7 +58,7 @@ import { useT } from '@/lib/i18n'
 import { useWriterStore } from '@/stores/writer-store'
 import { filterShotsByStatus, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
-import { ImageFailedPanel, ImageNeededTag, ShotPipelineRow, ShotStateTail } from '@/features/director/shot-status'
+import { ImageFailedPanel, ImageNeededTag, PickBox, ShotPipelineRow, ShotStateTail } from '@/features/director/shot-status'
 
 type SceneGroup = {
   key: string
@@ -187,6 +187,8 @@ function ShotCell({
   descriptionFontSize,
   shotMention,
   shotState,
+  picked,
+  pickMode,
 }: {
   node: DirectorNode
   roster: SlugEntry[]
@@ -204,6 +206,10 @@ function ShotCell({
   shotMention?: CardMention
   /** 샷 상태(시안 R 416:4941) — 실사 보기의 테두리 · 꼬리 · 이미지 → 영상 줄. */
   shotState: DirectorShotState
+  /** 고른 샷(시안 D2) — 흰 테두리 · 체크. */
+  picked: boolean
+  /** 고른 샷이 하나라도 있으면 모든 카드에 고름 상자를 보인다. */
+  pickMode: boolean
 }) {
   const t = useT()
   const generateStoryboardImage = useDirectorCanvasStore(
@@ -308,7 +314,13 @@ function ShotCell({
   const roughChanged = mediaMode === 'real' && classifyRoughChanged(rough, img)
   // 약속 I(오너 확정): 그리드에서 이미지를 눌러도 글자를 눌러도 같은 연출 편집 팝업(Writer 것) — writer 샷일 때.
   //   #e6 의 Previz 편집 팝업(previzOpen)이 이미 그 팝업이다 — 같은 상태를 연다.
+  // ⤢ 상세(시안 R "⤢ = 상세 열기", 오너 2026-11-14): 실사 보기는 샷 상세 팝업, 러프 보기는 지금 연출(화살표) 편집 창(결정 페이지 추천).
+  const togglePickedShot = useDirectorCanvasStore((s) => s.togglePickedShot)
   const openDetail = () => {
+    if (mediaMode === 'real') {
+      openPopup(node.id)
+      return
+    }
     if (writerShotId) setPrevizOpen(true)
     else openPopup(node.id)
   }
@@ -501,9 +513,15 @@ function ShotCell({
       // v3(2026-11-03): 노드 캔버스와 같은 판(작업 바탕색 · 모서리 16 · 그림자 하나 · 안쪽 12) — 캔버스 판(--canvas-bg) 위에 뜬다.
       className={cn(
         'group flex cursor-pointer flex-col rounded-2xl border-[1.5px] bg-background p-3 shadow-node transition-colors duration-100 hover:bg-card',
-        realTone?.frame ?? 'border-transparent',
+        picked ? 'border-foreground' : realTone?.frame ?? 'border-transparent',
       )}
       data-shot-state={mediaMode === 'real' ? shotState : undefined}
+      aria-selected={picked}
+      // 카드 몸통 = 고르기(시안 D2 · R) — 다시 누르면 푼다. ⤢ 상세 · 고름 상자 · 단추는 저마다 눌림을 멈춘다.
+      onClick={(event) => {
+        if (isMentionModifierClick(event)) return
+        togglePickedShot(node.id)
+      }}
       onClickCapture={(event) => {
         if (mentionCardOnModifierClick(event)) {
           event.preventDefault()
@@ -592,8 +610,40 @@ function ShotCell({
         {/* 단계 배지(#e2) — 좌상단 상시 표시(아이콘+문구). 배지를 호버하면 그 아래로 액션 목록이
             펼쳐진다(#e4 2026-08-11) — 우하단 스택에서 이사. 글자만, 폭 통일(w-28).
             생성 중엔 오버레이가 덮으므로 숨긴다. */}
-        {!generating && stageBadge && (
-          <div className="group/badge absolute left-2 top-2 z-10">
+        {/* 고름 상자(시안 D2) — 고른 샷이 있거나 마우스를 올리면 보인다. */}
+        <PickBox
+          picked={picked}
+          onToggle={() => togglePickedShot(node.id)}
+          className={cn('absolute left-2 top-2 z-20', !picked && !pickMode && 'opacity-0 group-hover:opacity-100 focus-visible:opacity-100')}
+        />
+        {/* ⤢ 상세(시안 R "⤢ = 상세 열기") */}
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation()
+            openDetail()
+          }}
+          onDoubleClick={(event) => event.stopPropagation()}
+          aria-label={t('Open details')}
+          className="absolute right-2 top-2 z-20 inline-flex items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-foreground transition-colors hover:bg-black/65"
+        >
+          <Maximize2 className="size-3" />
+          {t('Details')}
+        </button>
+
+        {/* 실사 보기: 이미지가 필요한 샷만 주황 태그(시안 R). 만드는 일은 위쪽 단추 · 상세가 맡는다(카드 위 숨은 단추 없앰). */}
+        {mediaMode === 'real' && !generating && (shotState === 'image_needed' || roughChanged) && (
+          <div className="absolute left-10 top-2 z-10 flex items-center gap-1">
+            {shotState === 'image_needed' && <ImageNeededTag />}
+            {roughChanged && (
+              <span className="inline-flex items-center rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-warning">
+                {t('Rough changed')}
+              </span>
+            )}
+          </div>
+        )}
+        {mediaMode === 'previz' && !generating && stageBadge && (
+          <div className="group/badge absolute left-10 top-2 z-10">
             <span
               className={cn(
                 'inline-flex items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold',
@@ -672,7 +722,7 @@ function ShotCell({
             {manualUncertain ? t('Generate again') : t('Check image status')}
           </button>
         )}
-        {childVideoFailure && (
+        {mediaMode === 'previz' && childVideoFailure && (
           <span
             title={childVideoFailure}
             className="absolute left-2 top-2 max-w-[calc(100%-1rem)] truncate rounded bg-destructive/90 px-1.5 py-0.5 text-[10px] text-destructive-foreground"
@@ -747,15 +797,7 @@ function ShotCell({
       />
 
       {/* #f9(2026-08-26 오너): 글자(캡션) 원클릭 = 편집 팝업 — 더블클릭을 몰라도 수정 진입. */}
-      <div
-        className="flex cursor-text flex-col gap-1 rounded-lg px-1 pb-0.5 pt-2.5 transition-colors hover:bg-accent/60"
-        title={t('Click to edit this shot')}
-        onClick={(event) => {
-          if (isMentionModifierClick(event)) return
-          event.stopPropagation()
-          openDetail()
-        }}
-      >
+      <div className="flex flex-col gap-1 rounded-lg px-1 pb-0.5 pt-2.5">
         <span className="truncate text-label font-semibold text-foreground">
           {sceneLabel ? `${sceneLabel} · ` : ''}
           {shotLabel}
@@ -863,6 +905,7 @@ export function StoryboardGridView({
   )
   const shotStates = useDirectorShotStates()
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
+  const pickedShotIds = useDirectorCanvasStore((s) => s.pickedShotIds)
 
   // 진행 중인 작업을 보고 Previz/Real 을 대신 바꾸던 effect 를 제거했다
   //   (#view-not-forced 2026-09-08 오너 판정). 진입 시 한 번이 아니라 작업이 도는 내내
@@ -1024,6 +1067,8 @@ export function StoryboardGridView({
                     descriptionFontSize={descriptionFontSize}
                     shotMention={mentionFor('shot', shot.id, mediaMode)}
                     shotState={shotStates.get(shot.id) ?? 'image_needed'}
+                    picked={pickedShotIds.includes(shot.id)}
+                    pickMode={pickedShotIds.length > 0}
                   />
                 ))}
               </div>

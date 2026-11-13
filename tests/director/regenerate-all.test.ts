@@ -27,31 +27,35 @@ describe('C3 — 전체 재생성을 요청할 수 있다', () => {
     expect(client).toContain("opts?.force ? { projectId, force: true } : { projectId }")
   })
 
-  it('모든 그림이 있어도 전체 재생성 전에 확인을 요청한다', () => {
-    // 예전: toast.info('All storyboards have already been generated.') 후 return
-    expect(page).toContain('setConfirmRegenAll(true)')
-    expect(page).toContain('runRealBatch(pid, { force: true })')
+  // 왜: 1110 확정 시안 D2 · R — [이미지 만들기]는 이미지 없는 샷만 센다. 8/27 오너의 "전체 재생성" 길은 고르기로 남는다:
+  //   전체 체크 → 고른 샷이 모두 이미지가 있으면 [이미지 다시 만들기 · N] → 확인 → 고른 샷만 다시(오너 2026-11-14 "나머지는 추천대로").
+  it('이미지가 있는 샷을 고르고 [이미지 다시 만들기]를 누르면 확인한 뒤 고른 샷만 다시 만든다', () => {
+    expect(page).toContain('setConfirmRemake(true)')
+    expect(page).toContain('runRealBatch(pid, { force: true, shotIds: batch })')
   })
 
-  it('비용이 드는 전체 재생성은 확인한 뒤 시작한다', () => {
+  // 왜: 다시 만들기는 지금 이미지를 바꾸니 몇 장인지 · Take 를 쓰지 않는다는 것 · 바뀐다는 것을 먼저 알린다.
+  it('다시 만들기 확인 창은 몇 장을 다시 만드는지, Take 를 쓰지 않는다는 것, 지금 이미지가 바뀐다는 것을 알린다', () => {
     expect(page).toContain('RegenerateConfirmDialog')
-    expect(page).toContain('Regenerate every storyboard image?')
-    // 영향 고지에 과금·교체가 둘 다 있어야 한다
-    expect(page).toContain('Costs money for every shot')
-    expect(page).toContain('Replaces the existing shooting images')
+    expect(page).toContain('Make {count} images again?')
+    expect(page).toContain('No Takes are used.')
+    expect(page).toContain('Replaces the current images in the picked shots.')
   })
 })
 
 describe('C3 — 막힐 때 이유를 말한다', () => {
-  it('생성 중에는 다시 누를 수 없는 이유를 알려준다', () => {
-    expect(page).toContain('Generation in progress. You can start again when it finishes.')
+  // 왜: 결정 페이지 추천 "꺼진 단추 아래 이유 한 줄" — 만들 게 없어 꺼진 단추에 마우스를 올리면 이유를 말한다.
+  it('꺼진 만들기 단추는 마우스를 올리면 왜 꺼졌는지 알려 준다', () => {
+    expect(page).toContain('Every shot here already has an image.')
+    expect(page).toContain('Videos need an image first.')
   })
 
-  it('전체 재생성 안내 문구를 한국어로 보여준다', () => {
+  it('다시 만들기 · 꺼진 단추 안내 문구를 한국어로 보여준다', () => {
     for (const key of [
-      'Regenerate every storyboard image?',
-      'Regenerate all',
-      'Generation in progress. You can start again when it finishes.',
+      'Make {count} images again?',
+      'Make images again',
+      'Every shot here already has an image.',
+      'Videos need an image first.',
     ]) {
       expect(ko[key], `missing ko: ${key}`).toBeTruthy()
     }

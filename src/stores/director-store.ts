@@ -1095,6 +1095,9 @@ interface DirectorCanvasState {
   storyboardMediaMode: 'previz' | 'real'
   /** 상태 고르기(시안 D1 406:3717, 오너 2026-11-14) — 고른 상태 샷만 보인다. 화면에서만 쓰고 저장하지 않는다. */
   statusFilter: ShotStatusFilter
+  /** 고른 샷(시안 D2 406:4588 · R, 오너 2026-11-14) — 카드 · 노드 몸통을 누르면 고르고 다시 누르면 푼다. 위쪽 단추 · 예상이 이 샷 기준.
+   *  샷 노드 id. 화면에서만 쓰고 저장하지 않는다(다른 프로젝트로 가거나 화면을 떠나면 풀림). */
+  pickedShotIds: string[]
   /** #ledger: 씬별 상태 장부(scenes.stage.ledger) — hydrate 때 DB 에서 읽는다. 화면 파생 전용. */
   sceneLedgers: Record<string, SceneLedger>
   // #real-grid-auto: 실사 일괄 생성 진행 중 — 개별 이미지 생성/재생성을 잠근다(시트 단위 작업과 충돌 방지).
@@ -1152,6 +1155,9 @@ interface DirectorCanvasState {
   setViewMode: (m: 'node' | 'storyboard') => void
   setStoryboardMediaMode: (m: 'previz' | 'real') => void
   setStatusFilter: (filter: ShotStatusFilter) => void
+  togglePickedShot: (shotNodeId: string) => void
+  setPickedShots: (shotNodeIds: string[]) => void
+  clearPickedShots: () => void
   /** 일괄 시작 — 중단 표시를 풀고 진행 상태를 연다. */
   beginVideoBatch: (total: number) => void
   /** 일괄 중단 — 도는 중일 때만 먹는다. 서버 DELETE로 중단을 확인한 뒤 반환한다. */
@@ -1642,6 +1648,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       viewMode: 'node',
       storyboardMediaMode: 'previz',
       statusFilter: 'all',
+      pickedShotIds: [],
       sceneLedgers: {},
       realBatchBusy: false,
       realBatchRemaining: null,
@@ -1695,6 +1702,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             deleteConfirmInfo: null,
             relationModal: null,
             statusFilter: 'all',
+            pickedShotIds: [],
             videoBatchBusy: false,
             videoBatchProgress: null,
             videoBatchQueue: null,
@@ -1726,6 +1734,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       setViewMode: (m) => set({ viewMode: m }),
       setStoryboardMediaMode: (m) => set({ storyboardMediaMode: m }),
       setStatusFilter: (filter) => set({ statusFilter: filter }),
+      togglePickedShot: (shotNodeId) =>
+        set((state) => ({
+          pickedShotIds: state.pickedShotIds.includes(shotNodeId)
+            ? state.pickedShotIds.filter((id) => id !== shotNodeId)
+            : [...state.pickedShotIds, shotNodeId],
+        })),
+      setPickedShots: (shotNodeIds) => set({ pickedShotIds: [...new Set(shotNodeIds)] }),
+      clearPickedShots: () => set({ pickedShotIds: [] }),
 
       beginVideoBatch: (total) =>
         set({

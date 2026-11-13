@@ -21,3 +21,18 @@ export function directorCanvasMeta(
   const shots = visible.filter((n) => n.data.kind === 'shot').length
   return t('{nodes} nodes · {shots} shots', { nodes: visible.length, shots })
 }
+
+/** 스토리보드형 "씬 2 · 샷 4 · 12초"(1110 확정 시안 D1 406:3717) — 씬 수 · 샷 수 · 샷 길이 합. 샷이 없으면 null. */
+export function storyboardCanvasMeta(
+  nodes: readonly DirectorNode[],
+  t: (text: string, params?: Record<string, string | number>) => string,
+): string | null {
+  const shots = nodes.filter((n) => n.data.kind === 'shot')
+  if (shots.length === 0) return null
+  const scenes = nodes.filter((n) => n.data.kind === 'scene').length
+  const seconds = shots.reduce((sum, n) => {
+    const value = (n.data as { durationSeconds?: unknown }).durationSeconds
+    return sum + (typeof value === 'number' && Number.isFinite(value) && value > 0 ? value : 0)
+  }, 0)
+  return t('{scenes} scenes · {shots} shots · {seconds}s', { scenes, shots: shots.length, seconds: Math.round(seconds) })
+}

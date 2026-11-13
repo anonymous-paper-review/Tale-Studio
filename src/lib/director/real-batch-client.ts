@@ -76,6 +76,8 @@ export async function runRealBatch(
     force?: boolean
     traceId?: string
     onJob?: GenerationJobObserver
+    /** 고른 샷만(시안 D2, 오너 2026-11-14) — Writer 샷 id. 없으면 지금처럼 빈 샷 전부. */
+    shotIds?: readonly string[]
   },
 ): Promise<RealBatchResult> {
   const store = useDirectorCanvasStore
@@ -90,8 +92,9 @@ export async function runRealBatch(
   let failedRounds = 0
   try {
     for (let round = 0; round < MAX_ROUNDS; round++) {
-      const requestBody: { projectId: string; force?: boolean; traceId?: string; runId?: string } =
+      const requestBody: { projectId: string; force?: boolean; traceId?: string; runId?: string; shotIds?: string[] } =
         opts?.force ? { projectId, force: true } : { projectId }
+      if (opts?.shotIds) requestBody.shotIds = [...opts.shotIds]
       if (opts?.traceId) requestBody.traceId = opts.traceId
       requestBody.runId = runId
       let res: Response | null = null

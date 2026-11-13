@@ -41,6 +41,12 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // 상태 고르기(시안 D1): 그 샷 상태가 안 맞으면 흐리게. 테두리는 이 Take 의 상태(시안 D4 · D7).
   const parentShotState = useShotState(isVideoData(data) ? data.parentShotNodeId : null)
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
+  // 영상 노드를 누르면 그 샷을 고른다(시안 R). 상세가 열린 노드만 단계 색 테두리 · 위 단추.
+  const picked = useDirectorCanvasStore((s) => {
+    const parent = isVideoData(data) ? data.parentShotNodeId : null
+    return !!parent && (s.pickedShotIds?.includes(parent) ?? false)
+  })
+  const detailOpen = useDirectorCanvasStore((s) => s.selectedNodeId === id)
   const playingNodeId = useDirectorCanvasStore((s) => s.playingNodeId)
   const setPlayingNode = useDirectorCanvasStore((s) => s.setPlayingNode)
   const ensureVideoThumbnail = useDirectorCanvasStore(
@@ -197,7 +203,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
     <>
       {/* 선택 시 상단 플로팅 툴바(#e4) — 옛 SHOT IMAGE 카드의 '새 영상 테이크'가 여기로 이동.
           부모 샷 설정으로 새 테이크를 만들어 재생성한다. */}
-      <NodeToolbar isVisible={selected} position={Position.Top} offset={8}>
+      <NodeToolbar isVisible={detailOpen} position={Position.Top} offset={8}>
         <div className="flex items-center gap-1.5 rounded-full bg-popover p-1 pr-2.5 shadow-node">
           <Button
             size="sm"
@@ -230,7 +236,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       id={id}
       theme="video"
       title={parentShotTitle ?? data.label}
-      selected={selected}
+      selected={detailOpen}
+      picked={picked}
       width={240}
       stale={data.stale}
       strongStale={isStrongStale}
