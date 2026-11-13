@@ -1,6 +1,7 @@
 // Director → Editor 넘기기 창(D8, 디자이너 1110 확정 · 오너 2026-11-14 답 8번) — 샷마다 Editor 로 가는 영상(Take)이 있는지,
 //   없으면 왜 없는지를 보드 순서로 정한다. 영상 없는 샷이 하나라도 있을 때만 창을 연다(다 있으면 지금처럼 바로, 10/1).
 //   Editor 로 가는 Take 는 내보내기 · 넘김과 같은 규칙(selectHandoffTake — ★ 최종 먼저, 없으면 가장 최근 완성)이다.
+//   화면에서 멈춘 Take 는 ★ 가 아니면 영상 없음 — 투영 · 샷 상태 · 일괄 검사와 같은 규칙(오너 2026-11-14 7번, 리드 검토 a 5).
 //   Editor 는 DB 샷(Writer 샷)만 컷으로 받는다 — Director 에서 더한 샷(writerShotId 없음)은 창에 넣지 않는다(검토 b 보통 1).
 //   약속: tests/director/editor-handover.test.ts
 import { selectHandoffTake, selectLatestAttempt } from '@/lib/director-video-take-selection'
@@ -53,13 +54,15 @@ export function editorHandoverView(nodes: readonly DirectorNode[], names: BoardN
         last_attempt_at: video.lastAttemptAt,
         last_attempt_status: video.lastAttemptStatus,
         thumbnail: video.thumbnailUrl,
+        cancelled_at: video.cancelledAt ?? null,
       }]
     })
     const chosen = selectHandoffTake(records)
     const latest = chosen ? null : selectLatestAttempt(records)
+    // 멈춘 Take 는 뒤에서 돌아도 만드는 중이 아니다 — 이 창에서 새 Take 를 바로 만들 수 있다.
     const missing: MissingVideoReason | null = chosen
       ? null
-      : latest?.last_attempt_status === 'generating' || latest?.last_attempt_status === 'pending'
+      : latest?.cancelled_at == null && (latest?.last_attempt_status === 'generating' || latest?.last_attempt_status === 'pending')
         ? 'generating'
         : latest?.last_attempt_status === 'failed' || latest?.status === 'failed'
           ? 'failed'

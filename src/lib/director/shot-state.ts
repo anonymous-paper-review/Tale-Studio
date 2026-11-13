@@ -118,14 +118,18 @@ export function shotFactsByNode(
             url: take.data.videoUrl,
             last_attempt_status: take.data.lastAttemptStatus,
             last_attempt_at: take.data.lastAttemptAt,
+            is_final: take.data.final,
+            cancelled_at: take.data.cancelledAt ?? null,
           }]
         : [],
     )
     const latest = selectLatestAttempt(records)
     const imageQueued = !!writerShotId && context.queuedImageShots.has(writerShotId)
     const imagePending = !!context.pendingImageNodeIds?.has(node.id)
+    // 화면에서 멈춘 Take(오너 2026-11-14 7번)는 뒤에서 돌아도 만드는 중이 아니고, ★ 가 아니면 뒤늦게 끝나도 영상 완성이 아니다
+    //   — 투영 · 넘기기 창 · 일괄 검사와 같은 규칙(리드 검토 a 5).
     const videoRunning =
-      records.some((r) => r.status === 'generating' || r.last_attempt_status === 'generating') ||
+      records.some((r) => r.cancelled_at == null && (r.status === 'generating' || r.last_attempt_status === 'generating')) ||
       (!!writerShotId && context.queuedVideoShots.has(writerShotId))
     const videoPending = !!writerShotId && !!context.pendingVideoShots?.has(writerShotId)
     out.set(node.id, {
@@ -136,7 +140,7 @@ export function shotFactsByNode(
       imageWaiting: imagePending && !imageQueued && image?.status !== 'generating',
       videoGenerating: videoRunning || videoPending,
       videoWaiting: videoPending && !videoRunning,
-      videoDone: records.some((r) => r.status === 'completed' && hasUrl(r.url)),
+      videoDone: records.some((r) => r.status === 'completed' && hasUrl(r.url) && (r.cancelled_at == null || r.is_final === true)),
       videoLatestFailed:
         !!latest && (latest.last_attempt_status === 'failed' || (latest.last_attempt_status == null && latest.status === 'failed')),
     })

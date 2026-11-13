@@ -1,8 +1,21 @@
-// Editor 로 넘기기 · 내보내기도 화면에서 멈춘 Take 를 ★ 로 고르지 않은 한 고르지 않는다 — 멈춤은 그 Take 의 마지막 작업에 적혀 있다 (오너 2026-11-14 7번 · 리드 C "넘기기 고르기")
+// 화면에서 멈춘 Take 는 ★ 가 아니면 영상 없음 — Editor 로 넘기기 · 넘기기 창 · 내보내기 · 샷 상태가 같은 규칙이고, 멈춤은 그 Take 의 마지막 작업에 적혀 있다 (오너 2026-11-14 7번 · 리드 C · 검토 a 5)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it, vi } from 'vitest'
 import { withCancelledTakes } from '@/lib/director/take-cancellations'
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
+import { editorHandoverView } from '@/lib/director/editor-handover'
+import { shotFactsByNode, shotState } from '@/lib/director/shot-state'
+import type { DirectorNode } from '@/types/director'
+
+/** 샷 하나와 그 Take 들 — 멈춘 Take 규칙을 넘기기 창 · 샷 상태에 똑같이 거는지 본다. */
+function shotWithTakes(takes: Array<Record<string, unknown>>): DirectorNode[] {
+  const shot = { id: 'shot-1', type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: 'sh_01_01', writerShotId: 'sh_01_01', durationSeconds: 3, storyboardImage: { url: 'https://media.test/s.png', status: 'completed', errorMessage: null, generatedAt: 1 } } }
+  return [shot, ...takes.map((data, i) => ({ id: `take-${i + 1}`, type: 'video', position: { x: 0, y: 0 }, data: {
+    kind: 'video', parentShotNodeId: 'shot-1', standaloneVideoKey: null, takeNumber: i + 1, createdAt: `2026-11-14T0${i}:00:00Z`, final: false,
+    status: 'completed', lastAttemptStatus: 'completed', lastAttemptAt: null, videoUrl: `https://media.test/t${i + 1}.mp4`, thumbnailUrl: null, override: {}, ...data,
+  } }))] as unknown as DirectorNode[]
+}
+const NO_QUEUE = { queuedImageShots: new Set<string>(), queuedVideoShots: new Set<string>() }
 
 const reader = (rows: unknown[] | null, error: unknown = null) => {
   const query = { select: vi.fn(() => query), in: vi.fn(() => query), then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: rows, error }).then(resolve) }
@@ -35,5 +48,31 @@ describe('넘기기 고르기의 멈춘 Take', () => {
       expect(src, file).toMatch(/withCancelledTakes\(/)
       expect(src, file).toMatch(/last_attempt_job_id/)
     }
+  })
+
+})
+
+describe('넘기기 창 · 샷 상태의 멈춘 Take', () => {
+  it('Editor 로 넘기기 창도 멈춘 Take 는 ★ 가 아니면 영상 없음으로 본다', () => {
+    // 왜: 리드 검토 a 5 — "멈춘 Take 는 ★ 가 아니면 영상 없음" 한 규칙을 투영 · 넘기기 창 · 샷 상태 · 일괄 검사 네 곳이 같이 쓴다.
+    const stoppedOnly = editorHandoverView(shotWithTakes([{ cancelledAt: '2026-11-14T03:00:00Z' }]), null)
+    expect(stoppedOnly.shots[0]!.take).toBeNull()
+    expect(stoppedOnly.missing).toHaveLength(1)
+    const picked = editorHandoverView(shotWithTakes([{ cancelledAt: '2026-11-14T03:00:00Z', final: true }]), null)
+    expect(picked.shots[0]!.take).toEqual({ number: 1, final: true })
+    // 멈추고 아직 도는 Take 는 "만드는 중"이 아니다(화면에서는 멈춘 것).
+    const running = editorHandoverView(shotWithTakes([{ status: 'generating', lastAttemptStatus: 'generating', videoUrl: null, cancelledAt: '2026-11-14T03:00:00Z' }]), null)
+    expect(running.shots[0]!.missing).not.toBe('generating')
+  })
+
+  it('샷 상태도 멈춘 Take 는 ★ 가 아니면 영상 완성으로 세지 않고, 멈춘 채 도는 Take 는 영상 만드는 중으로 세지 않는다', () => {
+    // 왜: 리드 검토 a 5 · 오너 7번 — 카드 · 노드의 상태 색과 고르기 줄이 넘기기 · 내보내기와 같은 말을 한다.
+    const stoppedDone = shotFactsByNode(shotWithTakes([{ cancelledAt: '2026-11-14T03:00:00Z' }]), NO_QUEUE).get('shot-1')!
+    expect(stoppedDone.videoDone).toBe(false)
+    expect(shotState(stoppedDone)).not.toBe('video_done')
+    const pickedDone = shotFactsByNode(shotWithTakes([{ cancelledAt: '2026-11-14T03:00:00Z', final: true }]), NO_QUEUE).get('shot-1')!
+    expect(pickedDone.videoDone).toBe(true)
+    const stoppedRunning = shotFactsByNode(shotWithTakes([{ status: 'generating', lastAttemptStatus: 'generating', videoUrl: null, cancelledAt: '2026-11-14T03:00:00Z' }]), NO_QUEUE).get('shot-1')!
+    expect(stoppedRunning.videoGenerating).toBe(false)
   })
 })
