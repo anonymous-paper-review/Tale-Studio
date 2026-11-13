@@ -119,7 +119,7 @@ describe('Director 샷 상세 화면', () => {
 
   it('이미지 탭 [다음: 영상 만들기 · N Take]는 그 자리에서 새 Take 를 만들고 영상 탭으로 넘어간다', () => {
     // 왜: D6 단추 글 "다음: 영상 만들기 · 5 Take" — 누르면 영상을 만든다(조각 1은 탭만 바꿨다). 모델 · 해상도는 다시 만들기와 같다.
-    expect(render('popup')).toContain('Next: make the video · 5 Take')
+    expect(render('popup')).toContain('Next: make the video · 5 Takes')
     setLocale('ko')
     expect(render('popup')).toContain('다음: 영상 만들기 · 5 Take')
     expect(readFileSync('src/features/director/shot-detail/director-shot-detail.tsx', 'utf8')).toMatch(/remakeShotVideo\(shotNodeId\)/)
@@ -176,7 +176,7 @@ describe('Director 샷 상세 화면', () => {
     const stopped = render('panel', 'video')
     expect(stopped).toContain('Stopped · The Take is not refunded. If it finishes later, it stays in this list.')
     expect(stopped).not.toContain('A Take is being made. You can make a new one when it is done.')
-    expect(buttonTag(stopped, 'Make a new Take · 5 Take')).not.toContain('disabled=""')
+    expect(buttonTag(stopped, 'Make a new Take · 5 Takes')).not.toContain('disabled=""')
     setLocale('ko')
     expect(render('panel', 'video')).toContain('멈췄어요 · Take 는 돌려드리지 않아요. 뒤늦게 끝나면 이 목록에 남아요.')
   })
@@ -198,8 +198,8 @@ describe('Director 샷 상세 화면', () => {
     director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: { ...IMAGE, ...keptStoryboardImage(IMAGE), status: 'generating' } })
     const video = render('panel', 'video')
     expect(video).toContain('The start and end images are being remade. Make the Take when they are done.')
-    expect(buttonTag(video, 'Make a new Take · 5 Take')).toContain('disabled=""')
-    expect(buttonTag(render('popup'), 'Next: make the video · 5 Take')).toContain('disabled=""')
+    expect(buttonTag(video, 'Make a new Take · 5 Takes')).toContain('disabled=""')
+    expect(buttonTag(render('popup'), 'Next: make the video · 5 Takes')).toContain('disabled=""')
     setLocale('ko')
     expect(render('panel', 'video')).toContain('시작 · 끝 이미지를 다시 만드는 중이에요. 다 되면 Take 를 만들어요.')
   })
@@ -313,7 +313,7 @@ describe('Director 샷 상세 화면', () => {
     }
     expect(out.match(/role="checkbox" aria-checked="true" aria-disabled="true"/g)?.length).toBe(2)
     expect(out).toContain('Remake start and end images · Takes 0')
-    expect(out).toContain('Make a new Take · 5 Take')
+    expect(out).toContain('Make a new Take · 5 Takes')
     expect(out).toContain('Delete this Take')
     setLocale('ko')
     const ko = render('panel', 'video')
@@ -326,7 +326,7 @@ describe('Director 샷 상세 화면', () => {
     done(1, { lastAttemptAt: '2026-11-14T01:00:00.000Z' })
     const out = render('panel', 'video')
     expect(out).toContain('The start and end images changed · A new Take will use them')
-    expect(out).toContain('Make a new Take with the changed image · 5 Take')
+    expect(out).toContain('Make a new Take with the changed image · 5 Takes')
     setLocale('ko')
     const ko = render('panel', 'video')
     expect(ko).toContain('시작 · 끝 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요')
@@ -337,8 +337,8 @@ describe('Director 샷 상세 화면', () => {
     // 왜: D6 "다음: 영상 만들기 · 5 Take" — 이미지 탭에서 넘어오면 바로 첫 Take 를 만든다. 지울 Take 는 없다.
     const out = render('popup', 'video')
     expect(out).toContain('No video for this shot yet.')
-    expect(out).toContain('Make the video · 5 Take')
-    expect(buttonTag(out, 'Make the video · 5 Take')).not.toContain('disabled=""')
+    expect(out).toContain('Make the video · 5 Takes')
+    expect(buttonTag(out, 'Make the video · 5 Takes')).not.toContain('disabled=""')
     expect(out).not.toContain('Delete this Take')
   })
 
@@ -347,7 +347,7 @@ describe('Director 샷 상세 화면', () => {
     director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: null })
     const out = render('popup', 'video')
     expect(out).toContain('Make the start and end images first.')
-    expect(buttonTag(out, 'Make the video · 5 Take')).toContain('disabled=""')
+    expect(buttonTag(out, 'Make the video · 5 Takes')).toContain('disabled=""')
   })
 
   it('같은 샷에서 Take 를 만드는 중이면 새 Take 단추를 끄고 다 되면 새로 만들 수 있다고 알린다', () => {
@@ -356,6 +356,6 @@ describe('Director 샷 상세 화면', () => {
     addTake({ takeNumber: 2, status: 'generating', lastAttemptStatus: 'generating' })
     const out = render('panel', 'video')
     expect(out).toContain('A Take is being made. You can make a new one when it is done.')
-    expect(buttonTag(out, 'Make a new Take · 5 Take')).toContain('disabled=""')
+    expect(buttonTag(out, 'Make a new Take · 5 Takes')).toContain('disabled=""')
   })
 })

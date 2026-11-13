@@ -46,7 +46,7 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   const settings = takeSettings(data, latestShotTake(nodes, shotNodeId)?.data ?? null)
   const count = takeCostForVideo(settings.model, settings.resolution)
   const makeVideo = {
-    label: takeBalance.mode === 'off' ? t('Next: make the video') : t('Next: make the video · {count} Take', { count }),
+    label: takeBalance.mode === 'off' ? t('Next: make the video') : t('Next: make the video · {count} Takes', { count }),
     // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
     disabled: !shotDetailFrames(data.storyboardImage).start || videoBatchBusy || takes.some((take) => takePhaseOf(take.data) === 'making')
       || imageGeneration.generating || data.storyboardImage?.status === 'pending',

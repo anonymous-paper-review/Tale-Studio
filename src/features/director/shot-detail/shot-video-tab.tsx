@@ -247,10 +247,10 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
   const showCost = takeBalance.mode !== 'off'
   const count = takeCostForVideo(provider, resolution)
   const label = !current
-    ? (showCost ? t('Make the video · {count} Take', { count }) : t('Make the video'))
+    ? (showCost ? t('Make the video · {count} Takes', { count }) : t('Make the video'))
     : imageChanged
-      ? (showCost ? t('Make a new Take with the changed image · {count} Take', { count }) : t('Make a new Take with the changed image'))
-      : (showCost ? t('Make a new Take · {count} Take', { count }) : t('Make a new Take'))
+      ? (showCost ? t('Make a new Take with the changed image · {count} Takes', { count }) : t('Make a new Take with the changed image'))
+      : (showCost ? t('Make a new Take · {count} Takes', { count }) : t('Make a new Take'))
   const videoSeconds = clampDuration(VIDEO_MODELS[provider], data.durationSeconds)
   // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
   const imageBusy = hasImage && (imageGeneration.generating || data.storyboardImage?.status === 'pending')
