@@ -156,7 +156,7 @@ describe('다시 만들기 단추 값과 요청', () => {
       useDirectorCanvasStore.setState({ remakeShotVideo: original })
       useGlobalChatStore.setState({ handoffConfirm: null })
     }
-    expect(remake).toHaveBeenCalledWith(shotId)
+    expect(remake).toHaveBeenCalledWith(shotId, { onAccepted: expect.any(Function) })
   })
 })
 
