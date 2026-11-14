@@ -19,7 +19,7 @@ const PROJECT = 'prose-project'
 const ko = (key: string) => translate('ko', key)
 const PENDING = 'Apply or discard the current scene story proposal before requesting another.'
 // 이 시험을 위해 새로 지은 글 — 실제 사용자의 글이 아니다.
-const LONG = '1. 은퇴한 제빵사. 새벽마다 빵집 문을 열고 단골들의 이름을 외운다.\n2. 그의 손녀. 대학을 쉬고 가게 일을 돕는다.\n3. 건너편 꽃집 주인. 말수가 적고 비 오는 날만 가게 문을 닫는다.'
+const LONG = '새벽 네 시에 문을 여는 빵집에는 은퇴한 제빵사와 그의 손녀가 함께 일한다. 제빵사는 단골들의 이름을 전부 외우고 있고, 손녀는 대학을 쉬면서 가게 일을 돕는다. 건너편 꽃집 주인은 말수가 적고 비 오는 날에만 가게 문을 닫는다. 세 사람은 서로의 사정을 잘 모르지만 매일 아침 같은 시간에 인사를 나눈다.'
 const S2: ParagraphPick = { projectId: PROJECT, index: 1, text: '서윤이 카운터 뒤에서 나와 창가로 걸어간다.' }
 
 let request: ReturnType<typeof vi.fn>
@@ -41,7 +41,7 @@ afterEach(() => {
 
 describe('튕긴 말 되돌리기', () => {
   it('고치기 안이 [적용]을 기다리는 동안 보낸 새 말은 요청을 보내지 않고 쓴 글을 입력칸으로 되돌린다', async () => {
-    // 왜: 안이 열려 있으면 새 말이 튕겼고, 입력칸은 이미 비워져 긴 글을 다시 붙여 넣어야 했다(바우처 사용자 채팅 C).
+    // 왜: 안이 열려 있으면 새 말이 튕겼고, 입력칸은 이미 비워져 긴 글을 다시 붙여 넣어야 했다(11/14 채팅 점검 C).
     proposalWaiting()
 
     await useGlobalChatStore.getState().sendMessage(LONG, undefined, { stageOverride: 'producer' })

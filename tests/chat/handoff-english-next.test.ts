@@ -4,10 +4,10 @@ import { matchHandoffIntent } from '@/lib/handoff-intent'
 import { workflowPermission } from '@/stores/chat-workflow-bindings'
 
 describe('영어 다음 단계 말', () => {
-  // 왜: Artist 에서 "LET'S GO TO NEXT STAGE"가 넘김으로 읽히지 않아 AI 가 "채팅으로는 못 옮긴다"고 답했다(바우처 사용자 채팅 F). 대문자 · 어깨점이 원인이 아니라 go · move 를 몰라서였다.
+  // 왜: Artist 에서 영어로 다음 단계로 가자고 해도 넘김으로 읽히지 않아 AI 가 "채팅으로는 못 옮긴다"고 답했다(11/14 채팅 점검 F). 대문자 · 어깨점이 원인이 아니라 go · move 를 몰라서였다.
   it.each([
-    "LET'S GO TO NEXT STAGE",
-    'MOVE TO NEXT STAGE',
+    "OK LET'S MOVE ON TO THE NEXT STEP",
+    'HEAD TO NEXT STAGE PLEASE',
     'go to the next stage',
     'go to next step',
     'Let’s go to the next screen',
@@ -60,7 +60,7 @@ describe('영어 다음 단계 말', () => {
     // 왜: 정상 경로 고정 — 새 꼴을 더해도 예전 꼴이 바뀌지 않는다.
     expect(matchHandoffIntent('Please hand over to Storyboard', 'artist')?.to).toBe('writer')
     expect(matchHandoffIntent('proceed to the next stage', 'artist')?.to).toBe('writer')
-    expect(matchHandoffIntent('다음 단계로 가자', 'artist')?.to).toBe('writer')
+    expect(matchHandoffIntent('이제 다음 단계로 이동하자', 'artist')?.to).toBe('writer')
     expect(matchHandoffIntent('스토리보드로 넘겨줘', 'artist')?.to).toBe('writer')
   })
 })

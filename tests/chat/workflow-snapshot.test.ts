@@ -58,7 +58,7 @@ async function snapshot(stage = 'artist', projectId = 'p') {
 
 describe('옛 Producer 관문 항목', () => {
   it('현황 스냅샷의 막힌 점과 권장 목록에 옛 Producer 관문 항목(영상 스타일 · 장르 · 길이 · 서브장르 · 톤 · 장소 목적)을 싣지 않는다', async () => {
-    // 왜: Artist 채팅이 "Video style needed" · "서브장르 · 톤" · "장소 목적" 같은 옛 관문 항목을 막힌 점으로 읽어 안내했다 — 지금 화면 흐름에는 그 관문이 없다(바우처 사용자 채팅 D · H).
+    // 왜: Artist 채팅이 "Video style needed" · "서브장르 · 톤" · "장소 목적" 같은 옛 관문 항목을 막힌 점으로 읽어 안내했다 — 지금 화면 흐름에는 그 관문이 없다(11/14 채팅 점검 D · H).
     db.producerDraft = draftOf([person('c1', '서윤')], [place('b1', '카페')])
     db.styleAnchorKey = null
 
@@ -114,7 +114,7 @@ describe('옛 Producer 관문 항목', () => {
 
 describe('인물 · 배경 수와 그린 그림 수', () => {
   it('인물 · 배경 수는 브레이크다운 목록(인물 · 배경 카드)으로 세고 사물은 세지 않는다', async () => {
-    // 왜: 그림 카드가 아직 없어 "인물 0 · 배경 0"이라 답했는데 화면 목록에는 인물 2 · 배경 3이 있었다(바우처 사용자 채팅 H). 사물은 Artist 카드가 없다.
+    // 왜: 그림 카드가 아직 없어 "인물 0 · 배경 0"이라 답했는데 화면 목록에는 인물 2 · 배경 3이 있었다(11/14 채팅 점검 H). 사물은 Artist 카드가 없다.
     db.producerDraft = draftOf([person('c1', '서윤'), person('c2', '하준'), thing('o1', '낡은 시계')], [place('b1', '카페'), place('b2', '옥상'), place('b3', '골목')])
 
     const state = await snapshot()

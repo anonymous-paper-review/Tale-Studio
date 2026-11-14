@@ -61,7 +61,7 @@ afterEach(async () => {
 
 describe('허락을 묻는 첫 글', () => {
   it('시작 대화 첫 글이 줄거리를 줘도 되는지 허락을 묻는 말이면 이야기를 시작하지 않고 앱 문장으로 답한다', async () => {
-    // 왜: 허락을 묻는 말까지 이야기 씨앗이 되어, 대답 없이 산문이 만들어졌다(바우처 사용자 채팅 A).
+    // 왜: 허락을 묻는 말까지 이야기 씨앗이 되어, 대답 없이 산문이 만들어졌다(11/14 채팅 점검 A).
     setDraft({ ...emptyEntryDraft(), idea: QUESTION })
 
     expect(await useEntryStore.getState().chatSendFirst()).toBe('asked')

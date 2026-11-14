@@ -1,5 +1,5 @@
 // Writer 의 "다음 단계로 넘어갈까요?" 카드에 말로 한 짧은 대답 읽기(오너 2026-11-14 답 F ①) — "응 · 네 · yes"는 넘어가자는 대답, "아니 · no"는 더 고치겠다는 대답이다.
-//   이 말을 수정 요청으로 보내면 카드가 지워지고 "바꿀 곳을 못 찾았어요"가 나왔다(바우처 사용자 채팅 F).
+//   이 말을 수정 요청으로 보내면 카드가 지워지고 "바꿀 곳을 못 찾았어요"가 나왔다(11/14 채팅 점검 F).
 //   그 말만 짧게 쓴 대답만 읽는다 — 길거나 고칠 점이 섞이거나 물음표가 붙은 말은 대답이 아니다(그 말은 고쳐 달라는 말로 간다).
 //   Lumi 카드의 "응 · 네" 승인과 같은 낱말이다(global-chat-store saysYes). 약속: tests/chat/writer-next-answer.test.ts
 import { isApprovalUtterance, isCancellationUtterance } from '@/lib/pending-proposal'

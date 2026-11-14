@@ -35,7 +35,7 @@ const options = () => ({ projectId: 'p', stage: 'artist', message: '상태 알�
 
 describe('지시문 · 도구 안내', () => {
   it('Producer · Writer · Storyboard · Artist 채팅이 함께 받는 지시문에 화면 순서가 적히고 Artist 다음은 Storyboard 다', () => {
-    // 왜: Artist 채팅이 "다음은 Director"라고 안내하고 "Writer 단계가 아직 시작되지 않았다"고 말했다(바우처 사용자 채팅 D · H). 화면 이름과 순서를 모르는 채 옛 이름으로 답했다.
+    // 왜: Artist 채팅이 "다음은 Director"라고 안내하고 "Writer 단계가 아직 시작되지 않았다"고 말했다(11/14 채팅 점검 D · H). 화면 이름과 순서를 모르는 채 옛 이름으로 답했다.
     expect(CHAT_AGENT_GUIDE).toContain('Producer (the start screen), Writer (the prose), Artist, Storyboard (scenes and shots), Director, Editor')
     expect(CHAT_AGENT_GUIDE).toContain('After Artist the next screen is Storyboard, never Director.')
     for (const route of ['produce', 'writer', 'artist']) {

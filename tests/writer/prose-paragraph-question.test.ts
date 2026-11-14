@@ -17,7 +17,7 @@ const PROJECT = 'prose-project'
 // 이 시험을 위해 새로 지은 글 — 실제 사용자의 글이 아니다.
 const P2 = '서윤이 카운터 뒤에서 나와 창가로 걸어간다. 밖에는 비가 내리고, 가게 안은 조용하다.'
 const S2: ParagraphPick = { projectId: PROJECT, index: 1, text: P2 }
-const ASK = '인물 설정은 어떻게 돼 있어?'
+const ASK = '이 장면은 어디에서 일어나는 일이야?'
 
 let request: ReturnType<typeof vi.fn>
 const urls = () => request.mock.calls.map(([url]) => String(url))
@@ -39,7 +39,7 @@ afterEach(() => {
 
 describe('문단을 붙인 채 보낸 물음', () => {
   it('문단을 붙인 채 보낸 말이 물음이면 문단 수정 요청으로 보내지 않고 그 문단 칩은 그대로 남긴다', () => {
-    // 왜: 질문을 보냈는데 "그 문단만 고쳐 주세요"가 붙어 수정안이 만들어졌고, 답은 없었다(바우처 사용자 채팅 B).
+    // 왜: 질문을 보냈는데 "그 문단만 고쳐 주세요"가 붙어 수정안이 만들어졌고, 답은 없었다(11/14 채팅 점검 B).
     useWriterRoomStore.setState({ paragraph: S2 })
 
     expect(pickRoute(ASK)).toBe('question')
@@ -71,7 +71,7 @@ describe('문단을 붙인 채 보낸 물음', () => {
 
 describe('고쳐 달라는 부탁은 계속 문단 수정 요청이다', () => {
   // 왜: 부탁 꼴 물음이 답변으로 바뀌면 사용자가 고치려던 문단이 그대로 남는다 — 잘못 걸리는 것이 제일 위험하다.
-  it.each(['더 짧게 해 줄래?', '여기 좀 더 웃기게 바꿔 줄 수 있어?', 'can you make it shorter?', 'Could you add a joke here?', '비 오는 밤으로 바꾸면 어때?', 'What if she were older?', '더 슬프게', '계속해'])(
+  it.each(['더 짧게 해 줄래?', '여기 좀 더 웃기게 바꿔 줄 수 있어?', 'can you make it shorter?', 'Could you add a joke here?', '비 오는 밤으로 바꾸면 어때?', 'What if she were older?', '더 슬프게', '이어서 써 줘'])(
     '문단을 붙인 채 보낸 %s 는 그 문단 수정 요청이다',
     (said) => {
       useWriterRoomStore.setState({ paragraph: S2 })
@@ -85,7 +85,7 @@ describe('붙은 문단과 함께 가는 물음', () => {
   const ASK_HERE = '이 문단에서 누가 말하고 있어?'
 
   it('문단을 붙인 채 보낸 물음은 AI 요청에 붙은 문단의 이름(S2)과 그 문단 글을 함께 싣고 채팅 줄에는 물음만 남긴다', async () => {
-    // 왜: "이 문단에서 …?"라고 물어도 AI 는 어느 문단인지 몰라 엉뚱하게 답했다(바우처 사용자 채팅 B) — 이름과 글을 같이 줘야 그 문단을 보고 답한다. 채팅 줄은 사용자가 쓴 말 그대로다.
+    // 왜: "이 문단에서 …?"라고 물어도 AI 는 어느 문단인지 몰라 엉뚱하게 답했다(11/14 채팅 점검 B) — 이름과 글을 같이 줘야 그 문단을 보고 답한다. 채팅 줄은 사용자가 쓴 말 그대로다.
     useWriterRoomStore.setState({ paragraph: S2 })
 
     await useGlobalChatStore.getState().sendMessage(ASK_HERE, undefined, { stageOverride: 'producer', askOnly: true })

@@ -148,7 +148,7 @@ export function matchStoryboardToDirector(text: string): boolean {
   }) !== null
 }
 
-// 영어 "go / move / head to (the) next step · stage"(리드 2026-11-14 F(1)) — 바우처 사용자 채팅에서 "LET'S GO TO NEXT STAGE"가 넘김으로 읽히지 않아
+// 영어 "go / move / head to (the) next step · stage"(리드 2026-11-14 F(1)) — 이 꼴이 넘김으로 읽히지 않아
 //   AI 가 "채팅으로는 못 옮긴다"고 답했다(대문자 · 어깨점이 원인이 아니라 MOVE_WORDS 에 go · move 가 없어서였다). 말 전체가 이 꼴일 때만 읽는다 —
 //   "go to the next step of the recipe"처럼 뒤에 말이 이어지거나 물음 · 부정이면(위 hasNonRequestContext) 넘기지 않는다.
 //   앞에는 맞장구 · please · let's 만, 뒤에는 please · now 만 올 수 있다. 대상은 "다음 단계" 또는 그 단계 이름(Storyboard · Artist …)이다.
