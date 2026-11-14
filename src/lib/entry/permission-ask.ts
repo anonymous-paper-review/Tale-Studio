@@ -10,7 +10,8 @@
 //   "Can I tell you a story about …" → "about …", "Could I share my idea: …" → "…"). 물음 뒤에 쓴 말("감사합니다!")은 씨앗에 넣지 않는다(리드 검토 11/14).
 //   withoutPermissionAsk 는 화면에서 고르기 탭이 안내를 본 사람의 글에서 물음의 틀만 덜 때 쓴다(앞 · 안 · 뒤 글을 모두 남긴다).
 //   물음 뒤에 줄거리를 이미 쓴 글(리드 검토 11/14)은 허락 물음으로 걸지 않는다 — storyWithoutPermissionAsk 가 인사 · 고마움 말과 물음꼴 문장을 뺀 글이 남으면
-//   물음 문장만 뺀 글을 돌려주고, 시작 화면이 묻지 않고 그 글로 이야기를 시작한다.
+//   물음 문장만 뺀 글을 돌려주고, 시작 화면이 묻지 않고 그 글로 이야기를 시작한다. 남은 문장이 모두 덧말(it · it's · this · that 으로 시작하는 영어 문장, 길이 · 분량 · 형식만
+//   말하는 문장)이면 줄거리가 아니라 지금처럼 허락 답을 하고, 덧말은 설명(preface)으로 들고 있어 줄거리를 이어 적을 때 앞에 붙는다.
 //   약속: tests/producer/entry-permission-ask.test.ts
 import { MIN_IDEA_CHARS, ideaLength } from '@/features/entry/options'
 
@@ -279,6 +280,31 @@ function isAfterNoise(sentence: string): boolean {
   return CLOSING_ONLY.has(t.replace(/[\s!?.~…,，。！？^]+/g, '').toLowerCase()) || /[?？]\s*$/.test(t) || KO_QUESTION_WORD_END.test(t) || isPermissionSentence(t)
 }
 
+// 덧말(리드 2026-11-14 검토) — 물음 뒤의 문장이 줄거리가 아니라 길이 · 형식 · 소개만 말하는 말이다: it · it's · this · that 으로 시작하는 영어 문장("It is long." · "This is my first try."),
+//   길이 · 분량 · 형식만 말하는 문장("about 3 pages" · "8회짜리예요." · "3페이지 정도예요."). 덧말만 남으면 줄거리를 준 것이 아니라 허락 답을 하고, 덧말은 설명(씨앗 앞)으로 들고 있는다.
+//   \W 는 한글도 잡으므로 쓰지 않고 따옴표 · 문장부호를 직접 적는다.
+const MARKS = `[\\s.,!~…"'“”‘’()\\[\\]-]*`
+const EN_META_START = new RegExp(`^${MARKS}(?:it|this|that)\\b`, 'i')
+// 길이 · 분량 · 형식만 말하는 문장 — 숫자 + 단위("3 pages" · "12 episodes" · "8회" · "두 장")와 군말(about · each · 짜리 · 정도 · 이에요 …)을 지우면 아무것도 남지 않는다.
+const EN_LENGTH_PHRASE = /\d[\d,]*\s*-?\s*(?:pages?|episodes?|minutes?|mins?|parts?|chapters?|words?|seasons?|scenes?|hours?|seconds?)\b/gi
+const EN_LENGTH_FILLER = /\b(?:about|around|roughly|approximately|approx|only|just|maybe|each|per|total|in|long|or|so|and|of|a|an|the|with|plus|episode)\b/gi
+const KO_LENGTH_PHRASE = /(?:A\d\s*)?(?:\d[\d,]*|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*(?:페이지|쪽|장|분|회|화|편|글자|자|부작|부|초|시간)/g // i18n-ok: 길이 · 분량 말을 알아듣는 정규식
+const KO_LENGTH_FILLER = /(?:이에요|예요|입니다|이랍니다|이야|이다|이고요|이고|인데|이며|씩|짜리|정도|쯤|가량|분량|안팎|이상|이하|내외|총|약|대략|대충|거의|대강|은|는|이|가|도|당)/g // i18n-ok: 길이 · 분량 말의 군말을 알아듣는 정규식
+
+const LENGTH_STRIP = /[\s.,!~…"'“”‘’()\[\];:/-]+/g
+
+function lengthOnly(text: string): boolean {
+  // 숫자 + 단위가 있고, 그것과 군말을 지운 뒤 문장부호까지 걷어 내면 아무것도 남지 않아야 한다.
+  const leftover = (phrase: RegExp, filler: RegExp): string | null =>
+    new RegExp(phrase.source, phrase.flags.replace('g', '')).test(text) ? text.replace(phrase, '').replace(filler, '').replace(LENGTH_STRIP, '') : null
+  return leftover(EN_LENGTH_PHRASE, EN_LENGTH_FILLER) === '' || leftover(KO_LENGTH_PHRASE, KO_LENGTH_FILLER) === ''
+}
+
+function isMetaRemark(sentence: string): boolean {
+  const t = sentence.trim()
+  return EN_META_START.test(t) || lengthOnly(t)
+}
+
 interface Analysis {
   found: boolean
   /** 첫 허락 문장까지의 설명(앞 글 + 그 문장 안의 설명). */
@@ -289,6 +315,8 @@ interface Analysis {
   story: string
   /** 물음 뒤에 쓴 글에서 인사 · 고마움 말 · 물음꼴 문장을 뺀 나머지. */
   afterStory: string
+  /** 그 나머지에 덧말이 아닌 문장이 있다. */
+  hasNonMeta: boolean
 }
 
 function analyze(text: string | null | undefined): Analysis {
@@ -296,6 +324,8 @@ function analyze(text: string | null | undefined): Analysis {
   const kept: string[] = []
   const storyKept: string[] = []
   const afterKept: string[] = []
+  const metaKept: string[] = []
+  let hasNonMeta = false
   let found = false
   let prefaceEnd = 0
   let last = 0
@@ -325,7 +355,11 @@ function analyze(text: string | null | undefined): Analysis {
     } else if (!isLeadOnly(trimmed)) {
       kept.push(sentence)
       if (!found || !isAfterNoise(trimmed)) storyKept.push(sentence)
-      if (found && !isAfterNoise(trimmed)) afterKept.push(sentence)
+      if (found && !isAfterNoise(trimmed)) {
+        afterKept.push(sentence)
+        if (isMetaRemark(trimmed)) metaKept.push(sentence)
+        else hasNonMeta = true
+      }
     }
     if (trimmed) previous = trimmed
   }
@@ -334,16 +368,18 @@ function analyze(text: string | null | undefined): Analysis {
   storyKept.push(tail)
   return {
     found,
-    preface: tidy(kept.slice(0, prefaceEnd).join('')),
+    // 물음 뒤의 덧말은 줄거리가 아니지만 잃지 않게 설명으로 들고 있는다(인사 · 고마움 말 · 물음꼴 문장은 넣지 않는다).
+    preface: tidy(kept.slice(0, prefaceEnd).join('') + metaKept.join('')),
     remainder: tidy(kept.join('')),
     story: tidy(storyKept.join('')),
     afterStory: tidy(afterKept.join('')),
+    hasNonMeta,
   }
 }
 
-/** 물음 뒤에 줄거리를 이미 썼나 — 인사 · 고마움 말 · 물음꼴 문장을 뺀 글이 첫 글 최소 길이(20자)를 넘는다. */
+/** 물음 뒤에 줄거리를 이미 썼나 — 인사 · 고마움 말 · 물음꼴 문장을 뺀 글에 덧말이 아닌 문장이 하나라도 있고 합쳐 첫 글 최소 길이(20자) 이상이다. */
 function hasStoryAfter(analysis: Analysis): boolean {
-  return analysis.found && ideaLength(analysis.afterStory) >= MIN_IDEA_CHARS
+  return analysis.found && analysis.hasNonMeta && ideaLength(analysis.afterStory) >= MIN_IDEA_CHARS
 }
 
 export interface PermissionSplit {

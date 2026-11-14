@@ -475,6 +475,7 @@ describe('허락 물음 나누기', () => {
     // 물음 뒤에 쓴 말은 씨앗에 넣지 않는다(리드 검토 11/14 보통 1) — 설명은 물음 앞 글만이다.
     ['줄거리를 줘도 될까요? 감사합니다!', true, ''],
     ['시리즈를 만들고 싶어요. 줄거리를 줘도 될까요? 영상은 몇 분까지 되나요?', true, '시리즈를 만들고 싶어요.'],
+    ['Can I paste my script here? It is long, about 3 pages.', true, 'It is long, about 3 pages.'],
     ['Can I paste my script here? Thanks in advance.', true, ''],
     ['Hello! Can I send you my script first? Thanks a lot.', true, ''],
     // 허락 문장 안에 쓴 이야기 · 설명도 남긴다(리드 검토 11/14 보통 2).
@@ -629,5 +630,64 @@ describe('허락 물음 뒤에 줄거리를 이미 쓴 첫 글', () => {
     expect(await useEntryStore.getState().chatSendFirst()).toBe('asked')
 
     expect(calls.some((c) => c.url.includes('/recommend'))).toBe(false)
+  })
+})
+
+describe('허락 물음 뒤의 덧말', () => {
+  // 왜: "It is long, about 3 pages."를 줄거리로 보고 시작하면 답 없이 엉뚱한 씨앗으로 이야기가 시작된다(리드 검토 11/14). 길이 · 형식 · 소개만 말한 덧말은 줄거리가 아니라 허락 답을 하고,
+  //   덧말은 이야기 씨앗 앞 설명으로 들고 있어 잃지 않는다.
+  it.each([
+    ['Can I paste my script here? It is long, about 3 pages.', 'It is long, about 3 pages.'],
+    ['줄거리를 줘도 될까요? 8회짜리예요.', '8회짜리예요.'],
+    ["May I give you my plot? It's a comedy about two rival bakers.", "It's a comedy about two rival bakers."],
+    ['Can I share my idea? This is my first try.', 'This is my first try.'],
+    ['줄거리를 줘도 될까요? 3페이지 정도예요.', '3페이지 정도예요.'],
+    ['Can I paste my script? About 3 pages.', 'About 3 pages.'],
+    ['Can I paste my script? Roughly 2,000 words.', 'Roughly 2,000 words.'],
+    ['줄거리를 줘도 될까요? 총 8편이에요.', '총 8편이에요.'],
+    ['Can I send my outline? It is long. Thanks!', 'It is long.'],
+    ['시리즈를 만들고 싶은데, 줄거리를 줘도 될까요? 8회짜리예요.', '시리즈를 만들고 싶은데 8회짜리예요.'],
+    ['Can I share my idea? That is why I wrote it. Is there a length limit?', 'That is why I wrote it.'],
+    // 길이 · 분량 · 형식 말이 여럿이어도 숫자 + 단위와 군말뿐이면 덧말이다.
+    ['Can I send my script? 12 episodes, 10 minutes each.', '12 episodes, 10 minutes each.'],
+    ['줄거리를 줘도 될까요? A4 두 장 분량이에요.', 'A4 두 장 분량이에요.'],
+    ['줄거리를 줘도 될까요? 한 편은 30초 안팎이에요.', '한 편은 30초 안팎이에요.'],
+  ])('%s → 허락 답을 하고 덧말은 설명으로 들고 있는다: %s', (text, preface) => {
+    expect(splitPermissionAsk(text)).toEqual({ asking: true, preface })
+    expect(storyWithoutPermissionAsk(text)).toBeNull()
+  })
+
+  // 왜: 덧말이 아닌 문장이 하나라도 있고 합쳐 20자 이상이면 줄거리를 이미 준 것이다 — 덧말은 줄거리와 함께 그대로 남는다.
+  it.each([
+    ['May I give you my plot? A girl swaps bodies with her grandmother for one summer.', 'A girl swaps bodies with her grandmother for one summer.'],
+    ['May I give you my plot? It is long. A girl swaps bodies with her grandmother for one summer.', 'It is long. A girl swaps bodies with her grandmother for one summer.'],
+    ['줄거리를 줘도 될까요? 8회짜리예요. 고양이가 우주로 갔어요.', '8회짜리예요. 고양이가 우주로 갔어요.'],
+  ])('%s → 바로 시작한다', (text, story) => {
+    expect(storyWithoutPermissionAsk(text)).toBe(story)
+    expect(asksToShareStory(text)).toBe(false)
+  })
+
+  it('숫자와 단위가 들어 있어도 다른 말이 섞인 문장은 덧말이 아니다', () => {
+    // 왜: 길이만 말하는 문장만 덧말이다 — 이야기 내용이 섞이면 줄거리다.
+    const story = '줄거리를 줘도 될까요? 세 자매가 한 장 남은 지도를 들고 바닷가 마을로 떠나는 이야기예요.'
+    expect(storyWithoutPermissionAsk(story)).toBe('세 자매가 한 장 남은 지도를 들고 바닷가 마을로 떠나는 이야기예요.')
+    expect(storyWithoutPermissionAsk('Can I share my idea? A 3 pages story about a baker who meets a ghost.')).toBe('A 3 pages story about a baker who meets a ghost.')
+  })
+
+  it('덧말이 아닌 문장이 있어도 합쳐 20자가 안 되면 줄거리가 아니라 허락 답이다', () => {
+    // 왜: "고양이요." 같은 짧은 말은 줄거리가 아니다.
+    expect(storyWithoutPermissionAsk('줄거리를 줘도 될까요? 3편. 고양이요.')).toBeNull()
+    expect(asksToShareStory('줄거리를 줘도 될까요? 3편. 고양이요.')).toBe(true)
+  })
+
+  it('물음 뒤에 덧말만 있으면 줄거리로 시작하지 않고 허락 답을 하며 덧말은 이야기 씨앗 앞에 들고 있는다', async () => {
+    // 왜: 덧말을 줄거리로 읽으면 답 없이 "It is long, about 3 pages."로 이야기가 시작된다. 덧말은 줄거리를 이어 적을 때 앞 설명으로 붙는다.
+    setDraft({ ...emptyEntryDraft(), idea: 'Can I paste my script here? It is long, about 3 pages.' })
+
+    expect(await useEntryStore.getState().chatSendFirst()).toBe('asked')
+
+    expect(calls.some((c) => c.url.includes('/recommend'))).toBe(false)
+    expect(useEntryStore.getState().chat.seedPrefix).toBe('It is long, about 3 pages.')
+    expect(useEntryStore.getState().draft.idea).toBe('')
   })
 })
