@@ -72,7 +72,7 @@ import { unresolvedSceneStoryProposal } from '@/lib/producer/scene-story-proposa
 import { WriterNextCard } from '@/features/prose/writer-next-card'
 import { ParagraphChip } from '@/features/prose/paragraph-chip'
 import { goesToParagraph, questionAboutPick, sendParagraphRequest } from '@/features/prose/paragraph-request'
-import { restoreIntoInput } from '@/lib/chat-input-restore'
+import { restoreIntoInput, restoreTextFor } from '@/lib/chat-input-restore'
 import { StyleReturnCard } from '@/features/artist-room/style-return-card'
 import {
   buildScriptLines,
@@ -759,18 +759,20 @@ export function GlobalChat() {
 
   // 튕긴 말 되돌리기(리드 2026-11-14 C) — 고치기 안이 [적용]을 기다려 새 말이 튕기면 쓴 글이 입력창으로 돌아온다.
   //   입력창에 그새 쓴 글이 있으면 되돌린 글 뒤에 이어 붙이고, 커서는 맨 끝에 둔다.
+  //   요청에는 말을 보낸 프로젝트가 실려 있다 — 같은 프로젝트일 때만 넣고, 다른 프로젝트의 요청은 넣지 않고 거둔다(리드 검토 높음 2).
   useEffect(() => {
     if (!inputRestore) return
-    const restored = inputRestore.text
-    setInput((prev) => restoreIntoInput(prev, restored))
+    const restored = restoreTextFor(inputRestore, projectId)
     consumeInputRestore(inputRestore.id)
+    if (restored === null) return
+    setInput((prev) => restoreIntoInput(prev, restored))
     requestAnimationFrame(() => {
       const el = textareaRef.current
       if (!el) return
       el.focus()
       el.setSelectionRange(el.value.length, el.value.length)
     })
-  }, [inputRestore, consumeInputRestore])
+  }, [inputRestore, projectId, consumeInputRestore])
 
   // 첫 진입 웰컴 등 → 채팅 입력창 포커스. 입력 알약의 focus-within 이 지금 단계 색 테두리를 켜 주의를 끈다(v3).
   useEffect(() => {

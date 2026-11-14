@@ -87,7 +87,7 @@ export async function sendParagraphRequest(typed: string): Promise<boolean> {
   const reply = useGlobalChatStore.getState().error ?? translate(contentLocale(), 'Could not send the change request. Please try again.')
   // 고치기 안이 [적용]을 기다려 튕겼다(리드 2026-11-14 C) — 쓴 글과 붙였던 문단을 되돌리고 채팅에는 안내만 남긴다(같은 말이 대화에 두 번 보이지 않게).
   if (useGlobalChatStore.getState().reviseRefused === 'pending') {
-    useChatUiStore.getState().requestInputRestore(said)
+    useChatUiStore.getState().requestInputRestore(said, projectId)
     useWriterRoomStore.setState({ paragraph: pick })
     useGlobalChatStore.getState().notifyIssue('producer', reply)
     useGlobalChatStore.setState({ error: reply })

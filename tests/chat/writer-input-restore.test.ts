@@ -6,7 +6,7 @@ vi.mock('@/lib/writer/use-writer-status', async (original) => ({ ...(await origi
 
 import { readFileSync } from 'node:fs'
 import { sendParagraphRequest } from '@/features/prose/paragraph-request'
-import { restoreIntoInput } from '@/lib/chat-input-restore'
+import { restoreIntoInput, restoreTextFor } from '@/lib/chat-input-restore'
 import { translate } from '@/lib/i18n/translate'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -122,5 +122,64 @@ describe('입력칸에 되돌려 넣기', () => {
     expect(/inputRestore/.test(source)).toBe(true)
     expect(/consumeInputRestore/.test(source)).toBe(true)
     expect(/restoreIntoInput/.test(source)).toBe(true)
+  })
+})
+
+describe('되돌리기 요청이 가는 프로젝트', () => {
+  it('튕긴 말을 되돌리는 요청에는 말을 보낸 프로젝트 번호가 실린다', async () => {
+    // 왜: 번호가 없으면 요청이 남아 있다가 다른 프로젝트의 입력칸에 들어간다(리드 검토 11/14 높음 2).
+    proposalWaiting()
+
+    await useGlobalChatStore.getState().sendMessage(LONG, undefined, { stageOverride: 'producer' })
+
+    expect(useChatUiStore.getState().inputRestore).toMatchObject({ text: LONG, projectId: PROJECT })
+  })
+
+  it('문단을 붙여 보낸 말이 튕겨도 되돌리는 요청에 프로젝트 번호가 실린다', async () => {
+    // 왜: 문단 길도 같은 요청을 만든다.
+    proposalWaiting()
+    useWriterRoomStore.setState({ paragraph: S2 })
+
+    await sendParagraphRequest('결말을 더 따뜻하게')
+
+    expect(useChatUiStore.getState().inputRestore).toMatchObject({ text: '결말을 더 따뜻하게', projectId: PROJECT })
+  })
+
+  it('되돌리기 요청은 같은 프로젝트의 입력칸에만 들어간다 — 다른 프로젝트나 프로젝트 없는 곳에는 넣지 않는다', () => {
+    // 왜: 프로젝트를 옮긴 뒤 열린 입력칸에 앞 프로젝트에서 쓰던 글이 불쑥 들어오면 안 된다.
+    const request = { id: 1, text: LONG, projectId: PROJECT }
+
+    expect(restoreTextFor(request, PROJECT)).toBe(LONG)
+    expect(restoreTextFor(request, 'another-project')).toBeNull()
+    expect(restoreTextFor(request, null)).toBeNull()
+    expect(restoreTextFor({ text: LONG, projectId: null }, null)).toBeNull()
+    expect(restoreTextFor(null, PROJECT)).toBeNull()
+  })
+
+  it('채팅 탭에서 튕긴 글이 입력칸에 되돌아오고, 그새 쓰던 글은 그 뒤에 이어 붙는다', async () => {
+    // 왜: 채팅 탭에서 보낸 글이 튕기면 입력칸은 이미 비워져 글이 화면 어디에도 없었다(리드 검토 11/14 높음 2).
+    proposalWaiting()
+    await useGlobalChatStore.getState().sendMessage(LONG, undefined, { stageOverride: 'producer' })
+    const request = useChatUiStore.getState().inputRestore
+
+    expect(restoreIntoInput('', restoreTextFor(request, PROJECT)!)).toBe(LONG)
+    expect(restoreIntoInput('그새 쓰던 말', restoreTextFor(request, PROJECT)!)).toBe(`${LONG}\n그새 쓰던 말`)
+  })
+})
+
+describe('되돌리기 요청을 받는 입력칸', () => {
+  it('Writer 채팅 탭의 입력칸도 되돌리기 요청을 받아 같은 프로젝트일 때만 자기 입력칸에 넣고 요청을 거둔다', () => {
+    // 왜: 채팅 탭에서는 오른쪽 채팅 패널(GlobalChat)이 그려지지 않아 요청을 받는 곳이 없었다.
+    const source = readFileSync('src/features/prose/prose-chat-tab.tsx', 'utf8')
+    expect(/inputRestore/.test(source)).toBe(true)
+    expect(/consumeInputRestore/.test(source)).toBe(true)
+    expect(/restoreTextFor\(/.test(source)).toBe(true)
+    expect(/restoreIntoInput/.test(source)).toBe(true)
+  })
+
+  it('채팅 패널의 입력칸도 같은 프로젝트의 요청만 받는다', () => {
+    // 왜: 이 확인이 없으면 다른 프로젝트의 요청이 남았다가 이 입력칸으로 들어온다.
+    const source = readFileSync('src/components/layout/global-chat.tsx', 'utf8')
+    expect(/restoreTextFor\(/.test(source)).toBe(true)
   })
 })

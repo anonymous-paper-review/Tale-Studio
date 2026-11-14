@@ -21,10 +21,11 @@ interface MentionInsertRequest {
   hint?: string
 }
 
-/** 튕긴 말을 입력칸으로 되돌려 달라는 요청(리드 2026-11-14 C) — GlobalChat 이 소비한다. */
+/** 튕긴 말을 입력칸으로 되돌려 달라는 요청(리드 2026-11-14 C) — GlobalChat 과 Writer 채팅 탭 입력칸이 소비한다. 말을 보낸 프로젝트가 같은 입력칸만 받는다. */
 interface InputRestoreRequest {
   id: number
   text: string
+  projectId: string | null
 }
 
 interface ChatUiState {
@@ -57,7 +58,7 @@ interface ChatUiState {
   consumeMentionInsert: (id: number) => void
   /** 고치기 안이 [적용]을 기다려 새 말이 튕겼다 — 쓴 글을 입력칸으로 되돌린다. 채팅이 접혀 있으면 먼저 편다(닫힌 입력칸에 글이 소리 없이 돌아가지 않게). */
   inputRestore: InputRestoreRequest | null
-  requestInputRestore: (text: string) => void
+  requestInputRestore: (text: string, projectId: string | null) => void
   consumeInputRestore: (id: number) => void
   // 채팅 입력창 포커스(+빔) 요청 브리지 — 첫 진입 웰컴 등에서 set, GlobalChat이 소비.
   stylePickerRequest: { id: number; projectId: string } | null
@@ -118,7 +119,7 @@ export const useChatUiStore = create<ChatUiState>()(
       consumeMentionInsert: (id) =>
         set((s) => (s.mentionInsert?.id === id ? { mentionInsert: null } : s)),
       inputRestore: null,
-      requestInputRestore: (text) => set({ inputRestore: { id: Date.now(), text }, collapsed: false }),
+      requestInputRestore: (text, projectId) => set({ inputRestore: { id: Date.now(), text, projectId }, collapsed: false }),
       consumeInputRestore: (id) =>
         set((s) => (s.inputRestore?.id === id ? { inputRestore: null } : s)),
       stylePickerRequest: null,

@@ -13,6 +13,8 @@ import { translate, useLocale, useT } from '@/lib/i18n'
 import { useContentLocale } from '@/lib/i18n/content'
 import { cn } from '@/lib/utils'
 import { runtimeLabel } from '@/lib/prose/conditions'
+import { restoreIntoInput, restoreTextFor } from '@/lib/chat-input-restore'
+import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
@@ -51,6 +53,8 @@ export function ProseChatTab({ prose, title }: { prose: ProseState; title: strin
   const suggestion = useGlobalChatStore((s) => s.suggestion)
   const rewriteOpen = useWriterRoomStore((s) => s.rewriteOpen)
   const focusRequest = useWriterRoomStore((s) => s.chatFocusRequest)
+  const inputRestore = useChatUiStore((s) => s.inputRestore)
+  const consumeInputRestore = useChatUiStore((s) => s.consumeInputRestore)
   const [text, setText] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
   const endRef = useRef<HTMLDivElement>(null)
@@ -67,6 +71,21 @@ export function ProseChatTab({ prose, title }: { prose: ProseState; title: strin
   useEffect(() => {
     if (focusRequest) inputRef.current?.focus()
   }, [focusRequest])
+  // 튕긴 말 되돌리기(리드 2026-11-14 검토 높음 2) — 이 탭에서는 채팅 패널(GlobalChat)이 그려지지 않아 요청을 받는 곳이 여기뿐이다.
+  //   같은 프로젝트일 때만 입력칸에 되돌리고(그새 쓰던 글이 있으면 되돌린 글 뒤에 이어 붙인다) 요청은 거둔다.
+  useEffect(() => {
+    if (!inputRestore) return
+    const restored = restoreTextFor(inputRestore, projectId)
+    consumeInputRestore(inputRestore.id)
+    if (restored === null) return
+    setText((prev) => restoreIntoInput(prev, restored))
+    requestAnimationFrame(() => {
+      const el = inputRef.current
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    })
+  }, [inputRestore, projectId, consumeInputRestore])
   useEffect(() => {
     endRef.current?.scrollIntoView({ block: 'end' })
   }, [thread.length, writerNext, rewriteOpen, proposal?.status])

@@ -3011,7 +3011,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const reply = get().error ?? translate(contentLocale(), 'Could not send the change request. Please try again.')
       // 고치기 안이 [적용]을 기다려 새 말이 튕겼다(리드 2026-11-14 C) — 쓴 글은 입력칸으로 되돌리고 채팅에는 안내만 남긴다(같은 말이 대화에 두 번 보이지 않게).
       if (get().reviseRefused === 'pending') {
-        useChatUiStore.getState().requestInputRestore(trimmed)
+        useChatUiStore.getState().requestInputRestore(trimmed, projectId)
         get().notifyIssue('producer', reply)
         set({ error: reply })
         return
