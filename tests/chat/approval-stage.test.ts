@@ -14,8 +14,9 @@ import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useWriterStore as writer } from '@/stores/writer-store'
 import { useLocaleStore } from '@/stores/locale-store'
 
+// 샷은 이미지가 있다 — "Take 카드를 말로 승인"은 이미지가 있는 샷에서만 생긴다(이미지 없는 샷의 영상은 글 카드에 묶지 않음, 리드 11/14).
 function shot(id: string): DirectorNode {
-  return { id, type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: `w-${id}`, writerShotId: `w-${id}`, derivedPrompt: `base prompt ${id}`, promptOverride: null, camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }, lighting: { position: 'front', brightness: 50, colorTemp: 5600 }, cameraPreset: { brand: 'arri', focalLength: 35, aperture: 2.8, whiteBalance: 5600 }, provider: 'seedance', durationSeconds: 3, storyboardImage: null, referenceImages: [], imageInputs: [] } } as unknown as DirectorNode
+  return { id, type: 'shot', position: { x: 0, y: 0 }, data: { kind: 'shot', label: `w-${id}`, writerShotId: `w-${id}`, derivedPrompt: `base prompt ${id}`, promptOverride: null, camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }, lighting: { position: 'front', brightness: 50, colorTemp: 5600 }, cameraPreset: { brand: 'arri', focalLength: 35, aperture: 2.8, whiteBalance: 5600 }, provider: 'seedance', durationSeconds: 3, storyboardImage: { status: 'completed', url: `https://media.test/${id}.png`, jobId: null }, referenceImages: [], imageInputs: [] } } as unknown as DirectorNode
 }
 const promptOf = (id: string) => (director.getState().nodes.find((n) => n.id === id)!.data as { promptOverride: string | null }).promptOverride
 const fetchMock = vi.fn()

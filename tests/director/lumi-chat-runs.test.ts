@@ -1089,4 +1089,39 @@ describe('이미지가 없는 샷의 영상 부탁(영어 재점검 B1)', () => 
     expect(said).toContain('The video for Shot 3 needs an image first.')
     expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
   })
+
+  // 왜: 검토 a 마지막 차이(리드 11/14) — c744f220 뒤 반대쪽 어긋남: 카드 때 그리는 중이던 샷 3 은 줄에서 빠지는데 묶음에는 남아,
+  //   [적용] 전에 다 그려지면 영상까지 시작했다(카드 줄 "Shot 1 · 5 Takes" → [적용] 뒤 "Shots 1 · 3 · 10 Takes", 카드 때 Lumi 는 "Okay."뿐).
+  it('글 카드에 묶는 영상 목록은 카드를 만들 때 이미지가 있는 샷만이고, [적용]은 카드 줄이 말한 그 목록만 낸다 — 이미지가 없거나 그리는 중인 샷은 그 자리에서 "이미지가 먼저 필요해요 / 이미지를 만드는 중이에요"라고 말하고 묶지 않는다', async () => {
+    const saidSince = (mark: number) => chat.getState().messages.slice(mark).filter((m) => m.role === 'model').map((m) => m.content)
+    const videoLines = () => (chat.getState().pendingProposal?.impact ?? []).filter((line) => line.startsWith('Applying also makes the video'))
+    const imageNow = (id: string) => director.setState({ nodes: director.getState().nodes.map((n) => (n.id === id ? { ...n, data: { ...n.data, storyboardImage: IMG(id) } } : n)) as DirectorNode[] })
+    // 새 글 카드 — 샷 3 그림을 그리는 중이다.
+    director.setState({ nodes: [shot('s1', IMG('s1')), shot('s2', IMG('s2')), shot('s3', { status: 'generating', url: null, jobId: null }), shot('s4', IMG('s4')), failedTake('v4', 's4')] })
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }, { type: 'updateShot', id: 's3', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s1', 's3'] }])
+    let mark = chat.getState().messages.length
+    await chat.getState().sendMessage('Make shots 1 and 3 warmer and then make the videos for shots 1 and 3')
+    expect(saidSince(mark)).toContain('The image for Shot 3 is being made. You can make the video once it is done.')
+    expect(videoLines()).toEqual(['Applying also makes the video for Shot 1 right away · 5 Takes.'])
+    // [적용] 전에 샷 3 그림이 다 됐다 — 그래도 카드 줄이 말한 샷 1 만 낸다.
+    imageNow('s3')
+    mark = chat.getState().messages.length
+    await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
+    expect(runShots()).toEqual(['s1'])
+    expect(saidSince(mark)).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
+    // 기다리는 글 카드에 영상을 더 묶을 때 — 샷 3 은 이미지가 없다.
+    director.setState({ nodes: NODES() })
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Cold' } }, { type: 'updateShot', id: 's3', patch: { prompt: 'Cold' } }])
+    await chat.getState().sendMessage('Make shots 1 and 3 colder')
+    expect(chat.getState().pendingProposal?.kind).toBe('directorTextEdit')
+    mocks.run.mockClear()
+    reply([{ type: 'generateVideos', shotIds: ['s1', 's3'] }])
+    mark = chat.getState().messages.length
+    await chat.getState().sendMessage('Make videos for shot 1 and 3')
+    expect(saidSince(mark)).toContain('The video for Shot 3 needs an image first.')
+    expect(videoLines()).toEqual(['Applying also makes the video for Shot 1 right away · 5 Takes.'])
+    imageNow('s3')
+    await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
+    expect(runShots()).toEqual(['s1'])
+  })
 })
