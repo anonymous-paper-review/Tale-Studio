@@ -116,6 +116,13 @@ describe('화면 배선', () => {
     expect(view).toMatch(/isModerationFailureText\(/)
   })
 
+  it('옛 러프가 남은 샷을 다시 그리다 내용 검사에 걸려도 그 샷을 알림에 모은다', () => {
+    // 왜: 다시 그리기는 옛 그림이 남아 "이미 그려진 샷"으로 보인다 — 완료된 샷을 걸러 내면 새 그림이 걸린 이 경우만 알림이 빠졌다.
+    const view = read('src/features/writer/rough-storyboard-view.tsx')
+    expect(view).toMatch(/if \(jobFailed && isModerationFailureText\(checked\.error\)\) moderationShots\.push\(\.\.\.jobShotIds\)/)
+    expect(view).not.toMatch(/moderationShots\.push\(\.\.\.jobShotIds\.filter/)
+  })
+
   it('Artist 에서 뒤로 그리는 러프도 걸린 샷을 Artist 채팅에 알린다', () => {
     // 왜: Artist 에서 미리 그리다 걸리면 Artist 머리 표시가 사라질 뿐 어디에도 말이 없었다.
     expect(read('src/features/artist-room/use-background-roughs.ts')).toMatch(/announceRoughModerationFailures\('artist', /)

@@ -3655,4 +3655,5 @@ export const KO: Record<string, string> = {
   // ── 2026-11-14 오너: 항목 · 씬이 1개일 때의 단수 문장(한국어는 같은 꼴) ──
   'There is {count} thing worth filling in:\n{summary}': '채워두면 좋을 항목이 {count}건 있어요:\n{summary}',
   'Splitting into {count} scene': '씬 {count}개로 나누기',
+  '{count} rough could not be drawn': '러프 {count}컷을 그리지 못했어요',
 }

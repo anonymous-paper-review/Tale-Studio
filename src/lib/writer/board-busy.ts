@@ -186,7 +186,7 @@ export function storyboardBusyView(
     return {
       open: true,
       phase: 'failed',
-      title: translate(locale, '{count} roughs could not be drawn', { count: rough.failed }),
+      title: countText((text, params) => translate(locale, text, params), rough.failed, '{count} rough could not be drawn', '{count} roughs could not be drawn', { count: rough.failed }),
       description: translate(locale, 'Draw the remaining cuts again, or close this and redraw them on the board.'),
       progress: percent,
       progressLabel: roughLabel,

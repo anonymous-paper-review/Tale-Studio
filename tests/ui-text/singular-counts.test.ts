@@ -116,3 +116,31 @@ describe('Writer 진행 화면의 씬 수', () => {
     expect(splitLabel('ko', 3)).toBe('씬 3개로 나누기')
   })
 })
+
+describe('Storyboard 잠금 창의 못 그린 러프 수', () => {
+  // 러프를 한 번 그리다 실패가 남은 채 끝난 보드의 잠금 표시 — 제목이 "N roughs could not be drawn"이다.
+  const failedTitle = (locale: 'en' | 'ko', failed: number) => {
+    const splitting = { runActive: true, reloading: false, hasShots: false, generating: 0, failed: 0, pumpActive: false, autoDrawPending: false }
+    const drawing = { runActive: false, reloading: false, hasShots: true, generating: 8, failed: 0, pumpActive: true, autoDrawPending: false }
+    const ended = { runActive: false, reloading: false, hasShots: true, generating: 0, failed, pumpActive: false, autoDrawPending: false }
+    const lock = [splitting, drawing, ended].reduce(advanceBoardLock, INITIAL_BOARD_LOCK)
+    return storyboardBusyView(
+      {
+        status: { started: true, engine: 'v1', pipeline_completed: true, pipeline_failed: false, current_status: 'completed', current_stage: 'persistShots' },
+        facts: ended,
+        lock,
+        rough: { total: 8, completed: 8 - failed, generating: 0, waiting: 0, failed },
+        sceneCount: 3,
+      },
+      locale,
+    ).title
+  }
+
+  it('영어 잠금 창은 못 그린 러프가 1개면 "1 rough could not be drawn"으로 단수로 말하고, 둘 이상이면 지금처럼 복수로 말한다', () => {
+    // 왜: 못 그린 러프가 하나뿐일 때 "1 roughs could not be drawn"으로 나왔다.
+    expect(failedTitle('en', 1)).toBe('1 rough could not be drawn')
+    expect(failedTitle('en', 2)).toBe('2 roughs could not be drawn')
+    expect(failedTitle('ko', 1)).toBe('러프 1컷을 그리지 못했어요')
+    expect(failedTitle('ko', 2)).toBe('러프 2컷을 그리지 못했어요')
+  })
+})

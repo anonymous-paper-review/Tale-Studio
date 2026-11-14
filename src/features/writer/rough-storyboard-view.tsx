@@ -554,14 +554,14 @@ export function RoughStoryboardView() {
           // 폴링이 던졌으면(pollOk=false) 실패인지 일시 오류인지 잡 상태를 한 번 권위 있게 확인한다.
           //   진짜 실패면 펌프 배리어(r.done)를 오래 붙잡지 않고 즉시 실패 표기 후 종료.
           let jobFailed = false
-          let failureText: string | null = null
           if (!pollOk) {
             const checked = await fetch(`/api/generation-jobs/${encodeURIComponent(jobId)}`)
               .then((r) => (r.ok ? r.json() : null))
               .then((b) => ({ failed: b?.data?.status === 'failed', error: typeof b?.data?.error === 'string' ? (b.data.error as string) : null }))
               .catch(() => ({ failed: false, error: null }))
             jobFailed = checked.failed
-            failureText = checked.error
+            // 내용 검사로 실패한 잡이 맡은 샷은 이 묶음 알림에 모은다 — 옛 그림이 남은 다시 그리기도 이번에 못 그린 것이다(시간 초과 · 일반 실패는 대상이 아니다).
+            if (jobFailed && isModerationFailureText(checked.error)) moderationShots.push(...jobShotIds)
           }
           for (let i = 0; i < ROUGH_CONVERGE_MAX_RELOADS; i++) {
             // #shots-cache-invalidate: 잡 완료를 안 순간의 리로드는 30초 신선 사물함을 그대로
@@ -576,8 +576,6 @@ export function RoughStoryboardView() {
               return 'drawn'
             }
             if (jobFailed) {
-              // 내용 검사로 실패했으면 그 샷들을 이 묶음 알림에 모은다 — 시간 초과 · 일반 실패는 이 알림 대상이 아니다.
-              if (isModerationFailureText(failureText)) moderationShots.push(...jobShotIds.filter((id) => !isDone(id)))
               // 잡 실패 확정 — 미완 샷을 실패 표기(재시도 버튼 노출)하고 종료.
               setPanelJobs((prev) => {
                 const next = { ...prev }
