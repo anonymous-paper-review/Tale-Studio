@@ -3386,6 +3386,7 @@ export const KO: Record<string, string> = {
   'Stopped. If the images being made finish later, they stay in the versions.': '멈췄어요. 그리던 이미지는 뒤늦게 끝나면 버전으로 남아요.',
   'Stopped.': '멈췄어요.',
   'Wrapping up the previous work. It will start right after.': '앞 작업을 정리하는 중이에요. 끝나면 바로 시작해요.',
+  "Already making images. Press again when they're done.": '이미 이미지를 만드는 중이에요. 끝나면 다시 눌러 주세요.',
   '{count} shots on the same sheet stop together': '같은 장 샷 {count}개가 같이 멈춰요',
   'Stopped {count} shots on the same sheet. If the images finish later, they stay in the versions.': '같은 장 샷 {count}개를 같이 멈췄어요. 그리던 이미지는 뒤늦게 끝나면 버전으로 남아요.',
   'It was already done.': '이미 다 만든 뒤였어요.',
