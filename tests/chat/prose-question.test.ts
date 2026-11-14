@@ -98,6 +98,12 @@ describe('물음 가르기', () => {
     '민수가 우는 걸로?',
     '이 장면 비 오는 밤으로 가는 건?',
     '여기서 지수가 웃으면 더 자연스럽지 않을까?',
+    // 묻는 낱말이 있어도 정도 말 · 고치는 낱말이 든 말은 지금처럼 고치기로 간다(헷갈리면 고치기).
+    '누가 더 나이가 많아?',
+    'Why is it so much longer than the first scene?',
+    'What if she could fly?',
+    'Why not let her cry here?',
+    'How about she leaves first?',
     '누가 먼저 말하는 게 낫지 않을까?',
     '민수는 왜 여기서 안 우는 거지? 울면 좋을 것 같은데',
     '배경은 카페로?',
@@ -153,6 +159,13 @@ describe('물음 가르기', () => {
     'Where does this scene take place?',
     'Please summarize this paragraph.',
     '지금까지 이야기를 한 줄로 요약해 줘',
+    // what · why · how · who · where · when 으로 시작하는 물음의 "조동사 + 대명사"는 제안이 아니라 물음이다(리드 검토 11/14 낮음 1).
+    'Why would he lie?',
+    'How could she forget?',
+    'What can he see from the window?',
+    "Why can't he sleep?",
+    'Who should cry here, Minsu or Jisu?',
+    'When can she see him again?',
   ])('묻는 낱말이 있고 부탁 · 제안 꼴이 없으면 물음으로 읽는다: %s', (text) => {
     expect(isProseQuestion(text)).toBe(true)
   })

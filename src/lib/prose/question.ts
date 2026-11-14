@@ -6,6 +6,7 @@
 //      물음표만 있는 말("해피엔딩으로 하면?" · "민수가 우는 걸로?" · "Could Minsu be a girl?")은 제안이라 물음이 아니다.
 //   ② 아래 중 하나도 없다: 고치라는 낱말(바꿔 · 줄여 · 넣어 · make · shorten …) · 정도 말(더 · 좀 더 · shorter …) ·
 //      바꿔 보자는 제안(어때 · 낫지 않을까 · 좋을 것 같 · what if · could/should + 이름 · is it possible …) · 부탁 꼴(해 줄래 · can you …).
+//      단, what · why · how · who · where · when 으로 시작하는 영어 물음의 "조동사 + 대명사"는 제안이 아니다("Why would he lie?") — what if · how about · why not 은 그대로 제안이다.
 //      단, 알려 달라는 말(설명 · tell me · explain …)이 함께 있는 부탁 꼴("설명해 줄래?")은 물음이다. 보여 줘 · 정리해 줘 · describe 는 알려 달라는 말이 아니라 고치기 쪽이다.
 //   한국어 · 영어를 읽고 중국어는 묻는 낱말 · 물음표와 고치는 낱말 몇 개만 읽는다.
 //   약속: tests/chat/prose-question.test.ts
@@ -39,9 +40,18 @@ const SUGGESTION = new RegExp(
     // 낫지 않을까 · 하지 않을까 · 좋을 것 같은데 · 어떨지 · "…로?" · "…건?" · "…하면?" — 물음표만 붙은 조각도 제안이다(리드 2026-11-14 검토).
     '낫지\\s*않|낫겠|나을\\s*것\\s*같|좋을\\s*것\\s*같|좋을\\s*듯|좋아\\s*보|어떨(?:지|까|런지)|지\\s*않을까|지\\s*않나|(?:으?로|걸로|건|게|면)\\s*[?？]\\s*$', // i18n-ok: 사용자 말에서 제안을 알아듣는 정규식
     "\\b(?:what\\s+if|what\\s+about|how\\s+about|why\\s+not|wouldn['’]?t\\s+it\\s+be|would\\s+it\\s+be\\s+(?:better|nicer|nice|funny|funnier|good|cool)|maybe|perhaps)\\b",
+    // Is it possible for him to stay? · Have her cry here?
+    '\\bis\\s+it\\s+possible\\b|\\bany\\s+chance\\b|\\bhave\\s+(?:her|him|them|it)\\b',
+  ].join('|'),
+  'i',
+)
+
+// ③-2 조동사 꼴의 제안 — Could Minsu be a girl? · Can Jisu say this line instead? · Shouldn't Minsu cry here? · Should she be older?
+//   what · why · how · who · where · when 으로 시작하는 물음에서는 제안으로 치지 않는다("Why would he lie?" · "How could she forget?") — 위 SUGGESTION 의 what if · how about · why not 은 그대로 걸린다.
+const SUGGESTION_MODAL = new RegExp(
+  [
     '\\b(?:should|could|can|would|might)\\s+(?:the|it|she|he|they|we|this|that|there)\\b',
-    // Could Minsu be a girl? · Can Jisu say this line instead? · Shouldn't Minsu cry here? · Is it possible for him to stay? · Have her cry here?
-    "^\\W*(?:can|could|should|would|shall|might|may)\\s+(?!you\\b|i\\b|we\\b|me\\b|someone\\b|anyone\\b)\\w+|\\b(?:shouldn['’]?t|couldn['’]?t|wouldn['’]?t|can['’]?t)\\s+\\w+|\\bis\\s+it\\s+possible\\b|\\bany\\s+chance\\b|\\bhave\\s+(?:her|him|them|it)\\b",
+    "^\\W*(?:can|could|should|would|shall|might|may)\\s+(?!you\\b|i\\b|we\\b|me\\b|someone\\b|anyone\\b)\\w+|\\b(?:shouldn['’]?t|couldn['’]?t|wouldn['’]?t|can['’]?t)\\s+\\w+",
   ].join('|'),
   'i',
 )
@@ -92,6 +102,7 @@ export function isProseQuestion(text: string | null | undefined): boolean {
   if (REVISION_CUE.test(said) || EDIT_WORD.test(said)) return false
   if (COMPARATIVE.test(said)) return false
   if (SUGGESTION.test(said)) return false
+  if (!EN_WH_START.test(said) && SUGGESTION_MODAL.test(said)) return false
   if (REQUEST_FRAME.test(said) && !INFO_VERB.test(said)) return false
   // 묻는 낱말이 있어야 하고, 물음의 꼴(물음표 · 묻는 끝맺음 · 영어 wh 로 시작 · 알려 달라는 말)도 갖춰야 한다.
   if (!ASK_WORD.test(said)) return false
