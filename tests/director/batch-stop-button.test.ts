@@ -66,7 +66,8 @@ describe('일괄 버튼', () => {
 
     // 2026-11-14 오너 7번: 이미 제출된 영상은 화면에서 멈추고(fal 에서는 끝까지 돈다) Take 는 돌려주지 않는다 —
     //   그 사실을 알려야 사용자가 오해하지 않는다(예전 기대 글 'Stop after current…' — 끝날 때까지 기다렸다).
+    //   오너 11/14 답 8: 글은 "멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요"(예전 기대 글 'Takes for the videos being made are not refunded').
     expect(page).toContain('toast.info(t(stopNotice(')
-    expect(stopWork).toMatch(/Takes for the videos being made are not refunded/)
+    expect(stopWork).toMatch(/Takes for videos that had already started aren't refunded/)
   })
 })

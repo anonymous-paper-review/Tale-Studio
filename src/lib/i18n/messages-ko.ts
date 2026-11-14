@@ -35,7 +35,8 @@ export const KO: Record<string, string> = {
   Stopped: '멈춤',
   'Stop making': '멈추기',
   'Could not stop it. Try again.': '멈추지 못했어요. 다시 눌러 주세요.',
-  'Stopped · The Take is not refunded. If it finishes later, it stays in this list.': '멈췄어요 · Take 는 돌려드리지 않아요. 뒤늦게 끝나면 이 목록에 남아요.',
+  // 멈춘 영상의 Take — 오너 11/14 답 8 글 그대로("멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요"), 뒤 기록 문장은 그대로(리드).
+  "Stopped. Takes for videos that had already started aren't refunded. If it finishes later, it stays in this list.": '멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요. 뒤늦게 끝나면 이 목록에 남아요.',
   'The image you stopped for {shot} finished later and was kept as version v{n}. The current image did not change.': '멈춘 {shot} 이미지가 뒤늦게 다 그려져 버전 v{n} 으로 남았어요. 지금 그림은 그대로예요.',
   'The image you stopped for {shot} finished later and was kept in the versions. The current image did not change.': '멈춘 {shot} 이미지가 뒤늦게 다 그려져 버전으로 남았어요. 지금 그림은 그대로예요.',
   'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.': '멈춘 {shot} Take 가 뒤늦게 끝났어요. Take 목록에만 남고, 고르지 않으면 Editor 로 가지 않아요.',
@@ -3419,7 +3420,7 @@ export const KO: Record<string, string> = {
   'Starts by itself when the image is done': '이미지가 끝나면 자동으로 시작해요',
   'Can be made once there is an image': '이미지가 생기면 만들 수 있어요',
   'Ready to make the video': '영상을 만들 수 있어요',
-  'Stopped. Takes for the videos being made are not refunded. If they finish later, they stay in the history.': '멈췄어요. 만들던 영상의 Take 는 돌려드리지 않아요. 뒤늦게 끝나면 기록에 남아요.',
+  "Stopped. Takes for videos that had already started aren't refunded. If they finish later, they stay in the history.": '멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요. 뒤늦게 끝나면 기록에 남아요.',
   'Stopped. If the images being made finish later, they stay in the versions.': '멈췄어요. 그리던 이미지는 뒤늦게 끝나면 버전으로 남아요.',
   'Stopped.': '멈췄어요.',
   'Wrapping up the previous work. It will start right after.': '앞 작업을 정리하는 중이에요. 끝나면 바로 시작해요.',

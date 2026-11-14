@@ -21,7 +21,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.f
 import { toast } from 'sonner'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { runRealBatch } from '@/lib/director/real-batch-client'
-import { stoppableJobs, stopNotice, videoBatchLive } from '@/lib/director/stop-work'
+import { stoppableJobs, stopNotice, stopShotWork, videoBatchLive } from '@/lib/director/stop-work'
 import { freshActiveJobs } from '@/lib/director/stop-all-client'
 import { _setGenerationQueueSnapshotForTests } from '@/lib/generation-queue'
 import { translate } from '@/lib/i18n/translate'
@@ -97,6 +97,19 @@ describe('같이 정한 것', () => {
     expect(videoBatchLive({ busy: false, cancelled: false, jobIds: [] }, [])).toBe(false)
     expect(page()).toContain('videoWorkBlock(workStates, picked, videoLive, ')
   })
+
+  it('영상을 멈추면 툴바 · 카드 · Take 노드 알림은 "멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요"라고 말하고, 뒤늦게 끝나면 기록에 남는다고 덧붙인다', async () => {
+    // 왜: 오너 11/14 답 8 — 멈춰도 이미 시작된 영상의 Take 는 빠진다는 것을 오너 글 그대로 알린다(예전 글 "만들던 영상의 Take 는 돌려드리지 않아요").
+    //   뒤의 기록 문장은 그대로 둔다(리드 11/14). [모두 멈추기]는 이미지 · 영상을 함께 멈춰도 이 문장 하나다.
+    const sentence = '멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요. 뒤늦게 끝나면 기록에 남아요.'
+    expect(ko(stopNotice({ images: 0, videos: 2 }))).toBe(sentence)
+    expect(ko(stopNotice({ images: 1, videos: 1 }))).toBe(sentence)
+    expect(translate('en', stopNotice({ images: 0, videos: 2 }))).toBe("Stopped. Takes for videos that had already started aren't refunded. If they finish later, they stay in the history.")
+    expect(stopAllSource()).toContain('toast.info(t(stopNotice(')
+    // 카드 · Take 노드 [멈추기]도 같은 알림이다.
+    const card = await stopShotWork(async (ids) => ids, { jobIds: ['video-1'], sheetShots: 1 }, 'video')
+    expect(ko(card.text)).toBe(sentence)
+  })
 })
 
 describe('혼자 정한 것', () => {
@@ -108,12 +121,11 @@ describe('혼자 정한 것', () => {
     expect(src).toContain('const imageBatchLive = realBatchBusy && !realBatchCancelled')
   })
 
-  it('멈춘 뒤 알림은 만들던 영상이 있었으면 Take 를 돌려드리지 않고 뒤늦게 끝나면 기록에 남는다고 말한다', () => {
-    // 왜: 오너 7번 "테이크는 차감되고 백그라운드에서 끝나면 히스토리로" — 멈춰도 Take 가 빠진다는 것을 알린다. 이미지는 Take 를 쓰지 않는다.
-    expect(ko(stopNotice({ images: 1, videos: 1 }))).toBe('멈췄어요. 만들던 영상의 Take 는 돌려드리지 않아요. 뒤늦게 끝나면 기록에 남아요.')
+  it('이미지만 멈춘 알림은 Take 를 말하지 않고, 그리던 이미지가 뒤늦게 끝나면 버전으로 남는다고 말한다', () => {
+    // 왜: 이미지는 Take 를 쓰지 않는다 — 영상 문장(오너 11/14 답 8)을 이미지에 붙이지 않는다(리드 11/14 "이미지만 멈춘 알림은 그대로").
+    //   멈출 것이 없었으면 "멈췄어요."만. (옛 시험 '멈춘 뒤 알림은 만들던 영상이 있었으면 …'에서 이미지 줄만 떼어 옮김)
     expect(ko(stopNotice({ images: 2, videos: 0 }))).toBe('멈췄어요. 그리던 이미지는 뒤늦게 끝나면 버전으로 남아요.')
     expect(ko(stopNotice({ images: 0, videos: 0 }))).toBe('멈췄어요.')
-    expect(stopAllSource()).toContain('toast.info(t(stopNotice(')
   })
 
   it('멈추지 못하면 "멈추지 못했어요. 다시 눌러 주세요."를 알리고 [모두 멈추기]를 다시 누를 수 있다', () => {
