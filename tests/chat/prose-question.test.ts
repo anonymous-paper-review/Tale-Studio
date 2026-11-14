@@ -1,4 +1,4 @@
-// Writer 채팅에서 "물음"과 "고쳐 달라는 부탁"을 가른다 — 문단을 붙인 채 보낸 물음은 AI 가 답하고 부탁 꼴은 계속 고친다 (오너 2026-11-14 답 B ①)
+// Writer 채팅에서 "물음"과 "고쳐 달라는 부탁"을 가른다 — 문단을 붙인 채 보낸 말은 묻는 낱말이 있고 부탁 · 제안 꼴이 없을 때만 AI 가 답하고 그 밖에는 계속 고친다 (오너 2026-11-14 답 B ① · 리드 검토 11/14)
 import { describe, expect, it } from 'vitest'
 import { isProseQuestion } from '@/lib/prose/question'
 
@@ -22,15 +22,12 @@ describe('물음 가르기', () => {
     'Who is the main character in this paragraph?',
     'How many scenes are there?',
     'What happens after this scene?',
-    'Is the ending sad?',
     'Why does she leave the room?',
     'Can you explain what this paragraph means?',
     'Could you tell me who the narrator is?',
     'how long is this story',
-    'Does the robot talk?',
     'Tell me about the characters.',
     'Which scene takes place at night?',
-    'Do you think the pacing works?',
     'What does this paragraph mean?',
     'Please explain the ending.',
     '主角是谁？',
@@ -88,6 +85,76 @@ describe('물음 가르기', () => {
     'Can the robot talk?',
   ])('바꿔 보자는 제안으로 읽는다: %s', (text) => {
     expect(isProseQuestion(text)).toBe(false)
+  })
+
+  // 왜: 제안 꼴은 물음표가 있어도 "이렇게 바꿔 보자"는 말이다 — 물음으로 읽어 AI 답으로 보내면 고치려던 문단이 그대로 남는다(리드 검토 11/14: 예문 40여 개 중 19개가 AI 답으로 빠졌다).
+  it.each([
+    '민수가 우는 게 낫지 않을까?',
+    '여기서 민수가 울어야 하지 않을까?',
+    '여기에 비 소리가 있으면 좋을 것 같은데?',
+    '민수가 먼저 사과하는 건 어떨지?',
+    '해피엔딩으로 하면?',
+    '대사를 반말로?',
+    '민수가 우는 걸로?',
+    '이 장면 비 오는 밤으로 가는 건?',
+    '여기서 지수가 웃으면 더 자연스럽지 않을까?',
+    '누가 먼저 말하는 게 낫지 않을까?',
+    '민수는 왜 여기서 안 우는 거지? 울면 좋을 것 같은데',
+    '배경은 카페로?',
+    '마지막은 비가 오는 걸로 하면 어떨까?',
+    'Could Minsu be a girl?',
+    'Can Jisu say this line instead?',
+    "Shouldn't Minsu cry here?",
+    'Is it possible for him to stay?',
+    'Have her cry here?',
+    'Would Minsu look better in a red coat?',
+    'Could Jisu be the one who speaks first?',
+  ])('제안 꼴로 읽는다: %s', (text) => {
+    expect(isProseQuestion(text)).toBe(false)
+  })
+
+  // 왜: 물음표가 없어도 "정리해 줘 · 보여 줘 · describe"는 알려 달라는 말이 아니라 글을 바꾸거나 더하라는 부탁이다.
+  it.each([
+    '이 문단 좀 정리해 줘',
+    '민수가 우는 모습을 보여줘',
+    '창밖 풍경을 보여 주세요',
+    '지수가 문을 여는 장면을 보여 줘',
+    'Describe the room here.',
+    'Show me the rain outside the window.',
+    'Can you show me Minsu crying here?',
+  ])('물음표 없는 부탁으로 읽는다: %s', (text) => {
+    expect(isProseQuestion(text)).toBe(false)
+  })
+
+  // 왜: 묻는 낱말도 알려 달라는 말도 없으면 물음표가 있어도 물음인지 부탁인지 알 수 없다 — 헷갈리면 지금처럼 고치기로 간다(리드 검토 11/14).
+  //   예전에는 이 가운데 일부를 AI 답으로 보냈다 — 예 · 아니오로 답하는 물음을 AI 답으로 받고 싶은지는 오너 결정으로 남는다.
+  it.each([
+    'Is the ending sad?',
+    'Does the robot talk?',
+    'Do you think the pacing works?',
+    'Are there other characters in this scene?',
+    '이 장면은 밤이야?',
+    '주인공이 여자야?',
+    '이 문단은 슬픈 내용이야?',
+    '이 장면에 소리가 나와요?',
+  ])('묻는 낱말이 없으면 물음표가 있어도 고치기로 간다: %s', (text) => {
+    expect(isProseQuestion(text)).toBe(false)
+  })
+
+  // 왜: 정상 경로 고정 — 묻는 낱말이 있고 부탁 · 제안 꼴이 없는 말은 계속 AI 답으로 보낸다.
+  it.each([
+    '이 문단에서 민수는 왜 화를 내는 거야?',
+    '이 장면은 어디에서 일어나는 일이야?',
+    '민수가 몇 번 나와?',
+    '지수는 언제 도착해?',
+    '이 문단에서 누가 말하고 있어?',
+    'Who is speaking in this paragraph?',
+    'Why does Minsu stay in this scene?',
+    'Where does this scene take place?',
+    'Please summarize this paragraph.',
+    '지금까지 이야기를 한 줄로 요약해 줘',
+  ])('묻는 낱말이 있고 부탁 · 제안 꼴이 없으면 물음으로 읽는다: %s', (text) => {
+    expect(isProseQuestion(text)).toBe(true)
   })
 
   // 왜: 물음이 아닌 말은 지금처럼 수정 요청이다 — 물음표가 없고 묻는 꼴도 아니면 건드리지 않는다.
