@@ -208,10 +208,11 @@ function escapeRegExp(s: string): string {
 // 입력창에서 한 멘션을 토글한다: 이미 있으면 지우고, 없으면 끝에 붙인다.
 // 스크립트 라인(@L5)처럼 숫자 접미어가 접두 충돌하는 라벨을 위해 제거는 경계 인식
 //   — @L5 는 지우되 @L51 은 건드리지 않는다((?![0-9A-Za-z_]) lookahead).
+//   이름 없는 카드처럼 " 2"가 붙는 라벨도 — "@이름 미정 인물"을 빼면서 "@이름 미정 인물 2"의 앞부분을 지우지 않는다((?!\s+\d), 리드 검토 4).
 // 삽입 규칙은 global-chat 의 기존 append 동작과 일치시킨다.
 export function toggleMentionToken(text: string, label: string): string {
   const token = `@${label}`
-  const boundary = escapeRegExp(token) + '(?![0-9A-Za-z_])'
+  const boundary = escapeRegExp(token) + '(?![0-9A-Za-z_]|\\s+\\d)'
   if (new RegExp(boundary).test(text)) {
     return text
       .replace(new RegExp(boundary, 'g'), '')

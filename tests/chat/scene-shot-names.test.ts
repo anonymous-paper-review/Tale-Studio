@@ -158,6 +158,36 @@ describe('혼자 정한 것', () => {
     expect(serializeDirectorCanvasContext(state, boardNodeNames(manifest, boardShots, 'en'))).toContain('Shot "sh_02_01" (board: Scene 2 · Shot 3)')
     expect(serializeWriterScriptContext(writerManifest, writerShots, 'ko')).toMatch(/sh_02_01 \(씬 2 · 샷 3\)/)
     expect(serializeWriterScriptContext(writerManifest, writerShots, 'en')).toMatch(/sh_02_01 \(Scene 2 · Shot 3\)/)
+    // 씬 머리도 같은 말 · 같은 띄어쓰기(화면 "씬 2")다 — 영어 대화에 "(씬2)"가 실려 영어 답에 "씬2"가 나갈 수 있었다(리드 검토 1).
+    expect(serializeWriterScriptContext(writerManifest, writerShots, 'ko')).toMatch(/sc_02 \(씬 2\)/)
+    expect(serializeWriterScriptContext(writerManifest, writerShots, 'en')).toMatch(/sc_02 \(Scene 2\)/)
+    expect(serializeWriterScriptContext(writerManifest, writerShots, 'en')).not.toMatch(/\(씬\s?\d/)
+  })
+
+  // 왜: Director 에서 만든 노드는 보드 이름이 없어 Lumi 목록에 원래 이름("New Shot")만 실렸다 — 한국어 대화에서 카드("새 샷")와 다른 이름으로 답할 수 있었다(리드 검토 2).
+  it('Director 에서 만든 노드도 Lumi 에게 보내는 목록에 채팅 언어의 보이는 이름이 실린다', () => {
+    const made = (id: string, kind: 'shot' | 'scene', label: string) =>
+      (kind === 'shot'
+        ? { id, type: 'shot', position: { x: 0, y: 0 }, data: { ...(shotNode(id, 'x', 's1').data as object), label, writerShotId: null } }
+        : { id, type: 'scene', position: { x: 0, y: 0 }, data: { kind: 'scene', label, writerSceneId: null, location: '', timeOfDay: '', mood: '', description: '' } }) as unknown as DirectorNode
+    const state = { nodes: [...nodes, made('m1', 'shot', 'New Shot'), made('m2', 'scene', 'New Scene')], edges: [], selectedNodeId: null }
+    const ko = serializeDirectorCanvasContext(state, boardNodeNames(manifest, boardShots, 'ko'))
+    expect(ko).toContain('Shot "New Shot" (name: 새 샷)')
+    expect(ko).toContain('Scene "New Scene" (name: 새 씬)')
+    // 영어는 보이는 이름이 원래 이름과 같아 덧붙이지 않는다. 사람이 지은 이름도 그대로라 덧붙이지 않는다.
+    const en = serializeDirectorCanvasContext(state, boardNodeNames(manifest, boardShots, 'en'))
+    expect(en).toContain('Shot "New Shot" (camera')
+    expect(en).not.toContain('(name: New Shot)')
+  })
+
+  // 왜: 멈춘 이미지 · Take 가 뒤늦게 끝났다는 알림은 채팅에 남는 줄이다 — 채팅 줄은 채팅 언어(H1)인데 문장 · 이름을 화면 언어로 지었다(리드 검토 3).
+  //   이름은 보드 이름이다(예전에는 id 숫자 "sh_02_07" → "Shot 7"로 불러 보드 번호 샷 8 과 달랐다).
+  it('멈춘 이미지 · Take 가 뒤늦게 끝났다는 채팅 알림은 문장과 샷 이름을 채팅 언어로 짓는다', () => {
+    const store = read('src/stores/director-store.ts')
+    expect(store).not.toMatch(/prettyNodeLabel\(shot\.data\.label/)
+    expect(store).toMatch(/function stoppedShotName\([\s\S]{0,400}?directorNodeLabel\([\s\S]{0,200}?boardNodeNames\(writer\.sceneManifest, writer\.shots \?\? \[\], locale\)/)
+    expect(store).toMatch(/const locale = contentLocale\(\)\s*\n\s*const name = stoppedShotName\(shot, locale\)/)
+    expect(store).toMatch(/const locale = contentLocale\(\)\s*\n\s*notifyStoppedResultKept\('director', translate\(locale, 'The Take you stopped for \{shot\}/)
   })
 
   // 왜: 모든 단계가 함께 쓰는 답 규칙이 "한국어 응답에서도 이 영문 표기를 그대로 쓴다"고 가르쳤다(8/26 단일형). 이제는 목록에 적힌 보드 이름 그대로 —

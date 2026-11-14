@@ -261,7 +261,8 @@ export function serializeWriterScriptContext(
       (scene.charactersPresent ?? []).map((id) => characterRef(manifest, id)).join(', ') || '없음'
     const heading = byRef.get(`${scene.sceneId}.heading`)
     lines.push(
-      `\n### ${lineLabel(heading)}${scene.sceneId} (씬${boardSceneNo(scene.sceneId, sceneIdx + 1)}) — 장소:${scene.location || '?'} / ${scene.timeOfDay || '?'} / 분위기:${scene.mood || '?'} (등장: ${present})`,
+      // 씬 머리 이름도 대화 언어 · 화면과 같은 띄어쓰기("씬 2" · "Scene 2") — 모델은 적힌 이름 그대로 답한다(리드 검토 1).
+      `\n### ${lineLabel(heading)}${scene.sceneId} (${sceneName(locale, boardSceneNo(scene.sceneId, sceneIdx + 1))}) — 장소:${scene.location || '?'} / ${scene.timeOfDay || '?'} / 분위기:${scene.mood || '?'} (등장: ${present})`,
     )
     if (scene.narrativeSummary) lines.push(`  요약: ${scene.narrativeSummary}`)
 

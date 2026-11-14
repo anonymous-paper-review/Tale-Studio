@@ -91,6 +91,14 @@ describe('toggleMentionToken (대본 줄을 눌러 @언급을 넣고 뺀다)', (
     // 둘 다 있을 때 L5 만 제거, L51 보존
     expect(toggleMentionToken('@L5 @L51 ', 'L5')).toBe('@L51')
   })
+
+  // 왜: 리드 검토 4(전부터) — 입력에 "@이름 미정 인물 2"가 있을 때 목록에서 "이름 미정 인물"을 누르면 그 멘션의 앞부분을 지워 "2"만 남았다(영어 "@Unnamed person 2"도).
+  it('이름 없는 카드 멘션을 넣고 뺄 때 번호가 붙은 다른 카드의 멘션은 건드리지 않는다', () => {
+    expect(toggleMentionToken('@이름 미정 인물 2 ', '이름 미정 인물')).toBe('@이름 미정 인물 2 @이름 미정 인물 ')
+    expect(toggleMentionToken('@Unnamed person 2 ', 'Unnamed person')).toBe('@Unnamed person 2 @Unnamed person ')
+    expect(toggleMentionToken('@이름 미정 인물 2 와 @이름 미정 인물 비교', '이름 미정 인물')).toBe('@이름 미정 인물 2 와 비교')
+    expect(toggleMentionToken('@Unnamed person 2 hi', 'Unnamed person 2')).toBe('hi')
+  })
 })
 
 describe('장면과 샷을 언급한다', () => {

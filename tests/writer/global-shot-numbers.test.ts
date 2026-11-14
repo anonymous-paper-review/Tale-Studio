@@ -82,9 +82,10 @@ describe('샷 번호는 보드와 같은 전체 번호', () => {
   //   <shot-numbers> 규칙(보드 전체 번호)과 어긋난다 — 번호는 보드 전체에서 센다.
   it('한국어 대사 이어 쓰기에 보내는 샷 목록도 보드 전체 번호다', () => {
     const oneScene = { ...manifest, scenes: manifest.scenes.filter((s) => s.sceneId === 'sc_02') }
-    const context = serializeWriterScriptContext(oneScene, shots.filter((s) => s.sceneId === 'sc_02'), 'en', undefined, { manifest, shots })
-    expect(context).toMatch(/sh_02_03 \(Scene 2 · Shot 4\)/)
-    expect(context).toContain('(씬2)')
+    // 한국어 대화로 보낸다 — 씬 · 샷 이름도 화면과 같은 한국어 · 띄어쓰기("씬 2 · 샷 4" · "씬 2", 오너 2026-11-14 답 7 · 리드 검토 1. 예전 기대값은 "(씬2)").
+    const context = serializeWriterScriptContext(oneScene, shots.filter((s) => s.sceneId === 'sc_02'), 'ko', undefined, { manifest, shots })
+    expect(context).toMatch(/sh_02_03 \(씬 2 · 샷 4\)/)
+    expect(context).toContain('(씬 2)')
     const store = readFileSync('src/stores/global-chat-store.ts', 'utf8')
     expect(store).toMatch(/serializeWriterScriptContext\(manifest, shots, contentLocale\(\), buildScriptLines\(manifest, shots\), \{ manifest: writer\.sceneManifest, shots: writer\.shots \}\)/)
   })

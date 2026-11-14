@@ -165,14 +165,6 @@ describe('혼자 정한 것', () => {
     expect(directorNodeLabel(sceneData(null), en)).toBe('New Scene')
   })
 
-  // 왜: 멈춘 이미지 · Take 가 뒤늦게 끝났다는 채팅 알림은 id 숫자("sh_02_07" → "Shot 7")로 불러 보드 번호(샷 8)와 달랐다 — 같은 샷을 다른 번호로 불렀다.
-  it('멈춘 이미지 · Take 가 뒤늦게 끝났다는 알림은 그 샷을 화면 언어의 보드 이름으로 부른다', () => {
-    const store = read('src/stores/director-store.ts')
-    expect(store).not.toMatch(/prettyNodeLabel\(shot\.data\.label/)
-    expect(store.match(/stoppedShotName\(/g)?.length ?? 0).toBeGreaterThanOrEqual(3)
-    expect(store).toMatch(/function stoppedShotName\([\s\S]{0,400}?directorNodeLabel\([\s\S]{0,200}?boardNodeNames\(writer\.sceneManifest, writer\.shots \?\? \[\], locale\)/)
-  })
-
   // 왜: Director 내보내기 shotlist.md 는 씬을 "Scene sc_01", 샷을 "sh_02_07"처럼 내부 id 로 적었다 — 이름 규칙이 내보낸 파일에서만 깨졌다(리드 11/14 H7).
   //   그림 · 영상 파일 경로는 그대로 둔다(묶음 안 경로는 바꾸지 않는다).
   it('Director 내보내기는 내부 id 대신 프로젝트 언어의 보드 이름으로 씬 · 샷을 적고 그림 · 영상 파일 경로는 그대로다', () => {

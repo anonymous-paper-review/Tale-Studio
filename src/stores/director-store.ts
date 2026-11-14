@@ -86,7 +86,8 @@ import { notifyGenerationComplete, notifyGenerationFailure, notifyStoppedResultK
 import { claimAction, releaseAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
-import { boardNodeNames, directorBoardLabel, directorNodeLabel, type BoardNodeNames } from '@/features/director/node-label'
+import { boardNodeNames, directorBoardLabel, directorNodeLabel, prettyNodeLabel, type BoardNodeNames } from '@/features/director/node-label'
+import { contentLocale } from '@/lib/i18n/content'
 import { useWriterStore } from '@/stores/writer-store'
 import type { AppLocale } from '@/lib/locale'
 import {
@@ -1711,7 +1712,7 @@ async function restoreActiveGenerationView(projectId: string): Promise<void> {
   }
 }
 
-/** 멈춘 작업이 뒤늦게 끝났다는 알림의 샷 이름 — 화면과 같은 보드 이름(그 알림 문장의 말, 오너 2026-11-14 답 7).
+/** 멈춘 작업이 뒤늦게 끝났다는 알림의 샷 이름 — 보드 이름, 말은 그 알림 문장의 말(채팅에 남는 줄이라 채팅 언어 — 오너 2026-11-14 답 7 · 리드 검토 3).
  *  예전에는 원래 id 숫자로 불러("sh_02_07" → "Shot 7") 보드 번호(샷 8)와 달랐다. */
 function stoppedShotName(shot: DirectorNode | undefined, locale: AppLocale): string {
   if (!shot) return ''
@@ -4293,7 +4294,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               await get().hydrateFromDb(projectId).catch(() => {})
               const shot = get().nodes.find((n) => n.id === shotNodeId)
               const version = shot && isShotData(shot.data) ? storyboardImageVersions(shot.data.storyboardImage).find((v) => v.id === jobId) : undefined
-              const locale = useLocaleStore.getState().locale
+              // 채팅에 남는 줄이라 문장 · 이름 모두 채팅 언어(리드 검토 3 — H1).
+              const locale = contentLocale()
               const name = stoppedShotName(shot, locale)
               notifyStoppedResultKept('director', version
                 ? translate(locale, 'The image you stopped for {shot} finished later and was kept as version v{n}. The current image did not change.', { shot: name, n: version.n })
@@ -5097,7 +5099,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 // 화면에서 멈춘 Take 가 뒤늦게 끝났다(오너 7번 · 리드 d) — Take 목록에만 있고 Editor 로 가는 Take 는 그대로다.
                 const doneNode = get().nodes.find((n) => n.id === videoNodeId)
                 const shot = doneNode && isVideoData(doneNode.data) ? get().nodes.find((n) => n.id === (doneNode.data as VideoNodeData).parentShotNodeId) : undefined
-                const locale = useLocaleStore.getState().locale
+                // 채팅에 남는 줄이라 문장 · 이름 모두 채팅 언어(리드 검토 3 — H1).
+                const locale = contentLocale()
                 notifyStoppedResultKept('director', translate(locale, 'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.', {
                   shot: stoppedShotName(shot, locale),
                 }))
@@ -6033,7 +6036,11 @@ export function serializeDirectorCanvasContext(
   const imageWord = (id: string) => ({ ready: 'image ready', drawing: 'image being made', missing: 'no image' } as const)[shotImages?.get(id) ?? 'missing']
   const boardSuffix = (data: Parameters<typeof directorBoardLabel>[0]) => {
     const name = directorBoardLabel(data, boardNames)
-    return name ? ` (board: ${name})` : ''
+    if (name) return ` (board: ${name})`
+    // 보드 이름이 없는 노드(Director 에서 만든 것 등)는 화면에 보이는 이름을 싣는다 — "New Shot" → "새 샷"(리드 검토 2).
+    //   원래 이름과 같으면(사람이 지은 이름 · 영어의 기본 이름) 덧붙이지 않는다.
+    const shown = prettyNodeLabel(data.label, boardNames?.locale ?? 'en')
+    return shown !== data.label ? ` (name: ${shown})` : ''
   }
 
   const scenes = nodes.filter((n) => isSceneData(n.data))
@@ -6060,7 +6067,7 @@ export function serializeDirectorCanvasContext(
     lines.push('### 노드 트리')
     if (boardNames && boardNames.shots.size > 0) {
       // 보드 이름은 대화 언어로 적힌다(오너 2026-11-14 답 7) — 사용자는 두 말 어느 쪽으로도 부른다.
-      lines.push('Board names in parentheses are what the user sees, written in the conversation language: shot numbers count across the whole storyboard and scene numbers follow the scene order. The user may use either language: "@Previz Shot 8", "@Real Shot 8", "Shot 8", "Scene 2 · Shot 8", "@러프 샷 8", "@실사 샷 8", "샷 8" or "씬 2 · 샷 8" means the node whose board number is 8. Call scenes and shots by their board names exactly as written in the parentheses.') // i18n-ok: 모델에게 알리는 두 말의 이름 꼴
+      lines.push('Names in parentheses are what the user sees, written in the conversation language: (board: …) for storyboard scenes and shots, (name: …) for nodes made in Director. Shot numbers count across the whole storyboard and scene numbers follow the scene order. The user may use either language: "@Previz Shot 8", "@Real Shot 8", "Shot 8", "Scene 2 · Shot 8", "@러프 샷 8", "@실사 샷 8", "샷 8" or "씬 2 · 샷 8" means the node whose board number is 8. Call scenes and shots by their board names exactly as written in the parentheses.') // i18n-ok: 모델에게 알리는 두 말의 이름 꼴
     }
     scenes.forEach((scene) => {
       if (!isSceneData(scene.data)) return
