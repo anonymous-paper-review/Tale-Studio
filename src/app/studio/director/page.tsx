@@ -28,7 +28,7 @@ import { Loader2,
   Square, ChevronDown, ChevronUp, LayoutGrid, Boxes, Lock, Unlock, Plus, Minus, Maximize2, Play, ImageIcon } from 'lucide-react'
 
 import { toast } from 'sonner'
-import { cancelRealBatchResume, cancelWaitingRealBatch, runRealBatch } from '@/lib/director/real-batch-client'
+import { afterStoppedRealBatch, cancelRealBatchResume, cancelWaitingRealBatch, runRealBatch, startSingleImage } from '@/lib/director/real-batch-client'
 import { takeImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
 import {
   runVideoBatch,
@@ -1042,32 +1042,44 @@ function PaletteBar() {
     }
     startImages()
   }
-  const startImages = () => {
+  // 멈춘 판이 정리 중이면 낱장 · 일괄 모두 정리가 끝난 뒤 그대로 시작한다(같은 알림 · [취소], 검토 a S1e).
+  //   chain = 영상까지 이어 보낼 샷 — 기다림에는 실제로 시작할 때 올린다(정리를 기다리는 동안 실패한 샷이 "못 만듦"으로 빠지지 않게).
+  const startImages = (chain: readonly string[] = []) => {
     const pid = useDirectorCanvasStore.getState().projectId
     if (!pid || imageWork.length === 0) return
-    const store = useDirectorCanvasStore.getState()
+    const singles: string[] = []
     const batch: string[] = []
     for (const id of imageWork) {
       const writerShotId = writerShotIdOf(id)
-      if (shotStates.get(id) === 'image_failed' || !writerShotId) void store.generateStoryboardImage(id).catch(() => {})
+      if (shotStates.get(id) === 'image_failed' || !writerShotId) singles.push(id)
       else batch.push(writerShotId)
     }
-    // 고르지 않았어도 화면이 센 목록을 그대로 싣는다 — 서버가 따로 고르지 않게(리드 검토 a 낮음 6).
-    if (batch.length > 0) void runRealBatch(pid, { shotIds: batch })
+    void afterStoppedRealBatch(() => {
+      if (chain.length > 0) {
+        const now = useDirectorCanvasStore.getState()
+        now.setChainWaitingShots([...now.chainWaitingShotIds, ...chain])
+      }
+      for (const id of singles) startSingleImage(id)
+      // 고르지 않았어도 화면이 센 목록을 그대로 싣는다 — 서버가 따로 고르지 않게(리드 검토 a 낮음 6).
+      if (batch.length > 0) void runRealBatch(pid, { shotIds: batch })
+    })
   }
   // [이미지 다시 만들기 · N] 확인 뒤: 고른 샷만 다시(일괄 force + 고른 샷).
   const remakePicked = () => {
     setConfirmRemake(false)
     const pid = useDirectorCanvasStore.getState().projectId
     if (!pid || imageMode.mode !== 'remake') return
-    const store = useDirectorCanvasStore.getState()
+    const singles: string[] = []
     const batch: string[] = []
     for (const id of imageMode.shotIds) {
       const writerShotId = writerShotIdOf(id)
       if (writerShotId) batch.push(writerShotId)
-      else void store.generateStoryboardImage(id).catch(() => {})
+      else singles.push(id)
     }
-    if (batch.length > 0) void runRealBatch(pid, { force: true, shotIds: batch })
+    void afterStoppedRealBatch(() => {
+      for (const id of singles) startSingleImage(id)
+      if (batch.length > 0) void runRealBatch(pid, { force: true, shotIds: batch })
+    })
   }
   // [영상 만들기 · N]: Take 를 쓰니 지금처럼 확인창을 거친다(약속 E).
   //   누를 때 잔액을 다시 읽고, 그래도 못 읽으면 확인 창을 열지 않는다 — 못 읽은 채 열면 Take 줄 없이 전부 시작했다(리드 11/14).
@@ -1418,8 +1430,7 @@ function PaletteBar() {
             startImages()
             return
           }
-          setChainWaitingShots([...chainWaitingShotIds, ...imageWork.slice(0, chainPlan.runCount)])
-          startImages()
+          startImages(imageWork.slice(0, chainPlan.runCount))
           toast.info(t("If you close this screen, the videos won't start."))
         }}
       />
