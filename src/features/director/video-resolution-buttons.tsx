@@ -1,7 +1,7 @@
 'use client'
 
-// 영상 해상도 단추 · 이번에 쓸 Take 표시(오너 2026-10-31 1080p) — 영상 팝업(VideoNodePopup)과 왼쪽 상세 패널
-//   (VideoDetailPanel)이 같이 쓴다. 영상 생성 모델 단추 바로 아래에 둔다. 1080p 는 720p 의 두 배 Take 를 쓰고(take-cost),
+// 영상 해상도 단추 · 이번에 쓸 Take 표시(오너 2026-10-31 1080p) — 독립 영상 왼쪽 상세 패널(VideoDetailPanel)과 샷 상세
+//   영상 탭(shot-video-tab)이 같이 쓴다. 영상 생성 모델 단추 바로 아래에 둔다. 1080p 는 720p 의 두 배 Take 를 쓰고(take-cost),
 //   해상도 칸이 없는 모델(Kling O3 Pro)을 고르면 단추를 끄고 안내한다. 고른 값은 영상 노드 설정(override)에 남는다.
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'

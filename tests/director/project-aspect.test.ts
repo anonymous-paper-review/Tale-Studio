@@ -78,7 +78,7 @@ describe('화면 — 노드 뷰와 스토리보드 뷰의 틀', () => {
       'src/features/director/canvas-nodes/VideoNode.tsx',
       'src/features/director/canvas-views/StoryboardGridView.tsx',
       'src/features/director/canvas-panels/VideoDetailPanel.tsx',
-      'src/features/director/canvas-popups/VideoNodePopup.tsx',
+      // 옛 영상 팝업(VideoNodePopup.tsx)은 뺐다 — 화면에서 닿지 않는 옛 부품이라 오너 답(11/14) "지워줘"(결정 페이지 "옛 부품").
     ]) {
       const src = read(f)
       expect(src, f).toMatch(/useProjectFormatStore\(\(s\) => s\.format\)/)

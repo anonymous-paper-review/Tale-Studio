@@ -1,4 +1,4 @@
-// 영상 팝업 · 왼쪽 상세 패널 · 영상 노드가 해상도 단추(720p · 1080p)와 그 해상도의 Take 를 보여준다 (오너 2026-10-31 1080p)
+// 왼쪽 상세 패널 · 영상 노드가 해상도 단추(720p · 1080p)와 그 해상도의 Take 를 보여준다 (오너 2026-10-31 1080p · 옛 영상 팝업 면은 오너 답 11/14 "지워줘"로 뺌)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 import type { StateCreator } from 'zustand/vanilla'
@@ -39,7 +39,6 @@ vi.mock('@/lib/billing/use-take-balance', () => ({
 vi.mock('@/lib/use-debug-prompts', () => ({ useDebugPrompts: () => false }))
 
 import { VideoDetailPanel } from '@/features/director/canvas-panels/VideoDetailPanel'
-import { VideoNodePopup } from '@/features/director/canvas-popups/VideoNodePopup'
 import { VideoNode } from '@/features/director/canvas-nodes/VideoNode'
 import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -97,9 +96,10 @@ function renderNode(id = videoId): Element[] {
   return elements(impl({ id, data: videoData(id), selected: true }))
 }
 
-const SURFACES = [['왼쪽 상세 패널', VideoDetailPanel], ['영상 팝업', VideoNodePopup]] as const
-// 오너 문장의 "Node 뷰의 영상 팝업" = Node 뷰에서 영상 노드를 누르면 열리는 왼쪽 상세 패널. 같은 단추를 둔 영상 팝업도 같이 본다.
-const WHERE = [['Director Node 뷰의 왼쪽 상세 패널', VideoDetailPanel], ['영상 팝업', VideoNodePopup]] as const
+// 옛 영상 팝업(VideoNodePopup) 면은 뺐다 — 화면에서 닿지 않는 옛 부품이라 오너 답(11/14) "지워줘"(결정 페이지 "옛 부품": 그때 이 시험의 면 목록도 바꿈).
+const SURFACES = [['왼쪽 상세 패널', VideoDetailPanel]] as const
+// 오너 문장의 "Node 뷰의 영상 팝업" = Node 뷰에서 영상 노드를 누르면 열리는 왼쪽 상세 패널.
+const WHERE = [['Director Node 뷰의 왼쪽 상세 패널', VideoDetailPanel]] as const
 
 beforeEach(() => {
   hooks.slots = []
@@ -112,7 +112,7 @@ beforeEach(() => {
 })
 
 describe('같이 정한 것', () => {
-  // 왜: Node 뷰에서 영상 노드를 누르면 왼쪽 상세 패널이 열린다(오너가 말한 "영상 팝업"). 같은 단추를 둔 영상 팝업도 같은 자리에 있어야 한다.
+  // 왜: Node 뷰에서 영상 노드를 누르면 왼쪽 상세 패널이 열린다(오너가 말한 "영상 팝업").
   it.each(WHERE)('%s에서 영상 생성 모델 아래에 해상도 단추(720p · 1080p)가 있다', (_label, surface) => {
     const nodes = render(surface)
     const models = modelButtons(nodes)

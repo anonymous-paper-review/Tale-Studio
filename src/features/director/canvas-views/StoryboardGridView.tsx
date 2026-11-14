@@ -65,7 +65,6 @@ import { STAGE_PERSONA } from '@/lib/lumi'
 import { useWriterStore } from '@/stores/writer-store'
 import { detailTabForShot, filterShotsByStatus, imageRemakeFailed, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
 import { RemakeRetryButton } from '@/features/director/remake-retry-button'
-import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
 import { ImageFailedPanel, ImageNeededTag, PickBox, RoughChangedTag, ShotPipelineRow, ShotStateTail } from '@/features/director/shot-status'
 
@@ -244,9 +243,6 @@ function ShotCell({
   const generateStoryboardImage = useDirectorCanvasStore(
     (s) => s.generateStoryboardImage,
   )
-  const generateVideoForShot = useDirectorCanvasStore(
-    (s) => s.generateVideoForShot,
-  )
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
   const openShotDetail = useDirectorCanvasStore((s) => s.openShotDetail)
   // 카드 몸통 = 고르기(시안 D2 · R). 훅이라 조기 반환보다 앞에 둔다.
@@ -262,10 +258,8 @@ function ShotCell({
   const nativeDescription = useShotActionDescription(writerShotId)
   // 카드 제목 "씬 1 · 샷 1 · CU · 3초"(시안 D1) — 샷 크기는 Writer 샷 기록에서.
   const shotType = useWriterStore((s) => (writerShotId ? s.shots.find((x) => x.shotId === writerShotId)?.shotType ?? null : null))
-  // 영상 생성(이미지→영상 체인 포함) 진행 플래그 — 버튼 잠금 + 오버레이(#e12)
-  const [videoBusy, setVideoBusy] = useState(false)
-  // 같은 화면에서 빠르게 두 번 불려도 한 번만 시작한다(videoBusy 는 다음 그리기에야 보인다, 검토 b 낮음 2).
-  const videoStartingRef = useRef(false)
+  // 카드에서 영상을 만드는 길([영상 만들기] · [다시 만들기] — 이미지→영상 체인)은 없앴다 — 실사 카드 위 숨은 단추를 없앤 뒤(시안 R) 화면에서
+  //   닿지 않았다(오너 답 11/14 "지워줘"). 카드의 영상은 툴바 · 샷 상세에서 만든다. 약속: tests/director/old-parts-removed.test.ts
   // 영상 묶음에서 이 샷의 차례(0 = 다음 차례, -1 = 기다리지 않음) — 꼬리 "순서 기다리는 중 · N번째" · [먼저 하기](시안 D4, 리드 S4-2 7).
   //   멈추는 중이면 남은 샷은 만들지 않는다(차례에 두지 않는다).
   const linePosition = useDirectorCanvasStore((s) => {
@@ -274,7 +268,7 @@ function ShotCell({
   })
   const [videoError, setVideoError] = useState<string | null>(null)
   // 재생성 확인 팝업(#regen-confirm) / Previz 편집 팝업(#e6)
-  const [confirm, setConfirm] = useState<null | 'image' | 'video' | 'previz' | 'manual-retry'>(null)
+  const [confirm, setConfirm] = useState<null | 'image' | 'previz' | 'manual-retry'>(null)
   // #f10(2026-08-26 오너): previz 호버에 '진짜 재생성'이 없었다(연출 화살표 팝업뿐) — 카드에서
   //   writer 러프 재생성을 직접 쏜다. 완료 반영은 writer finalize → 재수화 경로 그대로.
   const cardProjectId = useDirectorCanvasStore((s) => s.projectId)
@@ -393,43 +387,6 @@ function ShotCell({
       setVideoError(error instanceof Error ? error.message : t('Failed to generate the image.'))
     }
   }
-  // 영상 생성(#e12): 이미지가 없으면 먼저 생성하고, 성공했을 때만 영상으로 이어간다.
-  const runVideo = async () => {
-    if (videoBusy || videoStartingRef.current) return
-    if (realBatchBusy) {
-      setVideoError(t('Batch live-action generation is running. Try again after it finishes.'))
-      return
-    }
-    // 잔액을 다시 읽는 동안에도 단추를 끈다 — 두 번 눌러 Take 가 두 번 나가지 않게(검토 b 낮음 2).
-    videoStartingRef.current = true
-    setVideoBusy(true)
-    setVideoError(null)
-    try {
-      // Take 를 쓰니 잔액을 다시 읽고, 못 읽으면 시작하지 않고 카드 안에 까닭(리드 11/14, D8 과 같은 말).
-      if (!(await takesReadable())) {
-        setVideoError(t(TAKES_UNKNOWN_TEXT))
-        return
-      }
-      if (!hasImage) {
-        await useDirectorCanvasStore.getState().hydrateFreshFromDb().catch(() => {})
-        // Director 배선 5: 로컬이 낡았을 수 있다 — DB 를 먼저 다시 읽고, 그래도 없을 때만 이미지를 새로 만든다(승인한 그림 보호).
-        const completedNow = () => {
-          const fresh = useDirectorCanvasStore.getState().nodes.find((n) => n.id === node.id)
-          return !!fresh && isShotData(fresh.data) && fresh.data.storyboardImage?.status === 'completed'
-        }
-        if (!completedNow()) {
-          await generateStoryboardImage(node.id)
-          if (!completedNow()) return
-        }
-      }
-      await generateVideoForShot(node.id)
-    } catch (error) {
-      setVideoError(error instanceof Error ? error.message : t('Failed to generate video.'))
-    } finally {
-      videoStartingRef.current = false
-      setVideoBusy(false)
-    }
-  }
 
   // 큐가 진행 판정의 바닥이다(#queue-restore 2026-08-11) — 노드의 storyboardImage.status 는
   //   탭 재진입 시 DB 재수화로 덮이므로, 잡이 떠 있으면 그쪽이 맞다.
@@ -450,7 +407,7 @@ function ShotCell({
     mediaMode === 'real' && realBatchBusy && !realBatchCancelled && !hasImage && status !== 'failed' && !!roughUrl &&
     (realBatchShotIds === null || (!!writerShotId && realBatchShotIds.includes(writerShotId)))
   const imageGenerating = imageGeneration.generating || autoFillPending
-  const generating = imageGenerating || videoBusy || childVideoGenerating || queuedVideo
+  const generating = imageGenerating || childVideoGenerating || queuedVideo
   // 대기 vs 실작업(#e4 2026-08-12) — DB 큐(generation_jobs queued)에 앉았으면 fal 이 실제로
   //   돌리는 중이라 타이머가 의미 있고, 아직 큐에 없으면(일괄 러너가 순번 대기) 시간은
   //   거짓말이다 — 문구만 '대기 중'으로 바꾸고 초는 지운다.
@@ -458,7 +415,8 @@ function ShotCell({
 
   /**
    * 카드 액션 목록 — 단계에 따라 **문구만** 바뀌고 항목 수는 고정이다(#e4 2026-08-11).
-   *   이미지 단계 → [이미지 재생성, 영상 생성] · 영상 단계 → [이미지 재생성, 영상 재생성].
+   *   러프 보기 → [연출 고치기, Previz 다시 만들기] · 실사 보기 → [이미지 만들기 · 다시 만들기](실사 보기 목록은 지금 카드에 그리지 않는다 —
+   *   시안 R, 만드는 일은 위쪽 단추 · 상세). 실사 보기의 [영상 만들기 · 다시 만들기]는 없앴다(오너 답 11/14 "지워줘").
    *   이미 있는 것을 갈아치우는 항목만 확인 팝업을 거친다 — 빈칸 채우기는 바로 실행.
    */
   const actions: Array<{
@@ -517,17 +475,6 @@ function ShotCell({
               if (imageGeneration.disabled) return
               if (hasImage) setConfirm('image')
               else void runImage()
-            },
-          },
-          {
-            key: 'video',
-            label: completedVideoUrl ? t('Regenerate video') : t('Generate video'),
-            title: t('Generate video: creates the shooting image first if missing, then the video'),
-            primary: true,
-            disabled: generating || realBatchBusy || queueStatus !== 'ready',
-            onClick: () => {
-              if (completedVideoUrl) setConfirm('video')
-              else void runVideo()
             },
           },
         ]
@@ -829,28 +776,22 @@ function ShotCell({
           if (!o) setConfirm(null)
         }}
         title={
-          confirm === 'video'
-            ? t('Regenerate the video?')
-            : confirm === 'previz'
-              ? t('Regenerate the previz?')
-              : t('Regenerate the image?')
+          confirm === 'previz'
+            ? t('Regenerate the previz?')
+            : t('Regenerate the image?')
         }
         description={
           confirm === 'manual-retry'
             ? t('The previous request may still be running. Generating again sends a new request.')
-            : confirm === 'video'
-            ? t('Creates a new take based on the current shooting image.')
             : confirm === 'previz'
               ? t('Redraws this shot\'s rough 3-frame set (start/directing/end).')
               : t('Generates a new shooting image for this shot.')
         }
         impact={
-          confirm === 'manual-retry' ? [] : confirm === 'video'
-            ? [t('Costs money to generate the video.'), t('Adds a new take. The card shows the latest successful one.')]
-            : confirm === 'previz'
-              ? [t('Costs money to generate the previz.'), t('Replaces the existing rough frames with the new result.')]
-              // 다시 만들어도 지금 이미지는 버전으로 남는다(오너 답 5번 · prose 상세 단추와 같은 말).
-              : [t('The new image becomes the current one. The current image stays in the versions.')]
+          confirm === 'manual-retry' ? [] : confirm === 'previz'
+            ? [t('Costs money to generate the previz.'), t('Replaces the existing rough frames with the new result.')]
+            // 다시 만들어도 지금 이미지는 버전으로 남는다(오너 답 5번 · prose 상세 단추와 같은 말).
+            : [t('The new image becomes the current one. The current image stays in the versions.')]
         }
         // 다시 만들기 단추는 툴바 확인 창과 같은 "다시 만들기"(리드 11/14). 실패 뒤 "다시 생성"은 출시 시험이 그 글자를 박고 있어 그대로.
         confirmLabel={confirm === 'manual-retry' ? t('Generate again') : t('Make again')}
@@ -859,7 +800,6 @@ function ShotCell({
           const which = confirm
           setConfirm(null)
           if (which === 'manual-retry') void useDirectorCanvasStore.getState().retryUnconfirmedManualStoryboardImage(node.id)
-          else if (which === 'video') void runVideo()
           else if (which === 'previz') void runPrevizRegen()
           else void runImage()
         }}

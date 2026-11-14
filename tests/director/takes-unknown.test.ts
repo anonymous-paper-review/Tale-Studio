@@ -61,12 +61,8 @@ describe('카드 · 노드의 영상 단추', () => {
     expect(shot).toContain('{takesUnknown && takeBalance.failed && (')
   })
 
-  it('러프 보기 카드의 [영상 만들기 · 다시 만들기]도 잔액을 다시 읽어, 못 읽으면 시작하지 않고 카드 안에 까닭을 보인다', () => {
-    // 왜: 카드 단추도 같은 Take 를 쓴다(리드 11/14).
-    const grid = read('src/features/director/canvas-views/StoryboardGridView.tsx')
-    const run = grid.slice(grid.indexOf('const runVideo = async () => {'), grid.indexOf('const runVideo = async () => {') + 700)
-    expect(run).toMatch(/if \(!\(await takesReadable\(\)\)\) \{\s*setVideoError\(t\(TAKES_UNKNOWN_TEXT\)\)\s*return\s*\}/)
-  })
+  // '러프 보기 카드의 [영상 만들기 · 다시 만들기]도 …' 사례는 뺐다 — 카드의 [영상 만들기] 길을 오너 답(11/14) "지워줘"로 없앴다
+  //   (tests/director/old-parts-removed.test.ts).
 })
 
 describe('툴바 확인 창', () => {

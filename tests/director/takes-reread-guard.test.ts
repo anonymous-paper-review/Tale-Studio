@@ -1,5 +1,4 @@
 // 바로 시작하는 영상 단추는 Take 잔액을 다시 읽는 동안 꺼지고, 그사이 두 번 눌러도 한 번만 시작한다 (리드 11/14 검토 b 낮음 2 · prose 이미지 탭과 같은 꼴)
-import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 import type { StateCreator } from 'zustand/vanilla'
@@ -125,14 +124,7 @@ describe('혼자 정한 것', () => {
     expect(base().props.canBranch).toBe(true)
   })
 
-  it('러프 보기 카드 [영상 만들기]는 Take 잔액을 다시 읽기 전에 단추를 끄고, 그사이 두 번 불려도 한 번만 시작한다', () => {
-    // 왜: 카드는 읽은 뒤에야 "만드는 중"(videoBusy)이 되어 그사이 두 번 불릴 수 있었다(검토 b 낮음 2 — setVideoBusy 를 읽기 앞으로).
-    const grid = readFileSync('src/features/director/canvas-views/StoryboardGridView.tsx', 'utf8')
-    const run = grid.slice(grid.indexOf('const runVideo = async () => {'), grid.indexOf('await generateVideoForShot(node.id)'))
-    expect(run).toContain('if (videoBusy || videoStartingRef.current) return')
-    expect(run.indexOf('setVideoBusy(true)')).toBeGreaterThan(-1)
-    expect(run.indexOf('setVideoBusy(true)')).toBeLessThan(run.indexOf('await takesReadable()'))
-  })
+  // '러프 보기 카드 [영상 만들기]는 …' 사례는 뺐다 — 카드의 [영상 만들기] 길을 오너 답(11/14) "지워줘"로 없앴다(tests/director/old-parts-removed.test.ts).
 
   it('잔액을 못 읽으면 시작하지 않고 단추는 다시 켜진다', async () => {
     // 왜: 정상 경로 고정 — 읽기에 실패해도 단추가 꺼진 채 남지 않는다(다시 눌러 다시 읽는다).

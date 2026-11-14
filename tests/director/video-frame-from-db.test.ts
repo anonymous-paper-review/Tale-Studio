@@ -118,8 +118,6 @@ describe('승인된 스토리보드 화면을 영상에 쓰는 약속 (Director 
     expect(store).toMatch(/frameSource: chainFrameUrl \|\| hasManualFrameInputs \? 'manual' : 'auto'/)
   })
 
-  it('그리드의 "영상 생성"은 새 그림을 만들기 전에 저장된 그림을 다시 확인해 승인한 그림을 지킨다', () => {
-    const grid = read('src/features/director/canvas-views/StoryboardGridView.tsx')
-    expect(grid).toMatch(/if \(!hasImage\) \{\n\s*await useDirectorCanvasStore\.getState\(\)\.hydrateFreshFromDb\(\)/)
-  })
+  // '그리드의 "영상 생성"은 새 그림을 만들기 전에 저장된 그림을 다시 확인해 승인한 그림을 지킨다' 사례는 뺐다 — 카드의 [영상 만들기] 길이
+  //   시안 R 이후 화면에서 닿지 않았고 오너 답(11/14) "지워줘"로 없앴다(tests/director/old-parts-removed.test.ts). 출시 시험이라 보고에 싣는다.
 })

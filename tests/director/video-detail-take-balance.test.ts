@@ -1,4 +1,4 @@
-// 샷 없는 독립 영상의 왼쪽 패널 · 영상 팝업 [영상 재생성]도 Take 잔액을 못 읽으면 값을 보이고, 누를 때 다시 읽어 못 읽으면 시작하지 않고 단추 아래에 까닭을 보이며, 읽는 동안 꺼진다 (통합 검토 a · 리드 2026-11-14 · 샷 상세와 같은 말)
+// 샷 없는 독립 영상의 왼쪽 패널 [영상 재생성]도 Take 잔액을 못 읽으면 값을 보이고, 누를 때 다시 읽어 못 읽으면 시작하지 않고 단추 아래에 까닭을 보이며, 읽는 동안 꺼진다 (통합 검토 a · 리드 2026-11-14 · 샷 상세와 같은 말 · 옛 영상 팝업 면은 오너 답 11/14 "지워줘"로 뺌)
 import { beforeEach, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 import type { StateCreator } from 'zustand/vanilla'
@@ -39,7 +39,6 @@ vi.mock('@/lib/billing/use-take-balance', () => ({ useTakeBalance: () => takes.s
 vi.mock('@/lib/use-debug-prompts', () => ({ useDebugPrompts: () => false }))
 
 import { VideoDetailPanel } from '@/features/director/canvas-panels/VideoDetailPanel'
-import { VideoNodePopup } from '@/features/director/canvas-popups/VideoNodePopup'
 import { Button } from '@/components/ui/button'
 import { TAKES_UNKNOWN_TEXT } from '@/features/director/takes-check'
 import { createDefaultStandaloneVideoConfig } from '@/lib/director/standalone-video'
@@ -52,13 +51,10 @@ type Element = ReactElement<Record<string, unknown>>
 type Surface = (props: { nodeId: string; data: VideoNodeData }) => ReactNode
 const STANDALONE_ID = 'standalone-video-1'
 const STANDALONE_ID_2 = 'standalone-video-2'
-let takeId: string
-let takeId2: string
-// 샷 없는 독립 영상은 노드형 왼쪽 패널에서 연다. 영상 팝업은 마더 샷이 있는 Take 만 그린다(샷의 Take 는 이제 새 샷 상세로 가서
-//   화면에서는 닿지 않지만, 같은 단추 꼴이라 같은 규칙을 건다).
+// 샷 없는 독립 영상은 노드형 왼쪽 패널에서 연다. 옛 영상 팝업 면(마더 샷이 있는 Take 만 그렸고 화면에서 닿지 않았다)은 뺐다 —
+//   오너 답(11/14) "지워줘"(결정 페이지 "옛 부품").
 const SURFACES = [
   ['독립 영상 왼쪽 패널', VideoDetailPanel, () => STANDALONE_ID, () => [STANDALONE_ID, STANDALONE_ID_2] as const],
-  ['영상 팝업', VideoNodePopup, () => takeId, () => [takeId, takeId2] as const],
 ] as const
 const FAILED = { balance: null, mode: 'off', loading: false, failed: true }
 const READ = { balance: 100, mode: 'shadow', loading: false, failed: false }
@@ -112,15 +108,6 @@ beforeEach(() => {
     { id: STANDALONE_ID, type: 'video', position: { x: 0, y: 0 }, data },
     { id: STANDALONE_ID_2, type: 'video', position: { x: 400, y: 0 }, data: second },
   ], edges: [], popupNodeId: null } as never)
-  const takeOn = (writerShotId: string, y: number) => {
-    const shotId = director.getState().addShotNode(null, { x: 0, y })
-    director.getState().updateNodeData<'shot'>(shotId, { writerShotId, provider: 'seedance' })
-    const id = director.getState().addVideoTake(shotId)!
-    director.getState().updateNodeData<'video'>(id, { videoClipId: `clip-${writerShotId}`, status: 'completed', lastAttemptStatus: 'completed', videoUrl: `https://media.test/${writerShotId}.mp4` })
-    return id
-  }
-  takeId = takeOn('shot-1', 400)
-  takeId2 = takeOn('shot-2', 800)
 })
 
 it.each(SURFACES)('Take 잔액을 읽지 못해도 [영상 재생성] 옆 Take 값을 그대로 보인다 (%s)', (_name, surface, idOf) => {

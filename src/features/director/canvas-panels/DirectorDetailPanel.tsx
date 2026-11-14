@@ -3,7 +3,6 @@
 import { X } from 'lucide-react'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { isAssetData, isShotData, isVideoData } from '@/types/director'
-import { ShotDetailPanel } from './ShotDetailPanel'
 import { VideoDetailPanel } from './VideoDetailPanel'
 import { AssetDetailPanel } from './AssetDetailPanel'
 import { DirectorShotDetail } from '@/features/director/shot-detail/director-shot-detail'
@@ -72,10 +71,8 @@ export function DirectorDetailPanel() {
           <X className="size-4" />
         </button>
       </div>
+      {/* 샷은 위에서 샷 상세로 갔다 — 여기는 마더 샷이 없는 독립 영상과 에셋만(옛 샷 편집 패널은 오너 답 11/14 "지워줘"). */}
       <div className="min-h-0 flex-1">
-        {isShotData(node.data) && (
-          <ShotDetailPanel nodeId={node.id} data={node.data} />
-        )}
         {isVideoData(node.data) && (
           <VideoDetailPanel nodeId={node.id} data={node.data} />
         )}

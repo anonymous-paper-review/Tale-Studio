@@ -8,8 +8,6 @@ import {
 } from '@/types/director'
 import { popupVisibleInView } from '@/features/director/canvas-interaction'
 import { SceneNodePopup } from './SceneNodePopup'
-import { ShotNodePopup } from './ShotNodePopup'
-import { VideoNodePopup } from './VideoNodePopup'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { DirectorShotDetail } from '@/features/director/shot-detail/director-shot-detail'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
@@ -17,7 +15,8 @@ import { directorNodeLabel } from '@/features/director/node-label'
 
 /**
  * popupNodeId 기반으로 노드 종류별 popup으로 라우팅.
- * Scene/Shot/Video 각각 자체 Dialog를 렌더.
+ * Scene 은 자체 Dialog, 샷 · 샷의 Take 는 샷 상세 팝업을 렌더한다. 마더 샷이 없는 독립 영상은 팝업이 없다 — 노드형 왼쪽 패널
+ * (VideoDetailPanel)에서 연다. 옛 샷 편집 팝업 · 영상 팝업은 오너 답(11/14) "지워줘"로 뺐다.
  *
  * 노드 뷰(viewMode==='node')에서는 Shot/Video 상세를 좌측 패널이 담당하므로
  * 모달은 Scene만 허용한다(두 뷰 격리 방어 가드). 그리드 뷰는 기존대로 전부 허용.
@@ -33,7 +32,7 @@ export function DirectorNodePopup() {
     s.nodes.find((n) => n.id === shownId),
   )
   // 샷 · 샷의 Take 는 샷 상세 팝업(디자이너 11/13 D6 — 스토리보드형은 팝업, 노드형 왼쪽 패널과 같은 내용).
-  //   Take 에서 열면 그 샷의 영상 탭이 그 Take 를 먼저 보인다. 마더 샷이 없는 독립 영상은 지금 팝업.
+  //   Take 에서 열면 그 샷의 영상 탭이 그 Take 를 먼저 보인다. 마더 샷이 없는 독립 영상은 팝업이 없다(옛 영상 팝업도 그리지 않았다).
   const shotNodeId = !node ? null : isShotData(node.data) ? node.id : isVideoData(node.data) ? node.data.parentShotNodeId : null
   const shotNode = useDirectorCanvasStore((s) => (shotNodeId ? s.nodes.find((n) => n.id === shotNodeId) : undefined))
   const boardNames = useBoardNodeNames()
@@ -60,9 +59,5 @@ export function DirectorNodePopup() {
       </Dialog>
     )
   }
-  if (isShotData(node.data))
-    return <ShotNodePopup nodeId={node.id} data={node.data} />
-  if (isVideoData(node.data))
-    return <VideoNodePopup nodeId={node.id} data={node.data} />
   return null
 }
