@@ -93,11 +93,35 @@ describe('toggleMentionToken (대본 줄을 눌러 @언급을 넣고 뺀다)', (
   })
 
   // 왜: 리드 검토 4(전부터) — 입력에 "@이름 미정 인물 2"가 있을 때 목록에서 "이름 미정 인물"을 누르면 그 멘션의 앞부분을 지워 "2"만 남았다(영어 "@Unnamed person 2"도).
+  //   지금 목록(보이는 라벨들)을 함께 넘겨, 그 자리에서 더 긴 라벨이 맞을 때만 막는다(리드 재검토 — 뒤에 " 숫자"만 보고 막으면 흔한 문장에서 못 뺐다).
   it('이름 없는 카드 멘션을 넣고 뺄 때 번호가 붙은 다른 카드의 멘션은 건드리지 않는다', () => {
-    expect(toggleMentionToken('@이름 미정 인물 2 ', '이름 미정 인물')).toBe('@이름 미정 인물 2 @이름 미정 인물 ')
-    expect(toggleMentionToken('@Unnamed person 2 ', 'Unnamed person')).toBe('@Unnamed person 2 @Unnamed person ')
-    expect(toggleMentionToken('@이름 미정 인물 2 와 @이름 미정 인물 비교', '이름 미정 인물')).toBe('@이름 미정 인물 2 와 비교')
-    expect(toggleMentionToken('@Unnamed person 2 hi', 'Unnamed person 2')).toBe('hi')
+    const ko = ['이름 미정 인물', '이름 미정 인물 2', '카르타']
+    const en = ['Unnamed person', 'Unnamed person 2', 'Karta']
+    expect(toggleMentionToken('@이름 미정 인물 2 ', '이름 미정 인물', ko)).toBe('@이름 미정 인물 2 @이름 미정 인물 ')
+    expect(toggleMentionToken('@Unnamed person 2 ', 'Unnamed person', en)).toBe('@Unnamed person 2 @Unnamed person ')
+    expect(toggleMentionToken('@이름 미정 인물 2 와 @이름 미정 인물 비교', '이름 미정 인물', ko)).toBe('@이름 미정 인물 2 와 비교')
+    expect(toggleMentionToken('@Unnamed person 2 hi', 'Unnamed person 2', en)).toBe('hi')
+  })
+
+  // 왜: 리드 재검토(f03c975e 고장) — 멘션 바로 뒤에 띄어쓰기와 숫자가 오는 흔한 문장("@실사 샷 3 5초로 줄여줘")에서 그 멘션을 빼지 못하고
+  //   목록에서 누르면 같은 멘션이 끝에 하나 더 붙었다. 예전 경계는 넷 다 바르게 뺐다.
+  it('멘션 바로 뒤에 띄어쓰기와 숫자가 와도 같은 멘션을 다시 누르면 뺀다', () => {
+    const director = ['러프 샷 3', '실사 샷 3', '실사 샷 30', '실사 샷 12', '실사 샷 1']
+    const writer = ['씬 1', '샷 3', '샷 30', 'L5', 'L51']
+    const english = ['Real Shot 3', 'Real Shot 30', 'Real Shot 1', 'Real Shot 12']
+    expect(toggleMentionToken('@실사 샷 3 5초로 줄여줘', '실사 샷 3', director)).toBe('5초로 줄여줘')
+    expect(toggleMentionToken('@샷 3 2번째 대사 고쳐줘', '샷 3', writer)).toBe('2번째 대사 고쳐줘')
+    expect(toggleMentionToken('@Real Shot 3 2 seconds shorter', 'Real Shot 3', english)).toBe('2 seconds shorter')
+    expect(toggleMentionToken('@L5 3초 늘려줘', 'L5', writer)).toBe('3초 늘려줘')
+    // 목록 없이 불러도(예전 호출) 같은 문장에서 뺀다.
+    expect(toggleMentionToken('@L5 3초 늘려줘', 'L5')).toBe('3초 늘려줘')
+  })
+
+  // 왜: 숫자가 바로 붙은 더 긴 라벨("Real Shot 12")은 짧은 라벨("Real Shot 1")로 건드리지 않는다(예전 경계 그대로 — @L51 과 같은 규칙).
+  it('더 긴 번호의 멘션 "@Real Shot 12"는 "Real Shot 1"을 눌러도 그대로다', () => {
+    const english = ['Real Shot 1', 'Real Shot 12']
+    expect(toggleMentionToken('@Real Shot 12 hi', 'Real Shot 1', english)).toBe('@Real Shot 12 hi @Real Shot 1 ')
+    expect(toggleMentionToken('@Real Shot 12 @Real Shot 1 ', 'Real Shot 1', english)).toBe('@Real Shot 12')
   })
 })
 

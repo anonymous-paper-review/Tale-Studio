@@ -716,6 +716,9 @@ export function GlobalChat() {
     }
   }, [])
 
+  // 넣고 빼기가 더 긴 라벨(예: "이름 미정 인물 2")의 앞부분을 지우지 않게 지금 목록의 라벨을 함께 넘긴다(리드 검토 4).
+  const mentionLabels = useMemo(() => mentionItems.map((m) => m.label), [mentionItems])
+
   // 입력창의 @멘션 ↔ 카드 하이라이트 동기화 (입력에서 지우면 자동 해제)
   useEffect(() => {
     setMentionedRefs(activeMentionRefs(input, mentionItems.map((m) => ({ ref: m.id, label: m.label }))))
@@ -742,14 +745,14 @@ export function GlobalChat() {
     }
     setInput((prev) =>
       mentionInsert.mode === 'toggle'
-        ? toggleMentionToken(prev, mentionInsert.label)
+        ? toggleMentionToken(prev, mentionInsert.label, mentionLabels)
         : prev.includes(token)
           ? prev
           : `${prev.replace(/\s*$/, prev.trim() ? ' ' : '')}${token} `,
     )
     consumeMentionInsert(mentionInsert.id)
     requestAnimationFrame(() => textareaRef.current?.focus())
-  }, [mentionInsert, consumeMentionInsert])
+  }, [mentionInsert, consumeMentionInsert, mentionLabels])
 
   // 첫 진입 웰컴 등 → 채팅 입력창 포커스. 입력 알약의 focus-within 이 지금 단계 색 테두리를 켜 주의를 끈다(v3).
   useEffect(() => {
@@ -844,7 +847,7 @@ export function GlobalChat() {
   }
   // 에셋 팔레트 클릭 = @멘션 토글(카드 Cmd+클릭과 같은 경로). 다중 선택하도록 popover 는 열어 둔다.
   const toggleAssetMention = (label: string) => {
-    setInput((prev) => toggleMentionToken(prev, label))
+    setInput((prev) => toggleMentionToken(prev, label, mentionLabels))
     requestAnimationFrame(() => textareaRef.current?.focus())
   }
 
