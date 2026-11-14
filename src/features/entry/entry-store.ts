@@ -7,7 +7,7 @@ import { create } from 'zustand'
 import { translate } from '@/lib/i18n/translate'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { emptyEntryDraft, fileHasText, normalizeEntryDraft, recIsCurrent, type EntryDraft } from '@/lib/entry/draft'
-import { asksToShareStory, splitPermissionAsk, withoutPermissionAsk } from '@/lib/entry/permission-ask'
+import { asksToShareStory, splitPermissionAsk, storyWithoutPermissionAsk, withoutPermissionAsk } from '@/lib/entry/permission-ask'
 import type { EntryWriterStartBody } from '@/lib/entry/start-plan'
 import { useLocaleStore } from '@/stores/locale-store'
 import { settleProjectRename, useProjectStore } from '@/stores/project-store'
@@ -506,20 +506,28 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       if (get().reading || locked()) return 'busy'
       await get().flushIdea()
       let draft = get().draft
-      // 이야기를 내도 되는지 허락을 묻는 글은 이야기로 읽지 않는다 — 다음으로 가지 않고 "여기에 적어 주세요"를 보인다(글은 그대로, 길이 검사보다 먼저).
-      //   안내를 본 뒤 글을 고쳐 다시 눌렀으면 물음에 답한 것이다 — 이어 적은 글이 길어도(120자 가름은 첫 글만) 물음의 틀만 덜어 내고 이어 간다.
-      //   또 안내하면 줄거리를 이어 적은 사람이 같은 자리에서 막힌다(리드 검토 11/14 보통 3).
-      const shownFor = get().shareAskedText
-      const answeredAfterHint = shownFor !== null && shownFor !== draft.idea
-      const ask = draft.file ? null : splitPermissionAsk(draft.idea, answeredAfterHint ? { ignoreLength: true } : undefined)
-      if (ask?.asking) {
-        if (!answeredAfterHint) {
-          set({ showShareAnswer: true, shareAskedText: draft.idea, showLengthError: false })
-          return 'asked'
-        }
-        get().setIdea(withoutPermissionAsk(draft.idea))
+      // 허락 물음 뒤에 줄거리를 이미 썼으면(인사 · 고마움 말 · 물음꼴 문장을 뺀 글이 남으면) 묻지 않고 물음 문장만 빼고 그 글로 이어 간다 — 쓴 줄거리를 버리지 않는다(리드 검토 11/14 보통 1).
+      const direct = draft.file ? null : storyWithoutPermissionAsk(draft.idea)
+      if (direct !== null) {
+        get().setIdea(direct)
         await get().flushIdea()
         draft = get().draft
+      } else {
+        // 이야기를 내도 되는지 허락을 묻는 글은 이야기로 읽지 않는다 — 다음으로 가지 않고 "여기에 적어 주세요"를 보인다(글은 그대로, 길이 검사보다 먼저).
+        //   안내를 본 뒤 글을 고쳐 다시 눌렀으면 물음에 답한 것이다 — 이어 적은 글이 길어도(120자 가름은 첫 글만) 물음의 틀만 덜어 내고 이어 간다.
+        //   또 안내하면 줄거리를 이어 적은 사람이 같은 자리에서 막힌다(리드 검토 11/14 보통 3).
+        const shownFor = get().shareAskedText
+        const answeredAfterHint = shownFor !== null && shownFor !== draft.idea
+        const ask = draft.file ? null : splitPermissionAsk(draft.idea, answeredAfterHint ? { ignoreLength: true } : undefined)
+        if (ask?.asking) {
+          if (!answeredAfterHint) {
+            set({ showShareAnswer: true, shareAskedText: draft.idea, showLengthError: false })
+            return 'asked'
+          }
+          get().setIdea(withoutPermissionAsk(draft.idea))
+          await get().flushIdea()
+          draft = get().draft
+        }
       }
       set({ showShareAnswer: false, shareAskedText: null })
       if (draft.file?.noText) return 'no_text'
@@ -551,7 +559,7 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
     chatSendFirst: async () => {
       if (get().reading || locked()) return 'busy'
       await get().flushIdea()
-      const draft = get().draft
+      let draft = get().draft
       if (!draft.file && isExampleRequest(draft.idea)) {
         set({ chat: { ...get().chat, showExamples: true, lengthError: false } })
         get().setIdea('')
@@ -561,7 +569,14 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       // 이야기를 내도 되는지 허락을 묻는 첫 글(2026-11-14 오너 A ①) — 이야기로 시작하지 않고 앱이 먼저 "여기에 적어 주세요"로 답한다.
       //   물음은 대화에 사용자 말로 남기고 입력칸은 비운다. 길이 검사보다 먼저라 짧은 "줘도 될까?"도 이 답을 받는다.
       //   물음 앞에 적은 설명은 버리지 않는다 — 허락 물음 문장만 빼고 따로 들고 있다가 이어 적은 줄거리 앞에 붙인다(리드 2026-11-14).
-      const ask = draft.file ? null : splitPermissionAsk(draft.idea)
+      //   허락 물음 뒤에 줄거리를 이미 썼으면(인사 · 고마움 말 · 물음꼴 문장을 뺀 글이 남으면) 묻지 않고 물음 문장만 빼고 그 글로 바로 시작한다(리드 검토 11/14 보통 1).
+      const direct = draft.file ? null : storyWithoutPermissionAsk(draft.idea)
+      if (direct !== null) {
+        get().setIdea(direct)
+        await get().flushIdea()
+        draft = get().draft
+      }
+      const ask = draft.file || direct !== null ? null : splitPermissionAsk(draft.idea)
       if (ask?.asking) {
         const seedPrefix = [get().chat.seedPrefix?.trim(), ask.preface].filter(Boolean).join('\n\n') || null
         set({ chat: { ...get().chat, asked: draft.idea.trim(), seedPrefix, lengthError: false } })

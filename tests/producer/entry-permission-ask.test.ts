@@ -1,6 +1,6 @@
 // 시작 화면 첫 글이 "줄거리를 줘도 될까?"처럼 이야기를 내도 되는지 허락을 묻는 말이면 이야기를 시작하지 않고 "여기에 적어 주세요"로 먼저 답하고, 물음 앞에 적은 설명은 이어 적은 줄거리와 함께 이야기 씨앗으로 쓴다 (오너 2026-11-14 답 A ① · 리드 11/14)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { asksToShareStory, splitPermissionAsk, withoutPermissionAsk } from '@/lib/entry/permission-ask'
+import { asksToShareStory, splitPermissionAsk, storyWithoutPermissionAsk, withoutPermissionAsk } from '@/lib/entry/permission-ask'
 import { useEntryStore } from '@/features/entry/entry-store'
 import { CHAT_PERMISSION_ANSWER, chatTranscript } from '@/features/entry/chat-flow'
 import { emptyEntryDraft, materialBasis, type EntryDraft } from '@/lib/entry/draft'
@@ -237,6 +237,17 @@ describe('허락을 묻는 말 가르기', () => {
     '이거 올려도 돼요?',
     'Hello! May I give you my storyline first?',
     'I have a script already. Can I paste it here?',
+    // 허락 말 + 주는 말 + 줄거리 낱말이 한 문장에 있으면 사이에 my · a · the · 꾸밈말이 있어도 건다(리드 검토 11/14 보통 2).
+    'Can I share my two-page script?',
+    'Can I send my long story?',
+    'Is it okay to send the plot?',
+    'Could I give a synopsis?',
+    'Can I upload a story?',
+    'May I share an idea?',
+    'Can I paste a script?',
+    'Could I send my rough outline?',
+    'Is it alright to upload my plot?',
+    'May I give the storyline now?',
     // 존댓말로 말한 앞 문장은 이야기 속 말이 아니다(리드 검토 11/14 낮음 3) — 끝맺음이 "…다"인 말하기만 줄거리 속 말이다.
     '제가 먼저 말씀드렸어요. 줄거리를 줘도 될까요?',
     '시리즈를 만들고 싶다고 말했어요. 줄거리를 줘도 될까요?',
@@ -279,6 +290,14 @@ describe('허락을 묻는 말 가르기', () => {
     'A baker wonders: should I tell her the plot of the surprise party?',
     'Two rival chefs must share one kitchen for a night. Can I trust her? he wonders.',
     'Can I borrow your umbrella? the girl asks the stranger at the bus stop.',
+    // 주는 말이어도 받는 사람이 다른 사람이거나 줄거리 속 말이면 걸지 않는다(막이는 그대로).
+    'Can I send my long story to my teacher?',
+    'Can I share my script with the group?',
+    'Could I tell my mom the story?',
+    'Can I give him my script?',
+    'Can I send my friend a story?',
+    'Should I write a story about a lighthouse keeper?',
+    'Can I use a different script for the second scene?',
     // 줄거리 속 말(한국어) — 앞 문장이 "물었다 · 말했다 · 속삭였다"처럼 말하기로 끝나면 이야기 속 인물이 하는 말이다(리드 검토 11/14 낮음 3).
     '소년은 소녀에게 물었다. 내 이야기를 들려줘도 될까?',
     '노인이 천천히 말했다. 내 줄거리를 보내도 될까?',
@@ -456,7 +475,7 @@ describe('허락 물음 나누기', () => {
     // 물음 뒤에 쓴 말은 씨앗에 넣지 않는다(리드 검토 11/14 보통 1) — 설명은 물음 앞 글만이다.
     ['줄거리를 줘도 될까요? 감사합니다!', true, ''],
     ['시리즈를 만들고 싶어요. 줄거리를 줘도 될까요? 영상은 몇 분까지 되나요?', true, '시리즈를 만들고 싶어요.'],
-    ['Can I paste my script here? It is long, about 3 pages.', true, ''],
+    ['Can I paste my script here? Thanks in advance.', true, ''],
     ['Hello! Can I send you my script first? Thanks a lot.', true, ''],
     // 허락 문장 안에 쓴 이야기 · 설명도 남긴다(리드 검토 11/14 보통 2).
     ['고양이가 우주로 가는 이야기를 보내도 될까요?', true, '고양이가 우주로 가는 이야기'],
@@ -471,6 +490,17 @@ describe('허락 물음 나누기', () => {
     ['내 줄거리를 줘도 될까?', true, ''],
     ['직접 줄거리를 적어도 돼?', true, ''],
     ['Can I tell you about my idea?', true, ''],
+    // 꾸밈말 + 줄거리 낱말뿐이면 설명으로 남기지 않는다(리드 검토 11/14 낮음 2).
+    ['엄청 긴 이야기를 보내도 될까요?', true, ''],
+    ['재밌는 아이디어를 보내도 될까요?', true, ''],
+    ['제 소설 줄거리를 줘도 될까요?', true, ''],
+    ['짧은 줄거리를 보내도 괜찮을까요?', true, ''],
+    ['제 시리즈의 줄거리를 줘도 될까요?', true, ''],
+    ['무서운 귀신 이야기를 보내도 될까요?', true, '무서운 귀신 이야기'],
+    // 새로 걸리는 영어 허락 말의 설명(리드 검토 11/14 보통 2)
+    ['Can I tell the story of a fox and a crow?', true, 'of a fox and a crow'],
+    ['Can I share the plot of my script?', true, ''],
+    ['Can I share my two-page script?', true, ''],
     // 물음의 틀 낱말(here · instead · first …)은 설명 끝에 남기지 않는다.
     ['Can I paste my script for a five-episode series about bakers here?', true, 'about bakers'],
     ['Could I upload my outline - a drama about two chefs - instead?', true, 'a drama about two chefs'],
@@ -512,5 +542,92 @@ describe('허락 문장 안에 쓴 글의 길이', () => {
 
     expect(asksToShareStory(longInside)).toBe(false)
     expect(asksToShareStory('고양이가 우주로 가는 이야기를 보내도 될까요?')).toBe(true)
+  })
+})
+
+describe('허락 물음 뒤에 줄거리를 이미 쓴 글', () => {
+  // 왜: 앱이 "여기에 적어 주세요"로 답하고 이미 쓴 줄거리를 버리면 사용자는 그 줄거리를 다시 써야 한다(리드 검토 11/14 보통 1). 인사 · 고마움 말과 물음꼴 문장을 뺀 글이 남으면 줄거리를 준 것이다.
+  it.each([
+    ['May I give you my plot? A girl swaps bodies with her grandmother for one summer.', 'A girl swaps bodies with her grandmother for one summer.'],
+    ['줄거리를 줘도 될까요? 우주로 간 고양이가 열 년 만에 집으로 돌아오는 이야기예요.', '우주로 간 고양이가 열 년 만에 집으로 돌아오는 이야기예요.'],
+    ['Can I share my idea? A robot learns to paint after its owner goes blind.', 'A robot learns to paint after its owner goes blind.'],
+    ['시리즈를 만들고 싶은데, 줄거리를 줘도 될까요? 우주로 간 고양이가 열 년 만에 집으로 돌아오는 이야기예요.', '시리즈를 만들고 싶은데 우주로 간 고양이가 열 년 만에 집으로 돌아오는 이야기예요.'],
+    ['줄거리를 줘도 될까요? 우주로 간 고양이가 열 년 만에 집으로 돌아오는 이야기예요. 감사합니다!', '우주로 간 고양이가 열 년 만에 집으로 돌아오는 이야기예요.'],
+    ['Can I share my idea? A robot learns to paint after its owner goes blind. How long can it be?', 'A robot learns to paint after its owner goes blind.'],
+    ['Hi! Can I send you my script? Thanks! A baker finds a letter hidden inside a loaf of bread.', 'A baker finds a letter hidden inside a loaf of bread.'],
+  ])('%s → 물음을 빼고 그 줄거리로 시작한다', (text, story) => {
+    expect(storyWithoutPermissionAsk(text)).toBe(story)
+    expect(asksToShareStory(text)).toBe(false)
+  })
+
+  // 왜: 인사 · 고마움 말 · 물음꼴 문장 · 20자가 안 되는 짧은 말만 남으면 줄거리를 준 것이 아니다 — 지금처럼 허락 답이다.
+  it.each([
+    '줄거리를 줘도 될까요? 감사합니다!',
+    '줄거리를 줘도 될까요? 영상은 몇 분까지 되나요?',
+    '줄거리를 줘도 될까요? 네.',
+    'May I give you my plot? Thanks a lot.',
+    'Can I share my idea? How long can it be?',
+    'Can I share my idea? Thanks! Is there a length limit?',
+    '줄거리를 줘도 될까요?',
+  ])('%s → 물음 뒤에 줄거리가 없어 지금처럼 허락 답이다', (text) => {
+    expect(storyWithoutPermissionAsk(text)).toBeNull()
+    expect(asksToShareStory(text)).toBe(true)
+  })
+
+  it('허락 물음이 없는 글은 그대로 두고 줄거리를 이미 쓴 글로 보지 않는다', () => {
+    // 왜: 정상 경로 고정 — 물음이 없으면 건드릴 것이 없다.
+    expect(storyWithoutPermissionAsk(SEED)).toBeNull()
+    expect(storyWithoutPermissionAsk('')).toBeNull()
+  })
+})
+
+describe('허락 물음 뒤에 줄거리를 이미 쓴 첫 글', () => {
+  const STORY_AFTER = '줄거리를 줘도 될까요? 우주로 간 고양이가 열 년 만에 집으로 돌아오는 이야기예요.'
+  const STORY = '우주로 간 고양이가 열 년 만에 집으로 돌아오는 이야기예요.'
+
+  it('허락 물음 뒤에 줄거리를 이미 썼으면 묻지 않고 물음 문장만 빼고 그 줄거리로 시작한다', async () => {
+    // 왜: 줄거리를 이미 준 사람에게 "여기에 적어 주세요"라고 하며 쓴 글을 버리면 같은 글을 다시 써야 한다(리드 검토 11/14 보통 1).
+    setDraft({ ...emptyEntryDraft(), idea: STORY_AFTER })
+    routes['PATCH /api/produce/entry'] = (body) => {
+      const idea = (body as { patch?: { idea?: string } } | null)?.patch?.idea
+      if (typeof idea === 'string') savedForm = idea
+      return { body: { ok: true } }
+    }
+    routes['POST /api/produce/entry/recommend'] = () => ({ body: { draft: recommended({ ...useEntryStore.getState().draft, idea: savedForm }) } })
+
+    expect(await useEntryStore.getState().chatSendFirst()).toBe('ok')
+
+    const state = useEntryStore.getState()
+    expect(state.draft.idea).toBe(STORY)
+    expect(state.chat.asked ?? null).toBeNull()
+    expect(chatTranscript(state.draft, state.chat, ko).some((i) => i.id === 'permission-answer')).toBe(false)
+    expect(calls.some((c) => c.url.includes('/recommend'))).toBe(true)
+  })
+
+  it('화면에서 고르기 탭도 허락 물음 뒤에 줄거리를 이미 썼으면 안내 없이 물음 문장만 빼고 다음으로 간다', async () => {
+    // 왜: 두 탭이 같은 규칙이다.
+    setDraft({ ...emptyEntryDraft(), idea: `시리즈를 만들고 싶은데, ${STORY_AFTER}` })
+    routes['PATCH /api/produce/entry'] = (body) => {
+      const idea = (body as { patch?: { idea?: string } } | null)?.patch?.idea
+      if (typeof idea === 'string') savedForm = idea
+      return { body: { ok: true } }
+    }
+    routes['POST /api/produce/entry/recommend'] = () => ({ body: { draft: recommended({ ...useEntryStore.getState().draft, idea: savedForm }) } })
+
+    expect(await useEntryStore.getState().formNext()).toBe('ok')
+
+    const state = useEntryStore.getState()
+    expect(state.draft.idea).toBe(`시리즈를 만들고 싶은데 ${STORY}`)
+    expect(state.showShareAnswer).toBe(false)
+    expect(state.formStep).toBe(2)
+  })
+
+  it('허락 물음 뒤에 20자가 안 되는 짧은 말만 있으면 지금처럼 허락 답을 한다', async () => {
+    // 왜: 정상 경로 고정 — "네." 같은 말은 줄거리가 아니다.
+    setDraft({ ...emptyEntryDraft(), idea: '줄거리를 줘도 될까요? 네.' })
+
+    expect(await useEntryStore.getState().chatSendFirst()).toBe('asked')
+
+    expect(calls.some((c) => c.url.includes('/recommend'))).toBe(false)
   })
 })

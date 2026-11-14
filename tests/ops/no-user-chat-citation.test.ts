@@ -18,6 +18,7 @@ function sourceFiles(dir: string): string[] {
 describe('사용자 채팅 인용 금지', () => {
   it('코드 · 시험 · 주석 어디에도 바우처를 쓴 사람의 채팅을 출처로 적거나 인용하지 않는다', () => {
     // 왜: 실제 사용자의 글이 시험 이름(원장에도 찍힌다)이나 주석으로 남으면 그 사용자의 말이 저장소에 영구히 남는다 — 예문은 새로 짓고 출처는 "11/14 채팅 점검" 정도로만 적는다.
+    //   한계: 출처를 밝히는 낱말(바우처 + 사용자 · 계정 · 유저)만 잡는다 — 사용자가 친 글을 그대로 옮긴 예문은 이 시험이 못 잡는다(예문을 새로 짓는 것은 사람이 본다).
     const found: string[] = []
     for (const file of [...sourceFiles(join(ROOT, 'src')), ...sourceFiles(join(ROOT, 'tests'))]) {
       readFileSync(file, 'utf8').split('\n').forEach((line, index) => {
