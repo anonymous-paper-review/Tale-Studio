@@ -10,6 +10,7 @@ import { Loader2, Play, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { useT } from '@/lib/i18n'
+import { countText } from '@/lib/i18n/count-text'
 import { cn } from '@/lib/utils'
 import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
@@ -255,11 +256,12 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
   // 단추 값이 곧 동의인 자리 — 잔액을 못 읽어도 값을 보이고, 숨기는 것은 과금이 꺼졌을 때뿐이다(entry D8 과 같은 말, 리드 2026-11-14).
   const showCost = takeValuesShown(takeBalance)
   const count = takeCostForVideo(provider, resolution)
+  // 영어는 Take 가 1이면 단수 문장(리드 11/14 — "· 1 Take").
   const label = !current
-    ? (showCost ? t('Make the video · {count} Takes', { count }) : t('Make the video'))
+    ? (showCost ? countText(t, count, 'Make the video · 1 Take', 'Make the video · {count} Takes', { count }) : t('Make the video'))
     : imageChanged
-      ? (showCost ? t('Make a new Take with the changed image · {count} Takes', { count }) : t('Make a new Take with the changed image'))
-      : (showCost ? t('Make a new Take · {count} Takes', { count }) : t('Make a new Take'))
+      ? (showCost ? countText(t, count, 'Make a new Take with the changed image · 1 Take', 'Make a new Take with the changed image · {count} Takes', { count }) : t('Make a new Take with the changed image'))
+      : (showCost ? countText(t, count, 'Make a new Take · 1 Take', 'Make a new Take · {count} Takes', { count }) : t('Make a new Take'))
   const videoSeconds = clampDuration(VIDEO_MODELS[provider], data.durationSeconds)
   // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
   const imageBusy = hasImage && (imageGeneration.generating || data.storyboardImage?.status === 'pending')

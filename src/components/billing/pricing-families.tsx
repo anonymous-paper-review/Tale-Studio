@@ -10,6 +10,7 @@ import { useCheckout } from '@/lib/billing/use-checkout'
 import { isPurchasable } from '@/lib/billing/catalog'
 import { PRICING_FAMILIES, pricingOptions, pricingReturnPath, pricingSelectionFromSearch, type PricingFamily, type PricingOption, type PricingSelection } from '@/lib/billing/pricing-selection'
 import { useT } from '@/lib/i18n'
+import { countText } from '@/lib/i18n/count-text'
 import { cn } from '@/lib/utils'
 
 const FAMILY_COPY = {
@@ -92,7 +93,7 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
 
   const optionLabel = (value: PricingOption) => value.kind === 'plan'
     ? t('{n} min per project', { n: quantityOf(value) })
-    : t('{n} Takes', { n: quantityOf(value).toLocaleString('en-US') })
+    : countText(t, quantityOf(value), '1 Take', '{n} Takes', { n: quantityOf(value).toLocaleString('en-US') })
 
   return (
     <>
@@ -187,7 +188,7 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
                   </dl>
                 ) : (
                   <div className="min-h-36 space-y-4 text-sm">
-                    <p className="flex items-center gap-2"><Check className="size-4 text-primary" aria-hidden="true" />{t('{n} Takes', { n: option.item.takes.toLocaleString('en-US') })}</p>
+                    <p className="flex items-center gap-2"><Check className="size-4 text-primary" aria-hidden="true" />{countText(t, option.item.takes, '1 Take', '{n} Takes', { n: option.item.takes.toLocaleString('en-US') })}</p>
                     <p className="text-muted-foreground">{t('Valid for 12 months from purchase.')}</p>
                     <p className="text-muted-foreground">{t('One-time purchase. Your subscription does not change.')}</p>
                   </div>
@@ -201,7 +202,7 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
                   disabled={!checkoutEnabled || busy || !isPurchasable(option.item)}
                   onClick={() => void startCheckout({ kind: option.kind, id: option.item.id, returnTo: pricingReturnPath(option), onReady: handOff })}
                 >
-                  {!checkoutEnabled ? t('Payments are being prepared') : busy ? <><Loader2 className="size-4 animate-spin motion-reduce:animate-none" />{t('Preparing checkout…')}</> : !isPurchasable(option.item) ? t('Coming soon') : t(option.kind === 'plan' ? 'Continue with {plan}' : 'Buy {n} Takes', { plan: option.item.name, n: quantityOf(option).toLocaleString('en-US') })}
+                  {!checkoutEnabled ? t('Payments are being prepared') : busy ? <><Loader2 className="size-4 animate-spin motion-reduce:animate-none" />{t('Preparing checkout…')}</> : !isPurchasable(option.item) ? t('Coming soon') : option.kind === 'plan' ? t('Continue with {plan}', { plan: option.item.name }) : countText(t, quantityOf(option), 'Buy 1 Take', 'Buy {n} Takes', { n: quantityOf(option).toLocaleString('en-US') })}
                 </Button>
                 <p className="mt-2 text-center text-xs text-muted-foreground">{t(checkoutEnabled ? 'Pay in USD by card. Review the final total in Paddle.' : 'You can browse plans and Take packs. Purchases are not open yet.')}</p>
               </div>

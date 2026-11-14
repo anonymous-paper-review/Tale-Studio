@@ -1511,7 +1511,7 @@ async function confirmVideosLine(shotIds: readonly string[], locale: AppLocale, 
   const cost = (remake ? remakeTakeCosts(nodes, shotIds) : videoBatchTakeCosts(nodes, shotIds)).reduce((sum, n) => sum + n, 0)
   const free = takes.mode === 'off' && !takes.failed
   if (shotIds.length === 1) {
-    return free ? t('Shall I make the video for {shots}? Say yes to start.', { shots }) : t('Shall I make the video for {shots} ({takes} Takes)? Say yes to start.', { shots, takes: cost })
+    return free ? t('Shall I make the video for {shots}? Say yes to start.', { shots }) : countText(t, cost, 'Shall I make the video for {shots} (1 Take)? Say yes to start.', 'Shall I make the video for {shots} ({takes} Takes)? Say yes to start.', { shots, takes: cost })
   }
   return free
     ? t('Shall I make {count} videos for {shots}? Say yes to start.', { count: shotIds.length, shots })
@@ -1620,7 +1620,7 @@ async function heldWorkLines(held: HeldDirectorWork, locale: AppLocale, names: R
     const cost = [...videoBatchTakeCosts(nodes, videos), ...remakeTakeCosts(nodes, remakes)].reduce((sum, n) => sum + n, 0)
     lines.push(takes.mode === 'off' && !takes.failed
       ? shotsLine(locale, ids.length, 'Applying also makes the video for {shots} right away.', 'Applying also makes the videos for {shots} right away.', { shots: shots(ids) })
-      : shotsLine(locale, ids.length, 'Applying also makes the video for {shots} right away · {takes} Takes.', 'Applying also makes the videos for {shots} right away · {takes} Takes.', { shots: shots(ids), takes: cost }))
+      : shotsLine(locale, ids.length, cost === 1 ? 'Applying also makes the video for {shots} right away · 1 Take.' : 'Applying also makes the video for {shots} right away · {takes} Takes.', 'Applying also makes the videos for {shots} right away · {takes} Takes.', { shots: shots(ids), takes: cost }))
   }
   return lines
 }
@@ -1747,7 +1747,7 @@ async function startVideosFor(input: {
   }
   const startedLine = (ids: readonly string[], takesUsed: number) => (plan.mode === 'off'
     ? t('Started making videos for {shots}. Progress shows on the line above the cards.', { shots: shotsLabel(ids) })
-    : t('Started making videos for {shots} · {takes} Takes. Progress shows on the line above the cards.', { shots: shotsLabel(ids), takes: takesUsed }))
+    : countText(t, takesUsed, 'Started making videos for {shots} · 1 Take. Progress shows on the line above the cards.', 'Started making videos for {shots} · {takes} Takes. Progress shows on the line above the cards.', { shots: shotsLabel(ids), takes: takesUsed }))
   if (input.remake) {
     // 샷마다 같은 다시 만들기 하나(remakeShotVideo)로 보낸다. 내 영상 동시 한도에 걸리면 뒤 샷도 같은 한도에 걸리니 더 보내지 않는다.
     const started: string[] = []

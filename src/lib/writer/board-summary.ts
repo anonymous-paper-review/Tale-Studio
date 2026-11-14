@@ -188,7 +188,7 @@ export function directorConfirmView(summary: DirectorHandoffSummary, locale: App
       {
         label: translate(locale, 'After that'),
         value: extra.takesPerShot !== null
-          ? translate(locale, 'Check the images and make the videos · {takes} Takes per shot', { takes: extra.takesPerShot })
+          ? countText((key, params) => translate(locale, key, params), extra.takesPerShot, 'Check the images and make the videos · 1 Take per shot', 'Check the images and make the videos · {takes} Takes per shot', { takes: extra.takesPerShot })
           : translate(locale, 'Check the images and make the videos'),
       },
     ],
