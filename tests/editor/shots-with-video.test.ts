@@ -356,7 +356,8 @@ describe('저절로 빠지고 들어오는 샷 (검토 c, 2026-11-14)', () => {
     await save()
     db(['s1', 's2', 's3'], ['s1', 's2', 's3'])
     await open()
-    expect(mocks.toast.info).toHaveBeenCalledWith(translate('ko', 'New shots ({count}) came in, so the cuts and sounds after them moved.', { count: 1 }))
+    // 들어온 쪽 글은 검토 리드 규칙(11/14)으로 바뀜 — 옛 'New shots ({count}) came in, so the cuts and sounds after them moved.'
+    expect(mocks.toast.info).toHaveBeenCalledWith(translate('ko', 'New shots ({count}) came in, so the cuts after them and the clips, sounds and markers above them moved.', { count: 1 }))
   })
 
   it('최종 Take 가 바뀌면 다시 열 때 이어진 소리도 새 영상의 소리로 바뀐다 — 사람이 바꾼 소리 크기 · 음소거는 남는다', async () => {
@@ -441,8 +442,9 @@ describe('다른 장면으로 옮긴 샷 (재검토 c, 2026-11-14)', () => {
     expect(resets(fetchMock)).toEqual([])
   })
 
-  it('저장 뒤 Writer 에서 새로 생긴 샷이 들어와 자리가 바뀌어도 "샷 N개가 새로 들어와 뒤 컷과 소리를 옮겼어요"라고 알린다', async () => {
+  it('저장 뒤 Writer 에서 새로 생긴 샷이 들어와 자리가 바뀌어도 "샷 N개가 새로 들어와 뒤 컷과 그 위 클립 · 소리 · 마커를 옮겼어요"라고 알린다', async () => {
     // 왜: 재검토 c 2/2 — 알림이 "영상이 생긴 샷"이라고 했는데 Writer 에서 새로 생긴 샷도 섞여 있었다. 들어온 사실대로 말한다.
+    //   글은 검토 리드 규칙(11/14)으로 바뀜 — 옛 이름 '… "샷 N개가 새로 들어와 뒤 컷과 소리를 옮겼어요"라고 알린다'(그 위 클립 · 마커도 옮기니).
     db(['s1', 's2', 's3'], ['s1', 's2', 's3'], 1, { s3: { scene_id: 'scene-2' } })
     await open()
     await save()
@@ -451,7 +453,7 @@ describe('다른 장면으로 옮긴 샷 (재검토 c, 2026-11-14)', () => {
     await open()
     expect(timelineIds()).toEqual(['s1', 's2', 's4', 's3'])
     expect(mocks.toast.info).toHaveBeenCalledTimes(1)
-    expect(mocks.toast.info).toHaveBeenCalledWith('샷 1개가 새로 들어와 뒤 컷과 소리를 옮겼어요.')
+    expect(mocks.toast.info).toHaveBeenCalledWith('샷 1개가 새로 들어와 뒤 컷과 그 위 클립 · 소리 · 마커를 옮겼어요.')
   })
 })
 
@@ -537,5 +539,99 @@ describe('자유 배치에서 들어오는 샷 — 이야기 제자리에 넣고
     expect(upper()).toEqual([['Locked', 'v2', 9], ['Hidden', 'v3', 10]])
     expect(api().videoTracks.find((t) => t.id === 'v2')?.locked).toBe(true)
     expect(api().videoTracks.find((t) => t.id === 'v3')?.hidden).toBe(true)
+  })
+})
+
+describe('빠진 샷 · 빈 곳 위의 것 — 그 시각 아래 컷을 따른다 (검토 · 리드 규칙 11/14)', () => {
+  const save = () => saveEditorNow('project-8')
+  const upper = () =>
+    Object.entries(api().overlay)
+      .map(([id, p]) => [api().shots.find((s) => s.shotId === id)?.titleText?.text ?? id, p.trackId, p.startSec] as const)
+      .sort((a, b) => a[2] - b[2])
+  const v1 = () => selectTimelineLayout(api()).map((l) => [l.shotId, l.startSec])
+  const soundAt = (name: string) => api().audioClips.find((a) => a.name === name)?.startSec
+
+  /** s1 0 · s2 4 · s3 8 위에 제목 둘(V2 5초 · V3 6초) · 마커 둘(5 · 6.5초) · 사람이 놓은 소리(A2 5초)를 두고 저장한다. */
+  async function editOverS2() {
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'])
+    await open()
+    api().addTitleClip('v2', 5, 'V2 over s2')
+    api().addTitleClip('v3', 6, 'V3 over s2')
+    api().seek(5)
+    api().addMarker()
+    api().seek(6.5)
+    api().addMarker()
+    api().addAudioClip({ name: 'door.wav', url: 'https://audio.test/door.wav', startSec: 5, durationSec: 1, trackId: 'atrack_2', linkedShotId: null })
+    await save()
+  }
+
+  it('빈 곳이 남게 샷 영상이 없어지면 그 위의 제목 · 마커 · 사람이 놓은 소리는 제자리에 있다', async () => {
+    // 왜: 검토(11/14) — s2 영상이 없어지면 그 위 제목 둘이 앞 컷 끝(4초)으로 접히고 마커 둘은 [4] 하나로 합쳐졌다. 2판은 영상이 없어진 샷 자리가
+    //   빈 곳으로 남고 뒤 컷도 그대로라 그 위의 것도 그대로여야 한다(리드 규칙). Director 에서 Take 를 지우고 Editor 로 돌아올 때.
+    await editOverS2()
+    db(['s1', 's2', 's3'], ['s1', 's3'])
+    mocks.toast.info.mockClear()
+    await open()
+    expect(v1()).toEqual([['s1', 0], ['s3', 8]])
+    expect(upper()).toEqual([['V2 over s2', 'v2', 5], ['V3 over s2', 'v3', 6]])
+    expect(api().markers).toEqual([5, 6.5])
+    expect(soundAt('door.wav')).toBe(5)
+    // 아무것도 옮기지 않았으니 알림도 없다.
+    expect(mocks.toast.info).not.toHaveBeenCalled()
+  })
+
+  it('빈 곳에 다시 생긴 샷 위의 제목 · 마커 · 사람이 놓은 소리는 원래 자리 그대로 그 샷 위에 남는다', async () => {
+    // 왜: 검토(11/14) — 접힌 것은 s2 가 다시 생겨도 돌아오지 않았다. 빈 곳 위의 것은 빈 곳 뒤 컷(s3)을 따르고 s3 는 그대로라 제자리다(리드 규칙).
+    await editOverS2()
+    db(['s1', 's2', 's3'], ['s1', 's3'])
+    await open()
+    await save()
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'], 2)
+    await open()
+    expect(v1()).toEqual([['s1', 0], ['s2', 4], ['s3', 8]])
+    expect(upper()).toEqual([['V2 over s2', 'v2', 5], ['V3 over s2', 'v3', 6]])
+    expect(api().markers).toEqual([5, 6.5])
+    expect(soundAt('door.wav')).toBe(5)
+  })
+
+  /** s1 0 · s3 4 · 빈 곳 8–14 · s4 14 를 만든다(s2 는 아직 영상이 없다). */
+  async function gapBeforeS4() {
+    db(['s1', 's2', 's3', 's4'], ['s1', 's3', 's4'])
+    await open()
+    api().placeClipAt('s4', 14)
+    expect(v1()).toEqual([['s1', 0], ['s3', 4], ['s4', 14]])
+  }
+
+  it('들어온 샷이 민 컷 뒤 빈 곳 위의 제목 · 마커는 다음 컷을 넘지 않고 차례가 그대로다', async () => {
+    // 왜: 검토(11/14) — 빈 곳 위의 것이 앞 컷(s3)을 따라 4초 밀려 빈 곳 제목 15.5→16.5 · 마커 11→15 로 s4 위의 것을 넘어갔다. 빈 곳이 밀림을
+    //   받아내면 빈 곳 위의 것은 빈 곳 뒤 컷(s4)이 밀린 만큼만 옮긴다(리드 규칙).
+    await gapBeforeS4()
+    api().addTitleClip('v2', 11.5, 'In gap')
+    api().addTitleClip('v2', 14.5, 'Over s4')
+    api().seek(11)
+    api().addMarker()
+    api().seek(14.5)
+    api().addMarker()
+    await save()
+    db(['s1', 's2', 's3', 's4'], ['s1', 's2', 's3', 's4'])
+    useLocaleStore.setState({ locale: 'ko' })
+    await open()
+    // s2(4초)가 s1 뒤에 들어와 s3 는 4초 밀리고, 빈 곳 8–14 가 그 4초를 받아내 s4 는 그대로다.
+    expect(v1()).toEqual([['s1', 0], ['s2', 4], ['s3', 8], ['s4', 14]])
+    expect(upper()).toEqual([['In gap', 'v2', 11.5], ['Over s4', 'v2', 14.5]])
+    expect(api().markers).toEqual([11, 14.5])
+    expect(mocks.toast.info).toHaveBeenCalledWith('샷 1개가 새로 들어와 뒤 컷과 그 위 클립 · 소리 · 마커를 옮겼어요.')
+  })
+
+  it('들어온 샷 때문에 위 줄 클립이 서로 겹치게 되면 원래 차례대로 뒤 클립을 민다', async () => {
+    // 왜: 리드 규칙(11/14) "겹침을 풀 때도 원래 차례를 지킨다" — s3 끝 위 제목은 s3 를 따라 4초, 빈 곳 제목은 s4 를 따라 그대로라 서로 겹친다.
+    //   옮긴 자리 차례로 풀면 빈 곳 제목이 앞으로 와 차례가 뒤집힌다.
+    await gapBeforeS4()
+    api().addTitleClip('v2', 7.5, 'Over s3 end')
+    api().addTitleClip('v2', 9.6, 'In gap')
+    await save()
+    db(['s1', 's2', 's3', 's4'], ['s1', 's2', 's3', 's4'])
+    await open()
+    expect(upper()).toEqual([['Over s3 end', 'v2', 11.5], ['In gap', 'v2', 13.5]])
   })
 })

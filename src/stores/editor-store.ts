@@ -25,6 +25,7 @@ import { timelineEnd } from '@/lib/editor/timeline-segments'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
+import { autoMoveNotice } from '@/lib/editor/auto-move'
 import { nearestEditPoint } from '@/lib/editor/timeline-segments'
 import { TRANSITION_DEFAULT_SEC, cleanTransition, crossSourceSec, dipOpacityAt, dissolveOpacityAt, edgeFadeAt, edgeTransition, joinedNeighbor, transitionWindows, type TransitionEdge, type TransitionWindow } from '@/lib/editor/transition'
 import { VIDEO_EFFECT_DEFAULT, patchEffects, type VideoEffectKind, type VideoEffectPatch } from '@/lib/editor/video-effects'
@@ -865,15 +866,17 @@ function withLayout(state: EditorState, changes: Partial<EditorState>, desired: 
 
 /**
  * V1 밖 줄에서 겹치는 클립을 민다 — 줄마다 시작 초 순서로 앞 클립 끝보다 앞이면 그 끝으로(같은 줄의 클립은 겹치지 않는다, V1 과 같은
- *   규칙). 시작 초가 같으면 first(방금 놓은 클립)가 앞이다(2단계 ②).
+ *   규칙). 시작 초가 같으면 first(방금 놓은 클립)가 앞이다(2단계 ②). order 를 주면 그 초(옮기기 전 자리) 차례로 푼다 — 저절로 옮긴 뒤
+ *   겹침을 풀 때도 원래 차례를 지킨다(검토 리드 규칙 11/14).
  */
-function resolveOverlay(input: TimelineInput, overlay: OverlayPlacements, first?: string): OverlayPlacements {
+function resolveOverlay(input: TimelineInput, overlay: OverlayPlacements, first?: string, order?: ReadonlyMap<string, number>): OverlayPlacements {
   const items = selectOverlayLayout({ ...input, overlay })
   const out: OverlayPlacements = { ...overlay }
   const byTrack = new Map<string, TrackLayoutItem[]>()
   for (const item of items) byTrack.set(item.trackId, [...(byTrack.get(item.trackId) ?? []), item])
+  const rank = (item: TrackLayoutItem) => order?.get(item.shotId) ?? item.startSec
   for (const list of byTrack.values()) {
-    list.sort((a, b) => a.startSec - b.startSec || (a.shotId === first ? -1 : b.shotId === first ? 1 : 0))
+    list.sort((a, b) => rank(a) - rank(b) || a.startSec - b.startSec || (a.shotId === first ? -1 : b.shotId === first ? 1 : 0))
     let cursor = 0
     for (const item of list) {
       const start = round3(Math.max(cursor, item.startSec))
@@ -1230,27 +1233,40 @@ function freshClip(clip: VideoClip): VideoClip {
 }
 
 /**
- * 사람이 보던 타임라인의 한 시각이 자리가 저절로 바뀐 뒤 어디가 되는가 — 그 시각을 품은(또는 그 앞에서 가장 가까운) 클립이 움직인 만큼.
- *   빠진 칸 안의 시각은 그 칸이 있던 자리(앞에 남은 클립 끝)로 접힌다. 사람이 놓은 소리를 영상과 같이 옮길 때 쓴다(검토 c, 2026-11-14).
+ * 사람이 보던 타임라인의 한 시각이 자리가 저절로 바뀐 뒤 어디가 되는가 — 위 줄 클립 · 마커 · 사람이 놓은 소리를 영상과 같이 옮길 때 쓴다
+ *   (오너 답 (가) "뒤를 모두 밀어줘" · 검토 리드 규칙 11/14).
+ *   - 그 시각 아래 V1 컷이 남아 있으면 그 컷이 밀린 만큼.
+ *   - 빈 곳 위(영상이 없어져 빠진 컷 자리도 빈 곳으로 본다)면 빈 곳 뒤 컷(다음 컷)이 밀린 만큼 — 다음 컷을 넘지 않는다. 그래서 빈 곳이 남는
+ *     2판에서 영상이 없어진 샷 위의 것은 제자리이고, 그 빈 곳에 샷이 다시 생겨도 제자리(그 샷 위)다.
+ *   - 마지막 컷 뒤면 앞 컷이 밀린 만큼. 남은 컷이 하나도 없으면 그대로. 0초 앞으로는 가지 않는다.
+ *   약속: tests/editor/shots-with-video.test.ts
  */
 function movedTime(
   sec: number,
   shown: ReadonlyArray<{ shotId: string; startSec: number; durationSec: number }>,
   now: ReadonlyMap<string, { startSec: number; durationSec: number }>,
 ): number {
-  let anchor = -1
-  for (let i = 0; i < shown.length; i++) {
-    if (shown[i].startSec <= sec + 0.0005) anchor = i
-    else break
+  const EPS = 0.0005
+  let prevShift: number | null = null
+  let nextShift: number | null = null
+  for (const item of shown) {
+    const placed = now.get(item.shotId)
+    const shift = placed ? placed.startSec - item.startSec : null
+    if (item.startSec <= sec + EPS && sec < item.startSec + item.durationSec - EPS) {
+      // 그 시각 아래 컷 — 남아 있으면 그 컷을 따르고, 빠졌으면 빈 곳처럼 다음 남은 컷을 찾는다.
+      if (shift !== null) return Math.max(0, round3(sec + shift))
+      continue
+    }
+    if (item.startSec > sec + EPS) {
+      if (shift !== null) {
+        nextShift = shift
+        break
+      }
+      continue
+    }
+    if (shift !== null) prevShift = shift
   }
-  if (anchor < 0) return sec
-  const placed = now.get(shown[anchor].shotId)
-  if (placed) return round3(sec + placed.startSec - shown[anchor].startSec)
-  for (let i = anchor - 1; i >= 0; i--) {
-    const kept = now.get(shown[i].shotId)
-    if (kept) return round3(kept.startSec + kept.durationSec)
-  }
-  return 0
+  return Math.max(0, round3(sec + (nextShift ?? prevShift ?? 0)))
 }
 
 /** 샷 구간 · 빠르기를 서버(DB)에서 처음으로 되돌린다(보내고 잊음) — 영상이 새로 생겨 들어온 샷(검토 c, 2026-11-14). */
@@ -2033,20 +2049,20 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       const nowLayout = new Map(selectTimelineLayout({ shots: timelineShots, videoClips: timelineClips, clipOrder }).map((l) => [l.shotId, l]))
       const takenOut = new Set(shownLayout.filter((l) => !nowLayout.has(l.shotId) && !isDrawnClipShotId(l.shotId)).map((l) => rootShotIdOf(l.shotId)))
       const autoMoved = takenOut.size > 0 || entered.length > 0
-      // 이야기 제자리에 넣고 뒤를 모두 민다(오너 답 (가), 2026-11-14): 자리가 저절로 바뀌면 그 자리 뒤에서 시작하는 V2 · V3 클립(제목 포함,
-      //   잠근 줄 · 눈 끈 줄도)과 마커도 V1 이 실제로 밀린 만큼 옮긴다 — 사람이 놓은 소리(아래)와 같은 셈. 그 자리 전부터 놓인 것은 그대로다.
-      //   옮겨서 같은 줄 클립이 겹치면 뒤 클립을 민다. 약속: tests/editor/shots-with-video.test.ts
+      // 이야기 제자리에 넣고 뒤를 모두 민다(오너 답 (가), 2026-11-14): 자리가 저절로 바뀌면 V2 · V3 클립(제목 포함, 잠근 줄 · 눈 끈 줄도)과
+      //   마커도 사람이 놓은 소리(아래)와 같은 셈(movedTime — 그 시각 아래 컷, 빈 곳이면 다음 컷이 밀린 만큼)으로 옮긴다. 옮겨서 같은 줄 클립이
+      //   겹치면 원래 차례대로 뒤 클립을 민다 · 마커는 합치지 않는다(검토 리드 규칙 11/14). 약속: tests/editor/shots-with-video.test.ts
       let overlay = restoredOverlay
       if (autoMoved) {
         const movedOverlay: OverlayPlacements = {}
         for (const [id, p] of Object.entries(restoredOverlay)) movedOverlay[id] = { trackId: p.trackId, startSec: movedTime(p.startSec, shownLayout, nowLayout) }
         if (Object.entries(movedOverlay).some(([id, p]) => Math.abs(p.startSec - restoredOverlay[id].startSec) > 0.0005)) {
-          overlay = resolveOverlay({ shots: timelineShots, videoClips: timelineClips, clipOrder }, movedOverlay)
+          const originalOrder = new Map(Object.entries(restoredOverlay).map(([id, p]) => [id, p.startSec]))
+          overlay = resolveOverlay({ shots: timelineShots, videoClips: timelineClips, clipOrder }, movedOverlay, undefined, originalOrder)
         }
       }
-      const markers = autoMoved
-        ? cleanMarkers(cleanMarkers(saved.markers).map((m) => movedTime(m, shownLayout, nowLayout)))
-        : cleanMarkers(saved.markers)
+      const shownMarkers = cleanMarkers(saved.markers)
+      const markers = autoMoved ? shownMarkers.map((m) => movedTime(m, shownLayout, nowLayout)).sort((a, b) => a - b) : shownMarkers
       // 이음 칸이 없는 예전 저장본은 지금 영상 자리 · 처음 나눈 자리와 맞는 소리를 다시 잇고, 이어진 소리는 되살린 영상 자리에 맞춘다(결정 4).
       //   같은 소리 파일의 파형은 저장본에 한 번만 있다 — 빠진 조각은 같은 파일의 파형을 함께 쓴다(검토 b).
       const timeline = { shots: timelineShots, videoClips: timelineClips, clipOrder, overlay }
@@ -2091,24 +2107,25 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         }
         if (added.length) audioClips = syncLinkedAudio({ ...timeline, audioClips: [...audioClips, ...added] })
       }
-      // 자리가 저절로 바뀌었으면 열 때 한 번 알린다 — 사람이 하지 않은 일로 뒤 컷 · 소리가 옮겨졌다(검토 c).
-      const moved =
-        shownLayout.some((l) => {
-          const now = nowLayout.get(l.shotId)
-          return !!now && Math.abs(now.startSec - l.startSec) > 0.0005
-        }) || shifted.some((a, i) => a !== retargeted[i] && Math.abs(a.startSec - retargeted[i].startSec) > 0.0005)
-      if (moved) {
-        const locale = useLocaleStore.getState().locale
-        const out = takenOut.size
-        const came = entered.length
-        toast.info(
-          out && came
-            ? translate(locale, 'Shots without video ({removed}) were taken out and new shots ({added}) came in, so the cuts and sounds after them moved.', { removed: out, added: came })
-            : out
-              ? translate(locale, 'Shots without video ({count}) were taken out, so the cuts and sounds after them moved.', { count: out })
-              : translate(locale, 'New shots ({count}) came in, so the cuts and sounds after them moved.', { count: came }),
-        )
-      }
+      // 자리가 저절로 바뀌었으면 열 때 한 번 알린다 — 사람이 하지 않은 일로 뒤 컷 · 그 위 클립 · 소리 · 마커가 옮겨졌다(검토 c · 검토 리드
+      //   규칙 11/14: V1 이 그대로여도 위 줄 · 마커가 옮겨졌으면 알린다). 약속: tests/editor/auto-move-notice.test.ts
+      const soundStarts = (clips: readonly AudioTrackClip[]) => new Map(clips.filter((a) => !a.linkedShotId).map((a) => [a.id, a.startSec]))
+      const notice = autoMoveNotice(
+        {
+          cuts: new Map(shownLayout.map((l) => [l.shotId, l.startSec])),
+          upper: new Map(Object.entries(restoredOverlay).map(([id, p]) => [id, p.startSec])),
+          markers: shownMarkers,
+          sounds: soundStarts(retargeted),
+        },
+        {
+          cuts: new Map([...nowLayout].map(([id, l]) => [id, l.startSec])),
+          upper: new Map(Object.entries(overlay).map(([id, p]) => [id, p.startSec])),
+          markers,
+          sounds: soundStarts(shifted),
+        },
+        { removed: takenOut.size, added: entered.length },
+      )
+      if (notice) toast.info(translate(useLocaleStore.getState().locale, notice.key, notice.params))
       // 영상이 새로 생겨 들어온 샷의 옛 구간 · 빠르기는 서버(DB)에서도 처음으로 — 다음에 열 때 옛 구간이 다시 입혀지지 않게.
       for (const id of arrived) {
         const before = cur.videoClips.find((c) => c.shotId === id)
