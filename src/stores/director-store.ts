@@ -6015,8 +6015,11 @@ export function serializeDirectorCanvasContext(
   state: Pick<DirectorCanvasState, 'nodes' | 'edges' | 'selectedNodeId'>,
   /** 보드 이름표 — 씬 · 샷에 보드 이름("Scene 2 · Shot 8")을 붙인다(오너 2026-11-02 "전체 번호로 통일"). Writer 스토어는 부르는 쪽이 읽는다. */
   boardNames?: BoardNodeNames | null,
+  /** 샷마다 이미지(있음 · 그리는 중 · 없음) — 샷 줄에 붙인다(Lumi 가 이미지 없는 샷의 영상을 약속하지 않게, 리드 11/14 B3). 판정은 부르는 쪽(보드와 같은 근거). */
+  shotImages?: ReadonlyMap<string, 'ready' | 'drawing' | 'missing'> | null,
 ): string {
   const { nodes, edges, selectedNodeId } = state
+  const imageWord = (id: string) => ({ ready: 'image ready', drawing: 'image being made', missing: 'no image' } as const)[shotImages?.get(id) ?? 'missing']
   const boardSuffix = (data: Parameters<typeof directorBoardLabel>[0]) => {
     const name = directorBoardLabel(data, boardNames)
     return name ? ` (board: ${name})` : ''
@@ -6072,8 +6075,9 @@ export function serializeDirectorCanvasContext(
           imageInputs.length > 0
             ? `, image refs: ${imageInputs.join(',')}`
             : ''
+        const imageMark = shotImages ? `, ${imageWord(sh.id)}` : ''
         lines.push(
-          `  - [${sh.id}] Shot "${shData.label}"${boardSuffix(shData)} (camera ${camActive}/6 active, light ${shData.lighting.position}, ${shData.provider}${imageSuffix})${shData.stale ? ' [stale]' : ''}: ${promptSnippet || '(빈 prompt)'}`,
+          `  - [${sh.id}] Shot "${shData.label}"${boardSuffix(shData)} (camera ${camActive}/6 active, light ${shData.lighting.position}, ${shData.provider}${imageMark}${imageSuffix})${shData.stale ? ' [stale]' : ''}: ${promptSnippet || '(빈 prompt)'}`,
         )
         const childVideos = nodes.filter(
           (n) => isVideoData(n.data) && n.data.parentShotNodeId === sh.id,
@@ -6115,7 +6119,7 @@ export function serializeDirectorCanvasContext(
           imageInputs.length > 0
             ? ` (image refs: ${imageInputs.join(',')})`
             : ''
-        lines.push(`  - [${sh.id}] Shot "${sh.data.label}"${boardSuffix(sh.data)}${imageSuffix}`)
+        lines.push(`  - [${sh.id}] Shot "${sh.data.label}"${boardSuffix(sh.data)}${shotImages ? ` (${imageWord(sh.id)})` : ''}${imageSuffix}`)
       })
     }
     const standaloneVideos = videos.filter(

@@ -1140,21 +1140,27 @@ describe('Lumi 말과 앱 줄(영어 재점검 B3 · B4)', () => {
   it('Director 채팅이 Lumi 에게 보내는 보드 맥락에는 샷마다 이미지가 있는지(있음 · 그리는 중 · 없음)가 실린다 — 그리는 중은 보드처럼 이미지 일괄이 맡은 샷도', async () => {
     const fetchMock = vi.fn(async () => Response.json({ reply: 'Okay.', updates: [] }))
     vi.stubGlobal('fetch', fetchMock)
-    director.setState({ nodes: [shot('s1', IMG('s1')), shot('s2', DRAWING), shot('s3'), shot('s4', IMG('s4')), failedTake('v4', 's4')] })
+    // 보드처럼 씬 아래 샷 넷 — 맥락의 노드 트리에 샷 줄이 실린다.
+    const scene = { id: 'scn1', type: 'scene', position: { x: 0, y: 0 }, data: { kind: 'scene', label: 'sc1', writerSceneId: 'sc1', location: '', timeOfDay: '', mood: '', description: '' } } as unknown as DirectorNode
+    const inScene = (node: DirectorNode) => ({ ...node, data: { ...node.data, parentSceneNodeId: 'scn1' } }) as unknown as DirectorNode
+    director.setState({ nodes: [scene, ...[shot('s1', IMG('s1')), shot('s2', DRAWING), shot('s3'), shot('s4', IMG('s4'))].map(inScene), failedTake('v4', 's4')] })
     await chat.getState().sendMessage('How are the shots?')
+    const shotLine = (text: string, id: string) => text.split('\n').find((line) => line.includes(`[${id}] Shot `)) ?? ''
     let context = contextSent(fetchMock)
-    expect(context).toContain('### Shot images')
-    expect(context).toContain('- [s1] Shot 1: image ready')
-    expect(context).toContain('- [s2] Shot 2: image being made')
-    expect(context).toContain('- [s3] Shot 3: no image')
-    expect(context).toContain('- [s4] Shot 4: image ready')
+    expect(shotLine(context, 's1')).toContain(', image ready)')
+    expect(shotLine(context, 's2')).toContain(', image being made)')
+    expect(shotLine(context, 's3')).toContain(', no image)')
+    expect(shotLine(context, 's4')).toContain(', image ready)')
+    // 노드 트리의 샷 줄에 붙인다 — 샷마다 따로 줄을 두지 않아 노드 id 는 한 번만 싣는다(검토 a: 맥락 크기). 규칙이 가리키는 머리는 한 번.
+    expect(context.split('[s1]').length - 1).toBe(1)
+    expect(context.split('### Shot images').length - 1).toBe(1)
     // 이미지 일괄이 맡아 차례를 기다리는 샷도 그리는 중이다(보드와 같다).
     writer.setState({ shots: ['s1', 's2', 's3', 's4'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1', roughStoryboard: { status: 'completed', url: `https://media.test/rough-${id}.png` } })) as never })
     director.setState({ realBatchBusy: true, realBatchCancelled: false, realBatchShotIds: ['w-s3'] })
     fetchMock.mockClear()
     await chat.getState().sendMessage('How are the shots now?')
     context = contextSent(fetchMock)
-    expect(context).toContain('- [s3] Shot 3: image being made')
+    expect(shotLine(context, 's3')).toContain(', image being made)')
   })
 
   // 왜: 영어 재점검 B4 — 이미지 없는 샷이 둘이면 "The video for Shots 3 · 4 needs an image first."로 단수였다. 같은 꼴 줄(그리는 중 · 만드는 중 · 글 카드)도 같다.
