@@ -7,6 +7,7 @@ import { create } from 'zustand'
 import { translate } from '@/lib/i18n/translate'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { emptyEntryDraft, fileHasText, normalizeEntryDraft, recIsCurrent, type EntryDraft } from '@/lib/entry/draft'
+import { seedWithPrefix, splitPermissionAsk, storyWithoutPermissionAsk, withoutPermissionAsk } from '@/lib/entry/permission-ask'
 import type { EntryWriterStartBody } from '@/lib/entry/start-plan'
 import { useLocaleStore } from '@/stores/locale-store'
 import { settleProjectRename, useProjectStore } from '@/stores/project-store'
@@ -46,7 +47,7 @@ const IDEA_SAVE_DEBOUNCE_MS = 600
 const READ_STEP_MS = 1400
 const WRITER_POLL_MS = 2500
 
-export type NextResult = 'ok' | 'too_short' | 'no_text' | 'error' | 'busy' | 'examples'
+export type NextResult = 'ok' | 'too_short' | 'no_text' | 'error' | 'busy' | 'examples' | 'asked'
 
 export interface WriterInfo {
   started: boolean
@@ -94,6 +95,10 @@ interface EntryData {
   formStep: 1 | 2
   /** 20자 규칙을 어기고 다음을 눌렀다(글이 길어지면 화면이 알아서 안내를 감춘다). */
   showLengthError: boolean
+  /** 화면에서 고르기: 글이 "줄거리를 줘도 될까?"처럼 허락을 묻는 말이라 다음으로 가지 않았다(글이 바뀌면 화면이 알아서 안내를 감춘다, 오너 2026-11-14 A ①). */
+  showShareAnswer: boolean
+  /** 그 안내를 보였을 때의 글 — 안내를 본 뒤 글을 고쳐 다시 [다음]을 누르면 물음에 답한 것으로 본다. */
+  shareAskedText: string | null
   chat: ChatUi
   upload: { status: 'idle' | 'uploading' | 'error'; error: UploadError | null; name: string | null }
   /** AI가 글을 읽고 추천을 만드는 중(잠금 화면). */
@@ -154,6 +159,8 @@ function initialData(): EntryData {
     writerStart: null,
     formStep: 1,
     showLengthError: false,
+    showShareAnswer: false,
+    shareAskedText: null,
     chat: { ...EMPTY_CHAT_UI },
     upload: { status: 'idle', error: null, name: null },
     reading: null,
@@ -284,6 +291,20 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
     const pending = pendingIdea
     pendingIdea = null
     if (pending) void enqueue(() => patchDraft(pending.projectId, { idea: pending.idea }))
+  }
+
+  /**
+   * 들고 있는 설명(chat.seedPrefix — 허락 물음 앞 · 뒤에 쓴 글)을 이번에 보낸 말 앞에 붙여 이야기 씨앗으로 만든다(리드 2026-11-14 최종 규칙).
+   * 이번에 보낸 말이 "네 · 그게 다예요"처럼 짧은 확인 말뿐이면 그 말은 빼고 설명만이다. 길이 검사는 이 합친 글로 먼저 끝낸 뒤에 부른다(seedWithPrefix).
+   * 서버는 저장된 초안의 글을 읽어 추천하므로 합친 글을 먼저 저장한다.
+   */
+  const mergeSeedPrefix = async () => {
+    const prefix = get().chat.seedPrefix?.trim()
+    if (!prefix) return
+    set({ chat: { ...get().chat, seedPrefix: null } })
+    const typed = get().draft.idea.trim()
+    get().setIdea(typed ? seedWithPrefix(prefix, typed, IDEA_MAX_CHARS) : prefix)
+    await get().flushIdea()
   }
 
   const stopReadTicker = () => {
@@ -483,14 +504,43 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
     formNext: async () => {
       if (get().reading || locked()) return 'busy'
       await get().flushIdea()
-      const draft = get().draft
+      let draft = get().draft
+      // 허락 문장 밖의 글이 120자를 넘으면 이야기를 이미 적은 것이다 — 묻지 않고 물음 문장만 빼고 그 글로 이어 간다(리드 11/14 최종 규칙).
+      const direct = draft.file ? null : storyWithoutPermissionAsk(draft.idea)
+      if (direct !== null) {
+        get().setIdea(direct)
+        await get().flushIdea()
+        draft = get().draft
+      } else {
+        // 120자 이하의 허락 물음은 뒤에 줄거리든 사정 말이든 무엇이 와도 먼저 허락 답을 한다 — 다음으로 가지 않고 "여기에 적어 주세요"를 보인다(글은 그대로, 길이 검사보다 먼저).
+        //   안내를 본 뒤 글을 고쳐 다시 눌렀으면 물음에 답한 것이다 — 이어 적은 글이 길어도(120자 가름은 첫 글만) 물음의 틀만 덜어 내고 이어 간다.
+        //   고치지 않고 다시 눌렀으면 채팅 탭의 "그게 다예요"와 같다 — 설명(허락 문장 밖의 글)이 20자 이상이면 그 설명으로 이어 가고, 아니면 안내를 다시 보인다.
+        const shownFor = get().shareAskedText
+        const answeredAfterHint = shownFor !== null && shownFor !== draft.idea
+        const ask = draft.file ? null : splitPermissionAsk(draft.idea, answeredAfterHint ? { ignoreLength: true } : undefined)
+        if (ask?.asking) {
+          if (answeredAfterHint) {
+            get().setIdea(withoutPermissionAsk(draft.idea))
+          } else if (shownFor !== null && !materialProblem(ask.preface, null)) {
+            get().setIdea(ask.preface)
+          } else {
+            set({ showShareAnswer: true, shareAskedText: draft.idea, showLengthError: false })
+            return 'asked'
+          }
+          await get().flushIdea()
+          draft = get().draft
+        }
+      }
+      set({ showShareAnswer: false, shareAskedText: null })
       if (draft.file?.noText) return 'no_text'
-      if (materialProblem(draft.idea, draft.file)) {
+      // 길이는 합친 글(들고 있는 설명 + 이 글)로 잰다.
+      if (materialProblem(seedWithPrefix(get().chat.seedPrefix, draft.idea), draft.file)) {
         set({ showLengthError: true })
         return 'too_short'
       }
       set({ showLengthError: false })
-      if (recIsCurrent(draft)) {
+      await mergeSeedPrefix()
+      if (recIsCurrent(get().draft)) {
         set({ formStep: 2 })
         return 'ok'
       }
@@ -512,20 +562,41 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
     chatSendFirst: async () => {
       if (get().reading || locked()) return 'busy'
       await get().flushIdea()
-      const draft = get().draft
+      let draft = get().draft
       if (!draft.file && isExampleRequest(draft.idea)) {
         set({ chat: { ...get().chat, showExamples: true, lengthError: false } })
         get().setIdea('')
         await get().flushIdea()
         return 'examples'
       }
+      // 이야기를 내도 되는지 허락을 묻는 첫 글(2026-11-14 오너 A ①) — 이야기로 시작하지 않고 앱이 먼저 "여기에 적어 주세요"로 답한다.
+      //   물음은 대화에 사용자 말로 남고 입력칸은 비운다. 길이 검사보다 먼저라 짧은 "줘도 될까?"도 이 답을 받는다.
+      //   120자 이하의 허락 물음은 뒤에 줄거리든 사정 말이든 덧말이든 늘 먼저 이 답을 한다(리드 11/14 최종 규칙). 허락 물음 앞 · 뒤에 적은 설명은 버리지 않는다 —
+      //   인사 · 고마움 말 · 짧은 확인 말 · 물음꼴 문장만 빼고 따로 들고 있다가, 그 뒤에 보낸 말 앞에 붙여 이야기 씨앗을 만든다.
+      //   허락 문장 밖의 글이 120자를 넘으면 이야기를 이미 적은 것이라 묻지 않고 물음 문장만 빼고 그 글로 바로 시작한다.
+      const direct = draft.file ? null : storyWithoutPermissionAsk(draft.idea)
+      if (direct !== null) {
+        get().setIdea(direct)
+        await get().flushIdea()
+        draft = get().draft
+      }
+      const ask = draft.file || direct !== null ? null : splitPermissionAsk(draft.idea)
+      if (ask?.asking) {
+        const seedPrefix = [get().chat.seedPrefix?.trim(), ask.preface].filter(Boolean).join('\n\n') || null
+        set({ chat: { ...get().chat, asked: draft.idea.trim(), seedPrefix, lengthError: false } })
+        get().setIdea('')
+        await get().flushIdea()
+        return 'asked'
+      }
       if (draft.file?.noText) return 'no_text'
-      if (materialProblem(draft.idea, draft.file)) {
+      // 길이는 합친 글(들고 있는 설명 + 이번에 보낸 말)로 잰다 — "네"만 보냈으면 설명만으로 잰다.
+      if (materialProblem(seedWithPrefix(get().chat.seedPrefix, draft.idea), draft.file)) {
         set({ chat: { ...get().chat, lengthError: true } })
         return 'too_short'
       }
       set({ chat: { ...get().chat, lengthError: false } })
-      if (!recIsCurrent(draft)) {
+      await mergeSeedPrefix()
+      if (!recIsCurrent(get().draft)) {
         const result = await readAndRecommend()
         if (result !== 'ok') return result
         // 처음 보낸 글에 이미 적힌 값은 정하고 그 질문은 건너뛴다(이야기 속 낱말은 읽지 않는다).
@@ -537,7 +608,7 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
           await sendPatch(patch)
         }
       }
-      set({ chat: { ...get().chat, hint: null, showExamples: false, nudge: null } })
+      set({ chat: { ...get().chat, hint: null, showExamples: false, nudge: null, asked: null } })
       return 'ok'
     },
 
@@ -601,7 +672,7 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       const example = EXAMPLES[index]
       if (!example) return
       get().setIdea((t ?? uiTranslator())(example.text))
-      set({ chat: { ...get().chat, lengthError: false }, showLengthError: false })
+      set({ chat: { ...get().chat, lengthError: false, seedPrefix: null }, showLengthError: false })
     },
 
     uploadFile: async (file) => {

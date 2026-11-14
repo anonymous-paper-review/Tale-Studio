@@ -59,35 +59,56 @@ export function imageCardFillDirective(cardFill: unknown): string | null {
 }
 
 /**
- * 잠긴 Producer 안내문(2026-10-01 오너 "producer 완성 시 잠그기", "잠금을 풀 수 없게") — Writer 로 넘긴 프로젝트의 채팅 턴.
+ * 잠긴 Producer 안내문(2026-10-01 오너 "producer 완성 시 잠그기", "잠금을 풀 수 없게") — 산문을 확정한 프로젝트의 채팅 턴.
  * 모델은 질문에는 답하되 이야기·설정·인물·배경·화풍을 바꾸자고 제안하지 않는다. 최종 방어는 클라이언트
  * (producer-store 가드 + 바꾸는 제안이면 모델 답 대신 "바꾸지 않았다"를 남긴다).
+ * 화면 이름은 지금 이름이다(리드 2026-11-14 D): Writer 는 산문 화면, 씬 · 샷은 Storyboard 화면 — "handed over to Writer"는 옛 말이라 "Producer 가 잠겼다"로 새어 나갔다.
  */
 export function lockedProducerDirective(producerLocked: unknown): string | null {
   if (producerLocked !== true) return null
   return [
     '[Locked Producer]',
-    'This project was handed over to Writer, so the Producer materials (story, settings, cast cards, background cards, art style) are confirmed and cannot change.',
+    'The user confirmed the prose on the Writer screen, so the prose and the materials behind it (story, settings, cast cards, background cards, art style) are confirmed and locked. They cannot change in this project.',
     'Answer questions about them, summarize or explain them, but do not emit extractedSettings, choices or proposals that change them.',
-    'If the user asks for a change, say plainly that Producer is confirmed and cannot be changed, that a new project is needed to change it,',
-    'and that scenes and dialogue can still be edited in Writer and character and background pictures in Artist.',
+    'If the user asks for a change, say plainly that the prose is confirmed and locked, that a new project is needed to write a different story,',
+    'and that character and background pictures can still be changed on the Artist screen, and scenes, shots and dialogue can still be edited on the Storyboard screen once it opens.',
     // 2026-10-27 디자이너 QA 1차 #04: 산문 밖에서(예전 Artist 채팅) 만들어진 인물 카드는 지우기 단추로 지울 수 있다 — "새 프로젝트가 필요해요"와 어긋나지 않게.
     'One exception: a character card that was made outside the prose (for example by the old Artist chat) and is not used by any scene or shot',
     'can be deleted with the trash button on that card in Artist. Say so if the user wants to remove such a card. You cannot delete it from this chat.',
   ].join('\n')
 }
 
-/** 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04) — 트리트먼트(씬 스토리)는 채팅이 아니라 다시 쓰기 · 직접 고치기로 고친다.
- *  채팅은 Producer 상담(설정 · 캐스팅 · 배경 · 스타일)으로 남는다. 모델이 씬 고치기를 이야기 글 수정으로 처리하지 않게 한다. */
+/** 넘기기 전 트리트먼트 초안(2026-10-02 시안 v04) — 트리트먼트(씬 스토리)는 이 채팅 턴이 아니라 고치기 요청 · 다시 쓰기 · 직접 고치기로 고친다.
+ *  모델이 씬 고치기를 이야기 글 수정으로 처리하지 않게 한다. 지금 Writer 화면의 길로 말한다(리드 2026-11-14 D): 이 턴은 물음에 답하는 턴이다. */
 export function treatmentDraftDirective(treatmentDraft: unknown): string | null {
   if (treatmentDraft !== true) return null
   return [
     '[Treatment Draft]',
-    'Writer has already written a treatment (the scene story) from this story. It is shown on the Producer screen below the cast and backgrounds.',
-    'You cannot edit the treatment from this chat. If the user asks to change scenes, events, sentences, the flow or the ending,',
-    'tell them to press Rewrite above the scene story (it offers three versions, or they can type their own request there) or Edit manually,',
-    'and do not change the story text to make those changes.',
-    'Settings, cast cards, background cards and the art style can still be changed here as usual.',
-    'When the user is happy with the treatment, they press Hand over to Writer at the top right.',
+    'Writer has already written the prose draft (the scene story) from the story the user gave on the Producer start screen. It is shown on the Writer screen.',
+    'This chat turn is for answering questions. You cannot edit the prose from here, so do not change the story text. Answer the question in a few sentences and do not emit extractedSettings or choices.',
+    'If the user wants scenes, events, sentences, the flow or the ending changed, tell them to type what to change in this chat (the app turns it into a proposal they apply or discard),',
+    'to press Rewrite it for three versions, or to edit it themselves with Edit it myself (Edit manually in older projects).',
+    'When the user is happy with the prose, they press Run breakdown on the Writer screen and confirm it. Then the prose is locked and Artist opens.',
+  ].join('\n')
+}
+
+/** 붙은 문단 한 개의 글이 프롬프트를 부풀리지 않게 싣는 글자 수 상한. */
+const ATTACHED_PARAGRAPH_MAX_CHARS = 4000
+
+/**
+ * 붙은 문단 안내문(리드 2026-11-14 B) — Writer 화면에서 문단(S2)을 붙인 채 보낸 물음. AI 는 화면의 S번호를 모르므로 이름과 그 문단 글을 함께 싣는다.
+ * 이 턴은 문단을 고쳐 달라는 요청이 아니라 물음이다(고치기 요청은 클라이언트가 수정안 길로 보낸다). 클라이언트가 보낸 값이라 이름 꼴과 글 길이를 확인한다.
+ */
+export function attachedParagraphDirective(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const { label, text } = raw as { label?: unknown; text?: unknown }
+  if (typeof label !== 'string' || !/^S[1-9]\d{0,3}$/.test(label)) return null
+  if (typeof text !== 'string' || !text.trim()) return null
+  const body = Array.from(text.trim()).slice(0, ATTACHED_PARAGRAPH_MAX_CHARS).join('')
+  return [
+    `[Attached Paragraph ${label}]`,
+    body,
+    `The user attached paragraph ${label} of the prose to this message. "This paragraph" and "${label}" mean the text above.`,
+    'The message is a question about it, not a request to change the prose. Answer from that paragraph, and from the rest of the Current Story Text when the question needs it. Do not rewrite the paragraph.',
   ].join('\n')
 }

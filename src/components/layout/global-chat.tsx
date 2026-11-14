@@ -71,7 +71,8 @@ import { SceneStoryRewriteCard, SceneStoryUndoCard } from '@/components/layout/s
 import { unresolvedSceneStoryProposal } from '@/lib/producer/scene-story-proposal'
 import { WriterNextCard } from '@/features/prose/writer-next-card'
 import { ParagraphChip } from '@/features/prose/paragraph-chip'
-import { goesToParagraph, sendParagraphRequest } from '@/features/prose/paragraph-request'
+import { goesToParagraph, questionAboutPick, sendParagraphRequest } from '@/features/prose/paragraph-request'
+import { restoreIntoInput, restoreTextFor } from '@/lib/chat-input-restore'
 import { StyleReturnCard } from '@/features/artist-room/style-return-card'
 import {
   buildScriptLines,
@@ -538,6 +539,8 @@ export function GlobalChat() {
   const setMentionedRefs = useChatUiStore((s) => s.setMentionedRefs)
   const mentionInsert = useChatUiStore((s) => s.mentionInsert)
   const consumeMentionInsert = useChatUiStore((s) => s.consumeMentionInsert)
+  const inputRestore = useChatUiStore((s) => s.inputRestore)
+  const consumeInputRestore = useChatUiStore((s) => s.consumeInputRestore)
   const focusRequest = useChatUiStore((s) => s.focusRequest)
   const consumeChatFocus = useChatUiStore((s) => s.consumeChatFocus)
   const [dragging, setDragging] = useState(false)
@@ -754,6 +757,23 @@ export function GlobalChat() {
     requestAnimationFrame(() => textareaRef.current?.focus())
   }, [mentionInsert, consumeMentionInsert, mentionLabels])
 
+  // 튕긴 말 되돌리기(리드 2026-11-14 C) — 고치기 안이 [적용]을 기다려 새 말이 튕기면 쓴 글이 입력창으로 돌아온다.
+  //   입력창에 그새 쓴 글이 있으면 되돌린 글 뒤에 이어 붙이고, 커서는 맨 끝에 둔다.
+  //   요청에는 말을 보낸 프로젝트가 실려 있다 — 같은 프로젝트일 때만 넣고, 다른 프로젝트의 요청은 넣지 않고 거둔다(리드 검토 높음 2).
+  useEffect(() => {
+    if (!inputRestore) return
+    const restored = restoreTextFor(inputRestore, projectId)
+    consumeInputRestore(inputRestore.id)
+    if (restored === null) return
+    setInput((prev) => restoreIntoInput(prev, restored))
+    requestAnimationFrame(() => {
+      const el = textareaRef.current
+      if (!el) return
+      el.focus()
+      el.setSelectionRange(el.value.length, el.value.length)
+    })
+  }, [inputRestore, projectId, consumeInputRestore])
+
   // 첫 진입 웰컴 등 → 채팅 입력창 포커스. 입력 알약의 focus-within 이 지금 단계 색 테두리를 켜 주의를 끈다(v3).
   useEffect(() => {
     if (focusRequest == null) return
@@ -896,11 +916,13 @@ export function GlobalChat() {
     // 붙은 문단으로 보내기(v3 2026-11-03 오너 결정 7) — Writer 입력칸 위에 문단이 붙어 있으면 적은 말은 말 읽기를 거치지 않고
     //   그 문단만 고쳐 달라는 수정 요청으로 간다(features/prose/paragraph-request). 얹어 둔 파일은 그대로 남는다.
     //   넘김 · 확정 말이면 붙은 문단을 떼고 아래 지금 길로 간다 — 확정 창이 열린다(검토 A L1).
+    //   물음이면(오너 2026-11-14 B ①) 문단 수정 요청이 아니라 AI 가 답한다 — 붙은 문단 칩은 그대로 남고, 아래 sendMessage 가 askOnly 로 답을 받는다.
     if (currentStage === 'producer' && typed && goesToParagraph(typed)) {
       setInput('')
       await sendParagraphRequest(typed)
       return
     }
+    const askedAboutPick = currentStage === 'producer' && !!typed && questionAboutPick(typed)
     const texts = readyAttachments.filter((a) => a.kind === 'text')
     const images = readyAttachments.filter((a) => a.kind === 'image')
 
@@ -981,7 +1003,7 @@ export function GlobalChat() {
     await sendMessage(msg, {
       imageUrls: imageUrls.length > 0 ? imageUrls : undefined,
       thumbUrls,
-    }, { stageOverride: currentStage })
+    }, { stageOverride: currentStage, ...(askedAboutPick ? { askOnly: true } : {}) })
     // #attach-loud-fail(2026-08-24): 이미지 턴이 응답 없이 실패하면(모델 말풍선 미증가 + error)
     //   첨부를 복원한다 — 슬라이스는 이미 스토리지에 있으니 파일부터 다시 올리게 하지 않는다.
     const after = useGlobalChatStore.getState()

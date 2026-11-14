@@ -7,7 +7,14 @@ Ground state-dependent answers in the current project context or a fresh tool re
 Pending and deferred work is context, not new consent. Preserve approval and generation boundaries. Never resume deferred work just because it appears in context.
 After execution, use the actual results: saved and verified, awaiting approval, running, failed, or unknown. If a response is lost, check the saved state before repeating. Preserve successful targets and stop repeating the same failure.
 If recent history does not contain an earlier agreement and saved project data does not establish it, acknowledge the missing context and ask for the relevant detail. Do not invent long-term memory.
-</request-handling>`
+</request-handling>
+
+<screens>
+The user sees these screens in this order: Producer (the start screen), Writer (the prose), Artist, Storyboard (scenes and shots), Director, Editor.
+After Artist the next screen is Storyboard, never Director. Director comes after Storyboard and Editor comes last.
+Tool and code names are older than the screen names: the tool target "producer" is the Writer screen (the prose) and the tool target "writer" is the Storyboard screen (scenes and shots). Always talk to the user with the screen names.
+When the user confirms the prose on the Writer screen, the prose is locked and Artist opens. Scenes and shots are made after that and are edited on the Storyboard screen.
+</screens>`
 
 /** This only routes a message; execution permission remains in the tools and domain gates. */
 /** gateElsewhere: 씬 스토리 확정을 Producer 메인에서 기다리는 중(2026-10-01) — Writer 채팅의 수정 요청은 거기로 안내한다. */

@@ -148,9 +148,22 @@ export function matchStoryboardToDirector(text: string): boolean {
   }) !== null
 }
 
+// 영어 "go / move / head to (the) next step · stage"(리드 2026-11-14 F(1)) — 이 꼴이 넘김으로 읽히지 않아
+//   AI 가 "채팅으로는 못 옮긴다"고 답했다(대문자 · 어깨점이 원인이 아니라 MOVE_WORDS 에 go · move 가 없어서였다). 말 전체가 이 꼴일 때만 읽는다 —
+//   "go to the next step of the recipe"처럼 뒤에 말이 이어지거나 물음 · 부정이면(위 hasNonRequestContext) 넘기지 않는다.
+//   앞에는 맞장구 · please · let's 만, 뒤에는 please · now · then 만 올 수 있다(앞에 쉼표가 있어도 된다 — "Go to next stage, please"). 대상은 "다음 단계" 또는 그 단계 이름(Storyboard · Artist …)이다.
+const EN_GO_LEAD = "^(?:(?:ok(?:ay)?|yes|yeah|yep|sure|alright|great|good|now|then|so|and|please|let(?:['’]?s|\\s+us))[\\s,.!]*)*"
+function englishGoNext(request: string, spec: HandoffSpec): boolean {
+  const names = STAGE_WORDS[spec.to].filter((word) => /^[a-z]+$/i.test(word))
+  const destination = ['next\\s+(?:step|stage|screen|tab|phase)', ...names].join('|')
+  const re = new RegExp(`${EN_GO_LEAD}(?:go|move|head)\\s+(?:on\\s+)?(?:to|onto)\\s+(?:the\\s+)?(?:${destination})(?:[\\s,]+(?:please|now|then))?[\\s.!]*$`, 'i')
+  return re.test(request.trim())
+}
+
 function matchHandoffSpec(text: string, spec: HandoffSpec): HandoffSpec | null {
   const request = omitQuotedRequests(['writer', 'artist'].includes(spec.to) ? withoutMediaGenerationProhibition(text) : text)
   if (hasNonRequestContext(request)) return null
+  if (englishGoNext(request, spec)) return spec
   const t = normalize(request)
   if (!MOVE_WORDS.some((w) => t.includes(normalize(w)))) return null
   const mentionsTarget = STAGE_WORDS[spec.to].some((w) => t.includes(normalize(w)))
