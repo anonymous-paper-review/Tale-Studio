@@ -131,7 +131,8 @@ describe('Director 샷 상세 화면', () => {
   })
 
   it('이미지 탭은 시작 · 끝 그림 아래 버전 줄(v1 · v2 …)을 하나 보이고, 지금 그림인 버전이 눌린 채 보인다', () => {
-    // 왜: D6 "v1 · v2를 누르면 그 버전으로 돌아가요" — 1단계는 시작 · 끝이 함께라 줄은 하나(혼자 정한 것), 많으면 옆으로 넘긴다(리드 답).
+    // 왜: D6 "v1 · v2를 누르면 그 버전으로 돌아가요" — 1단계는 시작 · 끝이 함께라 줄은 하나(혼자 정한 것).
+    //   많으면 옆으로 밀지 않고 5개씩 넘겨 본다(오너 11/14 답 5 — 예전 기대 overflow-x-auto · 리드 답 "옆으로 넘긴다", 넘기기는 image-version-row.test.ts).
     const version = (id: string, tag: string, at: number) => ({ id, url: `https://media.test/${tag}-s.png`, frames: { start: `https://media.test/${tag}-s.png`, direction: `https://media.test/${tag}-d.png`, end: `https://media.test/${tag}-e.png` }, generatedAt: at, source: 'generated' as const })
     const two = withStoryboardVersion(withStoryboardVersion(null, version('job-1', 'a', 1), { select: true }), version('job-2', 'b', 2), { select: true })
     director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: two })
@@ -139,7 +140,7 @@ describe('Director 샷 상세 화면', () => {
     expect(out).toContain('data-testid="shot-detail-versions"')
     expect(out).toMatch(/aria-pressed="false"[^>]*>v1</)
     expect(out).toMatch(/aria-pressed="true"[^>]*>v2</)
-    expect(out).toMatch(/class="[^"]*overflow-x-auto[^"]*" data-testid="shot-detail-versions"/)
+    expect(out).not.toMatch(/class="[^"]*overflow-x-auto[^"]*" data-testid="shot-detail-versions"/)
     expect(out).toContain('Click v1 or v2 to go back to that version.')
     setLocale('ko')
     expect(render('popup')).toContain('버전(v1 · v2)을 누르면 그 버전으로 돌아가요.')
@@ -202,8 +203,9 @@ describe('Director 샷 상세 화면', () => {
     expect(translate('ko', 'Make again')).toBe('다시 만들기')
   })
 
-  it('Take 를 만드는 중이면 그 카드에 [멈추기]가 있고, 멈춘 Take 는 "멈췄어요"로 보이며 새 Take 단추가 켜진다', () => {
+  it('Take 를 만드는 중이면 그 카드에 [멈추기]가 있고, 멈춘 Take 는 "멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요"로 보이며 새 Take 단추가 켜진다', () => {
     // 왜: 오너 7번 "이미 생성이 진행 중인 것들은 UI로는 취소된걸로 보이게 해서 유저가 수정해서 다시 생성 요청할 수 있게" — Take 는 돌려주지 않는다.
+    //   글은 오너 11/14 답 8 그대로(예전 "멈췄어요 · Take 는 돌려드리지 않아요."), 뒤의 "뒤늦게 끝나면 이 목록에 남아요."는 그대로(리드 11/14).
     done(1)
     const making = addTake({ takeNumber: 2, status: 'generating', lastAttemptStatus: 'generating', generationJobId: '11111111-1111-4111-8111-111111111111' })
     queue.jobs = [{ id: '11111111-1111-4111-8111-111111111111', kind: 'shot_video', target: {} }]
@@ -216,11 +218,12 @@ describe('Director 샷 상세 화면', () => {
     expect(readFileSync('src/features/director/shot-detail/shot-video-tab.tsx', 'utf8')).toMatch(/cancelRunningJobs\(\[take\.data\.generationJobId!?\]\)/)
     director.getState().updateNodeData<'video'>(making, { cancelledAt: '2026-11-14T03:00:00Z' })
     const stopped = render('panel', 'video')
-    expect(stopped).toContain('Stopped · The Take is not refunded. If it finishes later, it stays in this list.')
+    // 영어 뒤 문장은 "this one" — 앞 문장이 복수(Takes)라 "it" 이 가리킬 말이 없었다(리드 검토 11/14, 예전 기대 "If it finishes later"). 한국어는 그대로.
+    expect(stopped.replace(/&#x27;/g, "'")).toContain("Stopped. Takes for videos that had already started aren't refunded. If this one finishes later, it stays in this list.")
     expect(stopped).not.toContain('A Take is being made. You can make a new one when it is done.')
     expect(buttonTag(stopped, 'Make a new Take · 5 Takes')).not.toContain('disabled=""')
     setLocale('ko')
-    expect(render('panel', 'video')).toContain('멈췄어요 · Take 는 돌려드리지 않아요. 뒤늦게 끝나면 이 목록에 남아요.')
+    expect(render('panel', 'video')).toContain('멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요. 뒤늦게 끝나면 이 목록에 남아요.')
   })
 
   it('만드는 중인 Take 의 [멈추기]는 지금 도는 작업 목록에 그 작업이 있을 때만 보이고, 요청이 오가는 동안에는 보이지 않는다', () => {

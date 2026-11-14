@@ -8,6 +8,8 @@ import { PathAllocator } from './sanitize'
 import type { ArtifactFile } from './types'
 import { loadShotsResult } from '@/lib/shots-cache'
 import { withCancelledTakes } from '@/lib/director/take-cancellations'
+import { sceneName, shotName } from '@/lib/board-names'
+import { boardShots } from '@/lib/writer/board-summary'
 
 export interface DirectorExportData {
   scenes: SceneRow[]
@@ -93,6 +95,9 @@ export function collectDirectorArtifacts(
   const clipsByShotId = groupClips(recordRows<ClipRow>(data.videoClips))
   const mediaFiles: ArtifactFile[] = []
   const shotRows = new Map<ShotRow, string[]>()
+  // 씬 · 샷은 보드와 같은 번호 · 프로젝트 언어 이름으로 적는다("씬 1" · "샷 3") — 예전에는 내부 id("Scene sc_01" · "sh_02_07")였다
+  //   (리드 2026-11-14 H7, 오너 답 7). 그림 · 영상 파일 경로(director/shots/sc_01-sh_01_01.png)는 그대로 둔다.
+  const names = boardNames(scenes, shots)
 
   for (const shot of shots) {
     const baseName = mediaBaseName(shot)
@@ -116,7 +121,7 @@ export function collectDirectorArtifacts(
     }
 
     shotRows.set(shot, [
-      shotLabel(shot),
+      shotName(locale, names.shotNo.get(requiredShotId(shot)) ?? '?'),
       imagePath ?? storyboardStatusNote(storyboard, locale),
       clipPath ? clipCell(clipPath, clip) : clipOmittedNote(locale),
       textOrUnset(nativeText(shot, 'action_description'), locale),
@@ -131,7 +136,7 @@ export function collectDirectorArtifacts(
     {
       path: 'director/shotlist.md',
       kind: 'text',
-      content: renderShotlist(scenes, shots, shotRows, locale),
+      content: renderShotlist(scenes, shots, shotRows, locale, names.sceneNo),
     },
     ...mediaFiles,
   ]
@@ -176,6 +181,7 @@ function renderShotlist(
   shots: ShotRow[],
   shotRows: Map<ShotRow, string[]>,
   locale: AppLocale,
+  sceneNo: ReadonlyMap<string, number>,
 ): string {
   let body = h1('Director Shotlist')
   body += kvSection(translate(locale, 'Summary'), [
@@ -186,7 +192,7 @@ function renderShotlist(
   if (shots.length === 0) return `${body}${escapeMd(translate(locale, 'No shots'))}\n`
 
   for (const group of sceneGroups(scenes, shots)) {
-    body += h2(sceneHeading(group.sceneId, group.scene))
+    body += h2(sceneHeading(group.scene, sceneNo.get(group.sceneId), locale))
 
     const details = sceneDetailItems(group.scene, locale)
     if (details.length > 0) body += bulletList(details)
@@ -256,9 +262,21 @@ function sceneDetailItems(scene: SceneRow | null, locale: AppLocale): string[] {
 }
 
 
-function sceneHeading(id: string, scene: SceneRow | null): string {
+/** 씬 머리 — "씬 1 — 옥상"(보드 순서, 프로젝트 언어). 씬 목록에 없는 씬(샷만 남은)은 "씬 ?". */
+function sceneHeading(scene: SceneRow | null, no: number | undefined, locale: AppLocale): string {
   const place = textValue(scene?.location)
-  return place ? `Scene ${id} — ${place}` : `Scene ${id}`
+  const name = sceneName(locale, no ?? '?')
+  return place ? `${name} — ${place}` : name
+}
+
+/** 보드와 같은 셈(boardShots) — 씬은 씬 목록 순서, 샷은 씬마다 다시 세지 않는 전체 번호. */
+function boardNames(scenes: SceneRow[], shots: ShotRow[]): { sceneNo: Map<string, number>; shotNo: Map<string, number> } {
+  const manifest = { scenes: scenes.map((scene) => ({ sceneId: sceneId(scene) })) }
+  const board = boardShots(manifest, shots.map((shot) => ({ shotId: requiredShotId(shot), sceneId: requiredSceneId(shot) })))
+  return {
+    sceneNo: new Map(manifest.scenes.map((scene, index) => [scene.sceneId, index + 1])),
+    shotNo: new Map(board.map((entry) => [entry.shot.shotId, entry.shotNo])),
+  }
 }
 
 function groupClips(clips: ClipRow[]): Map<string, ClipRow[]> {
@@ -309,10 +327,6 @@ function storyboardImageValue(value: unknown): StoryboardImageValue | null {
 
 function mediaBaseName(shot: ShotRow): string {
   return `${requiredSceneId(shot)}-${requiredShotId(shot)}`
-}
-
-function shotLabel(shot: ShotRow): string {
-  return requiredShotId(shot)
 }
 
 function sceneId(scene: SceneRow): string {

@@ -132,8 +132,9 @@ export function createStudioToolResources(options: {
       ])
       characterIds = new Set(characters.map(c => String(c.character_id)))
       // 샷은 보드 카드와 같은 전체 번호 이름을 함께 준다(읽기 전용) — 사용자는 "샷 8"로 부르고, 모델도 그 이름으로 답한다(오너 2026-11-02).
+      //   이름은 채팅 언어(오너 2026-11-14 답 7 — 모델은 적힌 이름 그대로 답한다).
       const writer = useWriterStore.getState()
-      const boardLabels = scene ? null : boardShotLabels(writer.sceneManifest, writer.shots)
+      const boardLabels = scene ? null : boardShotLabels(writer.sceneManifest, writer.shots, contentLocale())
       return rows.map(row => {
         const id = String(row[scene ? 'scene_id' : 'shot_id'])
         stored.set(`${resource}:${id}`, row)

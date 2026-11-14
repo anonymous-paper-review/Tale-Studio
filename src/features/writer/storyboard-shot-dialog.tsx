@@ -33,6 +33,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import type { DialogueLine, RoughStoryboardImage, Shot, ShotType } from '@/types'
+import { useLocaleStore } from '@/stores/locale-store'
 
 interface Draft {
   actionDescription: string
@@ -52,6 +53,8 @@ function draftOf(shot: Shot): Draft {
 
 export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: string | null; panel: RoughStoryboardImage | null; onOpenChange: (open: boolean) => void }) {
   const t = useT()
+  // 창 머리의 샷 이름은 화면 언어("씬 2 · 샷 8" · "Scene 2 · Shot 8", 오너 2026-11-14 답 7).
+  const locale = useLocaleStore((s) => s.locale)
   const shot = useWriterStore((s) => s.shots.find((x) => x.shotId === shotId))
   const shots = useWriterStore((s) => s.shots)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
@@ -84,7 +87,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   const value = draft.shotId === shot.shotId && draft.value ? draft.value : draftOf(shot)
   const patch = (next: Partial<Draft>) => setDraft({ shotId: shot.shotId, value: { ...value, ...next } })
 
-  const label = sceneShotLabel(sceneManifest, shots, shot.shotId) ?? ''
+  const label = sceneShotLabel(sceneManifest, shots, shot.shotId, locale) ?? ''
   const scene = sceneManifest?.scenes.find((item) => item.sceneId === shot.sceneId)
   const location = sceneManifest?.locations.find((item) => item.locationId === scene?.location)
   const castNames = shot.characters.map((id) => sceneManifest?.characters.find((c) => c.characterId === id)?.name ?? id)

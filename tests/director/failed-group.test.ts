@@ -26,7 +26,7 @@ const BOARD = [
   shot('s3'), finished('s3', 1, { cancelledAt: '2026-11-14T01:30:00Z' }), failed('s3', 2),
   shot('s4'), failed('s4', 1),
 ]
-const names = boardNodeNames({ scenes: [{ sceneId: 'sc1' }] }, ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1' })))
+const names = boardNodeNames({ scenes: [{ sceneId: 'sc1' }] }, ['s1', 's2', 's3', 's4', 's5', 's6', 's7', 's8', 's9'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1' })), 'en')
 const failedShots = (nodes: DirectorNode[]) => directorShotRefs(nodes, names).filter((shot) => shot.videoFailed).map((shot) => shot.nodeId)
 const remakeFailed = (nodes: DirectorNode[]) =>
   groundVideoRequest({ text: '실패한 샷 다시 만들어줘', requested: null, shots: directorShotRefs(nodes, names), eligible: eligibleVideoBatchShotIds(nodes), selected: [] })

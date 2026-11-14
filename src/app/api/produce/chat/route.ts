@@ -181,10 +181,14 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       //   "캐릭터가 없다"고 환각하거나 같은 카드를 중복 제안한다.
       //   ref/mention 포함 — @멘션(이름 없는 빈 카드 포함)을 정확한 카드로 매핑/수정 가능하게 한다.
       const castList = currentCast as Array<{ localId: string; name?: string; entityType?: string } & Record<string, unknown>>
-      const m = castMentions(castList)
+      // 이름 없는 카드의 @멘션은 화면 언어로 붙는다(한국어 "@이름 미정 인물" · 영어 "@Unnamed person", 오너 2026-11-14 답 7) —
+      //   어느 말로 넣은 @멘션이든 찾게 두 말 이름을 모두 싣는다(이름 있는 카드는 같은 이름 하나).
+      const m = castMentions(castList, 'ko')
+      const mEn = castMentions(castList, 'en')
       const castSummary = castList.map((c, i) => ({
         ref: m[i].ref,
         mention: `@${m[i].label}`,
+        ...(mEn[i].label !== m[i].label ? { mentionEn: `@${mEn[i].label}` } : {}),
         name: c.name,
         entityType: c.entityType,
         appearance: c.appearance,
@@ -196,10 +200,12 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     }
     if (Array.isArray(currentBackgrounds) && currentBackgrounds.length > 0) {
       const bgList = currentBackgrounds as Array<{ localId: string; name?: string } & Record<string, unknown>>
-      const m = backgroundMentions(bgList)
+      const m = backgroundMentions(bgList, 'ko')
+      const mEn = backgroundMentions(bgList, 'en')
       const bgSummary = bgList.map((b, i) => ({
         ref: m[i].ref,
         mention: `@${m[i].label}`,
+        ...(mEn[i].label !== m[i].label ? { mentionEn: `@${mEn[i].label}` } : {}),
         name: b.name,
         visualDescription: b.visualDescription,
         purpose: b.purpose,

@@ -17,7 +17,7 @@ const writerShots = [
   { shotId: 'sh_02_02', sceneId: 'sc_02' },
   { shotId: 'sh_02_03', sceneId: 'sc_02' },
 ]
-const names = boardNodeNames(manifest, writerShots)
+const names = boardNodeNames(manifest, writerShots, 'en')
 
 function sceneNode(id: string, writerSceneId: string | null, label = writerSceneId ?? 'New Scene'): DirectorNode {
   return { id, type: 'scene', position: { x: 0, y: 0 }, data: { kind: 'scene', label, writerSceneId, location: '', timeOfDay: '', mood: '', description: '' } } as unknown as DirectorNode
@@ -56,7 +56,7 @@ describe('Director 도 보드와 같은 전체 번호', () => {
   // 왜: 오너 2026-11-02 전체 번호로 통일 — @멘션도 카드와 같은 이름이어야 "@Previz Shot 4"가 그 카드를 가리킨다. 옛 이름(id 숫자)은 씬이 달라도 "Shot 2"가 겹쳤다.
   it('Director 채팅 @멘션도 보드와 같은 전체 번호로 "Previz Shot 8"처럼 부른다', () => {
     const nodes = [sceneNode('s1', 'sc_01'), sceneNode('s3', 'sc_03'), shotNode('n1', 'sh_02_02', 's2'), shotNode('n2', 'sh_01_04', 's1')]
-    const labels = sceneShotMentions(directorMentionTargets(nodes, names), 'previz').map((m) => m.label)
+    const labels = sceneShotMentions(directorMentionTargets(nodes, names), 'previz', 'en').map((m) => m.label)
     expect(labels).toEqual(['Previz Scene 1', 'Previz Scene 2', 'Previz Shot 4', 'Previz Shot 2'])
     const chat = readFileSync('src/components/layout/global-chat.tsx', 'utf8')
     expect(chat).toMatch(/directorMentionTargets\(directorNodes, directorNames\)/)

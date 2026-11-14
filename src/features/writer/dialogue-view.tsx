@@ -31,6 +31,8 @@ import { commitLineEdit, revertLineEdit } from '@/lib/writer/dialogue-line-edit'
 import { manifestEntities, resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import type { DialogueLine, Shot } from '@/types'
 import { useT } from '@/lib/i18n'
+import { sceneName, shotName } from '@/lib/board-names'
+import { useLocaleStore } from '@/stores/locale-store'
 
 // 화자 칩/라인 색 — 등장 순서대로 순환 (chart 토큰과 무관한 대사 전용 4색).
 const SPEAKER_COLORS = [
@@ -70,6 +72,8 @@ interface LineSave extends LineDraft {
 
 export function DialogueView() {
   const t = useT()
+  // 씬 · 샷 이름은 화면 언어(오너 2026-11-14 답 7).
+  const locale = useLocaleStore((s) => s.locale)
   const projectId = useProjectStore((state) => state.projectId)
   const sceneManifest = useWriterStore((state) => state.sceneManifest)
   const entityNames = useMemo(() => manifestEntities(sceneManifest), [sceneManifest])
@@ -353,7 +357,7 @@ export function DialogueView() {
               return (
                 <section key={scene.sceneId} className="rounded-xl bg-panel px-5 py-4">
                   <h3 className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
-                    <span className="font-num text-micro font-semibold text-foreground">Scene {sceneIdx + 1}</span>
+                    <span className="font-num text-micro font-semibold text-foreground">{sceneName(locale, sceneIdx + 1)}</span>
                     <span className="text-body font-semibold text-foreground">
                       {resolveEntityNames(scene.location, entityNames)}
                     </span>
@@ -367,12 +371,12 @@ export function DialogueView() {
                       return (
                         <div key={shot.shotId} data-shot-id={shot.shotId} className="group -mx-2 rounded-md px-2 py-1">
                           {/* 글자 크기는 트리트먼트와 통일(#c5), 본문은 흰색(#c2 2026-08-03) —
-                              muted 회색은 대본이 부차 정보처럼 읽혔다. 라벨(Shot N)만 muted 유지.
+                              muted 회색은 대본이 부차 정보처럼 읽혔다. 라벨(샷 N · Shot N)만 muted 유지.
                               스토리는 러프에 그려지므로 여기서 고치지 않는다 — 연필 단추가 샷 고치기 창을 연다(프로토타입 대본 보기의 ✎). */}
                           <div className="flex items-start gap-2">
                             <p className="min-w-0 flex-1 text-sm leading-7 text-foreground">
                               <span className="mr-1.5 font-num text-micro font-semibold text-subtle-foreground">
-                                Shot {shotNo}
+                                {shotName(locale, shotNo)}
                               </span>
                               {resolveEntityNames(shot.actionDescription, entityNames)}
                             </p>

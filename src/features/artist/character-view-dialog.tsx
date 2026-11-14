@@ -199,8 +199,8 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const capReached = (failure?.safeFailCount ?? 0) >= SAFE_RETRY_CAP
 
   const usedIn = shots.filter((shot) => shot.characters.includes(char.characterId))
-  // 샷 이름은 보드 카드와 같은 전체 번호("Scene 2 · Shot 8") — 오너 2026-11-02 "전체 번호로 통일".
-  const boardLabels = boardShotLabels(sceneManifest, shots)
+  // 샷 이름은 보드 카드와 같은 전체 번호("씬 2 · 샷 8") — 오너 2026-11-02 "전체 번호로 통일", 말은 화면 언어(2026-11-14 답 7).
+  const boardLabels = boardShotLabels(sceneManifest, shots, locale)
   const usedLabels = usedIn.map((shot) => boardLabels.get(shot.shotId)).filter((value): value is string => !!value)
 
   // 모습 지우기 — 기본 모습은 지우지 못한다(약속 C8). 팝업은 닫지 않는다 — 보던 모습을 지웠으면 기준 모습을 보인다(검토 지적).

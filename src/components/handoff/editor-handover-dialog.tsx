@@ -19,9 +19,12 @@ import { cn } from '@/lib/utils'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useWriterStore } from '@/stores/writer-store'
+import { useLocaleStore } from '@/stores/locale-store'
 
 export function EditorHandoverDialog({ open }: { open: boolean }) {
   const t = useT()
+  // 줄 이름은 화면 언어("씬 1 · 샷 3" · "Scene 1 · Shot 3", 오너 2026-11-14 답 7).
+  const locale = useLocaleStore((s) => s.locale)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const manifest = useWriterStore((s) => s.sceneManifest)
   const writerShots = useWriterStore((s) => s.shots)
@@ -42,7 +45,7 @@ export function EditorHandoverDialog({ open }: { open: boolean }) {
     setNotices(new Map())
   }, [open])
   if (!open) return null
-  const view = editorHandoverView(nodes, boardNodeNames(manifest, writerShots ?? []))
+  const view = editorHandoverView(nodes, boardNodeNames(manifest, writerShots ?? [], locale))
 
   const remakeRow = async (row: EditorHandoverShot) => {
     setStarting((current) => withStartingRow(current, row.shotNodeId, true))

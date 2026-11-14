@@ -1354,10 +1354,11 @@ function offerStyleFromAttachment(
 /** 씬 스토리 확정을 보내는 중인 프로젝트 — 두 번 누름 방지(2026-10-01). */
 const sceneGateInFlight = new Set<string>()
 
-/** Director 의 보드 이름(씬 · 샷 전체 번호) — 채팅이 샷을 부르는 이름과 같다(오너 2026-11-02 "전체 번호로 통일"). */
-function directorBoardNames() {
+/** Director 의 보드 이름(씬 · 샷 전체 번호) — 채팅이 샷을 부르는 이름과 같다(오너 2026-11-02 "전체 번호로 통일").
+ *  말은 그 이름이 들어갈 채팅 줄의 언어(오너 2026-11-14 답 7) — 번호만 쓰는 곳도 같은 이름표를 쓴다. */
+function directorBoardNames(locale: AppLocale) {
   const writerBoard = useWriterStore.getState()
-  return boardNodeNames(writerBoard.sceneManifest, writerBoard.shots)
+  return boardNodeNames(writerBoard.sceneManifest, writerBoard.shots, locale)
 }
 
 /** 지금 고른 샷(노드 id) — "고른 샷 영상 만들어 줘"가 쓴다. */
@@ -1438,7 +1439,7 @@ function shotImageReadiness(shotIds: readonly string[]): Map<string, 'ready' | '
 function withImagesOnly(shotIds: readonly string[], locale: AppLocale, say: (line: string) => void): string[] {
   const readiness = shotImageReadiness(shotIds)
   const nodes = useDirectorCanvasStore.getState().nodes
-  const names = directorBoardNames()
+  const names = directorBoardNames(locale)
   const shotsLabel = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
   const drawing = shotIds.filter((id) => readiness.get(id) === 'drawing')
   const missing = shotIds.filter((id) => readiness.get(id) === 'missing')
@@ -1462,7 +1463,7 @@ async function groundChatVideos(input: { userText: string; requested: string[] |
     text: input.userText,
     requested: input.requested,
     // "실패한 샷"은 보드가 빨강(영상 실패)으로 보이는 샷 그대로 — 멈춘 Take 규칙까지 같은 판단(리드 검토 a).
-    shots: directorShotRefs(nodes, directorBoardNames(), directorBoardStates(nodes, projectId)),
+    shots: directorShotRefs(nodes, directorBoardNames(contentLocale()), directorBoardStates(nodes, projectId)),
     // 다시 만들기 부탁이면 번호로 댄 샷은 영상이 있어도 겨눈다(묶음 말은 지금처럼 — 리드 결정).
     remakable: asksRemake(input.userText) ? directorRemakableShots(nodes, projectId) : undefined,
     eligible: eligibleVideoBatchShotIds(nodes),
@@ -1503,7 +1504,7 @@ async function askHoldReason(requested: readonly string[] | null, addedShotIds: 
 async function confirmVideosLine(shotIds: readonly string[], locale: AppLocale, remake = false): Promise<string> {
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
   const nodes = useDirectorCanvasStore.getState().nodes
-  const names = directorBoardNames()
+  const names = directorBoardNames(locale)
   const shots = shotListLabel(locale, shotIds.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
   // 지연 로드 — Take 계산기 · 잔액 훅(영상 러너와 같은 까닭).
   const [{ videoBatchTakeCosts }, { fetchTakeBalance }] = await Promise.all([import('@/lib/director/video-batch-plan'), import('@/lib/billing/use-take-balance')])
@@ -1559,7 +1560,7 @@ async function holdOnTextCard(
   const remakes = withImagesOnly(more.remakes ?? [], locale, say)
   more = { ...more, videos, remakes, named: (more.named ?? []).filter((id) => videos.includes(id) || remakes.includes(id)) }
   if (!more.allBlankImages && more.images.length === 0 && videos.length === 0 && remakes.length === 0) return
-  const names = directorBoardNames()
+  const names = directorBoardNames(locale)
   const nodes = useDirectorCanvasStore.getState().nodes
   const before = (card.proposal.payload.then as HeldDirectorWork | undefined) ?? { images: [], allBlankImages: false, videos: [] }
   const then: HeldDirectorWork = {
@@ -1647,7 +1648,7 @@ async function runHeldDirectorWork(held: HeldDirectorWork, ctx: {
       void runRealBatch(ctx.projectId, options)
       ctx.say(t('Started making live-action images for {count} shots · No Takes used. Progress shows on the line above the cards.', { count }))
     } else {
-      const names = directorBoardNames()
+      const names = directorBoardNames(locale)
       for (const id of held.images) void canvas.generateStoryboardImage(id, options)
       ctx.say(t('Started making live-action images for {shots} · No Takes used. Progress shows on the line above the cards.', {
         shots: shotListLabel(locale, held.images.map((id) => shotLabelOf(canvas.nodes.find((node) => node.id === id), names))),
@@ -1708,7 +1709,7 @@ async function startVideosFor(input: {
   const namedNow = new Set(input.named ?? [])
   const open = new Set(input.shotIds.filter((id) => eligibleNow.has(id) || (input.remake && namedNow.has(id) && remakableNow.has(id))))
   const making = directorShotsBeingMade(input.shotIds.filter((id) => !open.has(id)))
-  if (making.length > 0) input.say(shotsLine(locale, making.length, 'The video for {shots} is being made right now.', 'The videos for {shots} are being made right now.', { shots: shotListLabel(locale, making.map((id) => shotLabelOf(nodesNow.find((node) => node.id === id), directorBoardNames()))) }))
+  if (making.length > 0) input.say(shotsLine(locale, making.length, 'The video for {shots} is being made right now.', 'The videos for {shots} are being made right now.', { shots: shotListLabel(locale, making.map((id) => shotLabelOf(nodesNow.find((node) => node.id === id), directorBoardNames(locale)))) }))
   input = { ...input, shotIds: input.shotIds.filter((id) => open.has(id)) }
   if (input.shotIds.length === 0) {
     if (making.length === 0) input.say(t('There are no such shots right now.'))
@@ -1720,7 +1721,7 @@ async function startVideosFor(input: {
     input.say(hold)
     return
   }
-  const names = directorBoardNames()
+  const names = directorBoardNames(locale)
   const shotsLabel = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === id), names)))
   // 이미지가 없는 샷은 보내지 않는다 — 그리는 중이면 기다리고(옛 그림 · 그림 없이 만들지 않게), 없으면 먼저 그리라고 한다.
   //   다시 만들기 · 새 영상 모두 같다(넘기기 창 [다시 만들기] · 툴바 "영상 만들기는 이미지가 먼저 있어야 해요"와 같은 규칙, 리드 11/14 영어 재점검 B1).
@@ -1810,7 +1811,7 @@ async function runDirectorQuickChip(input: {
   const canvas = useDirectorCanvasStore.getState()
   // 보드를 아직 안 읽었거나 다른 프로젝트 보드면 샷이 없는 것으로 본다(엉뚱한 보드의 샷을 만들지 않는다).
   const nodes = canvas.projectId === input.projectId ? canvas.nodes : []
-  const names = directorBoardNames()
+  const names = directorBoardNames(locale)
   const labelOf = (id: string) => shotLabelOf(nodes.find((node) => node.id === id), names)
   // 보드처럼 일괄이 맡아 차례를 기다리는 샷 · 영상 묶음이 아직 내지 않은 샷도 만드는 중으로 센다(set c19f8008 — 칩이 그 샷을 다시 겨누지 않게).
   const states = directorBoardStates(nodes, input.projectId)
@@ -1899,10 +1900,10 @@ export type HandoffConfirm =
   // Editor 넘기기 창(D8) — 샷 목록은 창이 Director 캔버스에서 그때그때 읽는다(다시 만들기로 바뀌는 상태를 따라가게).
   | { kind: 'editorMissingVideos'; projectId: string; via: 'button' | 'chat' }
 
-/** Director 의 영상 없는 샷(D8) — 보드 순서 · 이름은 Director 화면과 같은 셈(boardNodeNames). */
+/** Director 의 영상 없는 샷(D8) — 보드 순서 · 이름은 Director 화면과 같은 셈(boardNodeNames). 여기서는 수만 쓴다(이름은 창이 화면 언어로). */
 function directorMissingVideos() {
   const writer = useWriterStore.getState()
-  return editorHandoverView(useDirectorCanvasStore.getState().nodes, boardNodeNames(writer.sceneManifest, writer.shots ?? [])).missing
+  return editorHandoverView(useDirectorCanvasStore.getState().nodes, boardNodeNames(writer.sceneManifest, writer.shots ?? [], contentLocale())).missing
 }
 
 /** Director 게이트 막힘 중 Writer 쪽(씬·샷 미완성) — "그래도 진행"으로도 넘기지 않는다. 나머지(Artist 이미지)는 창에서 고른다. */
@@ -2474,7 +2475,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const projectId = useProjectStore.getState().projectId
     if (projectId && waitingTextCard(projectId)?.bound.has(shotNodeId)) {
       const locale = contentLocale()
-      const label = shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === shotNodeId), directorBoardNames())
+      const label = shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === shotNodeId), directorBoardNames(locale))
       producerSpeaker(projectId, 'director')(translate(locale, '{shots} has a text change waiting for [Apply]. Apply or discard it, then make it again.', { shots: shotListLabel(locale, [label]) }))
       return { started: false, reason: 'pending_text_edit' }
     }
@@ -3051,11 +3052,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const nodes = useDirectorCanvasStore.getState().nodes
           // 다시 만들기 부탁이면 대답으로 댄 영상 있는 샷도 넣는다 — "1"로 답할 때와 같은 규칙(리드 11/14 · 검토 b 낮음 2).
           const open = new Set([...eligibleVideoBatchShotIds(nodes), ...(videoAsk.remake ? directorRemakableShots(nodes, projectId) : [])])
-          const answered = directorShotRefs(nodes, directorBoardNames()).filter((shot) => shot.shotNo !== null && askedBack.has(shot.shotNo)).map((shot) => shot.nodeId)
+          const answered = directorShotRefs(nodes, directorBoardNames(contentLocale())).filter((shot) => shot.shotNo !== null && askedBack.has(shot.shotNo)).map((shot) => shot.nodeId)
           // 다시 만들기가 아닌데 영상이 있는 샷을 댔다 — 목록에 넣지 않고 "이미 영상이 있어요"를 먼저 말한다("1"로 답할 때와 같은 규칙, 리드 11/14).
           const already = videoAsk.remake ? [] : directorShotsWithVideo(answered)
           const alreadyLine = already.length > 0
-            ? alreadyHasVideoLine(contentLocale(), already, shotListLabel(contentLocale(), already.map((id) => shotLabelOf(nodes.find((node) => node.id === id), directorBoardNames()))))
+            ? alreadyHasVideoLine(contentLocale(), already, shotListLabel(contentLocale(), already.map((id) => shotLabelOf(nodes.find((node) => node.id === id), directorBoardNames(contentLocale())))))
             : null
           // 이미지가 없는 샷은 그 줄을 먼저 말하고 목록에서 뺀다(되묻기 목록은 이미지가 있는 샷만, 리드 11/14 B1 ③).
           const lines = alreadyLine ? [alreadyLine] : []
@@ -3086,11 +3087,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (numbers) {
           await runDirectorTurn(projectId, trimmed, isCurrentSession, async (say) => {
             const nodes = useDirectorCanvasStore.getState().nodes
-            const shots = directorShotRefs(nodes, directorBoardNames())
+            const shots = directorShotRefs(nodes, directorBoardNames(contentLocale()))
             const answered = shots.filter((shot) => shot.shotNo !== null && numbers.has(shot.shotNo)).map((shot) => shot.nodeId)
             // 다시 만들기가 아닌데 영상이 있는 샷을 번호로 댔다 — 만들지 않고 "이미 영상이 있어요"(Take 0, 리드 11/14).
             const already = videoAsk.remake ? [] : directorShotsWithVideo(answered)
-            if (already.length > 0) say(alreadyHasVideoLine(contentLocale(), already, shotListLabel(contentLocale(), already.map((id) => shotLabelOf(nodes.find((node) => node.id === id), directorBoardNames())))))
+            if (already.length > 0) say(alreadyHasVideoLine(contentLocale(), already, shotListLabel(contentLocale(), already.map((id) => shotLabelOf(nodes.find((node) => node.id === id), directorBoardNames(contentLocale()))))))
             const shotIds = answered.filter((id) => !already.includes(id))
             if (shotIds.length === 0) {
               if (already.length === 0) say(translate(contentLocale(), 'There are no such shots right now.'))
@@ -3718,11 +3719,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // Director Canvas agentic 모드 — 항상 canvasContext 전달.
         // (unify-director-store-db Step 1: 옛 director-store legacy 분기 제거, canvas가 단일 진실)
         const canvasState = useDirectorCanvasStore.getState()
-        // 씬 · 샷마다 보드 이름("Scene 2 · Shot 8")을 붙인다 — 사용자는 보드 번호로 부르고(@Previz Shot 8), 모델도 그 이름으로 답한다(오너 2026-11-02 "전체 번호로 통일").
+        // 씬 · 샷마다 보드 이름("씬 2 · 샷 8" · "Scene 2 · Shot 8")을 붙인다 — 사용자는 보드 번호로 부르고(@실사 샷 8 · @Previz Shot 8), 모델도 그 이름으로 답한다(오너 2026-11-02 "전체 번호로 통일").
+        //   이름은 채팅 언어(오너 2026-11-14 답 7) — 모델은 적힌 이름을 그대로 쓴다.
         const writerBoard = useWriterStore.getState()
         // 샷마다 이미지가 있는지(있음 · 그리는 중 · 없음)를 덧붙인다 — 이미지 없는 샷의 영상을 약속하지 않게(리드 11/14 영어 재점검 B3).
         const shotImages = directorShotImages()
-        const canvasContext = [serializeDirectorCanvasContext(canvasState, boardNodeNames(writerBoard.sceneManifest, writerBoard.shots), shotImages), shotImages.size > 0 ? SHOT_IMAGES_NOTE : ''].filter(Boolean).join('\n\n')
+        const canvasContext = [serializeDirectorCanvasContext(canvasState, boardNodeNames(writerBoard.sceneManifest, writerBoard.shots, contentLocale()), shotImages), shotImages.size > 0 ? SHOT_IMAGES_NOTE : ''].filter(Boolean).join('\n\n')
         endpoint = '/api/director/chat'
         body = {
           message: trimmed,
@@ -3752,6 +3754,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           writerContext: serializeWriterScriptContext(
             writerState.sceneManifest,
             writerState.shots,
+            contentLocale(),
             scriptLines,
           ),
           ...(lineRefs.length > 0 ? { lineRefs } : {}),
@@ -4437,7 +4440,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             if (projectId) saveChatMessage(projectId, stage, 'model', content)
           }
           const before = useDirectorCanvasStore.getState()
-          const names = directorBoardNames()
+          const names = directorBoardNames(contentLocale())
           const blank = (node: DirectorNode) => isShotData(node.data) && node.data.storyboardImage?.status !== 'completed' && node.data.storyboardImage?.status !== 'generating'
           // 그림을 "남은 것 전부"로 부탁하면 만들기 전에 몇 장인지 센다(만들기 시작하면 상태가 바뀐다).
           const missingImages = before.nodes.filter(blank).length
@@ -4643,7 +4646,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             const writer = useWriterStore.getState()
             const manifest = writer.sceneManifest ? { ...writer.sceneManifest, scenes: writer.sceneManifest.scenes.filter(scene => scene.sceneId === shots[0].sceneId) } : null
             // 번호는 보드 전체에서 센다(리뷰 L5) — 씬 하나만 담은 목록으로 세면 "Scene 1 · Shot 1"이 되어 <shot-numbers> 와 어긋난다.
-            const context = serializeWriterScriptContext(manifest, shots, buildScriptLines(manifest, shots), { manifest: writer.sceneManifest, shots: writer.shots })
+            const context = serializeWriterScriptContext(manifest, shots, contentLocale(), buildScriptLines(manifest, shots), { manifest: writer.sceneManifest, shots: writer.shots })
             const response = await fetch('/api/writer/chat', {
               signal: controller.signal, method: 'POST', headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({

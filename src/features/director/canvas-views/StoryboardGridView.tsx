@@ -375,7 +375,8 @@ function ShotCell({
   const stageBadge =
     mediaMode === 'previz'
       ? roughStartUrl
-        ? { label: 'Previz', cls: 'text-foreground', video: false }
+        // 보기 단추 이름과 같은 말(러프 · Rough) — 한국어 화면에 "Previz"가 보였다(리드 2026-11-14, 오너 답 7 전역 규칙).
+        ? { label: t('Rough'), cls: 'text-foreground', video: false }
         : { label: t('Rough needed'), cls: 'text-warning', video: false }
       : null
 
@@ -874,8 +875,9 @@ export function StoryboardGridView({
   const sceneShotMentionItems = useMemo(() => {
     const targets = directorMentionTargets(nodes, boardNames)
     return [
-      ...sceneShotMentions(targets, 'previz'),
-      ...sceneShotMentions(targets, 'real'),
+      // 카드에서 넣는 @멘션도 채팅 고르기 목록과 같은 화면 언어 이름("@실사 샷 3" · "@Real Shot 3", 오너 2026-11-14 답 7).
+      ...sceneShotMentions(targets, 'previz', boardNames.locale),
+      ...sceneShotMentions(targets, 'real', boardNames.locale),
     ]
   }, [nodes, boardNames])
 

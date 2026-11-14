@@ -15,13 +15,13 @@ describe('샷 번호', () => {
   it('샷 고치기 팝업은 보드 카드와 같은 전체 번호로 "Scene 2 · Shot 8"처럼 부른다', () => {
     // 왜: 오너 2026-11-02 전체 번호로 통일 — 보드 카드는 "Scene 2 · Shot 8"인데 팝업 머리는 씬 안 번호("S2-3")라 같은 샷을 두 이름으로 불렀다.
     //   팝업 제목은 카드와 같은 이름에 "고치기"를 붙인다(오너에게 보인 그대로: "Scene 2 · Shot 8 고치기").
-    expect(sceneShotLabel(manifest, shots, 'b')).toBe('Scene 1 · Shot 2')
-    expect(sceneShotLabel(manifest, shots, 'c')).toBe('Scene 2 · Shot 3')
+    expect(sceneShotLabel(manifest, shots, 'b', 'en')).toBe('Scene 1 · Shot 2')
+    expect(sceneShotLabel(manifest, shots, 'c', 'en')).toBe('Scene 2 · Shot 3')
     expect(translate('ko', '{label} · edit', { label: 'Scene 2 · Shot 8' })).toBe('Scene 2 · Shot 8 고치기')
   })
 
   it('목록에 없는 샷은 번호를 지어내지 않는다', () => {
-    expect(sceneShotLabel(manifest, shots, 'zz')).toBeNull()
+    expect(sceneShotLabel(manifest, shots, 'zz', 'en')).toBeNull()
   })
 })
 

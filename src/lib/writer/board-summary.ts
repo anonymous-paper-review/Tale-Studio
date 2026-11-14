@@ -1,5 +1,6 @@
 // Storyboard 보드의 숫자 · 샷 이름 · Director 넘김 창 내용 (리뉴얼 1차 2026-10-19, 프로토타입 S1 · S7).
 //   보드 카드 · 화면 머리 · 넘김 창이 같은 셈을 쓰도록 한 곳에 둔다 — 러닝타임은 목표가 아니라 샷 길이의 합(지표)이다.
+import { sceneShotName } from '@/lib/board-names'
 import { countText } from '@/lib/i18n/count-text'
 import { translate } from '@/lib/i18n/translate'
 import type { AppLocale } from '@/lib/locale'
@@ -18,8 +19,6 @@ export interface BoardShotEntry<S extends NumberedShot = BoardShotInput> {
   sceneNo: number
   /** 보드에 보이는 샷 번호 — 씬마다 다시 세지 않고 씬 순서대로 이어 센다(#shot-global-no 2026-08-12). */
   shotNo: number
-  /** 보드 카드와 같은 이름 "Scene N · Shot M"(로케일 무관, #internal-id-scrub). */
-  label: string
 }
 
 /** 보드에 그려지는 샷과 번호 — 씬 목록 순서, 씬 안에서는 샷 순서. 씬 목록에 없는 샷은 보드에 없다.
@@ -31,15 +30,16 @@ export function boardShots<S extends NumberedShot>(manifest: BoardManifest, shot
     for (const shot of shots) {
       if (shot.sceneId !== scene.sceneId) continue
       shotNo++
-      out.push({ shot, sceneNo: sceneIndex + 1, shotNo, label: `Scene ${sceneIndex + 1} · Shot ${shotNo}` })
+      out.push({ shot, sceneNo: sceneIndex + 1, shotNo })
     }
   })
   return out
 }
 
-/** 샷 id → 보드 카드 이름("Scene 2 · Shot 8") — 번호는 id 가 아니라 지금 순서에서 센다(샷을 더하거나 지우면 다시 센다). */
-export function boardShotLabels(manifest: BoardManifest, shots: readonly NumberedShot[]): Map<string, string> {
-  return new Map(boardShots(manifest, shots).map((entry) => [entry.shot.shotId, entry.label]))
+/** 샷 id → 보드 카드 이름("씬 2 · 샷 8" · "Scene 2 · Shot 8", 그 이름이 들어갈 글의 언어 — 오너 2026-11-14 답 7) — 번호는 id 가 아니라
+ *  지금 순서에서 센다(샷을 더하거나 지우면 다시 센다). */
+export function boardShotLabels(manifest: BoardManifest, shots: readonly NumberedShot[], locale: AppLocale): Map<string, string> {
+  return new Map(boardShots(manifest, shots).map((entry) => [entry.shot.shotId, sceneShotName(locale, entry.sceneNo, entry.shotNo)]))
 }
 
 export interface BoardStats {
@@ -94,8 +94,9 @@ export interface DirectorHandoffSummary {
   movingShotIds: string[]
   /** 넘어가는 샷 길이의 합 — 정수 초. */
   movingSeconds: number
-  /** 러프가 없어 이번에 빠지는 샷 — drawable = 그릴 스토리(액션)가 있어 [남은 컷 그리기]로 그릴 수 있다. */
-  missing: Array<{ shotId: string; label: string; drawable: boolean }>
+  /** 러프가 없어 이번에 빠지는 샷(보드 번호) — drawable = 그릴 스토리(액션)가 있어 [남은 컷 그리기]로 그릴 수 있다.
+   *  이름은 창이 화면 언어로 짓는다(directorConfirmView). */
+  missing: Array<{ shotId: string; sceneNo: number; shotNo: number; drawable: boolean }>
 }
 
 /** Director 넘김 창의 숫자. panelOf = 보드가 지금 보여 주는 그림(막 받은 그림 포함), 없으면 저장된 그림. */
@@ -108,7 +109,7 @@ export function directorHandoffSummary<S extends BoardShotInput>(
   const moving = entries.filter((entry) => isRoughDrawn(panelOf(entry.shot)))
   const missing = entries
     .filter((entry) => !isRoughDrawn(panelOf(entry.shot)))
-    .map((entry) => ({ shotId: entry.shot.shotId, label: entry.label, drawable: !!entry.shot.actionDescription?.trim() }))
+    .map((entry) => ({ shotId: entry.shot.shotId, sceneNo: entry.sceneNo, shotNo: entry.shotNo, drawable: !!entry.shot.actionDescription?.trim() }))
   return { movingShots: moving.length, movingShotIds: moving.map((entry) => entry.shot.shotId), movingSeconds: secondsOf(moving), missing }
 }
 
@@ -148,7 +149,7 @@ export interface DirectorConfirmView {
 /** Storyboard → Director 넘기기 창(디자이너 1110 확정 D0 · 오너 2026-11-14 페이지 추천). 러프 없는 샷 경고 · [남은 컷 그리기]는 그대로 둔다.
  *  약속: tests/writer/board-summary.test.ts · tests/writer/director-handover-images.test.ts */
 export function directorConfirmView(summary: DirectorHandoffSummary, locale: AppLocale, extra: DirectorConfirmExtra): DirectorConfirmView {
-  const labels = summary.missing.map((item) => item.label)
+  const labels = summary.missing.map((item) => sceneShotName(locale, item.sceneNo, item.shotNo))
   const shots = labels.slice(0, MISSING_LABEL_LIMIT).join(', ')
   const more = labels.length - MISSING_LABEL_LIMIT
   const warning = labels.length === 0 ? null
