@@ -634,6 +634,22 @@ export const KO: Record<string, string> = {
   'Loaded the previously separated layer': '분리해 둔 레이어를 불러왔어요',
   'Separated the arrow layer. Scrape with the eraser to reveal the layer underneath': '화살표 레이어를 분리했어요. 지우개로 긁으면 밑층이 드러나요',
   'Layer separation failed': '레이어 분리 실패',
+  // 연출 화살표 편집기 — 낡은 화면에서 분리(2026-11-14 검토 낮음 2)
+  'The directing frame changed in the meantime. Open it again and separate the layer again.': '그사이 연출 그림이 바뀌었어요. 다시 열어 레이어를 다시 분리해 주세요.',
+  'The directing frame changed in the meantime, so we loaded it again. Separate the layer again.': '그사이 연출 그림이 바뀌어 다시 불러왔어요. 레이어를 다시 분리해 주세요.',
+  // 연출 화살표 편집기 — 저장하지 않은 화살표가 있으면 닫기 전에 묻는다(2026-11-14 오너 고장 · 리드 ②)
+  'You have unsaved arrows': '저장하지 않은 화살표가 있어요',
+  'Save them before closing, or close without saving them.': '닫기 전에 저장하거나, 저장하지 않고 닫을 수 있어요.',
+  'Keep drawing': '계속 그리기',
+  'Discard and close': '버리고 닫기',
+  'Save and close': '저장하고 닫기',
+  // [시작] 탭으로 바꿀 때 같은 물음(리드 2026-11-14)
+  'Save them before switching tabs, or switch without saving them.': '탭을 바꾸기 전에 저장하거나, 저장하지 않고 바꿀 수 있어요.',
+  'Discard and switch': '버리고 바꾸기',
+  'Save and switch': '저장하고 바꾸기',
+  // 연출 장을 다시 만들 때 같은 물음 — 저장해도 바뀌므로 둘만(검토 a 54016e65)
+  'Remaking the directing frame replaces it, so the arrows you drew go away.': '연출 그림을 다시 만들면 그린 화살표는 없어져요.',
+  'Discard and remake': '버리고 다시 만들기',
   'Could not create a canvas context': '캔버스 컨텍스트 생성 실패',
   'Saved the DIRECTING frame': 'DIRECTING 프레임을 저장했어요',
   'Redrawing the END frame, about 30 seconds': 'END 프레임을 다시 그리는 중이에요. 30초쯤 걸려요',
