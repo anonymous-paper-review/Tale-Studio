@@ -237,6 +237,10 @@ describe('허락을 묻는 말 가르기', () => {
     '이거 올려도 돼요?',
     'Hello! May I give you my storyline first?',
     'I have a script already. Can I paste it here?',
+    // 존댓말로 말한 앞 문장은 이야기 속 말이 아니다(리드 검토 11/14 낮음 3) — 끝맺음이 "…다"인 말하기만 줄거리 속 말이다.
+    '제가 먼저 말씀드렸어요. 줄거리를 줘도 될까요?',
+    '시리즈를 만들고 싶다고 말했어요. 줄거리를 줘도 될까요?',
+    '시리즈를 만들고 싶어. 줄거리를 줘도 될까?',
   ])('허락을 묻는 말로 읽는다: %s', (text) => {
     expect(asksToShareStory(text)).toBe(true)
   })
@@ -275,6 +279,13 @@ describe('허락을 묻는 말 가르기', () => {
     'A baker wonders: should I tell her the plot of the surprise party?',
     'Two rival chefs must share one kitchen for a night. Can I trust her? he wonders.',
     'Can I borrow your umbrella? the girl asks the stranger at the bus stop.',
+    // 줄거리 속 말(한국어) — 앞 문장이 "물었다 · 말했다 · 속삭였다"처럼 말하기로 끝나면 이야기 속 인물이 하는 말이다(리드 검토 11/14 낮음 3).
+    '소년은 소녀에게 물었다. 내 이야기를 들려줘도 될까?',
+    '노인이 천천히 말했다. 내 줄거리를 보내도 될까?',
+    '아이는 작게 속삭였다. 이 이야기를 들려줘도 돼?',
+    '소녀가 조용히 묻는다. 내 이야기를 들려줘도 될까?',
+    '소년이 말했다: 내 이야기를 들려줘도 될까?',
+    '소년은 소녀에게 물었다\n내 이야기를 들려줘도 될까?',
     '',
     '   ',
   ])('허락을 묻는 말로 읽지 않는다: %s', (text) => {

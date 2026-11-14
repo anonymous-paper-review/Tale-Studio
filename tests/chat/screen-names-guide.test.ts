@@ -52,6 +52,12 @@ describe('지시문 · 도구 안내', () => {
     expect(tool?.description).toContain('Storyboard')
   })
 
+  it('도구 안내가 처음 시작하는 넘김을 옛 이름(handoff to Writer)이 아니라 Storyboard 실행(targetStage "writer")으로 말한다', () => {
+    // 왜: "handoff to Writer"는 옛 이름이다 — 도구 대상 writer 는 Storyboard 화면의 씬 · 샷 실행이고 산문 Writer 화면이 아니다(리드 검토 11/14 낮음 2).
+    expect(CHAT_TOOL_GUIDE).not.toContain('handoff to Writer')
+    expect(CHAT_TOOL_GUIDE).toContain('handoff to the Storyboard run (targetStage "writer") uses the existing start approval when no run exists')
+  })
+
   it('잠긴 산문 지시문은 "Writer 로 넘겼다"가 아니라 산문을 확정했다고 지금 화면 이름으로 말한다', () => {
     // 왜: 옛 말 "handed over to Writer"가 그대로 답으로 나가 "Producer 가 잠겼다"가 되었다. 지금은 산문(Writer 화면)을 확정하면 잠기고 Artist 가 열린다.
     const directive = lockedProducerDirective(true)!

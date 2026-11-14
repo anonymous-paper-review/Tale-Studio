@@ -36,6 +36,17 @@ const KO_GIVE_ASK = new RegExp(`${KO_STORY}[^?？!]{0,${KO_GAP}}?${KO_GIVE}(?:�
 const KO_TELL_ASK = new RegExp(`${KO_STORY}[^?？!]{0,${KO_GAP}}?${KO_TELL}(?:도|두)${KO_PERMISSION}${KO_END}`) // i18n-ok: 허락을 묻는 한국어 말을 알아듣는 정규식
 const KO_THING_ASK = new RegExp(`${KO_THING}[^?？!]{0,12}?${KO_GIVE_SHORT}(?:도|두)${KO_PERMISSION}${KO_END}`) // i18n-ok: 허락을 묻는 한국어 말을 알아듣는 정규식
 
+// 줄거리 속 말(한국어, 리드 2026-11-14 검토 낮음 3) — "소년은 소녀에게 물었다. 내 이야기를 들려줘도 될까?"처럼 앞 문장이 말하기로 끝나면 이야기 속 인물이 하는 말이다.
+//   이야기 글의 끝맺음 "…다"만 읽는다 — "말씀드렸어요 · 말했어요" 같은 존댓말은 사용자 자신의 말이라 걸지 않는다. 같은 문장 안의 "…말했다: …"도 같다.
+const KO_SPEECH = '(?:물었다|되물었다|말했다|속삭였다|외쳤다|소리쳤다|중얼거렸다|대답했다|답했다|이야기했다|얘기했다|부탁했다|제안했다|고백했다|털어놓았다|청했다|묻는다|말한다|속삭인다|외친다|소리친다|중얼거린다|대답한다|답한다|이야기한다|부탁한다|제안한다|고백한다|털어놓는다|청한다)' // i18n-ok: 이야기 속 말하기 끝맺음을 알아듣는 정규식
+const KO_SPEECH_END = new RegExp(`${KO_SPEECH}["'”’」』)\\]]*[\\s.!?。…~]*$`)
+const KO_SPEECH_LEAD = new RegExp(`${KO_SPEECH}\\s*[:：,，]`)
+
+/** 이 허락 꼴 문장이 줄거리 속 인물의 말인가 — 앞 문장이 말하기로 끝났거나 같은 문장 앞에 "…말했다:"가 있다. */
+function storyInternalSpeech(previous: string, sentence: string): boolean {
+  return KO_SPEECH_END.test(previous) || KO_SPEECH_LEAD.test(sentence)
+}
+
 function koPermission(sentence: string): boolean {
   const compact = sentence.replace(/\s+/g, '')
   // 앱 말고 다른 사람에게 건네는 말("엄마에게 이야기를 보내도 될까")은 줄거리 속 말이다.
@@ -225,6 +236,7 @@ function analyze(text: string | null | undefined): Analysis {
   let found = false
   let prefaceEnd = 0
   let last = 0
+  let previous = ''
   for (const m of body.matchAll(SENTENCE)) {
     const start = m.index ?? 0
     kept.push(body.slice(last, start))
@@ -233,7 +245,7 @@ function analyze(text: string | null | undefined): Analysis {
     const trimmed = sentence.trim()
     if (!trimmed) {
       kept.push(sentence)
-    } else if (isPermissionSentence(trimmed)) {
+    } else if (isPermissionSentence(trimmed) && !storyInternalSpeech(previous, trimmed)) {
       const inside = permissionPieces(sentence)
       if (inside && !isLeadOnly(inside)) kept.push(`${sentence.match(/^\s*/)?.[0] ?? ''}${inside}`)
       if (!found) {
@@ -243,6 +255,7 @@ function analyze(text: string | null | undefined): Analysis {
     } else if (!isLeadOnly(trimmed)) {
       kept.push(sentence)
     }
+    if (trimmed) previous = trimmed
   }
   kept.push(body.slice(last))
   return { found, preface: tidy(kept.slice(0, prefaceEnd).join('')), remainder: tidy(kept.join('')) }

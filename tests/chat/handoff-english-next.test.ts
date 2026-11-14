@@ -16,6 +16,11 @@ describe('영어 다음 단계 말', () => {
     'yes go to the next stage now',
     'please go on to the next step',
     'move to the next tab.',
+    // 끝 꼬리(please · now) 앞의 쉼표(리드 검토 11/14 낮음 1)
+    'Go to next stage, please',
+    'go to the next step, now',
+    "let's go to the next screen, please",
+    'HEAD TO THE NEXT STAGE, PLEASE.',
   ])('Artist 에서 %s 는 Storyboard 로 넘기는 말이다', (said) => {
     expect(matchHandoffIntent(said, 'artist')?.to).toBe('writer')
   })
@@ -34,6 +39,9 @@ describe('영어 다음 단계 말', () => {
     'next stage',
     'the next stage looks fun',
     'go home',
+    // 쉼표 뒤에 다른 말이 이어지면 꼬리가 아니다.
+    'go to the next stage, then show me the cast',
+    'go to the next stage, please make the sky bluer',
   ])('Artist 에서 %s 는 넘기는 말로 읽지 않는다', (said) => {
     expect(matchHandoffIntent(said, 'artist')).toBeNull()
   })
