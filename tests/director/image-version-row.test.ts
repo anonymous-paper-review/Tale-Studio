@@ -16,8 +16,8 @@ import { DirectorShotDetail } from '@/features/director/shot-detail/director-sho
 import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectFormatStore } from '@/stores/project-format-store'
-import { selectStoryboardVersion, storyboardImageVersions, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
-import { shownVersionRowPage, versionRowPageOf, versionRowView } from '@/lib/director/image-version-row'
+import { currentStoryboardVersion, selectStoryboardVersion, storyboardImageVersions, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { versionRowStep, versionRowView, versionRowWindow } from '@/lib/director/image-version-row'
 import type { StoryboardImage } from '@/types/director'
 
 let shotId = ''
@@ -70,6 +70,12 @@ function arrowTag(out: string, label: string): string | null {
 }
 const names = (list: Array<{ n: number }>) => list.map((v) => `v${v.n}`)
 const source = () => readFileSync('src/features/director/shot-detail/shot-image-tab.tsx', 'utf8')
+/** 줄이 기억한 창(그때의 지금 그림 · 맨 오른쪽 버전 id)으로 지금 보이는 칩. */
+type Saved = { anchor: string | null; endId: string | null }
+const seen = (versions: ReturnType<typeof storyboardImageVersions>, currentId: string | null, saved: Saved | null) =>
+  names(versionRowView(versions, versionRowWindow(versions, currentId, saved).endId).shown)
+/** 멈춘 뒤 끝난 그림 하나를 더 붙인다 — 지금 그림은 그대로다. */
+const withStopped = (image: StoryboardImage, n: number) => withStoryboardVersion(image, { ...version(n), cancelled: true }, { select: false })
 
 beforeEach(() => {
   director.setState({ projectId: 'version-row-project', nodes: [], edges: [], realBatchBusy: false, generatingNodeIds: {} })
@@ -92,13 +98,18 @@ describe('같이 정한 것', () => {
   it('버전 줄의 왼쪽 단추를 누르면 이전 버전 5개가, 오른쪽 단추를 누르면 다음 버전 5개가 보인다', () => {
     // 왜: 오너 11/14 답 5 "오른쪽 왼쪽 버튼으로 … 이전껄 볼 수 있게" — 5개만 보여도 옛 버전으로 돌아갈 수 있어야 한다.
     const versions = storyboardImageVersions(made(12))
-    const after = (page: number) => names(versionRowView(versions, shownVersionRowPage(versions, 'job-12', { anchor: 'job-12', page })).shown)
-    expect(after(0)).toEqual(['v8', 'v9', 'v10', 'v11', 'v12'])
-    expect(after(1)).toEqual(['v3', 'v4', 'v5', 'v6', 'v7'])
-    expect(after(2)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5'])
-    // 단추가 쪽을 옮긴다 — 왼쪽은 한 쪽 이전(+1), 오른쪽은 한 쪽 다음(-1).
-    expect(source()).toMatch(/aria-label=\{t\('Show earlier versions'\)\}[^>]*onClick=\{\(\) => moveVersions\(1\)\}/)
-    expect(source()).toMatch(/aria-label=\{t\('Show later versions'\)\}[^>]*onClick=\{\(\) => moveVersions\(-1\)\}/)
+    const view = (endId: string | null) => names(versionRowView(versions, endId).shown)
+    let end = versionRowWindow(versions, 'job-12', null).endId
+    expect(view(end)).toEqual(['v8', 'v9', 'v10', 'v11', 'v12'])
+    end = versionRowStep(versions, end, -1)
+    expect(view(end)).toEqual(['v3', 'v4', 'v5', 'v6', 'v7'])
+    end = versionRowStep(versions, end, -1)
+    expect(view(end)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5'])
+    end = versionRowStep(versions, end, 1)
+    expect(view(end)).toEqual(['v6', 'v7', 'v8', 'v9', 'v10'])
+    // 단추가 창을 옮긴다 — 왼쪽은 보이는 5개 바로 앞(-1), 오른쪽은 바로 뒤(+1). (리드 검토 11/14 — 예전 기대는 쪽 번호 +1 · -1)
+    expect(source()).toMatch(/aria-label=\{t\('Show earlier versions'\)\}[^>]*onClick=\{\(\) => moveVersions\(-1\)\}/)
+    expect(source()).toMatch(/aria-label=\{t\('Show later versions'\)\}[^>]*onClick=\{\(\) => moveVersions\(1\)\}/)
     useImage(made(12))
     const out = render('popup')
     expect(arrowTag(out, 'Show earlier versions')).not.toContain('disabled=""')
@@ -113,6 +124,9 @@ describe('혼자 정한 것', () => {
     const out = render('popup')
     expect(chips(out)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5'])
     expect(row(out)).toMatch(/aria-pressed="true"[^>]*>v2</)
+    // 처음 창은 가장 새 것부터 5개씩 끊은 칸 중 지금 그림이 든 칸이다 — v8 이 지금 그림이면 v8~v12.
+    useImage(made(12, 8))
+    expect(chips(render('popup'))).toEqual(['v8', 'v9', 'v10', 'v11', 'v12'])
     // 멈춘 뒤 끝난 그림만 있는 샷(지금 그림 없음) — 가장 새 5개, 눌린 칩 없음.
     useImage(stoppedOnly(7))
     const none = render('popup')
@@ -120,13 +134,18 @@ describe('혼자 정한 것', () => {
     expect(row(none)).not.toContain('aria-pressed="true"')
   })
 
-  it('쪽은 가장 새 버전부터 5개씩 끊고, 맨 앞 쪽은 v1 부터 5개를 채운다 — 버전이 7개면 v3~v7 과 v1~v5 다', () => {
-    // 왜: 버전이 5개를 넘으면 어느 쪽이든 5개가 보인다 — v1 부터 끊으면 가장 새 쪽에 한두 개만 덩그러니 남는다.
-    const versions = storyboardImageVersions(made(7))
-    expect(names(versionRowView(versions, 0).shown)).toEqual(['v3', 'v4', 'v5', 'v6', 'v7'])
-    expect(names(versionRowView(versions, 1).shown)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5'])
-    expect(versionRowPageOf(7, 1)).toBe(1)
-    expect(versionRowPageOf(7, 2)).toBe(0)
+  it('넘기다 v1 이나 가장 새 버전에 닿으면 끝에서 5개를 채워 늘 5개가 보인다 — 버전이 7개면 v3~v7 과 v1~v5 이고 v3~v5 가 겹친다', () => {
+    // 왜: 버전이 5개를 넘으면 어디를 보든 5개가 보인다 — 끝에 한두 개만 덩그러니 남지 않게(리드 11/14 "겹침은 혼자 정한 것으로").
+    //   (리드 검토 11/14 — 단추는 쪽 번호가 아니라 보이는 5개 바로 앞 · 뒤로 옮긴다. 예전 이름 '쪽은 가장 새 버전부터 5개씩 끊고, 맨 앞 쪽은 v1 부터 5개를 채운다 …')
+    const seven = storyboardImageVersions(made(7))
+    const home = versionRowWindow(seven, 'job-7', null).endId
+    expect(names(versionRowView(seven, home).shown)).toEqual(['v3', 'v4', 'v5', 'v6', 'v7'])
+    const back = versionRowStep(seven, home, -1)
+    expect(names(versionRowView(seven, back).shown)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5'])
+    expect(names(versionRowView(seven, versionRowStep(seven, back, 1)).shown)).toEqual(['v3', 'v4', 'v5', 'v6', 'v7'])
+    // 가장 새 쪽 끝에서도 채운다 — 12개에서 v6~v10 을 보다 › 면 v8~v12(v8~v10 겹침).
+    const twelve = storyboardImageVersions(made(12))
+    expect(names(versionRowView(twelve, versionRowStep(twelve, 'job-10', 1)).shown)).toEqual(['v8', 'v9', 'v10', 'v11', 'v12'])
   })
 
   it('맨 앞 쪽에서는 왼쪽 단추가, 가장 새 쪽에서는 오른쪽 단추가 꺼지고 단추 자리는 그대로다', () => {
@@ -140,9 +159,11 @@ describe('혼자 정한 것', () => {
     expect(row(oldest).indexOf('Show earlier versions')).toBeLessThan(row(oldest).indexOf('>v1<'))
     expect(row(oldest).indexOf('Show later versions')).toBeGreaterThan(row(oldest).indexOf('>v5<'))
     const versions = storyboardImageVersions(made(12))
-    expect(versionRowView(versions, 2)).toMatchObject({ earlier: false, later: true })
-    expect(versionRowView(versions, 0)).toMatchObject({ earlier: true, later: false })
-    expect(versionRowView(versions, 5).page).toBe(2)
+    expect(versionRowView(versions, 'job-5')).toMatchObject({ earlier: false, later: true })
+    expect(versionRowView(versions, 'job-12')).toMatchObject({ earlier: true, later: false })
+    // 끝에서 더 누르면 그대로다 — 돌지 않는다.
+    expect(versionRowStep(versions, 'job-5', -1)).toBe('job-5')
+    expect(versionRowStep(versions, 'job-12', 1)).toBe('job-12')
   })
 
   it('버전이 5개 이하면 넘기기 단추가 없다', () => {
@@ -156,22 +177,26 @@ describe('혼자 정한 것', () => {
 
   it('지금 그림이 바뀌면(새로 만든 그림 · Lumi 그림 · 올린 그림) 버전 줄은 지금 그림이 든 쪽으로 가고, 멈춘 뒤 끝난 그림이 쌓일 때는 보던 쪽 그대로다', () => {
     // 왜: 다시 만들기가 끝나면 새 그림이 눌린 칩으로 바로 보여야 다 됐다는 것을 안다. 멈춘 뒤 끝난 그림은 지금 그림을 바꾸지 않는다(오너 7번).
-    const twelve = storyboardImageVersions(made(12))
-    const back = { anchor: 'job-12', page: 2 }
-    expect(shownVersionRowPage(twelve, 'job-12', back)).toBe(2)
-    // 새 그림 v13 이 지금 그림이 됨 → 가장 새 쪽.
+    //   (리드 검토 11/14 — 쪽 번호 대신 보이는 칩을 본다. 예전 기대는 쪽 번호 2)
+    const back: Saved = { anchor: 'job-12', endId: 'job-5' }
+    expect(seen(storyboardImageVersions(made(12)), 'job-12', back)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5'])
+    // 새 그림 v13 이 지금 그림이 됨 → 지금 그림이 든 가장 새 5개.
     const thirteen = storyboardImageVersions(made(13))
-    expect(names(versionRowView(thirteen, shownVersionRowPage(thirteen, 'job-13', back)).shown)).toEqual(['v9', 'v10', 'v11', 'v12', 'v13'])
-    // 멈춘 뒤 끝난 v13 은 지금 그림이 아니다 → 보던 쪽(2) 그대로.
-    const withStopped = storyboardImageVersions(withStoryboardVersion(made(12), { ...version(13), cancelled: true }, { select: false }))
-    expect(shownVersionRowPage(withStopped, 'job-12', back)).toBe(2)
+    const moved = versionRowWindow(thirteen, 'job-13', back)
+    expect(names(versionRowView(thirteen, moved.endId).shown)).toEqual(['v9', 'v10', 'v11', 'v12', 'v13'])
+    // 그 뒤 멈춘 v14 가 붙어도 v9~v13 그대로 — 다시 잡은 창을 화면이 기억한다.
+    expect(seen(storyboardImageVersions(withStopped(made(13), 14)), 'job-13', moved)).toEqual(['v9', 'v10', 'v11', 'v12', 'v13'])
+    expect(source()).toMatch(/if \(versionWindow !== savedVersionWindow\) setSavedVersionWindow\(versionWindow\)/)
+    // 멈춘 뒤 끝난 v13 은 지금 그림이 아니다 → 보던 v1~v5 그대로.
+    expect(seen(storyboardImageVersions(withStopped(made(12), 13)), 'job-12', back)).toEqual(['v1', 'v2', 'v3', 'v4', 'v5'])
   })
 
   it('버전 줄에서 버전을 누르면 그 버전이 지금 그림이 되고 줄은 보던 쪽 그대로다', () => {
-    // 왜: 맨 앞 쪽(v1~v5)은 다음 쪽(v3~v7)과 겹친다 — 맨 앞 쪽에서 v4 를 눌렀는데 줄이 v3~v7 로 튀면 어디를 보던지 놓친다.
+    // 왜: 맨 앞 쪽(v1~v5)은 바로 뒤 쪽(v3~v7)과 겹친다 — 맨 앞 쪽에서 v4 를 눌렀는데 줄이 v3~v7 로 튀면 어디를 보던지 놓친다.
+    //   (리드 검토 11/14 — 보이는 칩으로 본다. 예전 기대는 쪽 번호 2)
     const versions = storyboardImageVersions(made(12))
-    expect(shownVersionRowPage(versions, 'job-4', { anchor: 'job-4', page: 2 })).toBe(2)
-    expect(source()).toMatch(/setVersionMove\(\{ anchor: version\.id, page: versionRow\.page \}\)/)
+    expect(seen(versions, 'job-4', { anchor: 'job-4', endId: 'job-5' })).toEqual(['v1', 'v2', 'v3', 'v4', 'v5'])
+    expect(source()).toMatch(/setSavedVersionWindow\(\{ anchor: version\.id, endId: versionRow\.endId \}\)/)
     expect(source()).toMatch(/selectStoryboardImageVersion\(nodeId, version\.id\)/)
   })
 
@@ -191,5 +216,30 @@ describe('혼자 정한 것', () => {
     // 왜: 두 상세는 내용이 같다(디자이너 11/13 D6 · D7) — 한쪽만 넘겨 볼 수 있으면 안 된다.
     useImage(made(9))
     expect(row(render('panel'))).toBe(row(render('popup')))
+  })
+})
+
+describe('보이는 칸은 버전이 뒤에 붙어도 밀리지 않는다 (리드 검토 11/14)', () => {
+  it('6개에서 v2 를 고른 뒤 멈춘 v7 이 붙어도 v2~v6 이 그대로 보이고 v2 가 눌려 있다', () => {
+    // 왜: 보던 칸을 "가장 새 것부터 센 쪽 번호"로 기억해, 멈춘 v7 이 붙자 줄이 v3~v7 로 밀리고 눌린 v2 가 사라졌다 — 알림은 "지금 그림은 그대로예요"인데.
+    //   뒤에 붙은 v7 은 › 로 본다.
+    const six = storyboardImageVersions(made(6))
+    const opened = versionRowWindow(six, 'job-6', null)
+    expect(names(versionRowView(six, opened.endId).shown)).toEqual(['v2', 'v3', 'v4', 'v5', 'v6'])
+    // 줄에서 v2 를 누름 — 줄은 보던 칸(맨 오른쪽 v6)을 고른 버전과 함께 기억한다.
+    const picked: Saved = { anchor: 'job-2', endId: opened.endId }
+    const image = withStopped(made(6, 2), 7)
+    expect(currentStoryboardVersion(image)?.id).toBe('job-2')
+    const seven = storyboardImageVersions(image)
+    expect(seen(seven, 'job-2', picked)).toEqual(['v2', 'v3', 'v4', 'v5', 'v6'])
+    expect(versionRowView(seven, versionRowWindow(seven, 'job-2', picked).endId)).toMatchObject({ earlier: true, later: true })
+  })
+
+  it('12개에서 v3~v7 을 보던 중 멈춘 v13 이 붙어도 v3~v7 이 그대로다', () => {
+    // 왜: 같은 까닭으로 v4~v8 로 밀렸다 — 보던 버전이 한 칸씩 빠져나가 무엇을 보고 있었는지 놓친다.
+    const twelve = storyboardImageVersions(made(12))
+    const saved: Saved = { anchor: 'job-12', endId: versionRowStep(twelve, versionRowWindow(twelve, 'job-12', null).endId, -1) }
+    expect(seen(twelve, 'job-12', saved)).toEqual(['v3', 'v4', 'v5', 'v6', 'v7'])
+    expect(seen(storyboardImageVersions(withStopped(made(12), 13)), 'job-12', saved)).toEqual(['v3', 'v4', 'v5', 'v6', 'v7'])
   })
 })

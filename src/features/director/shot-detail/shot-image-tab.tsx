@@ -15,7 +15,7 @@ import { useT } from '@/lib/i18n'
 import { IMAGE_MODELS } from '@/lib/image-models'
 import { detailImageModel, detailImageModels, shotDetailFrames } from '@/lib/director/shot-detail'
 import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/director/storyboard-image-versions'
-import { shownVersionRowPage, versionRowView, type VersionRowMove } from '@/lib/director/image-version-row'
+import { versionRowStep, versionRowView, versionRowWindow } from '@/lib/director/image-version-row'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -51,10 +51,14 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   const frames = shotDetailFrames(data.storyboardImage)
   const versions = storyboardImageVersions(data.storyboardImage)
   const current = currentStoryboardVersion(data.storyboardImage)
-  // 버전 줄은 한 번에 5개(오너 11/14 답 5) — 처음엔 지금 그림이 든 쪽, 넘겨 본 쪽은 지금 그림이 그대로인 동안만 남는다.
-  const [versionMove, setVersionMove] = useState<VersionRowMove | null>(null)
-  const versionRow = versionRowView(versions, shownVersionRowPage(versions, current?.id ?? null, versionMove))
-  const moveVersions = (step: 1 | -1) => setVersionMove({ anchor: current?.id ?? null, page: versionRow.page + step })
+  // 버전 줄은 한 번에 5개(오너 11/14 답 5) — 보이는 5개는 맨 오른쪽 버전으로 기억해, 멈춘 뒤 끝난 그림이 뒤에 붙어도 밀리지 않는다(리드 검토 11/14).
+  //   처음 열 때와 지금 그림이 바뀔 때만 지금 그림이 든 칸으로 다시 잡고, 다시 잡은 창도 바로 기억한다(그 뒤 붙는 버전에도 밀리지 않게).
+  const currentId = current?.id ?? null
+  const [savedVersionWindow, setSavedVersionWindow] = useState(() => versionRowWindow(versions, currentId, null))
+  const versionWindow = versionRowWindow(versions, currentId, savedVersionWindow)
+  if (versionWindow !== savedVersionWindow) setSavedVersionWindow(versionWindow)
+  const versionRow = versionRowView(versions, versionWindow.endId)
+  const moveVersions = (step: 1 | -1) => setSavedVersionWindow({ anchor: currentId, endId: versionRowStep(versions, versionRow.endId, step) })
   const hasImage = !!frames.start
   const frameStyle = mediaFrameStyle(projectFormat, layout === 'popup' ? 360 : 200)
   // 실제로 도는 모델을 골라진 칸으로(리드 검토 c ④) — Writer 샷에 시트를 못 그리는 옛 모델이 저장돼 있으면 GPT Image 2.
@@ -83,7 +87,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
       {versions.length ? (
         <div className="flex items-center gap-1.5" data-testid="shot-detail-versions" role="group" aria-label={t('Image versions')}>
           {versionRow.paged ? (
-            <button type="button" disabled={!versionRow.earlier} aria-label={t('Show earlier versions')} title={t('Show earlier versions')} onClick={() => moveVersions(1)} className={VERSION_ARROW}>
+            <button type="button" disabled={!versionRow.earlier} aria-label={t('Show earlier versions')} title={t('Show earlier versions')} onClick={() => moveVersions(-1)} className={VERSION_ARROW}>
               <ChevronLeft className="size-3.5" />
             </button>
           ) : null}
@@ -94,7 +98,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
                 title={version.source === 'upload' ? t('Uploaded image') : version.cancelled ? t('Finished after it was stopped') : undefined}
                 onClick={() => {
                   if (active) return
-                  setVersionMove({ anchor: version.id, page: versionRow.page })
+                  setSavedVersionWindow({ anchor: version.id, endId: versionRow.endId })
                   void selectStoryboardImageVersion(nodeId, version.id)
                 }}
                 className={cn('shrink-0 rounded-full border px-2.5 py-0.5 font-num text-caption transition-colors', active ? 'border-info bg-info/15 text-foreground' : 'border-border text-muted-foreground hover:bg-accent')}>
@@ -103,7 +107,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
             )
           })}
           {versionRow.paged ? (
-            <button type="button" disabled={!versionRow.later} aria-label={t('Show later versions')} title={t('Show later versions')} onClick={() => moveVersions(-1)} className={VERSION_ARROW}>
+            <button type="button" disabled={!versionRow.later} aria-label={t('Show later versions')} title={t('Show later versions')} onClick={() => moveVersions(1)} className={VERSION_ARROW}>
               <ChevronRight className="size-3.5" />
             </button>
           ) : null}
