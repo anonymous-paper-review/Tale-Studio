@@ -404,4 +404,14 @@ describe('서버가 넘기는 영상 부탁', () => {
     // 칸이 아예 없으면 지금처럼 "남은 샷 전부" — 화면 막이가 사용자 말이 분명한 꼴인지 본다.
     expect(await updatesOf([{ type: 'generateVideos' }])).toEqual([{ type: 'generateVideos' }])
   })
+
+  // 왜: 영어 재점검(qa-golden f19330d7) B3 — "Make shots 3 or 4"(그림 없음)에 Lumi 가 "I've lined them up. The app will show the list for you to confirm"라고 했는데
+  //   목록은 나오지 않았다(앱은 이미지 없는 샷을 묻지 않고 "이미지가 먼저 필요해요"라고 말한다). 모델 답의 품질은 시험으로 못 본다 — 규칙이 실리는지만 본다.
+  it('Director 채팅 프롬프트에는 이미지 없는 샷의 영상을 보낸다거나 목록을 보인다고 약속하지 말고, 그런 샷은 앱이 "이미지가 먼저 필요해요"라고 말한다는 규칙이 실린다', async () => {
+    await updatesOf([])
+    const [system] = mocks.llmChat.mock.calls[0] as [string]
+    expect(system).toContain('The board context lists each shot\'s image under "### Shot images". The app makes a video only for a shot whose image is ready.')
+    expect(system).toContain('For a shot with no image the app tells the user the video needs an image first, and for a shot whose image is being made it says to wait.')
+    expect(system).toContain('So for those shots never say you are sending, starting or lining up a video, or that the app will show a list. Say the image comes first.')
+  })
 })
