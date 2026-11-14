@@ -526,6 +526,18 @@ describe('Director 의 다음 단계 버튼과 Editor 넘기기 창', () => {
     expect(detail).toMatch(/if \(openSeq !== undefined\) setTab\(initialTab\)[\s\S]{0,200}\}, \[openSeq\]\)/)
   })
 
+  // 왜(영어 재점검 qa-golden f19330d7, 리드 11/14): 노드 패널이 이미지 탭에서 아래로 내려가 있던 채 [Change] 로 영상 탭이 되면 스크롤이 그대로라
+  //   탭 머리 · Take 머리가 화면 밖이었다. 여는 차례로 탭을 바꿀 때만 상세(패널의 스크롤 칸)를 맨 위로 올린다 — 사람이 안에서 탭을 바꿀 때는 그대로다.
+  //   화면 시험 도구가 없어 상세의 쓰임(소스 글자)을 본다.
+  it('[바꾸기] · ⤢ 가 이미 열린 상세의 탭을 바꾸면 상세를 맨 위로 올려 탭 머리가 보이게 한다', () => {
+    const detail = readFileSync('src/features/director/shot-detail/director-shot-detail.tsx', 'utf8')
+    // 여는 차례가 바뀌고 탭이 달라질 때만 스크롤 칸(상세 맨 바깥 칸 — 노드 패널에서 스크롤된다)을 맨 위로.
+    expect(detail).toMatch(/if \(openSeq !== undefined && tab !== initialTab && rootRef\.current\) rootRef\.current\.scrollTop = 0\n\s*if \(openSeq !== undefined\) setTab\(initialTab\)/)
+    expect(detail).toMatch(/<div ref=\{rootRef\} className=\{cn\('flex min-h-0 flex-col gap-4', layout === 'panel' && 'h-full overflow-y-auto p-5'\)\}/)
+    // 사람이 탭을 바꿀 때는 스크롤을 건드리지 않는다.
+    expect(detail).toMatch(/onValueChange=\{\(value\) => setTab\(value as ShotDetailTab\)\}/)
+  })
+
   // 왜(혼자 정한 것): 채팅으로 넘겨 달라고 해도 같은 판단을 탄다 — Director 준비 창이 채팅에서도 열리는 것과 같게.
   it('채팅으로 Editor로 넘겨 달라고 해도 영상이 없는 샷이 있으면 같은 창을 연다', async () => {
     useDirectorCanvasStore.setState({ nodes: canvas(take('a1', 1, 'completed')) })
