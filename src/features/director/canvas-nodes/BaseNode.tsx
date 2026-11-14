@@ -10,6 +10,7 @@ import { useT } from '@/lib/i18n'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { editActionForKind } from '@/features/director/canvas-interaction'
 import { prettyNodeLabel } from '@/features/director/node-label'
+import { useLocaleStore } from '@/stores/locale-store'
 
 
 type Theme = 'scene' | 'shot' | 'video'
@@ -80,6 +81,8 @@ function BaseNodeImpl({
   picked = false,
 }: BaseNodeProps) {
   const t = useT()
+  // 남은 원래 id(take_v1 · sh_02_07)를 이름으로 바꿀 때도 화면 언어(오너 2026-11-14 답 7).
+  const locale = useLocaleStore((s) => s.locale)
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
   const selectNode = useDirectorCanvasStore((s) => s.selectNode)
   const openShotDetail = useDirectorCanvasStore((s) => s.openShotDetail)
@@ -227,7 +230,7 @@ function BaseNodeImpl({
 
       {/* 제목 · 꼬리표 */}
       <div className="mt-2 flex min-w-0 items-center gap-1.5" inert={inert}>
-        <div className="min-w-0 truncate text-[14px] font-semibold leading-tight text-foreground">{prettyNodeLabel(title) || '(untitled)'}</div>
+        <div className="min-w-0 truncate text-[14px] font-semibold leading-tight text-foreground">{prettyNodeLabel(title, locale) || '(untitled)'}</div>
         {tag}
       </div>
       {children}

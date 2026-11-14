@@ -17,6 +17,7 @@ import { downscaleForUpload, needsDownscale } from '@/lib/upload/downscale'
 import { TITLE_IMAGE_MAX_BYTES } from '@/lib/editor/title-image'
 import { useT } from '@/lib/i18n'
 import { boardShotLabels } from '@/lib/writer/board-summary'
+import { useLocaleStore } from '@/stores/locale-store'
 
 export interface ProjectImageOption {
   id: string
@@ -72,11 +73,12 @@ export function TitleImagePicker({
   const worlds = useAssetStorageStore((s) => s.worlds)
   const writerShots = useWriterStore((s) => s.shots)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
-  // 러프 그림 이름은 보드 카드와 같은 전체 번호("Scene 2 · Shot 8") — 내부 id 를 보이지 않는다(오너 2026-11-02 "전체 번호로 통일").
+  // 러프 그림 이름은 보드 카드와 같은 전체 번호("씬 2 · 샷 8") — 내부 id 를 보이지 않는다(오너 2026-11-02 "전체 번호로 통일"), 말은 화면 언어(2026-11-14 답 7).
+  const locale = useLocaleStore((s) => s.locale)
   const shots = useMemo(() => {
-    const labels = boardShotLabels(sceneManifest, writerShots)
+    const labels = boardShotLabels(sceneManifest, writerShots, locale)
     return writerShots.map((shot) => ({ ...shot, boardLabel: labels.get(shot.shotId) }))
-  }, [sceneManifest, writerShots])
+  }, [sceneManifest, writerShots, locale])
   const options = useMemo(() => collectProjectImages({ projectId, characters, worlds, shots }), [projectId, characters, worlds, shots])
   const fileRef = useRef<HTMLInputElement>(null)
   const [uploading, setUploading] = useState(false)

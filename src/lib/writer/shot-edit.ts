@@ -3,6 +3,7 @@
 import type { CameraConfig, DialogueLine, Shot, ShotType } from '@/types'
 import { toolValueKey } from '@/lib/chat-tools/executor'
 import { ROUGH_VISIBLE_SHOT_FIELDS } from '@/lib/writer/chat-rough-redraw'
+import type { AppLocale } from '@/lib/locale'
 import { boardShotLabels } from '@/lib/writer/board-summary'
 
 /** 시작 묶음(스토리 · 대사 · 샷 타입)의 값 — 팝업이 고치는 중인 값과 저장된 샷이 같은 모양이다. */
@@ -35,14 +36,15 @@ export function startApplyKind(changes: Partial<Shot>, hasRough: boolean): Apply
   return hasRough && ROUGH_VISIBLE_SHOT_FIELDS.some((field) => field in changes) ? 'redraw' : 'save'
 }
 
-/** 팝업이 부르는 샷 이름 — 보드 카드와 같은 전체 번호 이름("Scene 2 · Shot 8", 오너 2026-11-02 "전체 번호로 통일"). 보드에 없으면 null.
- *  옛 이름은 씬 안 번호("S2-3")였다. */
+/** 팝업이 부르는 샷 이름 — 보드 카드와 같은 전체 번호 이름("씬 2 · 샷 8" · "Scene 2 · Shot 8", 오너 2026-11-02 "전체 번호로 통일" ·
+ *  2026-11-14 답 7 화면 언어). 보드에 없으면 null. 옛 이름은 씬 안 번호("S2-3")였다. */
 export function sceneShotLabel(
   manifest: { scenes: ReadonlyArray<{ sceneId: string }> } | null | undefined,
   shots: ReadonlyArray<{ shotId: string; sceneId: string }>,
   shotId: string,
+  locale: AppLocale,
 ): string | null {
-  return boardShotLabels(manifest, shots).get(shotId) ?? null
+  return boardShotLabels(manifest, shots, locale).get(shotId) ?? null
 }
 
 export type CameraAngle = 'eye' | 'high' | 'low'

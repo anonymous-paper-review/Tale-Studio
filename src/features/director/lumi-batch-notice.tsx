@@ -39,7 +39,7 @@ export function LumiBatchNotice() {
   const busy = useGlobalChatStore((s) => s.loading)
 
   if (!notice || !collapsed || stage !== 'director' || notice.projectId !== projectId) return null
-  const names = boardNodeNames(sceneManifest, writerShots ?? [])
+  const names = boardNodeNames(sceneManifest, writerShots ?? [], locale)
   const view = lumiBatchNoticeView({
     notice,
     states,

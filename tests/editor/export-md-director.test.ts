@@ -208,8 +208,9 @@ describe('collectDirectorArtifacts', () => {
     const shotlist = textFile(files, 'director/shotlist.md')
 
     expect(shotlist).toContain('# Director Shotlist')
-    expect(shotlist).toContain('## Scene sc\\_01 — 옥상')
-    expect(shotlist).toContain('## Scene sc\\_02 — 골목')
+    // 씬 머리는 내부 id 대신 보드 번호 · 프로젝트 언어 이름이다(리드 2026-11-14 H7 · 오너 답 7).
+    expect(shotlist).toContain('## 씬 1 — 옥상')
+    expect(shotlist).toContain('## 씬 2 — 골목')
     expect(shotlist).toContain('요약: 한국어 옥상 장면')
     expect(shotlist).toContain('무드: 한국어 긴장감')
     expect(shotlist).toContain('한국어 액션이 먼저 나온다')

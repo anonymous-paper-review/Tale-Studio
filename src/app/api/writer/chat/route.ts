@@ -42,6 +42,9 @@ function dialogueLanguageChatDirective(lang: DialogueLanguage | undefined): stri
   return `\n\n[대사 언어] 이 프로젝트의 대사 언어는 ${name}(${lang})다. updates 로 대사 텍스트(dialogueLines 의 대사, 내레이션 등)를 새로 쓰거나 고칠 때는 ${name}로 쓴다. 예외는 하나 — 사용자가 이 메시지에서 명시적으로 다른 언어로 써 달라고 요구한 경우에만 그 요청을 따른다. 응답 본문 언어([응답 언어])와 대사 언어는 별개다.` // i18n-ok: LLM 프롬프트 디렉티브
 }
 
+// 한국어 대화의 보드 이름 예(오너 2026-11-14 답 7 — 보드 이름은 대화 언어로 적힌다).
+const KO_BOARD_NAME_EXAMPLE = '씬 2 · 샷 8' // i18n-ok: 모델에게 보이는 한국어 보드 이름 예
+
 const WRITER_CHAT_SYSTEM = `You are the Writers' Room assistant in an AI video production pipeline called "The Set."
 The user is reviewing the rough storyboard (pre-concept previz) of a story already broken into Scenes and Shots.
 
@@ -102,10 +105,10 @@ Ref mapping:
 </script-lines>
 
 <shot-numbers>
-Each shot in the context carries its board name in parentheses, e.g. sh_02_03 (Scene 2 · Shot 8). That is the name the user sees on the storyboard.
-Shot numbers count across the whole board; they do not restart in each scene. "Shot 8" in any language, or "Scene 2 · Shot 8", means the shot whose board name says Shot 8, never the 8th shot of a scene.
+Each shot in the context carries its board name in parentheses, written in the conversation language: e.g. sh_02_03 (Scene 2 · Shot 8) in English, sh_02_03 (${KO_BOARD_NAME_EXAMPLE}) in Korean. That is the name the user sees on the storyboard.
+Shot numbers count across the whole board; they do not restart in each scene. "Shot 8" in any language, or "Scene 2 · Shot 8" in either language, means the shot whose board name says Shot 8, never the 8th shot of a scene.
 A bare shot number ("Shot 8" in any language) always means the board number. When the user names a scene and a shot without the exact board name ("scene 2 shot 5"), it can be read two ways: the board's Shot 5 (only if it sits in that scene) or the 5th shot inside that scene. If only one reading exists, use it. If both exist and point to different shots, do not edit; ask which one they mean, naming both by their board names. An explicit position inside a scene ("the second shot of scene 2") means that position.
-When your reply names a shot, use its board name (Scene 2 · Shot 8). Never write the internal id (sh_..) or an in-scene position.
+When your reply names a shot, use its board name exactly as written in the parentheses. Never write the internal id (sh_..) or an in-scene position.
 </shot-numbers>
 
 <format>

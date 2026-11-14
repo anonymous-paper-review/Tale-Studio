@@ -42,6 +42,8 @@ import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-
 import { boardShots } from '@/lib/writer/board-summary'
 import type { GenerationMethod, LightingConfig, ShotType } from '@/types'
 import { useT } from '@/lib/i18n'
+import { sceneName, shotName } from '@/lib/board-names'
+import { useLocaleStore } from '@/stores/locale-store'
 
 // 모듈 상수는 영어 키, 번역은 렌더 지점에서 t() (writer-progress.tsx 의 STAGE_LABELS 패턴).
 // 카메라 앵글 — writer 배지(shot.camera.pan) 규칙과 왕복 일치: pan>=3=low, <=-3=high, else eye.
@@ -184,6 +186,8 @@ export function AddItemDialog({
   onOpenChange,
 }: AddItemDialogProps) {
   const t = useT()
+  // 씬 · 샷 이름은 화면 언어(오너 2026-11-14 답 7).
+  const locale = useLocaleStore((s) => s.locale)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const addShot = useWriterStore((s) => s.addShot)
@@ -352,7 +356,7 @@ export function AddItemDialog({
                       {/* 씬 헤더 (맥락) — 번호는 위치 기준(#5) */}
                       <div className="flex items-baseline gap-2 px-1 pt-2">
                         <span className="shrink-0 text-xs font-semibold text-foreground">
-                          Scene {si + 1}
+                          {sceneName(locale, si + 1)}
                         </span>
                         <TruncatedStory
                           text={scene.narrativeSummary}
@@ -393,7 +397,7 @@ export function AddItemDialog({
                                 )}
                               >
                                 <span className="shrink-0 text-xs font-medium text-muted-foreground">
-                                  Shot {globalShotNo.get(shot.shotId) ?? ki + 1}
+                                  {shotName(locale, globalShotNo.get(shot.shotId) ?? ki + 1)}
                                 </span>
                                 <TruncatedStory
                                   text={shot.actionDescription}

@@ -20,6 +20,8 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import type { RoughStoryboardImage } from '@/types'
 import { useT } from '@/lib/i18n'
+import { sceneShotName, shotName } from '@/lib/board-names'
+import { useLocaleStore } from '@/stores/locale-store'
 
 interface ShotDetailDialogProps {
   shotId: string | null
@@ -36,6 +38,7 @@ export function ShotDetailDialog({ shotId, panel, onOpenChange, variant = 'direc
 
 function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDialogProps, 'variant'>) {
   const t = useT()
+  const locale = useLocaleStore((s) => s.locale)
   const shot = useWriterStore((s) => s.shots.find((x) => x.shotId === shotId))
   const shots = useWriterStore((s) => s.shots)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
@@ -58,9 +61,9 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
     }
     if (found) break
   }
-  const positionLabel =
-    (sceneOrder >= 0 ? `Scene ${sceneOrder + 1} · ` : '') +
-    `Shot ${found ? globalNo : '?'}`
+  // 창 머리 이름은 화면 언어("씬 1 · 샷 2" · "Scene 1 · Shot 2", 오너 2026-11-14 답 7).
+  const shotNo = found ? globalNo : '?'
+  const positionLabel = sceneOrder >= 0 ? sceneShotName(locale, sceneOrder + 1, shotNo) : shotName(locale, shotNo)
 
   return (
     <>

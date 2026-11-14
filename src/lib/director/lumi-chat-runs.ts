@@ -7,7 +7,7 @@ import { translate } from '@/lib/i18n/translate'
 import type { AppLocale } from '@/lib/locale'
 import { effectivePromptOf } from '@/lib/director/video-frame-inputs'
 import type { BoardNodeNames } from '@/features/director/node-label'
-import { directorNodeLabel } from '@/features/director/node-label'
+import { directorBoardNo, directorNodeLabel } from '@/features/director/node-label'
 import type { DirectorCanvasUpdate } from '@/stores/director-store'
 import { isSceneData, isShotData, type DirectorNode } from '@/types/director'
 import type { ChatShotRef } from '@/lib/director/chat-video-targets'
@@ -15,11 +15,9 @@ import { shotFactsByNode, shotState, type DirectorShotState } from '@/lib/direct
 import { latestShotTake, takeSettings } from '@/lib/director/remake-take'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 
-/** 보드 번호("Shot 8" → 8). 보드에 없는 샷(Director 에서 만든 것 · 이름을 바꾼 것)은 null. */
+/** 보드 번호(샷 8 → 8) — 이름의 말과 상관없다(오너 2026-11-14 답 7 뒤 이름이 "샷 8"도 된다). 보드에 없는 샷(Director 에서 만든 것 · 이름을 바꾼 것)은 null. */
 function boardNo(node: DirectorNode, names: BoardNodeNames | null): number | null {
-  const name = directorNodeLabel(node.data, names)
-  const match = /^(?:Shot|Scene) (\d+)$/.exec(name)
-  return match ? Number(match[1]) : null
+  return directorBoardNo(node.data, names)
 }
 
 /** 샷마다 보드 번호 · 이미지 준비 · 영상 실패. 영상 실패는 보드가 빨강(영상 실패)으로 보이는 샷 그대로다 — 화면에서 멈춘 Take 규칙까지

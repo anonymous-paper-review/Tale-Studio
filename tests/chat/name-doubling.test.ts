@@ -7,8 +7,8 @@ const NAMES = new Map([['keeper', 'The Keeper'], ['char_1', 'Mina']])
 describe('채팅 말풍선 이름', () => {
   // 왜: 리드 2026-11-10(B2 추가) — 말풍선은 id 를 차례로 바꿔 "the keeper" → "the The Keeper", "The keeper" → "The The Keeper"가 됐다.
   it('채팅 말풍선의 id 를 이름으로 바꿀 때 관사가 겹치지 않고 이미 쓴 이름은 그대로 둔다', () => {
-    expect(scrubInternalIdsInProse('I think the keeper should fix the radio.', NAMES)).toBe('I think The Keeper should fix the radio.')
-    expect(scrubInternalIdsInProse('The keeper smiles.', NAMES)).toBe('The Keeper smiles.')
-    expect(scrubInternalIdsInProse('The Keeper smiles at char_1.', NAMES)).toBe('The Keeper smiles at Mina.')
+    expect(scrubInternalIdsInProse('I think the keeper should fix the radio.', 'en', NAMES)).toBe('I think The Keeper should fix the radio.')
+    expect(scrubInternalIdsInProse('The keeper smiles.', 'en', NAMES)).toBe('The Keeper smiles.')
+    expect(scrubInternalIdsInProse('The Keeper smiles at char_1.', 'en', NAMES)).toBe('The Keeper smiles at Mina.')
   })
 })

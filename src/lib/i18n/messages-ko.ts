@@ -3,6 +3,11 @@
 //   번역 공백이 깨진 화면이 아니라 영어 화면이 된다. 파이프라인 산출물·유저 콘텐츠는
 //   이 사전과 무관(프로젝트 locale 이 지배), 마케팅 페이지는 영어 고정이라 사전을 안 탄다.
 export const KO: Record<string, string> = {
+  // 씬 · 샷 이름은 화면 언어(오너 2026-11-14 답 7 — 8/26 단일형을 바꿈). 'Scene {n}' · 'Shot {n}' 은 아래에 있다. 짓는 곳: lib/board-names.ts
+  'Scene {scene} · Shot {shot}': '씬 {scene} · 샷 {shot}',
+  Shot: '샷',
+  'New Shot': '새 샷',
+  'New Scene': '새 씬',
   // Director 샷 상세(디자이너 11/13 시안 D6 · D7, 오너 2026-11-14) — 이미지 · 영상 탭, 시작 · 끝 나란히, 설정 한 화면, Take 쌓기
   'Video · none': '영상 · 없음',
   'Start image': '시작 이미지',
@@ -578,7 +583,7 @@ export const KO: Record<string, string> = {
   '(no shots)': '(샷 없음)',
   'No shot dialogue yet. Press "Generate dialogue" above to design character voices{br}and write shot-by-shot dialogue that follows the scene.': '아직 샷 대사가 없어요. 위의 "대사 생성"을 누르면 인물 어투를 설계하고{br}씬 흐름을 따라 샷 단위 대사를 써 드려요.',
   // ── writer 스테이지: writer-v2-preview ──
-  'Applied to the existing downstream contract. {scenes} scenes · {shots} shots': '기존 downstream 계약에 반영했습니다. 씬 {scenes}개 · Shot {shots}개',
+  'Applied to the existing downstream contract. {scenes} scenes · {shots} shots': '기존 downstream 계약에 반영했습니다. 씬 {scenes}개 · 샷 {shots}개',
   'Failed to apply.': '반영에 실패했습니다.',
   'Failed to save the review result.': '검토 결과 저장에 실패했습니다.',
   'V2 experimental previz: review story and visual together within each semantic unit': 'V2 실험 프리비즈: 의미 단위 안에서 story와 visual을 함께 검토합니다',
@@ -593,7 +598,7 @@ export const KO: Record<string, string> = {
   'Needs User Review': 'User Review 필요',
   'Connecting Artist·Director…': 'Artist·Director 연결 중…',
   'Apply the selected V2 result to downstream': '선택한 V2 결과를 downstream에 적용',
-  'After applying, Artist reads characters and backgrounds, and Director reads scenes and shots.': '적용 후 Artist가 캐릭터·배경을 읽고 Director가 씬·Shot을 읽습니다.',
+  'After applying, Artist reads characters and backgrounds, and Director reads scenes and shots.': '적용 후 Artist가 캐릭터·배경을 읽고 Director가 씬·샷을 읽습니다.',
   'Saving review…': '검토 저장 중…',
   'Select this result as the candidate': '현재 결과를 후보로 선택',
   Hold: '보류',
@@ -605,7 +610,7 @@ export const KO: Record<string, string> = {
   'Check passed': 'Check 통과',
   'Check failed': 'Check 실패',
   'Semantic units': '의미 단위',
-  'Each unit holds story intent, action, and reaction together with multiple shot expressions.': '한 단위 안에 이야기 의도·행동·반응과 여러 Shot 표현을 함께 보관합니다.',
+  'Each unit holds story intent, action, and reaction together with multiple shot expressions.': '한 단위 안에 이야기 의도·행동·반응과 여러 샷 표현을 함께 보관합니다.',
   '{count} shots': '샷 {count}개',
   'Intent:': '의도:',
   'Action:': '행동:',
@@ -620,7 +625,7 @@ export const KO: Record<string, string> = {
   'Camera:': '카메라:',
   'Blocking:': '동선:',
   'Transition:': '전환:',
-  'Shot expression': 'Shot 표현',
+  'Shot expression': '샷 표현',
   // ── writer 스테이지: script-view ──
   'No story text': '스토리 텍스트 없음',
   'No shots': '샷 없음',
@@ -772,7 +777,7 @@ export const KO: Record<string, string> = {
 
   // ── director: canvas-nodes ──
   Unused: '미사용',
-  'Connected to Shot': 'Shot에 연결됨',
+  'Connected to Shot': '샷에 연결됨',
   'Waiting to generate image': '이미지 생성 대기 중',
   'Generating image': '이미지 생성 중',
   'Regenerate image': '이미지 재생성',
@@ -797,7 +802,7 @@ export const KO: Record<string, string> = {
   // ── director: canvas-panels ──
   '{kind} details': '{kind} 상세',
   'Preset name': '프리셋 이름',
-  'Shot label': 'Shot 라벨',
+  'Shot label': '샷 라벨',
   'Prompt (for video generation)': '프롬프트 (영상 생성용)',
   'Action, mood, camera intent, etc. happening in this shot': '이 샷에서 일어나는 액션, 분위기, 카메라 의도 등',
   'Video generation model': '영상 생성 모델',
@@ -813,7 +818,7 @@ export const KO: Record<string, string> = {
   'Characters you Register in Artist will appear here.': 'Artist에서 캐릭터를 Register하면 여기에 나타납니다.',
   'World / locations ({count}/{total})': '월드 / 장소 ({count}/{total})',
   'Locations you Register in Artist will appear here.': 'Artist에서 장소를 Register하면 여기에 나타납니다.',
-  'Could not find the mother Shot.': '마더 Shot을 찾을 수 없습니다.',
+  'Could not find the mother Shot.': '마더 샷을 찾을 수 없습니다.',
   'Failed to generate video.': '영상 생성에 실패했습니다.',
   'Failed to add video node.': '영상 노드를 추가하지 못했습니다.',
   'Video label': 'Video 라벨',
@@ -827,19 +832,19 @@ export const KO: Record<string, string> = {
   'Enter a prompt before generating the video.': '영상을 만들기 전에 프롬프트를 입력하세요.',
   'The image was generated but could not be saved.': '이미지는 생성됐지만 저장하지 못했습니다.',
   '★ Unmark Final': '★ Final 해제',
-  'Mark as the Editor handoff target (only one per Shot)': 'Editor 핸드오프 대상으로 마킹 (Shot당 1개 강제)',
+  'Mark as the Editor handoff target (only one per Shot)': 'Editor 핸드오프 대상으로 마킹 (샷당 1개 강제)',
   'Video preview': '영상 미리보기',
   'Not generated yet': '아직 생성되지 않음',
   'A new generation attempt is in progress. You can keep playing the existing video.':
     '새 생성 시도를 진행 중입니다. 기존 영상은 계속 재생할 수 있습니다.',
-  "Mother Shot's prompt is empty": '마더 Shot의 prompt가 비어있음',
-  "Leave blank to use the mother Shot's prompt as-is.": '비워두면 마더 Shot의 prompt가 그대로 사용됩니다.',
+  "Mother Shot's prompt is empty": '마더 샷의 prompt가 비어있음',
+  "Leave blank to use the mother Shot's prompt as-is.": '비워두면 마더 샷의 prompt가 그대로 사용됩니다.',
   Regenerate: '재생성',
   Generate: '생성',
 
   // ── director: canvas-popups ──
-  'This also deletes {shotCount} Shots + {videoCount} Videos.': 'Shot {shotCount}개 + Video {videoCount}개가 함께 삭제됩니다.',
-  'This also deletes {count} Video takes.': 'Video 테이크 {count}개가 함께 삭제됩니다.',
+  'This also deletes {shotCount} Shots + {videoCount} Videos.': '샷 {shotCount}개 + 영상 {videoCount}개가 함께 삭제됩니다.',
+  'This also deletes {count} Video takes.': '영상 테이크 {count}개가 함께 삭제됩니다.',
   '⚠ Includes a take marked ★ Final. This may affect the Editor handoff.':
     '⚠ ★ Final로 마킹된 테이크가 포함됩니다. Editor 핸드오프에 영향이 있을 수 있어요.',
   'Delete node': '노드 삭제',
@@ -852,16 +857,16 @@ export const KO: Record<string, string> = {
   'Define relationship': '관계 정의',
   'Record the narrative relationship between the two nodes in one line.': '두 노드의 내러티브 관계를 한 줄로 기록할 수 있어요.',
   'Narrative (optional)': '내러티브 (선택)',
-  'E.g. continuous action from Shot A / a different POV of the same character': '예: Shot A의 연속 동작 / 같은 인물의 다른 시점',
+  'E.g. continuous action from Shot A / a different POV of the same character': '예: 샷 A의 연속 동작 / 같은 인물의 다른 시점',
   Connect: '연결',
-  'Scene label': 'Scene 라벨',
+  'Scene label': '씬 라벨',
   'E.g. on a bridge, a ruined city': '예: 다리 위, 폐허가 된 도시',
   'Time of Day': '시간대',
   'E.g. golden hour, midnight': '예: golden hour, midnight',
   'E.g. tense, melancholic, hopeful': '예: tense, melancholic, hopeful',
   Description: '씬 설명',
   'Narrative, characters, and event summary for the scene…': '씬의 내러티브, 등장 인물, 사건 요약…',
-  'Add Shot ({count} so far)': 'Shot 추가 ({count}개 보유)',
+  'Add Shot ({count} so far)': '샷 추가 ({count}개 보유)',
   'Original generation prompt (debug)': '원본 생성 프롬프트 (debug)',
   'Image generation model': '이미지 생성 모델',
   'Only a completed, playable video can be marked Final': '완료된 재생 가능 영상만 Final로 지정할 수 있습니다',
@@ -896,9 +901,9 @@ export const KO: Record<string, string> = {
   'Costs money to generate the image.': '이미지 생성 비용이 발생합니다.',
   'Replaces the existing shooting image with the new result.': '기존 촬영용 이미지가 새 결과로 교체됩니다.',
   '(Unassigned)': '(미배정)',
-  'No Shots yet': '아직 Shot이 없어요',
-  'Create a Scene and Shot first in the Node view.': 'Node 뷰에서 Scene과 Shot을 먼저 만들어 보세요.',
-  'This Scene has no Shots.': '이 Scene에는 Shot이 없어요.',
+  'No Shots yet': '아직 샷이 없어요',
+  'Create a Scene and Shot first in the Node view.': 'Node 뷰에서 씬과 샷을 먼저 만들어 보세요.',
+  'This Scene has no Shots.': '이 씬에는 샷이 없어요.',
 
   // ── director-store ──
   'Go live': '실사화',
@@ -1395,10 +1400,10 @@ export const KO: Record<string, string> = {
   'Show registered assets that this scene does not reference in the left asset column too': '씬마다 해당 씬이 참조하지 않는 등록 에셋도 좌측 에셋 컬럼에 표시',
   'Arrange assets, scenes, shots, and videos in a left-to-right layout with spacing (saved to DB)': '에셋·씬·샷·영상을 좌→우 레이아웃으로 정렬하고 간격을 확보 (DB 저장)',
   'Auto-arrange': '자동 정렬',
-  "Adds a standalone prompt node. Connect its right handle to a Shot's T input to sync the Shot prompt.": '분리된 프롬프트 노드를 추가합니다. 우측 핸들을 Shot의 T 입력에 연결하면 Shot 프롬프트가 동기됩니다.',
+  "Adds a standalone prompt node. Connect its right handle to a Shot's T input to sync the Shot prompt.": '분리된 프롬프트 노드를 추가합니다. 우측 핸들을 샷의 T 입력에 연결하면 샷 프롬프트가 동기됩니다.',
   'Prompt node': '프롬프트 노드',
   'Scenes come in automatically once you create them in Writer.': 'Writer에서 씬을 먼저 만들면 자동으로 들어와요.',
-  'Or double-click the canvas to create a Scene directly.': '또는 캔버스를 더블클릭해서 직접 Scene을 만들 수 있어요.',
+  'Or double-click the canvas to create a Scene directly.': '또는 캔버스를 더블클릭해서 직접 씬을 만들 수 있어요.',
   'Start shooting real images/videos based on the rough storyboard, characters, and world.': '러프 스토리보드와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요.',
   // v3 D1 Director 노드 캔버스(2026-11-03) — 툴바 제목 숫자 · 확대 알약 · 입력 구멍 라벨
   '{nodes} nodes · {shots} shots': '노드 {nodes} · 샷 {shots}',
@@ -2066,7 +2071,7 @@ export const KO: Record<string, string> = {
   'Every shot already has a video or one in progress.': '모든 샷에 이미 영상이 있거나 만들어지는 중이에요.',
   '{done} videos done, {failed} failed': '영상 {done}개 완료, {failed}개 실패',
   'A proposal is already pending, so the video generation proposal was held back.': '이미 대기 중인 제안이 있어 영상 생성 제안은 보류했어요.',
-  'Chat can start videos only for all remaining shots at once. For one shot, use the Video take button on the Shot node.': '채팅은 남은 샷 전체의 영상만 한꺼번에 시작할 수 있어요. 샷 하나는 Shot 카드의 Video take 버튼을 눌러 주세요.',
+  'Chat can start videos only for all remaining shots at once. For one shot, use the Video take button on the Shot node.': '채팅은 남은 샷 전체의 영상만 한꺼번에 시작할 수 있어요. 샷 하나는 샷 카드의 영상 Take 버튼을 눌러 주세요.',
   // 약속 F(2026-09-04): 선 지우기
   'Delete connection': '연결 지우기',
   // 약속 H(2026-09-04): 카드 상태 글자

@@ -90,7 +90,7 @@ export function DirectorReadinessDialog({
           {incompleteScenes.map((scene) => (
             <section key={scene.sceneId} className="overflow-hidden rounded-xl bg-card">
               <header className="flex items-center gap-2 bg-chip px-4 py-2 text-caption">
-                <span className="font-num font-semibold">Scene {scene.sceneNumber}</span>
+                <span className="font-num font-semibold">{t('Scene {n}', { n: scene.sceneNumber })}</span>
                 <span className="truncate text-muted-foreground">
                   {[scene.locationName, scene.timeOfDay].filter(Boolean).join(' · ')}
                 </span>
@@ -98,7 +98,7 @@ export function DirectorReadinessDialog({
               <ul className="divide-y divide-border">
                 {scene.shots.map((shot) => (
                   <li key={shot.shotId} className="flex items-start gap-3 px-4 py-3">
-                    <span className="w-14 shrink-0 pt-0.5 font-num text-caption text-muted-foreground">{shot.code}</span>
+                    <span className="w-14 shrink-0 pt-0.5 font-num text-caption text-muted-foreground">{t('Shot {n}', { n: shot.shotNo ?? '?' })}</span>
                     <span className="flex shrink-0 gap-1">
                       {shot.rough ? (
                         <>

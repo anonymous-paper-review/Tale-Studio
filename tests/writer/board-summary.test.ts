@@ -1,6 +1,7 @@
 // Storyboard 보드 제목 옆 숫자 · 샷 이름 · Director 넘김 창 내용 · 첫 안내 문구를 검사한다
 import { describe, expect, it } from 'vitest'
 import {
+  boardShotLabels,
   boardShots,
   boardStats,
   boardStatsLabel,
@@ -59,13 +60,16 @@ describe('Storyboard 제목 옆 숫자', () => {
 })
 
 describe('보드의 샷 이름', () => {
-  // 왜: 넘김 창이 말하는 샷을 사용자가 보드 카드에서 찾을 수 있어야 한다 — 카드와 같은 "Scene N · Shot M"(샷 번호는 씬마다 다시 세지 않는다, #shot-global-no).
+  // 왜: 넘김 창이 말하는 샷을 사용자가 보드 카드에서 찾을 수 있어야 한다 — 카드와 같은 "씬 N · 샷 M" · "Scene N · Shot M"(샷 번호는 씬마다 다시 세지 않는다, #shot-global-no).
+  //   말은 화면 언어(오너 2026-11-14 답 7).
   it('샷 이름은 보드 카드처럼 씬 순서대로 이어 센 번호로 붙는다', () => {
-    expect(boardShots(manifest, board()).map((entry) => entry.label)).toEqual([
+    expect(boardShots(manifest, board()).map((entry) => [entry.sceneNo, entry.shotNo])).toEqual([[1, 1], [1, 2], [2, 3]])
+    expect([...boardShotLabels(manifest, board(), 'en').values()]).toEqual([
       'Scene 1 · Shot 1',
       'Scene 1 · Shot 2',
       'Scene 2 · Shot 3',
     ])
+    expect([...boardShotLabels(manifest, board(), 'ko').values()]).toEqual(['씬 1 · 샷 1', '씬 1 · 샷 2', '씬 2 · 샷 3'])
   })
 })
 
@@ -87,9 +91,9 @@ describe('Director 넘김 확인 창', () => {
   it('러프가 없는 샷이 있으면 넘김 창이 그 샷들이 이번에 빠진다고 알리고 [남은 컷 그리기]를 같이 둔다', () => {
     const shots = board().map((s) => (s.shotId === 'a2' ? { ...s, roughStoryboard: null } : s.shotId === 'b1' ? { ...s, roughStoryboard: failedPanel() } : s))
     const summary = directorHandoffSummary(manifest, shots)
-    expect(summary.missing.map((m) => m.label)).toEqual(['Scene 1 · Shot 2', 'Scene 2 · Shot 3'])
+    expect(summary.missing.map((m) => [m.sceneNo, m.shotNo])).toEqual([[1, 2], [2, 3]])
     const view = directorConfirmView(summary, 'ko', extra)
-    expect(view.warning).toBe('러프가 없는 Scene 1 · Shot 2, Scene 2 · Shot 3은(는) 이번에 빠져요.')
+    expect(view.warning).toBe('러프가 없는 씬 1 · 샷 2, 씬 2 · 샷 3은(는) 이번에 빠져요.')
     expect(view.canDrawRemaining).toBe(true)
   })
 
@@ -104,7 +108,7 @@ describe('Director 넘김 확인 창', () => {
   it('러프가 없는 샷이 모두 스토리가 비어 그릴 수 없으면 [남은 컷 그리기]를 두지 않는다', () => {
     const shots = board().map((s) => (s.shotId === 'a2' ? { ...s, roughStoryboard: null, actionDescription: '  ' } : s))
     const view = directorConfirmView(directorHandoffSummary(manifest, shots), 'ko', extra)
-    expect(view.warning).toBe('러프가 없는 Scene 1 · Shot 2은(는) 이번에 빠져요.')
+    expect(view.warning).toBe('러프가 없는 씬 1 · 샷 2은(는) 이번에 빠져요.')
     expect(view.canDrawRemaining).toBe(false)
   })
 

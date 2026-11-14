@@ -76,6 +76,7 @@ import {
   type BoardLockState,
 } from '@/lib/writer/board-busy'
 import { boardShots, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel, storyboardBriefing } from '@/lib/writer/board-summary'
+import { pipelineLocationName, sceneName, sceneShotName } from '@/lib/board-names'
 import {
   announcedWaitShot,
   boardStoryFontSize,
@@ -1190,7 +1191,7 @@ export function RoughStoryboardView() {
             {status.directing_issues.map((issue, i) => (
               <li key={`${issue.location}-${i}`} className="flex gap-2">
                 <span className="shrink-0 font-num font-semibold text-foreground">
-                  {issue.location.replace(/shot_(\d+)/g, 'Shot $1').replace(/scene_(\d+)/g, 'Scene $1')}
+                  {pipelineLocationName(issue.location, locale)}
                 </span>
                 <span>
                   {issue.message}
@@ -1234,7 +1235,7 @@ export function RoughStoryboardView() {
                       className={cn('size-3.5 shrink-0 text-subtle-foreground transition-transform', sceneCollapsed && '-rotate-90')}
                       aria-hidden
                     />
-                    <span className="shrink-0 font-num text-micro font-semibold text-foreground">Scene {sceneIdx + 1}</span>
+                    <span className="shrink-0 font-num text-micro font-semibold text-foreground">{sceneName(locale, sceneIdx + 1)}</span>
                     {sceneTitle ? <span className="min-w-0 max-w-[45%] shrink-0 truncate text-body font-semibold text-foreground">{sceneTitle}</span> : null}
                     {/* 좁으면 요약만 말줄임 — 컷 수 · 초는 늘 보인다. */}
                     <span className="flex min-w-0 items-baseline gap-1 text-caption text-subtle-foreground">
@@ -1285,7 +1286,8 @@ export function RoughStoryboardView() {
                   {sceneShots.map((shot, shotIdx) => {
                     const panel = panelOf(shot)
                     const job = jobOf(shot.shotId)
-                    const shotLabel = `Scene ${sceneIdx + 1} · Shot ${globalShotNo.get(shot.shotId) ?? shotIdx + 1}`
+                    // 카드 이름은 화면 언어("씬 1 · 샷 2" · "Scene 1 · Shot 2", 오너 2026-11-14 답 7).
+                    const shotLabel = sceneShotName(locale, sceneIdx + 1, globalShotNo.get(shot.shotId) ?? shotIdx + 1)
                     const dialogue = cardDialogue(shot.dialogueLines, characterNames)
                     const dialogueText = dialogue ? resolveEntityNames(dialogue.text, entityNames) : ''
                     // 그리는 카드 위 기다림(11/5 SYS 노드 · 카드 위, 오너 2026-11-09) — "그리는 중" 판정 · 동시에 그리는 순서는 그대로, 모양만.
