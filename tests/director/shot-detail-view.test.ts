@@ -218,7 +218,8 @@ describe('Director 샷 상세 화면', () => {
     expect(readFileSync('src/features/director/shot-detail/shot-video-tab.tsx', 'utf8')).toMatch(/cancelRunningJobs\(\[take\.data\.generationJobId!?\]\)/)
     director.getState().updateNodeData<'video'>(making, { cancelledAt: '2026-11-14T03:00:00Z' })
     const stopped = render('panel', 'video')
-    expect(stopped.replace(/&#x27;/g, "'")).toContain("Stopped. Takes for videos that had already started aren't refunded. If it finishes later, it stays in this list.")
+    // 영어 뒤 문장은 "this one" — 앞 문장이 복수(Takes)라 "it" 이 가리킬 말이 없었다(리드 검토 11/14, 예전 기대 "If it finishes later"). 한국어는 그대로.
+    expect(stopped.replace(/&#x27;/g, "'")).toContain("Stopped. Takes for videos that had already started aren't refunded. If this one finishes later, it stays in this list.")
     expect(stopped).not.toContain('A Take is being made. You can make a new one when it is done.')
     expect(buttonTag(stopped, 'Make a new Take · 5 Takes')).not.toContain('disabled=""')
     setLocale('ko')

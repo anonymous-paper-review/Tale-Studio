@@ -39,7 +39,8 @@ export const KO: Record<string, string> = {
   'Stop making': '멈추기',
   'Could not stop it. Try again.': '멈추지 못했어요. 다시 눌러 주세요.',
   // 멈춘 영상의 Take — 오너 11/14 답 8 글 그대로("멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요"), 뒤 기록 문장은 그대로(리드).
-  "Stopped. Takes for videos that had already started aren't refunded. If it finishes later, it stays in this list.": '멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요. 뒤늦게 끝나면 이 목록에 남아요.',
+  //   영어 뒤 문장만 "this one" — 앞 문장이 복수(Takes)라 "it" 이 가리킬 말이 없었다(리드 검토 11/14).
+  "Stopped. Takes for videos that had already started aren't refunded. If this one finishes later, it stays in this list.": '멈췄어요. 이미 생성이 시작된 영상의 경우 Take 는 돌려드리지 않아요. 뒤늦게 끝나면 이 목록에 남아요.',
   'The image you stopped for {shot} finished later and was kept as version v{n}. The current image did not change.': '멈춘 {shot} 이미지가 뒤늦게 다 그려져 버전 v{n} 으로 남았어요. 지금 그림은 그대로예요.',
   'The image you stopped for {shot} finished later and was kept in the versions. The current image did not change.': '멈춘 {shot} 이미지가 뒤늦게 다 그려져 버전으로 남았어요. 지금 그림은 그대로예요.',
   'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.': '멈춘 {shot} Take 가 뒤늦게 끝났어요. Take 목록에만 남고, 고르지 않으면 Editor 로 가지 않아요.',
