@@ -1,4 +1,4 @@
-// 멈춘 이미지 판을 정리하는 동안 누른 이미지 일 — 기다린다고 한 줄 알리고([취소] 단추), 그 뒤 [모두 멈추기]나 [취소]면 서지 않고, 낱장 · 이어 보내기도 정리 뒤 그대로 시작한다 (검토 b S1b · S1c · 결정 ③ · 검토 a S1e, 리드 11/14)
+// 멈춘 이미지 판을 정리하는 동안 누른 이미지 일 — 기다린다고 한 줄 알리고([취소] 단추), 그 뒤 [모두 멈추기] · [취소] · 다른 프로젝트로 옮김이면 서지 않고, 낱장 · 이어 보내기도 정리 뒤 그대로 시작한다 (검토 b S1b · S1c · 결정 ③ · 검토 a S1e · 검토 b S1g, 리드 11/14)
 import { readFileSync } from 'node:fs'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -272,6 +272,35 @@ describe('같이 정한 것 — S1e', () => {
     expect(remake).not.toContain('generateStoryboardImage(')
     expect(src).toContain('startImages(imageWork.slice(0, chainPlan.runCount))')
     expect(src).not.toContain('setChainWaitingShots([...chainWaitingShotIds, ...imageWork.slice(0, chainPlan.runCount)])')
+  })
+})
+
+describe('같이 정한 것 — S1g', () => {
+  it('정리를 기다리는 사이 다른 프로젝트로 옮기면 기다리던 일(일괄 · 낱장)은 서지 않고 알림도 내린다 — 옮긴 것을 [취소]로 본다', async () => {
+    // 왜: 검토 b C5 — p1 정리 중 [이미지 만들기] → p2 로 옮기면 p1 판이 서서 p2 화면의 "이미지 만드는 중"이 켜졌다
+    //   (p2 [이미지 만들기]가 꺼지고 진행 줄도 p2 에 떴다). 옮긴 순간 [취소]와 같이 알림을 내리고, 정리 뒤에도 서지 않는다.
+    const real = useDirectorCanvasStore.getState().generateStoryboardImage
+    const single = vi.fn(async () => null)
+    useDirectorCanvasStore.setState({ generateStoryboardImage: single })
+    const first = runRealBatch('p1', { shotIds: ['s1'] })
+    await vi.advanceTimersByTimeAsync(10)
+    useDirectorCanvasStore.getState().cancelRealBatch()
+    const batchPress = runRealBatch('p1', { shotIds: ['s2'] })
+    const singlePress = afterStoppedRealBatch(() => { startSingleImage('failed-shot') })
+    const id = noticeOptions().id
+    expect(id).toBeTruthy()
+    expect(toast.dismiss).not.toHaveBeenCalledWith(id)
+    useDirectorCanvasStore.getState().setProjectId('p2')
+    expect(toast.dismiss).toHaveBeenCalledWith(id)
+    release.shift()!()
+    await first
+    expect(await batchPress).toEqual({ generated: 0, quotaBlocked: false })
+    await singlePress
+    await vi.advanceTimersByTimeAsync(10)
+    expect(bodies).toHaveLength(1)
+    expect(single).not.toHaveBeenCalled()
+    expect(useDirectorCanvasStore.getState().realBatchBusy).toBe(false)
+    useDirectorCanvasStore.setState({ generateStoryboardImage: real })
   })
 })
 

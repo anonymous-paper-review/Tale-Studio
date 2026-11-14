@@ -135,8 +135,14 @@ export function cancelWaitingRealBatch(): void {
   if (waitingPresses > 0) toast.dismiss(WAITING_TOAST_ID)
 }
 
+// 정리를 기다리는 사이 다른 프로젝트로 옮기면 [취소]와 같다 — 기다리던 일(일괄 · 낱장)은 서지 않고 알림도 바로 내린다(검토 b S1g):
+//   그대로 두면 앞 프로젝트의 판이 서서 옮겨 간 화면의 "이미지 만드는 중"이 켜졌다.
+useDirectorCanvasStore.subscribe((state, previous) => {
+  if (state.projectId !== previous.projectId && waitingPresses > 0) cancelWaitingRealBatch()
+})
+
 /** 멈춘 판이 정리 중이면 끝나기를 기다린다. 'go' = 이제 시작한다 · 'drop' = 기다리는 사이 거둬졌다 · 'busy' = 멈추지 않은 판이 돈다. */
-async function waitForStoppedRun(silent: boolean): Promise<'go' | 'drop' | 'busy'> {
+async function waitForStoppedRun(projectId: string, silent: boolean): Promise<'go' | 'drop' | 'busy'> {
   const now = useDirectorCanvasStore.getState()
   if (!now.realBatchBusy) return 'go'
   if (!now.realBatchCancelled || !currentRun) return 'busy'
@@ -158,8 +164,8 @@ async function waitForStoppedRun(silent: boolean): Promise<'go' | 'drop' | 'busy
   if (turn === stopTurn) liveWaiters -= 1
   // 기다림이 끝났다 — 새 판이 서든 거둬졌든 알림은 내린다.
   toast.dismiss(WAITING_TOAST_ID)
-  // 기다리는 사이 [모두 멈추기] · [취소]를 눌렀으면 서지 않는다(검토 b S1b · 결정 ③).
-  return turn === stopTurn ? 'go' : 'drop'
+  // 기다리는 사이 [모두 멈추기] · [취소]를 눌렀거나 다른 프로젝트로 옮겼으면 서지 않는다(검토 b S1b · 결정 ③ · S1g).
+  return turn === stopTurn && useDirectorCanvasStore.getState().projectId === projectId ? 'go' : 'drop'
 }
 
 /** 넘겨받은 "만드는 중"을 이어받을 누름이 더 없으면 내린다 — 낱장만 기다리던 누름 · 거둬진 누름 뒤(S1e). */
@@ -177,7 +183,8 @@ export function afterStoppedRealBatch(start: () => void): Promise<void> {
     start()
     return Promise.resolve()
   }
-  return waitForStoppedRun(false).then((outcome) => {
+  // 누른 화면의 프로젝트 — 기다리는 사이 옮기면 서지 않는다(S1g).
+  return waitForStoppedRun(now.projectId, false).then((outcome) => {
     if (outcome === 'go') start()
     finishHandOver()
   })
@@ -195,7 +202,7 @@ export function startSingleImage(shotNodeId: string): void {
 export async function runRealBatch(projectId: string, opts?: RealBatchOptions): Promise<RealBatchResult> {
   const store = useDirectorCanvasStore
   if (store.getState().realBatchBusy && !handedOver) {
-    const outcome = await waitForStoppedRun(!!opts?.silent)
+    const outcome = await waitForStoppedRun(projectId, !!opts?.silent)
     if (outcome !== 'go') {
       finishHandOver()
       return { generated: 0, quotaBlocked: false }
