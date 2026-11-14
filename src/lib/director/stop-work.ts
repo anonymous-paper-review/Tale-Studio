@@ -29,9 +29,9 @@ export function videoBatchLive(
   return batch.jobIds.some((id) => live.has(id))
 }
 
-/** 멈춘 뒤 알림(영어 키) — 만들던 영상이 있었으면 Take 를 돌려드리지 않는다는 것까지. 이미지는 Take 를 쓰지 않는다. */
+/** 멈춘 뒤 알림(영어 키) — 만들던 영상이 있었으면 Take 를 돌려드리지 않는다는 것까지(글은 오너 11/14 답 8 그대로). 이미지는 Take 를 쓰지 않는다. */
 export function stopNotice(stopped: { images: number; videos: number }): string {
-  if (stopped.videos > 0) return 'Stopped. Takes for the videos being made are not refunded. If they finish later, they stay in the history.'
+  if (stopped.videos > 0) return "Stopped. Takes for videos that had already started aren't refunded. If they finish later, they stay in the history."
   if (stopped.images > 0) return 'Stopped. If the images being made finish later, they stay in the versions.'
   return 'Stopped.'
 }

@@ -115,7 +115,7 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                       </span>
                     </div>
                   ) : phase === 'stopped' ? (
-                    <p className="text-caption text-subtle-foreground">{t('Stopped · The Take is not refunded. If it finishes later, it stays in this list.')}</p>
+                    <p className="text-caption text-subtle-foreground">{t("Stopped. Takes for videos that had already started aren't refunded. If this one finishes later, it stays in this list.")}</p>
                   ) : phase === 'done' ? (
                     <p className="text-caption text-subtle-foreground">
                       {[madeWith(take), VIDEO_MODELS[setup.model].label, resolution].filter(Boolean).join(' · ')}
