@@ -58,6 +58,12 @@ describe('지시문 · 도구 안내', () => {
     expect(CHAT_TOOL_GUIDE).toContain('handoff to the Storyboard run (targetStage "writer") uses the existing start approval when no run exists')
   })
 
+  it('도구 안내가 실행 기록이 없다는 말도 옛 이름(No Writer execution record)이 아니라 Storyboard 실행(targetStage "writer")으로 말한다', () => {
+    // 왜: "Writer execution record"의 Writer 는 옛 이름이다 — 도구 대상 writer 는 Storyboard 화면의 씬 · 샷 실행이라, 실행 기록이 없다는 말도 그 이름으로 해야 산문 Writer 화면과 섞이지 않는다(리드 11/14).
+    expect(CHAT_TOOL_GUIDE).not.toContain('No Writer execution record')
+    expect(CHAT_TOOL_GUIDE).toContain('No Storyboard run record (targetStage "writer") is not proof of missing script')
+  })
+
   it('잠긴 산문 지시문은 "Writer 로 넘겼다"가 아니라 산문을 확정했다고 지금 화면 이름으로 말한다', () => {
     // 왜: 옛 말 "handed over to Writer"가 그대로 답으로 나가 "Producer 가 잠겼다"가 되었다. 지금은 산문(Writer 화면)을 확정하면 잠기고 Artist 가 열린다.
     const directive = lockedProducerDirective(true)!
