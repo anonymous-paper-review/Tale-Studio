@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { translate } from '@/lib/i18n/translate'
 import { countText } from '@/lib/i18n/count-text'
 import { makingLabel, workEstimateText } from '@/lib/director/toolbar-work'
+import { describeVideoBatchPlan, planVideoBatch } from '@/lib/director/video-batch-plan'
 import { directorCanvasMeta, storyboardCanvasMeta } from '@/features/director/canvas-meta'
 import type { DirectorNode } from '@/types/director'
 
@@ -69,5 +70,19 @@ describe('영어 단수', () => {
     expect(page).toContain("countText(t, chainPlan.total, 'Costs money for every generated video: 1 video.', 'Costs money for every generated video: {count} videos.', { count: chainPlan.total })")
     expect(ko('Generate a video for 1 eligible shot.')).toBe(ko('Generate videos for {count} eligible shots.', { count: 1 }))
     expect(ko('Costs money for every generated video: 1 video.')).toBe(ko('Costs money for every generated video: {count} videos.', { count: 1 }))
+  })
+
+  it('영상 확인 창 본문 끝 줄도 1개면 자연스러운 단수다', () => {
+    // 왜: 영어 재점검(qa-golden f19330d7) S2b — 과금을 아직 막지 않을 때 영상 1개면 "…so all 1 will be generated."로 읽혔다.
+    //   Take 로 1개만 만들 수 있을 때도 "The first 1 will be generated."였다. 한국어는 그대로다.
+    const shadowOne = planVideoBatch([5], 3, 'shadow')
+    expect(describeVideoBatchPlan(shadowOne, en)[1]).toBe('Takes are short by 2. Billing is not enforced yet, so it will be generated.')
+    expect(describeVideoBatchPlan(planVideoBatch([5, 5], 3, 'shadow'), en)[1]).toBe('Takes are short by 7. Billing is not enforced yet, so all 2 will be generated.')
+    const enforceOne = planVideoBatch([5, 5, 5], 6, 'enforce')
+    expect(describeVideoBatchPlan(enforceOne, en)[1]).toBe('Only 1 of 3 videos can be made with your Takes. The first one will be generated.')
+    expect(describeVideoBatchPlan(planVideoBatch([5, 5, 5, 5], 10, 'enforce'), en)[1]).toBe('Only 2 of 4 videos can be made with your Takes. The first 2 will be generated.')
+    // 한국어는 그대로 — 1개여도 지금 글과 같다.
+    expect(describeVideoBatchPlan(shadowOne, ko)[1]).toBe('Take가 2개 모자라요. 아직 차감을 막지 않아 1개 모두 만들어요.')
+    expect(describeVideoBatchPlan(enforceOne, ko)[1]).toBe('Take가 모자라 3개 중 1개만 만들 수 있어요. 앞에서부터 1개를 만들어요.')
   })
 })

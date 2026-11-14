@@ -2030,6 +2030,8 @@ export const KO: Record<string, string> = {
   'Takes needed: {required}. This workspace has unlimited Takes.': '필요한 Take {required}개. 이 워크스페이스는 Take 제한이 없어요.',
   'Only {run} of {count} videos can be made with your Takes. The first {run} will be generated.': 'Take가 모자라 {count}개 중 {run}개만 만들 수 있어요. 앞에서부터 {run}개를 만들어요.',
   'Takes are short by {missing}. Billing is not enforced yet, so all {count} will be generated.': 'Take가 {missing}개 모자라요. 아직 차감을 막지 않아 {count}개 모두 만들어요.',
+  'Takes are short by {missing}. Billing is not enforced yet, so it will be generated.': 'Take가 {missing}개 모자라요. 아직 차감을 막지 않아 1개 모두 만들어요.',
+  'Only 1 of {count} videos can be made with your Takes. The first one will be generated.': 'Take가 모자라 {count}개 중 1개만 만들 수 있어요. 앞에서부터 1개를 만들어요.',
   'No videos can be made until you add Takes.': 'Take를 충전해야 영상을 만들 수 있어요.',
   'Generate videos for {count} shots': '샷 {count}개의 영상 생성',
   'Costs Takes for every generated video.': '영상마다 Take가 차감돼요.',
@@ -3323,6 +3325,7 @@ export const KO: Record<string, string> = {
   'Stop all': '모두 멈추기',
   'Making {count} images': '이미지 {count}장 만드는 중',
   'Making 1 image': '이미지 1장 만드는 중',
+  'Making images': '이미지 만드는 중',
   'Making 1 video': '영상 1개 만드는 중',
   'Making {what}': '{what} 만드는 중',
   // 진행 글 조각 · 예상 칸 문장(영어는 수가 1이면 단수, 리드 11/14 답 2)
