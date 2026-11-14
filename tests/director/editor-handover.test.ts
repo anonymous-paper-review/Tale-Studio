@@ -30,7 +30,7 @@ import { resetActionGuard } from '@/lib/action-guard'
 // 이 시험을 위해 지은 Director 캔버스 — 씬 하나에 샷 셋(보드 순서 a1 · a2 · a3), 샷마다 영상 Take 를 붙인다.
 const manifest = { scenes: [{ sceneId: 'sc_1' }] }
 const writerShots = ['a1', 'a2', 'a3'].map((shotId) => ({ shotId, sceneId: 'sc_1' }))
-const names = boardNodeNames(manifest, writerShots)
+const names = boardNodeNames(manifest, writerShots, 'en')
 function shot(writerShotId: string, seconds: number): DirectorNode {
   return {
     id: `n_${writerShotId}`, type: 'shot', position: { x: 0, y: 0 },

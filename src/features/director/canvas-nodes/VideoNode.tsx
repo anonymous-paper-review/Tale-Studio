@@ -476,8 +476,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           title={t('Making the video')}
           description={
             requestedSeconds === null
-              ? prettyNodeLabel(parentShotTitle ?? data.label)
-              : `${prettyNodeLabel(parentShotTitle ?? data.label)} · ${t('{seconds}s', { seconds: requestedSeconds })}`
+              ? prettyNodeLabel(parentShotTitle ?? data.label, boardNames.locale)
+              : `${prettyNodeLabel(parentShotTitle ?? data.label, boardNames.locale)} · ${t('{seconds}s', { seconds: requestedSeconds })}`
           }
           progress={batchPercent ?? undefined}
           note={nextInLineNote(nextNames ? nextNames.split('\n') : [], t)}

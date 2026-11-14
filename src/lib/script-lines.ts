@@ -9,6 +9,7 @@ import type { DialogueLine, Scene, SceneManifest, Shot } from '@/types'
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { collapseDoubledArticles, insideWrittenName, keyRule, writtenNameSpans } from '@/lib/writer/resolve-entity-names'
 import { boardShotLabels, boardShots } from '@/lib/writer/board-summary'
+import { sceneName, sceneShotName, shotName } from '@/lib/board-names'
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
 
@@ -189,26 +190,27 @@ export function scriptLineMentions(
 
 /**
  * Writer 채팅에서 라인 외에 직접 참조할 수 있는 씬·샷 목록.
- * 샷은 보드 카드와 같은 전체 번호(씬마다 다시 세지 않는 번호)로 부른다 — "Shot 8"(오너 2026-11-02 "전체 번호로 통일").
- * 셈은 보드와 같은 boardShots 하나다. 보드에 없는(씬 목록 밖) 샷은 멘션에도 없다.
+ * 샷은 보드 카드와 같은 전체 번호(씬마다 다시 세지 않는 번호)로 부른다 — "샷 8" · "Shot 8"(오너 2026-11-02 "전체 번호로 통일").
+ * 이름은 화면 언어(오너 2026-11-14 답 7). 셈은 보드와 같은 boardShots 하나다. 보드에 없는(씬 목록 밖) 샷은 멘션에도 없다.
  */
 export function writerSceneShotMentions(
   manifest: SceneManifest | null,
   shots: readonly Shot[],
+  locale: AppLocale,
 ): CardMention[] {
   const scenes = manifest?.scenes ?? []
   const targets: SceneShotMentionTarget[] = scenes.map((scene) => ({
     kind: 'scene',
     id: scene.sceneId,
-    label: `Scene ${scenes.indexOf(scene) + 1}`,
+    label: sceneName(locale, scenes.indexOf(scene) + 1),
   }))
   const seenShots = new Set<string>()
   for (const entry of boardShots(manifest, shots)) {
     if (seenShots.has(entry.shot.shotId)) continue
     seenShots.add(entry.shot.shotId)
-    targets.push({ kind: 'shot', id: entry.shot.shotId, label: `Shot ${entry.shotNo}` })
+    targets.push({ kind: 'shot', id: entry.shot.shotId, label: shotName(locale, entry.shotNo) })
   }
-  return sceneShotMentions(targets, 'writer')
+  return sceneShotMentions(targets, 'writer', locale)
 }
 
 function lineMap(lines: ScriptLine[]): Map<string, ScriptLine> {
@@ -222,6 +224,8 @@ function lineLabel(line: ScriptLine | undefined): string {
 export function serializeWriterScriptContext(
   manifest: SceneManifest | null,
   shots: Shot[],
+  /** 보드 이름(괄호)을 짓는 말 — 채팅 언어(오너 2026-11-14 답 7, 모델이 적힌 이름 그대로 답한다). */
+  locale: AppLocale,
   precomputedLines?: ScriptLine[],
   /** 번호를 셀 보드 전체 — 목록이 보드 일부(씬 하나)일 때 넘긴다. 없으면 이 목록이 보드다(리뷰 L5). */
   board?: { manifest: SceneManifest | null; shots: readonly Shot[] },
@@ -235,10 +239,11 @@ export function serializeWriterScriptContext(
   const lines: string[] = [
     '## 현재 씬/샷 (scene_id·shot_id 를 그대로 사용, [L#] = 스크립트 라인 번호)',
     // 오너 2026-11-02 "전체 번호로 통일" — 보드 카드 이름(괄호)이 샷의 이름이다. 씬마다 다시 세지 않는다.
-    '샷 번호: 샷마다 괄호 안의 보드 이름("Scene 2 · Shot 8")이 사용자가 보는 이름이고, 샷 번호는 씬마다 다시 세지 않는 전체 번호다. "샷 8"·"Shot 8"·"Scene 2 · Shot 8"은 그 전체 번호의 샷이다. 씬과 샷을 함께 말하면("씬2 샷5") 보드 Shot 5(그 씬에 있을 때)와 그 씬의 다섯 번째 샷 두 가지로 읽힐 수 있다 — 하나만 되면 그것, 둘 다 되고 서로 다르면 고치지 말고 두 샷을 보드 이름으로 보여 주며 되묻는다. "2씬 두 번째 샷"처럼 씬 안 자리를 말하면 그 자리다. 답할 때 샷은 이 보드 이름으로 부르고 id(sh_..)나 씬 안 순서로 부르지 않는다.',
+    // 오너 2026-11-14 답 7 — 괄호의 보드 이름은 대화 언어로 적힌다(한국어 대화 "씬 2 · 샷 8"). 사용자는 두 말 어느 쪽으로도 부른다.
+    `샷 번호: 샷마다 괄호 안의 보드 이름("${sceneShotName(locale, 2, 8)}")이 사용자가 보는 이름이고, 샷 번호는 씬마다 다시 세지 않는 전체 번호다. "샷 8"·"Shot 8"·"씬 2 · 샷 8"·"Scene 2 · Shot 8"은 어느 말로 써도 그 전체 번호의 샷이다. 씬과 샷을 함께 말하면("씬2 샷5") 보드 샷 5(그 씬에 있을 때)와 그 씬의 다섯 번째 샷 두 가지로 읽힐 수 있다 — 하나만 되면 그것, 둘 다 되고 서로 다르면 고치지 말고 두 샷을 보드 이름으로 보여 주며 되묻는다. "2씬 두 번째 샷"처럼 씬 안 자리를 말하면 그 자리다. 답할 때 샷은 괄호 안 보드 이름을 적힌 그대로 부르고 id(sh_..)나 씬 안 순서로 부르지 않는다.`,
   ]
   const numbering = board ?? { manifest, shots }
-  const boardLabels = boardShotLabels(numbering.manifest, numbering.shots)
+  const boardLabels = boardShotLabels(numbering.manifest, numbering.shots, locale)
   const boardSceneNo = (sceneId: string, fallback: number) => {
     const index = numbering.manifest?.scenes.findIndex((scene) => scene.sceneId === sceneId) ?? -1
     return index >= 0 ? index + 1 : fallback

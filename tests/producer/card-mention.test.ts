@@ -102,7 +102,7 @@ describe('장면과 샷을 언급한다', () => {
       { kind: 'scene', id: 'sc_a', label: 'Scene 1' },
       { kind: 'scene', id: 'sc_b', label: 'Scene 1' },
       { kind: 'shot', id: 'sh_a', label: 'Shot 1' },
-    ])
+    ], 'writer', 'en')
     expect(mentions.map((item) => item.label)).toEqual(['Scene 1', 'Scene 1', 'Shot 1'])
     for (const item of mentions) {
       expect(item.label).not.toMatch(/\b(sc|sh)_[a-z0-9]/i)
@@ -118,8 +118,8 @@ describe('장면과 샷을 언급한다', () => {
 
   it('Director Previz와 Real 대상을 서로 따로 구분한다', () => {
     const targets = [{ kind: 'shot' as const, id: 'sh_1', label: 'Shot 1' }]
-    const previz = sceneShotMentions(targets, 'previz')[0]
-    const real = sceneShotMentions(targets, 'real')[0]
+    const previz = sceneShotMentions(targets, 'previz', 'en')[0]
+    const real = sceneShotMentions(targets, 'real', 'en')[0]
     expect(previz.label).toContain('Previz')
     expect(real.label).toContain('Real')
     expect(previz.ref).not.toBe(real.ref)

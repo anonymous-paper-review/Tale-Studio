@@ -43,7 +43,7 @@ describe('채팅으로 V2 대사 고치기', () => {
       locations: [],
     } as unknown as SceneManifest
     const shot = { shotId: 'sh_02_07', sceneId: 'sc_02', shotType: 'CU', actionDescription: 'She strikes the glass.', characters: ['nurse'], durationSeconds: 5, generationMethod: 'T2V', dialogueLines: rows.shots[0].dialogue_lines } as unknown as Shot
-    expect(serializeWriterScriptContext(manifest, [shot])).toContain('plannedTiming: 2.0-3.5s')
+    expect(serializeWriterScriptContext(manifest, [shot], 'en')).toContain('plannedTiming: 2.0-3.5s')
   })
 
   // 왜: 칸을 받아 주더라도 모양이 다른 값은 지금처럼 막는다(2026-11-01 리뷰 L6 — 이상한 값을 그대로 저장하지 않는다). 정상 경로 고정.

@@ -52,8 +52,8 @@ export interface ShotGap {
 
 export interface ShotReadiness {
   shotId: string
-  /** 화면에 보이는 샷 이름 — 보드 카드와 같은 전체 번호("Shot 8", 오너 2026-11-02 "전체 번호로 통일"). */
-  code: string
+  /** 보드 번호(씬마다 다시 세지 않는 전체 번호) — 창이 화면 언어로 "샷 3" · "Shot 3"이라 부른다(오너 2026-11-14 답 7). 보드에 없으면 null. */
+  shotNo: number | null
   description: string
   rough: { start: string; end: string } | null
   gaps: ShotGap[]
@@ -131,7 +131,7 @@ export function classifyDirectorReadiness(input: {
         else incompleteCount += 1
         return {
           shotId: shot.shotId,
-          code: `Shot ${board.get(shot.shotId)?.shotNo ?? '?'}`,
+          shotNo: board.get(shot.shotId)?.shotNo ?? null,
           description: shot.description,
           rough: shot.rough,
           gaps,

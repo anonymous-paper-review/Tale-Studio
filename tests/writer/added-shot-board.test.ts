@@ -394,7 +394,7 @@ describe('보드의 더한 샷 카드 · 잠금 · 탭', () => {
     commit()
     expect(['sh_01_02', 'sh_02_01'].map(waitCardVoice)).toEqual(['announce', 'quiet'])
     // 씬 1 머리를 눌러 접는다.
-    const head = render().find((node) => node.type === 'button' && 'aria-expanded' in node.props && textOf(node).includes('Scene 1'))
+    const head = render().find((node) => node.type === 'button' && 'aria-expanded' in node.props && textOf(node).includes('씬 1'))
     ;(head!.props.onClick as () => void)()
     commit()
     expect(['sh_01_02', 'sh_02_01'].map(waitCardVoice)).toEqual(['quiet', 'announce'])
@@ -514,13 +514,14 @@ describe('[+ 샷 추가] 창', () => {
     expect(dialog().some((node) => textOf(node) === KO[key])).toBe(true)
   })
 
-  // 왜: 오너 11/2 "전체 번호로 통일" — 어디에 더할지 고르는 목록의 "Shot 3"이 보드 카드 "Scene 2 · Shot 3"과 다르면 다른 샷 뒤에 더한다.
+  // 왜: 오너 11/2 "전체 번호로 통일" — 어디에 더할지 고르는 목록의 "샷 3"이 보드 카드 "씬 2 · 샷 3"과 다르면 다른 샷 뒤에 더한다.
+  //   이 시험은 한국어 화면이라 이름이 한국어다(오너 2026-11-14 답 7 — 예전에는 한국어 화면도 "Shot 3" · "Scene 2 · Shot 3").
   it('[+ 샷 추가] 창 왼쪽 목록의 샷 번호는 보드 카드와 같은 전체 번호다', () => {
     twoScenes()
-    const listed = dialog().filter((node) => node.type === 'span' && /^Shot \d+$/.test(textOf(node))).map(textOf)
-    expect(listed).toEqual(['Shot 1', 'Shot 2', 'Shot 3'])
+    const listed = dialog().filter((node) => node.type === 'span' && /^샷 \d+$/.test(textOf(node))).map(textOf)
+    expect(listed).toEqual(['샷 1', '샷 2', '샷 3'])
     hooks.slots = []
-    const cardLabel = elements(card('sh_02_01').props.children as ReactNode).find((node) => node.type === 'span' && textOf(node).startsWith('Scene '))
-    expect(textOf(cardLabel)).toBe('Scene 2 · Shot 3')
+    const cardLabel = elements(card('sh_02_01').props.children as ReactNode).find((node) => node.type === 'span' && textOf(node).startsWith('씬 '))
+    expect(textOf(cardLabel)).toBe('씬 2 · 샷 3')
   })
 })

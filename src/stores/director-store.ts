@@ -86,7 +86,9 @@ import { notifyGenerationComplete, notifyGenerationFailure, notifyStoppedResultK
 import { claimAction, releaseAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
-import { directorBoardLabel, prettyNodeLabel, type BoardNodeNames } from '@/features/director/node-label'
+import { boardNodeNames, directorBoardLabel, directorNodeLabel, type BoardNodeNames } from '@/features/director/node-label'
+import { useWriterStore } from '@/stores/writer-store'
+import type { AppLocale } from '@/lib/locale'
 import {
   arrangeDirectorCanvas,
   ASSET_TO_SHOT_GAP,
@@ -1707,6 +1709,14 @@ async function restoreActiveGenerationView(projectId: string): Promise<void> {
   } catch {
     // 진행 상태 조회 실패는 마지막 탭 복원을 방해하지 않는다.
   }
+}
+
+/** 멈춘 작업이 뒤늦게 끝났다는 알림의 샷 이름 — 화면과 같은 보드 이름(그 알림 문장의 말, 오너 2026-11-14 답 7).
+ *  예전에는 원래 id 숫자로 불러("sh_02_07" → "Shot 7") 보드 번호(샷 8)와 달랐다. */
+function stoppedShotName(shot: DirectorNode | undefined, locale: AppLocale): string {
+  if (!shot) return ''
+  const writer = useWriterStore.getState()
+  return directorNodeLabel(shot.data, boardNodeNames(writer.sceneManifest, writer.shots ?? [], locale))
 }
 
 export const useDirectorCanvasStore = create<DirectorCanvasState>()(
@@ -4284,7 +4294,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               const shot = get().nodes.find((n) => n.id === shotNodeId)
               const version = shot && isShotData(shot.data) ? storyboardImageVersions(shot.data.storyboardImage).find((v) => v.id === jobId) : undefined
               const locale = useLocaleStore.getState().locale
-              const name = shot ? prettyNodeLabel(shot.data.label) : ''
+              const name = stoppedShotName(shot, locale)
               notifyStoppedResultKept('director', version
                 ? translate(locale, 'The image you stopped for {shot} finished later and was kept as version v{n}. The current image did not change.', { shot: name, n: version.n })
                 : translate(locale, 'The image you stopped for {shot} finished later and was kept in the versions. The current image did not change.', { shot: name }))
@@ -5087,8 +5097,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 // 화면에서 멈춘 Take 가 뒤늦게 끝났다(오너 7번 · 리드 d) — Take 목록에만 있고 Editor 로 가는 Take 는 그대로다.
                 const doneNode = get().nodes.find((n) => n.id === videoNodeId)
                 const shot = doneNode && isVideoData(doneNode.data) ? get().nodes.find((n) => n.id === (doneNode.data as VideoNodeData).parentShotNodeId) : undefined
-                notifyStoppedResultKept('director', translate(useLocaleStore.getState().locale, 'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.', {
-                  shot: shot ? prettyNodeLabel(shot.data.label) : '',
+                const locale = useLocaleStore.getState().locale
+                notifyStoppedResultKept('director', translate(locale, 'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.', {
+                  shot: stoppedShotName(shot, locale),
                 }))
                 return true
               }

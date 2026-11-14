@@ -771,7 +771,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       const ref = shotRef(rawId, strict)
       const locale = useLocaleStore.getState().locale
       if (ref?.kind !== 'ambiguous') return translate(locale, "Shot '{id}' not found", { id: rawId })
-      const labels = boardShotLabels(boardBefore.manifest, boardBefore.shots)
+      // 두 샷 이름도 이 문장의 말로(오너 2026-11-14 답 7).
+      const labels = boardShotLabels(boardBefore.manifest, boardBefore.shots, locale)
       const [first, second] = ref.shotIds.map((shotId) => labels.get(shotId) ?? shotId)
       return translate(locale, 'Which shot do you mean: {first} or {second}?', { first, second })
     }

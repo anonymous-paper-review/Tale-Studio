@@ -104,6 +104,7 @@ import {
   navigateWithStageSlide,
 } from '@/lib/stage-transition'
 import { useT } from '@/lib/i18n'
+import { pickContentLocale } from '@/lib/locale'
 import { totalInputTokens, type ChatTrace } from '@/lib/chat-trace'
 import type { StageId } from '@/types'
 import { boardNodeNames, directorMentionTargets } from '@/features/director/node-label'
@@ -496,6 +497,11 @@ export function GlobalChat() {
   const t = useT()
   // 채팅 @ 고르기 · 끌어 놓기 안내는 화면 크롬이라 화면 언어(2026-11-10). 스토어 값(문자열)이라 memo deps 에 넣어도 안정적이다.
   const locale = useLocaleStore((s) => s.locale)
+  // 말풍선 글은 채팅 언어(잠긴 프로젝트는 프로젝트 언어) — 말풍선 속 내부 id 를 바꾼 이름도 그 말로(오너 2026-11-14 답 7, 한 문장 안에서 말이 섞이지 않게).
+  //   스토어 값 두 개(원시값)로 바로 고른다 — useContentLocale 과 같은 규칙(pickContentLocale).
+  const projectLocale = useProjectStore((s) => s.projectLocale)
+  const projectLocaleLocked = useProjectStore((s) => s.projectLocaleLocked)
+  const chatLocale = pickContentLocale({ projectLocale, locked: projectLocaleLocked, uiLocale: locale })
 
   const router = useRouter()
   // stage 는 URL 에서 직접 읽는다 (#chat-continuity 2026-07-31). store.currentStage 는
@@ -548,8 +554,8 @@ export function GlobalChat() {
   const characterHint = t('Character')
   const locationHint = t('Location')
   const directorNodes = useDirectorCanvasStore((s) => s.nodes)
-  // Director 씬 · 샷 멘션 이름은 보드와 같은 전체 번호("Previz Shot 8", 오너 2026-11-02 "전체 번호로 통일").
-  const directorNames = useMemo(() => boardNodeNames(writerManifest, writerShots), [writerManifest, writerShots])
+  // Director 씬 · 샷 멘션 이름은 보드와 같은 전체 번호("러프 샷 8" · "Previz Shot 8", 오너 2026-11-02 "전체 번호로 통일") — 말은 카드와 같은 화면 언어(2026-11-14 답 7).
+  const directorNames = useMemo(() => boardNodeNames(writerManifest, writerShots, locale), [writerManifest, writerShots, locale])
   const mentionItems = useMemo<MentionItem[]>(() => {
     if (currentStage === 'producer') {
       return [
@@ -570,13 +576,13 @@ export function GlobalChat() {
     }
     if (currentStage === 'writer') {
       return [
-        ...writerSceneShotMentions(writerManifest, writerShots),
+        ...writerSceneShotMentions(writerManifest, writerShots, locale),
         ...scriptLineMentions(buildScriptLines(writerManifest, writerShots), locale),
       ].map((m) => ({ id: m.ref, label: m.label, hint: m.hint }))
     }
     if (currentStage === 'director') {
       const targets = directorMentionTargets(directorNodes, directorNames)
-      return [...sceneShotMentions(targets, 'previz'), ...sceneShotMentions(targets, 'real')].map(
+      return [...sceneShotMentions(targets, 'previz', locale), ...sceneShotMentions(targets, 'real', locale)].map(
         (m) => ({ id: m.ref, label: m.label, hint: m.hint }),
       )
     }
@@ -613,8 +619,8 @@ export function GlobalChat() {
     return map
   }, [producerCast, artistCharacters, artistWorlds, writerManifest])
   // 샷 id 는 지금 보드의 전체 번호로(오너 2026-11-02 "전체 번호로 통일") — id 숫자는 샷을 더하거나 지우면 보드와 어긋난다.
-  const shotLabelById = useMemo(() => boardShotLabels(writerManifest, writerShots), [writerManifest, writerShots])
-  const scrubProse = (text: string) => scrubInternalIdsInProse(text, scrubNameById, shotLabelById)
+  const shotLabelById = useMemo(() => boardShotLabels(writerManifest, writerShots, chatLocale), [writerManifest, writerShots, chatLocale])
+  const scrubProse = (text: string) => scrubInternalIdsInProse(text, chatLocale, scrubNameById, shotLabelById)
   const [input, setInput] = useState('')
   // 하나의 스레드를 stage 구간으로 쪼갠다 — 필터가 아니라 구분선용(전 메시지가 그대로 보인다).
   const sections = useMemo(

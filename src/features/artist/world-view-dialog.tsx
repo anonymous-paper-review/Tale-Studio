@@ -178,8 +178,8 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   const lookLabel = variant ? variant.label : t('Default')
 
   const sceneIds = new Set((sceneManifest?.scenes ?? []).filter((scene) => scene.location === world.locationId).map((scene) => scene.sceneId))
-  // 샷 이름은 보드 카드와 같은 전체 번호("Scene 2 · Shot 8") — 오너 2026-11-02 "전체 번호로 통일".
-  const boardLabels = boardShotLabels(sceneManifest, shots)
+  // 샷 이름은 보드 카드와 같은 전체 번호("씬 2 · 샷 8") — 오너 2026-11-02 "전체 번호로 통일", 말은 화면 언어(2026-11-14 답 7).
+  const boardLabels = boardShotLabels(sceneManifest, shots, locale)
   const usedLabels = shots.filter((item) => sceneIds.has(item.sceneId)).map((item) => boardLabels.get(item.shotId)).filter((value): value is string => !!value)
 
   // 다시 만들기 창은 늘 저장된 설명에서 시작한다(앞에서 쓰다 취소한 글이 남지 않게).

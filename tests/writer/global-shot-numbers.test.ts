@@ -58,19 +58,19 @@ beforeEach(() => {
 describe('샷 번호는 보드와 같은 전체 번호', () => {
   // 왜: 오너 2026-11-02 "전체 번호로 통일" — 보드는 "Scene 2 · Shot 4"인데 멘션은 "Shot 2.1"이라 같은 샷을 다르게 불렀다.
   it('채팅 @멘션의 샷 이름은 보드 카드와 같은 전체 번호다', () => {
-    const labels = writerSceneShotMentions(manifest, shots).map((m) => m.label)
+    const labels = writerSceneShotMentions(manifest, shots, 'en').map((m) => m.label)
     expect(labels).toEqual(['Scene 1', 'Scene 2', 'Shot 1', 'Shot 2', 'Shot 3', 'Shot 4', 'Shot 5'])
   })
 
   // 왜: 번호는 id 가 아니라 지금 순서에서 센다 — 샷을 더하거나 지우면 보드 카드처럼 다시 센다.
   it('샷을 더하거나 지우면 번호는 지금 순서로 다시 센다', () => {
-    expect(boardShotLabels(manifest, shots).get('sh_02_03')).toBe('Scene 2 · Shot 4')
-    expect(boardShotLabels(manifest, shots.filter((s) => s.shotId !== 'sh_01_02')).get('sh_02_03')).toBe('Scene 2 · Shot 3')
+    expect(boardShotLabels(manifest, shots, 'en').get('sh_02_03')).toBe('Scene 2 · Shot 4')
+    expect(boardShotLabels(manifest, shots.filter((s) => s.shotId !== 'sh_01_02'), 'en').get('sh_02_03')).toBe('Scene 2 · Shot 3')
   })
 
   // 왜: "샷 8 고쳐줘"가 씬 안 순서로 풀리거나 모델이 "Scene 2 · Shot 3"처럼 씬 안 번호로 답했다 — 목록에 전체 번호를 붙이고 그 번호로 찾고 답하게 한다.
   it('채팅 모델에 보내는 샷 목록에 보드 전체 번호가 붙고, 그 번호로 찾고 답하라고 알린다', () => {
-    const context = serializeWriterScriptContext(manifest, shots)
+    const context = serializeWriterScriptContext(manifest, shots, 'en')
     expect(context).toMatch(/sh_02_03 \(Scene 2 · Shot 4\)/)
     expect(context).toContain('전체 번호')
     expect(context).not.toContain('씬N의 M번째 샷')
@@ -82,11 +82,11 @@ describe('샷 번호는 보드와 같은 전체 번호', () => {
   //   <shot-numbers> 규칙(보드 전체 번호)과 어긋난다 — 번호는 보드 전체에서 센다.
   it('한국어 대사 이어 쓰기에 보내는 샷 목록도 보드 전체 번호다', () => {
     const oneScene = { ...manifest, scenes: manifest.scenes.filter((s) => s.sceneId === 'sc_02') }
-    const context = serializeWriterScriptContext(oneScene, shots.filter((s) => s.sceneId === 'sc_02'), undefined, { manifest, shots })
+    const context = serializeWriterScriptContext(oneScene, shots.filter((s) => s.sceneId === 'sc_02'), 'en', undefined, { manifest, shots })
     expect(context).toMatch(/sh_02_03 \(Scene 2 · Shot 4\)/)
     expect(context).toContain('(씬2)')
     const store = readFileSync('src/stores/global-chat-store.ts', 'utf8')
-    expect(store).toMatch(/serializeWriterScriptContext\(manifest, shots, buildScriptLines\(manifest, shots\), \{ manifest: writer\.sceneManifest, shots: writer\.shots \}\)/)
+    expect(store).toMatch(/serializeWriterScriptContext\(manifest, shots, contentLocale\(\), buildScriptLines\(manifest, shots\), \{ manifest: writer\.sceneManifest, shots: writer\.shots \}\)/)
   })
 
   // 왜: 도구로 읽은 샷에도 같은 이름이 있어야 모델이 고친 샷을 보드 번호로 말한다.
@@ -98,14 +98,15 @@ describe('샷 번호는 보드와 같은 전체 번호', () => {
 
   // 왜: 말풍선 · 실행 결과 · 승인 카드는 저장된 글 속 샷 id(sh_02_03)를 그릴 때 이름으로 바꾼다 — id 숫자로 바꾸면 보드와 어긋난다(Shot 3 ≠ Shot 4).
   it('채팅 말풍선 · 실행 결과 · 승인 카드에 나오는 샷 id는 지금 보드의 전체 번호로 보인다', () => {
-    expect(scrubInternalIdsInProse('sh_02_03 저장 확인', undefined, boardShotLabels(manifest, shots))).toBe('Scene 2 · Shot 4 저장 확인')
+    // 한국어 대화는 한국어 이름으로(오너 2026-11-14 답 7).
+    expect(scrubInternalIdsInProse('sh_02_03 저장 확인', 'ko', undefined, boardShotLabels(manifest, shots, 'ko'))).toBe('씬 2 · 샷 4 저장 확인')
     const chat = readFileSync('src/components/layout/global-chat.tsx', 'utf8')
-    expect(chat).toMatch(/scrubInternalIdsInProse\(text, scrubNameById, shotLabelById\)/)
+    expect(chat).toMatch(/scrubInternalIdsInProse\(text, chatLocale, scrubNameById, shotLabelById\)/)
   })
 
   // 왜: Artist 는 "S1-2"(씬 안 번호), Editor 제목 그림은 내부 id(sh_01_02)를 그대로 보였다.
   it('Artist 인물 · 배경 팝업의 나오는 샷과 Editor 제목 그림 고르기의 러프 그림 이름도 보드 전체 번호다', () => {
-    const labeled = shots.map((s) => ({ ...s, boardLabel: boardShotLabels(manifest, shots).get(s.shotId), roughStoryboard: { status: 'completed', frames: { start: `https://m/${s.shotId}.png` } } }))
+    const labeled = shots.map((s) => ({ ...s, boardLabel: boardShotLabels(manifest, shots, 'en').get(s.shotId), roughStoryboard: { status: 'completed', frames: { start: `https://m/${s.shotId}.png` } } }))
     const options = collectProjectImages({ projectId: 'p', characters: {}, worlds: {}, shots: labeled })
     expect(options.find((o) => o.id === 'rough:sh_02_03')?.label).toBe('Scene 2 · Shot 4')
     for (const file of ['src/features/artist/character-view-dialog.tsx', 'src/features/artist/world-view-dialog.tsx']) {
@@ -119,7 +120,8 @@ describe('샷 번호는 보드와 같은 전체 번호', () => {
   it('Storyboard 내보내기의 샷 번호도 보드 전체 번호이고 파일 이름에 내부 id가 없다', async () => {
     const files = await collectWriterBoardArtifacts('p', 'ko')
     const treatment = files.find((f) => f.path === 'writer/treatment.md')
-    expect(treatment && 'content' in treatment ? treatment.content : '').toContain('### Shot 4')
+    // 한국어 프로젝트의 내보내기는 한국어 이름(오너 2026-11-14 답 7 — 예전에는 한국어 프로젝트도 "### Shot 4").
+    expect(treatment && 'content' in treatment ? treatment.content : '').toContain('### 샷 4')
     const names = files.filter((f) => f.path.startsWith('writer/rough-storyboard/')).map((f) => f.path)
     expect(names).toContain('writer/rough-storyboard/scene-02_shot-04.png')
     expect(names.join(' ')).not.toMatch(/sh_\d/)

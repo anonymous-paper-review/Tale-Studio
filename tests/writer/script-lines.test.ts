@@ -226,7 +226,7 @@ describe('serializeWriterScriptContext', () => {
   it('전달하는 내용의 [L#] 표시가 실제 줄 번호와 맞는다', () => {
     const { manifest, shots } = fixture()
     const lines = buildScriptLines(manifest, shots)
-    const context = serializeWriterScriptContext(manifest, shots)
+    const context = serializeWriterScriptContext(manifest, shots, 'en')
 
     const labels = Array.from(context.matchAll(/\[L(\d+)\]/g), (match) => Number(match[1]))
     expect(labels).toEqual(lines.map((line) => line.lineNo))

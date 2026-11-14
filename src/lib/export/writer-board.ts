@@ -14,6 +14,7 @@ import { h1, h2 } from './md'
 import type { ArtifactFile } from './types'
 import { loadShotsResult } from '@/lib/shots-cache'
 import { boardShots } from '@/lib/writer/board-summary'
+import { sceneName, shotName } from '@/lib/board-names'
 
 interface SceneRow {
   scene_id: string
@@ -107,7 +108,8 @@ function renderTreatmentMd(data: WriterBoardData, locale: AppLocale): string {
   scenes.forEach((scene, sceneIndex) => {
     const place = replaceSlugs(scene.location ?? '?', roster, '')
     const mood = scene.mood?.trim()
-    body += h2(`Scene ${sceneIndex + 1} — ${place}${mood ? ` · ${mood}` : ''}`)
+    // 씬 · 샷 이름은 내보내는 프로젝트의 언어(오너 2026-11-14 답 7) — 한국어 프로젝트는 "씬 1" · "샷 3".
+    body += h2(`${sceneName(locale, sceneIndex + 1)} — ${place}${mood ? ` · ${mood}` : ''}`)
     if (scene.time_of_day) body += `- ${translate(locale, 'Time of day')}: ${scene.time_of_day}\n`
     if (scene.narrative_summary) body += `\n${replaceSlugs(scene.narrative_summary, roster)}\n`
     if (scene.original_text_quote) body += `\n> ${replaceSlugs(scene.original_text_quote, roster)}\n`
@@ -118,7 +120,7 @@ function renderTreatmentMd(data: WriterBoardData, locale: AppLocale): string {
       const meta = [shot.shot_type, shot.duration_seconds ? `${shot.duration_seconds}s` : null]
         .filter(Boolean)
         .join(' · ')
-      body += `### Shot ${shotNo.get(shot.shot_id)}${meta ? ` (${meta})` : ''}\n\n`
+      body += `### ${shotName(locale, shotNo.get(shot.shot_id) ?? '?')}${meta ? ` (${meta})` : ''}\n\n`
       body += `${replaceSlugs(shot.action_description || translate(locale, '(No description)'), roster)}\n\n`
       for (const line of shot.dialogue_lines ?? []) {
         if (!line?.text) continue
@@ -223,7 +225,7 @@ async function renderBoardSheet(data: WriterBoardData, locale: AppLocale): Promi
     ctx.font = '600 24px system-ui, sans-serif'
     ctx.textBaseline = 'top'
     ctx.fillText(
-      `Scene ${block.sceneIndex + 1}${place ? ` — ${place}` : ''}`,
+      `${sceneName(locale, block.sceneIndex + 1)}${place ? ` — ${place}` : ''}`,
       PAD,
       y + 8,
     )
@@ -254,7 +256,7 @@ async function renderBoardSheet(data: WriterBoardData, locale: AppLocale): Promi
       ctx.fillStyle = '#d4d4d8'
       ctx.font = '14px system-ui, sans-serif'
       ctx.fillText(
-        `Shot ${entry.shotNo}${meta ? ` · ${meta}` : ''}`,
+        `${shotName(locale, entry.shotNo ?? '?')}${meta ? ` · ${meta}` : ''}`,
         x,
         cy + CARD_H + 8,
       )

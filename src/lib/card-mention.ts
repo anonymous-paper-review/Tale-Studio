@@ -9,7 +9,10 @@
 //   고정한다 — 클라·서버가 서로 다른 locale 해석으로 다른 문자열을 만들면 LLM 이 되돌려준
 //   @멘션이 클라의 멘션 목록과 매칭되지 않는 조용한 고장이 된다. hint(카테고리 배지, 순수 표시용 —
 //   매칭에 안 쓰이고 서버도 안 읽음, 실측 확인)만 locale 인자로 번역한다.
+// 씬 · 샷 멘션(sceneShotMentions)은 화면 언어로 짓는다(오너 2026-11-14 답 7) — 서버가 읽지 않고, 고르기 목록과 입력창 글자가
+//   같은 화면 언어로 서로 맞는다. 모델에게는 목록 · 프롬프트가 두 말 이름을 같은 샷으로 알린다.
 import { translate } from '@/lib/i18n'
+import { sceneName, shotName } from '@/lib/board-names'
 import type { AppLocale } from '@/lib/locale'
 
 // locale 인자를 안 넘기는 호출부(서버 produce/chat 의 LLM 문맥 — 라벨만 쓴다)가 조용히
@@ -45,19 +48,27 @@ export function sceneShotMentionRef(
   return `${mode}:${kind}:${id}`
 }
 
+/** 보기 이름(Director 의 러프 · 실사) — 멘션 이름 · 꼬리표 앞에 붙는다. 영어는 예전 그대로("Previz" · "Real"). */
+function modeWord(mode: SceneShotMentionMode, locale: AppLocale): string {
+  if (mode === 'writer') return ''
+  if (mode === 'previz') return locale === 'ko' ? translate(locale, 'Rough') : 'Previz'
+  return translate(locale, 'Real')
+}
+
 /**
  * Writer/Director가 공유하는 씬·샷 멘션 항목 생성기.
  * #internal-id-scrub(2026-08-26, 오너 E5 "내부 ID 전면 금지"): 옛 라벨은 `… · ${id}` 로 내부
  *   id 를 그대로 노출했다("Real Shot 7 · sh_02_07" — 오너가 본 '변수'). 식별은 ref 가 전담하고
- *   라벨은 사람 이름만 쓴다. 규칙 생성명(Scene N · Shot N.M)은 구조상 유일해 dedup 도 유지된다.
- *   라벨은 여전히 로케일 고정(파일 헤더의 매칭 키 계약) — 한글 표기는 매칭에 안 쓰이는
- *   표면(캔버스 라벨·챗 산문 스크럽, src/lib/display-names.ts)이 맡는다.
+ *   라벨은 사람 이름만 쓴다. 규칙 생성명(씬 2 · 샷 8)은 구조상 유일해 dedup 도 유지된다.
+ *   라벨은 화면 언어(오너 2026-11-14 답 7): 한국어 "샷 8" · "실사 샷 8" · "러프 샷 8", 영어 "Shot 8" · "Real Shot 8" · "Previz Shot 8".
+ *   target.label 은 같은 화면 언어로 지은 이름이어야 한다(Director: boardNodeNames(…, locale), Writer: writerSceneShotMentions).
  */
 export function sceneShotMentions(
   targets: readonly SceneShotMentionTarget[],
-  mode: SceneShotMentionMode = 'writer',
+  mode: SceneShotMentionMode,
+  locale: AppLocale,
 ): CardMention[] {
-  const modeLabel = mode === 'writer' ? '' : `${mode === 'previz' ? 'Previz' : 'Real'} `
+  const prefix = modeWord(mode, locale)
   const seen = new Set<string>()
   return targets.flatMap((target) => {
     const id = target.id.trim()
@@ -66,13 +77,16 @@ export function sceneShotMentions(
     const ref = sceneShotMentionRef(mode, target.kind, id)
     if (seen.has(ref)) return []
     seen.add(ref)
-    const kindLabel = target.kind === 'scene' ? 'Scene' : 'Shot'
-    const displayName = name.replace(new RegExp(`^${kindLabel}\\s+`, 'i'), '').trim() || name
+    // 이름 앞의 종류 낱말(두 말)을 떼고 이 화면 말로 다시 붙인다 — 사람이 지은 이름은 "샷 river_gaze"처럼 종류만 붙는다.
+    const kindPattern = target.kind === 'scene' ? /^(?:scene|씬)\s+/i : /^(?:shot|샷)\s+/i // i18n-ok: 두 말의 종류 낱말을 뗀다
+    const bare = name.replace(kindPattern, '').trim() || name
+    const kindName = target.kind === 'scene' ? sceneName(locale, bare) : shotName(locale, bare)
+    const kindWord = translate(locale, target.kind === 'scene' ? 'Scene' : 'Shot')
     return [
       {
         ref,
-        label: `${modeLabel}${kindLabel} ${displayName}`,
-        hint: `${modeLabel}${kindLabel}`,
+        label: prefix ? `${prefix} ${kindName}` : kindName,
+        hint: prefix ? `${prefix} ${kindWord}` : kindWord,
       },
     ]
   })

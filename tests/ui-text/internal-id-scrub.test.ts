@@ -10,31 +10,33 @@ import { renderInlineMarkdown } from '@/lib/inline-markdown'
 import { sceneShotMentions } from '@/lib/card-mention'
 
 // #internal-id-scrub + #no-hr (2026-08-26, 오너 그룹 E) — 내부 id·구분선이 사용자 화면에
-//   보이지 않는다는 계약. 정책: 샷 규칙 생성명은 로케일 무관 "Scene 2 · Shot 7" 단일형
-//   (오너 확정 — 한국어 UI 도 동일), 내부 id 는 UI 전면 금지(디버그 예외 없음).
+//   보이지 않는다는 계약. 내부 id 는 UI 전면 금지(디버그 예외 없음).
+//   샷 규칙 생성명은 그 글의 언어(오너 2026-11-14 답 7 — 8/26 의 로케일 무관 단일형을 바꿈): 한국어 "씬 2 · 샷 7", 영어 "Scene 2 · Shot 7".
 
 describe('샷과 씬을 사람이 읽는 이름으로 보여준다 (#internal-id-scrub)', () => {
   it('장면과 샷 번호를 보여주면 읽기 쉬운 이름으로 바꾼다', () => {
-    expect(shotIdDisplayName('sh_02_07')).toBe('Scene 2 · Shot 7')
-    expect(shotIdDisplayName('sh_4_31')).toBe('Scene 4 · Shot 31')
+    expect(shotIdDisplayName('sh_02_07', 'en')).toBe('Scene 2 · Shot 7')
+    expect(shotIdDisplayName('sh_4_31', 'en')).toBe('Scene 4 · Shot 31')
+    expect(shotIdDisplayName('sh_02_07', 'ko')).toBe('씬 2 · 샷 7')
   })
 
   it('장면 번호가 아닌 값은 이름으로 바꾸지 않는다', () => {
-    expect(sceneIdDisplayName('sc_04')).toBe('Scene 4')
-    expect(shotIdDisplayName('char_2')).toBeNull()
-    expect(sceneIdDisplayName('scene-x')).toBeNull()
+    expect(sceneIdDisplayName('sc_04', 'en')).toBe('Scene 4')
+    expect(shotIdDisplayName('char_2', 'en')).toBeNull()
+    expect(sceneIdDisplayName('scene-x', 'en')).toBeNull()
   })
 })
 
 describe('대화 내용에서 내부 번호와 옛 표식을 숨긴다', () => {
   it('대화에 내부 장면 번호가 나오면 사람이 읽는 이름으로 보여준다', () => {
-    expect(scrubInternalIdsInProse('sh_02_07 의 구도를 sc_04 톤에 맞췄어요.')).toBe(
-      'Scene 2 · Shot 7 의 구도를 Scene 4 톤에 맞췄어요.',
+    // 한국어 대화의 말풍선은 한국어 이름으로(오너 2026-11-14 답 7 — 예전에는 한국어 문장 속에도 "Scene 2 · Shot 7").
+    expect(scrubInternalIdsInProse('sh_02_07 의 구도를 sc_04 톤에 맞췄어요.', 'ko')).toBe(
+      '씬 2 · 샷 7 의 구도를 씬 4 톤에 맞췄어요.',
     )
   })
 
   it('옛 단계 표시는 숨기되 [L3] 대사 줄 참조는 남겨둔다', () => {
-    expect(scrubInternalIdsInProse('[p3] 문단과 [L3] 라인을 참고했어요.')).toBe(
+    expect(scrubInternalIdsInProse('[p3] 문단과 [L3] 라인을 참고했어요.', 'ko')).toBe(
       '문단과 [L3] 라인을 참고했어요.',
     )
   })
@@ -51,7 +53,7 @@ describe('대화 내용에서 내부 번호와 옛 표식을 숨긴다', () => {
       ['loc_riverside', '강가'],
     ])
     expect(
-      scrubInternalIdsInProse('char_new_5l6sj 를 loc_riverside 에 배치했어요.', names),
+      scrubInternalIdsInProse('char_new_5l6sj 를 loc_riverside 에 배치했어요.', 'ko', names),
     ).toBe('체장수 를 강가 에 배치했어요.')
   })
 })
@@ -78,6 +80,7 @@ describe('멘션에는 사람이 읽는 이름만 보여준다 (#internal-id-scr
     const [m] = sceneShotMentions(
       [{ kind: 'shot', id: 'sh_02_07', label: 'Shot 2.7' }],
       'real',
+      'en',
     )
     expect(m.label).toBe('Real Shot 2.7')
     expect(m.label).not.toContain('sh_02_07')
