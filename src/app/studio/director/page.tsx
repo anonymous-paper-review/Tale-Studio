@@ -1157,7 +1157,8 @@ function PaletteBar() {
       ? makingLabel(makingImages, makingVideos, t)
       : makingVideos > 0 || videoLive
         ? makingVideos > 1 ? t('Making {count} videos', { count: makingVideos }) : t('Making 1 video')
-        : makingImages > 1 ? t('Making {count} images', { count: makingImages }) : t('Making 1 image')
+        // 셀 이미지가 아직 0개면 수 없이 — "1장"이라고 하지 않는다(영어 재점검: 2샷 다시 만들기가 "Making 1 image").
+        : makingImages > 1 ? t('Making {count} images', { count: makingImages }) : makingImages === 1 ? t('Making 1 image') : t('Making images')
 
   // v3 D1 → 1110 확정(시안 406:3717 · 406:4051): 위쪽 2줄.
   //   1줄: 보기 · 제목 · 예상 … 상태 고르기 · Lumi / 2줄: 진행 … 이미지 만들기 · 영상 만들기.

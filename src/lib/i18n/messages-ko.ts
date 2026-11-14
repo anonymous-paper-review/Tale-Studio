@@ -3318,6 +3318,7 @@ export const KO: Record<string, string> = {
   'Stop all': '모두 멈추기',
   'Making {count} images': '이미지 {count}장 만드는 중',
   'Making 1 image': '이미지 1장 만드는 중',
+  'Making images': '이미지 만드는 중',
   'Making 1 video': '영상 1개 만드는 중',
   'Making {what}': '{what} 만드는 중',
   // 진행 글 조각 · 예상 칸 문장(영어는 수가 1이면 단수, 리드 11/14 답 2)

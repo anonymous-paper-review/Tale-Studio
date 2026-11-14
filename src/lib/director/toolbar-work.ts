@@ -235,7 +235,8 @@ export function makingLabel(images: number, videos: number, t: Translate): strin
   const parts: string[] = []
   if (images > 0) parts.push(countText(t, images, '1 image', '{count} images', { count: images }))
   if (videos > 0) parts.push(countText(t, videos, '1 video', '{count} videos', { count: videos }))
-  if (parts.length === 0) parts.push(t('1 image'))
+  // 셀 샷이 아직 없으면(다시 그리는 샷은 서버 답 전에 세지 않는다) "1장"이라고 하지 않고 수 없이(리드 11/14).
+  if (parts.length === 0) return t('Making images')
   return t('Making {what}', { what: parts.join(' · ') })
 }
 
