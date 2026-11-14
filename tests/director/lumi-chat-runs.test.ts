@@ -523,7 +523,7 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(remake).toHaveBeenCalledTimes(2)
     const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
     expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
-    expect(said).toContain("Too many videos are being made at once, so I didn't start the video for Shots 2 · 4. Ask again once one is done.")
+    expect(said).toContain("Too many videos are being made at once, so I didn't start the videos for Shots 2 · 4. Ask again once one is done.")
     expect(translate('ko', "Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.", { shots: '샷 2·4' })).toBe('동시에 만드는 영상이 많아 샷 2·4 영상은 시작하지 못했어요. 하나가 끝나면 다시 부탁해 주세요.')
   })
 
@@ -722,8 +722,8 @@ describe('다시 만들기는 접수되는 대로(검토 b (a)~(g) 보통 1)', (
     expect(generated).toEqual(['w1', 'w2', 'w3', 'w4', 'w5', 'w6'])
     const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
     expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
-    expect(said).toContain("I can't tell yet whether the video for Shots 3 · 4 · 5 was accepted. You can see the result on the card.")
-    expect(said).toContain("I couldn't start the video for Shots 2 · 6. Please ask again in a moment.")
+    expect(said).toContain("I can't tell yet whether the videos for Shots 3 · 4 · 5 were accepted. You can see the results on the cards.")
+    expect(said).toContain("I couldn't start the videos for Shots 2 · 6. Please ask again in a moment.")
     expect(translate('ko', "I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.", { shots: '샷 3·4·5' })).toBe('샷 3·4·5 영상은 접수됐는지 아직 몰라요. 카드에서 결과를 볼 수 있어요.')
   })
 
@@ -1051,7 +1051,7 @@ describe('이미지가 없는 샷의 영상 부탁(영어 재점검 B1)', () => 
     // 남은 샷이 없으면 묻지 않고 그 줄만.
     director.setState({ nodes: [shot('s1'), shot('s2', IMG('s2')), shot('s3'), shot('s4')] })
     await chat.getState().sendMessage('샷 2 빼고 영상 다 만들어줘')
-    expect(lastModel()).toBe('The video for Shots 1 · 3 · 4 needs an image first.')
+    expect(lastModel()).toBe('The videos for Shots 1 · 3 · 4 need an image first.')
     expect(chat.getState().directorVideoAsk).toBeNull()
     // 번호를 물은 뒤 "3이나 4" — 샷 3 줄을 먼저 말하고 샷 4 만 되묻는다.
     director.setState({ nodes: NODES() })
@@ -1123,5 +1123,80 @@ describe('이미지가 없는 샷의 영상 부탁(영어 재점검 B1)', () => 
     imageNow('s3')
     await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
     expect(runShots()).toEqual(['s1'])
+  })
+})
+
+describe('Lumi 말과 앱 줄(영어 재점검 B3 · B4)', () => {
+  const making = (shotId: string) =>
+    ({ id: `v-${shotId}-making`, type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: `v-${shotId}-making`, parentShotNodeId: shotId, status: 'generating', lastAttemptStatus: 'generating', videoUrl: null, final: false, takeNumber: 1, override: {} } }) as unknown as DirectorNode
+  const DRAWING = { status: 'generating', url: null, jobId: null }
+  const contextSent = (fetchMock: ReturnType<typeof vi.fn>) => {
+    const call = fetchMock.mock.calls.find(([url]) => String(url).includes('/api/director/chat')) as [string, RequestInit] | undefined
+    return (JSON.parse(String(call?.[1].body)) as { canvasContext: string }).canvasContext
+  }
+
+  // 왜: 영어 재점검(qa-golden f19330d7) B3 — "Make the video for shot 3"(그림 없음)에 Lumi 가 먼저 "I'm sending Scene 1 · Shot 3 for video…"라고 하고
+  //   바로 뒤 앱 줄이 "The video for Shot 3 needs an image first."였다. Lumi 는 샷마다 이미지가 있는지 몰랐다.
+  it('Director 채팅이 Lumi 에게 보내는 보드 맥락에는 샷마다 이미지가 있는지(있음 · 그리는 중 · 없음)가 실린다 — 그리는 중은 보드처럼 이미지 일괄이 맡은 샷도', async () => {
+    const fetchMock = vi.fn(async () => Response.json({ reply: 'Okay.', updates: [] }))
+    vi.stubGlobal('fetch', fetchMock)
+    director.setState({ nodes: [shot('s1', IMG('s1')), shot('s2', DRAWING), shot('s3'), shot('s4', IMG('s4')), failedTake('v4', 's4')] })
+    await chat.getState().sendMessage('How are the shots?')
+    let context = contextSent(fetchMock)
+    expect(context).toContain('### Shot images')
+    expect(context).toContain('- [s1] Shot 1: image ready')
+    expect(context).toContain('- [s2] Shot 2: image being made')
+    expect(context).toContain('- [s3] Shot 3: no image')
+    expect(context).toContain('- [s4] Shot 4: image ready')
+    // 이미지 일괄이 맡아 차례를 기다리는 샷도 그리는 중이다(보드와 같다).
+    writer.setState({ shots: ['s1', 's2', 's3', 's4'].map((id) => ({ shotId: `w-${id}`, sceneId: 'sc1', roughStoryboard: { status: 'completed', url: `https://media.test/rough-${id}.png` } })) as never })
+    director.setState({ realBatchBusy: true, realBatchCancelled: false, realBatchShotIds: ['w-s3'] })
+    fetchMock.mockClear()
+    await chat.getState().sendMessage('How are the shots now?')
+    context = contextSent(fetchMock)
+    expect(context).toContain('- [s3] Shot 3: image being made')
+  })
+
+  // 왜: 영어 재점검 B4 — 이미지 없는 샷이 둘이면 "The video for Shots 3 · 4 needs an image first."로 단수였다. 같은 꼴 줄(그리는 중 · 만드는 중 · 글 카드)도 같다.
+  it('이미지가 먼저 필요하다는 앱 줄의 영어는 샷이 여럿이면 복수다 — "The videos for Shots 3 · 4 need an image first." · 같은 꼴 줄(그리는 중 · 만드는 중 · 글 카드 · 시작 못 함)도 복수, 한국어는 그대로', async () => {
+    director.setState({ nodes: [shot('s1', IMG('s1')), shot('s2', IMG('s2')), shot('s3'), shot('s4')] })
+    reply([{ type: 'generateVideos', shotIds: ['s3', 's4'] }])
+    await chat.getState().sendMessage('Make videos for shot 3 and 4')
+    expect(lastModel()).toBe('The videos for Shots 3 · 4 need an image first.')
+    // 그리는 중 둘.
+    director.setState({ nodes: [shot('s1', IMG('s1')), shot('s2', IMG('s2')), shot('s3', DRAWING), shot('s4', DRAWING)] })
+    await chat.getState().sendMessage('Make videos for shot 3 and 4')
+    expect(lastModel()).toBe('The images for Shots 3 · 4 are being made. You can make the videos once they are done.')
+    // 만드는 중 둘 — 다시 만들어 달라고 해도 보내지 않고 그렇다고 말한다.
+    director.setState({ nodes: [shot('s1', IMG('s1')), making('s1'), shot('s2', IMG('s2')), making('s2'), shot('s3'), shot('s4')] })
+    reply([{ type: 'generateVideos', shotIds: ['s1', 's2'] }])
+    await chat.getState().sendMessage('샷 1, 2 영상 다시 만들어줘')
+    expect(chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)).toContain('The videos for Shots 1 · 2 are being made right now.')
+    // 글 카드 줄 — 두 샷 영상.
+    director.setState({ nodes: [shot('s1', IMG('s1')), shot('s2', IMG('s2')), shot('s3'), shot('s4')] })
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'Warm' } }, { type: 'updateShot', id: 's2', patch: { prompt: 'Warm' } }, { type: 'generateVideos', shotIds: ['s1', 's2'] }])
+    await chat.getState().sendMessage('Make shots 1 and 2 warmer and then make the videos for shots 1 and 2')
+    expect(chat.getState().pendingProposal?.impact).toContain('Applying also makes the videos for Shots 1 · 2 right away · 10 Takes.')
+    // 한국어는 단수 · 복수 키가 같은 꼴이다.
+    const pairs: Array<[string, string]> = [
+      ['The video for {shots} needs an image first.', 'The videos for {shots} need an image first.'],
+      ['The image for {shots} is being made. You can make the video once it is done.', 'The images for {shots} are being made. You can make the videos once they are done.'],
+      ['The video for {shots} is being made right now.', 'The videos for {shots} are being made right now.'],
+      ["I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.", "I can't tell yet whether the videos for {shots} were accepted. You can see the results on the cards."],
+      ["Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.", "Too many videos are being made at once, so I didn't start the videos for {shots}. Ask again once one is done."],
+      ["I couldn't start the video for {shots}. Please ask again in a moment.", "I couldn't start the videos for {shots}. Please ask again in a moment."],
+      ['Applying the text card makes the video for {shots} with the new text.', 'Applying the text card makes the videos for {shots} with the new text.'],
+      ['Applying the text card makes the image for {shots} with the new text.', 'Applying the text card makes the images for {shots} with the new text.'],
+      ['Applying also makes the video for {shots} right away.', 'Applying also makes the videos for {shots} right away.'],
+      ['Applying also makes the video for {shots} right away · {takes} Takes.', 'Applying also makes the videos for {shots} right away · {takes} Takes.'],
+      ['Applying also makes the live-action image for {shots} right away · No Takes used.', 'Applying also makes the live-action images for {shots} right away · No Takes used.'],
+      ["I left out the video for {shots} because its text change isn't applied yet.", "I left out the videos for {shots} because their text changes aren't applied yet."],
+      ["I left out the image for {shots} because its text change isn't applied yet.", "I left out the images for {shots} because their text changes aren't applied yet."],
+    ]
+    for (const [one, many] of pairs) {
+      const vars = { shots: '샷 3 · 4', takes: 10 }
+      expect(translate('ko', many, vars)).toBe(translate('ko', one, vars))
+      expect(translate('ko', many, vars)).not.toBe(translate('en', many, vars))
+    }
   })
 })
