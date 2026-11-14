@@ -4,6 +4,7 @@
 // 사람이 읽을 수 있는 문장으로 만들 때 쓴다. 생성을 트리거하지 않는다(비용 무발생).
 //
 // 라벨은 넛지를 띄우는 화면의 언어로 쓴다(2026-11-10 오너 "영어 언어에서 한국어 나오는거 수정") — 언어를 안 넘기는 옛 호출은 종전처럼 한국어.
+import { countText } from '@/lib/i18n/count-text'
 import { translate } from '@/lib/i18n/translate'
 import type { AppLocale } from '@/lib/locale'
 import type { CharacterAsset, WorldAsset } from '@/types'
@@ -74,6 +75,18 @@ export function getDirectorGaps(
     if (d.storyboardImage?.status !== 'completed') gaps.push({ label: translate(locale, '{name}: no storyboard yet', { name: shotLabel }) })
   }
   return gaps
+}
+
+/** 채팅에 남기는 "채워 두면 좋은 것" 안내 문장 — 항목이 1개면 영어는 단수 문장 키(통째 키 짝, 한국어는 두 키가 같은 꼴 — 2026-11-14 오너).
+ *  summary 는 summarizeGaps 가 짓는 목록 줄이다. */
+export function gapNudgeText(locale: AppLocale, count: number, summary: string): string {
+  return countText(
+    (text, params) => translate(locale, text, params),
+    count,
+    'There is {count} thing worth filling in:\n{summary}',
+    'There are {count} things worth filling in:\n{summary}',
+    { count, summary },
+  )
 }
 
 /** 갭 목록을 채팅 메시지용 요약 문자열로 (상위 max건 + 나머지 개수). */

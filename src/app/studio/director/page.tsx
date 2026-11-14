@@ -91,7 +91,7 @@ import { useActiveGenerationJobs, useGenerationBatches } from '@/lib/generation-
 import { stoppableJobs, stoppedCounts, stopNotice, videoBatchLive } from '@/lib/director/stop-work'
 import { freshActiveJobs } from '@/lib/director/stop-all-client'
 import { withStoryboardBacklog } from '@/lib/generation-batches'
-import { getDirectorGaps, ledgerGapLabels, summarizeGaps } from '@/lib/completeness'
+import { getDirectorGaps, ledgerGapLabels, summarizeGaps, gapNudgeText } from '@/lib/completeness'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
   isShotData,
@@ -125,7 +125,7 @@ import {
   doubleClickActionForKind,
   connectRouteForTargetHandle,
 } from '@/features/director/canvas-interaction'
-import { translate, useT } from '@/lib/i18n'
+import { useT } from '@/lib/i18n'
 import { useContentLocale } from '@/lib/i18n/content'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 
@@ -476,13 +476,7 @@ function CanvasInner() {
   // 장부 줄은 말(chatLocale)이 들어가므로 메모 밖에서 짓는다 — useContentLocale() 결과를 훅 deps 에 넣으면 불안정 참조 검사에 걸린다(tests/ops/unstable-hook-deps).
   const ledgerGaps = ledgerGapLabels(sceneLedgers, (id) => assetCharacters[id]?.name ?? id, chatLocale)
   const gaps = getDirectorGaps(nodes, { ...gapAssets, ledgerGaps }, chatLocale, chatBoardNames)
-  const gapNudgeContent =
-    gaps.length > 0
-      ? translate(chatLocale, 'There are {count} things worth filling in:\n{summary}', {
-          count: gaps.length,
-          summary: summarizeGaps(gaps, 3, chatLocale),
-        })
-      : null
+  const gapNudgeContent = gaps.length > 0 ? gapNudgeText(chatLocale, gaps.length, summarizeGaps(gaps, 3, chatLocale)) : null
   useEffect(() => {
     if (!directorProjectId || nodes.length === 0) return
     if (!chatHistoryLoaded) return

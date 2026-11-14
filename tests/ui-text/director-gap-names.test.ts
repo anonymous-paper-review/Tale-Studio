@@ -62,6 +62,6 @@ describe('Director 화면 배선', () => {
     expect(page).toMatch(/useBoardNodeNames\(chatLocale\)/)
     expect(page).toMatch(/getDirectorGaps\(nodes, \{ \.\.\.gapAssets, ledgerGaps \}, chatLocale, chatBoardNames\)/)
     expect(page).toMatch(/summarizeGaps\(gaps, \d+, chatLocale\)/)
-    expect(page).toMatch(/translate\(chatLocale, 'There are \{count\} things worth filling in:/)
+    expect(page).toMatch(/gapNudgeText\(chatLocale, gaps\.length, summarizeGaps\(gaps, 3, chatLocale\)\)/)
   })
 })

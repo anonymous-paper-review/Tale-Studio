@@ -3652,4 +3652,7 @@ export const KO: Record<string, string> = {
   'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
   'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
   'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  // ── 2026-11-14 오너: 항목 · 씬이 1개일 때의 단수 문장(한국어는 같은 꼴) ──
+  'There is {count} thing worth filling in:\n{summary}': '채워두면 좋을 항목이 {count}건 있어요:\n{summary}',
+  'Splitting into {count} scene': '씬 {count}개로 나누기',
 }

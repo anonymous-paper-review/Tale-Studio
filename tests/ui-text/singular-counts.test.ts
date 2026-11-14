@@ -5,8 +5,10 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 
 import { artistBriefText } from '@/lib/artist/brief'
+import { gapNudgeText } from '@/lib/completeness'
 import { translate } from '@/lib/i18n/translate'
 import { storyboardBriefing } from '@/lib/writer/board-summary'
+import { INITIAL_BOARD_LOCK, advanceBoardLock, storyboardBusyView } from '@/lib/writer/board-busy'
 
 const en = (text: string, params?: Record<string, string | number>) => translate('en', text, params)
 const ko = (text: string, params?: Record<string, string | number>) => translate('ko', text, params)
@@ -69,5 +71,48 @@ describe('Storyboard 첫 안내의 씬 · 샷 수', () => {
     const rest = (text: string) => text.split('\n').filter((line) => !line.includes('Split into') && !line.includes('로 나눴어요'))
     expect(rest(storyboardBriefing('en', { sceneCount: 1, shotCount: 1 }))).toEqual(rest(storyboardBriefing('en', { sceneCount: 3, shotCount: 8 })))
     expect(rest(storyboardBriefing('ko', { sceneCount: 1, shotCount: 1 }))).toEqual(rest(storyboardBriefing('ko', { sceneCount: 3, shotCount: 8 })))
+  })
+})
+
+describe('Director 채워 두면 좋은 것 안내의 항목 수', () => {
+  it('영어 안내는 항목이 1개면 "There is 1 thing worth filling in"으로 단수로 말하고, 둘 이상이면 지금처럼 복수로 말한다', () => {
+    // 왜: 항목이 하나뿐일 때 "There are 1 things worth filling in"으로 나왔다.
+    expect(gapNudgeText('en', 1, '• Shot 1: no storyboard yet')).toBe('There is 1 thing worth filling in:\n• Shot 1: no storyboard yet')
+    expect(gapNudgeText('en', 7, '• Shot 1: no storyboard yet')).toBe('There are 7 things worth filling in:\n• Shot 1: no storyboard yet')
+  })
+
+  it('한국어 안내는 항목 수가 1이어도 그대로다', () => {
+    // 왜: 한국어는 단수 · 복수가 없다 — 한 문장 꼴이어야 한다.
+    expect(gapNudgeText('ko', 1, '• 샷 1: 스토리보드 미생성')).toBe('채워두면 좋을 항목이 1건 있어요:\n• 샷 1: 스토리보드 미생성')
+    expect(gapNudgeText('ko', 7, '• 샷 1: 스토리보드 미생성')).toBe('채워두면 좋을 항목이 7건 있어요:\n• 샷 1: 스토리보드 미생성')
+  })
+
+  it('Director 화면은 채워 두면 좋은 것 안내를 항목 수에 맞는 문장으로 짓는다', () => {
+    // 왜: 문장을 고르는 함수가 있어도 화면이 옛 한 줄 키를 그대로 부르면 단수 고침이 화면에 닿지 않는다.
+    expect(readFileSync('src/app/studio/director/page.tsx', 'utf8')).toMatch(/gapNudgeText\(chatLocale, gaps\.length, summarizeGaps\(gaps, 3, chatLocale\)\)/)
+  })
+})
+
+describe('Writer 진행 화면의 씬 수', () => {
+  // 씬 · 샷을 나누는 중(decoupage)인 보드의 잠금 표시 — 단계 목록의 두 번째 줄이 "Splitting into N scenes"다.
+  const splitting = { runActive: true, reloading: false, hasShots: false, generating: 0, failed: 0, pumpActive: false, autoDrawPending: false }
+  const splitLabel = (locale: 'en' | 'ko', sceneCount: number) =>
+    storyboardBusyView(
+      {
+        status: { started: true, engine: 'v1', pipeline_completed: false, pipeline_failed: false, current_status: 'running', current_stage: 'decoupage' },
+        facts: splitting,
+        lock: advanceBoardLock(INITIAL_BOARD_LOCK, splitting),
+        rough: { total: 0, completed: 0, generating: 0, waiting: 0, failed: 0 },
+        sceneCount,
+      },
+      locale,
+    ).steps?.[1]?.label
+
+  it('영어 진행 화면은 씬이 1개면 "Splitting into 1 scene"으로 단수로 말하고, 둘 이상이면 지금처럼 복수로 말한다', () => {
+    // 왜: 씬이 하나뿐일 때 "Splitting into 1 scenes"로 나왔다.
+    expect(splitLabel('en', 1)).toBe('Splitting into 1 scene')
+    expect(splitLabel('en', 3)).toBe('Splitting into 3 scenes')
+    expect(splitLabel('ko', 1)).toBe('씬 1개로 나누기')
+    expect(splitLabel('ko', 3)).toBe('씬 3개로 나누기')
   })
 })
