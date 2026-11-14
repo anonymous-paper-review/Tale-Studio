@@ -5,7 +5,7 @@
 //   1단계 다시 만들기는 지금처럼 시작 · 끝 함께 — 고르기 표시는 둘 다 고른 채 잠가 둔다. 모델 칸은 실제로 도는 것만.
 //   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts
 import { useMemo, useState } from 'react'
-import { Trash2, Upload, X } from 'lucide-react'
+import { ChevronLeft, ChevronRight, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ThumbImage } from '@/components/thumb-image'
@@ -15,6 +15,7 @@ import { useT } from '@/lib/i18n'
 import { IMAGE_MODELS } from '@/lib/image-models'
 import { detailImageModel, detailImageModels, shotDetailFrames } from '@/lib/director/shot-detail'
 import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/director/storyboard-image-versions'
+import { shownVersionRowPage, versionRowView, type VersionRowMove } from '@/lib/director/image-version-row'
 import { mediaFrameStyle } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -23,6 +24,9 @@ import { aspectRatioFromFormat } from '@/types/project'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { LockedFrame } from './locked-frame'
+
+// 버전 줄 넘기기 단추(‹ ›) — 시안에 없어(시안 없음) 칩과 같은 높이(24) · 테두리의 동그란 단추로 둔다. 꺼지면 40%(디자이너 R).
+const VERSION_ARROW = 'flex size-6 shrink-0 items-center justify-center rounded-full border border-border text-muted-foreground transition-colors hover:bg-accent hover:text-foreground disabled:pointer-events-none disabled:opacity-40'
 
 export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   nodeId: string
@@ -47,6 +51,10 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   const frames = shotDetailFrames(data.storyboardImage)
   const versions = storyboardImageVersions(data.storyboardImage)
   const current = currentStoryboardVersion(data.storyboardImage)
+  // 버전 줄은 한 번에 5개(오너 11/14 답 5) — 처음엔 지금 그림이 든 쪽, 넘겨 본 쪽은 지금 그림이 그대로인 동안만 남는다.
+  const [versionMove, setVersionMove] = useState<VersionRowMove | null>(null)
+  const versionRow = versionRowView(versions, shownVersionRowPage(versions, current?.id ?? null, versionMove))
+  const moveVersions = (step: 1 | -1) => setVersionMove({ anchor: current?.id ?? null, page: versionRow.page + step })
   const hasImage = !!frames.start
   const frameStyle = mediaFrameStyle(projectFormat, layout === 'popup' ? 360 : 200)
   // 실제로 도는 모델을 골라진 칸으로(리드 검토 c ④) — Writer 샷에 시트를 못 그리는 옛 모델이 저장돼 있으면 GPT Image 2.
@@ -70,20 +78,35 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
       <div className="grid grid-cols-2 gap-3">
         {(['start', 'end'] as const).map((which) => <LockedFrame key={which} which={which} url={frames[which]} style={frameStyle} />)}
       </div>
-      {/* 버전 줄(D6) — 1단계는 시작 · 끝이 함께라 줄은 하나. 저절로 지우지 않으니 많으면 옆으로 넘긴다(리드 답). 고르기는 Take 0. */}
+      {/* 버전 줄(D6) — 1단계는 시작 · 끝이 함께라 줄은 하나. 버전은 지우지 않고 한 번에 5개만 보이며, 5개를 넘으면 맨 앞 ‹ · 맨 뒤 › 로
+          이전 · 다음 5개를 넘겨 본다(오너 11/14 답 5 · 끝 쪽에서는 그쪽 단추가 꺼짐). 고르기는 Take 0 이고 줄은 보던 쪽 그대로. */}
       {versions.length ? (
-        <div className="flex gap-1.5 overflow-x-auto pb-1" data-testid="shot-detail-versions" role="group" aria-label={t('Image versions')}>
-          {versions.map((version) => {
+        <div className="flex items-center gap-1.5" data-testid="shot-detail-versions" role="group" aria-label={t('Image versions')}>
+          {versionRow.paged ? (
+            <button type="button" disabled={!versionRow.earlier} aria-label={t('Show earlier versions')} title={t('Show earlier versions')} onClick={() => moveVersions(1)} className={VERSION_ARROW}>
+              <ChevronLeft className="size-3.5" />
+            </button>
+          ) : null}
+          {versionRow.shown.map((version) => {
             const active = version.id === current?.id
             return (
               <button key={version.id} type="button" aria-pressed={active}
                 title={version.source === 'upload' ? t('Uploaded image') : version.cancelled ? t('Finished after it was stopped') : undefined}
-                onClick={() => { if (!active) void selectStoryboardImageVersion(nodeId, version.id) }}
+                onClick={() => {
+                  if (active) return
+                  setVersionMove({ anchor: version.id, page: versionRow.page })
+                  void selectStoryboardImageVersion(nodeId, version.id)
+                }}
                 className={cn('shrink-0 rounded-full border px-2.5 py-0.5 font-num text-caption transition-colors', active ? 'border-info bg-info/15 text-foreground' : 'border-border text-muted-foreground hover:bg-accent')}>
                 {`v${version.n}`}
               </button>
             )
           })}
+          {versionRow.paged ? (
+            <button type="button" disabled={!versionRow.later} aria-label={t('Show later versions')} title={t('Show later versions')} onClick={() => moveVersions(-1)} className={VERSION_ARROW}>
+              <ChevronRight className="size-3.5" />
+            </button>
+          ) : null}
         </div>
       ) : null}
       <p className="text-caption text-subtle-foreground">

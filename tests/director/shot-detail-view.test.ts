@@ -131,7 +131,8 @@ describe('Director 샷 상세 화면', () => {
   })
 
   it('이미지 탭은 시작 · 끝 그림 아래 버전 줄(v1 · v2 …)을 하나 보이고, 지금 그림인 버전이 눌린 채 보인다', () => {
-    // 왜: D6 "v1 · v2를 누르면 그 버전으로 돌아가요" — 1단계는 시작 · 끝이 함께라 줄은 하나(혼자 정한 것), 많으면 옆으로 넘긴다(리드 답).
+    // 왜: D6 "v1 · v2를 누르면 그 버전으로 돌아가요" — 1단계는 시작 · 끝이 함께라 줄은 하나(혼자 정한 것).
+    //   많으면 옆으로 밀지 않고 5개씩 넘겨 본다(오너 11/14 답 5 — 예전 기대 overflow-x-auto · 리드 답 "옆으로 넘긴다", 넘기기는 image-version-row.test.ts).
     const version = (id: string, tag: string, at: number) => ({ id, url: `https://media.test/${tag}-s.png`, frames: { start: `https://media.test/${tag}-s.png`, direction: `https://media.test/${tag}-d.png`, end: `https://media.test/${tag}-e.png` }, generatedAt: at, source: 'generated' as const })
     const two = withStoryboardVersion(withStoryboardVersion(null, version('job-1', 'a', 1), { select: true }), version('job-2', 'b', 2), { select: true })
     director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: two })
@@ -139,7 +140,7 @@ describe('Director 샷 상세 화면', () => {
     expect(out).toContain('data-testid="shot-detail-versions"')
     expect(out).toMatch(/aria-pressed="false"[^>]*>v1</)
     expect(out).toMatch(/aria-pressed="true"[^>]*>v2</)
-    expect(out).toMatch(/class="[^"]*overflow-x-auto[^"]*" data-testid="shot-detail-versions"/)
+    expect(out).not.toMatch(/class="[^"]*overflow-x-auto[^"]*" data-testid="shot-detail-versions"/)
     expect(out).toContain('Click v1 or v2 to go back to that version.')
     setLocale('ko')
     expect(render('popup')).toContain('버전(v1 · v2)을 누르면 그 버전으로 돌아가요.')

@@ -30,6 +30,9 @@ export const KO: Record<string, string> = {
   'Not made yet': '아직 안 만들었어요',
   '☆ Set as final': '☆ 최종으로 고르기',
   'Image versions': '이미지 버전',
+  // 버전 줄은 한 번에 5개 — 넘기기 단추 ‹ › 의 이름(오너 11/14 답 5).
+  'Show earlier versions': '이전 버전 보기',
+  'Show later versions': '다음 버전 보기',
   'Uploaded image': '올린 그림',
   'Finished after it was stopped': '멈춘 뒤 끝났어요',
   Stopped: '멈춤',
