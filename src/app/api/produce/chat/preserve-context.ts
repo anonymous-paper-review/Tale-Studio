@@ -91,3 +91,24 @@ export function treatmentDraftDirective(treatmentDraft: unknown): string | null 
     'When the user is happy with the prose, they press Run breakdown on the Writer screen and confirm it. Then the prose is locked and Artist opens.',
   ].join('\n')
 }
+
+/** 붙은 문단 한 개의 글이 프롬프트를 부풀리지 않게 싣는 글자 수 상한. */
+const ATTACHED_PARAGRAPH_MAX_CHARS = 4000
+
+/**
+ * 붙은 문단 안내문(리드 2026-11-14 B) — Writer 화면에서 문단(S2)을 붙인 채 보낸 물음. AI 는 화면의 S번호를 모르므로 이름과 그 문단 글을 함께 싣는다.
+ * 이 턴은 문단을 고쳐 달라는 요청이 아니라 물음이다(고치기 요청은 클라이언트가 수정안 길로 보낸다). 클라이언트가 보낸 값이라 이름 꼴과 글 길이를 확인한다.
+ */
+export function attachedParagraphDirective(raw: unknown): string | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const { label, text } = raw as { label?: unknown; text?: unknown }
+  if (typeof label !== 'string' || !/^S[1-9]\d{0,3}$/.test(label)) return null
+  if (typeof text !== 'string' || !text.trim()) return null
+  const body = Array.from(text.trim()).slice(0, ATTACHED_PARAGRAPH_MAX_CHARS).join('')
+  return [
+    `[Attached Paragraph ${label}]`,
+    body,
+    `The user attached paragraph ${label} of the prose to this message. "This paragraph" and "${label}" mean the text above.`,
+    'The message is a question about it, not a request to change the prose. Answer from that paragraph, and from the rest of the Current Story Text when the question needs it. Do not rewrite the paragraph.',
+  ].join('\n')
+}

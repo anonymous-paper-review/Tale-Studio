@@ -7,7 +7,7 @@ import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
 import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { buildProducerSystem } from './system-prompt'
-import { fixedStyleDirective, imageCardFillDirective, lockedProducerDirective, preservedScriptDirective, treatmentDraftDirective } from './preserve-context'
+import { attachedParagraphDirective, fixedStyleDirective, imageCardFillDirective, lockedProducerDirective, preservedScriptDirective, treatmentDraftDirective } from './preserve-context'
 import { parseExtractedSettings } from '@/lib/parse-extracted-settings'
 import { resolveProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { parseChatChoices } from '@/lib/chat-choices'
@@ -70,6 +70,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       treatmentDraft,
       answeringProducerQuestion,
       styleLocked,
+      attachedParagraph,
     } = await req.json()
     const modelSettings = parseChatModelSettings(rawModelSettings)
     if (!modelSettings) return NextResponse.json({ error: 'Invalid chat model settings' }, { status: 400 })
@@ -171,6 +172,9 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     // 넘기기 전 트리트먼트 초안(2026-10-02) — 씬 고치기는 다시 쓰기 · 직접 고치기로 안내한다.
     const draftDirective = treatmentDraftDirective(treatmentDraft)
     if (draftDirective) contextParts.push(draftDirective)
+    // 붙은 문단(S2)을 물음과 함께 받았다(리드 2026-11-14 B) — 그 문단의 이름과 글을 싣는다. AI 는 화면의 S번호를 모른다.
+    const paragraphDirective = attachedParagraphDirective(attachedParagraph)
+    if (paragraphDirective) contextParts.push(paragraphDirective)
     if (currentSettings) {
       contextParts.push(
         `[Current Project Settings]\n${JSON.stringify(currentSettings)}`,

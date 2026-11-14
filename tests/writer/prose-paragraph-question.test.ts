@@ -81,6 +81,47 @@ describe('고쳐 달라는 부탁은 계속 문단 수정 요청이다', () => {
   )
 })
 
+describe('붙은 문단과 함께 가는 물음', () => {
+  const ASK_HERE = '이 문단에서 누가 말하고 있어?'
+
+  it('문단을 붙인 채 보낸 물음은 AI 요청에 붙은 문단의 이름(S2)과 그 문단 글을 함께 싣고 채팅 줄에는 물음만 남긴다', async () => {
+    // 왜: "이 문단에서 …?"라고 물어도 AI 는 어느 문단인지 몰라 엉뚱하게 답했다(바우처 사용자 채팅 B) — 이름과 글을 같이 줘야 그 문단을 보고 답한다. 채팅 줄은 사용자가 쓴 말 그대로다.
+    useWriterRoomStore.setState({ paragraph: S2 })
+
+    await useGlobalChatStore.getState().sendMessage(ASK_HERE, undefined, { stageOverride: 'producer', askOnly: true })
+
+    expect(bodies()[0].body).toMatchObject({ message: ASK_HERE, attachedParagraph: { label: 'S2', text: P2 } })
+    expect(useGlobalChatStore.getState().messages.map((m) => `${m.role}:${m.content}`)[0]).toBe(`user:${ASK_HERE}`)
+  })
+
+  it('다른 문단을 붙였으면 그 문단의 이름과 글이 실린다', async () => {
+    // 왜: 이름은 화면 번호(S1 = 첫 문단)다 — 붙은 문단마다 자기 번호와 글이 가야 한다.
+    useWriterRoomStore.setState({ paragraph: { projectId: PROJECT, index: 4, text: '문이 열리고 낯선 손님이 들어온다.' } })
+
+    await useGlobalChatStore.getState().sendMessage(ASK_HERE, undefined, { stageOverride: 'producer', askOnly: true })
+
+    expect(bodies()[0].body).toMatchObject({ attachedParagraph: { label: 'S5', text: '문이 열리고 낯선 손님이 들어온다.' } })
+  })
+
+  it('붙은 문단이 없거나 다른 프로젝트의 문단이면 문단 정보를 싣지 않는다', async () => {
+    // 왜: 정상 경로 고정 — 문단 정보는 이 프로젝트에 붙은 문단일 때만 간다(다른 프로젝트 글이 새어 나가면 안 된다).
+    await useGlobalChatStore.getState().sendMessage(ASK_HERE, undefined, { stageOverride: 'producer', askOnly: true })
+    useWriterRoomStore.setState({ paragraph: { ...S2, projectId: 'another-project' } })
+    await useGlobalChatStore.getState().sendMessage(ASK_HERE, undefined, { stageOverride: 'producer', askOnly: true })
+
+    for (const { body } of bodies()) expect(body).not.toHaveProperty('attachedParagraph')
+  })
+
+  it('물음이 아니라 문단 수정 요청으로 가는 말에는 이 문단 정보를 싣지 않는다', async () => {
+    // 왜: 정상 경로 고정 — 수정 요청은 지금처럼 문단 앞부분을 붙인 요청으로 scene-gate 에 간다.
+    useWriterRoomStore.setState({ paragraph: S2 })
+
+    await useGlobalChatStore.getState().sendMessage('더 짧게 해 줄래?', undefined, { stageOverride: 'producer' })
+
+    expect(bodies().some(({ body }) => 'attachedParagraph' in body)).toBe(false)
+  })
+})
+
 describe('이번에 바뀌지 않는 길', () => {
   it('붙은 문단이 없으면 물음도 지금처럼 Writer 채팅 길을 따른다', async () => {
     // 왜: 정상 경로 고정 — 문단을 안 붙인 말은 2026-10-19 약속대로 산문 수정 요청이다. 같은 가름을 거기에도 쓸지는 오너 결정으로 남아 있다.

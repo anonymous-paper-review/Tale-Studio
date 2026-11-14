@@ -58,6 +58,7 @@ import { REWRITE_LEVELS, rewriteLevelOf, type RewriteLevel } from '@/lib/produce
 import type { ProseConditions } from '@/lib/writer/prose-conditions'
 import { writerChatIntent } from '@/lib/prose/writer-chat'
 import { answerToNextStep } from '@/lib/prose/next-answer'
+import { paragraphLabel } from '@/lib/prose/paragraph-pick'
 import { styleReturnCard, styleReturnRequest, versionStyleLabel } from '@/lib/artist/style-versions'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { stageIndex } from '@/lib/stage-gate'
@@ -3666,6 +3667,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     // 러프 그림에 보이는 칸의 턴 시작 모습 — 턴 끝과 견줘 실제로 바뀐 것만 [러프 다시 그리기]를 묻는다(2026-11-01 리뷰 M3).
     let roughBefore: RoughVisibleState | null = null
 
+    // 문단을 붙인 채 보낸 물음(오너 2026-11-14 B ①)은 붙은 문단의 이름(S2)과 글을 함께 싣는다 — AI 는 화면의 S번호를 모르므로 "이 문단에서 …?"에 바르게 답하려면 둘 다 필요하다(리드 11/14).
+    //   채팅 줄에는 사용자가 쓴 물음만 남는다. 이 프로젝트에 붙은 문단일 때만 싣는다.
+    const pickedParagraph = opts?.askOnly ? useWriterRoomStore.getState().paragraph : null
+    const askedParagraph = pickedParagraph && pickedParagraph.projectId === projectId ? { label: paragraphLabel(pickedParagraph.index), text: pickedParagraph.text } : null
+
     switch (stage) {
       case 'producer': {
         endpoint = '/api/produce/chat'
@@ -3685,6 +3691,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           // #image-to-artist: 카드 채우기 턴 — 서버가 모델에 "그 카드만" 을 알린다(최종 방어는 coerceCardFill).
           ...(opts?.cardFill ? { cardFill: opts.cardFill } : {}),
           ...(answeringProducerQuestion ? { answeringProducerQuestion: true } : {}),
+          ...(askedParagraph ? { attachedParagraph: askedParagraph } : {}),
           // 서버가 projects.locale 을 조회해 응답 언어를 강제할 수 있게 전달(#i18n-s5-batch6-chat).
           projectId,
         }
