@@ -7,7 +7,7 @@ import { create } from 'zustand'
 import { translate } from '@/lib/i18n/translate'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { emptyEntryDraft, fileHasText, normalizeEntryDraft, recIsCurrent, type EntryDraft } from '@/lib/entry/draft'
-import { asksToShareStory, splitPermissionAsk } from '@/lib/entry/permission-ask'
+import { asksToShareStory, splitPermissionAsk, withoutPermissionAsk } from '@/lib/entry/permission-ask'
 import type { EntryWriterStartBody } from '@/lib/entry/start-plan'
 import { useLocaleStore } from '@/stores/locale-store'
 import { settleProjectRename, useProjectStore } from '@/stores/project-store'
@@ -507,15 +507,17 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       await get().flushIdea()
       let draft = get().draft
       // 이야기를 내도 되는지 허락을 묻는 글은 이야기로 읽지 않는다 — 다음으로 가지 않고 "여기에 적어 주세요"를 보인다(글은 그대로, 길이 검사보다 먼저).
-      const ask = draft.file ? null : splitPermissionAsk(draft.idea)
+      //   안내를 본 뒤 글을 고쳐 다시 눌렀으면 물음에 답한 것이다 — 이어 적은 글이 길어도(120자 가름은 첫 글만) 물음의 틀만 덜어 내고 이어 간다.
+      //   또 안내하면 줄거리를 이어 적은 사람이 같은 자리에서 막힌다(리드 검토 11/14 보통 3).
+      const shownFor = get().shareAskedText
+      const answeredAfterHint = shownFor !== null && shownFor !== draft.idea
+      const ask = draft.file ? null : splitPermissionAsk(draft.idea, answeredAfterHint ? { ignoreLength: true } : undefined)
       if (ask?.asking) {
-        const shownFor = get().shareAskedText
-        if (shownFor === null || shownFor === draft.idea) {
+        if (!answeredAfterHint) {
           set({ showShareAnswer: true, shareAskedText: draft.idea, showLengthError: false })
           return 'asked'
         }
-        // 안내를 본 뒤 글을 고쳐 다시 눌렀다 — 물음에 답한 것이다. 물음 문장만 덜어 내고 이어 간다(또 안내하면 줄거리를 이어 적은 사람이 같은 자리에서 막힌다).
-        get().setIdea(ask.preface)
+        get().setIdea(withoutPermissionAsk(draft.idea))
         await get().flushIdea()
         draft = get().draft
       }

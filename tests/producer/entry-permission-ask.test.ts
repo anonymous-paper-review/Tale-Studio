@@ -1,6 +1,6 @@
 // 시작 화면 첫 글이 "줄거리를 줘도 될까?"처럼 이야기를 내도 되는지 허락을 묻는 말이면 이야기를 시작하지 않고 "여기에 적어 주세요"로 먼저 답하고, 물음 앞에 적은 설명은 이어 적은 줄거리와 함께 이야기 씨앗으로 쓴다 (오너 2026-11-14 답 A ① · 리드 11/14)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { asksToShareStory, splitPermissionAsk } from '@/lib/entry/permission-ask'
+import { asksToShareStory, splitPermissionAsk, withoutPermissionAsk } from '@/lib/entry/permission-ask'
 import { useEntryStore } from '@/features/entry/entry-store'
 import { CHAT_PERMISSION_ANSWER, chatTranscript } from '@/features/entry/chat-flow'
 import { emptyEntryDraft, materialBasis, type EntryDraft } from '@/lib/entry/draft'
@@ -150,6 +150,24 @@ describe('허락을 묻는 첫 글', () => {
 
     expect(useEntryStore.getState().draft.idea).toBe(`시리즈를 만들고 싶은데 ${SEED}`)
     expect(useEntryStore.getState().showShareAnswer).toBe(false)
+  })
+
+  it('화면에서 고르기 탭에서 안내를 본 뒤 긴 줄거리를 이어 적어도 물음 문장만 덜어 내고 이어 간다', async () => {
+    // 왜: 이어 적은 글이 120자를 넘으면 "이미 이야기를 적은 글"로 읽혀 물음 문장이 씨앗에 남았다(리드 검토 11/14 보통 3) — 안내를 본 뒤의 누름에서는 길이와 상관없이 물음만 덜어 낸다.
+    const long = '비 오는 항구 도시에서 길고양이를 돌보는 노인과 매일 밤 같은 자리에 앉는 소녀가 있다. 노인은 소녀에게 고양이들의 이름을 하나씩 알려 주고, 소녀는 그 이름을 공책에 적어 둔다. 어느 날 노인이 보이지 않자 소녀는 공책을 들고 항구의 가게들을 돌며 노인의 행방을 묻는다.'
+    setDraft({ ...emptyEntryDraft(), idea: QUESTION })
+    expect(await useEntryStore.getState().formNext()).toBe('asked')
+    routes['PATCH /api/produce/entry'] = (body) => {
+      const idea = (body as { patch?: { idea?: string } } | null)?.patch?.idea
+      if (typeof idea === 'string') savedForm = idea
+      return { body: { ok: true } }
+    }
+    routes['POST /api/produce/entry/recommend'] = () => ({ body: { draft: recommended({ ...useEntryStore.getState().draft, idea: savedForm }) } })
+
+    useEntryStore.getState().setIdea(`${QUESTION} ${long}`)
+    expect(await useEntryStore.getState().formNext()).toBe('ok')
+
+    expect(useEntryStore.getState().draft.idea).toBe(`시리즈를 만들고 싶은데 ${long}`)
   })
 
   it('화면에서 고르기 탭에서 안내를 본 뒤 글을 고치지 않고 다시 다음을 누르면 안내를 다시 보인다', async () => {
@@ -320,6 +338,28 @@ describe('허락 물음 앞에 적은 설명', () => {
     expect(useEntryStore.getState().draft.idea).not.toContain('Can I give you')
   })
 
+  it('허락 물음 뒤에 쓴 말은 이야기 씨앗에 들어가지 않는다', async () => {
+    // 왜: "감사합니다!" · 덧붙인 다른 물음이 이야기 맨 앞에 붙으면 산문이 인사나 물음으로 시작한다(리드 검토 11/14 보통 1).
+    await ask('시리즈를 만들고 싶은데, 줄거리를 줘도 될까요? 감사합니다!')
+    expect(useEntryStore.getState().chat.seedPrefix).toBe(PREFACE)
+
+    useEntryStore.getState().setIdea(SEED)
+    await useEntryStore.getState().chatSendFirst()
+
+    expect(useEntryStore.getState().draft.idea).toBe(MERGED)
+  })
+
+  it('허락 문장 안에 쓴 이야기는 버리지 않고 이어 적은 줄거리 앞에 붙는다', async () => {
+    // 왜: "고양이가 우주로 가는 이야기를 보내도 될까요?"처럼 이야기를 물음에 담은 사람의 글이 입력칸과 함께 사라졌다(리드 검토 11/14 보통 2).
+    await ask('고양이가 우주로 가는 이야기를 보내도 될까요?')
+    expect(useEntryStore.getState().chat.seedPrefix).toBe('고양이가 우주로 가는 이야기')
+
+    useEntryStore.getState().setIdea(SEED)
+    await useEntryStore.getState().chatSendFirst()
+
+    expect(useEntryStore.getState().draft.idea).toBe(`고양이가 우주로 가는 이야기\n\n${SEED}`)
+  })
+
   it('물음만 쓴 첫 글이면 붙일 설명이 없어 이어 적은 줄거리만 이야기 씨앗이 된다', async () => {
     // 왜: 정상 경로 고정 — 설명이 없는데 빈 줄이나 물음이 앞에 붙으면 안 된다.
     await ask(QUESTION_ONLY)
@@ -402,10 +442,64 @@ describe('허락 물음 나누기', () => {
     ['시리즈를 만들고 싶어요\n줄거리를 줘도 될까요?', true, '시리즈를 만들고 싶어요'],
     ['콘셉트: 요리 시리즈\n분량: 5편\n줄거리를 줘도 될까요?', true, '콘셉트: 요리 시리즈\n분량: 5편'],
     ['Hello! I have a question. Can I send you my script first?', true, ''],
+    // 물음 뒤에 쓴 말은 씨앗에 넣지 않는다(리드 검토 11/14 보통 1) — 설명은 물음 앞 글만이다.
+    ['줄거리를 줘도 될까요? 감사합니다!', true, ''],
+    ['시리즈를 만들고 싶어요. 줄거리를 줘도 될까요? 영상은 몇 분까지 되나요?', true, '시리즈를 만들고 싶어요.'],
+    ['Can I paste my script here? It is long, about 3 pages.', true, ''],
+    ['Hello! Can I send you my script first? Thanks a lot.', true, ''],
+    // 허락 문장 안에 쓴 이야기 · 설명도 남긴다(리드 검토 11/14 보통 2).
+    ['고양이가 우주로 가는 이야기를 보내도 될까요?', true, '고양이가 우주로 가는 이야기'],
+    ['Can I tell you a story about a dragon who learns to fly?', true, 'about a dragon who learns to fly'],
+    ['Could I share my idea: a lonely robot finds…', true, 'a lonely robot finds…'],
+    ['시리즈를 만들고 싶은데 줄거리를 줘도 될까?', true, '시리즈를 만들고 싶은데'],
+    ['저는 영상 작가인데 줄거리를 먼저 보내도 괜찮을까요?', true, '저는 영상 작가인데'],
+    ['서윤 이야기를 먼저 보내도 될까요?', true, '서윤 이야기'],
+    ['시리즈를 몇 편 만들어요. 고양이가 우주로 가는 이야기를 보내도 될까요?', true, '시리즈를 몇 편 만들어요. 고양이가 우주로 가는 이야기'],
+    // 물음의 틀뿐인 말(나 · 먼저 · 직접 · 쓴 …)은 설명이 아니다.
+    ['제가 쓴 줄거리를 먼저 보내도 될까요?', true, ''],
+    ['내 줄거리를 줘도 될까?', true, ''],
+    ['직접 줄거리를 적어도 돼?', true, ''],
+    ['Can I tell you about my idea?', true, ''],
+    // 물음의 틀 낱말(here · instead · first …)은 설명 끝에 남기지 않는다.
+    ['Can I paste my script for a five-episode series about bakers here?', true, 'about bakers'],
+    ['Could I upload my outline - a drama about two chefs - instead?', true, 'a drama about two chefs'],
     ['만약 고양이가 날 수 있다면?', false, ''],
     ['소녀는 고민한다. 엄마에게 이 이야기를 말해도 될까?', false, ''],
     ['', false, ''],
   ])('%s → 허락 %s · 앞에 적은 설명 %j', (text, asking, preface) => {
     expect(splitPermissionAsk(text)).toEqual({ asking, preface })
+  })
+})
+
+describe('허락 물음 문장만 덜어 낸 글', () => {
+  // 왜: 화면에서 고르기 탭은 안내를 본 사람이 물음 뒤에 줄거리를 이어 적는다 — 그때 물음 문장만 덜고 나머지(앞 · 물음 속 · 뒤)는 그대로 둔다.
+  it.each([
+    [`${QUESTION} ${SEED}`, `시리즈를 만들고 싶은데 ${SEED}`],
+    [`줄거리를 줘도 될까요? ${SEED}`, SEED],
+    ['줄거리를 줘도 될까요? 감사합니다!', '감사합니다!'],
+    [`고양이가 우주로 가는 이야기를 보내도 될까요? ${SEED}`, `고양이가 우주로 가는 이야기 ${SEED}`],
+    ['I have a plan. Can I give you my storyline? It is about a baker.', 'I have a plan. It is about a baker.'],
+    ['허락 물음이 없는 그냥 이야기 한 줄', '허락 물음이 없는 그냥 이야기 한 줄'],
+  ])('%s → %s', (text, expected) => {
+    expect(withoutPermissionAsk(text)).toBe(expected)
+  })
+
+  it('길이와 상관없이 허락 물음 문장만 덜어 낸다', () => {
+    // 왜: 안내를 본 뒤 긴 줄거리를 이어 적어도 물음이 씨앗에 남지 않아야 한다(120자 가름은 첫 글을 읽을 때만 쓴다).
+    const long = '비 오는 항구 도시에서 길고양이를 돌보는 노인과 매일 밤 같은 자리에 앉는 소녀가 있다. 노인은 소녀에게 고양이들의 이름을 하나씩 알려 주고, 소녀는 그 이름을 공책에 적어 둔다. 어느 날 노인이 보이지 않자 소녀는 공책을 들고 항구의 가게들을 돌며 노인의 행방을 묻는다.'
+
+    expect(asksToShareStory(`${QUESTION} ${long}`)).toBe(false)
+    expect(withoutPermissionAsk(`${QUESTION} ${long}`)).toBe(`시리즈를 만들고 싶은데 ${long}`)
+  })
+})
+
+describe('허락 문장 안에 쓴 글의 길이', () => {
+  it('허락 문장 안에 쓴 이야기가 길면(120자가 넘으면) 이야기를 이미 적은 것으로 읽는다', () => {
+    // 왜: 설명으로 남기는 글도 120자 셈에 든다 — 긴 이야기를 물음 하나에 담은 사람의 글을 막으면 쓴 이야기가 버려진다.
+    const longInside = '새벽 네 시에 문을 여는 동네 빵집에서 일하는 은퇴한 제빵사와 그의 손녀, 그리고 건너편 꽃집 주인이 매일 아침 인사를 나누며 서로의 사정을 조금씩 알아 가고, 계절마다 단골들의 사연이 하나씩 밝혀지며, 마지막 겨울에는 노인이 떠나고 손녀가 가게를 이어받아 새벽마다 같은 자리에 변함없이 불을 켜는 장면으로 끝나는 이야기를 보내도 될까요?'
+    expect(Array.from(withoutPermissionAsk(longInside).replace(/\s+/g, '')).length).toBeGreaterThan(120)
+
+    expect(asksToShareStory(longInside)).toBe(false)
+    expect(asksToShareStory('고양이가 우주로 가는 이야기를 보내도 될까요?')).toBe(true)
   })
 })
