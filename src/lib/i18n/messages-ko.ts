@@ -2023,6 +2023,8 @@ export const KO: Record<string, string> = {
   'Takes needed: {required}. This workspace has unlimited Takes.': '필요한 Take {required}개. 이 워크스페이스는 Take 제한이 없어요.',
   'Only {run} of {count} videos can be made with your Takes. The first {run} will be generated.': 'Take가 모자라 {count}개 중 {run}개만 만들 수 있어요. 앞에서부터 {run}개를 만들어요.',
   'Takes are short by {missing}. Billing is not enforced yet, so all {count} will be generated.': 'Take가 {missing}개 모자라요. 아직 차감을 막지 않아 {count}개 모두 만들어요.',
+  'Takes are short by {missing}. Billing is not enforced yet, so it will be generated.': 'Take가 {missing}개 모자라요. 아직 차감을 막지 않아 1개 모두 만들어요.',
+  'Only 1 of {count} videos can be made with your Takes. The first one will be generated.': 'Take가 모자라 {count}개 중 1개만 만들 수 있어요. 앞에서부터 1개를 만들어요.',
   'No videos can be made until you add Takes.': 'Take를 충전해야 영상을 만들 수 있어요.',
   'Generate videos for {count} shots': '샷 {count}개의 영상 생성',
   'Costs Takes for every generated video.': '영상마다 Take가 차감돼요.',
