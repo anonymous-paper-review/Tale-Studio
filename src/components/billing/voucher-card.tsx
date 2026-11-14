@@ -13,6 +13,7 @@ import { PADDLE_PLANS } from '@/lib/billing/catalog'
 import { voucherFailureMessage } from '@/lib/billing/voucher'
 import { refetchBillingAccount } from '@/lib/billing/use-billing-account'
 import { useT } from '@/lib/i18n'
+import { countText } from '@/lib/i18n/count-text'
 import { cn } from '@/lib/utils'
 
 const planName = (id: string) => PADDLE_PLANS.find((p) => p.id === id)?.name ?? id
@@ -36,7 +37,7 @@ export function VoucherCard({ className }: { className?: string }) {
       })
       const body = (await res.json().catch(() => null)) as { plan?: string; takes?: number; error?: string } | null
       if (res.ok && body?.plan) {
-        toast.success(t('{plan} plan is now active. {n} Takes added.', { plan: planName(body.plan), n: body.takes ?? 0 }))
+        toast.success(countText(t, body.takes ?? 0, '{plan} plan is now active. 1 Take added.', '{plan} plan is now active. {n} Takes added.', { plan: planName(body.plan), n: body.takes ?? 0 }))
         setCode('')
         await refetchBillingAccount()
       } else {

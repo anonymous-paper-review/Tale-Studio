@@ -7,6 +7,7 @@ import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useT } from '@/lib/i18n'
+import { countText } from '@/lib/i18n/count-text'
 import { cn } from '@/lib/utils'
 import { latestShotTake, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings, videoTabLabelKey, type ShotDetailTab } from '@/lib/director/shot-detail'
 import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
@@ -64,7 +65,7 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   const count = takeCostForVideo(settings.model, settings.resolution)
   const makeVideo = {
     // 단추 값이 곧 동의인 자리 — 잔액을 못 읽어도 값을 보인다(영상 탭 단추 · entry D8 과 같은 말, 리드 2026-11-14).
-    label: takeValuesShown(takeBalance) ? t('Next: make the video · {count} Takes', { count }) : t('Next: make the video'),
+    label: takeValuesShown(takeBalance) ? countText(t, count, 'Next: make the video · 1 Take', 'Next: make the video · {count} Takes', { count }) : t('Next: make the video'),
     // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
     disabled: !shotDetailFrames(data.storyboardImage).start || videoBatchBusy || takes.some((take) => takePhaseOf(take.data) === 'making')
       || imageGeneration.generating || data.storyboardImage?.status === 'pending' || nextStarting,

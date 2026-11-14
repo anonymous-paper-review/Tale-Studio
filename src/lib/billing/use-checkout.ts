@@ -6,6 +6,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import { toast } from 'sonner'
 import { loadPaddle, subscribePaddleEvents } from '@/lib/billing/paddle-client'
 import { useT } from '@/lib/i18n'
+import { countText } from '@/lib/i18n/count-text'
 import { fetchTakeBalance } from '@/lib/billing/use-take-balance'
 import { refetchBillingAccount } from '@/lib/billing/use-billing-account'
 import type { CheckoutDenyReason, CheckoutKind } from '@/lib/billing/checkout'
@@ -30,7 +31,7 @@ async function confirmAfterCheckout(t: ReturnType<typeof useT>, before: number |
     const [take] = await Promise.all([fetchTakeBalance(), refetchBillingAccount()])
     if (take.balance !== null && before !== null && take.balance !== before) {
       const delta = take.balance - before
-      toast.success(delta > 0 ? t('{n} Takes added to your balance.', { n: delta }) : t('Your balance is updated.'), { id })
+      toast.success(delta > 0 ? countText(t, delta, '1 Take added to your balance.', '{n} Takes added to your balance.', { n: delta }) : t('Your balance is updated.'), { id })
       return
     }
     if (take.balance !== null && before === null) {
@@ -46,7 +47,7 @@ async function confirmAfterCheckout(t: ReturnType<typeof useT>, before: number |
     if (res.ok && (body.recovered ?? 0) > 0) {
       const [take] = await Promise.all([fetchTakeBalance(), refetchBillingAccount()])
       const delta = take.balance !== null && before !== null ? take.balance - before : 0
-      toast.success(delta > 0 ? t('{n} Takes added to your balance.', { n: delta }) : t('Your balance is updated.'), { id })
+      toast.success(delta > 0 ? countText(t, delta, '1 Take added to your balance.', '{n} Takes added to your balance.', { n: delta }) : t('Your balance is updated.'), { id })
       return
     }
   } catch {
