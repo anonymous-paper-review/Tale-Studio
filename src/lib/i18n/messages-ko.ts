@@ -792,9 +792,6 @@ export const KO: Record<string, string> = {
   // ── director: canvas-panels ──
   '{kind} details': '{kind} 상세',
   'Preset name': '프리셋 이름',
-  'Shot label': 'Shot 라벨',
-  'Prompt (for video generation)': '프롬프트 (영상 생성용)',
-  'Action, mood, camera intent, etc. happening in this shot': '이 샷에서 일어나는 액션, 분위기, 카메라 의도 등',
   'Video generation model': '영상 생성 모델',
   // 영상 해상도(오너 2026-10-31 1080p): 모델 단추 아래 720p · 1080p
   Resolution: '해상도',
@@ -804,9 +801,7 @@ export const KO: Record<string, string> = {
   'Upload reference image': '참고 이미지 업로드',
   'Choose from inventory': '인벤토리에서 선택',
   'Choose reference image from inventory': '인벤토리에서 참고 이미지 선택',
-  'Characters ({count}/{total})': '등장 캐릭터 ({count}/{total})',
   'Characters you Register in Artist will appear here.': 'Artist에서 캐릭터를 Register하면 여기에 나타납니다.',
-  'World / locations ({count}/{total})': '월드 / 장소 ({count}/{total})',
   'Locations you Register in Artist will appear here.': 'Artist에서 장소를 Register하면 여기에 나타납니다.',
   'Could not find the mother Shot.': '마더 Shot을 찾을 수 없습니다.',
   'Failed to generate video.': '영상 생성에 실패했습니다.',
@@ -857,9 +852,7 @@ export const KO: Record<string, string> = {
   Description: '씬 설명',
   'Narrative, characters, and event summary for the scene…': '씬의 내러티브, 등장 인물, 사건 요약…',
   'Add Shot ({count} so far)': 'Shot 추가 ({count}개 보유)',
-  'Original generation prompt (debug)': '원본 생성 프롬프트 (debug)',
   'Image generation model': '이미지 생성 모델',
-  'Only a completed, playable video can be marked Final': '완료된 재생 가능 영상만 Final로 지정할 수 있습니다',
   'Loading…': '불러오는 중…',
   'Inventory is empty.': '인벤토리가 비어 있습니다.',
 
