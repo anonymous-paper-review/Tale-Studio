@@ -2026,9 +2026,30 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       //   약속: tests/editor/free-placement.test.ts
       const placed = new Map(Object.entries(saved.placements ?? {}).map(([id, p]) => [id, p.startSec]))
       const timelineClips = regap({ shots: timelineShots, videoClips: keptClips, clipOrder }, placed)
+      // 자리가 저절로 바뀌었나(영상 없는 샷이 빠지거나 영상이 생긴 샷이 들어옴) — 사람이 보던 V1 자리와 지금 V1 자리를 견준다.
+      //   사람이 보던 자리 — 2판 저장본은 저장한 시작 초(빈 곳까지), 예전 저장본은 붙은 줄.
+      const shownClips = regap({ shots: combinedShots, videoClips: combinedClips, clipOrder: shownOrder }, placed)
+      const shownLayout = selectTimelineLayout({ shots: combinedShots, videoClips: shownClips, clipOrder: shownOrder })
+      const nowLayout = new Map(selectTimelineLayout({ shots: timelineShots, videoClips: timelineClips, clipOrder }).map((l) => [l.shotId, l]))
+      const takenOut = new Set(shownLayout.filter((l) => !nowLayout.has(l.shotId) && !isDrawnClipShotId(l.shotId)).map((l) => rootShotIdOf(l.shotId)))
+      const autoMoved = takenOut.size > 0 || entered.length > 0
+      // 이야기 제자리에 넣고 뒤를 모두 민다(오너 답 (가), 2026-11-14): 자리가 저절로 바뀌면 그 자리 뒤에서 시작하는 V2 · V3 클립(제목 포함,
+      //   잠근 줄 · 눈 끈 줄도)과 마커도 V1 이 실제로 밀린 만큼 옮긴다 — 사람이 놓은 소리(아래)와 같은 셈. 그 자리 전부터 놓인 것은 그대로다.
+      //   옮겨서 같은 줄 클립이 겹치면 뒤 클립을 민다. 약속: tests/editor/shots-with-video.test.ts
+      let overlay = restoredOverlay
+      if (autoMoved) {
+        const movedOverlay: OverlayPlacements = {}
+        for (const [id, p] of Object.entries(restoredOverlay)) movedOverlay[id] = { trackId: p.trackId, startSec: movedTime(p.startSec, shownLayout, nowLayout) }
+        if (Object.entries(movedOverlay).some(([id, p]) => Math.abs(p.startSec - restoredOverlay[id].startSec) > 0.0005)) {
+          overlay = resolveOverlay({ shots: timelineShots, videoClips: timelineClips, clipOrder }, movedOverlay)
+        }
+      }
+      const markers = autoMoved
+        ? cleanMarkers(cleanMarkers(saved.markers).map((m) => movedTime(m, shownLayout, nowLayout)))
+        : cleanMarkers(saved.markers)
       // 이음 칸이 없는 예전 저장본은 지금 영상 자리 · 처음 나눈 자리와 맞는 소리를 다시 잇고, 이어진 소리는 되살린 영상 자리에 맞춘다(결정 4).
       //   같은 소리 파일의 파형은 저장본에 한 번만 있다 — 빠진 조각은 같은 파일의 파형을 함께 쓴다(검토 b).
-      const timeline = { shots: timelineShots, videoClips: timelineClips, clipOrder, overlay: restoredOverlay }
+      const timeline = { shots: timelineShots, videoClips: timelineClips, clipOrder, overlay }
       const relinked = relinkSavedAudio(sharePeaks(dedupAudioClips), timeline, { shots: cur.shots, videoClips: cur.videoClips }, saved.videoClips ?? [])
       // ★ 최종 Take 가 바뀌어 영상 주소가 달라졌으면 이어진 소리도 새 영상에서 다시 나눈다 — 사람이 바꾼 크기 · 음소거는 남기고,
       //   구간은 새 영상 자리에 맞추며(아래 맞추기), 파형은 편집 화면을 연 뒤 뒤에서 채운다(검토 c, 2026-11-14).
@@ -2036,14 +2057,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         const url = a.linkedShotId ? clipUrl.get(a.linkedShotId) : null
         return url && a.url !== url ? { ...a, url, peaks: [], sourceDurationSec: undefined } : a
       })
-      // 자리가 저절로 바뀌었으면(영상 없는 샷이 빠지거나 영상이 생긴 샷이 들어옴) 그 자리 뒤에서 시작하는 사람이 놓은 소리도 같은 만큼
-      //   옮긴다 — 그 자리 전부터 깔린 소리는 그대로(검토 c 리드 판단, 2단계 ㉠ 과 같은 원칙). 약속: tests/editor/shots-with-video.test.ts
-      //   사람이 보던 자리 — 2판 저장본은 저장한 시작 초(빈 곳까지), 예전 저장본은 붙은 줄.
-      const shownClips = regap({ shots: combinedShots, videoClips: combinedClips, clipOrder: shownOrder }, placed)
-      const shownLayout = selectTimelineLayout({ shots: combinedShots, videoClips: shownClips, clipOrder: shownOrder })
-      const nowLayout = new Map(selectTimelineLayout(timeline).map((l) => [l.shotId, l]))
-      const takenOut = new Set(shownLayout.filter((l) => !nowLayout.has(l.shotId) && !isDrawnClipShotId(l.shotId)).map((l) => rootShotIdOf(l.shotId)))
-      const shifted = takenOut.size || entered.length
+      // 자리가 저절로 바뀌었으면 그 자리 뒤에서 시작하는 사람이 놓은 소리도 같은 만큼 옮긴다 — 그 자리 전부터 깔린 소리는 그대로
+      //   (검토 c 리드 판단, 오너 답 (가)와 같은 원칙). 약속: tests/editor/shots-with-video.test.ts
+      const shifted = autoMoved
         ? retargeted.map((a) => (a.linkedShotId ? a : { ...a, startSec: movedTime(a.startSec, shownLayout, nowLayout) }))
         : retargeted
       let audioClips = syncLinkedAudio({ ...timeline, audioClips: shifted })
@@ -2113,8 +2129,8 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         audioSources: saved.audioSources ?? [],
         audioTracks: oldTrackSave ? padTracks(dedupTracks, DEFAULT_AUDIO_TRACKS) : dedupTracks,
         videoTracks,
-        overlay: restoredOverlay,
-        markers: cleanMarkers(saved.markers),
+        overlay,
+        markers,
         panelSizes: saved.panelSizes ?? { ...DEFAULT_PANEL_SIZES },
         selectedClipShotId: cur.selectedClipShotId,
         selectedShotIds: [],

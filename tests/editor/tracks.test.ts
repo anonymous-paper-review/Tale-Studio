@@ -285,6 +285,37 @@ describe('자물쇠', () => {
     api().updateAudioClip('a_A', { peaks: [0.5, 0.2], sourceDurationSec: 4.2 })
     expect(api().audioClips.find((a) => a.id === 'a_A')).toMatchObject({ peaks: [0.5, 0.2], sourceDurationSec: 4.2, startSec: 0, durationSec: 4, linkedShotId: 'A' })
   })
+
+  it('소리 줄을 잠가도 영상에 이어진 소리는 영상을 따라간다 — 다른 줄로 옮기기 · 잔물결 삭제 · 길이 · 빠르기 · Ctrl+K 나누기 모두', () => {
+    // 왜: 오너 답(11/14) "지금처럼 따라가줘" — 잠근 소리 줄이어도 영상과 소리가 어긋나지 않는다(결정 4 "같이 움직인다"). Ctrl+K 가 잠근 소리 줄의
+    //   이어진 소리도 함께 나누는 것도 같은 결정(리드 11/14). 정상 경로 고정 — 영상 줄은 열려 있고 A1 만 잠근 때.
+    api().toggleTrackLock('atrack_1')
+    api().moveClipToTrack('D', 'v2', 20)
+    expect(audioAt('D')).toBe(20)
+    api().rippleDeleteClip('A')
+    expect(v1()).toEqual([['B', 0], ['C', 4]])
+    expect([audioAt('B'), audioAt('C')]).toEqual([0, 4])
+    // 앞 가장자리를 1초 줄이면 영상 끝은 그대로이고 시작이 1초로 — 소리도 같은 자리 · 같은 구간.
+    api().setTrim('B', 1, 4)
+    expect(v1()).toEqual([['B', 1], ['C', 4]])
+    expect(api().audioClips.find((a) => a.linkedShotId === 'B')).toMatchObject({ startSec: 1, durationSec: 3, sourceOffsetSec: 1 })
+    api().setSpeed('C', 2)
+    expect(api().audioClips.find((a) => a.linkedShotId === 'C')).toMatchObject({ durationSec: 2, playbackRate: 2 })
+    useEditorStore.setState({ selectedShotIds: [], selectedAudioIds: [], selectedAudioId: null })
+    api().seek(21)
+    api().splitAtPlayhead()
+    const dAudio = api().audioClips.filter((a) => a.linkedShotId?.startsWith('D')).map((a) => [a.startSec, a.durationSec, a.trackId])
+    expect(dAudio).toEqual([[20, 1, 'atrack_1'], [21, 3, 'atrack_1']])
+  })
+
+  it('소리 줄을 잠가도 영상을 빼면 그 영상에 이어진 소리도 함께 빠진다', () => {
+    // 왜: 오너 답(11/14) "지금처럼 따라가줘"와 같은 결정 — 영상이 빠졌는데 잠근 줄에 그 소리만 남으면 영상 없는 소리가 내보낸 파일에 실린다.
+    //   정상 경로 고정.
+    api().toggleTrackLock('atrack_1')
+    api().deleteClip('B')
+    expect(audioAt('B')).toBeUndefined()
+    expect(audioAt('C')).toBe(8)
+  })
 })
 
 describe('되돌리기와 줄 표시', () => {

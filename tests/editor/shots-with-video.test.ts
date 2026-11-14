@@ -454,3 +454,88 @@ describe('다른 장면으로 옮긴 샷 (재검토 c, 2026-11-14)', () => {
     expect(mocks.toast.info).toHaveBeenCalledWith('샷 1개가 새로 들어와 뒤 컷과 소리를 옮겼어요.')
   })
 })
+
+describe('자유 배치에서 들어오는 샷 — 이야기 제자리에 넣고 뒤를 모두 민다 (오너 답 (가), 2026-11-14)', () => {
+  const save = () => saveEditorNow('project-8')
+  /** V1 밖 줄(V2 · V3)의 클립 — [이름, 줄, 시작 초], 시작 초 차례. 제목 클립은 글자로 부른다. */
+  const upper = () =>
+    Object.entries(api().overlay)
+      .map(([id, p]) => [api().shots.find((s) => s.shotId === id)?.titleText?.text ?? id, p.trackId, p.startSec] as const)
+      .sort((a, b) => a[2] - b[2])
+  const v1 = () => selectTimelineLayout(api()).map((l) => [l.shotId, l.startSec])
+
+  it('나중에 영상이 생긴 샷이 들어와 뒤 컷이 밀리면, 그 자리 뒤에서 시작하는 V2 · V3 클립과 그 소리도 같은 만큼 밀린다 — 그 자리 전부터 놓인 클립은 그대로다', async () => {
+    // 왜: 오너 답 (가) "이야기 제자리에 넣고 뒤를 모두 밀어줘"(11/14) — 위 줄에 올린 컷 · 제목이 아래 이야기 컷에서 떨어지지 않게.
+    //   Director 에서 남은 영상을 만든 뒤 Editor 로 돌아올 때. 사람이 놓은 소리는 이미 같은 만큼 옮긴다(위 '영상 자리가 저절로 바뀌면 …').
+    db(['s1', 's2', 's3', 's4'], ['s1', 's3', 's4'])
+    await open()
+    // V1: s1 0–4 · s3 4–8 · s4 8–12 → s4 를 V2 의 9초로 올리고, 제목을 V2 의 5초(s3 위) · V3 의 1초(s1 위)에 둔다.
+    api().moveClipToTrack('s4', 'v2', 9)
+    api().addTitleClip('v2', 5, 'Over s3')
+    api().addTitleClip('v3', 1, 'Over s1')
+    expect(upper()).toEqual([['Over s1', 'v3', 1], ['Over s3', 'v2', 5], ['s4', 'v2', 9]])
+    await save()
+    db(['s1', 's2', 's3', 's4'], ['s1', 's2', 's3', 's4'])
+    await open()
+    // s2(4초)가 s1 바로 뒤에 들어와 s3 가 4초 밀렸다 — 그 뒤에서 시작하는 위 줄 클립도 4초, s1 위 제목은 그대로.
+    expect(v1()).toEqual([['s1', 0], ['s2', 4], ['s3', 8]])
+    expect(upper()).toEqual([['Over s1', 'v3', 1], ['Over s3', 'v2', 9], ['s4', 'v2', 13]])
+    expect(api().audioClips.find((a) => a.linkedShotId === 's4')?.startSec).toBe(13)
+  })
+
+  it('나중에 영상이 생긴 샷이 들어와 뒤 컷이 밀리면, 그 자리 뒤의 마커도 같은 만큼 밀린다 — 그 자리 전의 마커는 그대로다', async () => {
+    // 왜: 마커가 가리키던 장면을 계속 가리키게 — 컷 · 소리만 밀리고 마커가 남으면 다른 장면을 가리킨다(혼자 정한 것, 오너 답 (가) "모두").
+    db(['s1', 's2', 's3'], ['s1', 's3'])
+    await open()
+    api().seek(2)
+    api().addMarker()
+    api().seek(6)
+    api().addMarker()
+    await save()
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'])
+    await open()
+    expect(v1()).toEqual([['s1', 0], ['s2', 4], ['s3', 8]])
+    expect(api().markers).toEqual([2, 10])
+  })
+
+  it('들어온 샷이 앞 빈 곳에 들어가 뒤 컷이 덜 밀리면, V2 · V3 클립과 마커도 뒤 컷이 실제로 밀린 만큼만 밀린다 — 영상이 없어져 남은 빈 곳에 다시 생긴 샷이 돌아올 때', async () => {
+    // 왜: 영상이 없어진 샷은 제 자리를 빈 곳으로 남긴다(자유 배치). 다시 생기면 그 빈 곳부터 쓰고 모자란 만큼만 밀어야 한다 — 새 샷 길이만큼
+    //   모두 밀면 옛 빈 곳이 뒤에 남아 영상을 다시 만들 때마다 시퀀스가 길어진다. 다른 넣기(타이틀 카드 · 끌어 놓기)와 같은 규칙(혼자 정한 것).
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'])
+    await open()
+    api().addTitleClip('v2', 9, 'Over s3')
+    api().seek(10)
+    api().addMarker()
+    await save()
+    // s2 의 영상이 없어졌다 — s2 자리 4–8 은 빈 곳으로 남고 뒤는 그대로다.
+    db(['s1', 's2', 's3'], ['s1', 's3'])
+    await open()
+    expect(v1()).toEqual([['s1', 0], ['s3', 8]])
+    expect(upper()).toEqual([['Over s3', 'v2', 9]])
+    expect(api().markers).toEqual([10])
+    await save()
+    // s2 를 6초로 다시 만들었다 — 빈 곳 4초를 쓰고 2초만 민다.
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'], 2, { s2: { duration_seconds: 6 } })
+    await open()
+    expect(v1()).toEqual([['s1', 0], ['s2', 4], ['s3', 10]])
+    expect(upper()).toEqual([['Over s3', 'v2', 11]])
+    expect(api().markers).toEqual([12])
+  })
+
+  it('들어온 샷이 뒤 컷을 밀면 잠근 줄 · 눈 끈 줄의 V2 · V3 클립도 같이 밀린다', async () => {
+    // 왜: 들어오는 샷은 사람이 한 편집이 아니라 저절로 바뀐 자리다 — 잠근 줄만 남으면 그 줄 그림이 아래 컷에서 떨어진다. 잠근 소리 줄의
+    //   이어진 소리도 영상을 따라가게 한 오너 답("지금처럼 따라가줘", 11/14)과 같은 쪽(혼자 정한 것).
+    db(['s1', 's2', 's3'], ['s1', 's3'])
+    await open()
+    api().addTitleClip('v2', 5, 'Locked')
+    api().addTitleClip('v3', 6, 'Hidden')
+    api().toggleTrackLock('v2')
+    api().toggleTrackVisible('v3')
+    await save()
+    db(['s1', 's2', 's3'], ['s1', 's2', 's3'])
+    await open()
+    expect(upper()).toEqual([['Locked', 'v2', 9], ['Hidden', 'v3', 10]])
+    expect(api().videoTracks.find((t) => t.id === 'v2')?.locked).toBe(true)
+    expect(api().videoTracks.find((t) => t.id === 'v3')?.hidden).toBe(true)
+  })
+})
