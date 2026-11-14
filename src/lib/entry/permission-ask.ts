@@ -2,18 +2,19 @@
 //   이런 말은 이야기 씨앗이 아니라 앱에게 하는 말이다. 이야기로 시작하면 물음에 답하는 줄 없이 산문이 만들어지므로
 //   시작 화면이 먼저 "여기에 적어 주세요"로 답한다. 잘못 걸리면 진짜 이야기가 막히므로 좁게 읽는다 —
 //   줄거리 낱말 · 주는 말 · 허락 끝이 한 문장에 모두 있어야 하고(한국어는 허락 끝이 문장 끝), 다른 사람에게 건네는 말(엄마에게 · tell him)이면 걸지 않으며,
-//   줄거리 속 말("A ghost asks a child: may I …")처럼 앞에 이야기 글이 붙은 말도 걸지 않고, 허락 문장 밖의 글이 길면(이미 이야기를 적었다) 걸지 않는다.
+//   줄거리 속 말("A ghost asks a child: may I …" · "…, she wondered." · "… 소년이 물었다.")처럼 이야기 속 인물이 하는 말도 걸지 않는다.
 //   한국어 · 영어만 읽는다(앱 말).
-//   허락 물음 앞에 적은 설명("시리즈를 만들고 싶은데" · 앞 문장 · 앞 줄)은 버리지 않는다(리드 2026-11-14) — splitPermissionAsk 가 허락 물음의 틀만 덜어 내고
-//   남은 설명을 돌려주면, 시작 화면이 그것을 이어 적은 줄거리 앞에 붙여 이야기 씨앗으로 쓴다. 설명이 되는 글은 둘이다:
-//   ① 물음 앞의 글(앞 문장 · 앞 줄 · 쉼표 앞 절) ② 허락 문장 안에 쓴 이야기("고양이가 우주로 가는 이야기를 보내도 될까요?" → "고양이가 우주로 가는 이야기",
-//   "Can I tell you a story about …" → "about …", "Could I share my idea: …" → "…"). 물음 뒤에 쓴 말("감사합니다!")은 씨앗에 넣지 않는다(리드 검토 11/14).
+//   최종 규칙(리드 2026-11-14) — 허락 문장 하나만 가르고, 그 밖의 글은 길이로만 본다(글을 읽어 가르는 규칙을 더 늘리지 않는다):
+//   ① 허락 문장 밖의 글(앞 · 문장 안 · 뒤)이 120자를 넘으면 이야기를 이미 적은 것이다 — 허락 물음이 아니다. storyWithoutPermissionAsk 가
+//      물음 문장만 뺀 글을 돌려주고, 시작 화면이 그 글로 바로 시작한다.
+//   ② 120자 이하면 뒤에 줄거리가 오든 사정 말이든 덧말이든 늘 먼저 허락 답을 한다. splitPermissionAsk 가 설명(preface)으로 허락 문장 밖의 글을
+//      앞뒤 차례대로 모두 + 허락 문장 안에 쓴 이야기 조각을 돌려주고(빼는 것은 인사 · 고마움 말 · 짧은 확인 말 · 물음꼴 문장뿐),
+//      시작 화면이 그것을 들고 있다가 그 뒤에 보낸 말과 합쳐 이야기 씨앗을 만든다(seedWithPrefix).
+//   ③ 그 뒤에 "네 · 응 · ok · 그게 다예요 · that's it"처럼 짧은 확인 말(isShortConfirmation)만 보냈으면 그 말은 빼고 설명만으로 시작한다.
+//   허락 문장 안의 이야기 조각: "고양이가 우주로 가는 이야기를 보내도 될까요?" → "고양이가 우주로 가는 이야기", "Can I tell you a story about …" → "about …",
+//   "Could I share my idea: …" → "…", "the story of how we met" → "how we met"(앞 of 는 뗀다). 영어 조각 뒤에 글이 이어지면 마침표로 끊어 붙인다.
 //   withoutPermissionAsk 는 화면에서 고르기 탭이 안내를 본 사람의 글에서 물음의 틀만 덜 때 쓴다(앞 · 안 · 뒤 글을 모두 남긴다).
-//   물음 뒤에 줄거리를 이미 쓴 글(리드 검토 11/14)은 허락 물음으로 걸지 않는다 — storyWithoutPermissionAsk 가 인사 · 고마움 말과 물음꼴 문장을 뺀 글이 남으면
-//   물음 문장만 뺀 글을 돌려주고, 시작 화면이 묻지 않고 그 글로 이야기를 시작한다. 남은 문장이 모두 덧말(it · it's · this · that 으로 시작하는 영어 문장, 길이 · 분량 · 형식만
-//   말하는 문장)이면 줄거리가 아니라 지금처럼 허락 답을 하고, 덧말은 설명(preface)으로 들고 있어 줄거리를 이어 적을 때 앞에 붙는다.
 //   약속: tests/producer/entry-permission-ask.test.ts
-import { MIN_IDEA_CHARS, ideaLength } from '@/features/entry/options'
 
 /** 허락 문장 밖의 글이 이만큼(공백 뺀 글자)을 넘으면 이야기를 이미 적은 것으로 본다. */
 const MAX_OTHER_CHARS = 120
@@ -46,9 +47,37 @@ const KO_SPEECH = '(?:물었다|되물었다|말했다|속삭였다|외쳤다|�
 const KO_SPEECH_END = new RegExp(`${KO_SPEECH}["'”’」』)\\]]*[\\s.!?。…~]*$`)
 const KO_SPEECH_LEAD = new RegExp(`${KO_SPEECH}\\s*[:：,，]`)
 
-/** 이 허락 꼴 문장이 줄거리 속 인물의 말인가 — 앞 문장이 말하기로 끝났거나 같은 문장 앞에 "…말했다:"가 있다. */
-function storyInternalSpeech(previous: string, sentence: string): boolean {
-  return KO_SPEECH_END.test(previous) || KO_SPEECH_LEAD.test(sentence)
+// 줄거리 속 말(한국어 · 뒷말) — 허락 꼴 문장 바로 뒤에 "소년이 물었다."처럼 짧은 말하기 문장뿐이면 앞 문장은 이야기 속 인물이 하는 말이다(리드 2026-11-14 낮음 b).
+const KO_SPEECH_TAG_MAX_CHARS = 16
+function koSpeechTag(next: string): boolean {
+  const said = next.trim().replace(/^["'“”‘’「『(\[\s]+/, '')
+  return charCount(said) <= KO_SPEECH_TAG_MAX_CHARS && KO_SPEECH_END.test(said)
+}
+
+// 줄거리 속 말(영어, 리드 2026-11-14 낮음 b) — "Could I give my idea a chance, she wondered."처럼 같은 문장 끝에 ", 누가 + 말하기"가 붙거나
+//   "Could I give my idea a chance? she wondered."처럼 바로 뒤의 문장이 "누가 + 말하기"뿐이면 이야기 속 인물이 하는 말이다.
+//   말하는 사람은 she · he · they · the girl · 이름이고, 그 뒤에는 말하기와 -ly 꾸밈말만 올 수 있다 —
+//   "I asked my sister and she said yes." · ", as you said."처럼 다른 말이 붙은 글은 사용자 자신의 말이라 걸지 않는다.
+const EN_SPEAK_VERB = '(?:asks?|asked|wonders?|wondered|says?|said|thinks?|thought|whispers?|whispered|murmur(?:s|ed)?|mutters?|muttered|repl(?:y|ies|ied)|adds?|added|shouts?|shouted|sighs?|sighed|begs?|begged|pleads?|pleaded|suggests?|suggested|offers?|offered|ventures?|ventured|cried|called)'
+const EN_SPEAK_END = `\\s+${EN_SPEAK_VERB}(?:\\s+(?:\\w+ly|again|aloud))?[\\s.!?…"”’']*$`
+const EN_SPEECH_TAIL = new RegExp(`[,，]\\s*["“”’']?\\s*([a-z]+(?:\\s+[a-z]+)?)${EN_SPEAK_END}`, 'i')
+const EN_SPEECH_TAG = new RegExp(`^["“”’'\\s]*([a-z]+(?:\\s+[a-z]+)?)${EN_SPEAK_END}`, 'i')
+const EN_NON_SPEAKER = /^(?:I|As|If|So|But|And|Or|You|We|Like|Please|Thanks|Maybe)$/
+
+function enSpeaker(word: string | undefined): boolean {
+  if (!word) return false
+  return /^(?:she|he|they|the\s+[a-z]+)$/i.test(word) || (/^[A-Z][a-z]+$/.test(word) && !EN_NON_SPEAKER.test(word))
+}
+
+/** 이 허락 꼴 문장이 줄거리 속 인물의 말인가 — 앞 문장이 말하기로 끝났거나, 같은 문장 앞에 "…말했다:"가 있거나, 같은 문장 끝 · 바로 뒤 문장이 "누가 말했다"뿐이다. */
+function storyInternalSpeech(previous: string, sentence: string, next: string): boolean {
+  return (
+    KO_SPEECH_END.test(previous) ||
+    KO_SPEECH_LEAD.test(sentence) ||
+    enSpeaker(EN_SPEECH_TAIL.exec(sentence)?.[1]) ||
+    enSpeaker(EN_SPEECH_TAG.exec(next)?.[1]) ||
+    koSpeechTag(next)
+  )
 }
 
 function koPermission(sentence: string): boolean {
@@ -228,9 +257,10 @@ function koInline(sentence: string): string {
 const EN_COLON = /[:：]|\s[-–—]\s/
 const EN_CONTENT_LEAD = /\b(?:about|where|featuring|starring)\b/i
 const EN_DETERMINER = /^(?:my|our|your|the|a|an|this|that|these|those|some)\s+/i
-const EN_BARE_NOUN = new RegExp(`^${EN_NOUN}$`, 'i')
-// "the story of a fox and a crow" — 줄거리 낱말 바로 뒤의 of 부터가 설명이다.
-const EN_OF_LEAD = /\b(?:story|stories|plot|idea|ideas|synopsis|outline|script|scripts)\s+(of\s+\S.*)$/i
+// "a story of my own"의 own 도 줄거리 낱말처럼 설명이 아니다.
+const EN_BARE_NOUN = new RegExp(`^(?:${EN_NOUN}|own)$`, 'i')
+// "the story of how my parents met" — 줄거리 낱말 바로 뒤의 of 다음부터가 설명이다(앞 of 는 뗀다: "how my parents met").
+const EN_OF_LEAD = /\b(?:story|stories|plot|idea|ideas|synopsis|outline|script|scripts)\s+of\s+(\S.*)$/i
 // 설명 끝에 붙은 물음의 틀 낱말("…about bakers here" · "… - instead")
 const EN_TRAIL_FRAME = /(?:\s*[-–—,]\s*|\s+)(?:here|now|first|please|instead|too|as well|right now)$/i
 
@@ -245,9 +275,12 @@ function enInline(clause: string): string {
   const colon = rest.search(EN_COLON)
   if (colon >= 0) content = rest.slice(colon).replace(/^(?:[:：]|\s[-–—]\s)\s*/, '')
   else {
+    // "the story of a man who talks about birds" — 더 앞에 있는 쪽부터가 설명이다(about 이 뒤에 있어도 of 다음 글을 잃지 않는다).
     const lead = EN_CONTENT_LEAD.exec(rest)
-    if (lead) content = rest.slice(lead.index)
-    else content = EN_OF_LEAD.exec(rest)?.[1] ?? ''
+    const of = EN_OF_LEAD.exec(rest)
+    const ofStart = of ? of.index + of[0].length - of[1].length : -1
+    if (of && (!lead || ofStart < lead.index)) content = of[1]
+    else if (lead) content = rest.slice(lead.index)
   }
   content = content.replace(/[\s?？!！.。]+$/, '').trim()
   for (;;) {
@@ -260,132 +293,136 @@ function enInline(clause: string): string {
   return EN_BARE_NOUN.test(bare) ? '' : content
 }
 
-/** 허락 문장에서 설명이 되는 글 — 앞 절(영어, 쉼표 앞)과 문장 안에 쓴 이야기. 물음의 틀은 뺀다. */
-function permissionPieces(sentence: string): string {
-  if (koPermission(sentence.trim())) return koInline(sentence)
+/** 허락 문장에서 설명이 되는 글 — 앞 절(영어, 쉼표 앞)과 문장 안에 쓴 이야기. 물음의 틀은 뺀다. fragment 는 끝 부호가 없는 영어 조각이다(뒤에 글이 이어지면 마침표로 끊는다). */
+function permissionPieces(sentence: string): { text: string; fragment: boolean } {
+  if (koPermission(sentence.trim())) return { text: koInline(sentence), fragment: false }
   const start = permissionStart(sentence)
   const head = sentence.slice(0, start).replace(CLAUSE_TAIL, '').trim()
-  return [isLeadOnly(head) ? '' : head, enInline(sentence.slice(start))].filter(Boolean).join(' ')
+  const text = [isLeadOnly(head) ? '' : head, enInline(sentence.slice(start))].filter(Boolean).join(' ')
+  return { text, fragment: text !== '' }
 }
 
-// 물음 뒤 문장 가르기(리드 2026-11-14 검토 보통 1) — 인사 · 고마움 말과 물음꼴 문장(물음표 · 묻는 끝맺음)은 줄거리가 아니다. 이것들을 뺀 글이 남으면 줄거리를 이미 준 것이다.
+// 설명에서 뺄 문장(리드 2026-11-14 최종 규칙) — 인사 · 고마움 말 · 짧은 확인 말 · 물음꼴 문장(물음표 · 묻는 끝맺음)만 뺀다. 이 밖의 글은 앞뒤 차례대로 모두 설명이 된다.
 const CLOSING_ONLY = new Set([
   '감사합니다', '감사해요', '감사드립니다', '고맙습니다', '고마워요', '고마워', '땡큐', '잘부탁드립니다', '잘부탁드려요', '잘부탁해요', '부탁드립니다', '부탁드려요', '수고하세요', '수고하셨습니다', // i18n-ok: 고마움 · 맺음 말을 알아듣는 목록
   'thanks', 'thankyou', 'thanksalot', 'thankyouverymuch', 'thankyousomuch', 'thanksinadvance', 'thankyouinadvance', 'manythanks', 'thx', 'cheers', 'please', 'pleasethanks', 'bye',
 ])
 const KO_QUESTION_WORD_END = /(?:나요|인가요|일까요|을까요|할까요|까요|ㅂ니까|습니까)\s*[.!~]*$/ // i18n-ok: 묻는 끝맺음을 알아듣는 정규식
 
-function isAfterNoise(sentence: string): boolean {
-  const t = sentence.trim()
-  return CLOSING_ONLY.has(t.replace(/[\s!?.~…,，。！？^]+/g, '').toLowerCase()) || /[?？]\s*$/.test(t) || KO_QUESTION_WORD_END.test(t) || isPermissionSentence(t)
+// 짧은 확인 말(리드 2026-11-14 최종 규칙) — 허락 답을 받고 "네 · 응 · ok · 그게 다예요 · that's it"만 보낸 말은 이야기가 아니라 확인이다.
+//   글자와 숫자만 남겨(공백 · 문장부호 · 이모지는 지운다) 아래 말과 맞춘다. 앞에 확인 말이 붙은 "네, 그게 다예요."도 확인이다.
+const CONFIRM_HEADS = [
+  '네', '넵', '넹', '예', '응', '웅', '어', '그래', '그래요', '좋아', '좋아요', '좋습니다', 'ㅇㅋ', 'ㅇㅇ', '오케이', '알겠어요', '알겠습니다', '알았어', '알았어요', '감사합니다', '감사해요', '고마워요', '고마워', // i18n-ok: 짧은 확인 말을 알아듣는 목록
+  'ok', 'okay', 'k', 'kk', 'yes', 'yep', 'yeah', 'yup', 'sure', 'alright', 'fine', 'thanks', 'thankyou', 'thx',
+].sort((a, b) => b.length - a.length)
+const CONFIRM_TAILS = new Set([
+  '그게다예요', '그게다에요', '그게다야', '그게다입니다', '이게다예요', '이게다에요', '이게다야', '이게다입니다', '이게전부예요', '이게전부야', '이게전부입니다', // i18n-ok: 짧은 확인 말을 알아듣는 목록
+  '이상이에요', '이상입니다', '이상이야', '이상', '끝', '끝이에요', '끝이야', '더없어요', '더없습니다', '시작해주세요', '시작해줘', '시작해요', '그냥시작해주세요', '그냥시작해줘', // i18n-ok: 짧은 확인 말을 알아듣는 목록
+  'thatsit', 'thatsall', 'thatisit', 'thatisall', 'thatsitforme', 'thatsallforme', 'thatsitfornow', 'thatsallfornow', 'nothingmore', 'nothingelse', 'nomore', 'goahead', 'start', 'startnow', 'pleasestart', 'justgo',
+])
+
+/** 이 말이 "네 · 응 · ok · 그게 다예요 · that's it"처럼 이야기가 아니라 확인뿐인 짧은 말인가. */
+export function isShortConfirmation(text: string | null | undefined): boolean {
+  let rest = (text ?? '').toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '')
+  if (!rest || rest.length > 30) return false
+  for (;;) {
+    if (CONFIRM_TAILS.has(rest)) return true
+    const head = CONFIRM_HEADS.find((h) => rest.startsWith(h))
+    if (!head) return false
+    rest = rest.slice(head.length)
+    if (!rest) return true
+  }
 }
 
-// 덧말(리드 2026-11-14 검토) — 물음 뒤의 문장이 줄거리가 아니라 길이 · 형식 · 소개만 말하는 말이다: it · it's · this · that 으로 시작하는 영어 문장("It is long." · "This is my first try."),
-//   길이 · 분량 · 형식만 말하는 문장("about 3 pages" · "8회짜리예요." · "3페이지 정도예요."). 덧말만 남으면 줄거리를 준 것이 아니라 허락 답을 하고, 덧말은 설명(씨앗 앞)으로 들고 있는다.
-//   \W 는 한글도 잡으므로 쓰지 않고 따옴표 · 문장부호를 직접 적는다.
-const MARKS = `[\\s.,!~…"'“”‘’()\\[\\]-]*`
-const EN_META_START = new RegExp(`^${MARKS}(?:it|this|that)\\b`, 'i')
-// 길이 · 분량 · 형식만 말하는 문장 — 숫자 + 단위("3 pages" · "12 episodes" · "8회" · "두 장")와 군말(about · each · 짜리 · 정도 · 이에요 …)을 지우면 아무것도 남지 않는다.
-const EN_LENGTH_PHRASE = /\d[\d,]*\s*-?\s*(?:pages?|episodes?|minutes?|mins?|parts?|chapters?|words?|seasons?|scenes?|hours?|seconds?)\b/gi
-const EN_LENGTH_FILLER = /\b(?:about|around|roughly|approximately|approx|only|just|maybe|each|per|total|in|long|or|so|and|of|a|an|the|with|plus|episode)\b/gi
-const KO_LENGTH_PHRASE = /(?:A\d\s*)?(?:\d[\d,]*|한|두|세|네|다섯|여섯|일곱|여덟|아홉|열)\s*(?:페이지|쪽|장|분|회|화|편|글자|자|부작|부|초|시간)/g // i18n-ok: 길이 · 분량 말을 알아듣는 정규식
-const KO_LENGTH_FILLER = /(?:이에요|예요|입니다|이랍니다|이야|이다|이고요|이고|인데|이며|씩|짜리|정도|쯤|가량|분량|안팎|이상|이하|내외|총|약|대략|대충|거의|대강|은|는|이|가|도|당)/g // i18n-ok: 길이 · 분량 말의 군말을 알아듣는 정규식
-
-const LENGTH_STRIP = /[\s.,!~…"'“”‘’()\[\];:/-]+/g
-
-function lengthOnly(text: string): boolean {
-  // 숫자 + 단위가 있고, 그것과 군말을 지운 뒤 문장부호까지 걷어 내면 아무것도 남지 않아야 한다.
-  const leftover = (phrase: RegExp, filler: RegExp): string | null =>
-    new RegExp(phrase.source, phrase.flags.replace('g', '')).test(text) ? text.replace(phrase, '').replace(filler, '').replace(LENGTH_STRIP, '') : null
-  return leftover(EN_LENGTH_PHRASE, EN_LENGTH_FILLER) === '' || leftover(KO_LENGTH_PHRASE, KO_LENGTH_FILLER) === ''
+function isNoise(sentence: string): boolean {
+  const t = sentence.trim()
+  return (
+    CLOSING_ONLY.has(t.replace(/[\s!?.~…,，。！？^]+/g, '').toLowerCase()) ||
+    isShortConfirmation(t) ||
+    /[?？]\s*$/.test(t) ||
+    KO_QUESTION_WORD_END.test(t) ||
+    isPermissionSentence(t)
+  )
 }
 
-function isMetaRemark(sentence: string): boolean {
-  const t = sentence.trim()
-  return EN_META_START.test(t) || lengthOnly(t)
+// 글 이어 붙이기 — 영어 조각("about a dragon" · "how my parents met")은 문장 끝 부호가 없다. 뒤에 글이 이어지면 마침표로 끊어 붙인다(리드 2026-11-14 낮음 a).
+const SENTENCE_END = /[.!?…。！？]$/
+
+function createJoiner() {
+  const parts: string[] = []
+  let last = -1
+  let open = false
+  return {
+    /** 글 사이의 공백 · 줄바꿈 — 조각의 끝 부호를 가리는 데 들지 않는다. */
+    gap(text: string) {
+      parts.push(text)
+    },
+    /** 글 한 덩이. fragment 는 끝 부호가 없는 영어 조각이다. */
+    piece(text: string, fragment = false) {
+      if (open && last >= 0) parts[last] += '.'
+      parts.push(text)
+      last = parts.length - 1
+      open = fragment && !SENTENCE_END.test(text.trim())
+    },
+    text: () => parts.join(''),
+  }
 }
 
 interface Analysis {
   found: boolean
-  /** 첫 허락 문장까지의 설명(앞 글 + 그 문장 안의 설명). */
+  /** 설명 — 허락 문장 밖의 글(앞 · 뒤)과 허락 문장 안의 이야기 조각을 차례대로. 인사 · 고마움 말 · 짧은 확인 말 · 물음꼴 문장은 뺀다. */
   preface: string
-  /** 허락 물음의 틀만 덜어 낸 글 전체(앞 · 안 · 뒤). */
+  /** 허락 문장의 틀만 덜어 낸 글 전체(앞 · 안 · 뒤) — 길이를 재고, 120자를 넘으면 바로 시작하는 글이 된다. */
   remainder: string
-  /** 물음 문장과 물음 뒤의 인사 · 고마움 말 · 물음꼴 문장을 뺀 글 전체(앞 · 안 · 뒤 줄거리). */
-  story: string
-  /** 물음 뒤에 쓴 글에서 인사 · 고마움 말 · 물음꼴 문장을 뺀 나머지. */
-  afterStory: string
-  /** 그 나머지에 덧말이 아닌 문장이 있다. */
-  hasNonMeta: boolean
 }
 
 function analyze(text: string | null | undefined): Analysis {
   const body = (text ?? '').trim()
-  const kept: string[] = []
-  const storyKept: string[] = []
-  const afterKept: string[] = []
-  const metaKept: string[] = []
-  let hasNonMeta = false
+  const sentences = Array.from(body.matchAll(SENTENCE))
+  const said = sentences.map((m) => m[0].trim())
+  const whole = createJoiner()
+  const outside = createJoiner()
   let found = false
-  let prefaceEnd = 0
   let last = 0
   let previous = ''
-  for (const m of body.matchAll(SENTENCE)) {
+  sentences.forEach((m, i) => {
     const start = m.index ?? 0
     const gap = body.slice(last, start)
-    kept.push(gap)
-    storyKept.push(gap)
     last = start + m[0].length
     const sentence = m[0]
-    const trimmed = sentence.trim()
+    const trimmed = said[i]
     if (!trimmed) {
-      kept.push(sentence)
-      storyKept.push(sentence)
-    } else if (isPermissionSentence(trimmed) && !storyInternalSpeech(previous, trimmed)) {
-      const inside = permissionPieces(sentence)
+      whole.gap(gap + sentence)
+      return
+    }
+    whole.gap(gap)
+    const next = said.slice(i + 1).find(Boolean) ?? ''
+    if (isPermissionSentence(trimmed) && !storyInternalSpeech(previous, trimmed, next)) {
+      found = true
+      const { text: inside, fragment } = permissionPieces(sentence)
       if (inside && !isLeadOnly(inside)) {
         const piece = `${sentence.match(/^\s*/)?.[0] ?? ''}${inside}`
-        kept.push(piece)
-        if (!found) storyKept.push(piece)
-      }
-      if (!found) {
-        found = true
-        prefaceEnd = kept.length
+        whole.piece(piece, fragment)
+        outside.gap(gap)
+        outside.piece(piece, fragment)
       }
     } else if (!isLeadOnly(trimmed)) {
-      kept.push(sentence)
-      if (!found || !isAfterNoise(trimmed)) storyKept.push(sentence)
-      if (found && !isAfterNoise(trimmed)) {
-        afterKept.push(sentence)
-        if (isMetaRemark(trimmed)) metaKept.push(sentence)
-        else hasNonMeta = true
+      whole.piece(sentence)
+      if (!isNoise(trimmed)) {
+        outside.gap(gap)
+        outside.piece(sentence)
       }
     }
-    if (trimmed) previous = trimmed
-  }
-  const tail = body.slice(last)
-  kept.push(tail)
-  storyKept.push(tail)
-  return {
-    found,
-    // 물음 뒤의 덧말은 줄거리가 아니지만 잃지 않게 설명으로 들고 있는다(인사 · 고마움 말 · 물음꼴 문장은 넣지 않는다).
-    preface: tidy(kept.slice(0, prefaceEnd).join('') + metaKept.join('')),
-    remainder: tidy(kept.join('')),
-    story: tidy(storyKept.join('')),
-    afterStory: tidy(afterKept.join('')),
-    hasNonMeta,
-  }
-}
-
-/** 물음 뒤에 줄거리를 이미 썼나 — 인사 · 고마움 말 · 물음꼴 문장을 뺀 글에 덧말이 아닌 문장이 하나라도 있고 합쳐 첫 글 최소 길이(20자) 이상이다. */
-function hasStoryAfter(analysis: Analysis): boolean {
-  return analysis.found && analysis.hasNonMeta && ideaLength(analysis.afterStory) >= MIN_IDEA_CHARS
+    previous = trimmed
+  })
+  whole.gap(body.slice(last))
+  return { found, preface: tidy(outside.text()), remainder: tidy(whole.text()) }
 }
 
 export interface PermissionSplit {
   /** 이 글이 "이야기(줄거리 · 아이디어 · 대본)를 내도 되나요?"라고 허락을 묻는 말인가. */
   asking: boolean
-  /** 이야기 씨앗 앞에 붙일 설명 — 물음 앞에 적은 글과 허락 문장 안에 쓴 이야기(인사말만이면 빈 글). 물음 뒤에 쓴 말은 넣지 않는다. 허락을 묻는 말이 아니면 빈 글. */
+  /** 이야기 씨앗 앞에 붙일 설명 — 허락 문장 밖의 글(앞 · 뒤)과 허락 문장 안에 쓴 이야기를 차례대로(인사 · 고마움 말 · 짧은 확인 말 · 물음꼴 문장은 뺀다). 허락을 묻는 말이 아니면 빈 글. */
   preface: string
 }
 
@@ -397,25 +434,23 @@ function charCount(text: string): number {
 
 /**
  * 허락을 묻는 말인지 가르고, 이야기 씨앗 앞에 붙일 설명은 따로 돌려준다.
- *   허락 물음 밖의 글(앞 · 문장 안 · 뒤)이 120자를 넘으면 이야기를 이미 적은 것으로 보아 허락을 묻는 말이 아니다 — ignoreLength 는 이 가름을 건너뛴다
- *   (화면에서 고르기 탭에서 안내를 본 뒤 이어 적은 글).
+ *   허락 문장 밖의 글(앞 · 문장 안 · 뒤)이 120자를 넘으면 이야기를 이미 적은 것으로 보아 허락을 묻는 말이 아니다 — ignoreLength 는 이 가름을 건너뛴다
+ *   (화면에서 고르기 탭에서 안내를 본 뒤 이어 적은 글). 120자 이하면 뒤에 무엇이 오든 허락을 묻는 말이다.
  */
 export function splitPermissionAsk(text: string | null | undefined, opts?: { ignoreLength?: boolean }): PermissionSplit {
   const analysis = analyze(text)
   if (!analysis.found) return NOT_ASKING
-  // 물음 뒤에 줄거리를 이미 썼으면 허락을 묻는 말이 아니다 — 시작 화면이 storyWithoutPermissionAsk 로 그 줄거리로 시작한다.
-  if (hasStoryAfter(analysis)) return NOT_ASKING
   if (!opts?.ignoreLength && charCount(analysis.remainder) > MAX_OTHER_CHARS) return NOT_ASKING
   return { asking: true, preface: analysis.preface }
 }
 
 /**
- * 허락 물음 뒤에 줄거리를 이미 썼으면 물음 문장만 뺀 글(앞 설명 + 뒤 줄거리), 아니면 null(리드 2026-11-14 검토 보통 1).
- *   "May I give you my plot? A girl swaps bodies with her grandmother." → "A girl swaps bodies with her grandmother." — 물음 뒤의 인사 · 고마움 말 · 물음꼴 문장도 뺀다.
+ * 허락 문장 밖의 글이 120자를 넘으면 이야기를 이미 적은 것이다 — 물음 문장만 뺀 글(앞 설명 + 뒤 줄거리)을 돌려주고, 아니면 null(리드 2026-11-14 최종 규칙).
+ *   "Can I give you my storyline? <긴 줄거리>" → "<긴 줄거리>". 120자 이하의 글은 뒤에 무엇이 오든 null 이라 시작 화면이 먼저 허락 답을 한다.
  */
 export function storyWithoutPermissionAsk(text: string | null | undefined): string | null {
   const analysis = analyze(text)
-  return hasStoryAfter(analysis) ? analysis.story : null
+  return analysis.found && charCount(analysis.remainder) > MAX_OTHER_CHARS ? analysis.remainder : null
 }
 
 /** 허락 물음의 틀만 덜어 낸 글 — 앞 · 문장 안 · 뒤에 쓴 글은 모두 남긴다. 허락 물음이 없으면 글 그대로(길이 가름은 하지 않는다). */
@@ -427,4 +462,19 @@ export function withoutPermissionAsk(text: string | null | undefined): string {
 /** 이 글이 "이야기(줄거리 · 아이디어 · 대본)를 내도 되나요?"라고 허락을 묻는 말인가. */
 export function asksToShareStory(text: string | null | undefined): boolean {
   return splitPermissionAsk(text).asking
+}
+
+/**
+ * 들고 있던 설명(prefix)과 그 뒤에 보낸 말(typed)로 이야기 씨앗을 만든다(리드 2026-11-14 최종 규칙) — 설명 + 빈 줄 + 보낸 말.
+ *   보낸 말이 "네 · 그게 다예요"처럼 짧은 확인 말뿐이면 그 말은 빼고 설명만이다. 보낸 말이 비어 있으면 씨앗도 없다(빈 글).
+ *   설명이 없으면 보낸 말 그대로다. 길이(20자) 검사는 이 글로 한다. maxChars 가 있으면 보낸 말을 지키려고 설명의 뒤쪽을 자른다.
+ */
+export function seedWithPrefix(prefix: string | null | undefined, typed: string | null | undefined, maxChars = Number.POSITIVE_INFINITY): string {
+  const head = (prefix ?? '').trim()
+  const body = (typed ?? '').trim()
+  if (!body) return ''
+  if (!head) return body
+  if (isShortConfirmation(body)) return head
+  const room = maxChars - body.length - 2
+  return [room > 0 ? head.slice(0, room) : '', body].filter(Boolean).join('\n\n')
 }

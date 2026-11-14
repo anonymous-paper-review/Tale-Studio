@@ -19,7 +19,7 @@ import { STAGE_PERSONA } from '@/lib/lumi'
 import { useLocale, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { fileHasText, picksComplete } from '@/lib/entry/draft'
-import { asksToShareStory } from '@/lib/entry/permission-ask'
+import { asksToShareStory, seedWithPrefix } from '@/lib/entry/permission-ask'
 import {
   MIN_IDEA_CHARS,
   MOODS,
@@ -96,8 +96,10 @@ function MaterialStep() {
   const removeFile = useEntryStore((s) => s.removeFile)
   const openFileDialog = useEntryStore((s) => s.openFileDialog)
 
+  const seedPrefix = useEntryStore((s) => s.chat.seedPrefix)
   const length = ideaLength(draft.idea)
-  const problem = materialProblem(draft.idea, draft.file)
+  // 길이는 합친 글(채팅 탭에서 들고 온 설명 + 이 글)로 잰다 — 채팅 탭과 같은 규칙이다.
+  const problem = materialProblem(seedWithPrefix(seedPrefix, draft.idea), draft.file)
   const lengthError = showLengthError && problem ? tooShortMessage(locale, problem.length) : null
   // 허락을 묻는 글이라 다음으로 가지 않았다(오너 2026-11-14 A ①) — 글이 바뀌어 더는 그 꼴이 아니면 안내를 감춘다.
   const shareAnswer = showShareAnswer && !draft.file && asksToShareStory(draft.idea)

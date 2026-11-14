@@ -3,6 +3,7 @@
 //   한쪽에서 쓴 글 · 올린 파일 · 고른 값이 다른 쪽에 그대로 보인다.
 //   약속: tests/producer/entry-store.test.ts · tests/producer/entry-screens.test.ts
 import { fileHasText, recIsCurrent, type EntryChatProgress, type EntryDraft, type EntryPicks } from '@/lib/entry/draft'
+import { seedWithPrefix } from '@/lib/entry/permission-ask'
 import {
   CHAT_QUESTION,
   MATERIAL_KINDS,
@@ -171,7 +172,8 @@ export function chatTranscript(draft: EntryDraft, ui: ChatUi, t: Translator): Ch
       items.push({ kind: 'user', id: 'ask-permission', text: ui.asked })
       items.push({ kind: 'agent', id: 'permission-answer', text: t(CHAT_PERMISSION_ANSWER) })
     }
-    const problem = materialProblem(draft.idea, draft.file)
+    // 길이는 합친 글(들고 있는 설명 + 이번에 보낸 말)로 잰다 — 안내 문구의 "지금 N자"가 실제로 잰 글자 수여야 한다(리드 2026-11-14 최종 규칙).
+    const problem = materialProblem(seedWithPrefix(ui.seedPrefix, draft.idea), draft.file)
     if (ui.lengthError && problem) {
       items.push({ kind: 'error', id: 'too-short', text: t(TOO_SHORT_KEY, { min: MIN_IDEA_CHARS, n: problem.length }), guide: t(CHAT_GUIDE) })
     }

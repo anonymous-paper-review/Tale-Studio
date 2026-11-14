@@ -7,6 +7,8 @@
 //   ② 아래 중 하나도 없다: 고치라는 낱말(바꿔 · 줄여 · 넣어 · make · shorten …) · 정도 말(더 · 좀 더 · shorter …) ·
 //      바꿔 보자는 제안(어때 · 낫지 않을까 · 좋을 것 같 · what if · could/should + 이름 · is it possible …) · 부탁 꼴(해 줄래 · can you …).
 //      단, what · why · how · who · where · when 으로 시작하는 영어 물음의 "조동사 + 대명사"는 제안이 아니다("Why would he lie?") — what if · how about · why not 은 그대로 제안이다.
+//      단, 그 wh 물음에서도 "can't · cannot · couldn't · shouldn't + 대명사 · 이름"("Why can't Minsu be a girl?" · "Why shouldn't it rain here?")과 끝에 붙은 instead("Who should say this line instead?")는
+//      "그렇게 해 달라"는 제안이다(리드 2026-11-14 낮음 c) — won't · wouldn't · didn't 는 이야기 속 까닭을 묻는 말이라 물음으로 둔다("Why wouldn't he tell her?").
 //      단, 알려 달라는 말(설명 · tell me · explain …)이 함께 있는 부탁 꼴("설명해 줄래?")은 물음이다. 보여 줘 · 정리해 줘 · describe 는 알려 달라는 말이 아니라 고치기 쪽이다.
 //   한국어 · 영어를 읽고 중국어는 묻는 낱말 · 물음표와 고치는 낱말 몇 개만 읽는다.
 //   약속: tests/chat/prose-question.test.ts
@@ -42,6 +44,8 @@ const SUGGESTION = new RegExp(
     "\\b(?:what\\s+if|what\\s+about|how\\s+about|why\\s+not|wouldn['’]?t\\s+it\\s+be|would\\s+it\\s+be\\s+(?:better|nicer|nice|funny|funnier|good|cool)|maybe|perhaps)\\b",
     // Is it possible for him to stay? · Have her cry here?
     '\\bis\\s+it\\s+possible\\b|\\bany\\s+chance\\b|\\bhave\\s+(?:her|him|them|it)\\b',
+    // 끝에 붙은 instead("Who should say this line instead?") — "instead of" 는 까닭을 묻는 말에도 쓰여 걸지 않는다.
+    '\\binstead\\s*[?？!.]*\\s*$',
   ].join('|'),
   'i',
 )
@@ -55,6 +59,16 @@ const SUGGESTION_MODAL = new RegExp(
   ].join('|'),
   'i',
 )
+
+// ③-3 wh 물음의 "부정 조동사 + 이름 · 대명사" — "Why can't Minsu be a girl?" · "Why shouldn't it rain here?"는 그렇게 해 달라는 제안이다(리드 2026-11-14 낮음 c).
+//   can't · cannot · couldn't · shouldn't 만 본다 — won't · wouldn't · didn't 는 이야기 속 까닭을 묻는 말이고, 대명사 · 이름이 아닌 낱말("Why can't the door open?")이 따르면 물음으로 둔다.
+const WH_NEGATIVE_MODAL = /^\W*(?:what|who|whom|whose|where|when|why|how|which)\s+(?:can['’]?t|cannot|couldn['’]?t|shouldn['’]?t)\s+([A-Za-z]+)/i
+const PRONOUN = /^(?:he|she|they|it|we|i|you)$/i
+
+function whNegativeSuggestion(said: string): boolean {
+  const subject = WH_NEGATIVE_MODAL.exec(said)?.[1]
+  return !!subject && (PRONOUN.test(subject) || /^[A-Z]/.test(subject))
+}
 
 // ④ 부탁 꼴 — 알려 달라는 말이 함께 있으면 물음으로 본다.
 const REQUEST_FRAME = new RegExp(
@@ -103,6 +117,7 @@ export function isProseQuestion(text: string | null | undefined): boolean {
   if (COMPARATIVE.test(said)) return false
   if (SUGGESTION.test(said)) return false
   if (!EN_WH_START.test(said) && SUGGESTION_MODAL.test(said)) return false
+  if (whNegativeSuggestion(said)) return false
   if (REQUEST_FRAME.test(said) && !INFO_VERB.test(said)) return false
   // 묻는 낱말이 있어야 하고, 물음의 꼴(물음표 · 묻는 끝맺음 · 영어 wh 로 시작 · 알려 달라는 말)도 갖춰야 한다.
   if (!ASK_WORD.test(said)) return false

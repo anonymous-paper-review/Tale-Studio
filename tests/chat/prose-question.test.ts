@@ -115,6 +115,14 @@ describe('물음 가르기', () => {
     'Have her cry here?',
     'Would Minsu look better in a red coat?',
     'Could Jisu be the one who speaks first?',
+    // wh 뒤의 부정 조동사(can't · cannot · couldn't · shouldn't) + 이름 · 대명사는 "그렇게 해 달라"는 제안이다(리드 11/14 낮음 c). 끝에 붙은 instead 도 같다.
+    "Why can't Minsu be a girl?",
+    "Why shouldn't it rain here?",
+    'Who should say this line instead?',
+    "Why can't he sleep?",
+    "Why couldn't she be the one to speak first?",
+    'Why cannot Jisu go first?',
+    'What should Minsu say instead?',
   ])('제안 꼴로 읽는다: %s', (text) => {
     expect(isProseQuestion(text)).toBe(false)
   })
@@ -163,9 +171,14 @@ describe('물음 가르기', () => {
     'Why would he lie?',
     'How could she forget?',
     'What can he see from the window?',
-    "Why can't he sleep?",
     'Who should cry here, Minsu or Jisu?',
     'When can she see him again?',
+    // 부정 조동사라도 won't · wouldn't · didn't 는 이야기 속 까닭을 묻는 말이고, 대명사 · 이름이 아닌 낱말이 따르거나 instead of 는 제안이 아니다(리드 11/14 낮음 c).
+    "Why wouldn't he tell her?",
+    "Why won't she come back?",
+    "Why didn't Minsu answer the phone?",
+    "Why can't the door open?",
+    'Why did he choose the boat instead of the train?',
   ])('묻는 낱말이 있고 부탁 · 제안 꼴이 없으면 물음으로 읽는다: %s', (text) => {
     expect(isProseQuestion(text)).toBe(true)
   })
