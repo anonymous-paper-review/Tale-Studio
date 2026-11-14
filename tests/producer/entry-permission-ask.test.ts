@@ -1,6 +1,6 @@
-// 시작 화면 첫 글이 "줄거리를 줘도 될까?"처럼 이야기를 내도 되는지 허락을 묻는 말이면 이야기를 시작하지 않고 "여기에 적어 주세요"로 먼저 답한다 (오너 2026-11-14 답 A ①)
+// 시작 화면 첫 글이 "줄거리를 줘도 될까?"처럼 이야기를 내도 되는지 허락을 묻는 말이면 이야기를 시작하지 않고 "여기에 적어 주세요"로 먼저 답하고, 물음 앞에 적은 설명은 이어 적은 줄거리와 함께 이야기 씨앗으로 쓴다 (오너 2026-11-14 답 A ① · 리드 11/14)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { asksToShareStory } from '@/lib/entry/permission-ask'
+import { asksToShareStory, splitPermissionAsk } from '@/lib/entry/permission-ask'
 import { useEntryStore } from '@/features/entry/entry-store'
 import { CHAT_PERMISSION_ANSWER, chatTranscript } from '@/features/entry/chat-flow'
 import { emptyEntryDraft, materialBasis, type EntryDraft } from '@/lib/entry/draft'
@@ -13,9 +13,12 @@ const PID = 'project-1'
 // 이 시험을 위해 새로 지은 글 — 실제 사용자의 글이 아니다.
 const SEED = '비 오는 항구 도시에서 길고양이를 돌보는 노인과 매일 밤 같은 자리에 앉는 소녀의 이야기'
 const QUESTION = '시리즈를 만들고 싶은데, 줄거리를 줘도 될까?'
+// 앞에 적은 설명 없이 물음만 쓴 글.
+const QUESTION_ONLY = '줄거리를 줘도 될까?'
 
 interface Call { method: string; url: string; body: unknown }
 let calls: Call[] = []
+let savedForm = ''
 let routes: Record<string, (body: unknown, call: Call) => { status?: number; body: unknown }> = {}
 
 function respond(status: number, body: unknown) {
@@ -84,8 +87,8 @@ describe('허락을 묻는 첫 글', () => {
   })
 
   it('허락 물음 뒤에 적은 줄거리는 첫 글처럼 읽어 추천을 만든다', async () => {
-    // 왜: 앱이 "여기에 적어 주세요"라고 했으니, 이어 적은 글이 이야기다. 물음은 이야기에 들어가지 않는다.
-    setDraft({ ...emptyEntryDraft(), idea: QUESTION })
+    // 왜: 앱이 "여기에 적어 주세요"라고 했으니, 이어 적은 글이 이야기다. 물음은 이야기에 들어가지 않는다(앞에 적은 설명이 있을 때는 아래 "허락 물음 앞에 적은 설명").
+    setDraft({ ...emptyEntryDraft(), idea: QUESTION_ONLY })
     await useEntryStore.getState().chatSendFirst()
     routes['POST /api/produce/entry/recommend'] = () => ({ body: { draft: recommended({ ...useEntryStore.getState().draft, idea: SEED }) } })
 
@@ -128,6 +131,35 @@ describe('허락을 묻는 첫 글', () => {
     expect(state.formStep).toBe(1)
     expect(state.showShareAnswer).toBe(true)
     expect(state.draft.idea).toBe(QUESTION)
+    expect(calls.some((c) => c.url.includes('/recommend'))).toBe(false)
+  })
+
+  it('화면에서 고르기 탭에서 안내를 보고 줄거리를 이어 적어 다음을 누르면 물음 문장만 덜어 내고 이어 간다', async () => {
+    // 왜: 안내를 본 사람은 "여기에 적어 주세요"대로 물음 뒤에 줄거리를 이어 적는다 — 이때 또 안내를 보이면 시험 없이 같은 자리에서 막힌다. 물음 앞에 적은 설명은 남는다.
+    setDraft({ ...emptyEntryDraft(), idea: QUESTION })
+    expect(await useEntryStore.getState().formNext()).toBe('asked')
+    routes['PATCH /api/produce/entry'] = (body) => {
+      const idea = (body as { patch?: { idea?: string } } | null)?.patch?.idea
+      if (typeof idea === 'string') savedForm = idea
+      return { body: { ok: true } }
+    }
+    routes['POST /api/produce/entry/recommend'] = () => ({ body: { draft: recommended({ ...useEntryStore.getState().draft, idea: savedForm }) } })
+
+    useEntryStore.getState().setIdea(`${QUESTION} ${SEED}`)
+    expect(await useEntryStore.getState().formNext()).toBe('ok')
+
+    expect(useEntryStore.getState().draft.idea).toBe(`시리즈를 만들고 싶은데 ${SEED}`)
+    expect(useEntryStore.getState().showShareAnswer).toBe(false)
+  })
+
+  it('화면에서 고르기 탭에서 안내를 본 뒤 글을 고치지 않고 다시 다음을 누르면 안내를 다시 보인다', async () => {
+    // 왜: 아무것도 답하지 않았는데 이야기로 넘기면 물음이 이야기가 된다 — 고친 것이 있을 때만 답한 것으로 본다.
+    setDraft({ ...emptyEntryDraft(), idea: QUESTION })
+    expect(await useEntryStore.getState().formNext()).toBe('asked')
+
+    expect(await useEntryStore.getState().formNext()).toBe('asked')
+
+    expect(useEntryStore.getState().draft.idea).toBe(QUESTION)
     expect(calls.some((c) => c.url.includes('/recommend'))).toBe(false)
   })
 
@@ -237,5 +269,143 @@ describe('허락을 묻는 말 가르기', () => {
     expect(asksToShareStory(long)).toBe(false)
     const longEn = 'Can I give you my storyline? A lighthouse keeper lights the lamp at the same hour every night. One stormy evening a small fishing boat follows the light home, and its captain turns out to be the son who left the village long ago. They drink tea in silence until morning.'
     expect(asksToShareStory(longEn)).toBe(false)
+  })
+})
+
+describe('허락 물음 앞에 적은 설명', () => {
+  // 이 시험을 위해 새로 지은 글 — 실제 사용자의 글이 아니다.
+  const PREFACE = '시리즈를 만들고 싶은데'
+  const MERGED = `${PREFACE}\n\n${SEED}`
+  const SEED_EN = 'A new baker at a neighborhood bakery learns why an elderly regular buys the same loaf every single day'
+
+  async function ask(idea: string) {
+    setDraft({ ...emptyEntryDraft(), idea })
+    expect(await useEntryStore.getState().chatSendFirst()).toBe('asked')
+  }
+  // 진짜 서버처럼 저장된 초안의 글을 읽어 추천한다 — 합친 글이 추천을 묻기 전에 저장되지 않았다면 돌아온 초안의 글이 합쳐지지 않은 채로 남는다.
+  let savedIdea = ''
+  beforeEach(() => {
+    savedIdea = ''
+    routes['PATCH /api/produce/entry'] = (body) => {
+      const idea = (body as { patch?: { idea?: string } } | null)?.patch?.idea
+      if (typeof idea === 'string') savedIdea = idea
+      return { body: { ok: true } }
+    }
+    routes['POST /api/produce/entry/recommend'] = () => ({ body: { draft: recommended({ ...useEntryStore.getState().draft, idea: savedIdea }) } })
+  })
+
+  it('허락 물음 앞에 적은 설명은 이어 적은 줄거리와 함께 이야기 씨앗이 된다', async () => {
+    // 왜: 허락 물음에 답한 뒤 사용자가 시리즈 콘셉트를 다시 쓰지 않게 한다 — 물음 문장만 빼고 앞에 적은 설명은 이어 적은 줄거리 앞에 붙는다(리드 2026-11-14).
+    await ask(QUESTION)
+    expect(useEntryStore.getState().chat.seedPrefix).toBe(PREFACE)
+    expect(useEntryStore.getState().draft.idea).toBe('')
+
+    useEntryStore.getState().setIdea(SEED)
+    expect(await useEntryStore.getState().chatSendFirst()).toBe('ok')
+
+    expect(useEntryStore.getState().draft.idea).toBe(MERGED)
+    expect(useEntryStore.getState().chat.seedPrefix ?? null).toBeNull()
+  })
+
+  it('허락 물음 문장 자체는 이야기 씨앗에 들어가지 않는다 — 영어도 같다', async () => {
+    // 왜: 물음은 앱에게 한 말이지 이야기가 아니다. 설명이 따로 문장이어도 물음 문장만 뺀다.
+    const preface = 'I want to make a few episodes about city bakers, like a documentary.'
+    await ask(`${preface} Can I give you my storyline?`)
+    expect(useEntryStore.getState().chat.seedPrefix).toBe(preface)
+
+    useEntryStore.getState().setIdea(SEED_EN)
+    await useEntryStore.getState().chatSendFirst()
+
+    expect(useEntryStore.getState().draft.idea).toBe(`${preface}\n\n${SEED_EN}`)
+    expect(useEntryStore.getState().draft.idea).not.toContain('Can I give you')
+  })
+
+  it('물음만 쓴 첫 글이면 붙일 설명이 없어 이어 적은 줄거리만 이야기 씨앗이 된다', async () => {
+    // 왜: 정상 경로 고정 — 설명이 없는데 빈 줄이나 물음이 앞에 붙으면 안 된다.
+    await ask(QUESTION_ONLY)
+    expect(useEntryStore.getState().chat.seedPrefix ?? null).toBeNull()
+
+    useEntryStore.getState().setIdea(SEED)
+    await useEntryStore.getState().chatSendFirst()
+
+    expect(useEntryStore.getState().draft.idea).toBe(SEED)
+  })
+
+  it('인사말만 앞에 붙은 허락 물음은 인사말을 이야기 씨앗에 넣지 않는다', async () => {
+    // 왜: "안녕하세요!"가 이야기 맨 앞에 붙으면 산문 초안이 인사로 시작한다.
+    await ask('안녕하세요! 줄거리를 줘도 될까요?')
+    expect(useEntryStore.getState().chat.seedPrefix ?? null).toBeNull()
+  })
+
+  it('허락을 또 물으면 앞에 적은 설명이 이어 쌓여 줄거리 앞에 함께 붙는다', async () => {
+    // 왜: 두 번째 물음에 덧붙인 설명도 버리지 않는다.
+    await ask(QUESTION)
+    useEntryStore.getState().setIdea('한 편은 30초 안팎이에요. 지금 줄거리를 보내도 될까요?')
+    expect(await useEntryStore.getState().chatSendFirst()).toBe('asked')
+    expect(useEntryStore.getState().chat.seedPrefix).toBe(`${PREFACE}\n\n한 편은 30초 안팎이에요.`)
+
+    useEntryStore.getState().setIdea(SEED)
+    await useEntryStore.getState().chatSendFirst()
+
+    expect(useEntryStore.getState().draft.idea).toBe(`${PREFACE}\n\n한 편은 30초 안팎이에요.\n\n${SEED}`)
+  })
+
+  it('허락 뒤에 20자가 안 되는 짧은 말만 보내면 앞에 적은 설명이 있어도 더 적어 달라고 한다', async () => {
+    // 왜: 합친 글로 길이를 재면 설명이 길 때 "ㅇㅋ" 같은 말이 이야기가 되어 추천이 엉뚱하게 만들어진다. 길이는 이번에 보낸 글만 잰다.
+    await ask(QUESTION)
+    useEntryStore.getState().setIdea('ㅇㅋ')
+
+    expect(await useEntryStore.getState().chatSendFirst()).toBe('too_short')
+
+    expect(calls.some((c) => c.url.includes('/recommend'))).toBe(false)
+    expect(useEntryStore.getState().chat.seedPrefix).toBe(PREFACE)
+    expect(useEntryStore.getState().draft.idea).toBe('ㅇㅋ')
+  })
+
+  it('예시를 골라 쓰면 앞에 적은 설명은 붙이지 않는다', async () => {
+    // 왜: 예시를 고른 것은 그 이야기로 가겠다는 뜻이다 — 이전 콘셉트가 예시 앞에 섞이면 안 된다.
+    await ask(QUESTION)
+    expect(useEntryStore.getState().chat.seedPrefix).toBe(PREFACE)
+
+    useEntryStore.getState().pickExample(0, ko)
+
+    expect(useEntryStore.getState().chat.seedPrefix ?? null).toBeNull()
+  })
+
+  it('화면에서 고르기 탭으로 옮겨 줄거리를 적고 다음을 눌러도 앞에 적은 설명이 붙는다', async () => {
+    // 왜: 두 탭이 같은 초안을 쓴다 — 어느 탭에서 줄거리를 보내도 설명이 사라지지 않는다.
+    await ask(QUESTION)
+
+    useEntryStore.getState().setIdea(SEED)
+    expect(await useEntryStore.getState().formNext()).toBe('ok')
+
+    expect(useEntryStore.getState().draft.idea).toBe(MERGED)
+    expect(useEntryStore.getState().chat.seedPrefix ?? null).toBeNull()
+  })
+})
+
+describe('허락 물음 나누기', () => {
+  // 왜: 물음 문장만 빼고 앞에 적은 설명은 남긴다 — 같은 문장 안의 쉼표 앞 설명도 남기고, 인사말만이면 비운다. 이 목록은 모두 새로 지은 글이다.
+  it.each([
+    ['줄거리를 줘도 될까?', true, ''],
+    ['시리즈를 만들고 싶은데, 줄거리를 줘도 될까?', true, '시리즈를 만들고 싶은데'],
+    ['요리 시리즈를 몇 편 만들고 싶어요. 어느 정도 현실적인 분위기예요. 줄거리를 먼저 보내도 괜찮을까요?', true, '요리 시리즈를 몇 편 만들고 싶어요. 어느 정도 현실적인 분위기예요.'],
+    ['안녕하세요! 줄거리를 줘도 될까요?', true, ''],
+    ['Can I give you my storyline?', true, ''],
+    ['I want to make a few episodes about city bakers, like a documentary. Can I give you my storyline?', true, 'I want to make a few episodes about city bakers, like a documentary.'],
+    ['I want a series, and can I give you the storyline?', true, 'I want a series'],
+    ['Hi! Can I send you my script first?', true, ''],
+    // 물음 앞에 문장 둘 — 쉼표가 든 문장도 통째로 남는다.
+    ['동네 빵집 이야기를 여섯 편짜리 시리즈로 만들려고 해요. 잔잔한 다큐 같은 분위기, 새벽 장면이 많아요. 줄거리를 지금 보내도 괜찮을까요?', true, '동네 빵집 이야기를 여섯 편짜리 시리즈로 만들려고 해요. 잔잔한 다큐 같은 분위기, 새벽 장면이 많아요.'],
+    ['저기, 줄거리를 줘도 될까요?', true, ''],
+    ['안녕하세요, 제 줄거리를 먼저 보내도 될까요?', true, ''],
+    ['시리즈를 만들고 싶어요\n줄거리를 줘도 될까요?', true, '시리즈를 만들고 싶어요'],
+    ['콘셉트: 요리 시리즈\n분량: 5편\n줄거리를 줘도 될까요?', true, '콘셉트: 요리 시리즈\n분량: 5편'],
+    ['Hello! I have a question. Can I send you my script first?', true, ''],
+    ['만약 고양이가 날 수 있다면?', false, ''],
+    ['소녀는 고민한다. 엄마에게 이 이야기를 말해도 될까?', false, ''],
+    ['', false, ''],
+  ])('%s → 허락 %s · 앞에 적은 설명 %j', (text, asking, preface) => {
+    expect(splitPermissionAsk(text)).toEqual({ asking, preface })
   })
 })

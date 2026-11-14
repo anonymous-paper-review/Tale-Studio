@@ -4,6 +4,8 @@
 //   줄거리 낱말 · 주는 말 · 허락 끝이 한 문장에 모두 있어야 하고(한국어는 허락 끝이 문장 끝), 다른 사람에게 건네는 말(엄마에게 · tell him)이면 걸지 않으며,
 //   줄거리 속 말("A ghost asks a child: may I …")처럼 앞에 이야기 글이 붙은 말도 걸지 않고, 허락 문장 밖의 글이 길면(이미 이야기를 적었다) 걸지 않는다.
 //   한국어 · 영어만 읽는다(앱 말).
+//   허락 물음 앞에 적은 설명("시리즈를 만들고 싶은데" · 앞 문장 · 앞 줄)은 버리지 않는다(리드 2026-11-14) — splitPermissionAsk 가 허락 물음 문장만 덜어 내고
+//   남은 설명을 돌려주면, 시작 화면이 그것을 이어 적은 줄거리 앞에 붙여 이야기 씨앗으로 쓴다.
 //   약속: tests/producer/entry-permission-ask.test.ts
 
 /** 허락 문장 밖의 글이 이만큼(공백 뺀 글자)을 넘으면 이야기를 이미 적은 것으로 본다. */
@@ -71,17 +73,82 @@ function enPermission(sentence: string): boolean {
 }
 
 // ── 문장 가르기 ──────────────────────────────────────────────────────────────
-function sentencesOf(text: string): string[] {
-  return (text.match(/[^.!?。！？\n]+[.!?。！？]*/g) ?? []).map((s) => s.trim()).filter(Boolean)
+const SENTENCE = /[^.!?。！？\n]+[.!?。！？]*/g
+/** 쉼표로 이어진 절 하나(끝의 쉼표 포함) — "시리즈를 만들고 싶은데, 줄거리를 줘도 될까?"에서 앞 절은 설명으로 남긴다. */
+const CLAUSE = /[^,，、;；]+[,，、;；]?/g
+const CLAUSE_TAIL = /[\s,，、;；]+$/
+
+// 인사말 · 말머리만으로 된 문장은 이야기 씨앗에 붙이지 않는다 — "안녕하세요!"가 이야기 맨 앞에 붙으면 산문이 인사로 시작한다. 문장 전체가 이 말일 때만이다.
+const LEAD_ONLY = new Set([
+  '안녕', '안녕하세요', '안녕하십니까', '반갑습니다', '반가워요', '하이', '헬로', '저기', '저기요', '있잖아', '있잖아요', // i18n-ok: 인사말을 알아듣는 목록
+  '질문이있어요', '질문있어요', '질문이있는데요', '질문이있습니다', '궁금한게있어요', '궁금한게있는데요', '궁금한점이있어요', // i18n-ok: 말머리를 알아듣는 목록
+  '여쭤볼게있어요', '물어볼게있어요', '하나물어볼게요', '하나여쭤볼게요', '부탁이있어요', '부탁이있는데요', // i18n-ok: 말머리를 알아듣는 목록
+  'hi', 'hello', 'hey', 'hithere', 'hellothere', 'heythere', 'hiall', 'goodmorning', 'goodafternoon', 'goodevening', 'excuseme',
+  'quickquestion', 'onequestion', 'question', 'ihaveaquestion', 'ihaveaquickquestion',
+])
+
+function isLeadOnly(sentence: string): boolean {
+  return LEAD_ONLY.has(sentence.replace(/[\s!?.~…,，。！？^]+/g, '').toLowerCase())
+}
+
+function isPermissionSentence(sentence: string): boolean {
+  return koPermission(sentence) || enPermission(sentence)
+}
+
+/** 허락 문장 안에서 허락 물음이 시작하는 자리 — 쉼표로 이어진 앞 절이 있으면 가장 짧은 뒷부분만 물음으로 보고 앞 절은 설명으로 남긴다. */
+function permissionStart(sentence: string): number {
+  const starts = Array.from(sentence.matchAll(CLAUSE), (m) => m.index ?? 0)
+  for (let i = starts.length - 1; i > 0; i--) {
+    if (isPermissionSentence(sentence.slice(starts[i]).trim())) return starts[i]
+  }
+  return 0
+}
+
+function tidy(text: string): string {
+  return text.replace(/[ \t]+/g, ' ').replace(/ ?\n ?/g, '\n').replace(/\n{3,}/g, '\n\n').trim()
+}
+
+export interface PermissionSplit {
+  /** 이 글이 "이야기(줄거리 · 아이디어 · 대본)를 내도 되나요?"라고 허락을 묻는 말인가. */
+  asking: boolean
+  /** 허락 물음 문장만 덜어 낸 나머지 설명(인사말만이면 빈 글). 허락을 묻는 말이 아니면 빈 글. */
+  preface: string
+}
+
+const NOT_ASKING: PermissionSplit = { asking: false, preface: '' }
+
+/** 허락을 묻는 말인지 가르고, 물음 앞에 적은 설명은 따로 돌려준다. */
+export function splitPermissionAsk(text: string | null | undefined): PermissionSplit {
+  const body = (text ?? '').trim()
+  if (!body) return NOT_ASKING
+  const kept: string[] = []
+  let asking = false
+  let last = 0
+  for (const m of body.matchAll(SENTENCE)) {
+    const start = m.index ?? 0
+    kept.push(body.slice(last, start))
+    last = start + m[0].length
+    const sentence = m[0]
+    const trimmed = sentence.trim()
+    if (!trimmed) {
+      kept.push(sentence)
+    } else if (isPermissionSentence(trimmed)) {
+      asking = true
+      const head = sentence.slice(0, permissionStart(sentence)).replace(CLAUSE_TAIL, '')
+      kept.push(isLeadOnly(head.trim()) ? '' : head)
+    } else if (!isLeadOnly(trimmed)) {
+      kept.push(sentence)
+    }
+  }
+  if (!asking) return NOT_ASKING
+  kept.push(body.slice(last))
+  const preface = tidy(kept.join(''))
+  // 허락 물음 밖의 글이 길면 이야기를 이미 적은 것이다 — 막으면 쓴 줄거리가 버려진다.
+  if (Array.from(preface.replace(/\s+/g, '')).length > MAX_OTHER_CHARS) return NOT_ASKING
+  return { asking: true, preface }
 }
 
 /** 이 글이 "이야기(줄거리 · 아이디어 · 대본)를 내도 되나요?"라고 허락을 묻는 말인가. */
 export function asksToShareStory(text: string | null | undefined): boolean {
-  const body = (text ?? '').trim()
-  if (!body) return false
-  const sentences = sentencesOf(body)
-  const asking = sentences.filter((s) => koPermission(s) || enPermission(s))
-  if (asking.length === 0) return false
-  const other = sentences.filter((s) => !asking.includes(s)).join('')
-  return Array.from(other.replace(/\s+/g, '')).length <= MAX_OTHER_CHARS
+  return splitPermissionAsk(text).asking
 }

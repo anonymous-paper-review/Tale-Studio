@@ -7,7 +7,7 @@ import { create } from 'zustand'
 import { translate } from '@/lib/i18n/translate'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { emptyEntryDraft, fileHasText, normalizeEntryDraft, recIsCurrent, type EntryDraft } from '@/lib/entry/draft'
-import { asksToShareStory } from '@/lib/entry/permission-ask'
+import { asksToShareStory, splitPermissionAsk } from '@/lib/entry/permission-ask'
 import type { EntryWriterStartBody } from '@/lib/entry/start-plan'
 import { useLocaleStore } from '@/stores/locale-store'
 import { settleProjectRename, useProjectStore } from '@/stores/project-store'
@@ -97,6 +97,8 @@ interface EntryData {
   showLengthError: boolean
   /** 화면에서 고르기: 글이 "줄거리를 줘도 될까?"처럼 허락을 묻는 말이라 다음으로 가지 않았다(글이 바뀌면 화면이 알아서 안내를 감춘다, 오너 2026-11-14 A ①). */
   showShareAnswer: boolean
+  /** 그 안내를 보였을 때의 글 — 안내를 본 뒤 글을 고쳐 다시 [다음]을 누르면 물음에 답한 것으로 본다. */
+  shareAskedText: string | null
   chat: ChatUi
   upload: { status: 'idle' | 'uploading' | 'error'; error: UploadError | null; name: string | null }
   /** AI가 글을 읽고 추천을 만드는 중(잠금 화면). */
@@ -158,6 +160,7 @@ function initialData(): EntryData {
     formStep: 1,
     showLengthError: false,
     showShareAnswer: false,
+    shareAskedText: null,
     chat: { ...EMPTY_CHAT_UI },
     upload: { status: 'idle', error: null, name: null },
     reading: null,
@@ -288,6 +291,21 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
     const pending = pendingIdea
     pendingIdea = null
     if (pending) void enqueue(() => patchDraft(pending.projectId, { idea: pending.idea }))
+  }
+
+  /**
+   * 허락 물음 앞에 적은 설명(chat.seedPrefix)을 이번에 보낸 줄거리 앞에 붙여 이야기 씨앗으로 만든다(리드 2026-11-14).
+   * 길이 검사는 이번에 보낸 글만으로 끝낸 뒤에 부른다. 서버는 저장된 초안의 글을 읽어 추천하므로 합친 글을 먼저 저장한다.
+   */
+  const mergeSeedPrefix = async () => {
+    const prefix = get().chat.seedPrefix?.trim()
+    if (!prefix) return
+    set({ chat: { ...get().chat, seedPrefix: null } })
+    const typed = get().draft.idea.trim()
+    const room = IDEA_MAX_CHARS - typed.length - 2
+    const head = typed ? (room > 0 ? prefix.slice(0, room) : '') : prefix
+    get().setIdea([head, typed].filter(Boolean).join('\n\n'))
+    await get().flushIdea()
   }
 
   const stopReadTicker = () => {
@@ -487,20 +505,29 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
     formNext: async () => {
       if (get().reading || locked()) return 'busy'
       await get().flushIdea()
-      const draft = get().draft
+      let draft = get().draft
       // 이야기를 내도 되는지 허락을 묻는 글은 이야기로 읽지 않는다 — 다음으로 가지 않고 "여기에 적어 주세요"를 보인다(글은 그대로, 길이 검사보다 먼저).
-      if (!draft.file && asksToShareStory(draft.idea)) {
-        set({ showShareAnswer: true, showLengthError: false })
-        return 'asked'
+      const ask = draft.file ? null : splitPermissionAsk(draft.idea)
+      if (ask?.asking) {
+        const shownFor = get().shareAskedText
+        if (shownFor === null || shownFor === draft.idea) {
+          set({ showShareAnswer: true, shareAskedText: draft.idea, showLengthError: false })
+          return 'asked'
+        }
+        // 안내를 본 뒤 글을 고쳐 다시 눌렀다 — 물음에 답한 것이다. 물음 문장만 덜어 내고 이어 간다(또 안내하면 줄거리를 이어 적은 사람이 같은 자리에서 막힌다).
+        get().setIdea(ask.preface)
+        await get().flushIdea()
+        draft = get().draft
       }
-      set({ showShareAnswer: false })
+      set({ showShareAnswer: false, shareAskedText: null })
       if (draft.file?.noText) return 'no_text'
       if (materialProblem(draft.idea, draft.file)) {
         set({ showLengthError: true })
         return 'too_short'
       }
       set({ showLengthError: false })
-      if (recIsCurrent(draft)) {
+      await mergeSeedPrefix()
+      if (recIsCurrent(get().draft)) {
         set({ formStep: 2 })
         return 'ok'
       }
@@ -531,8 +558,11 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       }
       // 이야기를 내도 되는지 허락을 묻는 첫 글(2026-11-14 오너 A ①) — 이야기로 시작하지 않고 앱이 먼저 "여기에 적어 주세요"로 답한다.
       //   물음은 대화에 사용자 말로 남기고 입력칸은 비운다. 길이 검사보다 먼저라 짧은 "줘도 될까?"도 이 답을 받는다.
-      if (!draft.file && asksToShareStory(draft.idea)) {
-        set({ chat: { ...get().chat, asked: draft.idea.trim(), lengthError: false } })
+      //   물음 앞에 적은 설명은 버리지 않는다 — 허락 물음 문장만 빼고 따로 들고 있다가 이어 적은 줄거리 앞에 붙인다(리드 2026-11-14).
+      const ask = draft.file ? null : splitPermissionAsk(draft.idea)
+      if (ask?.asking) {
+        const seedPrefix = [get().chat.seedPrefix?.trim(), ask.preface].filter(Boolean).join('\n\n') || null
+        set({ chat: { ...get().chat, asked: draft.idea.trim(), seedPrefix, lengthError: false } })
         get().setIdea('')
         await get().flushIdea()
         return 'asked'
@@ -543,7 +573,8 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
         return 'too_short'
       }
       set({ chat: { ...get().chat, lengthError: false } })
-      if (!recIsCurrent(draft)) {
+      await mergeSeedPrefix()
+      if (!recIsCurrent(get().draft)) {
         const result = await readAndRecommend()
         if (result !== 'ok') return result
         // 처음 보낸 글에 이미 적힌 값은 정하고 그 질문은 건너뛴다(이야기 속 낱말은 읽지 않는다).
@@ -619,7 +650,7 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       const example = EXAMPLES[index]
       if (!example) return
       get().setIdea((t ?? uiTranslator())(example.text))
-      set({ chat: { ...get().chat, lengthError: false }, showLengthError: false })
+      set({ chat: { ...get().chat, lengthError: false, seedPrefix: null }, showLengthError: false })
     },
 
     uploadFile: async (file) => {

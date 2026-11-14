@@ -50,9 +50,11 @@ export interface ChatUi {
   focus?: number
   /** 이야기를 내도 되는지 허락을 물은 첫 글(2026-11-14 오너 A ①) — 이야기로 시작하지 않고 앱이 먼저 답한다. 줄거리를 보내면 지운다. */
   asked?: string | null
+  /** 허락 물음 앞에 적은 설명(리드 2026-11-14) — 이어 적은 줄거리 앞에 붙어 이야기 씨앗이 된다. 붙이거나 예시를 고르면 지운다. */
+  seedPrefix?: string | null
 }
 
-export const EMPTY_CHAT_UI: ChatUi = { showExamples: false, examplePage: 0, lengthError: false, hint: null, nudge: null, focus: 0, asked: null }
+export const EMPTY_CHAT_UI: ChatUi = { showExamples: false, examplePage: 0, lengthError: false, hint: null, nudge: null, focus: 0, asked: null, seedPrefix: null }
 
 export type ChatItem =
   | { kind: 'agent'; id: string; text: string; action?: 'quick_replies' }
