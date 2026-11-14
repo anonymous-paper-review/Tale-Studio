@@ -155,6 +155,8 @@ export type DirectorGenerationRequestOptions = {
   resumeDepth?: number
   /** Internal flag used exclusively by the explicit full-video batch runner. */
   batch?: boolean
+  /** 멈춘 실사 일괄이 끝나며 넘겨준 "만드는 중" 안에서 낸 낱장(검토 a S1e) — 앞 판은 끝났으니 일괄 중 낱장 막이를 지난다. */
+  afterStoppedBatch?: boolean
   /**
    * 리테이크 상속(#retake-inherit 2026-08-31 오너): 이 Video 노드의 수동 배선
    * (frameInputs·영상 체인·override)을 새 테이크에 복사한다. 8/31 실측에서
@@ -4110,7 +4112,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       generateStoryboardImage: async (shotNodeId, options) => {
         // #real-grid-auto: 일괄 시트 생성 중 개별 생성 차단 — 같은 샷이 시트와 단일 잡에서
         //   동시에 그려지는 충돌 방지. UI 버튼도 disabled 지만 스토어가 최종 방어선.
-        if (get().realBatchBusy) {
+        if (get().realBatchBusy && !options?.afterStoppedBatch) {
           console.warn('[director] 실사 일괄 생성 중 — 개별 생성 요청 무시:', shotNodeId)
           options?.onJob?.({ jobId: null, status: 'deduped' })
           return { jobId: null, status: 'deduped' }

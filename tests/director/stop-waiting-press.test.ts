@@ -1,4 +1,4 @@
-// 멈춘 이미지 판을 정리하는 동안 누른 [이미지 만들기] — 기다린다고 한 줄 알리고([취소] 단추), 그 뒤 [모두 멈추기]나 [취소]를 누르면 서지 않는다 (검토 b S1b · S1c · 결정 ③, 리드 11/14)
+// 멈춘 이미지 판을 정리하는 동안 누른 이미지 일 — 기다린다고 한 줄 알리고([취소] 단추), 그 뒤 [모두 멈추기]나 [취소]면 서지 않고, 낱장 · 이어 보내기도 정리 뒤 그대로 시작한다 (검토 b S1b · S1c · 결정 ③ · 검토 a S1e, 리드 11/14)
 import { readFileSync } from 'node:fs'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,9 +20,16 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.f
 import { toast } from 'sonner'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
-import { cancelWaitingRealBatch, runRealBatch } from '@/lib/director/real-batch-client'
+import { afterStoppedRealBatch, cancelWaitingRealBatch, runRealBatch, startSingleImage } from '@/lib/director/real-batch-client'
 
 const page = () => readFileSync('src/app/studio/director/page.tsx', 'utf8')
+const between = (text: string, start: string, end: string) => {
+  const from = text.indexOf(start)
+  const to = text.indexOf(end, from)
+  expect(from).toBeGreaterThanOrEqual(0)
+  expect(to).toBeGreaterThan(from)
+  return text.slice(from, to)
+}
 const WAIT_EN = 'Wrapping up the previous work. It will start right after.'
 const WAIT_KO = '앞 작업을 정리하는 중이에요. 끝나면 바로 시작해요.'
 let bodies: Array<{ shotIds?: string[] }>
@@ -169,6 +176,102 @@ describe('같이 정한 것 — 결정 ③', () => {
     release.shift()!()
     for (let i = 0; i < 20; i++) await vi.advanceTimersByTimeAsync(1000)
     await waiting
+  })
+})
+
+describe('같이 정한 것 — S1e', () => {
+  it('멈춘 판을 정리하는 몇 초 동안 누른 이미지 일은 낱장 길이든 이어 보내기든 말없이 빠지지 않는다 — 정리가 끝나면 그대로 시작한다', async () => {
+    // 왜: 검토 a 낮음(S1 의 틈) — 툴바는 켜졌는데 "이미지 만드는 중"이 아직 켜져 있어 (a) 실패한 샷 · Director 에서 더한 샷의
+    //   낱장이 일괄 막이에 걸려 콘솔 경고만 남기고 버려졌고, (b) 앞 판이 "만드는 중"을 내리고 기다리던 새 판이 다시 올리기 전 틈에
+    //   이어 보내기가 기다리던 샷을 "이미지를 못 만들어 영상 시작 못 함"으로 버릴 수 있었다. Take 는 나가지 않는다.
+    // (b) 앞 판이 끝나도 기다리던 새 판이 이어받는다 — "만드는 중"이 한 번도 꺼지지 않는다.
+    const busyLog: boolean[] = []
+    const first = runRealBatch('p1', { shotIds: ['s1'] })
+    await vi.advanceTimersByTimeAsync(10)
+    useDirectorCanvasStore.getState().cancelRealBatch()
+    const next = runRealBatch('p1', { shotIds: ['s2'] })
+    let unsubscribe = useDirectorCanvasStore.subscribe((state) => { busyLog.push(state.realBatchBusy) })
+    release.shift()!()
+    await first
+    await vi.advanceTimersByTimeAsync(10)
+    unsubscribe()
+    expect(bodies.map((b) => b.shotIds)).toEqual([['s1'], ['s2']])
+    expect(busyLog).not.toContain(false)
+    release.shift()!()
+    for (let i = 0; i < 20; i++) await vi.advanceTimersByTimeAsync(1000)
+    await next
+    // (a) 낱장: 정리 중에 누른 낱장 · 이어 보내기 기다림은 정리가 끝날 때 시작한다 — 낱장은 일괄 막이에 걸리지 않는다.
+    const real = useDirectorCanvasStore.getState().generateStoryboardImage
+    const single = vi.fn(async () => null)
+    useDirectorCanvasStore.setState({ generateStoryboardImage: single })
+    const order: string[] = []
+    const again = runRealBatch('p1', { shotIds: ['s1'] })
+    await vi.advanceTimersByTimeAsync(10)
+    useDirectorCanvasStore.getState().cancelRealBatch()
+    const press = afterStoppedRealBatch(() => {
+      order.push('chain')
+      startSingleImage('failed-shot')
+      void runRealBatch('p1', { shotIds: ['s4'] })
+    })
+    await vi.advanceTimersByTimeAsync(10)
+    expect(order).toEqual([])
+    expect(single).not.toHaveBeenCalled()
+    expect(waitNotices().length).toBeGreaterThan(0)
+    busyLog.length = 0
+    unsubscribe = useDirectorCanvasStore.subscribe((state) => { busyLog.push(state.realBatchBusy) })
+    release.shift()!()
+    await again
+    await press
+    await vi.advanceTimersByTimeAsync(10)
+    unsubscribe()
+    expect(order).toEqual(['chain'])
+    expect(single).toHaveBeenCalledWith('failed-shot', { afterStoppedBatch: true })
+    expect(bodies.at(-1)?.shotIds).toEqual(['s4'])
+    expect(busyLog).not.toContain(false)
+    release.shift()!()
+    for (let i = 0; i < 20; i++) await vi.advanceTimersByTimeAsync(1000)
+    // 낱장만 기다리던 누름이면 낱장을 낸 뒤 "만드는 중"을 내린다.
+    const third = runRealBatch('p1', { shotIds: ['s1'] })
+    await vi.advanceTimersByTimeAsync(10)
+    useDirectorCanvasStore.getState().cancelRealBatch()
+    const onlySingles = afterStoppedRealBatch(() => { startSingleImage('added-shot') })
+    release.shift()!()
+    await third
+    await onlySingles
+    expect(single).toHaveBeenLastCalledWith('added-shot', { afterStoppedBatch: true })
+    expect(useDirectorCanvasStore.getState().realBatchBusy).toBe(false)
+    // 낱장도 같은 알림의 [취소]로 거둔다 — 정리가 끝나도 내지 않고 "만드는 중"도 내린다.
+    single.mockClear()
+    const fourth = runRealBatch('p1', { shotIds: ['s1'] })
+    await vi.advanceTimersByTimeAsync(10)
+    useDirectorCanvasStore.getState().cancelRealBatch()
+    const cancelledSingles = afterStoppedRealBatch(() => { startSingleImage('added-shot') })
+    noticeOptions(waitNotices().length - 1).action!.onClick({})
+    release.shift()!()
+    await fourth
+    await cancelledSingles
+    expect(single).not.toHaveBeenCalled()
+    expect(useDirectorCanvasStore.getState().realBatchBusy).toBe(false)
+    useDirectorCanvasStore.setState({ generateStoryboardImage: real })
+    // 일괄 막이: 도는 일괄 중 낱장은 지금처럼 막고, 넘겨받은 자리의 낱장만 지난다.
+    useDirectorCanvasStore.setState({ realBatchBusy: true })
+    expect(await real('no-such-shot')).toEqual({ jobId: null, status: 'deduped' })
+    expect(await real('no-such-shot', { afterStoppedBatch: true })).toBeNull()
+    useDirectorCanvasStore.setState({ realBatchBusy: false })
+    // 화면: 툴바의 [이미지 만들기] · [이미지 다시 만들기]가 이 길을 탄다 — 낱장을 바로 내지 않고, 이어 보내기는 시작할 때 오른다.
+    const src = page()
+    const start = between(src, 'const startImages = (', '// [이미지 다시 만들기 · N] 확인 뒤')
+    expect(start).toContain('void afterStoppedRealBatch(() => {')
+    expect(start).toContain('for (const id of singles) startSingleImage(id)')
+    expect(start).toContain('void runRealBatch(pid, { shotIds: batch })')
+    expect(start).not.toContain('generateStoryboardImage(')
+    const remake = between(src, 'const remakePicked = () => {', '// [영상 만들기 · N]')
+    expect(remake).toContain('void afterStoppedRealBatch(() => {')
+    expect(remake).toContain('for (const id of singles) startSingleImage(id)')
+    expect(remake).toContain('void runRealBatch(pid, { force: true, shotIds: batch })')
+    expect(remake).not.toContain('generateStoryboardImage(')
+    expect(src).toContain('startImages(imageWork.slice(0, chainPlan.runCount))')
+    expect(src).not.toContain('setChainWaitingShots([...chainWaitingShotIds, ...imageWork.slice(0, chainPlan.runCount)])')
   })
 })
 
