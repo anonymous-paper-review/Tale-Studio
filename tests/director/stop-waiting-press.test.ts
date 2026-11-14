@@ -1,4 +1,4 @@
-// 멈춘 이미지 판을 정리하는 동안 누른 이미지 일 — 기다린다고 한 줄 알리고([취소] 단추), 그 뒤 [모두 멈추기] · [취소] · 다른 프로젝트로 옮김이면 서지 않고, 낱장 · 이어 보내기도 정리 뒤 그대로 시작한다 (검토 b S1b · S1c · 결정 ③ · 검토 a S1e · 검토 b S1g, 리드 11/14)
+// 멈춘 이미지 판을 정리하는 동안 누른 이미지 일 — 기다린다고 한 줄 알리고([취소] 단추), 그 뒤 [모두 멈추기] · [취소] · 다른 프로젝트로 옮김이면 서지 않고, 낱장 · 이어 보내기도 정리 뒤 그대로 시작하며, 서로 다른 둘째 누름은 "이미 만드는 중" 한 줄을 받는다 (검토 b S1b · S1c · 결정 ③ · 검토 a S1e · 검토 b S1g · 검토 a 마지막 참고, 리드 11/14)
 import { readFileSync } from 'node:fs'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -20,6 +20,7 @@ vi.mock('sonner', () => ({ toast: { success: vi.fn(), info: vi.fn(), error: vi.f
 import { toast } from 'sonner'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useLocaleStore } from '@/stores/locale-store'
+import { translate } from '@/lib/i18n/translate'
 import { afterStoppedRealBatch, cancelWaitingRealBatch, runRealBatch, startSingleImage } from '@/lib/director/real-batch-client'
 
 const page = () => readFileSync('src/app/studio/director/page.tsx', 'utf8')
@@ -32,6 +33,8 @@ const between = (text: string, start: string, end: string) => {
 }
 const WAIT_EN = 'Wrapping up the previous work. It will start right after.'
 const WAIT_KO = '앞 작업을 정리하는 중이에요. 끝나면 바로 시작해요.'
+const ALREADY_EN = "Already making images. Press again when they're done."
+const ALREADY_KO = '이미 이미지를 만드는 중이에요. 끝나면 다시 눌러 주세요.'
 let bodies: Array<{ shotIds?: string[] }>
 let release: Array<() => void>
 
@@ -301,6 +304,79 @@ describe('같이 정한 것 — S1g', () => {
     expect(single).not.toHaveBeenCalled()
     expect(useDirectorCanvasStore.getState().realBatchBusy).toBe(false)
     useDirectorCanvasStore.setState({ generateStoryboardImage: real })
+  })
+})
+
+describe('같이 정한 것 — 둘째 누름', () => {
+  it('정리 중에 서로 다른 두 이미지 일을 누르면(예: [이미지 만들기] 다음 [이미지 다시 만들기]) 둘째는 첫째 판이 도는 중이면 말없이 빠지지 않고 "이미 이미지를 만드는 중이에요. 끝나면 다시 눌러 주세요." 한 줄을 알린다', async () => {
+    // 왜: 검토 a 마지막 차이(참고) — 둘 다 "끝나면 바로 시작해요"를 받았는데, 둘째가 깨어날 때 첫째 판이 돌아 일괄은 그냥 끝나고
+    //   낱장은 일괄 중 막이에 걸려 알림만 내려가고 일이 빠졌다(탐침: s3 · x2 빠짐). 같은 단추를 두 번 누른 것은 지금처럼 하나로.
+    const real = useDirectorCanvasStore.getState().generateStoryboardImage
+    const single = vi.fn(async () => null)
+    useDirectorCanvasStore.setState({ generateStoryboardImage: single })
+    const already = () => vi.mocked(toast.info).mock.calls.filter(([text]) => text === ALREADY_KO || text === ALREADY_EN)
+    const first = runRealBatch('p1', { shotIds: ['s1'] })
+    await vi.advanceTimersByTimeAsync(10)
+    useDirectorCanvasStore.getState().cancelRealBatch()
+    // 툴바: [이미지 만들기] → [이미지 다시 만들기](다른 일) → [이미지 만들기](같은 단추를 다시).
+    const make = () => { void runRealBatch('p1', { shotIds: ['s2'] }) }
+    const pressMake = afterStoppedRealBatch(make, 'make:s2')
+    const pressRemake = afterStoppedRealBatch(() => {
+      startSingleImage('x2')
+      void runRealBatch('p1', { force: true, shotIds: ['s3'] })
+    }, 'remake:x2|s3')
+    const pressMakeAgain = afterStoppedRealBatch(make, 'make:s2')
+    release.shift()!()
+    await first
+    await Promise.all([pressMake, pressRemake, pressMakeAgain])
+    await vi.advanceTimersByTimeAsync(10)
+    expect(bodies.map((b) => b.shotIds)).toEqual([['s1'], ['s2']])
+    expect(single).not.toHaveBeenCalled()
+    expect(already().map(([text]) => text)).toEqual([ALREADY_KO])
+    expect(translate('ko', ALREADY_EN)).toBe(ALREADY_KO)
+    release.shift()!()
+    for (let i = 0; i < 20; i++) await vi.advanceTimersByTimeAsync(1000)
+    // 일괄 길끼리도 같다(채팅 등): 다른 샷이면 한 줄, 같은 샷이면 하나로.
+    vi.mocked(toast.info).mockClear()
+    const again = runRealBatch('p1', { shotIds: ['s1'] })
+    await vi.advanceTimersByTimeAsync(10)
+    useDirectorCanvasStore.getState().cancelRealBatch()
+    const a = runRealBatch('p1', { shotIds: ['s5'] })
+    const b = runRealBatch('p1', { shotIds: ['s6'] })
+    const a2 = runRealBatch('p1', { shotIds: ['s5'] })
+    // 저절로 다시 도는 판(사람이 누르지 않음)은 둘째여도 말하지 않는다.
+    const auto = runRealBatch('p1', { silent: true, shotIds: ['s7'] })
+    release.shift()!()
+    await again
+    await vi.advanceTimersByTimeAsync(10)
+    expect(await b).toEqual({ generated: 0, quotaBlocked: false })
+    expect(await a2).toEqual({ generated: 0, quotaBlocked: false })
+    expect(await auto).toEqual({ generated: 0, quotaBlocked: false })
+    expect(bodies.map((x) => x.shotIds).slice(-2)).toEqual([['s1'], ['s5']])
+    expect(already()).toHaveLength(1)
+    release.shift()!()
+    for (let i = 0; i < 20; i++) await vi.advanceTimersByTimeAsync(1000)
+    await a
+    // 첫째가 낱장만 냈으면(일괄이 서지 않음) 다른 둘째도 그대로 선다 — 막을 판이 없다.
+    const third = runRealBatch('p1', { shotIds: ['s1'] })
+    await vi.advanceTimersByTimeAsync(10)
+    useDirectorCanvasStore.getState().cancelRealBatch()
+    const singlesFirst = afterStoppedRealBatch(() => { startSingleImage('x9') }, 'make:x9')
+    const batchSecond = afterStoppedRealBatch(() => { void runRealBatch('p1', { shotIds: ['s8'] }) }, 'remake:s8')
+    release.shift()!()
+    await third
+    await Promise.all([singlesFirst, batchSecond])
+    await vi.advanceTimersByTimeAsync(10)
+    expect(single).toHaveBeenCalledWith('x9', { afterStoppedBatch: true })
+    expect(bodies.at(-1)?.shotIds).toEqual(['s8'])
+    expect(already()).toHaveLength(1)
+    release.shift()!()
+    for (let i = 0; i < 20; i++) await vi.advanceTimersByTimeAsync(1000)
+    useDirectorCanvasStore.setState({ generateStoryboardImage: real })
+    // 화면: 툴바의 두 단추는 일마다 다른 표를 붙인다 — 같은 단추를 다시 누르면 같은 표다.
+    const src = page()
+    expect(between(src, 'const startImages = (', '// [이미지 다시 만들기 · N] 확인 뒤')).toContain("}, JSON.stringify(['make', singles, batch, chain]))")
+    expect(between(src, 'const remakePicked = () => {', '// [영상 만들기 · N]')).toContain("}, JSON.stringify(['remake', singles, batch]))")
   })
 })
 

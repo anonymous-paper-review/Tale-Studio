@@ -1054,6 +1054,7 @@ function PaletteBar() {
       if (shotStates.get(id) === 'image_failed' || !writerShotId) singles.push(id)
       else batch.push(writerShotId)
     }
+    // 끝 값은 이 누름의 일 — 정리 중 같은 단추를 다시 누르면 하나로, 다른 일이면 "이미 만드는 중" 한 줄(리드 11/14).
     void afterStoppedRealBatch(() => {
       if (chain.length > 0) {
         const now = useDirectorCanvasStore.getState()
@@ -1062,7 +1063,7 @@ function PaletteBar() {
       for (const id of singles) startSingleImage(id)
       // 고르지 않았어도 화면이 센 목록을 그대로 싣는다 — 서버가 따로 고르지 않게(리드 검토 a 낮음 6).
       if (batch.length > 0) void runRealBatch(pid, { shotIds: batch })
-    })
+    }, JSON.stringify(['make', singles, batch, chain]))
   }
   // [이미지 다시 만들기 · N] 확인 뒤: 고른 샷만 다시(일괄 force + 고른 샷).
   const remakePicked = () => {
@@ -1079,7 +1080,7 @@ function PaletteBar() {
     void afterStoppedRealBatch(() => {
       for (const id of singles) startSingleImage(id)
       if (batch.length > 0) void runRealBatch(pid, { force: true, shotIds: batch })
-    })
+    }, JSON.stringify(['remake', singles, batch]))
   }
   // [영상 만들기 · N]: Take 를 쓰니 지금처럼 확인창을 거친다(약속 E).
   //   누를 때 잔액을 다시 읽고, 그래도 못 읽으면 확인 창을 열지 않는다 — 못 읽은 채 열면 Take 줄 없이 전부 시작했다(리드 11/14).

@@ -168,6 +168,20 @@ async function waitForStoppedRun(projectId: string, silent: boolean): Promise<'g
   return turn === stopTurn && useDirectorCanvasStore.getState().projectId === projectId ? 'go' : 'drop'
 }
 
+/** 정리 뒤 먼저 선 누름의 일 — 같은 정리를 기다리던 둘째가 같은 일(같은 단추를 두 번)인지 가른다(리드 11/14). */
+let startedKey: string | null = null
+
+/** 정리 뒤 깨어난 누름 — 같은 정리를 기다리던 다른 누름이 이미 판을 세웠으면 서지 않는다. 같은 일이면 말없이 하나로,
+ *  다른 일이면 "이미 만드는 중" 한 줄을 알린다 — 둘째 일이 말없이 빠지지 않게(검토 a 마지막 참고). 저절로 도는 판은 말하지 않는다. */
+function startedByAnother(key: string | undefined, silent: boolean): boolean {
+  const now = useDirectorCanvasStore.getState()
+  if (handedOver || !now.realBatchBusy || now.realBatchCancelled) return false
+  if (!silent && (key === undefined || key !== startedKey)) {
+    toast.info(translate(useLocaleStore.getState().locale, "Already making images. Press again when they're done."), { id: 'real-batch-already' })
+  }
+  return true
+}
+
 /** 넘겨받은 "만드는 중"을 이어받을 누름이 더 없으면 내린다 — 낱장만 기다리던 누름 · 거둬진 누름 뒤(S1e). */
 function finishHandOver(): void {
   if (!handedOver || liveWaiters > 0) return
@@ -176,8 +190,9 @@ function finishHandOver(): void {
 }
 
 /** 툴바의 이미지 일(낱장 + 일괄) — 멈춘 판이 정리 중이면 정리가 끝나는 순간 start 를 부른다(같은 알림 · [취소], 검토 a S1e).
- *  거둬지면 부르지 않는다. 정리 중이 아니면 지금처럼 바로 부른다. start 안에서 낱장은 startSingleImage, 일괄은 runRealBatch 로 낸다. */
-export function afterStoppedRealBatch(start: () => void): Promise<void> {
+ *  거둬지면 부르지 않는다. 정리 중이 아니면 지금처럼 바로 부른다. start 안에서 낱장은 startSingleImage, 일괄은 runRealBatch 로 낸다.
+ *  key = 이 누름의 일 — 같은 단추를 두 번 누르면 같은 값이다(둘째 누름 가르기). */
+export function afterStoppedRealBatch(start: () => void, key?: string): Promise<void> {
   const now = useDirectorCanvasStore.getState()
   if (!now.realBatchBusy || !now.realBatchCancelled || !currentRun) {
     start()
@@ -185,7 +200,10 @@ export function afterStoppedRealBatch(start: () => void): Promise<void> {
   }
   // 누른 화면의 프로젝트 — 기다리는 사이 옮기면 서지 않는다(S1g).
   return waitForStoppedRun(now.projectId, false).then((outcome) => {
-    if (outcome === 'go') start()
+    if (outcome === 'go' && !startedByAnother(key, false)) {
+      startedKey = key ?? null
+      start()
+    }
     finishHandOver()
   })
 }
@@ -203,10 +221,12 @@ export async function runRealBatch(projectId: string, opts?: RealBatchOptions): 
   const store = useDirectorCanvasStore
   if (store.getState().realBatchBusy && !handedOver) {
     const outcome = await waitForStoppedRun(projectId, !!opts?.silent)
-    if (outcome !== 'go') {
+    const key = JSON.stringify(['batch', !!opts?.force, opts?.shotIds ?? null])
+    if (outcome !== 'go' || startedByAnother(key, !!opts?.silent)) {
       finishHandOver()
       return { generated: 0, quotaBlocked: false }
     }
+    startedKey = key
   }
   const takeOver = handedOver
   handedOver = false
