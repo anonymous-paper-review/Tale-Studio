@@ -48,9 +48,11 @@ export interface ChatUi {
   nudge?: ChatNudge | null
   /** 입력칸에 커서를 두라는 요청 횟수 — 바뀌면 지금 입력칸이 커서를 받는다. */
   focus?: number
+  /** 이야기를 내도 되는지 허락을 물은 첫 글(2026-11-14 오너 A ①) — 이야기로 시작하지 않고 앱이 먼저 답한다. 줄거리를 보내면 지운다. */
+  asked?: string | null
 }
 
-export const EMPTY_CHAT_UI: ChatUi = { showExamples: false, examplePage: 0, lengthError: false, hint: null, nudge: null, focus: 0 }
+export const EMPTY_CHAT_UI: ChatUi = { showExamples: false, examplePage: 0, lengthError: false, hint: null, nudge: null, focus: 0, asked: null }
 
 export type ChatItem =
   | { kind: 'agent'; id: string; text: string; action?: 'quick_replies' }
@@ -74,6 +76,8 @@ const CHAT_REVISE_ASK = 'What would you like to change?'
 export const CHAT_EXAMPLES_INTRO = 'How about these? Click one you like and I will put it in the input. You can edit it before sending.'
 export const CHAT_SHOW_EXAMPLES = 'Show me examples'
 const CHAT_GUIDE = 'Who, where, what happens and how it ends: one or two lines are enough.'
+/** 첫 글이 "줄거리를 줘도 될까?"처럼 허락을 물었을 때 앱이 하는 답 — 화면에서 고르기 탭은 입력칸 아래에 같은 문장을 보인다. */
+export const CHAT_PERMISSION_ANSWER = 'Sure! Write your storyline here.'
 const CHAT_PRE = 'From your message I read {items}. I will only ask the rest.'
 const CHAT_READ_AS = 'I read {name} as {kind}.'
 const CHAT_HINT_SET = '"{text}": set {items}.'
@@ -160,6 +164,10 @@ export function chatTranscript(draft: EntryDraft, ui: ChatUi, t: Translator): Ch
     if (ui.showExamples) {
       items.push({ kind: 'user', id: 'ask-examples', text: t(CHAT_SHOW_EXAMPLES) })
       items.push({ kind: 'examples', id: 'examples', page: ui.examplePage, intro: t(CHAT_EXAMPLES_INTRO) })
+    }
+    if (ui.asked) {
+      items.push({ kind: 'user', id: 'ask-permission', text: ui.asked })
+      items.push({ kind: 'agent', id: 'permission-answer', text: t(CHAT_PERMISSION_ANSWER) })
     }
     const problem = materialProblem(draft.idea, draft.file)
     if (ui.lengthError && problem) {

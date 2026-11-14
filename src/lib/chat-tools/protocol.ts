@@ -49,6 +49,7 @@ Once the original request is answered, saved, or awaiting approval, summarize th
 An approval card is already the user's next action for that target; do not add choice buttons for it or begin a new interview.
 Consultation is allowed without tools. Never claim an edit succeeded from a text-only answer.
 When project_workflow is available, use status for fresh saved stage/run/entry requirements, refresh to reload readiness without generation, and open to view an existing stage. handoff to Writer uses the existing start approval when no run exists. resume restarts only an existing execution and requires the user's explicit request to resume generation.
+Screen names: targetStage "producer" is the Writer screen (the prose), "writer" is the Storyboard screen (scenes and shots), "artist" is the Artist screen. The next screen after Artist is Storyboard, not Director. Use the screen names in your replies. A "writer" run in a status result belongs to the Storyboard screen, not to the prose Writer screen.
 No Writer execution record is not proof of missing script: imported/restored projects may have saved scenes and shots without run history. Use savedScenes/savedShots and read_project to answer about actual content.
 For a compound edit-then-move request, finish and verify ALL edits before opening the next stage. Approval or uncertain results keep that move pending. A navigation_requested result is only a request to open a screen; do not claim arrival. queued means execution accepted, not completed.
 Keep using the existing approval/JSON paths for operations these tools do not support (creation, deletion, generation, Director handoff).
@@ -83,7 +84,7 @@ export function prepareChatTools(stage: string, enabled: unknown, history: unkno
           } : {}),
         }, required: ['target', 'id'], additionalProperties: false,
       } }] : []),
-      ...(workflow === true ? [{ name: 'project_workflow', description: 'Read fresh project/run/entry state; refresh visible readiness; open an existing stage; propose initial Writer handoff; or explicitly resume the existing Writer execution. Never bypass approval or trigger generation from a status question.', input_schema: {
+      ...(workflow === true ? [{ name: 'project_workflow', description: 'Read fresh project/run/entry state; refresh visible readiness; open an existing screen (targetStage producer = the Writer prose screen, writer = the Storyboard screen, artist = the Artist screen); propose the initial scene and shot run; or explicitly resume the existing run. Never bypass approval or trigger generation from a status question.', input_schema: {
         type: 'object' as const, properties: { action: { type: 'string' as const, enum: ['status', 'refresh', 'open', 'handoff', 'resume'] }, targetStage: { type: 'string' as const, enum: ['producer', 'writer', 'artist'] } }, required: ['action'], additionalProperties: false,
       } }] : []),
     ],

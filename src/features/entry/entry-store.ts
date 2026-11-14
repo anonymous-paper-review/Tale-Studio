@@ -7,6 +7,7 @@ import { create } from 'zustand'
 import { translate } from '@/lib/i18n/translate'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { emptyEntryDraft, fileHasText, normalizeEntryDraft, recIsCurrent, type EntryDraft } from '@/lib/entry/draft'
+import { asksToShareStory } from '@/lib/entry/permission-ask'
 import type { EntryWriterStartBody } from '@/lib/entry/start-plan'
 import { useLocaleStore } from '@/stores/locale-store'
 import { settleProjectRename, useProjectStore } from '@/stores/project-store'
@@ -46,7 +47,7 @@ const IDEA_SAVE_DEBOUNCE_MS = 600
 const READ_STEP_MS = 1400
 const WRITER_POLL_MS = 2500
 
-export type NextResult = 'ok' | 'too_short' | 'no_text' | 'error' | 'busy' | 'examples'
+export type NextResult = 'ok' | 'too_short' | 'no_text' | 'error' | 'busy' | 'examples' | 'asked'
 
 export interface WriterInfo {
   started: boolean
@@ -94,6 +95,8 @@ interface EntryData {
   formStep: 1 | 2
   /** 20자 규칙을 어기고 다음을 눌렀다(글이 길어지면 화면이 알아서 안내를 감춘다). */
   showLengthError: boolean
+  /** 화면에서 고르기: 글이 "줄거리를 줘도 될까?"처럼 허락을 묻는 말이라 다음으로 가지 않았다(글이 바뀌면 화면이 알아서 안내를 감춘다, 오너 2026-11-14 A ①). */
+  showShareAnswer: boolean
   chat: ChatUi
   upload: { status: 'idle' | 'uploading' | 'error'; error: UploadError | null; name: string | null }
   /** AI가 글을 읽고 추천을 만드는 중(잠금 화면). */
@@ -154,6 +157,7 @@ function initialData(): EntryData {
     writerStart: null,
     formStep: 1,
     showLengthError: false,
+    showShareAnswer: false,
     chat: { ...EMPTY_CHAT_UI },
     upload: { status: 'idle', error: null, name: null },
     reading: null,
@@ -484,6 +488,12 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       if (get().reading || locked()) return 'busy'
       await get().flushIdea()
       const draft = get().draft
+      // 이야기를 내도 되는지 허락을 묻는 글은 이야기로 읽지 않는다 — 다음으로 가지 않고 "여기에 적어 주세요"를 보인다(글은 그대로, 길이 검사보다 먼저).
+      if (!draft.file && asksToShareStory(draft.idea)) {
+        set({ showShareAnswer: true, showLengthError: false })
+        return 'asked'
+      }
+      set({ showShareAnswer: false })
       if (draft.file?.noText) return 'no_text'
       if (materialProblem(draft.idea, draft.file)) {
         set({ showLengthError: true })
@@ -519,6 +529,14 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
         await get().flushIdea()
         return 'examples'
       }
+      // 이야기를 내도 되는지 허락을 묻는 첫 글(2026-11-14 오너 A ①) — 이야기로 시작하지 않고 앱이 먼저 "여기에 적어 주세요"로 답한다.
+      //   물음은 대화에 사용자 말로 남기고 입력칸은 비운다. 길이 검사보다 먼저라 짧은 "줘도 될까?"도 이 답을 받는다.
+      if (!draft.file && asksToShareStory(draft.idea)) {
+        set({ chat: { ...get().chat, asked: draft.idea.trim(), lengthError: false } })
+        get().setIdea('')
+        await get().flushIdea()
+        return 'asked'
+      }
       if (draft.file?.noText) return 'no_text'
       if (materialProblem(draft.idea, draft.file)) {
         set({ chat: { ...get().chat, lengthError: true } })
@@ -537,7 +555,7 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
           await sendPatch(patch)
         }
       }
-      set({ chat: { ...get().chat, hint: null, showExamples: false, nudge: null } })
+      set({ chat: { ...get().chat, hint: null, showExamples: false, nudge: null, asked: null } })
       return 'ok'
     },
 

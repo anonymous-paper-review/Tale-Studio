@@ -47,7 +47,7 @@ const FIX_THEN_MOVE = /(?:고치|고쳐|바꾸|바꿔|다듬|줄이|줄여|늘�
 const BEFORE_MOVING = /(?:넘어가|넘기|넘겨|이동하|진행하|가)기\s*전에|\bbefore\s+(?:we\s+|i\s+|you\s+)?(?:move|moving|go|going|proceed|proceeding|hand(?:ing)?\s+over)\b/i // i18n-ok: 사용자 말에서 "넘어가기 전에"를 알아듣는 정규식
 
 // 고칠 점이 담긴 말 — 넘김 말이 함께 있어도 수정 요청이다(검증 지적 4: "결말 수정하고 넘어가자" · "결말을 바꿔서 Artist로 넘겨줘").
-const REVISION_CUE = /(?:고치|고쳐|고친|수정|바꾸|바꿔|바꾼|다듬|줄이|줄여|줄인|늘리|늘려|늘린|넣어|넣고|넣은|빼고|빼줘|빼서|뺀|살리|살려|키우|키워|밝게|어둡게|짧게|길게|웃기게|슬프게|따뜻하게|차갑게|무섭게|자연스럽게)|\b(?:improve|polish|adjust|update|rework|change|fix|rewrite|shorten|lengthen|cut|add|remove|edit|tweak|revise|trim|expand)\b|\bmake\s+(?:it|the|her|him|them|this|that)\b/i // i18n-ok: 사용자 말에서 고칠 점을 알아듣는 정규식
+export const REVISION_CUE = /(?:고치|고쳐|고친|수정|바꾸|바꿔|바꾼|다듬|줄이|줄여|줄인|늘리|늘려|늘린|넣어|넣고|넣은|빼고|빼줘|빼서|뺀|살리|살려|키우|키워|밝게|어둡게|짧게|길게|웃기게|슬프게|따뜻하게|차갑게|무섭게|자연스럽게)|\b(?:improve|polish|adjust|update|rework|change|fix|rewrite|shorten|lengthen|cut|add|remove|edit|tweak|revise|trim|expand)\b|\bmake\s+(?:it|the|her|him|them|this|that)\b/i // i18n-ok: 사용자 말에서 고칠 점을 알아듣는 정규식
 // "고치고 싶은 건 없어 · nothing to fix"는 고칠 점이 아니다 — 그 마디를 빼고 읽는다(검증 지적 5).
 const NO_CHANGE = /(?:고칠|고치고\s*싶은|바꿀|바꾸고\s*싶은|수정할)\s*(?:건|게|것은|거|것|부분은?|곳은?|점은?)?\s*(?:없|없어|없어요|없습니다|없네)[^,.!?]*|\bnothing\s+(?:more\s+)?to\s+(?:fix|change)\b|\bno\s+(?:more\s+)?changes?\b/gi // i18n-ok: "고칠 게 없어"를 알아듣는 정규식
 

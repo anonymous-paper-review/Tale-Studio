@@ -1,0 +1,83 @@
+// Writer 채팅에서 "물음"과 "고쳐 달라는 부탁"을 가른다(오너 2026-11-14 답 B ①) — 문단을 붙인 채 보낸 물음은 AI 가 답하고, 부탁 꼴은 계속 문단 수정 요청이다.
+//   바우처 사용자 채팅 B: 문단을 골라 둔 채 보낸 질문이 "그 문단만 고쳐 주세요" 수정 요청이 되어 답을 못 받았다.
+//   잘못 걸리면 고쳐 달라는 말이 답변으로 바뀌므로(제일 위험) 헷갈리면 지금처럼 고치기로 간다 — 아래 중 하나라도 있으면 물음이 아니다:
+//   ① 고치라는 낱말(바꿔 · 줄여 · 넣어 · make · shorten …) ② 정도 말(더 · 좀 더 · shorter …) ③ 바꿔 보자는 제안(어때 · what if · should she …)
+//   ④ 부탁 꼴(해 줄래 · can you …) — 단, 알려 달라는 말(설명 · tell me · explain …)이 함께 있으면 물음이다.
+//   물음표나 묻는 꼴(누구 · 왜 · who · how …)이면서 위가 하나도 없을 때만 물음이다. 한국어 · 영어를 읽고 중국어는 물음표와 고치는 낱말 몇 개만 읽는다.
+//   약속: tests/chat/prose-question.test.ts
+import { REVISION_CUE } from '@/lib/prose/writer-chat'
+
+const QUESTION_MARK = /[?？]/
+
+// ① 고치라는 낱말 — 한국어 · 영어 · 중국어. REVISION_CUE(writer-chat)에 더해 묻는 말 속에 자주 끼는 낱말까지 본다.
+const EDIT_WORD = new RegExp(
+  [
+    '고치|고쳐|고칠|고친|수정|바꾸|바꿔|바꿀|바꾼|바뀌|다듬|줄이|줄여|줄일|줄인|늘리|늘려|늘릴|늘린|넣|빼|뺄|지우|지워|지울|삭제|제거|추가|교체|변경|합치|합쳐|나누|나눠|더하|더할|붙이|만들|(?:다시|새로)\\s*(?:써|쓰)', // i18n-ok: 사용자 말에서 고치라는 낱말을 알아듣는 정규식
+    '\\b(?:change[sd]?|changing|edit|add|remove|delete|split|merge|rewrite|shorten|lengthen|make|polish|rework|improve|adjust|update|fix|cut|tweak|revise|trim|expand|replace|swap|insert|rename|reduce|increase|extend|simplify|rephrase|reword|redo)\\b',
+    '改|修改|换成|替换|缩短|加长|删除|删掉|重写|添加|润色|调整',
+  ].join('|'),
+  'i',
+)
+
+// ② 정도 말 — "더 짧게"처럼 바라는 쪽을 말한다.
+const COMPARATIVE = new RegExp(
+  [
+    '(?:^|\\s)(?:더|좀\\s*더|조금\\s*더|더욱|한층|훨씬)(?=\\s|$)|좀\\s*더|조금\\s*더|너무\\s*(?:길|짧|많|적|느리|빠르|세|약|어둡|밝|무겁|가볍|딱딱|슬프|웃기|무섭|유치|뻔|지루)', // i18n-ok: 사용자 말에서 정도 말을 알아듣는 정규식
+    '\\b(?:more|less|fewer|shorter|longer|funnier|sadder|darker|lighter|brighter|scarier|faster|slower|softer|calmer|warmer|colder|bigger|smaller|simpler|clearer|stronger|weaker|older|younger|better|worse|happier|angrier|nicer|cooler|too\\s+(?:long|short|dark|sad|fast|slow|much|many|little|serious|silly))\\b',
+  ].join('|'),
+  'i',
+)
+
+// ③ 바꿔 보자는 제안 — 물음표가 있어도 수정 요청이다.
+const SUGGESTION = new RegExp(
+  [
+    '어때|어떨까|어떠(?:니|세요|십니까|할까)|어떻겠|좋겠|좋을까|나을까|괜찮을까|하면\\s*안|면\\s*안\\s*(?:돼|될까|되나)|(?:해도|하면|(?:으)?로\\s*하면)\\s*(?:돼|될까|되나|괜찮|좋)|만약|만일', // i18n-ok: 사용자 말에서 제안을 알아듣는 정규식
+    "\\b(?:what\\s+if|what\\s+about|how\\s+about|why\\s+not|wouldn['’]?t\\s+it\\s+be|would\\s+it\\s+be\\s+(?:better|nicer|nice|funny|funnier|good|cool)|maybe|perhaps)\\b",
+    '\\b(?:should|could|can|would|might)\\s+(?:the|it|she|he|they|we|this|that|there)\\b',
+  ].join('|'),
+  'i',
+)
+
+// ④ 부탁 꼴 — 알려 달라는 말이 함께 있으면 물음으로 본다.
+const REQUEST_FRAME = new RegExp(
+  [
+    '줘|줄래|줄\\s*수|주세요|주실\\s*수|주시겠|주라|주렴|부탁', // i18n-ok: 사용자 말에서 부탁 꼴을 알아듣는 정규식
+    "\\b(?:can|could|would|will)\\s+you\\b|\\bplease\\b|\\blet['’]?s\\b|\\b(?:want|need)\\s+you\\s+to\\b|\\bi\\s+(?:want|need|would\\s+like|['’]d\\s+like)\\b",
+  ].join('|'),
+  'i',
+)
+const INFO_VERB = new RegExp(
+  [
+    '알려|설명|말해|보여|요약|정리해|가르쳐|궁금', // i18n-ok: 사용자 말에서 알려 달라는 말을 알아듣는 정규식
+    '\\b(?:tell|explain|describe|show|list|summari[sz]e|clarify|remind|walk\\s+me\\s+through|let\\s+me\\s+know)\\b',
+  ].join('|'),
+  'i',
+)
+
+// 물음표 없이 알려 달라고 하는 말("인물 설정 알려줘" · "tell me about the cast").
+const INFO_REQUEST = new RegExp(
+  [
+    '알려\\s*(?:줘|주세요|줄래|줄\\s*수)|설명(?:해|좀)|말해\\s*(?:줘|주세요|줄래)|보여\\s*(?:줘|주세요|줄래)|요약해|정리해\\s*(?:줘|주세요)|궁금', // i18n-ok: 사용자 말에서 알려 달라는 말을 알아듣는 정규식
+    '\\b(?:tell\\s+me|explain|describe|summari[sz]e|show\\s+me|walk\\s+me\\s+through|let\\s+me\\s+know|list\\s+(?:the|all))\\b',
+  ].join('|'),
+  'i',
+)
+
+// 묻는 꼴 — 물음표 없이도 묻는 말.
+const KO_WH = /누구|누가|언제|어디|어떻게|어떤|무엇|뭐|뭘|왜|얼마|몇|어느|무슨/ // i18n-ok: 사용자 말에서 묻는 낱말을 알아듣는 정규식
+const KO_QUESTION_END = /(?:인가요|일까요|나요|있어요?|없어요?|있나요|없나요|뭐야|뭔가요|뭐예요|뭐지|누구야|누구예요|이야|이에요|예요|돼요|였지|이었지|였어|이었어|했지|했어|야|지)\s*$/ // i18n-ok: 사용자 말에서 묻는 끝맺음을 알아듣는 정규식
+const EN_WH_START = /^\W*(?:what|who|whom|whose|where|when|why|how|which)\b/i
+const EN_AUX_START = /^\W*(?:is|are|was|were|does|did|has|had|can|could|will|would|shall|should|might|may)\b/i
+
+/** 이 말이 산문을 고쳐 달라는 부탁이 아니라 알고 싶어서 묻는 말인가. */
+export function isProseQuestion(text: string | null | undefined): boolean {
+  const said = (text ?? '').trim()
+  if (!said) return false
+  if (REVISION_CUE.test(said) || EDIT_WORD.test(said)) return false
+  if (COMPARATIVE.test(said)) return false
+  if (SUGGESTION.test(said)) return false
+  if (REQUEST_FRAME.test(said) && !INFO_VERB.test(said)) return false
+  const asks =
+    QUESTION_MARK.test(said) || EN_WH_START.test(said) || EN_AUX_START.test(said) || (KO_WH.test(said) && KO_QUESTION_END.test(said))
+  return asks || INFO_REQUEST.test(said)
+}

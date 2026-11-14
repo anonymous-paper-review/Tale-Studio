@@ -19,6 +19,7 @@ import { STAGE_PERSONA } from '@/lib/lumi'
 import { useLocale, useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { fileHasText, picksComplete } from '@/lib/entry/draft'
+import { asksToShareStory } from '@/lib/entry/permission-ask'
 import {
   MIN_IDEA_CHARS,
   MOODS,
@@ -31,7 +32,7 @@ import {
   materialProblem,
   tooShortMessage,
 } from './options'
-import { fileReadLine, isScriptDraft, levelOptionsOf } from './chat-flow'
+import { CHAT_PERMISSION_ANSWER, fileReadLine, isScriptDraft, levelOptionsOf } from './chat-flow'
 import { useEntryStore } from './entry-store'
 import { FileChip, OPTION_OFF_CLASS, OptionGroup, UploadingChip, WhyLine, WithOffReason } from './entry-parts'
 import { dialogueLanguageName, moodRecommendation, ratioRecommendation } from './series'
@@ -86,6 +87,7 @@ function MaterialStep() {
   const locale = useLocale()
   const draft = useEntryStore((s) => s.draft)
   const showLengthError = useEntryStore((s) => s.showLengthError)
+  const showShareAnswer = useEntryStore((s) => s.showShareAnswer)
   const upload = useEntryStore((s) => s.upload)
   const reading = useEntryStore((s) => s.reading)
   const readError = useEntryStore((s) => s.readError)
@@ -97,6 +99,8 @@ function MaterialStep() {
   const length = ideaLength(draft.idea)
   const problem = materialProblem(draft.idea, draft.file)
   const lengthError = showLengthError && problem ? tooShortMessage(locale, problem.length) : null
+  // 허락을 묻는 글이라 다음으로 가지 않았다(오너 2026-11-14 A ①) — 글이 바뀌어 더는 그 꼴이 아니면 안내를 감춘다.
+  const shareAnswer = showShareAnswer && !draft.file && asksToShareStory(draft.idea)
   const busy = !!reading || upload.status === 'uploading'
 
   return (
@@ -127,6 +131,10 @@ function MaterialStep() {
             <p id="entry-idea-help" role="alert" className="flex items-start gap-1.5 text-caption text-destructive">
               <CircleAlert className="mt-0.5 size-3.5 shrink-0" aria-hidden />
               <span>{lengthError}</span>
+            </p>
+          ) : shareAnswer ? (
+            <p id="entry-idea-help" role="status" className="text-caption text-foreground">
+              {t(CHAT_PERMISSION_ANSWER)}
             </p>
           ) : (
             <p id="entry-idea-help" className="text-caption text-subtle-foreground">

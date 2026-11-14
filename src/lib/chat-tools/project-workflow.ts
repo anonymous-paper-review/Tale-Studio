@@ -8,6 +8,8 @@ export interface ProjectWorkflowSnapshot {
   producer: { canHandoff: boolean; blockers: string[]; [key: string]: unknown }
   writer: { started: boolean; status: string | null; [key: string]: unknown }
   artist: { images_ready: boolean; [key: string]: unknown }
+  /** 화면 이름 표(리드 2026-11-14 D) — 위 키(옛 이름)와 사용자가 보는 화면 이름의 짝. */
+  screens?: Record<string, string>
 }
 
 export function unresolvedChatEdits(outcomes: ToolOutcome[], required: boolean): boolean {

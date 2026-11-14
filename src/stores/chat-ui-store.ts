@@ -21,6 +21,12 @@ interface MentionInsertRequest {
   hint?: string
 }
 
+/** 튕긴 말을 입력칸으로 되돌려 달라는 요청(리드 2026-11-14 C) — GlobalChat 이 소비한다. */
+interface InputRestoreRequest {
+  id: number
+  text: string
+}
+
 interface ChatUiState {
   modelSettings: ChatModelSettings
   setModelSettings: (value: ChatModelSettings) => void
@@ -49,6 +55,10 @@ interface ChatUiState {
   /** 약속 M: 완드 — 입력창에 "@라벨 "만 넣고 커서를 뒤에 둔다(보내지 않음). hint 는 회색 안내("이 카드 채워줘"). */
   requestMentionCompose: (label: string, hint: string) => void
   consumeMentionInsert: (id: number) => void
+  /** 고치기 안이 [적용]을 기다려 새 말이 튕겼다 — 쓴 글을 입력칸으로 되돌린다. 채팅이 접혀 있으면 먼저 편다(닫힌 입력칸에 글이 소리 없이 돌아가지 않게). */
+  inputRestore: InputRestoreRequest | null
+  requestInputRestore: (text: string) => void
+  consumeInputRestore: (id: number) => void
   // 채팅 입력창 포커스(+빔) 요청 브리지 — 첫 진입 웰컴 등에서 set, GlobalChat이 소비.
   stylePickerRequest: { id: number; projectId: string } | null
   requestStylePicker: (projectId: string) => void
@@ -107,6 +117,10 @@ export const useChatUiStore = create<ChatUiState>()(
         set({ mentionInsert: { id: Date.now(), label, mode: 'compose', hint }, collapsed: false }),
       consumeMentionInsert: (id) =>
         set((s) => (s.mentionInsert?.id === id ? { mentionInsert: null } : s)),
+      inputRestore: null,
+      requestInputRestore: (text) => set({ inputRestore: { id: Date.now(), text }, collapsed: false }),
+      consumeInputRestore: (id) =>
+        set((s) => (s.inputRestore?.id === id ? { inputRestore: null } : s)),
       stylePickerRequest: null,
       requestStylePicker: (projectId) => set({ stylePickerRequest: { id: Date.now(), projectId } }),
       consumeStylePicker: (id) => set((s) => s.stylePickerRequest?.id === id ? { stylePickerRequest: null } : s),

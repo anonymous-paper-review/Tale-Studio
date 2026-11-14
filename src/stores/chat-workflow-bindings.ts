@@ -10,6 +10,14 @@ import type { StageId } from '@/types'
 
 const stages = ['producer', 'writer', 'artist', 'director', 'editor']
 
+/** 현황 스냅샷의 화면 이름 표 — 순서 · 도구 대상 이름 ↔ 사용자가 보는 화면 이름. */
+const SCREEN_NAMES = {
+  order: 'Producer (start) > Writer (prose) > Artist > Storyboard (scenes and shots) > Director > Editor',
+  producer: 'Writer screen (prose)',
+  writer: 'Storyboard screen (scenes and shots)',
+  artist: 'Artist screen',
+}
+
 /** A conservative authorization check: tool selection alone does not grant permission. */
 export function workflowPermission(message: string, action: string, target?: string): boolean {
   if (action === 'status') return true
@@ -18,7 +26,8 @@ export function workflowPermission(message: string, action: string, target?: str
   if (/(하지\s*마|말고|don't|do not)/i.test(message)) return false // i18n-ok: 사용자 요청 의도 인식.
   if (action === 'refresh') return /(새로|갱신|다시.*(?:불러|조회|확인)|refresh|reload)/i.test(message) // i18n-ok: 사용자 요청 의도 인식.
   if (action === 'resume') return /(재개해|이어서.*(?:실행해|생성해|진행해)|실행.*재시도해|^(?:please\s+)?resume\b|^(?:please\s+)?retry.*(?:run|generation))/i.test(message.replace(/"[^"]*"|“[^”]*”|`[^`]*`/g, '')) // i18n-ok: 사용자 요청 의도 인식.
-  const targetWords: Record<string, RegExp> = { producer: /(producer|프로듀서)/i, writer: /(writer|라이터|작가)/i, artist: /(artist|아티스트)/i } // i18n-ok: 단계 이름 인식.
+  // 화면 이름(리뉴얼 1차 · 오너 2026-11-14): 도구 대상 producer 는 Writer 산문 화면, writer 는 Storyboard 화면이다 — 옛 낱말(producer · writer · 작가)은 그대로 두고 화면 이름을 더한다.
+  const targetWords: Record<string, RegExp> = { producer: /(producer|프로듀서|writer|라이터|작가|prose|산문)/i, writer: /(writer|라이터|작가|storyboard|스토리보드)/i, artist: /(artist|아티스트)/i } // i18n-ok: 단계 이름 인식.
   return !!target && !!targetWords[target]?.test(message) && /(열어|열기|가자|가줘|이동|넘겨|넘기|보여|호출|불러|핸드오프|open|go|move|hand.?over|take me|invite)/i.test(message) // i18n-ok: 사용자 요청 의도 인식.
 }
 
@@ -62,8 +71,11 @@ export function createStudioWorkflow(options: {
         working: options.stage === 'producer' ? { settings: working.projectSettings, storyReady: working.storyReady } : undefined,
         savedDraft: saved ? { settings: saved.settings, storyReady: saved.storyReady, savedAt: saved.savedAt } : null,
         committed: { settings: project.data.settings, storyPresent: !!project.data.story_text }, styleAnchorKey: project.data.style_anchor_key },
-      writer: { started: handedOff, treatmentDraft: status.draft === true, status: status.current_status, stage: status.current_stage, error: status.error, completed: status.pipeline_completed, progress: status.progress_percent, savedScenes: scenes.count, savedShots: shots.count, note: 'No execution record does not imply missing script. Saved scene and shot counts are independent of the execution history.' },
+      // 키 이름은 시험이 못 박아 그대로 둔다 — writer 는 Storyboard 화면의 씬 · 샷 실행이고 산문 Writer 화면이 아니다(screens 표가 화면 이름을 말한다).
+      writer: { started: handedOff, treatmentDraft: status.draft === true, status: status.current_status, stage: status.current_stage, error: status.error, completed: status.pipeline_completed, progress: status.progress_percent, savedScenes: scenes.count, savedShots: shots.count, note: 'This writer entry is the Storyboard screen scene and shot run, not the prose Writer screen. No execution record does not imply missing script. Saved scene and shot counts are independent of the execution history.' },
       artist: status.assets,
+      // 화면 이름 표(리드 2026-11-14 D · H-3) — 위 키는 옛 이름이라 사용자가 보는 이름을 함께 준다.
+      screens: SCREEN_NAMES,
     }
     return last
   }

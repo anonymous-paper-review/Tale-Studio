@@ -57,6 +57,7 @@ import { sceneGatePhase } from '@/lib/writer/scene-gate'
 import { REWRITE_LEVELS, rewriteLevelOf, type RewriteLevel } from '@/lib/producer/scene-story-rewrite'
 import type { ProseConditions } from '@/lib/writer/prose-conditions'
 import { writerChatIntent } from '@/lib/prose/writer-chat'
+import { answerToNextStep } from '@/lib/prose/next-answer'
 import { styleReturnCard, styleReturnRequest, versionStyleLabel } from '@/lib/artist/style-versions'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { stageIndex } from '@/lib/stage-gate'
@@ -171,6 +172,8 @@ interface GlobalChatState {
   sceneStoryRefresh: number
   refreshSceneStory: () => void
   sceneStoryProposalPending: { projectId: string; id: string | null } | null
+  /** 산문 고치기 요청이 안 간 까닭(리드 2026-11-14 C) — 'pending' = 고치기 안이 [적용]을 기다려 새 말이 튕겼다. 부른 쪽이 쓴 글을 입력칸으로 되돌리는 데 읽는다. */
+  reviseRefused: 'pending' | null
   syncSceneStoryProposal: (projectId: string, id: string | null) => void
   /** 마지막으로 적용 · 버린 수정안(디자이너 QA 1차 관찰 26) — 미리 보기를 다시 읽기 전에도 그 카드를 내린다(unresolvedSceneStoryProposal). */
   sceneStoryResolved: { projectId: string; id: string } | null
@@ -297,7 +300,8 @@ interface GlobalChatState {
      *  승인 카드를 다시 띄우지 않고 바로 실행한다(D12, 2026-08-31 오너). */
     /** acceptIncomplete: Director 준비 창에서 "그래도 진행"을 고른 넘김 — 준비가 덜 된 샷이 있어도 막지 않는다(Writer 미완료는 그대로 막는다). */
     /** acceptMissingVideos: Editor 넘기기 창(D8)을 지난 넘김 — 영상 없는 샷이 있어도 창을 다시 열지 않는다. */
-    opts?: { consentedHandoff?: boolean; stageOverride?: StageId; silentUser?: boolean; cardFill?: CardFill; acceptIncomplete?: boolean; acceptMissingVideos?: boolean; answeringProducerQuestion?: boolean },
+    /** askOnly: 문단을 붙인 채 보낸 물음(오너 2026-11-14 B ①) — Writer 산문 고치기 길을 타지 않고 AI 가 답한다. */
+    opts?: { consentedHandoff?: boolean; stageOverride?: StageId; silentUser?: boolean; cardFill?: CardFill; acceptIncomplete?: boolean; acceptMissingVideos?: boolean; answeringProducerQuestion?: boolean; askOnly?: boolean },
   ) => Promise<void>
   /** 진행 중인 LLM 응답 중단 (#oiioii-chat) — Stop 버튼. 대기 중이 아니면 no-op. */
   stopGeneration: () => void
@@ -2122,6 +2126,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   sceneStoryEdit: null,
   sceneStoryRefresh: 0,
   sceneStoryProposalPending: null,
+  reviseRefused: null,
   sceneStoryResolved: null,
   proseConfirmDeclined: null,
   sceneStoryVariantPreview: null,
@@ -2589,9 +2594,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   reviseSceneGate: async (feedback) => {
     const projectId = useProjectStore.getState().projectId
     const text = feedback.trim()
+    if (get().reviseRefused) set({ reviseRefused: null })
     if (!projectId || !text || get().sceneStoryEdit) return false
     if (sceneGateInFlight.has(projectId) || sceneStoryRequests.has(projectId) || get().sceneStoryProposalPending?.projectId === projectId) {
-      set({ error: translate(contentLocale(), 'Apply or discard the current scene story proposal before requesting another.') })
+      set({ error: translate(contentLocale(), 'Apply or discard the current scene story proposal before requesting another.'), reviseRefused: 'pending' })
       return false
     }
     const session = chatSession
@@ -2609,7 +2615,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const accepted = await response.json() as { proposalId?: string; code?: string }
       if (!isCurrent()) return false
       if (!response.ok) {
-        if (accepted.code === 'scene_story_proposal_pending') set({ error: translate(contentLocale(), 'Apply or discard the current scene story proposal before requesting another.') })
+        if (accepted.code === 'scene_story_proposal_pending') set({ error: translate(contentLocale(), 'Apply or discard the current scene story proposal before requesting another.'), reviseRefused: 'pending' })
         // 원작 그대로 쓰는 대본은 서버가 고치지 않는다 — 다시 시도하라고 하면 같은 말만 돌아온다. 까닭과 넘어가는 길을 말한다(2026-10-27 운영).
         if (accepted.code === 'preserved_script') set({ error: translate(contentLocale(), 'This project keeps the original script as is, so the prose cannot be changed. When you have read it, press [Run breakdown] to move on.') })
         return false
@@ -2941,7 +2947,24 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     //   넘김 말은 확정 전이면 늘 확정 창으로 간다(산문 초안이 아직 없는 예전 프로젝트도 예전 Producer 넘김으로 가지 않는다).
     //   초안이 없는 예전 프로젝트의 나머지 말은 예전 Producer 채팅 그대로다(이야기 · 설정 채우기).
     const writerProse = stage === 'producer' && draftLive
-    if (stage === 'producer' && !imageFirst && !useProjectStore.getState().producerLocked) {
+    // "다음 단계로 넘어갈까요?" 카드가 떠 있을 때 말로 한 짧은 "응 · 아니"는 그 질문에 대한 답이다(오너 2026-11-14 답 F ①) —
+    //   수정 요청으로 보내면 카드가 지워지고 "바꿀 곳을 못 찾았어요"가 나왔다. "응"은 단추와 같은 확정 창, "아니"는 [아니요, 더 고칠래요]와 같은 더 고치는 길 카드다.
+    //   카드가 없을 때의 "응"이나 다른 말이 섞인 말은 지금처럼 수정 요청이다.
+    if (writerProse && !imageFirst && !opts?.silentUser && !opts?.askOnly &&
+      sceneSuggestion?.stage === 'producer' && sceneSuggestion.action?.kind === 'writerNext' && sceneSuggestion.action.step === 'ask') {
+      const answer = answerToNextStep(trimmed)
+      if (answer === 'yes') {
+        useWriterRoomStore.getState().openConfirm()
+        get().appendLocalExchange('producer', trimmed, translate(contentLocale(), 'Check the prose, then confirm it to move on. Once you confirm, the prose is locked and Artist picks the characters and backgrounds.'))
+        return
+      }
+      if (answer === 'no') {
+        get().appendLocalUser('producer', trimmed)
+        get().offerWriterNext('more')
+        return
+      }
+    }
+    if (stage === 'producer' && !imageFirst && !opts?.askOnly && !useProjectStore.getState().producerLocked) {
       const intent = writerChatIntent(trimmed, { proseDraft: writerProse })
       if (intent === 'breakdown' || (intent === 'rewrite' && writerProse)) {
         if (sceneSuggestion?.stage === 'producer') get().dismissSuggestion({ implicit: true })
@@ -2955,7 +2978,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
     const sceneGate = writerProse || (!draftLive && (sceneSuggestion?.action?.kind === 'confirmScenes' || get().sceneStoryProposalPending?.projectId === projectId))
     // 다시 쓰기 정도(시안 v04) — 선택지나 그 이름을 말하면 세 가지 안을 만든다. 다른 말은 아래처럼 수정안 하나로 간다.
-    const rewriteLevel = stage === 'producer' && !imageFirst && (sceneChoices || sceneGate)
+    const rewriteLevel = stage === 'producer' && !imageFirst && !opts?.askOnly && (sceneChoices || sceneGate)
       ? rewriteLevelOf(trimmed, contentLocale()) ?? rewriteLevelOf(trimmed, useLocaleStore.getState().locale)
       : null
     if (rewriteLevel) {
@@ -2971,7 +2994,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (!ok) set({ error: reply })
       return
     }
-    if (stage === 'producer' && !imageFirst && (sceneChoices || sceneGate) && writerInputRoute(trimmed, { sceneGate: true, running: false, explicitRevision: !sceneChoices && !writerProse }) === 'revise') {
+    if (stage === 'producer' && !imageFirst && !opts?.askOnly && (sceneChoices || sceneGate) && writerInputRoute(trimmed, { sceneGate: true, running: false, explicitRevision: !sceneChoices && !writerProse }) === 'revise') {
       if (isCancellationUtterance(trimmed) && sceneChoices) { get().dismissSuggestion({ implicit: true }); return }
       get().dismissSuggestion({ implicit: true })
       set({ error: null })
@@ -2985,6 +3008,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         return
       }
       const reply = get().error ?? translate(contentLocale(), 'Could not send the change request. Please try again.')
+      // 고치기 안이 [적용]을 기다려 새 말이 튕겼다(리드 2026-11-14 C) — 쓴 글은 입력칸으로 되돌리고 채팅에는 안내만 남긴다(같은 말이 대화에 두 번 보이지 않게).
+      if (get().reviseRefused === 'pending') {
+        useChatUiStore.getState().requestInputRestore(trimmed)
+        get().notifyIssue('producer', reply)
+        set({ error: reply })
+        return
+      }
       get().appendLocalExchange('producer', trimmed, reply)
       set({ error: reply })
       return
@@ -6021,6 +6051,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       sceneStoryEdit: null,
       sceneStoryRefresh: 0,
       sceneStoryProposalPending: null,
+      reviseRefused: null,
       sceneStoryResolved: null,
       proseConfirmDeclined: null,
       sceneStoryVariantPreview: null,

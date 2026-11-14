@@ -2700,6 +2700,7 @@ export const KO: Record<string, string> = {
   'E.g. A story of two people who meet on a rainy day': '예: 비 오는 날 만난 두 사람 이야기',
   // 정리 카드의 [아니요, 더 고칠래요](11/5 시안 P2)
   'What would you like to change?': '무엇을 바꿀까요?',
+  'Sure! Write your storyline here.': '네, 줄거리를 여기에 적어 주세요.',
   'Show me examples': '예시 보여줘',
   'How about these? Click one you like and I will put it in the input. You can edit it before sending.': '이런 건 어때요? 마음에 드는 걸 누르면 입력칸에 넣어 드려요. 고쳐서 보내도 돼요.',
   'Other examples': '다른 예시',
