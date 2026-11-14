@@ -8,6 +8,7 @@ import type { DirectorNode } from '@/types/director'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { videoBatchShotSettings } from '@/lib/director/video-batch-take'
 import type { TakeBillingMode } from '@/lib/billing/take-hold'
+import { countText } from '@/lib/i18n/count-text'
 
 export interface VideoBatchPlan {
   /** 만들 영상 수(자격 있는 샷 수) */
@@ -64,10 +65,12 @@ export function describeVideoBatchPlan(plan: VideoBatchPlan, t: Translate): stri
       lines.push(
         plan.runCount === 0
           ? t('No videos can be made until you add Takes.')
-          : t('Only {run} of {count} videos can be made with your Takes. The first {run} will be generated.', { run: plan.runCount, count: plan.total }),
+          // 영어는 1개면 "The first one"(영어 재점검 S2b) — 한국어는 그대로.
+          : countText(t, plan.runCount, 'Only 1 of {count} videos can be made with your Takes. The first one will be generated.', 'Only {run} of {count} videos can be made with your Takes. The first {run} will be generated.', { run: plan.runCount, count: plan.total }),
       )
     } else {
-      lines.push(t('Takes are short by {missing}. Billing is not enforced yet, so all {count} will be generated.', { missing: plan.requiredTakes - plan.balance, count: plan.total }))
+      // 영어는 1개면 "so it will be generated"(영어 재점검 S2b — "so all 1"로 읽혔다) — 한국어는 그대로.
+      lines.push(countText(t, plan.total, 'Takes are short by {missing}. Billing is not enforced yet, so it will be generated.', 'Takes are short by {missing}. Billing is not enforced yet, so all {count} will be generated.', { missing: plan.requiredTakes - plan.balance, count: plan.total }))
     }
   }
   return lines

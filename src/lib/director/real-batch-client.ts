@@ -107,20 +107,142 @@ const MAX_ROUNDS = 200
 const MAX_ROUND_RETRIES = 2
 const ROUND_RETRY_DELAY_MS = 5000
 
-/** 라운드 반복 일괄 생성 — 완료 시 캔버스 rehydrate. 이미 진행 중이면 no-op. */
-export async function runRealBatch(
-  projectId: string,
-  opts?: {
-    silent?: boolean
-    force?: boolean
-    traceId?: string
-    onJob?: GenerationJobObserver
-    /** 고른 샷만(시안 D2, 오너 2026-11-14) — Writer 샷 id. 없으면 지금처럼 빈 샷 전부. */
-    shotIds?: readonly string[]
-  },
-): Promise<RealBatchResult> {
+type RealBatchOptions = {
+  silent?: boolean
+  force?: boolean
+  traceId?: string
+  onJob?: GenerationJobObserver
+  /** 고른 샷만(시안 D2, 오너 2026-11-14) — Writer 샷 id. 없으면 지금처럼 빈 샷 전부. */
+  shotIds?: readonly string[]
+}
+
+/** 지금 도는 판 — 멈춘 판이 서버 답을 기다려 보낸 장을 멈추는 동안 새 판이 그 정리를 기다리게 한다. */
+let currentRun: Promise<RealBatchResult> | null = null
+/** [모두 멈추기]를 누른 차례 — 정리를 기다리던 누름은 그사이 이 수가 바뀌었으면 서지 않는다(사람이 마지막에 누른 것을 따른다, 검토 b S1b). */
+let stopTurn = 0
+/** 정리를 기다리는 누름의 수 — 거둘 알림이 있을 때만 거둔다. */
+let waitingPresses = 0
+/** 거둬지지 않고 정리를 기다리는 누름의 수 — 앞 판이 끝날 때 "만드는 중"을 넘겨줄지 정한다(검토 a S1e). */
+let liveWaiters = 0
+/** 앞 판이 "만드는 중"을 내리지 않고 넘겨준 자리 — 깨어난 누름이 새 판으로 이어받거나, 낱장만 냈으면 마지막 누름이 내린다(S1e). */
+let handedOver = false
+const WAITING_TOAST_ID = 'real-batch-waiting'
+
+/** [모두 멈추기] · 알림의 [취소] — 멈춘 판의 정리를 기다리던 누름을 거둔다(그 뒤에 누른 것은 선다). "끝나면 바로 시작해요" 알림도 거둔다. */
+export function cancelWaitingRealBatch(): void {
+  stopTurn += 1
+  liveWaiters = 0
+  if (waitingPresses > 0) toast.dismiss(WAITING_TOAST_ID)
+}
+
+// 정리를 기다리는 사이 다른 프로젝트로 옮기면 [취소]와 같다 — 기다리던 일(일괄 · 낱장)은 서지 않고 알림도 바로 내린다(검토 b S1g):
+//   그대로 두면 앞 프로젝트의 판이 서서 옮겨 간 화면의 "이미지 만드는 중"이 켜졌다.
+useDirectorCanvasStore.subscribe((state, previous) => {
+  if (state.projectId !== previous.projectId && waitingPresses > 0) cancelWaitingRealBatch()
+})
+
+/** 멈춘 판이 정리 중이면 끝나기를 기다린다. 'go' = 이제 시작한다 · 'drop' = 기다리는 사이 거둬졌다 · 'busy' = 멈추지 않은 판이 돈다. */
+async function waitForStoppedRun(projectId: string, silent: boolean): Promise<'go' | 'drop' | 'busy'> {
+  const now = useDirectorCanvasStore.getState()
+  if (!now.realBatchBusy) return 'go'
+  if (!now.realBatchCancelled || !currentRun) return 'busy'
+  // 누름이 말없이 기다리지 않게 한 줄 알린다 — 여러 번 눌러도 한 줄(검토 b S1c). 저절로 도는 판은 말하지 않는다.
+  //   새 판이 시작하거나 취소될 때까지 남고, [취소]로 기다리던 누름을 거둔다 — 다른 것이 안 돌면 [모두 멈추기]가 안 보인다(리드 11/14 결정 ③).
+  if (!silent) {
+    const locale = useLocaleStore.getState().locale
+    toast.info(translate(locale, 'Wrapping up the previous work. It will start right after.'), {
+      id: WAITING_TOAST_ID,
+      duration: Infinity,
+      action: { label: translate(locale, 'Cancel'), onClick: () => cancelWaitingRealBatch() },
+    })
+  }
+  const turn = stopTurn
+  waitingPresses += 1
+  liveWaiters += 1
+  await currentRun.catch(() => undefined)
+  waitingPresses -= 1
+  if (turn === stopTurn) liveWaiters -= 1
+  // 기다림이 끝났다 — 새 판이 서든 거둬졌든 알림은 내린다.
+  toast.dismiss(WAITING_TOAST_ID)
+  // 기다리는 사이 [모두 멈추기] · [취소]를 눌렀거나 다른 프로젝트로 옮겼으면 서지 않는다(검토 b S1b · 결정 ③ · S1g).
+  return turn === stopTurn && useDirectorCanvasStore.getState().projectId === projectId ? 'go' : 'drop'
+}
+
+/** 정리 뒤 먼저 선 누름의 일 — 같은 정리를 기다리던 둘째가 같은 일(같은 단추를 두 번)인지 가른다(리드 11/14). */
+let startedKey: string | null = null
+
+/** 정리 뒤 깨어난 누름 — 같은 정리를 기다리던 다른 누름이 이미 판을 세웠으면 서지 않는다. 같은 일이면 말없이 하나로,
+ *  다른 일이면 "이미 만드는 중" 한 줄을 알린다 — 둘째 일이 말없이 빠지지 않게(검토 a 마지막 참고). 저절로 도는 판은 말하지 않는다. */
+function startedByAnother(key: string | undefined, silent: boolean): boolean {
+  const now = useDirectorCanvasStore.getState()
+  if (handedOver || !now.realBatchBusy || now.realBatchCancelled) return false
+  if (!silent && (key === undefined || key !== startedKey)) {
+    toast.info(translate(useLocaleStore.getState().locale, "Already making images. Press again when they're done."), { id: 'real-batch-already' })
+  }
+  return true
+}
+
+/** 넘겨받은 "만드는 중"을 이어받을 누름이 더 없으면 내린다 — 낱장만 기다리던 누름 · 거둬진 누름 뒤(S1e). */
+function finishHandOver(): void {
+  if (!handedOver || liveWaiters > 0) return
+  handedOver = false
+  useDirectorCanvasStore.setState({ realBatchBusy: false, realBatchRemaining: null, realBatchShotIds: null, realBatchCancelled: false })
+}
+
+/** 툴바의 이미지 일(낱장 + 일괄) — 멈춘 판이 정리 중이면 정리가 끝나는 순간 start 를 부른다(같은 알림 · [취소], 검토 a S1e).
+ *  거둬지면 부르지 않는다. 정리 중이 아니면 지금처럼 바로 부른다. start 안에서 낱장은 startSingleImage, 일괄은 runRealBatch 로 낸다.
+ *  key = 이 누름의 일 — 같은 단추를 두 번 누르면 같은 값이다(둘째 누름 가르기). */
+export function afterStoppedRealBatch(start: () => void, key?: string): Promise<void> {
+  const now = useDirectorCanvasStore.getState()
+  if (!now.realBatchBusy || !now.realBatchCancelled || !currentRun) {
+    start()
+    return Promise.resolve()
+  }
+  // 누른 화면의 프로젝트 — 기다리는 사이 옮기면 서지 않는다(S1g).
+  return waitForStoppedRun(now.projectId, false).then((outcome) => {
+    if (outcome === 'go' && !startedByAnother(key, false)) {
+      startedKey = key ?? null
+      start()
+    }
+    finishHandOver()
+  })
+}
+
+/** 낱장 이미지(실패한 샷 · Director 에서 더한 샷) — 앞 판이 넘겨준 자리면 일괄 막이를 지난다: 앞 판은 이미 끝났다(S1e). */
+export function startSingleImage(shotNodeId: string): void {
+  void useDirectorCanvasStore.getState().generateStoryboardImage(shotNodeId, handedOver ? { afterStoppedBatch: true } : undefined).catch(() => {})
+}
+
+/** 라운드 반복 일괄 생성 — 완료 시 캔버스 rehydrate. 이미 진행 중이면 no-op.
+ *  멈춘 판이 아직 정리 중이면(작업 행이 생기기 전에 [모두 멈추기]) 그 정리가 끝난 뒤 새 판을 연다 — 툴바는 멈추자마자 켜지므로
+ *  누름이 말없이 무시되지 않게, 앞 판의 끝 정리가 새 판의 표시를 지우지 않게(영어 재점검 S1).
+ *  앞 판이 끝나며 넘겨준 "만드는 중"은 기다리지 않고 이어받는다 — 내렸다 다시 올리는 틈이 없다(S1e). */
+export async function runRealBatch(projectId: string, opts?: RealBatchOptions): Promise<RealBatchResult> {
   const store = useDirectorCanvasStore
-  if (store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
+  if (store.getState().realBatchBusy && !handedOver) {
+    const outcome = await waitForStoppedRun(projectId, !!opts?.silent)
+    const key = JSON.stringify(['batch', !!opts?.force, opts?.shotIds ?? null])
+    if (outcome !== 'go' || startedByAnother(key, !!opts?.silent)) {
+      finishHandOver()
+      return { generated: 0, quotaBlocked: false }
+    }
+    startedKey = key
+  }
+  const takeOver = handedOver
+  handedOver = false
+  // 도는 판이 있으면 서지 않는다 — 두 번 눌러도 판 하나.
+  if (!takeOver && store.getState().realBatchBusy) return { generated: 0, quotaBlocked: false }
+  const run = runRealBatchOnce(projectId, opts)
+  currentRun = run
+  try {
+    return await run
+  } finally {
+    if (currentRun === run) currentRun = null
+  }
+}
+
+async function runRealBatchOnce(projectId: string, opts?: RealBatchOptions): Promise<RealBatchResult> {
+  const store = useDirectorCanvasStore
   store.setState({
     realBatchBusy: true,
     realBatchRemaining: null,
@@ -214,6 +336,12 @@ export async function runRealBatch(
       store.setState({ realBatchRemaining: remaining })
       if (!submitted.length && !inProgress.length) break
       generated += ourJobs.reduce((n, s) => n + s.shotIds.length, 0)
+      // 멈춘 판이 서버 답을 받았다 — 받은 장을 "만드는 중"으로 띄우지 않고(목록을 다시 읽지 않음) 아래 끝에서 바로 멈춘다
+      //   (영어 재점검 S1: 카드가 0.5초 "Making image · Stop making"으로 깜빡였다).
+      if (store.getState().realBatchCancelled) {
+        for (const s of [...submitted, ...inProgress]) waitedJobs.add(s.jobId)
+        break
+      }
       // 잡이 큐에 앉는 즉시 진행 표시(알림바·카드 스피너)가 켜지게 — 폴링 틱을 기다리지 않는다.
       refreshGenerationQueue()
       for (const s of [...submitted, ...inProgress]) {
@@ -327,7 +455,14 @@ export async function runRealBatch(
       )
     } else console.error('[real-batch] auto batch generation failed:', e)
   } finally {
-    store.setState({ realBatchBusy: false, realBatchRemaining: null, realBatchShotIds: null, realBatchCancelled: false })
+    if (liveWaiters > 0) {
+      // 정리를 기다리던 누름이 있다 — "만드는 중"을 내리지 않고 넘겨준다: 내렸다 다시 올리는 틈에 이어 보내기 지켜보기가
+      //   기다리던 샷을 "못 만듦"으로 버리지 않게(검토 a S1e). 깨어난 누름이 새 판으로 이어받거나, 낱장만 냈으면 내린다.
+      handedOver = true
+      store.setState({ realBatchRemaining: null, realBatchShotIds: null })
+    } else {
+      store.setState({ realBatchBusy: false, realBatchRemaining: null, realBatchShotIds: null, realBatchCancelled: false })
+    }
   }
   return { generated, quotaBlocked }
 }

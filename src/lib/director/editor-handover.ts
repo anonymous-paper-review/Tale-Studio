@@ -118,10 +118,11 @@ export function remakeButton(
           return takeCostForVideo(model, resolution)
         })()
       : null
+  // 영어는 Take 가 1이면 단수 문장(리드 11/14 — "Make again · 1 Take").
   const label =
     row.missing === 'not_made'
-      ? takes === null ? t('Make video') : t('Make video · {takes} Takes', { takes })
-      : takes === null ? t('Make again') : t('Make again · {takes} Takes', { takes })
+      ? takes === null ? t('Make video') : countText(t, takes, 'Make video · 1 Take', 'Make video · {takes} Takes', { takes })
+      : takes === null ? t('Make again') : countText(t, takes, 'Make again · 1 Take', 'Make again · {takes} Takes', { takes })
   return { label, disabled: row.missing === 'generating' }
 }
 

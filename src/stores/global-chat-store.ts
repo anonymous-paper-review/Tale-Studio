@@ -107,6 +107,7 @@ import { stripLegacyStageMarkers } from '@/lib/display-names'
 //   언어**를 따른다(#i18n-content-voice 2026-08-23) — 챗 응답(서버가 프로젝트 locale 강제)과
 //   같은 대화창에서 언어가 섞이지 않게. 미조회 시 UI 언어 폴백은 contentLocale() 안에 있다.
 import { translate } from '@/lib/i18n'
+import { countText } from '@/lib/i18n/count-text'
 import { contentLocale } from '@/lib/i18n/content'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -1407,6 +1408,20 @@ function alreadyHasVideoLine(locale: AppLocale, shotIds: readonly string[], shot
 
 /** 영상을 만들 이미지가 있는지(키 = 샷 노드 id) — 'ready' 이미지 완료 · 'drawing' 그리는 중(이미지 일괄이 맡아 차례를 기다리는 샷도 — 보드와 같음) ·
  *  'missing' 없음 · 실패. 서버 영상 묶음도 이미지가 없는 샷은 건너뛰고(missing_storyboard) 그 까닭은 화면에 안 보인다 — 보내기 전에 거른다(리드 11/14 B1). */
+/** 샷 목록 줄의 단수 · 복수 — 샷이 여럿이면 영어는 복수 문장(리드 11/14 영어 재점검 B4). 한국어는 두 키가 같은 꼴. */
+function shotsLine(locale: AppLocale, count: number, one: string, many: string, vars: Record<string, string | number>): string {
+  return countText((key, params) => translate(locale, key, params), count, one, many, vars)
+}
+
+/** Lumi 에게 보내는 보드 맥락의 샷 줄 이미지 표시(있음 · 그리는 중 · 없음) — 앱은 이미지가 있는 샷만 영상을 만든다(리드 11/14 영어 재점검 B3).
+ *  그리는 중은 보드처럼 이미지 일괄이 맡아 차례를 기다리는 샷도. 노드 트리의 샷 줄에 붙여 노드 id 를 두 번 싣지 않는다(검토 a — 맥락 크기). */
+function directorShotImages(): Map<string, 'ready' | 'drawing' | 'missing'> {
+  return shotImageReadiness(useDirectorCanvasStore.getState().nodes.filter((node) => isShotData(node.data)).map((node) => node.id))
+}
+
+/** 프롬프트 규칙이 가리키는 "### Shot images" 머리 — 샷마다의 표시는 노드 트리의 샷 줄에 있다고 샷 수와 상관없이 한 번만 알린다. */
+const SHOT_IMAGES_NOTE = '### Shot images\nEach shot line in the node tree shows its image in the parentheses: image ready, image being made or no image. The app makes a video only for a shot whose image is ready.'
+
 function shotImageReadiness(shotIds: readonly string[]): Map<string, 'ready' | 'drawing' | 'missing'> {
   const { nodes, projectId } = useDirectorCanvasStore.getState()
   const states = directorBoardStates(nodes, projectId)
@@ -1427,8 +1442,8 @@ function withImagesOnly(shotIds: readonly string[], locale: AppLocale, say: (lin
   const shotsLabel = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
   const drawing = shotIds.filter((id) => readiness.get(id) === 'drawing')
   const missing = shotIds.filter((id) => readiness.get(id) === 'missing')
-  if (drawing.length > 0) say(translate(locale, 'The image for {shots} is being made. You can make the video once it is done.', { shots: shotsLabel(drawing) }))
-  if (missing.length > 0) say(translate(locale, 'The video for {shots} needs an image first.', { shots: shotsLabel(missing) }))
+  if (drawing.length > 0) say(shotsLine(locale, drawing.length, 'The image for {shots} is being made. You can make the video once it is done.', 'The images for {shots} are being made. You can make the videos once they are done.', { shots: shotsLabel(drawing) }))
+  if (missing.length > 0) say(shotsLine(locale, missing.length, 'The video for {shots} needs an image first.', 'The videos for {shots} need an image first.', { shots: shotsLabel(missing) }))
   return shotIds.filter((id) => readiness.get(id) === 'ready')
 }
 
@@ -1496,7 +1511,7 @@ async function confirmVideosLine(shotIds: readonly string[], locale: AppLocale, 
   const cost = (remake ? remakeTakeCosts(nodes, shotIds) : videoBatchTakeCosts(nodes, shotIds)).reduce((sum, n) => sum + n, 0)
   const free = takes.mode === 'off' && !takes.failed
   if (shotIds.length === 1) {
-    return free ? t('Shall I make the video for {shots}? Say yes to start.', { shots }) : t('Shall I make the video for {shots} ({takes} Takes)? Say yes to start.', { shots, takes: cost })
+    return free ? t('Shall I make the video for {shots}? Say yes to start.', { shots }) : countText(t, cost, 'Shall I make the video for {shots} (1 Take)? Say yes to start.', 'Shall I make the video for {shots} ({takes} Takes)? Say yes to start.', { shots, takes: cost })
   }
   return free
     ? t('Shall I make {count} videos for {shots}? Say yes to start.', { count: shotIds.length, shots })
@@ -1539,6 +1554,11 @@ async function holdOnTextCard(
 ): Promise<void> {
   const locale = contentLocale()
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  // 묶는 영상은 지금 이미지가 있는 샷만 — 없거나 그리는 중이면 그 자리에서 말하고 묶지 않는다([적용]은 카드 줄이 말한 그 목록만, 리드 11/14).
+  const videos = withImagesOnly(more.videos, locale, say)
+  const remakes = withImagesOnly(more.remakes ?? [], locale, say)
+  more = { ...more, videos, remakes, named: (more.named ?? []).filter((id) => videos.includes(id) || remakes.includes(id)) }
+  if (!more.allBlankImages && more.images.length === 0 && videos.length === 0 && remakes.length === 0) return
   const names = directorBoardNames()
   const nodes = useDirectorCanvasStore.getState().nodes
   const before = (card.proposal.payload.then as HeldDirectorWork | undefined) ?? { images: [], allBlankImages: false, videos: [] }
@@ -1563,9 +1583,9 @@ async function holdOnTextCard(
   })
   const shots = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
   if (more.allBlankImages) say(t('Applying the text card makes the live-action images with the new text.'))
-  if (more.images.length > 0) say(t('Applying the text card makes the image for {shots} with the new text.', { shots: shots(more.images) }))
+  if (more.images.length > 0) say(shotsLine(locale, more.images.length, 'Applying the text card makes the image for {shots} with the new text.', 'Applying the text card makes the images for {shots} with the new text.', { shots: shots(more.images) }))
   const moreVideos = [...more.videos, ...(more.remakes ?? [])]
-  if (moreVideos.length > 0) say(t('Applying the text card makes the video for {shots} with the new text.', { shots: shots(moreVideos) }))
+  if (moreVideos.length > 0) say(shotsLine(locale, moreVideos.length, 'Applying the text card makes the video for {shots} with the new text.', 'Applying the text card makes the videos for {shots} with the new text.', { shots: shots(moreVideos) }))
 }
 
 /** 글 카드 [적용]에 묶인 생성(검토 b 보통 1) — [적용]이면 글을 바꾼 뒤 만들고, [버리기]면 만들지 않는다. 샷은 노드 id. */
@@ -1587,17 +1607,20 @@ async function heldWorkLines(held: HeldDirectorWork, locale: AppLocale, names: R
   const shots = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(nodes.find((node) => node.id === id), names)))
   const lines: string[] = []
   if (held.allBlankImages) lines.push(t('Applying also makes the live-action images for the shots that need one right away · No Takes used.'))
-  if (held.images.length > 0) lines.push(t('Applying also makes the live-action image for {shots} right away · No Takes used.', { shots: shots(held.images) }))
-  const remakes = held.remakes ?? []
-  if (held.videos.length > 0 || remakes.length > 0) {
+  if (held.images.length > 0) lines.push(shotsLine(locale, held.images.length, 'Applying also makes the live-action image for {shots} right away · No Takes used.', 'Applying also makes the live-action images for {shots} right away · No Takes used.', { shots: shots(held.images) }))
+  // 영상 수 · Take 수는 이미지가 있는 샷만 센다 — 없는 샷은 [적용] 뒤 "이미지가 먼저 필요해요"로 빠진다(리드 11/14, 되묻기 B1 ③ 과 같은 셈).
+  const readiness = shotImageReadiness([...held.videos, ...(held.remakes ?? [])])
+  const videos = held.videos.filter((id) => readiness.get(id) === 'ready')
+  const remakes = (held.remakes ?? []).filter((id) => readiness.get(id) === 'ready')
+  if (videos.length > 0 || remakes.length > 0) {
     // 지연 로드 — Take 계산기 · 잔액 훅(영상 러너와 같은 까닭).
     const [{ videoBatchTakeCosts }, { fetchTakeBalance }] = await Promise.all([import('@/lib/director/video-batch-plan'), import('@/lib/billing/use-take-balance')])
     const takes = await fetchTakeBalance()
-    const ids = [...held.videos, ...remakes]
-    const cost = [...videoBatchTakeCosts(nodes, held.videos), ...remakeTakeCosts(nodes, remakes)].reduce((sum, n) => sum + n, 0)
+    const ids = [...videos, ...remakes]
+    const cost = [...videoBatchTakeCosts(nodes, videos), ...remakeTakeCosts(nodes, remakes)].reduce((sum, n) => sum + n, 0)
     lines.push(takes.mode === 'off' && !takes.failed
-      ? t('Applying also makes the video for {shots} right away.', { shots: shots(ids) })
-      : t('Applying also makes the video for {shots} right away · {takes} Takes.', { shots: shots(ids), takes: cost }))
+      ? shotsLine(locale, ids.length, 'Applying also makes the video for {shots} right away.', 'Applying also makes the videos for {shots} right away.', { shots: shots(ids) })
+      : shotsLine(locale, ids.length, cost === 1 ? 'Applying also makes the video for {shots} right away · 1 Take.' : 'Applying also makes the video for {shots} right away · {takes} Takes.', 'Applying also makes the videos for {shots} right away · {takes} Takes.', { shots: shots(ids), takes: cost }))
   }
   return lines
 }
@@ -1685,7 +1708,7 @@ async function startVideosFor(input: {
   const namedNow = new Set(input.named ?? [])
   const open = new Set(input.shotIds.filter((id) => eligibleNow.has(id) || (input.remake && namedNow.has(id) && remakableNow.has(id))))
   const making = directorShotsBeingMade(input.shotIds.filter((id) => !open.has(id)))
-  if (making.length > 0) input.say(t('The video for {shots} is being made right now.', { shots: shotListLabel(locale, making.map((id) => shotLabelOf(nodesNow.find((node) => node.id === id), directorBoardNames()))) }))
+  if (making.length > 0) input.say(shotsLine(locale, making.length, 'The video for {shots} is being made right now.', 'The videos for {shots} are being made right now.', { shots: shotListLabel(locale, making.map((id) => shotLabelOf(nodesNow.find((node) => node.id === id), directorBoardNames()))) }))
   input = { ...input, shotIds: input.shotIds.filter((id) => open.has(id)) }
   if (input.shotIds.length === 0) {
     if (making.length === 0) input.say(t('There are no such shots right now.'))
@@ -1724,7 +1747,7 @@ async function startVideosFor(input: {
   }
   const startedLine = (ids: readonly string[], takesUsed: number) => (plan.mode === 'off'
     ? t('Started making videos for {shots}. Progress shows on the line above the cards.', { shots: shotsLabel(ids) })
-    : t('Started making videos for {shots} · {takes} Takes. Progress shows on the line above the cards.', { shots: shotsLabel(ids), takes: takesUsed }))
+    : countText(t, takesUsed, 'Started making videos for {shots} · 1 Take. Progress shows on the line above the cards.', 'Started making videos for {shots} · {takes} Takes. Progress shows on the line above the cards.', { shots: shotsLabel(ids), takes: takesUsed }))
   if (input.remake) {
     // 샷마다 같은 다시 만들기 하나(remakeShotVideo)로 보낸다. 내 영상 동시 한도에 걸리면 뒤 샷도 같은 한도에 걸리니 더 보내지 않는다.
     const started: string[] = []
@@ -1756,9 +1779,9 @@ async function startVideosFor(input: {
       else failed.push(id)
     }
     if (started.length > 0) input.say(startedLine(started, started.reduce((sum, id) => sum + costs[input.shotIds.indexOf(id)], 0)))
-    if (uncertain.length > 0) input.say(t("I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.", { shots: shotsLabel(uncertain) }))
-    if (limited.length > 0) input.say(t("Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.", { shots: shotsLabel(limited) }))
-    if (failed.length > 0) input.say(t("I couldn't start the video for {shots}. Please ask again in a moment.", { shots: shotsLabel(failed) }))
+    if (uncertain.length > 0) input.say(shotsLine(locale, uncertain.length, "I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.", "I can't tell yet whether the videos for {shots} were accepted. You can see the results on the cards.", { shots: shotsLabel(uncertain) }))
+    if (limited.length > 0) input.say(shotsLine(locale, limited.length, "Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.", "Too many videos are being made at once, so I didn't start the videos for {shots}. Ask again once one is done.", { shots: shotsLabel(limited) }))
+    if (failed.length > 0) input.say(shotsLine(locale, failed.length, "I couldn't start the video for {shots}. Please ask again in a moment.", "I couldn't start the videos for {shots}. Please ask again in a moment.", { shots: shotsLabel(failed) }))
     return
   }
   const runBefore = useDirectorCanvasStore.getState().videoBatchRunId
@@ -3697,7 +3720,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const canvasState = useDirectorCanvasStore.getState()
         // 씬 · 샷마다 보드 이름("Scene 2 · Shot 8")을 붙인다 — 사용자는 보드 번호로 부르고(@Previz Shot 8), 모델도 그 이름으로 답한다(오너 2026-11-02 "전체 번호로 통일").
         const writerBoard = useWriterStore.getState()
-        const canvasContext = serializeDirectorCanvasContext(canvasState, boardNodeNames(writerBoard.sceneManifest, writerBoard.shots))
+        // 샷마다 이미지가 있는지(있음 · 그리는 중 · 없음)를 덧붙인다 — 이미지 없는 샷의 영상을 약속하지 않게(리드 11/14 영어 재점검 B3).
+        const shotImages = directorShotImages()
+        const canvasContext = [serializeDirectorCanvasContext(canvasState, boardNodeNames(writerBoard.sceneManifest, writerBoard.shots), shotImages), shotImages.size > 0 ? SHOT_IMAGES_NOTE : ''].filter(Boolean).join('\n\n')
         endpoint = '/api/director/chat'
         body = {
           message: trimmed,
@@ -4493,7 +4518,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             const labelsOf = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(useDirectorCanvasStore.getState().nodes.find((node) => node.id === id), names)))
             const makingNamed = directorShotsBeingMade(namedIds)
             const alreadyNamed = remake ? [] : directorShotsWithVideo(namedIds)
-            if (makingNamed.length > 0) lumiSays(translate(locale, 'The video for {shots} is being made right now.', { shots: labelsOf(makingNamed) }))
+            if (makingNamed.length > 0) lumiSays(shotsLine(locale, makingNamed.length, 'The video for {shots} is being made right now.', 'The videos for {shots} are being made right now.', { shots: labelsOf(makingNamed) }))
             if (alreadyNamed.length > 0) lumiSays(alreadyHasVideoLine(locale, alreadyNamed, labelsOf(alreadyNamed)))
             const unavailable = makingNamed.length + alreadyNamed.length
             const onlyMaking = unavailable > 0 && unavailable === namedIds.length &&
@@ -4506,7 +4531,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             if (grounding.kind === 'ask' && !hold && !onlyMaking && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true, ...(remake ? { remake } : {}) } })
           }
           // 되묻기 목록 중 이 답의 글 카드가 건 샷은 그 카드 [적용]이 곧 허락이다 — 카드에 묶고, 나머지만 "응"으로 묻는다.
-          const boundVideos = [...videoIds, ...confirmIds].filter((id) => bound.has(id))
+          //   묶는 영상은 지금 이미지가 있는 샷만 — 없거나 그리는 중이면 그 자리에서 말하고 묶지 않는다([적용]은 카드 줄이 말한 그 목록만, 리드 11/14).
+          const boundVideos = withImagesOnly([...videoIds, ...confirmIds].filter((id) => bound.has(id)), locale, lumiSays)
           if (remake) held.remakes = boundVideos
           else held.videos = boundVideos
           held.named = boundVideos.filter((id) => namedVideoIds.includes(id))
@@ -4532,8 +4558,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               // 글이 걸린 샷의 그림 · 영상은 되묻기에도 넣지 않았다 — 무엇을 뺐는지 말한다(재재검토 b 낮음 2).
               const shots = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(before.nodes.find((node) => node.id === id), names)))
               const leftVideos = [...held.videos, ...(held.remakes ?? [])]
-              if (leftVideos.length > 0) lumiSays(translate(locale, "I left out the video for {shots} because its text change isn't applied yet.", { shots: shots(leftVideos) }))
-              if (held.images.length > 0) lumiSays(translate(locale, "I left out the image for {shots} because its text change isn't applied yet.", { shots: shots(held.images) }))
+              if (leftVideos.length > 0) lumiSays(shotsLine(locale, leftVideos.length, "I left out the video for {shots} because its text change isn't applied yet.", "I left out the videos for {shots} because their text changes aren't applied yet.", { shots: shots(leftVideos) }))
+              if (held.images.length > 0) lumiSays(shotsLine(locale, held.images.length, "I left out the image for {shots} because its text change isn't applied yet.", "I left out the images for {shots} because their text changes aren't applied yet.", { shots: shots(held.images) }))
               if (held.allBlankImages) lumiSays(translate(locale, "I left out the live-action images because a text change isn't applied yet."))
             }
           }

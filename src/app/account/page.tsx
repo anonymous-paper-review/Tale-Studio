@@ -20,6 +20,7 @@ import { Button } from '@/components/ui/button'
 import { createClient } from '@/lib/supabase/client'
 import { clearLastProjectId } from '@/lib/session-restore'
 import { useT } from '@/lib/i18n'
+import { countText } from '@/lib/i18n/count-text'
 import { useLocaleStore } from '@/stores/locale-store'
 import { PADDLE_PLANS, PADDLE_TAKE_PACKS, isPurchasable } from '@/lib/billing/catalog'
 import { getPlanEntitlements } from '@/lib/plan-limits'
@@ -98,7 +99,7 @@ export default function AccountPage() {
     entitlements.maxLinkedProjects === 1
       ? t('1 linked project')
       : t('{n} linked projects', { n: entitlements.maxLinkedProjects }),
-    t('{n} Takes per month', { n: entitlements.includedTakesPerMonth }),
+    countText(t, entitlements.includedTakesPerMonth, '1 Take per month', '{n} Takes per month', { n: entitlements.includedTakesPerMonth }),
     entitlements.accountSeats === 1 ? t('1 account') : t('{n} accounts', { n: entitlements.accountSeats }),
   ]
 
@@ -270,7 +271,7 @@ export default function AccountPage() {
                 <div key={pack.id} className="flex flex-col rounded-xl border border-white/10 bg-white/[0.02] p-4">
                   <span className="text-sm font-semibold">{pack.name}</span>
                   <span className="mt-1 text-xl font-semibold">${pack.priceUsd.toLocaleString('en-US')}</span>
-                  <span className="text-xs text-gray-400">{t('{n} Takes', { n: pack.takes.toLocaleString('en-US') })}</span>
+                  <span className="text-xs text-gray-400">{countText(t, pack.takes, '1 Take', '{n} Takes', { n: pack.takes.toLocaleString('en-US') })}</span>
                   <span className="mb-4 mt-1 text-xs text-gray-500">{t('Valid for 12 months.')}</span>
                   {isPurchasable(pack) ? (
                     <CheckoutButton

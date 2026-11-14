@@ -155,6 +155,8 @@ export type DirectorGenerationRequestOptions = {
   resumeDepth?: number
   /** Internal flag used exclusively by the explicit full-video batch runner. */
   batch?: boolean
+  /** 멈춘 실사 일괄이 끝나며 넘겨준 "만드는 중" 안에서 낸 낱장(검토 a S1e) — 앞 판은 끝났으니 일괄 중 낱장 막이를 지난다. */
+  afterStoppedBatch?: boolean
   /**
    * 리테이크 상속(#retake-inherit 2026-08-31 오너): 이 Video 노드의 수동 배선
    * (frameInputs·영상 체인·override)을 새 테이크에 복사한다. 8/31 실측에서
@@ -1150,6 +1152,10 @@ interface DirectorCanvasState {
   detailNodeId: string | null
   /** 상세를 열 때 먼저 보일 탭. */
   detailTab: 'image' | 'video'
+  /** 상세를 연 차례 — openShotDetail 이 열 때마다 하나 올린다. 노드형 왼쪽 패널은 이것을 상세에 넘기고, 상세는 이것이 바뀔 때
+   *  다시 붙지 않고 탭만 고른 탭으로 맞춘다 — 이미 열린 상세를 안에서 다른 탭으로 바꿔 두었어도 [바꾸기] · ⤢ 가 고른 탭으로 열고,
+   *  탭이 그대로면 상세 안에서 적던 글도 남는다(리드 11/14, 검토 a). */
+  detailOpenSeq: number
   deleteConfirmInfo: DeleteCascadeInfo
   relationModal: RelationModalState
 
@@ -1733,6 +1739,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       popupNodeId: null,
       detailNodeId: null,
       detailTab: 'image',
+      detailOpenSeq: 0,
       deleteConfirmInfo: null,
       relationModal: null,
       generatingNodeIds: {},
@@ -4110,7 +4117,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       generateStoryboardImage: async (shotNodeId, options) => {
         // #real-grid-auto: 일괄 시트 생성 중 개별 생성 차단 — 같은 샷이 시트와 단일 잡에서
         //   동시에 그려지는 충돌 방지. UI 버튼도 disabled 지만 스토어가 최종 방어선.
-        if (get().realBatchBusy) {
+        if (get().realBatchBusy && !options?.afterStoppedBatch) {
           console.warn('[director] 실사 일괄 생성 중 — 개별 생성 요청 무시:', shotNodeId)
           options?.onJob?.({ jobId: null, status: 'deduped' })
           return { jobId: null, status: 'deduped' }
@@ -5326,7 +5333,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       closePopup: () => set({ popupNodeId: null }),
       openShotDetail: (nodeId, tab) => {
         const node = get().nodes.find((n) => n.id === nodeId)
-        set({ detailNodeId: nodeId, detailTab: tab ?? (node && isVideoData(node.data) ? 'video' : 'image') })
+        set((s) => ({ detailNodeId: nodeId, detailTab: tab ?? (node && isVideoData(node.data) ? 'video' : 'image'), detailOpenSeq: s.detailOpenSeq + 1 }))
       },
       // 지금은 selectNode · openPopup 으로 연 상세도 같은 닫기로 닫는다 — 샷 · 영상을 가리킬 때만 비운다(에셋 · 씬은 그대로).
       closeShotDetail: () =>
@@ -6008,8 +6015,11 @@ export function serializeDirectorCanvasContext(
   state: Pick<DirectorCanvasState, 'nodes' | 'edges' | 'selectedNodeId'>,
   /** 보드 이름표 — 씬 · 샷에 보드 이름("Scene 2 · Shot 8")을 붙인다(오너 2026-11-02 "전체 번호로 통일"). Writer 스토어는 부르는 쪽이 읽는다. */
   boardNames?: BoardNodeNames | null,
+  /** 샷마다 이미지(있음 · 그리는 중 · 없음) — 샷 줄에 붙인다(Lumi 가 이미지 없는 샷의 영상을 약속하지 않게, 리드 11/14 B3). 판정은 부르는 쪽(보드와 같은 근거). */
+  shotImages?: ReadonlyMap<string, 'ready' | 'drawing' | 'missing'> | null,
 ): string {
   const { nodes, edges, selectedNodeId } = state
+  const imageWord = (id: string) => ({ ready: 'image ready', drawing: 'image being made', missing: 'no image' } as const)[shotImages?.get(id) ?? 'missing']
   const boardSuffix = (data: Parameters<typeof directorBoardLabel>[0]) => {
     const name = directorBoardLabel(data, boardNames)
     return name ? ` (board: ${name})` : ''
@@ -6065,8 +6075,9 @@ export function serializeDirectorCanvasContext(
           imageInputs.length > 0
             ? `, image refs: ${imageInputs.join(',')}`
             : ''
+        const imageMark = shotImages ? `, ${imageWord(sh.id)}` : ''
         lines.push(
-          `  - [${sh.id}] Shot "${shData.label}"${boardSuffix(shData)} (camera ${camActive}/6 active, light ${shData.lighting.position}, ${shData.provider}${imageSuffix})${shData.stale ? ' [stale]' : ''}: ${promptSnippet || '(빈 prompt)'}`,
+          `  - [${sh.id}] Shot "${shData.label}"${boardSuffix(shData)} (camera ${camActive}/6 active, light ${shData.lighting.position}, ${shData.provider}${imageMark}${imageSuffix})${shData.stale ? ' [stale]' : ''}: ${promptSnippet || '(빈 prompt)'}`,
         )
         const childVideos = nodes.filter(
           (n) => isVideoData(n.data) && n.data.parentShotNodeId === sh.id,
@@ -6108,7 +6119,7 @@ export function serializeDirectorCanvasContext(
           imageInputs.length > 0
             ? ` (image refs: ${imageInputs.join(',')})`
             : ''
-        lines.push(`  - [${sh.id}] Shot "${sh.data.label}"${boardSuffix(sh.data)}${imageSuffix}`)
+        lines.push(`  - [${sh.id}] Shot "${sh.data.label}"${boardSuffix(sh.data)}${shotImages ? ` (${imageWord(sh.id)})` : ''}${imageSuffix}`)
       })
     }
     const standaloneVideos = videos.filter(

@@ -149,7 +149,8 @@ function stageDotColor(dot: ShotStageDot): { color: ShotStateColor | null; ring:
   }
 }
 
-/** 카드 아래 "● 이미지 → ● 영상" 줄(시안 D1 · D3). */
+/** 카드 아래 "● 이미지 → ● 영상" 줄(시안 D1 · D3). 가장 좁은 카드(50% + 채팅 열림)에서는 글을 줄여 쓴다 —
+ *  카드 테두리에 걸리지 않게, 점 · 화살표는 그대로(검토 b S1f · 카드 위쪽 줄과 같은 규칙). */
 export function ShotPipelineRow({ state, className }: { state: DirectorShotState; className?: string }) {
   const t = useT()
   const dots = shotStageDots(state)
@@ -158,18 +159,18 @@ export function ShotPipelineRow({ state, className }: { state: DirectorShotState
   return (
     <div
       className={cn(
-        'flex items-center gap-2 rounded-lg bg-card px-2.5 py-1.5 text-[11.5px] font-medium text-muted-foreground',
+        'flex min-w-0 items-center gap-2 overflow-hidden rounded-lg bg-card px-2.5 py-1.5 text-[11.5px] font-medium text-muted-foreground',
         className,
       )}
     >
-      <span className="inline-flex items-center gap-1.5">
+      <span title={t('Image')} className="inline-flex min-w-0 items-center gap-1.5">
         <ShotStateDot color={image.color} ring={image.ring} />
-        {t('Image')}
+        <span className="min-w-0 truncate">{t('Image')}</span>
       </span>
-      <span aria-hidden className="text-subtle-foreground">→</span>
-      <span className="inline-flex items-center gap-1.5">
+      <span aria-hidden className="shrink-0 text-subtle-foreground">→</span>
+      <span title={t('Video')} className="inline-flex min-w-0 items-center gap-1.5">
         <ShotStateDot color={video.color} ring={video.ring} />
-        {t('Video')}
+        <span className="min-w-0 truncate">{t('Video')}</span>
       </span>
     </div>
   )
@@ -180,13 +181,28 @@ export function ImageNeededTag({ className }: { className?: string }) {
   const t = useT()
   return (
     <span
+      title={t('Image needed')}
       className={cn(
-        'inline-flex items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-stage-producer',
+        // 좁은 카드에서는 줄여 쓴다(…) — ⤢ 상세 단추와 겹치지 않게(영어 재점검 S3).
+        'inline-flex min-w-0 items-center gap-1 rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-stage-producer',
         className,
       )}
     >
       <ImageIcon className="size-3 shrink-0" />
-      <span className="whitespace-nowrap">{t('Image needed')}</span>
+      <span className="min-w-0 truncate">{t('Image needed')}</span>
+    </span>
+  )
+}
+
+/** 러프가 실사 이미지 뒤에 바뀐 샷의 꼬리표(약속 I4) — "이미지 필요"와 같이 좁은 카드에서는 줄여 쓴다(검토 b S1d). */
+export function RoughChangedTag({ className }: { className?: string }) {
+  const t = useT()
+  return (
+    <span
+      title={t('Rough changed')}
+      className={cn('inline-flex min-w-0 items-center rounded-[6px] bg-black/45 px-1.5 py-0.5 text-[11px] font-semibold text-warning', className)}
+    >
+      <span className="min-w-0 truncate">{t('Rough changed')}</span>
     </span>
   )
 }

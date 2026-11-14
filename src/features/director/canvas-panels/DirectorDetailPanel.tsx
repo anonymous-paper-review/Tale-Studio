@@ -22,6 +22,8 @@ export function DirectorDetailPanel() {
   // 샷 상세(openShotDetail)는 노드형에서만 왼쪽 패널 — 스토리보드형은 팝업(DirectorNodePopup)이 맡는다.
   const detailNodeId = useDirectorCanvasStore((s) => (s.viewMode === 'node' ? s.detailNodeId : null))
   const detailTab = useDirectorCanvasStore((s) => s.detailTab)
+  // 여는 차례 — 이미 열린 상세를 [바꾸기] · ⤢ 로 다시 열면 다시 붙이지 않고 탭만 고른 탭으로 맞춘다(적던 글은 남는다, 리드 11/14).
+  const detailOpenSeq = useDirectorCanvasStore((s) => s.detailOpenSeq)
   const closeShotDetail = useDirectorCanvasStore((s) => s.closeShotDetail)
   const shownId = detailNodeId ?? selectedNodeId
   const node = useDirectorCanvasStore((s) =>
@@ -41,10 +43,11 @@ export function DirectorDetailPanel() {
     return (
       <aside className="absolute left-0 top-0 z-10 flex h-full w-[420px] flex-col border-r border-border bg-background/95 shadow-lg backdrop-blur">
         <DirectorShotDetail
-          key={`${node.id}:${detailNodeId ? detailTab : ''}`}
+          key={node.id}
           shotNodeId={shotNodeId}
           initialTab={detailNodeId ? detailTab : isVideoData(node.data) ? 'video' : 'image'}
           initialTakeId={isVideoData(node.data) ? node.id : null}
+          openSeq={detailNodeId ? detailOpenSeq : undefined}
           layout="panel"
           onClose={() => closeShotDetail()}
         />

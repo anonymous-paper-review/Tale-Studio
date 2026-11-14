@@ -36,6 +36,19 @@ export function stopNotice(stopped: { images: number; videos: number }): string 
   return 'Stopped.'
 }
 
+/** [모두 멈추기] 알림에 쓸 수 — 멈춘 작업을 이미지 · 영상으로 세고, 도는 이미지 판을 멈췄으면 그 판이 보낸(또는 막 보내는) 장의
+ *  작업이 아직 목록에 없어도 이미지를 멈춘 것으로 센다(영어 재점검 S1 — "Stopped."만 떴다). */
+export function stoppedCounts(
+  asked: readonly Pick<ActiveJob, 'id' | 'kind'>[],
+  stopped: ReadonlySet<string>,
+  imageBatchWasLive: boolean,
+): { images: number; videos: number } {
+  const jobs = asked.filter((job) => stopped.has(job.id))
+  const videos = jobs.filter((job) => job.kind === 'shot_video').length
+  const images = jobs.length - videos
+  return { images: images === 0 && imageBatchWasLive ? 1 : images, videos }
+}
+
 /** 카드 · 노드 [멈추기]가 멈출 것 — 그 샷을 만드는 작업들과, 그 작업이 함께 그리는 샷 수(4샷 한 장이면 4). */
 export interface ShotStopTarget {
   jobIds: string[]
