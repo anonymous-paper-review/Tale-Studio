@@ -109,7 +109,7 @@ describe('영어 화면의 Director 채팅 채울 것 목록', () => {
     const summary = summarizeGaps(gaps, 3, 'en')
     expect(summary).toContain('2 more')
     expect(summary).not.toMatch(HANGUL)
-    expect(source('src/app/studio/director/page.tsx')).toMatch(/summarizeGaps\(gaps, \d+, locale\)/)
+    expect(source('src/app/studio/director/page.tsx')).toMatch(/summarizeGaps\(gaps, \d+, chatLocale\)/)
   })
 })
 

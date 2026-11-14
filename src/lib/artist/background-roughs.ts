@@ -3,6 +3,7 @@
 //   샷이 저장되고 Artist 그림을 다 그린 뒤, Artist 화면이 열려 있는 동안 빠진 컷을 미리 그린다(Storyboard 화면과 같은 펌프 규칙).
 //   러프는 인물 · 배경 그림을 기준으로 쓰지 않는다(컷 배치 틀만) — Artist 그림과 상관없이 그릴 수 있다.
 //   약속: tests/artist/rough-in-background.test.ts
+import { isModerationFailureText } from '@/lib/fal/failure-class'
 import { runRoughPump, type RoughPumpOutcome } from '@/lib/writer/rough-pump-client'
 
 type RunStatusLike = {
@@ -26,6 +27,8 @@ export interface BackgroundRoughDeps {
   /** 잡 하나가 끝날 때까지 기다린다(성공 · 실패 모두) — 묶음 사이의 배리어. */
   poll: (jobId: string) => Promise<unknown>
   isAborted: () => boolean
+  /** 한 묶음이 끝난 뒤, 내용 검사(moderation)로 실패한 잡이 맡은 샷들을 한 번에 알린다(2026-11-14 오너). 걸린 잡이 없으면 부르지 않는다. */
+  onModerationFailed?: (shotIds: string[]) => void
 }
 
 /** 빠진 러프를 묶음으로 차례로 맡긴다 — 어느 컷이 빠졌는지는 서버가 고른다. 자리가 차면(429) 알림 없이 멈춘다
@@ -52,12 +55,24 @@ export function drawRoughsInBackground(projectId: string, deps: BackgroundRoughD
       if (!res.ok || !body?.data) return null
       const submitted = body.data.submitted ?? []
       const jobIds = [...new Set(submitted.map((item) => item.jobId).filter(Boolean))]
+      // 잡 하나가 맡은 샷들(그리드 한 장 = 최대 4샷) — 걸린 잡의 샷을 가려 낸다.
+      const shotsByJob = new Map<string, string[]>()
+      for (const item of submitted) shotsByJob.set(item.jobId, [...(shotsByJob.get(item.jobId) ?? []), item.shotId])
       return {
         submitted: submitted.length,
         remaining: body.data.remaining ?? 0,
         quota: false,
         confirmationPending: body.data.confirmationPending === true || submitted.some((item) => item.confirmationPending === true),
-        done: Promise.allSettled(jobIds.map((jobId) => deps.poll(jobId))),
+        // 한 묶음의 실패는 묶음이 끝난 뒤 한 번에 모아 알린다(샷마다 줄을 만들지 않게). 알림은 덤이라 그리기 흐름을 막지 않는다.
+        done: Promise.allSettled(jobIds.map((jobId) => deps.poll(jobId))).then((results) => {
+          const blocked = results.flatMap((result, index) => {
+            if (result.status !== 'rejected') return []
+            const reason: unknown = result.reason
+            return isModerationFailureText(reason instanceof Error ? reason.message : reason) ? shotsByJob.get(jobIds[index]) ?? [] : []
+          })
+          if (blocked.length > 0) deps.onModerationFailed?.(blocked)
+          return results
+        }),
       }
     },
   })

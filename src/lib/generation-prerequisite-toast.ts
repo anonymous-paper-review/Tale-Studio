@@ -11,8 +11,13 @@
 
 import { toast } from 'sonner'
 import { translate } from '@/lib/i18n'
+import { contentLocale } from '@/lib/i18n/content'
+import { shotName } from '@/lib/board-names'
+import type { AppLocale } from '@/lib/locale'
+import { boardShots } from '@/lib/writer/board-summary'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useWriterStore } from '@/stores/writer-store'
 import { createClient } from '@/lib/supabase/client'
 import { hasStoryboardImage } from '@/lib/director/storyboard-image'
 import type { StageId } from '@/types'
@@ -54,31 +59,47 @@ function missingNames(body: PrerequisiteBody): string {
     .join(', ')
 }
 
-/** 사람이 읽는 "무엇을 기다리나" — 인물 시트: 이름들 / 러프 스토리보드(샷) / 실사 스토리보드(샷). */
-export function prerequisiteLabel(body: PrerequisiteBody & { code: PrerequisiteCode }): string {
-  const locale = useLocaleStore.getState().locale
+/** 기다리는 샷의 보드 이름("샷 3" · "Shot 3") — 보드를 모르거나 없는 샷은 번호를 지어내지 않고 지금처럼 Writer 샷 id 그대로(2026-11-14 오너 — 씬 · 샷 이름 전역 규칙).
+ *  locale = 그 이름이 들어갈 글의 언어(화면 알림은 화면 언어, 채팅 줄은 채팅 언어). */
+function waitingShotName(shotId: string | undefined, locale: AppLocale): string {
+  if (!shotId) return '?'
+  const board = useWriterStore.getState()
+  const entry = boardShots(board.sceneManifest, board.shots).find((item) => item.shot.shotId === shotId)
+  return entry ? shotName(locale, entry.shotNo) : shotId
+}
+
+/** 사람이 읽는 "무엇을 기다리나" — 인물 시트: 이름들 / 러프 스토리보드(샷) / 실사 스토리보드(샷). locale 을 안 주면 화면 언어. */
+export function prerequisiteLabel(
+  body: PrerequisiteBody & { code: PrerequisiteCode },
+  locale: AppLocale = useLocaleStore.getState().locale,
+): string {
   switch (body.code) {
     case 'missing_character_sheets':
       return translate(locale, 'character sheets for {names}', { names: missingNames(body) || '?' }) // copy-ok: fragment
     case 'missing_rough_storyboard':
-      return translate(locale, 'the rough storyboard of {shot}', { shot: body.shotId ?? '?' }) // copy-ok: fragment
+      return translate(locale, 'the rough storyboard of {shot}', { shot: waitingShotName(body.shotId, locale) }) // copy-ok: fragment
     case 'missing_storyboard':
-      return translate(locale, 'the live-action storyboard of {shot}', { shot: body.shotId ?? '?' }) // copy-ok: fragment
+      return translate(locale, 'the live-action storyboard of {shot}', { shot: waitingShotName(body.shotId, locale) }) // copy-ok: fragment
   }
 }
 
 const TOAST_ID = 'generation-prerequisite'
 
+/** 대기 안내 문장 — 화면 알림(화면 언어)과 채팅 줄(채팅 언어)이 같은 글을 각자의 말로 짓는다. */
+function waitingSentence(locale: AppLocale, body: PrerequisiteBody & { code: PrerequisiteCode }): string {
+  return translate(locale, 'Waiting for {what}. Generation resumes automatically when it is ready.', { what: prerequisiteLabel(body, locale) })
+}
+
+function timeoutSentence(locale: AppLocale, body: PrerequisiteBody & { code: PrerequisiteCode }): string {
+  return translate(locale, 'Stopped waiting for {what} after 20 minutes. Generate it, then retry manually.', { what: prerequisiteLabel(body, locale) })
+}
+
 export function notifyPrerequisiteWaiting(stage: StageId, body: PrerequisiteBody & { code: PrerequisiteCode }): void {
-  const locale = useLocaleStore.getState().locale
-  const message = translate(
-    locale,
-    'Waiting for {what}. Generation resumes automatically when it is ready.',
-    { what: prerequisiteLabel(body) },
-  )
-  toast.info(message, { id: TOAST_ID })
+  toast.info(waitingSentence(useLocaleStore.getState().locale, body), { id: TOAST_ID })
   // 채팅에도 남긴다 — toast 는 사라지지만 "왜 안 됐나"는 stage 를 옮겨도 읽을 수 있어야 한다.
-  useGlobalChatStore.getState().notifyActionError(stage, translate(locale, 'Generation'), message)
+  //   notifyActionError 의 "Couldn't start {label} generation: …" 틀을 쓰지 않는다 — 라벨 "Generation"이 겹쳐 "Generation generation"
+  //   (한국어 "생성 생성")이 됐고, 실패가 아닌 기다림을 실패처럼 말했다(2026-11-14 오너). ⚠ 는 채팅이 상태 행으로 가르는 고정 마커(chat-blocks).
+  useGlobalChatStore.getState().notifyIssue(stage, `⚠ ${waitingSentence(contentLocale(), body)}`)
 }
 
 export function notifyPrerequisiteResumed(body: PrerequisiteBody & { code: PrerequisiteCode }): void {
@@ -87,14 +108,8 @@ export function notifyPrerequisiteResumed(body: PrerequisiteBody & { code: Prere
 }
 
 export function notifyPrerequisiteTimeout(stage: StageId, body: PrerequisiteBody & { code: PrerequisiteCode }): void {
-  const locale = useLocaleStore.getState().locale
-  const message = translate(
-    locale,
-    'Stopped waiting for {what} after 20 minutes. Generate it, then retry manually.',
-    { what: prerequisiteLabel(body) },
-  )
-  toast.error(message, { id: TOAST_ID })
-  useGlobalChatStore.getState().notifyActionError(stage, translate(locale, 'Generation'), message)
+  toast.error(timeoutSentence(useLocaleStore.getState().locale, body), { id: TOAST_ID })
+  useGlobalChatStore.getState().notifyIssue(stage, `⚠ ${timeoutSentence(contentLocale(), body)}`)
 }
 
 /**

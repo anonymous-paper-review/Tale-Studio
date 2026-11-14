@@ -7,10 +7,13 @@ import { useMemo } from 'react'
 import { boardNodeNames, type BoardNodeNames } from '@/features/director/node-label'
 import { useWriterStore } from '@/stores/writer-store'
 import { useLocaleStore } from '@/stores/locale-store'
+import type { AppLocale } from '@/lib/locale'
 
-export function useBoardNodeNames(): BoardNodeNames {
+/** localeOverride: 이름을 지을 말 — 안 주면 화면 언어. 채팅에 남는 글의 이름은 채팅 언어를 준다(오너 2026-11-14 답 7). */
+export function useBoardNodeNames(localeOverride?: AppLocale): BoardNodeNames {
   const manifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
-  const locale = useLocaleStore((s) => s.locale)
+  const uiLocale = useLocaleStore((s) => s.locale)
+  const locale = localeOverride ?? uiLocale
   return useMemo(() => boardNodeNames(manifest, shots ?? [], locale), [manifest, shots, locale])
 }

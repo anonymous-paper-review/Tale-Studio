@@ -29,7 +29,7 @@ import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { artistPhase, artistRunStopped, assetCompletionGaps, legacyProgressHolds, makingProgress } from '@/lib/artist/breakdown'
-import { ARTIST_BRIEF_TEXT, artistBriefCounts, offerArtistBrief } from '@/lib/artist/brief'
+import { artistBriefCounts, artistBriefText, offerArtistBrief } from '@/lib/artist/brief'
 import { completeBlockedNote, drawContinueDecision, drawTargetCount, makingOverlayCopy, missingDrawTargets, autoGenerateOnEnter, writerStatusKnown } from '@/lib/artist/draw-continue'
 import { backgroundRoughReady, storyboardPrepView } from '@/lib/artist/background-roughs'
 import { isDemoSession } from '@/lib/demo/context'
@@ -311,7 +311,7 @@ export default function VisualPage() {
   // 첫 안내는 채팅 기록을 다 읽은 뒤에만 — 읽기 전에 말하면 이미 안내한 프로젝트에 한 번 더 남는다.
   const chatHistoryLoaded = useGlobalChatStore((s) => s.messagesLoadedProjectId === projectId)
   const briefCounts = artistBriefCounts({ ready, phase, characters: characterAssets, worlds: worldAssets })
-  const artistBriefContent = briefCounts ? t(ARTIST_BRIEF_TEXT, briefCounts) : null
+  const artistBriefContent = briefCounts ? artistBriefText(t, briefCounts) : null
   useEffect(() => {
     if (!projectId || !artistBriefContent || !chatHistoryLoaded || artistBriefedRef.current === projectId) return
     if (offerArtistBrief(projectId, artistBriefContent)) artistBriefedRef.current = projectId

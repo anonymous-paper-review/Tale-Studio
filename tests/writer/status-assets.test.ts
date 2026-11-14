@@ -85,6 +85,8 @@ interface StatusAssets {
   worlds_total: number
   queued_count: number
   failed_count: number
+  /** 10분 넘게 대기로 멈춘 작업 수 — 실패도 대기도 아니다(2026-11-14 오너). */
+  stale_count: number
   stalled: boolean
   images_ready: boolean
 }
@@ -140,6 +142,7 @@ describe('Writer 작업 상태에서 인물·장소 이미지 현황을 보여�
       worlds_total: 1,
       queued_count: 1,
       failed_count: 0,
+      stale_count: 0,
       stalled: false,
       images_ready: false,
     })
@@ -185,7 +188,8 @@ describe('Writer 작업 상태에서 인물·장소 이미지 현황을 보여�
     expect(assets.stalled).toBe(true)
   })
 
-  it('오래 대기한 이미지 작업은 실패로 세고 대기 중으로 남기지 않는다', async () => {
+  it('10분 넘게 대기로 멈춘 이미지 작업은 실패가 아니라 멈춘 작업으로 따로 세고 대기 중으로 남기지 않는다', async () => {
+    // 왜: 멈춘 작업을 실패로 세서 Lumi 가 "대기 0 · 실패 1 · 마지막 시도가 실패했어요"라고 DB(대기 그대로)와 다르게 말했다(2026-11-14 오너).
     mocks.db.characters = [characterFixture({ character_id: 'missing-char', view_main: null })]
     mocks.db.locations = [locationFixture({ wide_shot: 'https://img/world.png' })]
     mocks.db.generationJobs = [
@@ -196,8 +200,40 @@ describe('Writer 작업 상태에서 인물·장소 이미지 현황을 보여�
     const assets = expectAssets(body)
 
     expect(assets.queued_count).toBe(0)
-    expect(assets.failed_count).toBe(1)
+    expect(assets.failed_count).toBe(0)
+    expect(assets.stale_count).toBe(1)
     expect(assets.stalled).toBe(true)
+  })
+
+  it('실패한 작업과 멈춘 작업이 같이 있으면 각각 따로 센다', async () => {
+    // 왜: 둘을 한 숫자로 합치면 "실패 2"라고만 말해 무엇을 다시 해야 하는지 가릴 수 없다.
+    mocks.db.characters = [characterFixture({ character_id: 'missing-char', view_main: null })]
+    mocks.db.locations = [locationFixture({ wide_shot: null })]
+    mocks.db.generationJobs = [
+      generationJobFixture({ kind: 'character_view', status: 'failed', created_at: STALE_CREATED_AT }),
+      generationJobFixture({ kind: 'world_shot', status: 'queued', created_at: STALE_CREATED_AT }),
+      generationJobFixture({ kind: 'world_shot', status: 'queued', created_at: FRESH_CREATED_AT }),
+    ]
+
+    const assets = expectAssets(await statusBody('/api/writer/status/project-1?assets=1'))
+
+    expect(assets.failed_count).toBe(1)
+    expect(assets.stale_count).toBe(1)
+    expect(assets.queued_count).toBe(1)
+    expect(assets.stalled).toBe(false)
+  })
+
+  it('10분 안에 대기한 이미지 작업은 지금처럼 대기 중으로 센다', async () => {
+    // 왜: 정상 경로 고정 — 막 접수한 작업을 멈춘 것으로 세면 안 된다.
+    mocks.db.characters = [characterFixture({ character_id: 'drawing-char', view_main: null })]
+    mocks.db.locations = [locationFixture({ wide_shot: 'https://img/world.png' })]
+    mocks.db.generationJobs = [
+      generationJobFixture({ kind: 'character_view', status: 'queued', created_at: FRESH_CREATED_AT }),
+    ]
+
+    const assets = expectAssets(await statusBody('/api/writer/status/project-1?assets=1'))
+
+    expect(assets).toMatchObject({ queued_count: 1, failed_count: 0, stale_count: 0, stalled: false })
   })
 
   it('기존 이미지와 대표 이미지가 있으면 준비 완료로 센다', async () => {
@@ -217,6 +253,7 @@ describe('Writer 작업 상태에서 인물·장소 이미지 현황을 보여�
       worlds_total: 1,
       queued_count: 0,
       failed_count: 0,
+      stale_count: 0,
       stalled: false,
       images_ready: true,
     })
@@ -238,6 +275,7 @@ describe('Writer 작업 상태에서 인물·장소 이미지 현황을 보여�
         worlds_total: 0,
         queued_count: 0,
         failed_count: 0,
+        stale_count: 0,
         stalled: false,
         images_ready: false,
       })

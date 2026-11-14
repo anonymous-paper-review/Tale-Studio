@@ -5011,10 +5011,20 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
     const { suggestion: current, dismissedSuggestionIds } = get()
     if (suggestion.content && suggestion.action?.kind !== 'choices' && !get().recordedSuggestionIds.includes(suggestion.id)) {
-      const message = { id: makeId(), stage: suggestion.stage, role: 'model' as const, content: suggestion.content }
-      set(state => ({ messages: [...state.messages, message], recordedSuggestionIds: [...state.recordedSuggestionIds, suggestion.id] }))
-      const projectId = useProjectStore.getState().projectId
-      if (projectId) saveChatMessage(projectId, suggestion.stage, 'model', suggestion.content)
+      // 같은 단계에 같은 문장이 이미 채팅 기록에 있으면 다시 남기지 않는다(2026-11-14 오너). "이미 남겼다"는 기억(recordedSuggestionIds)은
+      //   이 브라우저 저장소에만 있어, 다른 브라우저 · 저장소를 지운 계정 · 기록을 읽기 전 화면에서는 같은 안내가 기록에 또 쌓였다.
+      //   버튼 없는 안내(첫 사용법 · 채워 두면 좋은 것 · 보드 첫 안내)만 막는다 — 단추가 달린 질문("다음 단계로 넘어갈까요?")은 다시 적용할 때마다
+      //   채팅에 새로 남는 것이 의도다(tests/chat/writer-prose-chat). 안내 카드(제안 자리)는 아래에서 그대로 뜬다 — 줄만 다시 남기지 않는다.
+      //   정확히 같은 글자만 막는다(수가 바뀐 안내는 새 안내).
+      const alreadySaid = suggestion.action == null && get().messages.some((m) => m.role === 'model' && m.stage === suggestion.stage && m.content === suggestion.content)
+      if (alreadySaid) {
+        set(state => ({ recordedSuggestionIds: [...state.recordedSuggestionIds, suggestion.id] }))
+      } else {
+        const message = { id: makeId(), stage: suggestion.stage, role: 'model' as const, content: suggestion.content }
+        set(state => ({ messages: [...state.messages, message], recordedSuggestionIds: [...state.recordedSuggestionIds, suggestion.id] }))
+        const projectId = useProjectStore.getState().projectId
+        if (projectId) saveChatMessage(projectId, suggestion.stage, 'model', suggestion.content)
+      }
       persistConversationState(get())
     }
     // blocking 게이트(dismissible:false)는 "닫을 수 없는" 제안이라 닫힘 기록에 갇히지 않는다 —

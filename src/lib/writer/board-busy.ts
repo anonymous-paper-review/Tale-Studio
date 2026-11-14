@@ -3,6 +3,7 @@
 //   보드는 뒤에 그대로 그려져 다 그린 샷부터 보인다. 다 그리면 잠금을 풀고, 실패한 컷이 남으면 실패 안내를 둔다.
 //   화면(rough-storyboard-view)은 그때그때의 사실만 넘기고, 언제 잠그고 무엇을 보일지는 여기서만 정한다.
 import { translate } from '@/lib/i18n/translate'
+import { countText } from '@/lib/i18n/count-text'
 import type { AppLocale } from '@/lib/locale'
 import { writerProgressView } from '@/lib/writer/progress-view'
 import type { RoughProgress } from '@/lib/writer/rough-progress'
@@ -110,7 +111,9 @@ const ROUGH_STEP = SPLIT_STEPS
 function steps(current: number, sceneCount: number, rough: RoughProgress | null, locale: AppLocale): StoryboardBusyStep[] {
   const labels = [
     translate(locale, 'Reading the prose'),
-    sceneCount > 0 ? translate(locale, 'Splitting into {count} scenes', { count: sceneCount }) : translate(locale, 'Splitting into scenes'),
+    sceneCount > 0
+      ? countText((text, params) => translate(locale, text, params), sceneCount, 'Splitting into {count} scene', 'Splitting into {count} scenes', { count: sceneCount })
+      : translate(locale, 'Splitting into scenes'),
     translate(locale, 'Placing the camera and shots'),
     translate(locale, 'Choosing shot size, angle and movement'),
     current >= ROUGH_STEP && rough && rough.total > 0
@@ -183,7 +186,7 @@ export function storyboardBusyView(
     return {
       open: true,
       phase: 'failed',
-      title: translate(locale, '{count} roughs could not be drawn', { count: rough.failed }),
+      title: countText((text, params) => translate(locale, text, params), rough.failed, '{count} rough could not be drawn', '{count} roughs could not be drawn', { count: rough.failed }),
       description: translate(locale, 'Draw the remaining cuts again, or close this and redraw them on the board.'),
       progress: percent,
       progressLabel: roughLabel,

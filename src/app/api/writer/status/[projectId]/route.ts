@@ -19,7 +19,11 @@ interface WriterStatusAssets {
   worlds_ready: number;
   worlds_total: number;
   queued_count: number;
+  /** 실패한 작업만 센다 — 10분 넘게 멈춘 대기 작업은 여기 섞지 않는다(stale_count). */
   failed_count: number;
+  /** 10분 넘게 대기로 멈춘 작업 수 — 실패도 대기도 아니다. 웹훅을 놓친 유령 · 접수 확인이 안 된 예약(2026-11-14 오너 — 현황이 멈춘 작업을 따로 말하게).
+   *  Lumi 가 이 키를 "멈춘 작업 N개"로 말한다(chat-tools/protocol.ts 안내). */
+  stale_count: number;
   stalled: boolean;
   images_ready: boolean;
 }
@@ -32,6 +36,7 @@ function emptyAssets(): WriterStatusAssets {
     worlds_total: 0,
     queued_count: 0,
     failed_count: 0,
+    stale_count: 0,
     stalled: false,
     images_ready: false,
   };
@@ -153,7 +158,7 @@ async function computeAssets(
       : 0;
 
     const charsReady = Math.min(charsTotal, charsWithImage + charsReadyFromCandidates);
-    const failedCount = failedJobs + staleQueuedJobs;
+    // 멈춘 대기 작업은 실패로 합치지 않고 따로 센다 — 합치면 AI 가 "마지막 시도가 실패했어요"라고 DB(대기 그대로)와 다르게 말했다.
     const imagesReady = charsReady === charsTotal && worldsReady === worldsTotal;
     const designTokensPresent = projectResult.data?.design_tokens != null;
 
@@ -163,7 +168,8 @@ async function computeAssets(
       worlds_ready: worldsReady,
       worlds_total: worldsTotal,
       queued_count: queuedCount,
-      failed_count: failedCount,
+      failed_count: failedJobs,
+      stale_count: staleQueuedJobs,
       stalled: (designTokensPresent || pipelineCompleted) && !imagesReady && queuedCount === 0,
       images_ready: imagesReady,
     };

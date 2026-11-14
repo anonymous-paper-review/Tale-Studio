@@ -16,6 +16,13 @@ export function shotName(locale: AppLocale, no: number | string): string {
   return translate(locale, 'Shot {n}', { n: no })
 }
 
+/** "샷 3" · "샷 3·5" / "Shot 3" · "Shots 3 · 5" — 보드 번호 여럿을 한 이름으로, 번호 순서로(채팅 줄). Director 채팅의 shotListLabel 과 같은 꼴이다. */
+export function shotNumbersName(locale: AppLocale, nos: readonly number[]): string {
+  const sorted = [...new Set(nos)].sort((a, b) => a - b)
+  if (sorted.length === 1) return shotName(locale, sorted[0])
+  return translate(locale, 'Shots {list}', { list: sorted.join(locale === 'ko' ? '·' : ' · ') })
+}
+
 /** "씬 2 · 샷 8" · "Scene 2 · Shot 8" — 씬 맥락 없이 샷 하나를 부를 때(보드 카드 · 넘기기 창 · 채팅). */
 export function sceneShotName(locale: AppLocale, sceneNo: number | string, shotNo: number | string): string {
   return translate(locale, 'Scene {scene} · Shot {shot}', { scene: sceneNo, shot: shotNo })
