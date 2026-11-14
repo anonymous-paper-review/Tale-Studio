@@ -31,8 +31,12 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
 }) {
   const t = useT()
   const [tab, setTab] = useState<ShotDetailTab>(initialTab)
+  // 스크롤 칸 — 노드형 패널에서는 이 맨 바깥 칸이 스크롤된다.
+  const rootRef = useRef<HTMLDivElement>(null)
   // 이미 열린 상세를 [바꾸기] · ⤢ 로 다시 열면 탭만 고른 탭으로 맞춘다 — 다시 붙이면 상세 안에서 보내기 전에 적던 글이 지워졌다(리드 11/14).
+  //   탭이 바뀔 때는 맨 위로 올려 탭 머리가 보이게 한다 — 내려가 있던 채 바뀌면 탭 머리 · Take 머리가 화면 밖이었다(영어 재점검 qa-golden).
   useEffect(() => {
+    if (openSeq !== undefined && tab !== initialTab && rootRef.current) rootRef.current.scrollTop = 0
     if (openSeq !== undefined) setTab(initialTab)
     // eslint-disable-next-line react-hooks/exhaustive-deps -- 여는 차례가 바뀔 때만 맞춘다(사람이 안에서 바꾼 탭은 그대로 둔다)
   }, [openSeq])
@@ -87,7 +91,7 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   const meta = [scene ? directorNodeLabel(scene.data, boardNames) : null, t('{seconds}s', { seconds: data.durationSeconds }), effectivePrompt(data)].filter(Boolean).join(' · ')
 
   return (
-    <div className={cn('flex min-h-0 flex-col gap-4', layout === 'panel' && 'h-full overflow-y-auto p-5')} data-testid="director-shot-detail">
+    <div ref={rootRef} className={cn('flex min-h-0 flex-col gap-4', layout === 'panel' && 'h-full overflow-y-auto p-5')} data-testid="director-shot-detail">
       {/* 패널은 높이가 정해진 세로 줄이라 머리 · 설명 줄이 눌려 사라지지 않게 shrink-0. */}
       <header className="flex shrink-0 items-center gap-3">
         <h2 className="text-h3 font-semibold">{directorNodeLabel(data, boardNames)}</h2>
