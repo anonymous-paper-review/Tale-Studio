@@ -7,7 +7,7 @@ vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTra
 import { artistBriefText } from '@/lib/artist/brief'
 import { gapNudgeText } from '@/lib/completeness'
 import { translate } from '@/lib/i18n/translate'
-import { storyboardBriefing } from '@/lib/writer/board-summary'
+import { boardTotalText, storyboardBriefing } from '@/lib/writer/board-summary'
 import { INITIAL_BOARD_LOCK, advanceBoardLock, storyboardBusyView } from '@/lib/writer/board-busy'
 
 const en = (text: string, params?: Record<string, string | number>) => translate('en', text, params)
@@ -142,5 +142,23 @@ describe('Storyboard 잠금 창의 못 그린 러프 수', () => {
     expect(failedTitle('en', 2)).toBe('2 roughs could not be drawn')
     expect(failedTitle('ko', 1)).toBe('러프 1컷을 그리지 못했어요')
     expect(failedTitle('ko', 2)).toBe('러프 2컷을 그리지 못했어요')
+  })
+})
+
+describe('Storyboard 진행 줄의 보드 전체 샷 수', () => {
+  it('영어 진행 줄은 샷이 1개면 "Board total: 1 shot"으로 단수로 말하고, 0개나 둘 이상이면 지금처럼 복수로 말한다', () => {
+    // 왜: 보드에 샷이 하나뿐일 때 진행 줄 머리가 "Board total: 1 shots"로 나왔다.
+    expect(boardTotalText(en, 1)).toBe('Board total: 1 shot')
+    expect(boardTotalText(en, 0)).toBe('Board total: 0 shots')
+    expect(boardTotalText(en, 47)).toBe('Board total: 47 shots')
+    expect(boardTotalText(ko, 1)).toBe('보드 전체 1샷')
+    expect(boardTotalText(ko, 47)).toBe('보드 전체 47샷')
+  })
+
+  it('Storyboard 화면은 보드 전체 샷 수 줄을 수에 맞는 문장으로 짓는다', () => {
+    // 왜: 문장을 고르는 함수가 있어도 화면이 옛 한 줄 키를 그대로 부르면 단수 고침이 화면에 닿지 않는다.
+    const view = readFileSync('src/features/writer/rough-storyboard-view.tsx', 'utf8')
+    expect(view).toMatch(/boardTotalText\(t, roughProgress\.total\)/)
+    expect(view).not.toMatch(/t\('Board total: \{count\} shots'/)
   })
 })

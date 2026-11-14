@@ -3656,4 +3656,5 @@ export const KO: Record<string, string> = {
   'There is {count} thing worth filling in:\n{summary}': '채워두면 좋을 항목이 {count}건 있어요:\n{summary}',
   'Splitting into {count} scene': '씬 {count}개로 나누기',
   '{count} rough could not be drawn': '러프 {count}컷을 그리지 못했어요',
+  'Board total: {count} shot': '보드 전체 {count}샷',
 }

@@ -75,7 +75,7 @@ import {
   type BoardLockFacts,
   type BoardLockState,
 } from '@/lib/writer/board-busy'
-import { boardShots, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel, storyboardBriefing } from '@/lib/writer/board-summary'
+import { boardShots, boardTotalText, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel, storyboardBriefing } from '@/lib/writer/board-summary'
 import { pipelineLocationName, sceneName, sceneShotName } from '@/lib/board-names'
 import {
   announcedWaitShot,
@@ -1178,7 +1178,7 @@ export function RoughStoryboardView() {
     <div className="flex min-h-0 flex-1 flex-col">
       <WriterHeader description={headerDescription} tools={storyboardTools} actions={storyboardActions} />
       <div role="status" aria-label={t('Rough storyboard progress')} className="flex shrink-0 flex-wrap items-center gap-x-4 gap-y-1 px-7 pt-3 font-num text-meta tabular-nums text-subtle-foreground">
-        <span className="font-medium text-muted-foreground">{t('Board total: {count} shots', { count: roughProgress.total })}</span>
+        <span className="font-medium text-muted-foreground">{boardTotalText(t, roughProgress.total)}</span>
         <span>{t('Completed')} {roughProgress.completed}</span>
         <span className="inline-flex items-center gap-1">
           {generatingCount > 0 && <Loader2 className="size-3 animate-spin" />}
