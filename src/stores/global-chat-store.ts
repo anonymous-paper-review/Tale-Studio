@@ -1413,21 +1413,14 @@ function shotsLine(locale: AppLocale, count: number, one: string, many: string, 
   return countText((key, params) => translate(locale, key, params), count, one, many, vars)
 }
 
-/** Lumi 에게 보내는 보드 맥락의 "샷마다 이미지" 칸(있음 · 그리는 중 · 없음) — 앱은 이미지가 있는 샷만 영상을 만든다(리드 11/14 영어 재점검 B3).
- *  그리는 중은 보드처럼 이미지 일괄이 맡아 차례를 기다리는 샷도. Lumi 가 이미지 없는 샷의 영상을 "보낸다 · 목록을 보인다"고 약속하지 않게. */
-function directorShotImagesContext(): string {
-  const nodes = useDirectorCanvasStore.getState().nodes
-  const names = directorBoardNames()
-  const shots = nodes.filter((node) => isShotData(node.data))
-  if (shots.length === 0) return ''
-  const readiness = shotImageReadiness(shots.map((node) => node.id))
-  const word = { ready: 'image ready', drawing: 'image being made', missing: 'no image' } as const
-  return [
-    '### Shot images',
-    'The app makes a video only for a shot whose image is ready.',
-    ...shots.map((node) => `- [${node.id}] ${shotListLabel('en', [shotLabelOf(node, names)])}: ${word[readiness.get(node.id) ?? 'missing']}`),
-  ].join('\n')
+/** Lumi 에게 보내는 보드 맥락의 샷 줄 이미지 표시(있음 · 그리는 중 · 없음) — 앱은 이미지가 있는 샷만 영상을 만든다(리드 11/14 영어 재점검 B3).
+ *  그리는 중은 보드처럼 이미지 일괄이 맡아 차례를 기다리는 샷도. 노드 트리의 샷 줄에 붙여 노드 id 를 두 번 싣지 않는다(검토 a — 맥락 크기). */
+function directorShotImages(): Map<string, 'ready' | 'drawing' | 'missing'> {
+  return shotImageReadiness(useDirectorCanvasStore.getState().nodes.filter((node) => isShotData(node.data)).map((node) => node.id))
 }
+
+/** 프롬프트 규칙이 가리키는 "### Shot images" 머리 — 샷마다의 표시는 노드 트리의 샷 줄에 있다고 샷 수와 상관없이 한 번만 알린다. */
+const SHOT_IMAGES_NOTE = '### Shot images\nEach shot line in the node tree shows its image in the parentheses: image ready, image being made or no image. The app makes a video only for a shot whose image is ready.'
 
 function shotImageReadiness(shotIds: readonly string[]): Map<string, 'ready' | 'drawing' | 'missing'> {
   const { nodes, projectId } = useDirectorCanvasStore.getState()
@@ -3728,7 +3721,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // 씬 · 샷마다 보드 이름("Scene 2 · Shot 8")을 붙인다 — 사용자는 보드 번호로 부르고(@Previz Shot 8), 모델도 그 이름으로 답한다(오너 2026-11-02 "전체 번호로 통일").
         const writerBoard = useWriterStore.getState()
         // 샷마다 이미지가 있는지(있음 · 그리는 중 · 없음)를 덧붙인다 — 이미지 없는 샷의 영상을 약속하지 않게(리드 11/14 영어 재점검 B3).
-        const canvasContext = [serializeDirectorCanvasContext(canvasState, boardNodeNames(writerBoard.sceneManifest, writerBoard.shots)), directorShotImagesContext()].filter(Boolean).join('\n\n')
+        const shotImages = directorShotImages()
+        const canvasContext = [serializeDirectorCanvasContext(canvasState, boardNodeNames(writerBoard.sceneManifest, writerBoard.shots), shotImages), shotImages.size > 0 ? SHOT_IMAGES_NOTE : ''].filter(Boolean).join('\n\n')
         endpoint = '/api/director/chat'
         body = {
           message: trimmed,
