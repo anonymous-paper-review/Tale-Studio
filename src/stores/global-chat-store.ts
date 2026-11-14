@@ -1539,6 +1539,11 @@ async function holdOnTextCard(
 ): Promise<void> {
   const locale = contentLocale()
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  // 묶는 영상은 지금 이미지가 있는 샷만 — 없거나 그리는 중이면 그 자리에서 말하고 묶지 않는다([적용]은 카드 줄이 말한 그 목록만, 리드 11/14).
+  const videos = withImagesOnly(more.videos, locale, say)
+  const remakes = withImagesOnly(more.remakes ?? [], locale, say)
+  more = { ...more, videos, remakes, named: (more.named ?? []).filter((id) => videos.includes(id) || remakes.includes(id)) }
+  if (!more.allBlankImages && more.images.length === 0 && videos.length === 0 && remakes.length === 0) return
   const names = directorBoardNames()
   const nodes = useDirectorCanvasStore.getState().nodes
   const before = (card.proposal.payload.then as HeldDirectorWork | undefined) ?? { images: [], allBlankImages: false, videos: [] }
@@ -4509,7 +4514,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             if (grounding.kind === 'ask' && !hold && !onlyMaking && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true, ...(remake ? { remake } : {}) } })
           }
           // 되묻기 목록 중 이 답의 글 카드가 건 샷은 그 카드 [적용]이 곧 허락이다 — 카드에 묶고, 나머지만 "응"으로 묻는다.
-          const boundVideos = [...videoIds, ...confirmIds].filter((id) => bound.has(id))
+          //   묶는 영상은 지금 이미지가 있는 샷만 — 없거나 그리는 중이면 그 자리에서 말하고 묶지 않는다([적용]은 카드 줄이 말한 그 목록만, 리드 11/14).
+          const boundVideos = withImagesOnly([...videoIds, ...confirmIds].filter((id) => bound.has(id)), locale, lumiSays)
           if (remake) held.remakes = boundVideos
           else held.videos = boundVideos
           held.named = boundVideos.filter((id) => namedVideoIds.includes(id))
