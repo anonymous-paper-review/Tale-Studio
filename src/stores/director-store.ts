@@ -6059,7 +6059,8 @@ export function serializeDirectorCanvasContext(
   if (nodes.length > 0) {
     lines.push('### 노드 트리')
     if (boardNames && boardNames.shots.size > 0) {
-      lines.push('Board names in parentheses are what the user sees: shot numbers count across the whole storyboard and scene numbers follow the scene order. "@Previz Shot 8", "@Real Shot 8", "Shot 8" or "Scene 2 · Shot 8" means the node whose board name says so. Call scenes and shots by their board names in replies.')
+      // 보드 이름은 대화 언어로 적힌다(오너 2026-11-14 답 7) — 사용자는 두 말 어느 쪽으로도 부른다.
+      lines.push('Board names in parentheses are what the user sees, written in the conversation language: shot numbers count across the whole storyboard and scene numbers follow the scene order. The user may use either language: "@Previz Shot 8", "@Real Shot 8", "Shot 8", "Scene 2 · Shot 8", "@러프 샷 8", "@실사 샷 8", "샷 8" or "씬 2 · 샷 8" means the node whose board number is 8. Call scenes and shots by their board names exactly as written in the parentheses.') // i18n-ok: 모델에게 알리는 두 말의 이름 꼴
     }
     scenes.forEach((scene) => {
       if (!isSceneData(scene.data)) return

@@ -2,15 +2,11 @@
 // 이름이 없는 "빈 깡통" 카드도 안정 ref(localId)로 멘션·지정 가능하게 한다.
 // 같은 종류의 이름 없는 카드가 여러 개면 번호를 붙여 라벨을 고유하게 만든다(이름 미정 인물, 이름 미정 인물 2 …).
 //
-// i18n(#i18n-s5-batch4): label 은 LLM @멘션 텍스트 매칭의 식별자를 겸한다(활성 멘션 판정 —
-//   activeMentionRefs/toggleMentionToken — 이 label 문자열 자체를 매칭 키로 쓴다) + 클라(드롭다운
-//   렌더)·서버(produce/chat/route.ts, LLM 컨텍스트에 "@{label}" 을 주입)가 이 값을 공유한다.
-//   따라서 label(이름 있는 카드는 그대로, 없는 카드의 "이름 미정 …" 폴백)은 로케일과 무관하게
-//   고정한다 — 클라·서버가 서로 다른 locale 해석으로 다른 문자열을 만들면 LLM 이 되돌려준
-//   @멘션이 클라의 멘션 목록과 매칭되지 않는 조용한 고장이 된다. hint(카테고리 배지, 순수 표시용 —
-//   매칭에 안 쓰이고 서버도 안 읽음, 실측 확인)만 locale 인자로 번역한다.
-// 씬 · 샷 멘션(sceneShotMentions)은 화면 언어로 짓는다(오너 2026-11-14 답 7) — 서버가 읽지 않고, 고르기 목록과 입력창 글자가
-//   같은 화면 언어로 서로 맞는다. 모델에게는 목록 · 프롬프트가 두 말 이름을 같은 샷으로 알린다.
+// i18n: label 은 입력창 @멘션 텍스트 매칭의 식별자를 겸한다(활성 멘션 판정 — activeMentionRefs/toggleMentionToken —
+//   이 label 문자열 자체를 매칭 키로 쓴다). 오너 2026-11-14 답 7(전역 — 영어 화면에 한국어가 나오지 않게) 뒤로 label 도
+//   화면 언어로 짓는다: 고르기 목록과 입력창 글자는 같은 화면 언어로 서로 맞고(클라 안), 서버(produce/chat/route.ts)는
+//   LLM 컨텍스트에 두 말 이름(@이름 미정 인물 · @Unnamed person)을 모두 실어 어느 말로 넣은 @멘션도 찾는다.
+//   씬 · 샷 이름은 "씬 2" · "샷 8" / "Scene 2" · "Shot 8"(lib/board-names), Director 는 보기 단추 이름을 앞에 붙인다(러프 · 실사).
 import { translate } from '@/lib/i18n'
 import { sceneName, shotName } from '@/lib/board-names'
 import type { AppLocale } from '@/lib/locale'
@@ -23,7 +19,7 @@ const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 export interface CardMention {
   ref: string // 카드 안정 핸들 (localId) — AI가 이름 없는 카드도 정확히 지정
-  label: string // 표시/삽입 라벨 (이름 또는 "이름 미정 …") — 매칭 식별자 겸용, 로케일 고정
+  label: string // 표시/삽입 라벨 (이름 또는 "이름 미정 …" · "Unnamed …") — 입력창 매칭 식별자 겸용, 화면 언어
   hint: string // 종류 (인물/사물/배경) — 순수 표시용, 번역 가능
 }
 
@@ -121,22 +117,31 @@ interface BackgroundLike {
   name?: string
 }
 
+/** 이름 없는 카드의 @멘션 이름 — 영어 화면은 카드에 보이는 영어 이름(리드 2026-11-14, 오너 답 7 전역 규칙), 한국어는 예전 그대로. */
+const UNNAMED_LABEL: Record<AppLocale, Record<'person' | 'object' | 'background', string>> = {
+  en: { person: 'Unnamed person', object: 'Unnamed object', background: 'Unnamed background' },
+  ko: { person: '이름 미정 인물', object: '이름 미정 사물', background: '이름 미정 배경' }, // i18n-ok: 한국어 화면의 @멘션 이름(예전 그대로)
+}
+
+function unnamedLabel(kind: 'person' | 'object' | 'background', locale: AppLocale, nth: number): string {
+  return `${UNNAMED_LABEL[locale][kind]}${nth > 1 ? ` ${nth}` : ''}`
+}
+
 export function castMentions(
   cast: CastLike[],
   locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
 ): CardMention[] {
   const unnamed: Record<string, number> = {}
   return cast.map((m) => {
-    // 매칭 키(label 폴백)는 로케일 고정(위 헤더 코멘트) — 표시용 hint 만 번역.
-    const kind = m.entityType === 'object' ? '사물' : '인물'
-    const hint = translate(locale, kind === '사물' ? 'Object' : 'Person')
+    const kind = m.entityType === 'object' ? 'object' : 'person'
+    const hint = translate(locale, kind === 'object' ? 'Object' : 'Person')
     const named = m.name?.trim()
     let label: string
     if (named) {
       label = named
     } else {
       unnamed[kind] = (unnamed[kind] ?? 0) + 1
-      label = `이름 미정 ${kind}${unnamed[kind] > 1 ? ` ${unnamed[kind]}` : ''}`
+      label = unnamedLabel(kind, locale, unnamed[kind])
     }
     return { ref: m.localId, label, hint }
   })
@@ -154,7 +159,7 @@ export function backgroundMentions(
       label = named
     } else {
       unnamed += 1
-      label = `이름 미정 배경${unnamed > 1 ? ` ${unnamed}` : ''}`
+      label = unnamedLabel('background', locale, unnamed)
     }
     return { ref: b.localId, label, hint: translate(locale, 'Background') }
   })

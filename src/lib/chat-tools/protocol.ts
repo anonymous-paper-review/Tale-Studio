@@ -19,6 +19,9 @@ export function toolResourcesForStage(stage: string): string[] {
   return []
 }
 
+// 한국어 대화의 보드 이름 예(오너 2026-11-14 답 7 — boardLabel 은 대화 언어로 적힌다).
+const KO_BOARD_LABEL_EXAMPLE = '씬 2 · 샷 8' // i18n-ok: 모델에게 보이는 한국어 보드 이름 예
+
 export const CHAT_TOOL_GUIDE = `
 <app-tools>
 Use read_project and edit_project for their supported queries and edits. They are real app operations.
@@ -27,7 +30,7 @@ Supported edits must use tools instead of extractedSettings or updates JSON. Do 
 Settings fields: playtime (seconds), genre, subGenre, format (horizontal_16:9/vertical_9:16/cinema_2.39:1/square_1:1), tone (array of labels), dialogueLanguage (ko/en/ja/zh).
 Scene fields: location, timeOfDay, mood, narrativeSummary, originalTextQuote, charactersPresent, estimatedDurationSeconds.
 Shot fields: shotType, actionDescription, characters, durationSeconds, dialogueLines.
-Shot rows carry boardLabel (read-only), the board name the user sees ("Scene 2 · Shot 8"; shot numbers count across the board). Find a shot the user names by number through boardLabel, and call shots by boardLabel in replies, never by id.
+Shot rows carry boardLabel (read-only), the board name the user sees, written in the conversation language ("Scene 2 · Shot 8" in English, "${KO_BOARD_LABEL_EXAMPLE}" in Korean; shot numbers count across the board). The user may name a shot in either language. Find a shot the user names by number through boardLabel, and call shots by boardLabel exactly as written in replies, never by id.
 Dialogue fields: dialogueLines (complete array; retain every unchanged line and all its metadata; characterId:null means narration).
 Character fields: name, role, description, appearance (base appearance source; approval required).
 Background fields: visualDescription (base description source; approval required).

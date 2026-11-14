@@ -7,6 +7,7 @@
 //   샷(목록 맨 뒤에 붙는다)이 다른 번호로 풀렸다(2026-11-02 리뷰 3차 M1). id 꼴(shot_7)은 보드 번호로 읽지 않는다(리뷰 3차 L4).
 //   "씬2 샷5"는 보드 Shot 5(그 씬에 있을 때)와 그 씬의 다섯 번째 샷 두 가지로 읽힌다 — 둘 다 되고 서로 다르면 고르지 않고
 //   ambiguous 로 돌려 묻게 한다(2026-11-02 리뷰 M3). 지우기는 strict — 정확한 id 나 보드 이름으로만 찾는다.
+//   보드 이름은 두 말 모두 받는다(오너 2026-11-14 답 7 — 한국어 대화의 보드 이름은 "씬 2 · 샷 3", 영어는 "Scene 2 · Shot 3").
 //   약속: tests/writer/chat-id-resolve.test.ts · chat-shot-ambiguity.test.ts · chat-shot-board-order.test.ts
 import { boardShots } from '@/lib/writer/board-summary'
 
@@ -23,7 +24,7 @@ export type ChatShotRef =
 export interface ShotResolveOptions {
   /** 보드의 씬 목록(차례) — 화면에서는 늘 넘긴다. 없으면(옛 호출) 샷 목록에 처음 나온 차례로 센다. */
   manifest?: { scenes: ReadonlyArray<{ sceneId: string }> } | null
-  /** 지우기 — 정확한 id 나 보드 이름("Scene 2 · Shot 8" · "Shot 8" · "샷 8")으로만 찾는다. 옛 id 숫자 · 씬 안 자리로는 찾지 않는다. */
+  /** 지우기 — 정확한 id 나 보드 이름("Scene 2 · Shot 8" · "씬 2 · 샷 8" · "Shot 8" · "샷 8")으로만 찾는다. 옛 id 숫자 · 씬 안 자리로는 찾지 않는다. */
   strict?: boolean
 }
 
@@ -49,8 +50,8 @@ export function resolveChatShotRef(shots: ResolvableShot[], raw: string, opts: S
     const shot = board[parseInt(words[1], 10) - 1]
     return shot ? { kind: 'shot', shotId: shot.shotId } : null
   }
-  // 보드 이름 그대로("Scene 2 · Shot 3") — 그 씬에 있는 보드 Shot 3 만.
-  const label = /^scene\s*0*(\d+)\s*·\s*shot\s*0*(\d+)$/i.exec(id)
+  // 보드 이름 그대로("Scene 2 · Shot 3" · "씬 2 · 샷 3") — 그 씬에 있는 보드 샷 3 만.
+  const label = /^(?:scene|씬)\s*0*(\d+)\s*·\s*(?:shot|샷)\s*0*(\d+)$/i.exec(id)
   if (label) {
     const shot = board[parseInt(label[2], 10) - 1]
     return shot && shot.sceneId === sceneOrder[parseInt(label[1], 10) - 1] ? { kind: 'shot', shotId: shot.shotId } : null

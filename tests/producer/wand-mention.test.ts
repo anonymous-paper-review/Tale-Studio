@@ -46,7 +46,9 @@ describe('약속 M — 완드에 @ 붙이기', () => {
     expect(board).toMatch(/mentionLabel=\{castMentionList\[i\]\?\.label \?\? member\.name\}/)
     expect(board).toMatch(/mentionLabel=\{bgMentionList\[i\]\?\.label \?\? background\.name\}/)
     const route = read('src/app/api/produce/chat/route.ts')
-    expect(route).toMatch(/const m = castMentions\(castList\)/)
+    // 서버는 한국어 라벨(mention)과 영어 화면 라벨(mentionEn)을 함께 싣는다 — 어느 화면에서 넣은 @멘션이든 찾는다(리드 2026-11-14, 오너 답 7).
+    expect(route).toMatch(/const m = castMentions\(castList, 'ko'\)/)
+    expect(route).toMatch(/const mEn = castMentions\(castList, 'en'\)/)
     expect(route).toMatch(/mention: `@\$\{m\[i\]\.label\}`/)
   })
 
