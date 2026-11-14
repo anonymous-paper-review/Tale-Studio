@@ -7,7 +7,7 @@ vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTra
 import { artistBriefText } from '@/lib/artist/brief'
 import { gapNudgeText } from '@/lib/completeness'
 import { translate } from '@/lib/i18n/translate'
-import { boardTotalText, storyboardBriefing } from '@/lib/writer/board-summary'
+import { boardTotalText, missingPanelsText, storyboardBriefing } from '@/lib/writer/board-summary'
 import { INITIAL_BOARD_LOCK, advanceBoardLock, storyboardBusyView } from '@/lib/writer/board-busy'
 
 const en = (text: string, params?: Record<string, string | number>) => translate('en', text, params)
@@ -160,5 +160,23 @@ describe('Storyboard 진행 줄의 보드 전체 샷 수', () => {
     const view = readFileSync('src/features/writer/rough-storyboard-view.tsx', 'utf8')
     expect(view).toMatch(/boardTotalText\(t, roughProgress\.total\)/)
     expect(view).not.toMatch(/t\('Board total: \{count\} shots'/)
+  })
+})
+
+describe('Storyboard 누락 패널 만들기 단추의 패널 수', () => {
+  it('영어 단추는 빠진 패널이 1개면 "Generate 1 missing panel"로 단수로 말하고, 둘 이상이면 지금처럼 복수로 말한다', () => {
+    // 왜: 러프가 빠진 샷이 하나뿐일 때 단추가 "Generate 1 missing panels"로 나왔다.
+    expect(missingPanelsText(en, 1)).toBe('Generate 1 missing panel')
+    expect(missingPanelsText(en, 2)).toBe('Generate 2 missing panels')
+    expect(missingPanelsText(en, 47)).toBe('Generate 47 missing panels')
+    expect(missingPanelsText(ko, 1)).toBe('누락 패널 1개 생성')
+    expect(missingPanelsText(ko, 47)).toBe('누락 패널 47개 생성')
+  })
+
+  it('Storyboard 화면은 누락 패널 단추를 수에 맞는 문장으로 짓는다', () => {
+    // 왜: 문장을 고르는 함수가 있어도 화면이 옛 한 줄 키를 그대로 부르면 단수 고침이 화면에 닿지 않는다.
+    const view = readFileSync('src/features/writer/rough-storyboard-view.tsx', 'utf8')
+    expect(view).toMatch(/missingPanelsText\(t, missingIds\.length\)/)
+    expect(view).not.toMatch(/t\('Generate \{count\} missing panels'/)
   })
 })

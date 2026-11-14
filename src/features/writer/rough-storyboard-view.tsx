@@ -75,7 +75,7 @@ import {
   type BoardLockFacts,
   type BoardLockState,
 } from '@/lib/writer/board-busy'
-import { boardShots, boardTotalText, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel, storyboardBriefing } from '@/lib/writer/board-summary'
+import { boardShots, boardTotalText, directorConfirmView, directorHandoffSummary, missingPanelsText, sceneStats, sceneStatsLabel, storyboardBriefing } from '@/lib/writer/board-summary'
 import { pipelineLocationName, sceneName, sceneShotName } from '@/lib/board-names'
 import {
   announcedWaitShot,
@@ -924,7 +924,7 @@ export function RoughStoryboardView() {
           onClick={() => void generateAllMissing(false)}
         >
           <RefreshCw className="size-3.5" />
-          {t('Generate {count} missing panels', { count: missingIds.length })}
+          {missingPanelsText(t, missingIds.length)}
         </Button>
       )}
     </>

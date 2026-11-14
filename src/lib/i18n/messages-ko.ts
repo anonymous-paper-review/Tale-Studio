@@ -3657,4 +3657,5 @@ export const KO: Record<string, string> = {
   'Splitting into {count} scene': '씬 {count}개로 나누기',
   '{count} rough could not be drawn': '러프 {count}컷을 그리지 못했어요',
   'Board total: {count} shot': '보드 전체 {count}샷',
+  'Generate {count} missing panel': '누락 패널 {count}개 생성',
 }

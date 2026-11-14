@@ -218,6 +218,11 @@ export function boardTotalText(t: (text: string, params?: Record<string, string 
   return countText(t, total, 'Board total: {count} shot', 'Board total: {count} shots', { count: total })
 }
 
+/** Storyboard 의 [누락 패널 만들기] 단추 글("Generate 1 missing panel") — 빠진 패널이 1개면 영어는 단수 문장 키(통째 키 짝, 한국어는 두 키가 같은 꼴 — 2026-11-14 오너 "1 shots"와 같은 꼴). */
+export function missingPanelsText(t: (text: string, params?: Record<string, string | number>) => string, count: number): string {
+  return countText(t, count, 'Generate {count} missing panel', 'Generate {count} missing panels', { count })
+}
+
 /** 보드 첫 안내(채팅) — 카드를 Ctrl/Cmd 로 눌러 붙이는 여러 샷 선택은 없앴으니 말하지 않는다(프로토타입 S1).
  *  씬 · 샷 수가 1이면 영어는 단수 문장 키(통째 키 짝, 한국어는 네 키가 같은 꼴 — 2026-11-14 오너 "Split into 1 scenes, 1 shots"). */
 export function storyboardBriefing(locale: AppLocale, counts: { sceneCount: number; shotCount: number }): string {
