@@ -93,7 +93,6 @@ import { freshActiveJobs } from '@/lib/director/stop-all-client'
 import { withStoryboardBacklog } from '@/lib/generation-batches'
 import { getDirectorGaps, ledgerGapLabels, summarizeGaps } from '@/lib/completeness'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
-import { useLocaleStore } from '@/stores/locale-store'
 import {
   isShotData,
   SNAP_GRID,
@@ -126,7 +125,9 @@ import {
   doubleClickActionForKind,
   connectRouteForTargetHandle,
 } from '@/features/director/canvas-interaction'
-import { useT } from '@/lib/i18n'
+import { translate, useT } from '@/lib/i18n'
+import { useContentLocale } from '@/lib/i18n/content'
+import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 
 // #scene-hide/#node-merge(2026-08-31 대공사): scene 노드는 캔버스에서 숨기고(데이터는
 // Writer 동기화·스토리보드 뷰가 계속 소비), 파생 shotImage/videoPlaceholder 카드는 제거.
@@ -361,8 +362,10 @@ function CanvasInner() {
   // 몸통 = 고르기 — 상태 고르기로 흐려진 노드는 고르지 않는다(아래 onNodeClick).
   const shotStates = useDirectorShotStates()
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
-  // 채울 것 넛지의 목록 줄도 감싸는 문장(t)과 같은 화면 언어로 — 스토어 값(문자열)이라 memo deps 에 넣어도 안정적이다.
-  const locale = useLocaleStore((s) => s.locale)
+  // 채울 것 넛지는 채팅에 남는 글이다 — 목록 줄 · 감싸는 문장 · 샷 이름 모두 채팅 언어로(1.1 규칙: 채팅 줄 = 채팅 언어, 2026-11-14 오너).
+  //   값이 문자열이라 memo deps 에 넣어도 안정적이다.
+  const chatLocale = useContentLocale()
+  const chatBoardNames = useBoardNodeNames(chatLocale)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const edges = useDirectorCanvasStore((s) => s.edges)
   const deleteNode = useDirectorCanvasStore((s) => s.deleteNode)
@@ -389,6 +392,9 @@ function CanvasInner() {
   const redo = useDirectorCanvasStore((s) => s.redo)
   const directorProjectId = useDirectorCanvasStore((s) => s.projectId)
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
+  // 채팅 기록을 다 읽은 뒤에만 안내한다(2026-11-14 오너) — 화면이 기록보다 먼저 띄우면 이미 안내한 프로젝트를 처음으로 보고 같은 안내가 한 번 더 남았다.
+  //   Artist 첫 안내 · Prose 가 이미 쓰는 같은 규칙(messagesLoadedProjectId).
+  const chatHistoryLoaded = useGlobalChatStore((s) => !!directorProjectId && s.messagesLoadedProjectId === directorProjectId)
 
   // 키보드 — Ctrl/Cmd+Z=undo, Ctrl/Cmd+Y·Shift+Z=redo, Del/Backspace=선택 노드 삭제 확인(#e3).
   //   입력 필드(input/textarea/contentEditable)에서는 브라우저 기본 편집을 우선해 무시.
@@ -464,20 +470,22 @@ function CanvasInner() {
         return !!c && ((c.referenceImages?.length ?? 0) > 0 || (c.views?.single?.length ?? 0) > 0)
       },
       characterName: (id: string) => assetCharacters[id]?.name ?? id,
-      ledgerGaps: ledgerGapLabels(sceneLedgers, (id) => assetCharacters[id]?.name ?? id, locale),
     }),
-    [assetCharacters, sceneLedgers, locale],
+    [assetCharacters],
   )
-  const gaps = getDirectorGaps(nodes, gapAssets, locale)
+  // 장부 줄은 말(chatLocale)이 들어가므로 메모 밖에서 짓는다 — useContentLocale() 결과를 훅 deps 에 넣으면 불안정 참조 검사에 걸린다(tests/ops/unstable-hook-deps).
+  const ledgerGaps = ledgerGapLabels(sceneLedgers, (id) => assetCharacters[id]?.name ?? id, chatLocale)
+  const gaps = getDirectorGaps(nodes, { ...gapAssets, ledgerGaps }, chatLocale, chatBoardNames)
   const gapNudgeContent =
     gaps.length > 0
-      ? t('There are {count} things worth filling in:\n{summary}', {
+      ? translate(chatLocale, 'There are {count} things worth filling in:\n{summary}', {
           count: gaps.length,
-          summary: summarizeGaps(gaps, 3, locale),
+          summary: summarizeGaps(gaps, 3, chatLocale),
         })
       : null
   useEffect(() => {
     if (!directorProjectId || nodes.length === 0) return
+    if (!chatHistoryLoaded) return
     if (gapNudgeRef.current === directorProjectId) return
     if (!gapNudgeContent) return
     const timer = setTimeout(() => {
@@ -490,7 +498,7 @@ function CanvasInner() {
       })
     }, 2000)
     return () => clearTimeout(timer)
-  }, [directorProjectId, nodes, offerSuggestion, gapNudgeContent])
+  }, [directorProjectId, nodes, offerSuggestion, gapNudgeContent, chatHistoryLoaded])
 
   // Editor 핸드오프(#handoff-to-chat 2026-07-31) — 탭 하단 'Head to Editor' 버튼을 걷어내고
   //   채팅 제안으로 옮겼다. 옛 버튼은 게이트 없이 항상 활성이었으므로 여기서도 막지 않는다.
@@ -512,7 +520,7 @@ function CanvasInner() {
   // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once) — 진실은 DB 의 reachedStage.
   const reachedStageForNudge = useProjectStore((s) => s.reachedStage)
   useEffect(() => {
-    if (!directorProjectId || !hasRenderedVideo) return
+    if (!directorProjectId || !hasRenderedVideo || !chatHistoryLoaded) return
     if (!shouldOfferHandoffNudge('director', reachedStageForNudge)) return
     if (editorNudgeRef.current === directorProjectId) return
     editorNudgeRef.current = directorProjectId
@@ -528,7 +536,7 @@ function CanvasInner() {
       }),
       action: { kind: 'handoff', utterance: t(spec.utterance), label: t(spec.label) },
     })
-  }, [directorProjectId, hasRenderedVideo, shotsWithVideo.size, shotCountForNudge, reachedStageForNudge, t])
+  }, [directorProjectId, hasRenderedVideo, shotsWithVideo.size, shotCountForNudge, reachedStageForNudge, t, chatHistoryLoaded])
 
   const {
     screenToFlowPosition,
@@ -1517,6 +1525,8 @@ export default function DirectorCanvasPage() {
   // 스토리보드 축척 — PaletteBar(컨트롤)와 StoryboardGridView(그리드·단축키)가 공유(#e-zoom-merge)
   const [storyboardZoom, setStoryboardZoom] = useStoryboardZoom('director:storyboard:zoomLevel')
   const guideProjectId = useDirectorCanvasStore((s) => s.projectId)
+  // 첫 사용법 안내도 채팅 기록을 다 읽은 뒤에만(위 채워 두면 좋은 것 안내와 같은 까닭, 2026-11-14 오너).
+  const guideChatLoaded = useGlobalChatStore((s) => !!guideProjectId && s.messagesLoadedProjectId === guideProjectId)
   // Node↔Storyboard 전환 슬라이드(#e2 2026-08-03) — 두 뷰는 조건 렌더(원래 remount)라
   //   mount 애니메이션이 곧 전환 연출. 방향은 토글 순서(시안 D1: Storyboard 왼쪽·Node 오른쪽, 리드 11/14).
   const [prevViewMode, setPrevViewMode] = useState(viewMode)
@@ -1589,6 +1599,7 @@ export default function DirectorCanvasPage() {
   //   제안 슬롯은 선점형: 갭 넛지가 점유 중이면 내리고 안내를 올리고, 그 외 제안이면 양보.
   useEffect(() => {
     if (!guideProjectId || guideProjectId === 'default' || !stageReady) return
+    if (!guideChatLoaded) return
     const key = viewMode === 'storyboard' ? 'storyboardGuide' : 'nodeGuide'
     const guardKey = `director:${key}:${guideProjectId}`
     try {
@@ -1624,7 +1635,7 @@ export default function DirectorCanvasPage() {
                 '· When images are ready, "Make videos" makes the videos',
             ),
     })
-  }, [guideProjectId, viewMode, stageReady, offerSuggestion, t])
+  }, [guideProjectId, viewMode, stageReady, guideChatLoaded, offerSuggestion, t])
 
   return (
     // v3 D1(2026-11-03): 위 막대 아래 캔버스 판 하나(모서리 16 · --canvas-bg) — 아래 8px 띄움, 오른쪽 8px 는 스튜디오 틀 여백(SHELL_INSET)이 준다.

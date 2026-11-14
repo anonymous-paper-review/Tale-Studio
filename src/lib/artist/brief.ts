@@ -12,6 +12,22 @@ export const ARTIST_BRIEF_TEXT =
   "Let me know which character or background you'd like to revise.\n" +
   'Press "@" to pick a character or background (Ctrl+click a card does the same).'
 
+/** 첫 안내 문장 — 인물 · 배경 수가 1이면 영어는 단수 문장 키(통째 키 짝, 한국어는 네 키가 같은 꼴 — 2026-11-14 오너 "1 backgrounds"). 둘 이상이거나 0 이면 위 ARTIST_BRIEF_TEXT. */
+function artistBriefKey(counts: { count: number; worldCount: number }): string {
+  if (counts.count !== 1 && counts.worldCount !== 1) return ARTIST_BRIEF_TEXT
+  return ARTIST_BRIEF_TEXT
+    .replace('{count} characters', counts.count === 1 ? '{count} character' : '{count} characters')
+    .replace('{worldCount} backgrounds', counts.worldCount === 1 ? '{worldCount} background' : '{worldCount} backgrounds')
+}
+
+/** 첫 안내 글 — t = 화면 번역 함수(useT). 수에 맞는 문장 키를 골라 번역한다. */
+export function artistBriefText(
+  t: (text: string, params?: Record<string, string | number>) => string,
+  counts: { count: number; worldCount: number },
+): string {
+  return t(artistBriefKey(counts), counts)
+}
+
 /** 안내할 수 — 화면이 열렸고 디자인이 끝나 카드가 있을 때만. 아니면 null(아직 말하지 않는다). 수는 머리 줄과 같다(사람 인물 · 배경). */
 export function artistBriefCounts(input: {
   ready: boolean

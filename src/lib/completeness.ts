@@ -9,6 +9,7 @@ import type { AppLocale } from '@/lib/locale'
 import type { CharacterAsset, WorldAsset } from '@/types'
 import type { DirectorNode } from '@/types/director'
 import { isShotData } from '@/types/director'
+import { directorNodeLabel, type BoardNodeNames } from '@/features/director/node-label'
 
 const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
@@ -43,19 +44,23 @@ export interface DirectorGapAssets {
   ledgerGaps?: string[]
 }
 
-/** Director 누락: 샷에 캐릭터·배경 참조가 없거나, 연결된 인물의 시트가 없거나, 스토리보드가 아직 안 만들어진 것들. */
+/** Director 누락: 샷에 캐릭터·배경 참조가 없거나, 연결된 인물의 시트가 없거나, 스토리보드가 아직 안 만들어진 것들.
+ *  names(보드 이름표)를 주면 샷을 내부 번호(sh_01_01)가 아니라 보드 이름("샷 3")으로 부른다(2026-11-14 오너 — 이름은 그 이름이 들어간 글의 언어).
+ *  안 주면 종전처럼 샷 라벨 그대로 — 이름표 없는 옛 호출이 조용히 달라지지 않는다. */
 export function getDirectorGaps(
   nodes: DirectorNode[],
   assets?: DirectorGapAssets,
   locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+  names?: BoardNodeNames | null,
 ): CompletenessGap[] {
   const gaps: CompletenessGap[] = []
   for (const label of assets?.ledgerGaps ?? []) gaps.push({ label })
   for (const n of nodes) {
     if (!isShotData(n.data)) continue
     const d = n.data
+    const shotLabel = names ? directorNodeLabel(d, names) : d.label
     if (d.characterAssetIds.length === 0 && d.worldAssetIds.length === 0) {
-      gaps.push({ label: translate(locale, '{name}: no character or background reference', { name: d.label }) })
+      gaps.push({ label: translate(locale, '{name}: no character or background reference', { name: shotLabel }) })
       continue
     }
     // #ref-gate(2026-09-02, 실측 겨울_4): 연결은 됐는데 시트가 없는 인물은 실사에서 목각 인형으로 남는다 —
@@ -63,10 +68,10 @@ export function getDirectorGaps(
     const noSheet = assets ? d.characterAssetIds.filter((id) => !assets.hasCharacterImage(id)) : []
     if (noSheet.length > 0) {
       const characters = noSheet.map((id) => assets!.characterName(id)).join(', ')
-      gaps.push({ label: translate(locale, '{name}: no sheet for {characters}', { name: d.label, characters }) })
+      gaps.push({ label: translate(locale, '{name}: no sheet for {characters}', { name: shotLabel, characters }) })
       continue
     }
-    if (d.storyboardImage?.status !== 'completed') gaps.push({ label: translate(locale, '{name}: no storyboard yet', { name: d.label }) })
+    if (d.storyboardImage?.status !== 'completed') gaps.push({ label: translate(locale, '{name}: no storyboard yet', { name: shotLabel }) })
   }
   return gaps
 }

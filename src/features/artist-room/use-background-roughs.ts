@@ -7,6 +7,7 @@
 import { useEffect, useState, useSyncExternalStore } from 'react'
 import { createBackgroundRoughRuns, drawRoughsInBackground } from '@/lib/artist/background-roughs'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
+import { announceRoughModerationFailures } from '@/lib/writer/rough-moderation-notice'
 import type { RoughPumpOutcome } from '@/lib/writer/rough-pump-client'
 
 export function useBackgroundRoughs(projectId: string | null, ready: boolean, nudge: number): { drawing: boolean; outcome: RoughPumpOutcome | null } {
@@ -26,6 +27,8 @@ export function useBackgroundRoughs(projectId: string | null, ready: boolean, nu
       fetchImpl: (input, init) => fetch(input, init),
       poll: (jobId) => pollGenerationJob(jobId),
       isAborted: () => runs.isAborted(projectId),
+      // 내용 검사로 걸린 샷은 한 묶음에 한 줄로 Artist 채팅이 알린다(2026-11-14 오너) — 머리 표시만 사라지고 말이 없던 것.
+      onModerationFailed: (shotIds) => announceRoughModerationFailures('artist', shotIds),
     })
       .catch((): RoughPumpOutcome => 'request_failed')
       .then((outcome) => runs.finish(projectId, outcome))

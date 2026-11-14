@@ -3640,4 +3640,16 @@ export const KO: Record<string, string> = {
   'There is no track to put the title on. Show and unlock {track}.': '제목을 놓을 줄이 없어요. {track} 의 눈을 켜고 잠금을 풀어 주세요.',
   "This browser can't export effects. To include effects, export in Chrome.": '이 브라우저는 효과를 내보내지 못해요. 효과까지 실으려면 Chrome 에서 내보내 주세요.',
   'Add a marker': '마커 달기',
+  // ── 2026-11-14 오너: 러프 내용 검사 알림 ──
+  'The rough for {shots} was not drawn because it did not pass the content check.': '{shots} 러프는 내용 검사에 걸려 그리지 못했어요.',
+  'The roughs for {shots} were not drawn because they did not pass the content check.': '{shots} 러프는 내용 검사에 걸려 그리지 못했어요.',
+  'A rough was not drawn because it did not pass the content check.': '러프 1장은 내용 검사에 걸려 그리지 못했어요.',
+  '{count} roughs were not drawn because they did not pass the content check.': '러프 {count}장은 내용 검사에 걸려 그리지 못했어요.',
+  // ── 2026-11-14 오너: 첫 안내의 단수 문장(인물 · 배경 · 씬 · 샷 수가 1) — 한국어는 네 경우가 같은 꼴 ──
+  'I have concepts ready for the characters and backgrounds: {count} character · {worldCount} backgrounds.\nLet me know which character or background you\'d like to revise.\nPress "@" to pick a character or background (Ctrl+click a card does the same).': '인물과 배경의 컨셉을 준비했어요: 캐릭터 {count}명 · 배경 {worldCount}곳.\n고치고 싶은 인물이나 배경을 알려주세요.\n"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
+  'I have concepts ready for the characters and backgrounds: {count} characters · {worldCount} background.\nLet me know which character or background you\'d like to revise.\nPress "@" to pick a character or background (Ctrl+click a card does the same).': '인물과 배경의 컨셉을 준비했어요: 캐릭터 {count}명 · 배경 {worldCount}곳.\n고치고 싶은 인물이나 배경을 알려주세요.\n"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
+  'I have concepts ready for the characters and backgrounds: {count} character · {worldCount} background.\nLet me know which character or background you\'d like to revise.\nPress "@" to pick a character or background (Ctrl+click a card does the same).': '인물과 배경의 컨셉을 준비했어요: 캐릭터 {count}명 · 배경 {worldCount}곳.\n고치고 싶은 인물이나 배경을 알려주세요.\n"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
 }

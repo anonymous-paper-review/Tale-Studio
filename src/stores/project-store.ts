@@ -43,6 +43,8 @@ export interface WriterStatusAssets {
   worlds_total: number
   queued_count: number
   failed_count: number
+  /** 10분 넘게 대기로 멈춘 작업 수(서버가 실패와 따로 센다) — 옛 서버 응답에는 없다. */
+  stale_count?: number
   stalled: boolean
   images_ready: boolean
 }

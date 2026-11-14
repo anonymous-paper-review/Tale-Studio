@@ -95,6 +95,7 @@ import {
   notifyQuotaRefusal,
 } from '@/lib/generation-quota-toast'
 import { runRoughPump } from '@/lib/writer/rough-pump-client'
+import { announceRoughModerationFailures, isModerationFailureText } from '@/lib/writer/rough-moderation-notice'
 import { resolveEntityNames, manifestEntities } from '@/lib/writer/resolve-entity-names'
 import {
   useActiveGenerationJobs,
@@ -176,6 +177,8 @@ export function RoughStoryboardView() {
   const setActiveTab = useWriterUiStore((s) => s.setActiveTab)
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   const chatMessages = useGlobalChatStore((s) => s.messages)
+  // 채팅 기록을 다 읽은 뒤에만 첫 안내를 한다 — 기록이 비어 있는 동안 "writer 단계 말이 없다"로 보고 같은 안내를 또 남겼다(2026-11-14 오너; Artist 첫 안내 · Prose 와 같은 규칙).
+  const chatHistoryLoaded = useGlobalChatStore((s) => s.messagesLoadedProjectId === projectId)
   const briefedRef = useRef(false)
 
   // Coordinate (4) ui_reflected for Writer rough panels (#a2-observability 2026-08-26).
@@ -542,6 +545,8 @@ export function RoughStoryboardView() {
           }
         }
         // 끝을 돌려준다 — 'drawn'(그 샷들이 그려짐) · 'failed'(작업 실패 확정) · 'unknown'(상한까지 모름). 더한 샷의 한 번 더 그리기가 읽는다.
+        // 이 묶음에서 내용 검사(moderation)로 실패한 잡이 맡은 샷 — 묶음이 끝난 뒤 채팅에 한 줄로 모아 알린다(2026-11-14 오너).
+        const moderationShots: string[] = []
         const convergeJob = async (jobId: string, jobShotIds: string[]): Promise<'drawn' | 'failed' | 'unknown'> => {
           const pollOk = await pollGenerationJob(jobId)
             .then(() => true)
@@ -549,11 +554,14 @@ export function RoughStoryboardView() {
           // 폴링이 던졌으면(pollOk=false) 실패인지 일시 오류인지 잡 상태를 한 번 권위 있게 확인한다.
           //   진짜 실패면 펌프 배리어(r.done)를 오래 붙잡지 않고 즉시 실패 표기 후 종료.
           let jobFailed = false
+          let failureText: string | null = null
           if (!pollOk) {
-            jobFailed = await fetch(`/api/generation-jobs/${encodeURIComponent(jobId)}`)
+            const checked = await fetch(`/api/generation-jobs/${encodeURIComponent(jobId)}`)
               .then((r) => (r.ok ? r.json() : null))
-              .then((b) => b?.data?.status === 'failed')
-              .catch(() => false)
+              .then((b) => ({ failed: b?.data?.status === 'failed', error: typeof b?.data?.error === 'string' ? (b.data.error as string) : null }))
+              .catch(() => ({ failed: false, error: null }))
+            jobFailed = checked.failed
+            failureText = checked.error
           }
           for (let i = 0; i < ROUGH_CONVERGE_MAX_RELOADS; i++) {
             // #shots-cache-invalidate: 잡 완료를 안 순간의 리로드는 30초 신선 사물함을 그대로
@@ -568,6 +576,8 @@ export function RoughStoryboardView() {
               return 'drawn'
             }
             if (jobFailed) {
+              // 내용 검사로 실패했으면 그 샷들을 이 묶음 알림에 모은다 — 시간 초과 · 일반 실패는 이 알림 대상이 아니다.
+              if (isModerationFailureText(failureText)) moderationShots.push(...jobShotIds.filter((id) => !isDone(id)))
               // 잡 실패 확정 — 미완 샷을 실패 표기(재시도 버튼 노출)하고 종료.
               setPanelJobs((prev) => {
                 const next = { ...prev }
@@ -600,7 +610,11 @@ export function RoughStoryboardView() {
           submittedShotIds: submitted.map((item) => item.shotId),
           skipped: (j.data?.skipped ?? []) as Array<{ shotId: string; reason: string }>,
           // 이번 라운드 잡들의 종결(성공/실패 모두 위에서 상태 반영) — 펌프의 라운드 배리어.
-          done: Promise.allSettled(polls),
+          //   묶음이 끝나면 내용 검사로 걸린 샷을 채팅에 한 줄로 알린다(걸린 샷이 없으면 아무것도 안 한다).
+          done: Promise.allSettled(polls).then((results) => {
+            announceRoughModerationFailures('writer', moderationShots)
+            return results
+          }),
         }
       } catch (e) {
         const event = autoSubmitEventPayload({ auto, source: opts?.source }, { error: e instanceof Error ? e.message : String(e) })
@@ -855,7 +869,7 @@ export function RoughStoryboardView() {
   //   카드를 Ctrl/Cmd 로 눌러 붙이는 여러 샷 선택은 없앴으니 그 조작은 안내하지 않는다.
   const busyOpen = busy.open
   useEffect(() => {
-    if (!projectId || briefedRef.current) return
+    if (!projectId || !chatHistoryLoaded || briefedRef.current) return
     if (!hasShots || busyOpen) return
     const sceneCount = sceneManifest?.scenes.length ?? 0
     if (sceneCount === 0) return
@@ -868,7 +882,7 @@ export function RoughStoryboardView() {
       action: null,
       content: storyboardBriefing(locale, { sceneCount, shotCount: shots.length }),
     })
-  }, [projectId, sceneManifest, shots.length, hasShots, busyOpen, chatMessages, offerSuggestion, locale])
+  }, [projectId, sceneManifest, shots.length, hasShots, busyOpen, chatMessages, chatHistoryLoaded, offerSuggestion, locale])
   // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
   // 트리트먼트·대사 탭과 같은 자리의 도움말(#c4 2026-08-03) — 헤더 아래 한 줄.
   const headerDescription = t(

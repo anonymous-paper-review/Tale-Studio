@@ -213,15 +213,14 @@ export function directorConfirmView(summary: DirectorHandoffSummary, locale: App
   }
 }
 
-/** 보드 첫 안내(채팅) — 카드를 Ctrl/Cmd 로 눌러 붙이는 여러 샷 선택은 없앴으니 말하지 않는다(프로토타입 S1). */
+/** 보드 첫 안내(채팅) — 카드를 Ctrl/Cmd 로 눌러 붙이는 여러 샷 선택은 없앴으니 말하지 않는다(프로토타입 S1).
+ *  씬 · 샷 수가 1이면 영어는 단수 문장 키(통째 키 짝, 한국어는 네 키가 같은 꼴 — 2026-11-14 오너 "Split into 1 scenes, 1 shots"). */
 export function storyboardBriefing(locale: AppLocale, counts: { sceneCount: number; shotCount: number }): string {
-  return translate(
-    locale,
+  const key =
     'Scene and shot work is done.\n\n' +
-      '· Split into {sceneCount} scenes, {shotCount} shots\n' +
-      '· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\n' +
-      'Tell me which scene or shot you want to revise or add.\n' +
-      'Press "@" to pick a scene or shot.',
-    { sceneCount: counts.sceneCount, shotCount: counts.shotCount },
-  )
+    `· Split into {sceneCount} ${counts.sceneCount === 1 ? 'scene' : 'scenes'}, {shotCount} ${counts.shotCount === 1 ? 'shot' : 'shots'}\n` +
+    '· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\n' +
+    'Tell me which scene or shot you want to revise or add.\n' +
+    'Press "@" to pick a scene or shot.'
+  return translate(locale, key, { sceneCount: counts.sceneCount, shotCount: counts.shotCount })
 }
