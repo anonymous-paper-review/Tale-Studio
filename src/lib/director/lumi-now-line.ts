@@ -35,8 +35,8 @@ export function lumiNowLine(input: LumiNowInput, t: Translate): string | null {
   const makingVideos = states.filter((state) => state === 'video_generating').length
   // 만드는 동안은 남은 시간을 쓰지 않는다(오너 8/26) — 무엇을 만드는지와 끝난 수만.
   if (makingImages + makingVideos > 0 || input.imageBusy || input.videoBusy) {
-    // 영상 묶음이 막 시작해 아직 만드는 샷이 잡히지 않았으면 위쪽 진행 글처럼 영상 1개로 쓴다.
-    const making = makingLabel(makingImages, makingImages + makingVideos === 0 && input.videoBusy ? 1 : makingVideos, t)
+    // 영상 묶음이 막 시작해 아직 만드는 샷이 잡히지 않았으면 위쪽 진행 글처럼 수 없이 "영상 만드는 중"(리드 11/14 — "1개"라고 하지 않는다).
+    const making = makingImages + makingVideos === 0 && input.videoBusy ? t('Making videos') : makingLabel(makingImages, makingVideos, t)
     const done = input.progress && input.progress.total > 0 ? t('Finished {done} of {total}', input.progress) : null
     return t('Up next · {work}', { work: done ? `${making} · ${done}` : making })
   }

@@ -1151,13 +1151,13 @@ function PaletteBar() {
   }, [chainKey, realBatchBusy, videoBatchBusy])
   const progressDone = (storyboardBatch?.done ?? 0) + (videoBatch?.done ?? (videoBatchProgress?.done ?? 0))
   const progressTotal = (storyboardBatch?.total ?? 0) + (videoBatch?.total ?? (videoBatchProgress?.total ?? 0))
-  // 영어는 수가 1이면 단수(리드 11/14 답 2).
+  // 영어는 수가 1이면 단수(리드 11/14 답 2). 셀 이미지 · 영상이 아직 0개면 수 없이 — "1장" · "1개"라고 하지 않는다
+  //   (영어 재점검: 2샷 다시 만들기가 "Making 1 image" — 다시 그리는 샷은 서버 답 전에 세지 않는다).
   const progressLabel =
     makingImages > 0 && makingVideos > 0
       ? makingLabel(makingImages, makingVideos, t)
       : makingVideos > 0 || videoLive
-        ? makingVideos > 1 ? t('Making {count} videos', { count: makingVideos }) : t('Making 1 video')
-        // 셀 이미지가 아직 0개면 수 없이 — "1장"이라고 하지 않는다(영어 재점검: 2샷 다시 만들기가 "Making 1 image").
+        ? makingVideos > 1 ? t('Making {count} videos', { count: makingVideos }) : makingVideos === 1 ? t('Making 1 video') : t('Making videos')
         : makingImages > 1 ? t('Making {count} images', { count: makingImages }) : makingImages === 1 ? t('Making 1 image') : t('Making images')
 
   // v3 D1 → 1110 확정(시안 406:3717 · 406:4051): 위쪽 2줄.
