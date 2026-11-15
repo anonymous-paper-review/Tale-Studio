@@ -118,6 +118,11 @@ scripts/*
 !scripts/generation-autopsy.mjs
 !scripts/fixtures/
 !scripts/fixtures/producer-seed.json
+# 샷 화면 설명 고치기 목록(2026-11-15) — tests/ops/native-repair-script.test.ts 가 돌린다. 파일만 읽고 쓴다(DB · 비밀 값 없음).
+#   빠지면 클린 클론에서 pnpm test 가 깨진다. scripts/ops/ 는 하위 예외가 안 먹는 디렉토리라 안을 다시 막고 이 한 파일만 추적한다.
+!scripts/ops/
+scripts/ops/*
+!scripts/ops/plan-native-repair.mts
 
 # OS
 .DS_Store

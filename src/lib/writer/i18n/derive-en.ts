@@ -3,15 +3,14 @@
 //   DB 주 컬럼(EN) + `_native`(원천) + i18n_provenance(원천 해시)를 채운다.
 //   모델은 번역/정규화만(내용 추가 금지, architecture §3). 엔티티 종류당 claudeJSON 1콜 배치.
 //   best-effort: 파생 실패 항목은 주 컬럼=native 유지(회귀 없음).  server-only(supabaseAdmin 의존).
-import { createHash } from 'node:crypto'
 import { claudeJSON } from '@/lib/claude'
 import { supabaseAdmin } from '@/lib/supabase/admin'
+import { i18nHash, isTargetScript, needsTranslation } from '@/lib/writer/i18n/native-script'
 import type { CastContract } from '@/lib/writer/types/pipeline'
 
-/** native 원천 텍스트의 안정 해시 — i18n_provenance 에 기록(편집→stale 판정 근거, S6). */
-export function i18nHash(s: string): string {
-  return createHash('md5').update(s).digest('hex')
-}
+// 해시 · 글자 판정 · 화면 칸 규칙은 순수 모듈(native-script.ts)에 있다 — 서버 전용이 아닌 스크립트도 같은 규칙을 써야 해서다.
+//   여기서 다시 내보내 기존 import 자리(`from '@/lib/writer/i18n/derive-en'`)를 지킨다.
+export { i18nHash, isTargetScript }
 
 interface I18nItem {
   id: string
@@ -28,8 +27,7 @@ Rules:
 - Return STRICT JSON ONLY: {"items":[{"id":"<id>","en":"<english>"}]} — exactly one entry per input id, identical ids.`
 
 // 이미 영어(라틴)면 LLM skip — 파이프라인 산출은 드리프트로 영어/한국어 혼재라 무변환 통과로 비용↓.
-//   CJK·Hangul·전각 문자가 있으면 번역 대상(보수적 필터, locale 감지 S4 와 별개).
-const NEEDS_TRANSLATION = /[　-鿿가-힯＀-￯]/ // i18n-ok — 문자 클래스 경계값(문구 아님)
+//   CJK·Hangul·전각 문자가 있으면 번역 대상(needsTranslation — 보수적 필터, locale 감지 S4 와 별개).
 
 /** native 배열 → Map<id, en>. 빈/공백 제외, 이미 영어면 무변환. LLM 실패 항목은 맵에 없음(호출부 native 폴백). */
 export async function deriveEnBatch(items: I18nItem[], kind: string): Promise<Map<string, string>> {
@@ -38,7 +36,7 @@ export async function deriveEnBatch(items: I18nItem[], kind: string): Promise<Ma
   for (const i of items) {
     const n = (i.native ?? '').trim()
     if (!n) continue
-    if (!NEEDS_TRANSLATION.test(n)) map.set(i.id, n) // 이미 영어 → 무변환
+    if (!needsTranslation(n)) map.set(i.id, n) // 이미 영어 → 무변환
     else todo.push({ id: i.id, native: n })
   }
   if (!todo.length) return map
@@ -207,16 +205,7 @@ export async function locationI18nFields(
 //   원칙: 생성(이미지/영상)은 여전히 EN 주 컬럼만 쓴다 — 여기서 **주 컬럼은 절대 건드리지 않는다**(_native 만).
 //   (language boundary S7, '영어=base, 유저언어=표기')
 
-// locale 별 "이미 타깃 언어" 스크립트 — 있으면 번역 skip(원문/사람 산출 보존, 비용↓). ko 외는 확장 여지.
-const LOCALE_SCRIPT: Record<string, RegExp> = {
-  ko: /[가-힣]/,
-  ja: /[぀-ゟ゠-ヿ一-鿿]/,
-  zh: /[一-鿿]/,
-}
-export function isTargetScript(text: string | null | undefined, locale: string): boolean {
-  const re = LOCALE_SCRIPT[locale]
-  return re ? re.test(text ?? '') : false
-}
+// "이미 타깃 언어" 판정(isTargetScript)은 native-script.ts — 있으면 번역 skip(원문/사람 산출 보존, 비용↓).
 
 const LOCALE_NAME: Record<string, string> = {
   ko: 'Korean (한국어)', // i18n-ok — 언어 고유 표기
