@@ -123,11 +123,13 @@ describe('Writer 채팅의 수정안 자리', () => {
     expect(out).not.toContain('scene-story-proposal-discard')
   })
 
-  it('수정안이 준비되면 Writer 채팅에는 카드 대신 "수정안 · S2 · 1곳" 칩이 보이고 버리기 · 적용은 산문 안 상자에서 한다', () => {
-    // 왜: 11/5 시안 WS(오너 2026-11-09 결정 5) — 바뀐 곳은 산문에서 보고 그 자리에서 정한다. 채팅은 어느 문단 몇 곳인지만 알린다.
+  it('수정안이 준비되면 Writer 채팅에는 큰 비교 카드 대신 "수정안 · S2 · 1곳" 칩이 보이고 채팅에서도 [적용] · [적용 안 함]으로 정한다', () => {
+    // 왜: 11/5 시안 WS(오너 2026-11-09 결정 5) — 바뀐 곳은 산문에서 보고 어느 문단 몇 곳인지는 채팅 칩이 알린다. 오너 2026-11-16 — 정하는 단추는 채팅에도 있다(자세한 것은 tests/writer/prose-apply-in-chat.test.ts).
     const out = render(createElement(SceneStoryProposalCard, { projectId: PROJECT, proposal: READY, look: 'writer' }))
     expect(out).toContain('data-testid="scene-story-proposal-chip"')
     expect(out).toContain('수정안 · S2 · 1곳')
+    expect(out).toContain('scene-story-chip-apply')
+    expect(out).toContain('scene-story-chip-decline')
     expect(out).not.toContain('scene-story-proposal-apply')
     expect(out).not.toContain('scene-story-proposal-discard')
     expect(proposalChipText('en', READY)).toBe('Proposal · S2 · 1 changed')

@@ -14,26 +14,36 @@ import { useProjectStore } from '@/stores/project-store'
 
 /**
  * 씬 스토리 수정안 카드. look="writer"(Writer 산문, 11/5 시안 WL · WS · 오너 2026-11-09 결정 5)면 만드는 동안은 카드 대신 Lumi 점 세 개,
- *   준비되면 "수정안 · S2 · 1곳" 칩만 — 버리기 · 적용은 산문 안 "AI 수정안" 상자(features/prose/proposal-view)에서 한다.
- *   실패 · 충돌은 Writer 에서도 이 카드가 까닭과 [최신 내용으로 다시 제안] · [버리기]를 보인다. 약속: tests/writer/prose-revise-chat.test.ts
+ *   준비되면 "수정안 · S2 · 1곳" 칩 말풍선 — 그 안에 "적용할까요?"와 [적용] · [적용 안 함] 단추가 있다(오너 2026-11-16, 시안 없음: 11/5 WS 시안은 칩만 있다).
+ *   채팅 단추는 산문 안 "AI 수정안" 상자(features/prose/proposal-view)의 [적용] · [버리기]와 같은 결정이다 — [적용]은 같은 store 행동,
+ *   [적용 안 함]은 [버리기]와 같은 행동(declineProseProposal)이라 채팅에 "적용하지 않았어요" 결과 말이 남는다. 한쪽이 정하는 동안(sceneStoryResolving) 두 쪽 단추가 함께 꺼진다.
+ *   세 가지 안은 고르기 창이 정하므로 채팅 단추가 없다. 실패 · 충돌은 Writer 에서도 이 카드가 까닭과 [최신 내용으로 다시 제안] · [버리기]를 보인다.
+ *   약속: tests/writer/prose-revise-chat.test.ts · tests/writer/prose-apply-in-chat.test.ts
  */
 export function SceneStoryProposalCard({ projectId, proposal, look = 'card' }: { projectId: string; proposal: SceneStoryProposalView; look?: 'card' | 'writer' }) {
   const t = useT()
   const locale = useLocale()
   const manualEdit = useGlobalChatStore((state) => state.sceneStoryEdit?.projectId === projectId)
+  // 수정안을 정하는 중(채팅 · 산문 어느 쪽 단추든) — 두 쪽이 함께 꺼진다(오너 2026-11-16).
+  const resolving = useGlobalChatStore((state) => state.sceneStoryResolving?.projectId === projectId)
   const [working, setWorking] = useState(false)
   const generating = proposal.status === 'generating'
   const failed = proposal.status === 'failed'
   const conflict = proposal.status === 'ready' && proposal.stale
-  const disabled = manualEdit || working
+  const disabled = manualEdit || resolving || working
   const changes = changedSceneRows(proposal.before, proposal.after)
 
-  const resolve = async (action: 'apply' | 'discard') => {
+  const settle = async (run: (chat: ReturnType<typeof useGlobalChatStore.getState>) => Promise<unknown>) => {
     if (disabled || useProjectStore.getState().projectId !== projectId) return
     setWorking(true)
-    await useGlobalChatStore.getState().resolveSceneStoryProposal(action, proposal.id)
-    setWorking(false)
+    try {
+      await run(useGlobalChatStore.getState())
+    } finally {
+      setWorking(false)
+    }
   }
+  const resolve = (action: 'apply' | 'discard') =>
+    settle((chat) => (action === 'apply' ? chat.resolveSceneStoryProposal('apply', proposal.id) : chat.resolveSceneStoryProposal('discard', proposal.id)))
   const regenerate = async () => {
     if (disabled || useProjectStore.getState().projectId !== projectId) return
     setWorking(true)
@@ -64,14 +74,35 @@ export function SceneStoryProposalCard({ projectId, proposal, look = 'card' }: {
     )
   }
   if (look === 'writer' && proposal.status === 'ready' && !conflict) {
-    // 준비됨 — 어느 문단 몇 곳인지 칩 하나. 바로 위 Lumi 말("S2를 고쳐 봤어요…")에 이어 붙는다.
+    // 준비됨 — 어느 문단 몇 곳인지 칩 하나 + "적용할까요?"와 단추 둘. 바로 위 Lumi 말("S2를 고쳐 봤어요…")에 이어 붙는다.
+    //   [적용]은 크림 메인, [적용 안 함]은 채팅 말풍선 위에서 보이게 한 단 밝은 보조색(단계 확인 단추와 같다). 둘 다 작은 알약(design.md §13.8).
+    //   세 가지 안을 담은 수정안은 단추 없이 칩만 — 무엇을 적용할지는 고르기 창이 정한다.
+    const choosable = !proposal.variants?.length
     return (
       <div data-stage={STAGE_PERSONA.producer} className="pl-[38px]" data-testid="scene-story-proposal-chip">
-        <div className="rounded-xl bg-chat-lumi-bubble px-[22px] py-[14px]">
+        <div className="flex flex-col items-start gap-3 rounded-xl bg-chat-lumi-bubble px-[22px] py-[14px]">
           <p className="inline-flex items-center gap-2 rounded-[10px] bg-side px-3.5 py-2.5 text-[12.5px] font-medium text-foreground">
             <AiIcon className="size-6 text-stage" aria-hidden />
             {proposalChipText(locale, proposal)}
           </p>
+          {choosable ? (
+            <>
+              <p className="text-chat text-foreground">{t('Shall I apply it?')}</p>
+              <div className="flex flex-wrap gap-2">
+                <Button size="pill" disabled={disabled} onClick={() => void settle((chat) => chat.resolveSceneStoryProposal('apply', proposal.id))} data-testid="scene-story-chip-apply">{t('Apply')}</Button>
+                <Button
+                  size="pill"
+                  variant="secondary"
+                  className="bg-surface-elevated hover:bg-chip"
+                  disabled={disabled}
+                  onClick={() => void settle((chat) => chat.declineProseProposal(proposal.id))}
+                  data-testid="scene-story-chip-decline"
+                >
+                  {t('Do not apply')}
+                </Button>
+              </div>
+            </>
+          ) : null}
         </div>
       </div>
     )

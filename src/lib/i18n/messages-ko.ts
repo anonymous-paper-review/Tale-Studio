@@ -2826,6 +2826,10 @@ export const KO: Record<string, string> = {
   'I revised the prose. The changes are marked in the prose. The original stays as it is until you press [Apply].': '산문을 고쳐 봤어요. 바뀐 곳은 산문에 표시해 뒀어요. [적용] 전에는 원래 글 그대로예요.',
   'Proposal · {labels} · {count} changed': '수정안 · {labels} · {count}곳',
   'AI proposal': 'AI 수정안',
+  // 채팅에서도 수정안을 정한다(오너 2026-11-16) — 칩 말풍선 안 물음 · 단추 · 버렸을 때 남기는 결과 말. 적용했을 때의 결과 말은 위 'Applied. Shall we move on …?'이다.
+  'Shall I apply it?': '적용할까요?',
+  'Do not apply': '적용 안 함',
+  'I did not apply it. The prose stays as it was.': '적용하지 않았어요. 원래 글은 그대로예요.',
   'Lumi is writing the change': 'Lumi가 수정안을 쓰고 있어요',
   'This scene is removed in the proposal.': '수정안에서는 이 씬이 빠져요.',
   'Revising the prose': '산문을 고치고 있어요',
