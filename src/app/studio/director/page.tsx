@@ -73,7 +73,7 @@ import { countStatusFilters, dimmedByStatusFilter, directorHasFinishedVideo, mat
 import { HIDDEN_ON_CANVAS, directorCanvasMeta, storyboardCanvasMeta } from '@/features/director/canvas-meta'
 import { separateAssetCards } from '@/features/director/asset-column'
 import { arrangeOnceCardsRendered, renderedCardSizes } from '@/features/director/canvas-layout'
-import { firstEntryViewport } from '@/features/director/first-entry-layout'
+import { firstEntryViewport, markFirstEntrySettled } from '@/features/director/first-entry-layout'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
@@ -569,7 +569,11 @@ function CanvasInner() {
         const store = useDirectorCanvasStore.getState()
         const firstEntry = store.arrangeFirstEntry
         store.relayoutCanvas()
-        if (firstEntry) void reframeFirstShot()
+        if (firstEntry) {
+          // 정렬을 마쳤다: 이 창에서는 이 프로젝트를 다시 점검(DB 읽기)하지 않는다. 첫 화면은 새 자리 기준으로 다시 맞춘다.
+          markFirstEntrySettled(store.projectId)
+          void reframeFirstShot()
+        }
       },
     })
   }, [arrangePending, reframeFirstShot])

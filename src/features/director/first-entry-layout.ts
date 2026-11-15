@@ -13,12 +13,25 @@ import type { Viewport, XYPosition } from '@xyflow/react'
 import { createClient } from '@/lib/supabase/client'
 import { isAssetData, isDerivedNodeData, isSceneData, isShotData, type DirectorNode } from '@/types/director'
 
-/** 이 화면을 닫기 전까지 "저장된 자리가 있다"고 확인한 프로젝트 — 다시 읽지 않는다. 읽기 실패로 있다고 본 것은 넣지 않는다. */
-const knownSaved = new Set<string>()
+/**
+ * 이 창을 닫기 전까지 처음 정렬 확인을 끝낸 프로젝트(리드 2026-11-16): 저장된 자리를 찾았거나 정렬을 마쳤다.
+ * 다시 들어가도(Storyboard 에 갔다 와도) DB 를 다시 읽지 않는다. 읽기 실패로 "있다고 본" 것은 넣지 않는다.
+ */
+const settled = new Set<string>()
+
+/** 정렬을 마친 프로젝트를 확인 끝으로 기억한다. 정렬을 실제로 마친 곳은 화면이라 화면이 부른다. */
+export function markFirstEntrySettled(projectId: string): void {
+  settled.add(projectId)
+}
+
+/** 이 창에서 처음 정렬 확인을 이미 끝낸 프로젝트인가. */
+export function isFirstEntrySettled(projectId: string): boolean {
+  return settled.has(projectId)
+}
 
 /** 시험용: 기억을 비운다. */
-export function resetSavedLayoutMemo(): void {
-  knownSaved.clear()
+export function resetFirstEntryMemo(): void {
+  settled.clear()
 }
 
 /**
@@ -27,7 +40,7 @@ export function resetSavedLayoutMemo(): void {
  * 읽기가 실패하거나 답이 이상하면 true(= 있다고 보고 아무것도 안 한다): 모르는데 덮는 것보다 안 고치는 편이 안전하다.
  */
 export async function projectHasSavedLayout(projectId: string): Promise<boolean> {
-  if (knownSaved.has(projectId)) return true
+  if (settled.has(projectId)) return true
   try {
     const supabase = createClient()
     const saved = (table: 'scenes' | 'shots') =>
@@ -39,7 +52,7 @@ export async function projectHasSavedLayout(projectId: string): Promise<boolean>
     ])
     if (scenes.error || shots.error || !takes || !Array.isArray(takes.takes)) return true
     const has = (scenes.data?.length ?? 0) > 0 || (shots.data?.length ?? 0) > 0 || takes.takes.length > 0
-    if (has) knownSaved.add(projectId)
+    if (has) settled.add(projectId)
     return has
   } catch {
     return true

@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { XYPosition } from '@xyflow/react'
-import { cardsUnmovedSince, isAutoPlacedCandidate, projectHasSavedLayout, snapshotCardPositions } from '@/features/director/first-entry-layout'
+import { cardsUnmovedSince, isAutoPlacedCandidate, isFirstEntrySettled, projectHasSavedLayout, snapshotCardPositions } from '@/features/director/first-entry-layout'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
@@ -58,10 +58,11 @@ export interface FirstEntryCheck {
 }
 
 /**
- * 지금 캔버스가 처음 정렬 후보(Writer 카드만 있다)면 DB 점검을 시작한다. 후보가 아니면 null — DB 를 읽지 않는다.
+ * 지금 캔버스가 처음 정렬 후보(Writer 카드만 있다)면 DB 점검을 시작한다. 후보가 아니거나 이 창에서 이미 확인을 끝낸 프로젝트면 null — DB 를 읽지 않는다.
  * 카드가 갖춰진 직후에 시작하면 Pass 2.5 의 DB 읽기와 함께 돌아, 정렬을 기다리게 하지 않는다.
  */
 export function startFirstEntryCheck(projectId: string): FirstEntryCheck | null {
+  if (isFirstEntrySettled(projectId)) return null
   const nodes = useDirectorCanvasStore.getState().nodes
   if (!isAutoPlacedCandidate(nodes)) return null
   return { saved: projectHasSavedLayout(projectId), snapshot: snapshotCardPositions(nodes) }

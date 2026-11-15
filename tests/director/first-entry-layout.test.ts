@@ -97,7 +97,7 @@ describe('처음 들어갔을 때 놓는 자리', () => {
 
   // 왜: 리드 2026-11-16 — 오너가 지금 보는 프로젝트는 이미 한 번 열어 본 것이라 브라우저에 옛 간격 자리가 남아 있다. 새 프로젝트만 고치면 오너가 고쳐진 것을 못 본다.
   //   "처음"은 DB 기준이다: 저장된 자리가 하나도 없으면 사람이 자리를 놓은 적이 없다(끌면 바로 저장된다).
-  it('브라우저에 옛 간격 자리가 남아 있어도 DB 에 저장된 자리가 하나도 없으면 한 번 정렬하고 저장한다', async () => {
+  it('브라우저에 옛 간격 자리가 남아 있어도 DB 에 저장된 자리 · 테이크 · Director 에서 만든 카드가 없으면 한 번 정렬하고 저장한다', async () => {
     const { sceneIds, shotIds } = createCards([2, 1])
     measureShots(shotIds)
     const persist = vi.fn()
@@ -151,7 +151,7 @@ describe('처음으로 보는 때와 안 보는 때', () => {
   // 왜: 저장된 자리(DB canvas_position)는 사람이 끌었거나 정렬한 것이다. 실제 화면에서 확인한 사고다(2026-11-16 개발 DB): 진입 때 DB 읽기가 둘 겹쳐 돌아
   //   먼저 끝난 쪽은 저장된 자리를 카드에 못 싣고 버려진다 — 그 시점엔 카드가 아직 옛 자리라 카드 자리만 보고 정렬하면 사람이 저장해 둔 자리가 덮였다.
   //   그래서 DB 에 저장된 자리가 있으면 카드가 어디에 있든(저장된 자리가 이미 들어왔든 아직 안 들어왔든) 그대로 둔다.
-  it('DB 에 사람이 저장한 자리가 하나라도 있으면 카드가 어디에 있든 그대로 둔다', async () => {
+  it('DB 에 사람이 저장한 자리가 하나라도 있으면 브라우저에 남은 자리를 그대로 둔다', async () => {
     const { shotIds } = createCards([2, 1])
     measureShots(shotIds)
     // 아직 안 들어온 경우: 카드는 옛 자리 그대로
@@ -305,6 +305,27 @@ describe('처음 놓은 뒤 첫 화면', () => {
     const arrangeBlock = page.slice(page.indexOf('arrange: () => {'), page.indexOf('arrange: () => {') + 600)
     expect(arrangeBlock.indexOf('relayoutCanvas()')).toBeGreaterThan(-1)
     expect(arrangeBlock.indexOf('reframeFirstShot()')).toBeGreaterThan(arrangeBlock.indexOf('relayoutCanvas()'))
+  })
+})
+
+describe('처음 정렬 뒤 화면 배선 (남아 있던 카드를 다시 열 때도)', () => {
+  // 왜: 리드 2026-11-16 — 같은 창에서 정렬을 마친 프로젝트는 Storyboard 에 갔다 와도 DB 를 다시 읽지 않는다. 정렬을 실제로 마친 곳은 화면이라 화면이 알린다.
+  it('화면은 처음 정렬을 마치면 그 프로젝트를 이 창에서 확인 끝난 것으로 기억한다', () => {
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    const block = page.slice(page.indexOf('arrange: () => {'), page.indexOf('arrange: () => {') + 600)
+    expect(block.indexOf('relayoutCanvas()')).toBeGreaterThan(-1)
+    expect(block.indexOf('markFirstEntrySettled(store.projectId)')).toBeGreaterThan(block.indexOf('relayoutCanvas()'))
+  })
+
+  // 왜: 이미 열어 본 프로젝트는 저장된 viewportInitialized 가 true 라 첫 화면 효과가 저장된 화면을 복원만 한다. 처음 정렬 뒤 첫 화면 맞추기가 그 값을 보고 건너뛰면
+  //   카드가 옮겨졌는데 화면이 옛 자리를 보고 있다 — 정렬 뒤 맞추기는 viewportInitialized 를 읽지 않고(쓰기만 한다) 늘 한다.
+  it('다시 열 때(viewportInitialized 가 이미 참)도 정렬 뒤 첫 화면을 다시 맞춘다', () => {
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    const from = page.indexOf('const reframeFirstShot = useCallback')
+    const reframe = page.slice(from, page.indexOf('[applyViewport])', from))
+    expect(reframe).toMatch(/viewportInitialized: true/)
+    expect(reframe).not.toMatch(/if \([^)]*viewportInitialized/)
+    expect(reframe).not.toMatch(/\.viewportInitialized\b/)
   })
 })
 

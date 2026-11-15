@@ -12,25 +12,25 @@ const db = vi.hoisted(() => ({
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     from: (table: 'scenes' | 'shots') => {
-      const query = {
-        select: () => query,
-        eq: () => query,
-        not: (column: string, op: string, value: unknown) => {
-          db.reads.push(`${table}.${column} ${op} ${String(value)}`)
-          return query
-        },
-        limit: () => Promise.resolve({ data: db.rows[table], error: db.error }),
+      const query: Record<string, unknown> = {}
+      const chain = () => query
+      for (const name of ['select', 'eq', 'limit', 'update', 'insert', 'upsert', 'delete', 'order', 'in', 'is', 'single', 'maybeSingle']) query[name] = chain
+      query.not = (column: string, op: string, value: unknown) => {
+        db.reads.push(`${table}.${column} ${op} ${String(value)}`)
+        return query
       }
+      query.then = (resolve: (value: unknown) => unknown) => resolve({ data: db.rows[table] ?? [], error: db.error })
       return query
     },
   }),
 }))
 
-import { projectHasSavedLayout, resetSavedLayoutMemo } from '@/features/director/first-entry-layout'
+import { markFirstEntrySettled, projectHasSavedLayout, resetFirstEntryMemo } from '@/features/director/first-entry-layout'
 import { arrangeIfFirstEntry } from '@/features/director/hooks/use-writer-director-sync'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 
 beforeEach(() => {
-  resetSavedLayoutMemo()
+  resetFirstEntryMemo()
   db.rows = { scenes: [], shots: [] }
   db.error = null
   db.takes = []
@@ -117,5 +117,50 @@ describe('DB 를 읽는 때', () => {
 
     expect(db.reads).toEqual([])
     expect(fetch).not.toHaveBeenCalled()
+  })
+})
+
+describe('같은 창에서 이미 확인한 프로젝트', () => {
+  const api = () => useDirectorCanvasStore.getState()
+  /** Writer 에서 온 씬 · 샷 카드 하나씩 — 처음 정렬 후보다. */
+  function addWriterCards() {
+    api().reset()
+    const sceneId = api().addSceneNode({ x: 380, y: 80 }, 'sc_01')
+    api().updateNodeData<'scene'>(sceneId, { writerSceneId: 'sc_01' })
+    const shotId = api().addShotNode(sceneId, { x: 740, y: 80 }, 'sh_01_01')
+    api().updateNodeData<'shot'>(shotId, { writerShotId: 'sh_01_01' })
+  }
+
+  // 왜: 리드 2026-11-16 — 같은 창에서 한 번 확인을 마친 프로젝트(저장된 자리를 찾았거나 정렬을 마쳤다)는 Storyboard 에 갔다 와도 DB 를 셋(씬 · 샷 · 테이크) 다시 읽을 까닭이 없다.
+  it('같은 창에서 이미 확인한 프로젝트는 다시 들어가도 DB 를 다시 읽지 않는다', async () => {
+    const projectId = api().projectId
+
+    // 저장된 자리를 찾은 프로젝트
+    addWriterCards()
+    db.rows.shots = [{ project_id: projectId }]
+    expect(await arrangeIfFirstEntry(projectId)).toBe(false)
+    const reads = db.reads.length
+    const calls = vi.mocked(fetch).mock.calls.length
+    expect(reads).toBeGreaterThan(0)
+
+    addWriterCards() // 다시 들어감
+    expect(await arrangeIfFirstEntry(projectId)).toBe(false)
+    expect(db.reads.length).toBe(reads)
+    expect(vi.mocked(fetch).mock.calls.length).toBe(calls)
+
+    // 정렬을 마친 프로젝트: 저장된 자리가 없어 정렬을 요청했고, 화면이 정렬을 마쳤다고 알린다
+    resetFirstEntryMemo()
+    db.rows.shots = []
+    addWriterCards()
+    expect(await arrangeIfFirstEntry(projectId)).toBe(true)
+    markFirstEntrySettled(projectId)
+    const readsAfterArranged = db.reads.length
+    const callsAfterArranged = vi.mocked(fetch).mock.calls.length
+
+    addWriterCards() // 다시 들어감
+    expect(await arrangeIfFirstEntry(projectId)).toBe(false)
+    expect(api().arrangePending).toBe(false)
+    expect(db.reads.length).toBe(readsAfterArranged)
+    expect(vi.mocked(fetch).mock.calls.length).toBe(callsAfterArranged)
   })
 })
