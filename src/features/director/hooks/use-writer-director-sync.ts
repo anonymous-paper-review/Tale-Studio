@@ -1,11 +1,14 @@
 'use client'
 
 import { useEffect, useRef, useState } from 'react'
+import type { XYPosition } from '@xyflow/react'
+import { cardsUnmovedSince, isAutoPlacedCandidate, isFirstEntrySettled, projectHasSavedLayout, snapshotCardPositions } from '@/features/director/first-entry-layout'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
   useDirectorCanvasStore,
+  hasPendingDirectorPositionSaves,
   nextScenePosition,
   nextShotPosition,
 } from '@/stores/director-store'
@@ -47,6 +50,69 @@ export function buildWriterDirectorPromptPatch(
 
   return patch
 }
+
+/** 처음 정렬(오너 2026-11-16)의 점검: DB 에 저장된 자리 · 영상 테이크가 있는가(읽는 중) + 점검을 시작할 때의 카드 자리. */
+export interface FirstEntryCheck {
+  saved: Promise<boolean>
+  snapshot: ReadonlyMap<string, XYPosition>
+}
+
+/** 처음 정렬을 요청한 때의 점검: 프로젝트 · 점검할 때 찍은 카드 자리 · 요청한 시각. 실제 정렬(화면이 카드를 다 그린 뒤)이 이것으로 한 번 더 확인한다. */
+let pendingFirstEntry: { projectId: string; snapshot: ReadonlyMap<string, XYPosition>; requestedAt: number } | null = null
+
+/** 요청한 뒤 이만큼 지나서 정렬하게 되면(노드 보기가 늦게 열림) 정렬 직전에 DB 를 한 번 더 읽는다. 보통은 0.2~0.5초면 돈다. */
+export const LATE_FIRST_ENTRY_ARRANGE_MS = 1500
+
+/**
+ * 지금 캔버스가 처음 정렬 후보(Writer 카드만 있다)면 DB 점검을 시작한다. 후보가 아니거나 이 창에서 이미 확인을 끝낸 프로젝트면 null — DB 를 읽지 않는다.
+ * 카드가 갖춰진 직후에 시작하면 Pass 2.5 의 DB 읽기와 함께 돌아, 정렬을 기다리게 하지 않는다.
+ */
+export function startFirstEntryCheck(projectId: string): FirstEntryCheck | null {
+  if (isFirstEntrySettled(projectId)) return null
+  const nodes = useDirectorCanvasStore.getState().nodes
+  if (!isAutoPlacedCandidate(nodes)) return null
+  return { saved: projectHasSavedLayout(projectId), snapshot: snapshotCardPositions(nodes) }
+}
+
+/**
+ * 처음 들어온 프로젝트면 [자동 정렬]을 한 번 요청한다. 요청했으면 true.
+ * 처음 = DB 에 저장된 자리도 영상 테이크도 없고, 카드가 Writer 에서 온 것뿐일 때(리드 2026-11-16: 브라우저에 옛 간격 자리가 남아 있어도 한다).
+ * 저장된 자리는 DB 에서 직접 본다: 카드 자리만 보면 저장된 자리가 아직 안 들어온 것과 없는 것을 못 가른다
+ * (진입 때 DB 읽기가 둘 겹쳐 돌아 먼저 끝난 쪽이 버려진다). 기다리는 사이 카드가 옮겨지거나 새로 생겼거나, 끌기가 아직 저장되기 전이면 그만둔다.
+ * 자리는 카드를 그리기 전에 정해 크기를 모르므로 넉넉하게 벌어진다 — 카드를 다 그려 잰 뒤 단추와 같은 길로 놓는다.
+ * check: undefined 면 지금 점검을 시작하고, null 이면 후보가 아니라는 뜻이라 아무것도 안 한다.
+ */
+export async function arrangeIfFirstEntry(projectId: string, check?: FirstEntryCheck | null): Promise<boolean> {
+  const started = check === undefined ? startFirstEntryCheck(projectId) : check
+  if (!started) return false
+  if (await started.saved) return false
+  const state = useDirectorCanvasStore.getState()
+  if (state.projectId !== projectId) return false
+  if (!isAutoPlacedCandidate(state.nodes) || !cardsUnmovedSince(state.nodes, started.snapshot)) return false
+  if (hasPendingDirectorPositionSaves()) return false
+  // 사람이 누른 [자동 정렬]이 이미 기다리는 중이면 그 정렬이 단추 정렬로 남게 처음 정렬은 요청하지 않는다(리뷰 s11 낮음 1).
+  if (state.arrangePending && !state.arrangeFirstEntry) return false
+  pendingFirstEntry = { projectId, snapshot: started.snapshot, requestedAt: Date.now() }
+  state.requestArrange({ firstEntry: true })
+  return true
+}
+
+/**
+ * 처음 정렬을 실제로 하기 직전(화면이 카드를 다 그린 뒤)에 한 번 더 본다. 하나라도 어긋나면 false — 정렬하지 않고 "확인 마침"으로도 기억하지 않는다.
+ * 요청한 뒤 정렬하기까지 기다리는 사이(스토리보드 보기로 열리면 노드 보기가 열릴 때까지) 카드가 옮겨지거나 Take 가 생기거나 끌기가 저장되기 전일 수 있고,
+ * 늦게 돌게 됐으면 다른 탭에서 저장한 자리가 생겼을 수 있다(리뷰 s11 낮음 1). 요청한 적 없는 정렬은 확인할 것이 없어 false.
+ * 확인할 것: 전부 Writer 카드다 · 직접 만든 카드와 Take 가 없다(isAutoPlacedCandidate) · 요청할 때 찍은 자리에서 카드가 안 옮겨졌다 · 저장 전 끌기가 없다 · (늦으면) DB 에 저장된 자리가 없다.
+ */
+export async function confirmFirstEntryArrange(projectId: string): Promise<boolean> {
+  const pending = pendingFirstEntry
+  pendingFirstEntry = null
+  if (!pending || pending.projectId !== projectId) return false
+  if (Date.now() - pending.requestedAt > LATE_FIRST_ENTRY_ARRANGE_MS && (await projectHasSavedLayout(projectId))) return false
+  const state = useDirectorCanvasStore.getState()
+  if (state.projectId !== projectId) return false
+  return isAutoPlacedCandidate(state.nodes) && cardsUnmovedSince(state.nodes, pending.snapshot) && !hasPendingDirectorPositionSaves()
+}
+
 let historySuppressionRuns = 0
 
 function suppressDirectorHistory() {
@@ -142,6 +208,8 @@ export function useWriterDirectorSync() {
     configs: Record<string, { camera_config: CameraConfig; lighting_config: LightingConfig }>
   } | null>(null)
   const shotConfigPromiseRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null)
+  // 처음 정렬(오너 2026-11-16): projectId별 점검. check = undefined(아직 시작 전) · null(후보 아님) · 점검(DB 읽는 중). 효과가 다시 돌아도 이어 쓰고, 정렬은 한 번만 요청한다.
+  const firstEntryRef = useRef<{ projectId: string; requested: boolean; check: FirstEntryCheck | null | undefined } | null>(null)
   const scheduleRetry = (retryProjectId: string, label: string) => {
     if (useProjectStore.getState().projectId !== retryProjectId) return
     if (retryTimersRef.current.has(retryProjectId)) return
@@ -300,6 +368,11 @@ export function useWriterDirectorSync() {
 
     const dir = useDirectorCanvasStore.getState()
     const assets = useAssetStorageStore.getState()
+    const entryProjectId = dir.projectId
+    const firstEntry =
+      firstEntryRef.current?.projectId === entryProjectId
+        ? firstEntryRef.current
+        : (firstEntryRef.current = { projectId: entryProjectId, requested: false, check: undefined })
 
     // ── Pass 1: Scene 노드 ─────────────────────────────────────────────
     for (const scene of manifest.scenes) {
@@ -406,6 +479,9 @@ export function useWriterDirectorSync() {
       dir.updateNodeData<'shot'>(id, patch)
     }
 
+    // ── 처음 정렬(오너 2026-11-16): 카드가 갖춰진 지금 DB 에 저장된 자리 · 영상 테이크가 있는지 읽기 시작한다(아래 Pass 2.5 의 DB 읽기와 함께 돈다) ──
+    if (firstEntry.check === undefined) firstEntry.check = startFirstEntryCheck(entryProjectId)
+
     // ── Pass 2.5: DB → 캔버스 hydrate (DB가 진실, projectId별 1회) ──────
     // Scene/Shot seed 후 실행 — 부모 노드가 존재해야 Video 노드를 매달 수 있음.
     // canvas_position을 기존 노드에 적용 + 누락된 video_clips 행을 Video 노드로 생성.
@@ -440,6 +516,13 @@ export function useWriterDirectorSync() {
     // ── Pass 2.7: 실사 보드 자율 채움 — 제거됨 (#c5 2026-08-27 오너 지시) ──
     // 진입만으로 실사 i2i 가 발사되던 경로. 사용자가 previz 를 확인·수정할 틈 없이 과금이
     // 먼저 나서 껐다. 실사 생성은 전체 버튼·개별 버튼·채팅 셋 중 하나로만 시작한다.
+
+    // ── Pass 2.8: 처음 들어온 프로젝트면 [자동 정렬]을 한 번 한다(오너 2026-11-16) ──────────
+    // 자리는 카드를 그리기 전에 정해 크기를 몰라 넉넉하게 벌어진다. DB 에 저장된 자리 · 영상 테이크가 있거나 직접 만든 카드가 있으면 하지 않는다(first-entry-layout.ts).
+    if (!firstEntry.requested) {
+      firstEntry.requested = true
+      await arrangeIfFirstEntry(entryProjectId, firstEntry.check)
+    }
 
     // ── Pass 3: 스토리보드 자동생성 — 비활성화 (Higgsfield 노드 뷰 전환) ──
     // 목각(roughStoryboard)이 노드 뷰의 초기 상태로 남아야 하므로, 진입 시

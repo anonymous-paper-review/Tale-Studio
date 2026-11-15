@@ -786,6 +786,11 @@ function debouncedShotSaveToDb(
 
 const pendingPositionSaves = new Map<string, ReturnType<typeof setTimeout>>()
 
+/** 끌고 난 뒤 아직 DB 로 안 간(0.5초 뒤 저장 예정) 카드 자리가 있는가. 처음 정렬이 방금 끈 자리를 덮지 않게 본다(오너 2026-11-16). */
+export function hasPendingDirectorPositionSaves(): boolean {
+  return pendingPositionSaves.size > 0
+}
+
 /** 노드 종류별로 canvas_position을 올바른 테이블에 debounce write. key id null이면 skip. */
 function debouncedPositionSaveToDb(
   nodeId: string,
@@ -1207,7 +1212,10 @@ interface DirectorCanvasState {
   relayoutCanvas: () => void
   /** [자동 정렬]을 기다리는 중(검토 C 3번): 캔버스가 화면 밖 카드까지 그려 지금 크기를 잰 뒤 relayoutCanvas 를 부른다. relayoutCanvas · 프로젝트 바꿈이 끈다. */
   arrangePending: boolean
-  requestArrange: () => void
+  /** 기다리는 정렬이 "처음 들어갔을 때"의 것이면 true(오너 2026-11-16): 되돌리기 기록에 안 남기고, 화면이 정렬 뒤 첫 화면을 다시 맞춘다. relayoutCanvas · 프로젝트 바꿈이 끈다. */
+  arrangeFirstEntry: boolean
+  /** [자동 정렬] 요청. 처음 들어갔을 때의 정렬은 { firstEntry: true }(use-writer-director-sync). 단추는 인자 없이 부른다. */
+  requestArrange: (options?: { firstEntry?: boolean }) => void
   /** 진입 시 DB → 캔버스 hydrate. canvas_position 적용 + 누락 Video 노드 생성 (DB가 진실) */
   hydrateFromDb: (projectId: string) => Promise<void>
 
@@ -1810,6 +1818,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             playingNodeId: null,
             showUnusedAssets: false,
             arrangePending: false,
+            arrangeFirstEntry: false,
             historyPast: [],
             historyFuture: [],
             lastSavedAt: Date.now(),
@@ -1890,10 +1899,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       //   에셋 → 샷 116 · 씬 묶음 160)으로, 화면이 잰 카드 크기를 세어 겹치지 않게 놓는다.
       //   in-memory 즉시 적용 + 씬 · 샷 · 영상은 nodeId별 persist로 DB(canvas_position) 반영(재진입 유지). 에셋 자리는 DB 에 없다.
       arrangePending: false,
-      requestArrange: () => set({ arrangePending: true }),
+      arrangeFirstEntry: false,
+      requestArrange: (options) =>
+        set((s) => ({
+          arrangePending: true,
+          // 사람이 누른 [자동 정렬]이 이미 기다리는 중이면 처음 정렬로 바꾸지 않는다: 단추 정렬은 되돌리기 기록이 남아야 한다(리뷰 s11 낮음 1).
+          arrangeFirstEntry: options?.firstEntry === true && !(s.arrangePending && !s.arrangeFirstEntry),
+        })),
 
       relayoutCanvas: () => {
-        get().commitHistory()
+        // 처음 들어갔을 때의 정렬은 동기화 셋업과 같은 시스템 변경이라 되돌리기 기록에 남기지 않는다(오너 2026-11-16). [자동 정렬] 단추는 남긴다.
+        if (!get().arrangeFirstEntry) get().commitHistory()
         // 크기 셈(검토 C 3번): 지금 화면에 그린 카드는 DOM 크기, 화면 밖은 예전에 잰 크기와 넉넉한 크기 중 큰 값.
         const posById = arrangeDirectorCanvas(get().nodes, canvasCardSizing())
         set((s) => ({
@@ -1903,6 +1919,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           }),
           lastSavedAt: Date.now(),
           arrangePending: false,
+          arrangeFirstEntry: false,
         }))
         for (const id of posById.keys()) {
           const node = get().nodes.find((n) => n.id === id)
@@ -5909,6 +5926,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           playingNodeId: null,
           showUnusedAssets: false,
           arrangePending: false,
+          arrangeFirstEntry: false,
           historyPast: [],
           historyFuture: [],
           lastSavedAt: Date.now(),

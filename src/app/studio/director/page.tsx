@@ -73,6 +73,7 @@ import { countStatusFilters, dimmedByStatusFilter, directorHasFinishedVideo, mat
 import { HIDDEN_ON_CANVAS, directorCanvasMeta, storyboardCanvasMeta } from '@/features/director/canvas-meta'
 import { separateAssetCards } from '@/features/director/asset-column'
 import { arrangeOnceCardsRendered, renderedCardSizes } from '@/features/director/canvas-layout'
+import { firstEntryViewport, markFirstEntrySettled } from '@/features/director/first-entry-layout'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
@@ -100,7 +101,7 @@ import {
 import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
 import { useStoryboardZoom } from '@/components/generating-frame'
 import { countText } from '@/lib/i18n/count-text'
-import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
+import { confirmFirstEntryArrange, useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
 
 import { ShotNode } from '@/features/director/canvas-nodes/ShotNode'
@@ -289,7 +290,8 @@ const zoomPillSelector = (s: ReactFlowState) => ({
   interactive: s.nodesDraggable || s.nodesConnectable || s.elementsSelectable,
 })
 
-function CanvasZoomPill() {
+/** 확대 · 축소 · 화면 맞추기 단추. onPersonMove: 단추는 코드가 부르는 화면 움직임(onMoveStart 의 event 가 비어 있다)이라 사람이 눌렀음을 직접 알린다. */
+function CanvasZoomPill({ onPersonMove }: { onPersonMove?: () => void }) {
   const t = useT()
   const store = useStoreApi()
   const { zoom, minReached, maxReached, interactive } = useStore(zoomPillSelector, (a, b) =>
@@ -301,14 +303,14 @@ function CanvasZoomPill() {
   return (
     <Panel position="bottom-left" className="!m-4">
       <div className="flex h-[37px] items-center gap-0.5 rounded-full bg-background px-1.5 shadow-node" role="group" aria-label={t('Canvas zoom')}>
-        <button type="button" className={button} onClick={() => void zoomOut()} disabled={minReached} title={t('Zoom out canvas')} aria-label={t('Zoom out canvas')}>
+        <button type="button" className={button} onClick={() => { onPersonMove?.(); void zoomOut() }} disabled={minReached} title={t('Zoom out canvas')} aria-label={t('Zoom out canvas')}>
           <Minus className="size-3.5" />
         </button>
         <span className="min-w-11 text-center font-num text-meta font-medium tabular-nums text-muted-foreground">{Math.round(zoom * 100)}%</span>
-        <button type="button" className={button} onClick={() => void zoomIn()} disabled={maxReached} title={t('Zoom in canvas')} aria-label={t('Zoom in canvas')}>
+        <button type="button" className={button} onClick={() => { onPersonMove?.(); void zoomIn() }} disabled={maxReached} title={t('Zoom in canvas')} aria-label={t('Zoom in canvas')}>
           <Plus className="size-3.5" />
         </button>
-        <button type="button" className={button} onClick={() => void fitView()} title={t('Fit the canvas to the screen')} aria-label={t('Fit the canvas to the screen')}>
+        <button type="button" className={button} onClick={() => { onPersonMove?.(); void fitView() }} title={t('Fit the canvas to the screen')} aria-label={t('Fit the canvas to the screen')}>
           <Maximize2 className="size-3.5" />
         </button>
         <button
@@ -540,17 +542,69 @@ function CanvasInner() {
   } = useReactFlow()
   const nodesInitialized = useNodesInitialized()
 
+  // 진입 뒤 사람이 화면을 끌거나 확대했는가(이 캔버스가 열려 있는 동안). 처음 정렬이 1~2초 늦게 끝나도 사람이 옮긴 화면을 끌어오지 않는다(리뷰 s11 낮음 2).
+  const viewportMovedByPersonRef = useRef(false)
+
+  // 처음 들어갔을 때 보여 주는 화면(가장 왼쪽 샷을 가운데에, 0.75 배)을 지금 카드 자리 기준으로 맞춘다. 처음 정렬이 카드를 옮긴 뒤에도 쓴다(아래, 오너 2026-11-16).
+  //   그때 화면은 이미 첫 화면으로 움직이는 중일 수 있다. 움직임이 있는 맞추기(duration 250)가 그 움직임을 끊는다(0 이면 못 끊어 옛 자리로 되돌아간다).
+  const firstEntryReframedRef = useRef(false)
+  const reframeFirstShot = useCallback(async () => {
+    const pane = document.querySelector('.react-flow')
+    const target = firstEntryViewport(useDirectorCanvasStore.getState().nodes, {
+      width: pane?.clientWidth ?? 1200,
+      height: pane?.clientHeight ?? 800,
+    })
+    if (!target) return
+    firstEntryReframedRef.current = true
+    await applyViewport(target, { duration: 250 })
+    useDirectorCanvasStore.setState({ viewport: target, viewportInitialized: true })
+  }, [applyViewport])
+
   // [자동 정렬](검토 C 3번, 2026-11-10): 누른 동안만 화면 밖 카드까지 그려 지금 크기를 재고, 다 그려지면 정렬한다.
   //   정렬이 기다림 표시를 끄면 다시 보이는 카드만 그린다(아래 onlyRenderVisibleElements).
+  //   처음 들어갔을 때의 정렬(동기화가 요청, 오너 2026-11-16)도 같은 길이다. 다만 기다리는 사이 카드가 옮겨지거나 Take 가 생겼거나 늦게 돌아 다른 곳에서 자리가
+  //   저장됐을 수 있어, 정렬 직전에 한 번 더 확인하고(confirmFirstEntryArrange) 어긋나면 정렬하지 않는다(리뷰 s11 낮음 1). 정렬하면 이 창에서는 다시 점검하지 않고
+  //   첫 화면은 새 자리 기준으로 다시 맞춘다(사람이 화면을 옮겼으면 맞추지 않는다).
   const arrangePending = useDirectorCanvasStore((s) => s.arrangePending)
   useEffect(() => {
     if (!arrangePending) return
-    return arrangeOnceCardsRendered({
+    let cancelled = false
+    const stop = arrangeOnceCardsRendered({
       cardIds: () => useDirectorCanvasStore.getState().nodes.filter((n) => !HIDDEN_ON_CANVAS.has(n.data.kind)).map((n) => n.id),
       renderedIds: renderedCardSizes,
-      arrange: () => useDirectorCanvasStore.getState().relayoutCanvas(),
+      arrange: () => {
+        const store = useDirectorCanvasStore.getState()
+        if (!store.arrangeFirstEntry) {
+          store.relayoutCanvas()
+          return
+        }
+        void (async () => {
+          const projectId = store.projectId
+          const go = await confirmFirstEntryArrange(projectId)
+          if (cancelled) return
+          const now = useDirectorCanvasStore.getState()
+          if (now.projectId !== projectId) return
+          if (!now.arrangeFirstEntry) {
+            // 그 사이 사람이 [자동 정렬]을 눌렀다: 단추 정렬로 마저 한다(되돌리기 기록이 남는다).
+            now.relayoutCanvas()
+            return
+          }
+          if (!go) {
+            // 그만둔다: 기다림 표시만 끈다(화면 밖 카드 그리기도 멈춘다). 확인 마침으로 기억하지 않는다.
+            useDirectorCanvasStore.setState({ arrangePending: false, arrangeFirstEntry: false })
+            return
+          }
+          now.relayoutCanvas()
+          markFirstEntrySettled(projectId)
+          if (!viewportMovedByPersonRef.current) void reframeFirstShot()
+        })()
+      },
     })
-  }, [arrangePending])
+    return () => {
+      cancelled = true
+      stop()
+    }
+  }, [arrangePending, reframeFirstShot])
 
   // Node 뷰 재진입 시 마지막 뷰포트 복원 (#e 2026-07-14).
   //   CanvasInner는 Node↔Storyboard 토글·스테이지 이동마다 remount된다. 예전엔 매 mount마다
@@ -573,29 +627,21 @@ function CanvasInner() {
     //   (씬 노드는 캔버스에서 숨겨져 기준이 될 수 없다 — 2026-08-31 대공사.)
     void (async () => {
       await fitView()
-      const shots = useDirectorCanvasStore
-        .getState()
-        .nodes.filter((n) => n.data.kind === 'shot')
-      if (shots.length === 0) {
+      const pane = document.querySelector('.react-flow')
+      const target = firstEntryViewport(useDirectorCanvasStore.getState().nodes, {
+        width: pane?.clientWidth ?? 1200,
+        height: pane?.clientHeight ?? 800,
+      })
+      if (!target) {
         useDirectorCanvasStore.setState({
           viewport: getViewport(),
           viewportInitialized: true,
         })
         return
       }
-      const first = shots.reduce((a, b) =>
-        a.position.x <= b.position.x ? a : b,
-      )
-      const pane = document.querySelector('.react-flow')
-      const w = pane?.clientWidth ?? 1200
-      const h = pane?.clientHeight ?? 800
-      const zoom = 0.75
-      const target = {
-        x: w / 2 - (first.position.x + 130) * zoom,
-        y: h / 3 - (first.position.y + 60) * zoom,
-        zoom,
-      }
       await applyViewport(target, { duration: 900 })
+      // 움직이는 사이에 처음 정렬이 카드를 옮겨 화면을 다시 맞췄으면(reframeFirstShot) 옛 자리 기준 화면으로 되돌려 저장하지 않는다.
+      if (firstEntryReframedRef.current) return
       useDirectorCanvasStore.setState({
         viewport: target,
         viewportInitialized: true,
@@ -843,6 +889,10 @@ function CanvasInner() {
         }}
         onNodeDragStart={() => commitHistory()}
         onMove={(_, vp) => setViewport(vp)}
+        // 사람이 끌거나 확대하면(event 가 있다) 기억한다 — 화면이 스스로 움직일 때(첫 화면 효과 · 다시 맞추기)는 event 가 비어 있다. 처음 정렬 뒤 첫 화면 다시 맞추기가 이 화면을 끌어오지 않게(리뷰 s11 낮음 2).
+        onMoveStart={(event) => {
+          if (event) viewportMovedByPersonRef.current = true
+        }}
         snapToGrid
         snapGrid={SNAP_GRID}
         // 더 넓게 축소 가능하게(#e2 2026-07-15) — RF 기본 minZoom 0.5는 넓은 그래프에서
@@ -870,7 +920,7 @@ function CanvasInner() {
         className="bg-canvas-bg"
       >
         <Background gap={20} size={1.2} color="var(--canvas-dot)" className="opacity-10" />
-        <CanvasZoomPill />
+        <CanvasZoomPill onPersonMove={() => { viewportMovedByPersonRef.current = true }} />
         <MiniMapPanel />
       </ReactFlow>
 
