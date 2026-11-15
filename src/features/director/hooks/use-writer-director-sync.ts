@@ -2,12 +2,13 @@
 
 import { useEffect, useRef, useState } from 'react'
 import type { XYPosition } from '@xyflow/react'
-import { isUntouchedFirstLayout, projectHasSavedLayout } from '@/features/director/first-entry-layout'
+import { cardsUnmovedSince, isAutoPlacedCandidate, projectHasSavedLayout, snapshotCardPositions } from '@/features/director/first-entry-layout'
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
   useDirectorCanvasStore,
+  hasPendingDirectorPositionSaves,
   nextScenePosition,
   nextShotPosition,
 } from '@/stores/director-store'
@@ -50,32 +51,38 @@ export function buildWriterDirectorPromptPatch(
   return patch
 }
 
+/** 처음 정렬(오너 2026-11-16)의 점검: DB 에 저장된 자리 · 영상 테이크가 있는가(읽는 중) + 점검을 시작할 때의 카드 자리. */
+export interface FirstEntryCheck {
+  saved: Promise<boolean>
+  snapshot: ReadonlyMap<string, XYPosition>
+}
+
 /**
- * 처음 정렬(오너 2026-11-16)의 재료: 이번 진입에서 동기화가 새로 만든 씬 · 샷 카드의 처음 자리를 모아 둔다.
- * 나중에 저장된 자리가 들어오거나 사람이 옮기면 이 자리와 달라진다(first-entry-layout.isUntouchedFirstLayout).
- * 카드가 안 만들어졌으면(데모 세션은 id 가 '') 기억하지 않는다.
+ * 지금 캔버스가 처음 정렬 후보(Writer 카드만 있다)면 DB 점검을 시작한다. 후보가 아니면 null — DB 를 읽지 않는다.
+ * 카드가 갖춰진 직후에 시작하면 Pass 2.5 의 DB 읽기와 함께 돌아, 정렬을 기다리게 하지 않는다.
  */
-export function rememberFirstPlacement(placedAt: Map<string, XYPosition>, nodeId: string): void {
-  const node = useDirectorCanvasStore.getState().nodes.find((n) => n.id === nodeId)
-  if (node) placedAt.set(nodeId, { x: node.position.x, y: node.position.y })
+export function startFirstEntryCheck(projectId: string): FirstEntryCheck | null {
+  const nodes = useDirectorCanvasStore.getState().nodes
+  if (!isAutoPlacedCandidate(nodes)) return null
+  return { saved: projectHasSavedLayout(projectId), snapshot: snapshotCardPositions(nodes) }
 }
 
 /**
  * 처음 들어온 프로젝트면 [자동 정렬]을 한 번 요청한다. 요청했으면 true.
- * 처음 = 카드가 전부 이번 진입에서 새로 만든 Writer 카드이고 아직 그 자리에 있고, DB 에 저장된 자리도 영상 테이크도 없을 때.
- * 저장된 자리는 DB 에서 직접 본다(hasSavedLayout): 카드 자리만 보면 저장된 자리가 아직 안 들어온 것과 없는 것을 못 가른다
- * (진입 때 DB 읽기가 둘 겹쳐 돌아 먼저 끝난 쪽이 버려진다). 기다리는 사이 카드가 옮겨졌으면 다시 보고 그만둔다.
+ * 처음 = DB 에 저장된 자리도 영상 테이크도 없고, 카드가 Writer 에서 온 것뿐일 때(리드 2026-11-16: 브라우저에 옛 간격 자리가 남아 있어도 한다).
+ * 저장된 자리는 DB 에서 직접 본다: 카드 자리만 보면 저장된 자리가 아직 안 들어온 것과 없는 것을 못 가른다
+ * (진입 때 DB 읽기가 둘 겹쳐 돌아 먼저 끝난 쪽이 버려진다). 기다리는 사이 카드가 옮겨지거나 새로 생겼거나, 끌기가 아직 저장되기 전이면 그만둔다.
  * 자리는 카드를 그리기 전에 정해 크기를 모르므로 넉넉하게 벌어진다 — 카드를 다 그려 잰 뒤 단추와 같은 길로 놓는다.
+ * check: undefined 면 지금 점검을 시작하고, null 이면 후보가 아니라는 뜻이라 아무것도 안 한다.
  */
-export async function arrangeIfFirstEntry(
-  placedAt: ReadonlyMap<string, XYPosition>,
-  projectId: string,
-  hasSavedLayout?: Promise<boolean>,
-): Promise<boolean> {
-  if (!isUntouchedFirstLayout(useDirectorCanvasStore.getState().nodes, placedAt)) return false
-  if (await (hasSavedLayout ?? projectHasSavedLayout(projectId))) return false
+export async function arrangeIfFirstEntry(projectId: string, check?: FirstEntryCheck | null): Promise<boolean> {
+  const started = check === undefined ? startFirstEntryCheck(projectId) : check
+  if (!started) return false
+  if (await started.saved) return false
   const state = useDirectorCanvasStore.getState()
-  if (state.projectId !== projectId || !isUntouchedFirstLayout(state.nodes, placedAt)) return false
+  if (state.projectId !== projectId) return false
+  if (!isAutoPlacedCandidate(state.nodes) || !cardsUnmovedSince(state.nodes, started.snapshot)) return false
+  if (hasPendingDirectorPositionSaves()) return false
   state.requestArrange({ firstEntry: true })
   return true
 }
@@ -175,10 +182,8 @@ export function useWriterDirectorSync() {
     configs: Record<string, { camera_config: CameraConfig; lighting_config: LightingConfig }>
   } | null>(null)
   const shotConfigPromiseRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null)
-  // 처음 정렬(오너 2026-11-16): 이번 진입에서 새로 만든 씬 · 샷 카드의 처음 자리(projectId별). 효과가 다시 돌아도 이어 쓰고, 정렬은 한 번만 요청한다.
-  //   savedLayout = DB 에 저장된 자리 · 영상 테이크가 있는가. 카드를 새로 만들 때 한 번만 읽기 시작한다(다시 열기는 카드를 안 만들어 읽지 않는다).
-  //   카드를 만든 뒤 DB 읽기가 도는 동안 읽혀 끝나 있어 기다림이 늘지 않는다.
-  const firstPlacementRef = useRef<{ projectId: string; placedAt: Map<string, XYPosition>; requested: boolean; savedLayout: Promise<boolean> | null } | null>(null)
+  // 처음 정렬(오너 2026-11-16): projectId별 점검. check = undefined(아직 시작 전) · null(후보 아님) · 점검(DB 읽는 중). 효과가 다시 돌아도 이어 쓰고, 정렬은 한 번만 요청한다.
+  const firstEntryRef = useRef<{ projectId: string; requested: boolean; check: FirstEntryCheck | null | undefined } | null>(null)
   const scheduleRetry = (retryProjectId: string, label: string) => {
     if (useProjectStore.getState().projectId !== retryProjectId) return
     if (retryTimersRef.current.has(retryProjectId)) return
@@ -338,15 +343,10 @@ export function useWriterDirectorSync() {
     const dir = useDirectorCanvasStore.getState()
     const assets = useAssetStorageStore.getState()
     const entryProjectId = dir.projectId
-    const firstPlacement =
-      firstPlacementRef.current?.projectId === entryProjectId
-        ? firstPlacementRef.current
-        : (firstPlacementRef.current = { projectId: entryProjectId, placedAt: new Map<string, XYPosition>(), requested: false, savedLayout: null })
-    // 새로 만든 카드의 처음 자리를 기억하고, 처음 정렬을 판가름할 DB 읽기를 한 번 시작해 둔다.
-    const noteCreated = (nodeId: string) => {
-      rememberFirstPlacement(firstPlacement.placedAt, nodeId)
-      if (firstPlacement.placedAt.size > 0) firstPlacement.savedLayout ??= projectHasSavedLayout(entryProjectId)
-    }
+    const firstEntry =
+      firstEntryRef.current?.projectId === entryProjectId
+        ? firstEntryRef.current
+        : (firstEntryRef.current = { projectId: entryProjectId, requested: false, check: undefined })
 
     // ── Pass 1: Scene 노드 ─────────────────────────────────────────────
     for (const scene of manifest.scenes) {
@@ -359,7 +359,6 @@ export function useWriterDirectorSync() {
 
       const pos = nextScenePosition(useDirectorCanvasStore.getState())
       const id = dir.addSceneNode(pos, scene.sceneId)
-      noteCreated(id)
       dir.updateNodeData<'scene'>(id, {
         writerSceneId: scene.sceneId,
         location: scene.location,
@@ -431,7 +430,6 @@ export function useWriterDirectorSync() {
 
       const pos = nextShotPosition(cur, parent.id)
       const id = dir.addShotNode(parent.id, pos, shot.shotId)
-      noteCreated(id)
 
       const patch: Partial<ShotNodeData> = {
         writerShotId: shot.shotId,
@@ -454,6 +452,9 @@ export function useWriterDirectorSync() {
       if (shot.cameraPreset) patch.cameraPreset = shot.cameraPreset
       dir.updateNodeData<'shot'>(id, patch)
     }
+
+    // ── 처음 정렬(오너 2026-11-16): 카드가 갖춰진 지금 DB 에 저장된 자리 · 영상 테이크가 있는지 읽기 시작한다(아래 Pass 2.5 의 DB 읽기와 함께 돈다) ──
+    if (firstEntry.check === undefined) firstEntry.check = startFirstEntryCheck(entryProjectId)
 
     // ── Pass 2.5: DB → 캔버스 hydrate (DB가 진실, projectId별 1회) ──────
     // Scene/Shot seed 후 실행 — 부모 노드가 존재해야 Video 노드를 매달 수 있음.
@@ -492,9 +493,9 @@ export function useWriterDirectorSync() {
 
     // ── Pass 2.8: 처음 들어온 프로젝트면 [자동 정렬]을 한 번 한다(오너 2026-11-16) ──────────
     // 자리는 카드를 그리기 전에 정해 크기를 몰라 넉넉하게 벌어진다. DB 에 저장된 자리 · 영상 테이크가 있거나 직접 만든 카드가 있으면 하지 않는다(first-entry-layout.ts).
-    if (!firstPlacement.requested) {
-      firstPlacement.requested = true
-      await arrangeIfFirstEntry(firstPlacement.placedAt, entryProjectId, firstPlacement.savedLayout ?? undefined)
+    if (!firstEntry.requested) {
+      firstEntry.requested = true
+      await arrangeIfFirstEntry(entryProjectId, firstEntry.check)
     }
 
     // ── Pass 3: 스토리보드 자동생성 — 비활성화 (Higgsfield 노드 뷰 전환) ──

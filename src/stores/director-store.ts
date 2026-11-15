@@ -786,6 +786,11 @@ function debouncedShotSaveToDb(
 
 const pendingPositionSaves = new Map<string, ReturnType<typeof setTimeout>>()
 
+/** 끌고 난 뒤 아직 DB 로 안 간(0.5초 뒤 저장 예정) 카드 자리가 있는가. 처음 정렬이 방금 끈 자리를 덮지 않게 본다(오너 2026-11-16). */
+export function hasPendingDirectorPositionSaves(): boolean {
+  return pendingPositionSaves.size > 0
+}
+
 /** 노드 종류별로 canvas_position을 올바른 테이블에 debounce write. key id null이면 skip. */
 function debouncedPositionSaveToDb(
   nodeId: string,

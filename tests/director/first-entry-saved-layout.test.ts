@@ -26,10 +26,11 @@ vi.mock('@/lib/supabase/client', () => ({
   }),
 }))
 
-import { projectHasSavedLayout } from '@/features/director/first-entry-layout'
+import { projectHasSavedLayout, resetSavedLayoutMemo } from '@/features/director/first-entry-layout'
 import { arrangeIfFirstEntry } from '@/features/director/hooks/use-writer-director-sync'
 
 beforeEach(() => {
+  resetSavedLayoutMemo()
   db.rows = { scenes: [], shots: [] }
   db.error = null
   db.takes = []
@@ -84,12 +85,35 @@ describe('DB 에 저장된 자리가 있는가', () => {
     vi.stubGlobal('fetch', vi.fn(async () => new Response(JSON.stringify({ unexpected: true }), { status: 200 })))
     expect(await projectHasSavedLayout('p1')).toBe(true)
   })
+
+  // 왜: 저장된 자리가 있는 프로젝트는 열 때마다 DB 를 세 번(씬 · 샷 · 테이크) 다시 읽을 까닭이 없다. 한 번 있다고 확인했으면 이 화면을 닫기 전까지 다시 읽지 않는다.
+  it('저장된 자리가 있다고 한 번 확인한 프로젝트는 다시 읽지 않는다', async () => {
+    db.rows.shots = [{ project_id: 'p-memo' }]
+    expect(await projectHasSavedLayout('p-memo')).toBe(true)
+    const reads = db.reads.length
+    const calls = vi.mocked(fetch).mock.calls.length
+
+    db.rows.shots = []
+    expect(await projectHasSavedLayout('p-memo')).toBe(true)
+
+    expect(db.reads.length).toBe(reads)
+    expect(vi.mocked(fetch).mock.calls.length).toBe(calls)
+  })
+
+  // 왜: 읽기가 실패해 "있다고 본" 답까지 기억하면, 일시적인 오류 한 번으로 그 프로젝트는 이 화면에서 처음 정렬이 영영 안 된다.
+  it('읽기가 실패해서 있다고 본 답은 기억하지 않는다', async () => {
+    db.error = { message: 'network down' }
+    expect(await projectHasSavedLayout('p-flaky')).toBe(true)
+
+    db.error = null
+    expect(await projectHasSavedLayout('p-flaky')).toBe(false)
+  })
 })
 
 describe('DB 를 읽는 때', () => {
-  // 왜: 다시 열기(카드가 이미 있어 이번 진입에서 새로 만든 카드가 없다)는 처음일 수 없다. 그 판별에 DB 읽기 셋(씬 · 샷 · 테이크)을 매번 쓸 까닭이 없다.
-  it('이번 진입에서 카드를 새로 만들지 않았으면 DB 를 읽지 않고 정렬도 하지 않는다', async () => {
-    expect(await arrangeIfFirstEntry(new Map(), 'p1')).toBe(false)
+  // 왜: 점검은 카드가 Writer 에서 온 것뿐일 때만 한다. 카드가 없거나 영상 · 직접 만든 카드가 섞였으면 처음일 수 없다 — 그 판별에 DB 읽기 셋(씬 · 샷 · 테이크)을 쓸 까닭이 없다.
+  it('Writer 카드만 있는 캔버스가 아니면 DB 를 읽지 않고 정렬도 하지 않는다', async () => {
+    expect(await arrangeIfFirstEntry('p1')).toBe(false)
 
     expect(db.reads).toEqual([])
     expect(fetch).not.toHaveBeenCalled()
