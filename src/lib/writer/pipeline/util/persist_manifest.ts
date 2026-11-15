@@ -37,6 +37,7 @@ import {
   i18nHash,
   isTargetScript,
 } from '@/lib/writer/i18n/derive-en'
+import { chooseNativeText, nativeProvenance } from '@/lib/writer/i18n/native-script'
 import type { ShotType } from '@/types'
 import type {
   SceneLedger,
@@ -91,13 +92,16 @@ function normRole(role: string): 'protagonist' | 'antagonist' | 'supporting' {
     : 'supporting'
 }
 
-// 프로젝트 표시 locale — _native 역파생(EN→유저언어) 대상 판정. 미설정/조회실패 시 'en'(역파생 skip).
+// 프로젝트 표시 locale — _native 역파생(EN→유저언어) 대상 판정. 미설정이면 'en'(역파생 skip).
+//   조회 실패는 'en' 으로 덮지 않고 던진다(2026-11-15): 'en' 이면 이제 한국어 원문 대신 영어 옮긴 글이 화면 칸에 들어가므로,
+//   조회가 한 번 실패한 것이 한국어 프로젝트를 영어로 저장하게 두면 안 된다. 호출부는 쓰기보다 먼저 읽어 실패하면 아무것도 쓰기 전에 멈춘다.
 async function projectLocale(projectId: string): Promise<string> {
-  const { data } = await supabaseAdmin
+  const { data, error } = await supabaseAdmin
     .from('projects')
     .select('locale')
     .eq('id', projectId)
     .maybeSingle()
+  assertDbOk('projects locale read', error)
   return ((data?.locale as string) ?? 'en').trim() || 'en'
 }
 
@@ -242,6 +246,8 @@ export async function persistAssetsToDb(
     const sRowsAll = scenes.scenes.map((sc, i) => ({
       id: writerSceneIdToMain(sc.scene_id),
       narrativeNative: sceneSummaryText(sc), // 대본에서 옮긴 씬은 첫 지문(2026-09-21)
+      // 요약이 사람이 쓴 대본 원문인가(sceneSummaryText 와 같은 조건) — 그렇다면 영어 프로젝트에서도 원문을 화면에 둔다.
+      narrativeIsSource: sc.provenance?.source === 'script' && !!sc.source_summary,
       moodNative: `${sc.emotion_beat?.start ?? ''} → ${sc.emotion_beat?.end ?? ''}`,
       quote: (sc.scene_actions ?? []).join(' '),
       location: sc.location ?? '',
@@ -284,26 +290,30 @@ export async function persistAssetsToDb(
     ])
     const { error: sceneInsertErr } = await supabaseAdmin.from('scenes').insert(
       sRows.map((r) => {
-        const narrTx = !isTargetScript(r.narrativeNative, locale) && narrKo.has(r.id)
-        const moodTx = !isTargetScript(r.moodNative, locale) && moodKo.has(r.id)
+        // 화면 칸(_native): 옮긴 글이 있으면 그 글, 영어 프로젝트에서 한국어로 온 글은 영어로 옮긴 글(2026-11-15 chooseNativeText).
+        //   대본에서 옮긴 요약은 사람이 쓴 원천이라 그대로 둔다. 영어 글에서 온 칸은 아래 provenance 에 영어 글 해시를 남긴다.
+        const narrEnText = narrEn.get(r.id) ?? r.narrativeNative
+        const moodEnText = moodEn.get(r.id) ?? r.moodNative
+        const narrNative = chooseNativeText({ locale, raw: r.narrativeNative, en: narrEnText, derived: narrKo.get(r.id), keepSource: r.narrativeIsSource })
+        const moodNative = chooseNativeText({ locale, raw: r.moodNative, en: moodEnText, derived: moodKo.get(r.id) })
         return {
           project_id: projectId,
           scene_id: r.id,
           source: 'pipeline', // #F-003 R3 — 이 행은 재런 시 파이프라인이 갈아엎는다
-          narrative_summary: narrEn.get(r.id) ?? r.narrativeNative,
-          narrative_summary_native: narrKo.get(r.id) ?? r.narrativeNative,
+          narrative_summary: narrEnText,
+          narrative_summary_native: narrNative.text,
           original_text_quote: r.quote,
           location: r.location,
           time_of_day: r.timeOfDay,
           narrative_time: r.narrativeTime,
-          mood: moodEn.get(r.id) ?? r.moodNative,
-          mood_native: moodKo.get(r.id) ?? r.moodNative,
+          mood: moodEnText,
+          mood_native: moodNative.text,
           i18n_provenance: {
             narrative_summary: i18nHash(r.narrativeNative),
             mood: i18nHash(r.moodNative),
             // 역파생(EN→native) 출처 해시 — EN 주 컬럼 변경 시 _native stale 판정.
-            ...(narrTx ? { narrative_summary_native: i18nHash(narrEn.get(r.id) ?? r.narrativeNative) } : {}),
-            ...(moodTx ? { mood_native: i18nHash(moodEn.get(r.id) ?? r.moodNative) } : {}),
+            ...nativeProvenance('narrative_summary', narrNative, narrEnText),
+            ...nativeProvenance('mood', moodNative, moodEnText),
           },
           characters_present: r.chars,
           estimated_duration_seconds: r.seconds,
@@ -374,16 +384,16 @@ export async function persistAssetsToDb(
       locale,
       'character appearance',
     )
-    // 한 인물의 3면: en(생성 base) / native(표시 — 원문이 타깃 언어면 원문, 아니면 역파생) / provenance
+    // 한 인물의 3면: en(생성 base) / native(표시 — 원문이 타깃 언어면 원문, 옮긴 글이 있으면 그 글, 영어 프로젝트에서 한국어로 온 글은 영어로 옮긴 글) / provenance
     const appearFields = (id: string) => {
       const raw = appearRaw.get(id) ?? ''
       if (!raw) return { appearance: '', appearance_native: '', i18n_provenance: {} as Record<string, string> }
       const en = appearEn.get(id) ?? raw
-      const native = isTargetScript(raw, locale) ? raw : appearKo.get(id) ?? raw
+      const native = chooseNativeText({ locale, raw, en, derived: appearKo.get(id) })
       const prov: Record<string, string> = {}
       if (en !== raw) prov.appearance = i18nHash(raw)
-      if (native !== raw && native !== en) prov.appearance_native = i18nHash(en)
-      return { appearance: en, appearance_native: native, i18n_provenance: prov }
+      Object.assign(prov, nativeProvenance('appearance', native, en))
+      return { appearance: en, appearance_native: native.text, i18n_provenance: prov }
     }
 
     // 사람만 사람 전용 저장 창구로 보낸다(2026-10-10 오너 · 운영 806e2cc2) — 사물은 8월부터 사물 목록(props) 자리다.
@@ -774,6 +784,8 @@ export async function persistShotsToDb(
 ): Promise<void> {
   if (!UUID_RE.test(projectId)) return // 핸드오프 외 run — DB project 없음
 
+  // 표시 locale(화면 칸 _native 를 정하는 기준) — 쓰기보다 먼저 읽는다. 조회가 실패하면 기존 샷을 지우기 전에 멈춘다(projectLocale 주석).
+  const locale = await projectLocale(projectId)
   const existingByShotId = await readShotCarryForwardById(projectId)
 
   // shot_id → 대사 매핑 (화자 명시 — 옛 chars[0] 추정 제거).
@@ -919,7 +931,6 @@ export async function persistShotsToDb(
     )
     const prompts = await resolvePersistShotPrompts(shRows, actionEn, existingByShotId)
     // 표시용 _native(유저 locale): EN base → locale 역파생(S7). 파이프라인이 타깃 언어를 준 행은 원문 보존.
-    const locale = await projectLocale(projectId)
     const actionKo = await deriveNativeBatch(
       shRows.map((r) => ({
         id: r.shotMainId,
@@ -930,7 +941,10 @@ export async function persistShotsToDb(
     )
     const { error: shotInsertErr } = await supabaseAdmin.from('shots').insert(
       shRows.map((r) => {
-        const actTx = !isTargetScript(r.actionNative, locale) && actionKo.has(r.shotMainId)
+        // 화면 칸(_native): 옮긴 글이 있으면 그 글, 영어 프로젝트에서 한국어로 온 글은 영어로 옮긴 글(2026-11-15 chooseNativeText —
+        //   운영 영어 프로젝트 샷 19개가 한국어로 보인 구멍). 고치기 스크립트(plan-native-repair)도 같은 함수를 쓴다.
+        const actionEnText = actionEn.get(r.shotMainId) ?? r.actionNative
+        const actionNative = chooseNativeText({ locale, raw: r.actionNative, en: actionEnText, derived: actionKo.get(r.shotMainId) })
         const promptValue = prompts.get(r.shotMainId) ?? defaultPersistPrompt(r, actionEn)
         // #p2-wiring 가드: 프롬프트 공란 persist 는 하류(실사/영상)를 추상 폴백에 밀어넣는다 —
         //   과거 실측(25샷 prompt='')의 재발을 로그로 가시화 (composition·action 모두 빈 경우만 남는다).
@@ -943,11 +957,11 @@ export async function persistShotsToDb(
           shot_id: r.shotMainId,
           source: 'pipeline', // #F-003 R3 — 이 행은 재런 시 파이프라인이 갈아엎는다
           shot_type: r.shotType,
-          action_description: actionEn.get(r.shotMainId) ?? r.actionNative,
-          action_description_native: actionKo.get(r.shotMainId) ?? r.actionNative,
+          action_description: actionEnText,
+          action_description_native: actionNative.text,
           i18n_provenance: {
             action_description: i18nHash(r.actionNative),
-            ...(actTx ? { action_description_native: i18nHash(actionEn.get(r.shotMainId) ?? r.actionNative) } : {}),
+            ...nativeProvenance('action_description', actionNative, actionEnText),
           },
           characters: r.chars,
           character_appearance_keys: r.characterAppearanceKeys,
