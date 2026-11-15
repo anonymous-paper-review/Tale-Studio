@@ -3,6 +3,8 @@
 // Writer 산문 수정안을 산문 안에서 본다(11/5 시안 WS, 오너 2026-11-09 결정 5 추천대로) — 바뀐 문단은 원래 글을 같은 크기 지운 줄(회색)로 두고,
 //   바로 아래 "AI 수정안" 상자(지금 단계 색 8% 바탕 · 1px 테두리 · 모서리 12 · 안쪽 16/20)에 새 글(15)을 보인다.
 //   [버리기] · [적용]은 그 상자 안 작은 알약 — 수정안은 한 덩어리로 적용되므로 바뀐 문단이 여럿이면 마지막 상자에만 둔다(혼자 정한 것).
+//   오른쪽 채팅의 칩 말풍선에도 같은 결정의 [적용] · [적용 안 함]이 있다(오너 2026-11-16) — [적용 안 함]은 이 [버리기]와 같은 행동(declineProseProposal)이라
+//   어느 쪽으로 버려도 채팅에 "적용하지 않았어요" 결과 말이 남고, 한쪽이 정하는 동안(sceneStoryResolving) 두 쪽 단추가 함께 꺼진다.
 //   세 가지 안 미리 보기 · Producer 트리트먼트는 예전 비교(TreatmentDiffView, 새 글 초록) 그대로. 약속: tests/writer/prose-proposal-box.test.ts
 import { useState } from 'react'
 import { AiIcon } from '@/components/icons/v3-icons'
@@ -16,17 +18,19 @@ import { useProjectStore } from '@/stores/project-store'
 export function ProseProposalView({ rows, proposal }: { rows: TreatmentDiffRow[]; proposal: Pick<SceneStoryProposalView, 'id'> }) {
   const t = useT()
   const projectId = useProjectStore((s) => s.projectId)
-  // 채팅 카드와 같은 규칙 — 산문을 직접 고치는 창이 열려 있거나 처리하는 동안은 정하지 않는다.
+  // 채팅 카드와 같은 규칙 — 산문을 직접 고치는 창이 열려 있거나 처리하는 동안은 정하지 않는다. 채팅 쪽 단추가 정하는 중일 때도 함께 꺼진다.
   const manualEdit = useGlobalChatStore((s) => s.sceneStoryEdit?.projectId === projectId)
+  const resolving = useGlobalChatStore((s) => s.sceneStoryResolving?.projectId === projectId)
   const [working, setWorking] = useState(false)
-  const disabled = manualEdit || working
+  const disabled = manualEdit || resolving || working
   const lastChanged = rows.reduce((at, row, index) => (row.kind === 'same' ? at : index), -1)
 
   const resolve = async (action: 'apply' | 'discard') => {
     if (disabled || !projectId || useProjectStore.getState().projectId !== projectId) return
     setWorking(true)
     try {
-      await useGlobalChatStore.getState().resolveSceneStoryProposal(action, proposal.id)
+      if (action === 'apply') await useGlobalChatStore.getState().resolveSceneStoryProposal('apply', proposal.id)
+      else await useGlobalChatStore.getState().declineProseProposal(proposal.id)
     } finally {
       setWorking(false)
     }

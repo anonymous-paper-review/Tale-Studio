@@ -178,8 +178,15 @@ interface GlobalChatState {
   syncSceneStoryProposal: (projectId: string, id: string | null) => void
   /** 마지막으로 적용 · 버린 수정안(디자이너 QA 1차 관찰 26) — 미리 보기를 다시 읽기 전에도 그 카드를 내린다(unresolvedSceneStoryProposal). */
   sceneStoryResolved: { projectId: string; id: string } | null
+  /** 지금 정하는 중인 수정안(오너 2026-11-16) — 서버 답을 기다리는 동안만 있다. 채팅 [적용] · [적용 안 함]과 산문 상자 [적용] · [버리기]가 같이 읽어 함께 꺼진다. */
+  sceneStoryResolving: { projectId: string; id: string } | null
   /** variantId — 다시 쓰기의 세 안 중 고른 안(2026-10-02 시안 v04). AI 수정안 하나면 비운다. */
   resolveSceneStoryProposal: (action: 'apply' | 'discard', proposalId: string, variantId?: string) => Promise<boolean>
+  /**
+   * Writer 산문 수정안을 적용하지 않는다(오너 2026-11-16 채팅 [적용 안 함] · 산문 상자 [버리기]) — 수정안을 버리고 채팅에 "적용하지 않았어요. 원래 글은 그대로예요."를 저장해 남긴다.
+   * 다시 제안 · 바꿀 곳 없음 · 세 가지 안 버리기는 이 길이 아니라 resolveSceneStoryProposal('discard') 그대로다(이 말을 남기지 않는다). 버리지 못했으면 아무 말도 남기지 않는다.
+   */
+  declineProseProposal: (proposalId: string) => Promise<boolean>
   /** 바꿀 곳이 없었던 수정안(디자이너 QA 1차 #01)을 카드 없이 버리고 채팅에 한 줄 알린다. 수정안 하나에 한 번. */
   settleUnchangedSceneStoryProposal: (proposalId: string) => Promise<boolean>
   /** 산문 확정 창을 확정하지 않고 닫은 프로젝트([아니오] · X · Esc, 디자이너 QA 1차 #08) — 그 뒤 적용 · 저장은 다음 단계를 다시 묻지 않는다. */
@@ -2129,6 +2136,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   sceneStoryProposalPending: null,
   reviseRefused: null,
   sceneStoryResolved: null,
+  sceneStoryResolving: null,
   proseConfirmDeclined: null,
   sceneStoryVariantPreview: null,
   refreshSceneStory: () => set((state) => ({ sceneStoryRefresh: state.sceneStoryRefresh + 1 })),
@@ -2642,7 +2650,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const session = chatSession
     const isCurrent = () => session === chatSession && projectId === useProjectStore.getState().projectId
     sceneGateInFlight.add(projectId)
-    set({ error: null })
+    // 정하는 동안은 채팅 · 산문 두 쪽 단추가 함께 꺼진다(오너 2026-11-16 — 한쪽을 누른 사이 다른 쪽이 눌려도 조용히 무시되던 것을 눈에 보이게 맞춘다).
+    set({ error: null, sceneStoryResolving: { projectId, id: proposalId } })
     try {
       const response = await fetch('/api/writer/scene-gate', {
         method: 'POST',
@@ -2671,7 +2680,21 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       return false
     } finally {
       sceneGateInFlight.delete(projectId)
+      const resolving = get().sceneStoryResolving
+      if (resolving?.projectId === projectId && resolving.id === proposalId) set({ sceneStoryResolving: null })
     }
+  },
+
+  declineProseProposal: async (proposalId) => {
+    const projectId = useProjectStore.getState().projectId
+    const discarded = await get().resolveSceneStoryProposal('discard', proposalId)
+    // 버리지 못했으면 "적용하지 않았어요"는 거짓이다 — 수정안이 아직 열려 있고 단추가 다시 눌린다. 그새 다른 프로젝트로 옮겼으면 그 채팅에 끼어들지 않는다.
+    if (!discarded || !projectId || useProjectStore.getState().projectId !== projectId || !writerProseLive()) return discarded
+    // 같은 말이 연달아 와도 합치지 않는다(notifyIssue 는 합친다) — 수정안을 두 번 버렸으면 두 번 정한 것이다.
+    const content = translate(contentLocale(), 'I did not apply it. The prose stays as it was.')
+    set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer', role: 'model', content }] }))
+    saveChatMessage(projectId, 'producer', 'model', content)
+    return true
   },
 
   settleUnchangedSceneStoryProposal: async (proposalId) => {
@@ -6070,6 +6093,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       sceneStoryProposalPending: null,
       reviseRefused: null,
       sceneStoryResolved: null,
+      sceneStoryResolving: null,
       proseConfirmDeclined: null,
       sceneStoryVariantPreview: null,
       recoveryProgress: null,
