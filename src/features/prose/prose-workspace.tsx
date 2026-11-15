@@ -155,8 +155,10 @@ export function ProseWorkspace() {
         </div>
       ) : null}
 
-      {/* 투명 덮개(고치는 동안) 너머로 휠 · 손가락 끌기가 이 칸을 스크롤한다(lib/ai-busy-scroll). */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7" data-ai-busy-scroll>
+      {/* 투명 덮개(고치는 동안) 너머로 휠 · 손가락 끌기가 이 칸을 스크롤한다(lib/ai-busy-scroll).
+          이 칸이 Writer 에서 스크롤하는 유일한 본문 칸이다 — 바깥 칸은 스크롤하지 않는다(lib/studio-frame, 오너 2026-11-16).
+          overscroll-y-contain: 끝에 닿은 뒤 더 밀어도 그 움직임이 바깥 칸 · 문서로 넘어가 화면 전체가 출렁이지 않게. */}
+      <div className="min-h-0 flex-1 overflow-y-auto overscroll-y-contain px-8 pb-10 pt-7" data-ai-busy-scroll>
         {/* v3 W1 — 화면 머리 · 조건 칩 · 산문 판 · 안내가 820 폭 한 줄로 쌓인다(간격 18). */}
         <div className="mx-auto flex max-w-[820px] flex-col gap-[18px]">
           <PageHeader

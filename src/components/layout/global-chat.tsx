@@ -1475,8 +1475,10 @@ export function GlobalChat() {
         {currentStage === 'director' && <LumiNowLine />}
 
         {/* Messages */}
-        {/* 투명 덮개(AI 가 같은 단계에서 일하는 동안)가 받은 휠 · 끌기를 넘길 칸 — 실제로 스크롤하는 viewport 에 단다(검토 A2 N1). */}
-        <ScrollArea className="min-h-0 flex-1 px-5 pb-3 pt-2" viewportProps={{ [AI_BUSY_SCROLL_ATTR]: '' }}>
+        {/* 투명 덮개(AI 가 같은 단계에서 일하는 동안)가 받은 휠 · 끌기를 넘길 칸 — 실제로 스크롤하는 viewport 에 단다(검토 A2 N1).
+            overscroll-y-contain: 채팅 끝에서 더 밀어도 그 움직임이 화면 쪽으로 넘어가 전체가 출렁이지 않게(오너 2026-11-16) —
+            스크롤하는 것은 뿌리가 아니라 안쪽 viewport 라 뿌리 class 의 변형으로 viewport 에만 건다(viewportProps 식은 투명 덮개 시험이 글자 그대로 못 박았다). */}
+        <ScrollArea className="min-h-0 flex-1 px-5 pb-3 pt-2 [&_[data-slot=scroll-area-viewport]]:overscroll-y-contain" viewportProps={{ [AI_BUSY_SCROLL_ATTR]: '' }}>
           {/* 11/5 시안 — 말풍선 사이 20(구간 사이도 같다). */}
           <div className="space-y-5">
 
