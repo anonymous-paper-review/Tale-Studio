@@ -1,7 +1,7 @@
 // 샷 화면 설명 고치기 스크립트(scripts/ops/plan-native-repair.mts)가 행 목록 JSON 을 읽어 고칠 목록 JSON 을 쓰고, 입력이 잘못되면 아무것도 쓰지 않고 오류로 끝난다
 import { spawnSync } from 'node:child_process'
 import { createHash } from 'node:crypto'
-import { existsSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import path from 'node:path'
 import { describe, expect, it } from 'vitest'
@@ -17,9 +17,14 @@ const fixable = { id: 'row-fix', shot_id: 'sh_02_01', scene_id: 'sc_02', action_
 const alreadyEnglish = { id: 'row-ok', shot_id: 'sh_01_01', scene_id: 'sc_01', action_description: EN, action_description_native: EN, i18n_provenance: { action_description: md5(EN) } }
 const edited = { id: 'row-edited', shot_id: 'sh_03_01', scene_id: 'sc_03', action_description: EN, action_description_native: EDITED, i18n_provenance: { action_description: md5(KO) } }
 
-/** 스크립트를 실제로 돌린다 — package.json 의 media:plan 과 같은 방식(node + @/ 별칭 훅). 파일은 시험마다 새 임시 폴더에 둔다. */
+// 이 파일을 한 번 도는 동안 쓰는 임시 폴더 하나 — 시험마다 하위 폴더를 따로 받아 서로 겹치지 않는다(실행마다 폴더가 하나만 남는다).
+const RUN_DIR = mkdtempSync(path.join(tmpdir(), 'native-repair-'))
+let caseCount = 0
+
+/** 스크립트를 실제로 돌린다 — package.json 의 media:plan 과 같은 방식(node + @/ 별칭 훅). 파일은 시험마다 새 하위 폴더에 둔다. */
 function setup(input: unknown, raw?: string) {
-  const dir = mkdtempSync(path.join(tmpdir(), 'native-repair-'))
+  const dir = path.join(RUN_DIR, String((caseCount += 1)))
+  mkdirSync(dir)
   const inFile = path.join(dir, 'rows.json')
   const outFile = path.join(dir, 'plan.json')
   writeFileSync(inFile, raw ?? JSON.stringify(input))
