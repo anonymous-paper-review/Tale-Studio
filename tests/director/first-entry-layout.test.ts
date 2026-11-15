@@ -4,7 +4,7 @@ import type { XYPosition } from '@xyflow/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { arrangeDirectorCanvas } from '@/features/director/canvas-layout'
 import { cardsUnmovedSince, firstEntryViewport, isAutoPlacedCandidate, snapshotCardPositions } from '@/features/director/first-entry-layout'
-import { arrangeIfFirstEntry, type FirstEntryCheck } from '@/features/director/hooks/use-writer-director-sync'
+import { arrangeIfFirstEntry, confirmFirstEntryArrange, type FirstEntryCheck } from '@/features/director/hooks/use-writer-director-sync'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import { nextScenePosition, nextShotPosition, useDirectorCanvasStore } from '@/stores/director-store'
 import type { DirectorNode } from '@/types/director'
@@ -168,6 +168,64 @@ describe('처음으로 보는 때와 안 보는 때', () => {
     expect(at(shotIds[1]!)).toEqual({ x: 12, y: 34 })
   })
 
+  // 왜: 리뷰 s11 낮음 1 — 처음 정렬은 요청한 뒤 화면이 카드를 다 그리기를 기다렸다가 돈다(스토리보드 보기로 열리면 노드 보기가 열릴 때까지 기다린다).
+  //   그 사이 사람이 카드를 끌거나 Take 가 생기면 요청할 때의 점검은 낡았다. 정렬하는 곳에서 한 번 더 보고, 어긋나면 정렬하지 않는다.
+  it('처음 정렬을 기다리는 사이 카드가 옮겨지거나 Take 가 생기면 정렬하지 않는다', async () => {
+    const request = async () => {
+      api().reset()
+      api().setProjectId(PROJECT)
+      useDirectorCanvasStore.setState({ persistNodePosition: vi.fn() })
+      const cards = createCards([2])
+      measureShots(cards.shotIds)
+      expect(await arrangeIfFirstEntry(PROJECT, checkWith(false))).toBe(true)
+      return cards
+    }
+
+    // 아무 일 없으면 정렬한다
+    await request()
+    expect(await confirmFirstEntryArrange(PROJECT)).toBe(true)
+
+    // 카드가 옮겨졌다
+    const moved = await request()
+    moveCard(moved.shotIds[0]!, { x: 50, y: 60 })
+    expect(await confirmFirstEntryArrange(PROJECT)).toBe(false)
+
+    // Take 가 생겼다
+    const withTake = await request()
+    api().addVideoTake(withTake.shotIds[0]!)
+    expect(await confirmFirstEntryArrange(PROJECT)).toBe(false)
+
+    // 끌고 난 자리가 아직 DB 에 저장되기 전이다
+    vi.useFakeTimers()
+    try {
+      const dragged = await request()
+      realPersistNodePosition(dragged.shotIds[0]!)
+      expect(await confirmFirstEntryArrange(PROJECT)).toBe(false)
+    } finally {
+      useDirectorCanvasStore.setState({ nodes: [] })
+      await vi.advanceTimersByTimeAsync(600)
+      vi.useRealTimers()
+    }
+
+    // 요청하지 않은 정렬은 확인할 것이 없다
+    expect(await confirmFirstEntryArrange(PROJECT)).toBe(false)
+  })
+
+  // 왜: 리뷰 s11 낮음 1 — [자동 정렬] 단추 요청이 이미 기다리는 중인데 처음 정렬 요청이 그 위를 덮으면, 사람이 누른 정렬이 되돌리기 기록 없이 돌아간다.
+  it('[자동 정렬]을 먼저 눌렀으면 처음 정렬로 바꾸지 않고 단추 정렬로 남긴다', async () => {
+    const { shotIds } = createCards([2])
+    measureShots(shotIds)
+    api().requestArrange() // 사람이 [자동 정렬]을 먼저 눌렀다 — 기다리는 중
+
+    expect(await arrangeIfFirstEntry(PROJECT, checkWith(false))).toBe(false)
+    api().requestArrange({ firstEntry: true }) // 상점에서도 단추 요청을 처음 정렬로 바꾸지 못한다
+    expect(api().arrangeFirstEntry).toBe(false)
+
+    const before = api().historyPast.length
+    api().relayoutCanvas()
+    expect(api().historyPast.length).toBe(before + 1) // 단추 정렬이라 되돌리기 기록이 남는다
+  })
+
   // 왜: DB 를 읽는 동안(수백 ms) 사람이 카드를 끌었을 수 있다. 읽고 난 뒤에 카드를 다시 보고, 옮겨졌으면 그 자리를 지킨다.
   it('DB 를 읽는 사이에 카드가 옮겨졌으면 정렬하지 않는다', async () => {
     const { shotIds } = createCards([2])
@@ -298,23 +356,27 @@ describe('처음 놓은 뒤 첫 화면', () => {
   //   화면 맞추기는 움직이는 중인 첫 화면을 끊어야 하므로 움직임이 있는 짧은 맞추기(duration 250)로 한다 — 0 이면 끊지 못해 옛 자리로 되돌아간다.
   it('화면은 처음 정렬이 끝나면 새 자리 기준으로 첫 화면을 다시 맞춘다', () => {
     const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
-    expect(page).toMatch(/const firstEntry = (?:useDirectorCanvasStore\.getState\(\)|store)\.arrangeFirstEntry/)
     expect(page).toMatch(/firstEntryViewport\(useDirectorCanvasStore\.getState\(\)\.nodes,/)
     expect(page).toMatch(/applyViewport\(target, \{ duration: 250 \}\)/)
-    // 정렬 뒤에 맞춘다: 정렬(relayoutCanvas)이 먼저, 화면 맞추기가 나중.
-    const arrangeBlock = page.slice(page.indexOf('arrange: () => {'), page.indexOf('arrange: () => {') + 600)
-    expect(arrangeBlock.indexOf('relayoutCanvas()')).toBeGreaterThan(-1)
-    expect(arrangeBlock.indexOf('reframeFirstShot()')).toBeGreaterThan(arrangeBlock.indexOf('relayoutCanvas()'))
+    // 정렬(relayoutCanvas)이 먼저, 화면 맞추기가 나중.
+    expect(page).toMatch(/now\.relayoutCanvas\(\)\s*markFirstEntrySettled\(projectId\)\s*if \(!viewportMovedByPersonRef\.current\) void reframeFirstShot\(\)/)
   })
 })
 
 describe('처음 정렬 뒤 화면 배선 (남아 있던 카드를 다시 열 때도)', () => {
   // 왜: 리드 2026-11-16 — 같은 창에서 정렬을 마친 프로젝트는 Storyboard 에 갔다 와도 DB 를 다시 읽지 않는다. 정렬을 실제로 마친 곳은 화면이라 화면이 알린다.
-  it('화면은 처음 정렬을 마치면 그 프로젝트를 이 창에서 확인 끝난 것으로 기억한다', () => {
+  //   리뷰 s11 낮음 1 — 정렬하는 곳에서 한 번 더 확인해 어긋나면 정렬하지 않고, 이때는 확인 마침으로도 기억하지 않는다.
+  it('화면은 처음 정렬을 마치면 그 프로젝트를 이 창에서 확인 끝난 것으로 기억하고, 그만둘 때는 기억하지 않는다', () => {
     const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
-    const block = page.slice(page.indexOf('arrange: () => {'), page.indexOf('arrange: () => {') + 600)
-    expect(block.indexOf('relayoutCanvas()')).toBeGreaterThan(-1)
-    expect(block.indexOf('markFirstEntrySettled(store.projectId)')).toBeGreaterThan(block.indexOf('relayoutCanvas()'))
+    expect(page).toMatch(/const go = await confirmFirstEntryArrange\(projectId\)/)
+    const giveUp = page.indexOf('if (!go) {')
+    const settle = page.indexOf('markFirstEntrySettled(projectId)')
+    expect(giveUp).toBeGreaterThan(-1)
+    expect(settle).toBeGreaterThan(giveUp)
+    // 그만두는 쪽은 기다림 표시만 끄고(화면 밖 카드 그리기도 멈춘다) 확인 마침을 기억하지 않는다.
+    const giveUpBlock = page.slice(giveUp, settle)
+    expect(giveUpBlock).toMatch(/setState\(\{ arrangePending: false, arrangeFirstEntry: false \}\)/)
+    expect(giveUpBlock).not.toMatch(/markFirstEntrySettled/)
   })
 
   // 왜: 이미 열어 본 프로젝트는 저장된 viewportInitialized 가 true 라 첫 화면 효과가 저장된 화면을 복원만 한다. 처음 정렬 뒤 첫 화면 맞추기가 그 값을 보고 건너뛰면
@@ -326,6 +388,18 @@ describe('처음 정렬 뒤 화면 배선 (남아 있던 카드를 다시 열 �
     expect(reframe).toMatch(/viewportInitialized: true/)
     expect(reframe).not.toMatch(/if \([^)]*viewportInitialized/)
     expect(reframe).not.toMatch(/\.viewportInitialized\b/)
+  })
+
+  // 왜: 리뷰 s11 낮음 2 — 진입 뒤 처음 정렬이 1~2초 늦게 끝나는데 그 사이 사람이 화면을 끌거나 확대하면, 정렬 뒤 첫 화면 맞추기가 0.75 배로 되돌려 사람이 옮긴 화면을 끌어온다.
+  //   사람 입력만 센다: 화면이 스스로 움직일 때(첫 화면 효과 · 다시 맞추기)는 onMoveStart 의 event 가 비어 있다. 확대 단추 · 화면 맞추기 단추는 코드가 부르는 움직임이라 단추가 직접 알린다.
+  //   카드 자리 정렬과 저장은 화면을 옮겼어도 그대로 한다.
+  it('정렬을 기다리는 사이 사람이 화면을 옮기거나 확대했으면 첫 화면을 다시 맞추지 않는다', () => {
+    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
+    expect(page).toMatch(/onMoveStart=\{\(event\) => \{\s*if \(event\) viewportMovedByPersonRef\.current = true\s*\}\}/)
+    expect(page).toMatch(/<CanvasZoomPill onPersonMove=\{\(\) => \{ viewportMovedByPersonRef\.current = true \}\} \/>/)
+    expect(page.match(/onPersonMove\?\.\(\)/g)).toHaveLength(3)
+    // 맞추기만 건너뛴다: 정렬은 그 앞에서 이미 했다.
+    expect(page).toMatch(/now\.relayoutCanvas\(\)\s*markFirstEntrySettled\(projectId\)\s*if \(!viewportMovedByPersonRef\.current\) void reframeFirstShot\(\)/)
   })
 })
 

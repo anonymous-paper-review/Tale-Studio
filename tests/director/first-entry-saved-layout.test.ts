@@ -26,7 +26,7 @@ vi.mock('@/lib/supabase/client', () => ({
 }))
 
 import { markFirstEntrySettled, projectHasSavedLayout, resetFirstEntryMemo } from '@/features/director/first-entry-layout'
-import { arrangeIfFirstEntry } from '@/features/director/hooks/use-writer-director-sync'
+import { arrangeIfFirstEntry, confirmFirstEntryArrange, LATE_FIRST_ENTRY_ARRANGE_MS } from '@/features/director/hooks/use-writer-director-sync'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 
 beforeEach(() => {
@@ -162,5 +162,32 @@ describe('같은 창에서 이미 확인한 프로젝트', () => {
     expect(api().arrangePending).toBe(false)
     expect(db.reads.length).toBe(readsAfterArranged)
     expect(vi.mocked(fetch).mock.calls.length).toBe(callsAfterArranged)
+  })
+
+  // 왜: 리뷰 s11 낮음 1 — 이 브라우저가 마지막 보기를 되살려 스토리보드 보기로 열리면 노드 보기가 열릴 때까지 정렬을 기다린다. 그 사이 다른 탭에서 자리를 저장했거나
+  //   Take 를 만들었을 수 있는데 요청할 때의 점검은 그것을 모른다. 늦게 돌게 되면 정렬 직전에 DB 를 한 번 더 읽는다(빨리 돌면 다시 읽지 않는다).
+  it('노드 보기가 늦게 열리면 정렬하기 직전에 저장된 자리를 다시 확인한다', async () => {
+    const projectId = api().projectId
+    vi.useFakeTimers()
+    try {
+      // 빨리 돌면 정렬 직전에 다시 읽지 않는다
+      addWriterCards()
+      expect(await arrangeIfFirstEntry(projectId)).toBe(true)
+      const readsAtRequest = db.reads.length
+      expect(await confirmFirstEntryArrange(projectId)).toBe(true)
+      expect(db.reads.length).toBe(readsAtRequest)
+
+      // 늦게 돌면 다시 읽는다: 그 사이 다른 탭에서 저장한 자리가 있으면 정렬하지 않는다
+      resetFirstEntryMemo()
+      addWriterCards()
+      expect(await arrangeIfFirstEntry(projectId)).toBe(true)
+      const readsAfterSecondRequest = db.reads.length
+      await vi.advanceTimersByTimeAsync(LATE_FIRST_ENTRY_ARRANGE_MS + 100)
+      db.rows.shots = [{ project_id: projectId }]
+      expect(await confirmFirstEntryArrange(projectId)).toBe(false)
+      expect(db.reads.length).toBeGreaterThan(readsAfterSecondRequest)
+    } finally {
+      vi.useRealTimers()
+    }
   })
 })

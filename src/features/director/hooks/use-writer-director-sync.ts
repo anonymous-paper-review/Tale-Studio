@@ -57,6 +57,12 @@ export interface FirstEntryCheck {
   snapshot: ReadonlyMap<string, XYPosition>
 }
 
+/** 처음 정렬을 요청한 때의 점검: 프로젝트 · 점검할 때 찍은 카드 자리 · 요청한 시각. 실제 정렬(화면이 카드를 다 그린 뒤)이 이것으로 한 번 더 확인한다. */
+let pendingFirstEntry: { projectId: string; snapshot: ReadonlyMap<string, XYPosition>; requestedAt: number } | null = null
+
+/** 요청한 뒤 이만큼 지나서 정렬하게 되면(노드 보기가 늦게 열림) 정렬 직전에 DB 를 한 번 더 읽는다. 보통은 0.2~0.5초면 돈다. */
+export const LATE_FIRST_ENTRY_ARRANGE_MS = 1500
+
 /**
  * 지금 캔버스가 처음 정렬 후보(Writer 카드만 있다)면 DB 점검을 시작한다. 후보가 아니거나 이 창에서 이미 확인을 끝낸 프로젝트면 null — DB 를 읽지 않는다.
  * 카드가 갖춰진 직후에 시작하면 Pass 2.5 의 DB 읽기와 함께 돌아, 정렬을 기다리게 하지 않는다.
@@ -84,8 +90,27 @@ export async function arrangeIfFirstEntry(projectId: string, check?: FirstEntryC
   if (state.projectId !== projectId) return false
   if (!isAutoPlacedCandidate(state.nodes) || !cardsUnmovedSince(state.nodes, started.snapshot)) return false
   if (hasPendingDirectorPositionSaves()) return false
+  // 사람이 누른 [자동 정렬]이 이미 기다리는 중이면 그 정렬이 단추 정렬로 남게 처음 정렬은 요청하지 않는다(리뷰 s11 낮음 1).
+  if (state.arrangePending && !state.arrangeFirstEntry) return false
+  pendingFirstEntry = { projectId, snapshot: started.snapshot, requestedAt: Date.now() }
   state.requestArrange({ firstEntry: true })
   return true
+}
+
+/**
+ * 처음 정렬을 실제로 하기 직전(화면이 카드를 다 그린 뒤)에 한 번 더 본다. 하나라도 어긋나면 false — 정렬하지 않고 "확인 마침"으로도 기억하지 않는다.
+ * 요청한 뒤 정렬하기까지 기다리는 사이(스토리보드 보기로 열리면 노드 보기가 열릴 때까지) 카드가 옮겨지거나 Take 가 생기거나 끌기가 저장되기 전일 수 있고,
+ * 늦게 돌게 됐으면 다른 탭에서 저장한 자리가 생겼을 수 있다(리뷰 s11 낮음 1). 요청한 적 없는 정렬은 확인할 것이 없어 false.
+ * 확인할 것: 전부 Writer 카드다 · 직접 만든 카드와 Take 가 없다(isAutoPlacedCandidate) · 요청할 때 찍은 자리에서 카드가 안 옮겨졌다 · 저장 전 끌기가 없다 · (늦으면) DB 에 저장된 자리가 없다.
+ */
+export async function confirmFirstEntryArrange(projectId: string): Promise<boolean> {
+  const pending = pendingFirstEntry
+  pendingFirstEntry = null
+  if (!pending || pending.projectId !== projectId) return false
+  if (Date.now() - pending.requestedAt > LATE_FIRST_ENTRY_ARRANGE_MS && (await projectHasSavedLayout(projectId))) return false
+  const state = useDirectorCanvasStore.getState()
+  if (state.projectId !== projectId) return false
+  return isAutoPlacedCandidate(state.nodes) && cardsUnmovedSince(state.nodes, pending.snapshot) && !hasPendingDirectorPositionSaves()
 }
 
 let historySuppressionRuns = 0

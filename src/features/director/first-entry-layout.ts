@@ -38,6 +38,8 @@ export function resetFirstEntryMemo(): void {
  * DB 에 이 프로젝트의 카드 자리(scenes · shots 의 canvas_position)가 하나라도 저장돼 있거나 영상 테이크가 있는가.
  * 사람이 끌었거나 [자동 정렬]을 눌렀거나 영상 작업을 시작한 프로젝트다 — 처음 정렬이 덮으면 안 된다.
  * 읽기가 실패하거나 답이 이상하면 true(= 있다고 보고 아무것도 안 한다): 모르는데 덮는 것보다 안 고치는 편이 안전하다.
+ * 알아 둘 것(리뷰 s11 낮음 3): 소유자가 아니면 Take API 가 403 을 돌려줘 true 가 된다. 처음 정렬이 남의 프로젝트에 자리 저장(쓰기)을 시도하지 않는 막이가
+ *   이 점검의 소유자 검사에 기댄다 — 지금은 안전하니 손대지 않는다(쓰기 자체는 DB 의 소유자 쓰기 규칙이 따로 막는다).
  */
 export async function projectHasSavedLayout(projectId: string): Promise<boolean> {
   if (settled.has(projectId)) return true

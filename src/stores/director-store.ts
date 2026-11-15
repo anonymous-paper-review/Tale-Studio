@@ -1900,7 +1900,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       //   in-memory 즉시 적용 + 씬 · 샷 · 영상은 nodeId별 persist로 DB(canvas_position) 반영(재진입 유지). 에셋 자리는 DB 에 없다.
       arrangePending: false,
       arrangeFirstEntry: false,
-      requestArrange: (options) => set({ arrangePending: true, arrangeFirstEntry: options?.firstEntry === true }),
+      requestArrange: (options) =>
+        set((s) => ({
+          arrangePending: true,
+          // 사람이 누른 [자동 정렬]이 이미 기다리는 중이면 처음 정렬로 바꾸지 않는다: 단추 정렬은 되돌리기 기록이 남아야 한다(리뷰 s11 낮음 1).
+          arrangeFirstEntry: options?.firstEntry === true && !(s.arrangePending && !s.arrangeFirstEntry),
+        })),
 
       relayoutCanvas: () => {
         // 처음 들어갔을 때의 정렬은 동기화 셋업과 같은 시스템 변경이라 되돌리기 기록에 남기지 않는다(오너 2026-11-16). [자동 정렬] 단추는 남긴다.
