@@ -20,6 +20,7 @@ import { useWriterRoomStore, writerRightChatHidden } from '@/stores/writer-room-
 import { ChatBackground } from '@/components/layout/chat-background'
 import { StudioTopBar } from '@/components/layout/studio-top-bar'
 import { STAGE_PERSONA } from '@/lib/lumi'
+import { stageFrameClass } from '@/lib/studio-frame'
 import { useIdleTimeout } from '@/hooks/use-idle-timeout'
 import { useArtistLockPoll } from '@/hooks/use-artist-lock-poll'
 import { readLastProjectId, writeLastProjectId } from '@/lib/session-restore'
@@ -197,7 +198,7 @@ export default function StudioLayout({
       <DemoBanner />
       <Sidebar />
       <main
-        className="min-h-screen transition-[margin] duration-350 ease-out"
+        className="min-h-dvh transition-[margin] duration-350 ease-out"
         // 왼쪽 레일은 INSET 만큼 띄운 둥근 패널(#shell-lift), 오른쪽 채팅은 v3 처럼 가장자리에 붙은 패널 — 본문 여백은
         //   왼쪽 INSET + 레일폭 + INSET, 오른쪽 채팅폭 + INSET. 접힘 시 폭은 열기 레일(w-11) 전용.
         style={{
@@ -210,16 +211,17 @@ export default function StudioLayout({
             : SHELL_INSET + (chatCollapsed ? CHAT_COLLAPSED_RAIL : chatWidth),
         }}
       >
-        {/* h-screen으로 높이 고정 + overflow-y-auto: 내용이 화면을 넘치면
-            세로 스크롤 자동 생성. 캔버스 페이지(director)는 flex-1로 딱 채워
-            넘치지 않으므로 스크롤 미발생 — 카드 페이지만 스크롤된다.
-            overflow-x-hidden: 전환 슬라이드(#tab-slide, template.tsx)가 24px 를 밀고
-            들어오는 동안 가로 스크롤바가 깜빡이지 않게.
+        {/* 바깥 칸 모양은 lib/studio-frame 의 stageFrameClass 가 정한다: 높이는 보이는 화면에 고정(h-dvh),
+            가로는 가림(overflow-x-hidden: 전환 슬라이드(#tab-slide, template.tsx)가 24px 를 밀고
+            들어오는 동안 가로 스크롤바가 깜빡이지 않게), 세로는 단계마다 — Writer(id producer)는 산문 칸 ·
+            오른쪽 채팅 칸이 각자 스크롤하므로 바깥 칸은 스크롤하지 않는다(overflow-y-hidden, 오너 2026-11-16 —
+            바깥이 같이 밀려 칸이 잘려 보인다). 나머지 단계는 내용이 화면을 넘치면 세로 스크롤이 생긴다(마지막 안전망).
+            캔버스 페이지(director)는 flex-1로 딱 채워 넘치지 않으므로 스크롤 미발생.
             data-stage-content: 세로 연속 스트립(#tab-slide-v2)의 view-transition-name 대상 —
-            h-screen 고정 높이라 스냅샷이 뷰포트 크기로 안정된다(globals.css §stage-strip). */}
+            고정 높이라 스냅샷이 뷰포트 크기로 안정된다(globals.css §stage-strip). */}
         <div
           data-stage-content
-          className="flex h-screen flex-col overflow-x-hidden overflow-y-auto"
+          className={stageFrameClass(shownStage)}
         >
           {/* 위 막대(v3) — 단계 칩 · 프로젝트 제목 · 연필. Producer 시작 화면은 탭이 든 자기 막대를 같은 모양으로 그린다. */}
           {pathname.startsWith('/studio/start') ? null : <StudioTopBar stage={shownStage} />}

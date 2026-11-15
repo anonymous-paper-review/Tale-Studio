@@ -1,7 +1,7 @@
 ---
 name: tale-studio design system
 version: 1.1.1
-last_updated: 2026-11-09
+last_updated: 2026-11-16
 owner: shared
 canonical_implementation: src/app/globals.css
 source_of_truth: 토큰 값은 globals.css. design.md는 *역할 / 사용 룰 / 스케일 정량 명세*.
@@ -547,6 +547,8 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
   막대와 본문은 같은 폭 `DASHBOARD_CONTAINER`(1440 화면에서 본문 1104 · 양옆 168).
 - **화면 머리** `src/components/layout/page-header.tsx` `PageHeader`: `title` · `tag` · `meta` · `actions`(오른쪽, 메인은 크림). 작업 영역 맨 위.
   `variant="stacked"`(11/5 R2 프로젝트 목록): 제목 30 Bold, 메타는 다음 줄(8 아래 · 13px 500 흐린 글자), 오른쪽 자리는 두 줄의 가운데. 다른 화면은 기본(`inline`) 그대로.
+- **본문 바깥 칸** `[data-stage-content]`(`src/app/studio/layout.tsx`, 모양은 `src/lib/studio-frame.ts` `stageFrameClass`): 위 막대와 단계 화면을 담는다. 높이는 보이는 화면에 고정한다(`h-dvh`). **Writer(산문, 단계 id producer)는 바깥 칸이 스크롤하지 않는다** — 산문 칸 · 오른쪽 채팅 칸이 각자 스크롤하고, 끝에 닿은 움직임은 바깥으로 넘기지 않는다(`overscroll-y-contain`, 오너 2026-11-16 "바깥이 같이 밀려 칸이 잘려 보인다").
+  나머지 단계는 바깥 칸이 마지막 안전망으로 스크롤을 허용한다 — 안쪽 칸 구조를 하나씩 확인하는 대로 `FIXED_FRAME_STAGES` 에 더한다. 스튜디오에서는 문서도 위아래로 출렁이지 않는다(`html[data-stage] { overscroll-behavior-y: none }`). 약속 tests/writer/prose-scroll-frame.test.ts.
 - **채팅** `src/components/layout/global-chat.tsx`: §13.10.
 
 ### 13.2 Card anatomy
