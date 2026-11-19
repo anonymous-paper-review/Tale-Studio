@@ -4,6 +4,7 @@ import {
   decidePortOneCancel,
   decidePortOnePlan,
   decidePortOneRenewal,
+  processPortOneCancel,
   processPortOnePayment,
   type PortOneDeps,
   type PortOneOrder,
@@ -43,14 +44,16 @@ describe('구독 결제창을 열기 전', () => {
   })
 })
 
-function makeDeps(order: PortOneOrder) {
+function makeDeps(order: PortOneOrder, paymentStatus = 'PAID') {
   const grants: { amount: number; expiresAt: string | null; kind: string }[] = []
   const subs: unknown[] = []
   const plans: string[] = []
+  const ended: unknown[] = []
+  const revokes: { amount: number }[] = []
   const deps: PortOneDeps = {
     now: () => new Date('2026-11-21T03:00:00Z'),
     findOrder: async () => order,
-    fetchPayment: async () => ({ status: 'PAID', amountTotal: order.amountKrw, currency: 'KRW', paidAt: '2026-11-21T02:59:00Z' }),
+    fetchPayment: async () => ({ status: paymentStatus, amountTotal: order.amountKrw, amountCancelled: paymentStatus === 'CANCELLED' ? order.amountKrw : 0, currency: 'KRW', paidAt: '2026-11-21T02:59:00Z' }),
     recordEvent: async () => 'new',
     markProcessed: async () => {},
     findWorkspace: async (id) => ({ id, plan: 'free' }),
@@ -65,8 +68,16 @@ function makeDeps(order: PortOneOrder) {
     upsertSubscription: async (row) => {
       subs.push(row)
     },
+    findGrantsForPayment: async () => [{ id: 'grant-plan', workspaceId: 'ws-1', delta: S1_TAKES }],
+    revokedTotalForPayment: async () => 0,
+    revoke: async (r) => {
+      revokes.push(r)
+    },
+    endSubscription: async (e) => {
+      ended.push(e)
+    },
   }
-  return { deps, grants, subs, plans }
+  return { deps, grants, subs, plans, ended, revokes }
 }
 
 describe('구독 결제가 확인되면', () => {
@@ -103,6 +114,25 @@ describe('구독 결제가 확인되면', () => {
     expect(await processPortOnePayment('tale-renew', deps)).toBe('plan_granted')
     expect(subs).toEqual([expect.objectContaining({ status: 'active', currentPeriodEnd: '2027-01-21T02:59:00.000Z' })])
     expect(grants).toEqual([expect.objectContaining({ expiresAt: '2027-01-21T02:59:00.000Z' })])
+  })
+})
+
+describe('구독 결제가 취소되면', () => {
+  // 왜: 그 달 돈을 돌려줬으면 그 달 Take 와 플랜도 돌려받는다. 남겨 두면 다음 달에 또 청구된다.
+  it('구독 결제가 전액 취소되면 그 달 Take 를 회수하고 구독을 끝낸다', async () => {
+    const order: PortOneOrder = {
+      kind: 'plan',
+      paymentId: 'tale-first',
+      workspaceId: 'ws-1',
+      planId: 's1',
+      amountKrw: 22000,
+      subscriptionId: 'portone-sub-1',
+      periodEnd: null,
+    }
+    const { deps, revokes, ended } = makeDeps(order, 'CANCELLED')
+    expect(await processPortOneCancel('tale-first', deps)).toBe('revoked')
+    expect(revokes).toEqual([expect.objectContaining({ amount: S1_TAKES })])
+    expect(ended).toEqual([{ workspaceId: 'ws-1', subscriptionId: 'portone-sub-1', plan: 's1' }])
   })
 })
 

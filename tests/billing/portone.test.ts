@@ -19,11 +19,12 @@ function order(overrides: Partial<PortOneOrder> = {}): PortOneOrder {
 }
 
 function paid(overrides: Partial<PortOnePayment> = {}): PortOnePayment {
-  return { status: 'PAID', amountTotal: 39000, currency: 'KRW', paidAt: '2026-11-21T02:59:00Z', ...overrides }
+  return { status: 'PAID', amountTotal: 39000, amountCancelled: 0, currency: 'KRW', paidAt: '2026-11-21T02:59:00Z', ...overrides }
 }
 
 function makeDeps(input: { order?: PortOneOrder | null; payment?: PortOnePayment | null; granted?: boolean; plan?: string } = {}) {
   const grants: unknown[] = []
+  const revokes: { amount: number; refId: string }[] = []
   const alerts: { title: string }[] = []
   const processed: string[] = []
   const seen = new Map<string, boolean>()
@@ -52,8 +53,14 @@ function makeDeps(input: { order?: PortOneOrder | null; payment?: PortOnePayment
     },
     setPlan: vi.fn(async () => {}),
     upsertSubscription: vi.fn(async () => {}),
+    findGrantsForPayment: vi.fn(async () => (input.granted ? [{ id: 'grant-1', workspaceId: 'ws-1', delta: 50 }] : [])),
+    revokedTotalForPayment: vi.fn(async () => revokes.reduce((sum, r) => sum + r.amount, 0)),
+    async revoke(row) {
+      revokes.push(row)
+    },
+    endSubscription: vi.fn(async () => {}),
   }
-  return { deps, grants, alerts, processed }
+  return { deps, grants, alerts, processed, revokes }
 }
 
 describe('결제창을 열기 전', () => {
@@ -194,13 +201,42 @@ describe('결제 알림(웹훅)', () => {
     expect(grants).toHaveLength(1)
   })
 
-  // 왜: 첫 버전은 환불을 자동으로 처리하지 않는다. 취소가 오면 사람이 Take 회수를 정한다.
-  it('결제 취소 알림이 오면 Take 는 그대로 두고 운영팀에 알린다', async () => {
-    const { deps, grants, alerts } = makeDeps()
-    const body = JSON.stringify({ type: 'Transaction.Cancelled', timestamp: '2026-11-22T00:00:00Z', data: { paymentId: 'tale-abc' } })
+  function cancelBody(type = 'Transaction.Cancelled') {
+    return JSON.stringify({ type, timestamp: '2026-11-22T00:00:00Z', data: { paymentId: 'tale-abc', cancellationId: 'c-1' } })
+  }
+
+  // 왜: 오너 11/19 "결제 취소인데 왜 회수가 안돼?". 돈을 돌려줬으면 그 돈으로 준 Take 도 돌려받는다.
+  it('결제가 전액 취소되면 그 결제로 준 Take 를 모두 회수한다', async () => {
+    const { deps, revokes } = makeDeps({ payment: paid({ status: 'CANCELLED', amountCancelled: 39000 }), granted: true })
+    const body = cancelBody()
     const out = await handlePortOneWebhook({ rawBody: body, headers: signed(body), secret: SECRET, deps })
-    expect(out).toEqual({ status: 200, body: { ok: true, result: 'cancel_alerted' } })
-    expect(grants).toEqual([])
-    expect(alerts).toHaveLength(1)
+    expect(out).toEqual({ status: 200, body: { ok: true, result: 'revoked' } })
+    expect(revokes).toEqual([expect.objectContaining({ workspaceId: 'ws-1', grantId: 'grant-1', amount: 50 })])
+  })
+
+  // 왜: 일부만 환불하면 환불한 몫만큼만 돌려받는다(Paddle 환불과 같은 규칙).
+  it('결제가 일부 취소되면 취소된 금액 비율만큼 Take 를 회수한다', async () => {
+    const { deps, revokes } = makeDeps({ payment: paid({ status: 'PARTIAL_CANCELLED', amountCancelled: 19500 }), granted: true })
+    const body = cancelBody('Transaction.PartialCancelled')
+    await handlePortOneWebhook({ rawBody: body, headers: signed(body), secret: SECRET, deps })
+    expect(revokes).toEqual([expect.objectContaining({ amount: 25 })])
+  })
+
+  // 왜: PortOne 이 같은 취소 알림을 다시 보내거나, 일부 취소 뒤 나머지를 취소하는 경우. 준 것보다 많이 회수하면 안 된다.
+  it('같은 취소를 두 번 받아도 준 Take 보다 많이 회수하지 않는다', async () => {
+    const { deps, revokes } = makeDeps({ payment: paid({ status: 'CANCELLED', amountCancelled: 39000 }), granted: true })
+    const body = cancelBody()
+    await handlePortOneWebhook({ rawBody: body, headers: signed(body), secret: SECRET, deps })
+    const again = await handlePortOneWebhook({ rawBody: body, headers: signed(body), secret: SECRET, deps })
+    expect(again.body.result).toBe('already_revoked')
+    expect(revokes).toHaveLength(1)
+  })
+
+  // 왜: 환불 전에 Take 를 이미 써 버린 경우. 회수를 줄이지 않는다 — 잔액이 0 아래로 가고 새 영상 생성이 멈춘다(Paddle 환불과 같다).
+  it('이미 써 버린 Take 도 잔액과 상관없이 준 만큼 회수한다', async () => {
+    const { deps, revokes } = makeDeps({ payment: paid({ status: 'CANCELLED', amountCancelled: 39000 }), granted: true })
+    const body = cancelBody()
+    await handlePortOneWebhook({ rawBody: body, headers: signed(body), secret: SECRET, deps })
+    expect(revokes[0]).toEqual(expect.objectContaining({ amount: 50 }))
   })
 })
