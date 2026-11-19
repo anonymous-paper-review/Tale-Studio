@@ -24,8 +24,8 @@ importers:
         specifier: ^1.6.5
         version: 1.6.5
       '@portone/browser-sdk':
-        specifier: 0.1.14
-        version: 0.1.14
+        specifier: 0.1.13
+        version: 0.1.13
       '@portone/server-sdk':
         specifier: 0.19.0
         version: 0.19.0
@@ -803,8 +803,8 @@ packages:
     resolution: {integrity: sha512-+1VkjdD0QBLPodGrJUeqarH8VAIvQODIbwh9XpP5Syisf7YoQgsJKPNFoqqLQlu+VQ/tVSshMR6loPMn8U+dPg==}
     engines: {node: '>=14'}
 
-  '@portone/browser-sdk@0.1.14':
-    resolution: {integrity: sha512-hkNdqAfwqU2jSlGyFi/n/S9JtSlc1KLEgwV1SfUIWP45t2un13pFWfUTvZQjuA1o+8LfN9p1rMwJKB4znHAfjw==}
+  '@portone/browser-sdk@0.1.13':
+    resolution: {integrity: sha512-zC94/gmMeh5O44iRx/SiIyt8p+1YXxEVRQu+Fhi7WKMlzbERBViwCxY6B6MVO2QprGJS5iQG2bf6e7KoXln5Kg==}
 
   '@portone/server-sdk@0.19.0':
     resolution: {integrity: sha512-JIbD9HEEqaYuuW0zKU/sapqH1HQBf/Len+8ZPnMRb7E7tHnqRGrKPLS+fom34xUTiF3ZVKTrDjHeQHQ2YZc2og==}
@@ -6103,7 +6103,7 @@ snapshots:
   '@pkgjs/parseargs@0.11.0':
     optional: true
 
-  '@portone/browser-sdk@0.1.14': {}
+  '@portone/browser-sdk@0.1.13': {}
 
   '@portone/server-sdk@0.19.0': {}
 
