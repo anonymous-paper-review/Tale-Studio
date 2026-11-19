@@ -8,6 +8,9 @@ import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, Di
 import { Button } from '@/components/ui/button'
 import { PlanChangeDialog } from '@/components/billing/plan-change-dialog'
 import { useCheckout } from '@/lib/billing/use-checkout'
+import { usePortOneCheckout } from '@/lib/billing/use-portone-checkout'
+import { PortOneBuyerDialog } from '@/components/billing/portone-buyer-dialog'
+import { PORTONE_PACK_PRICES_KRW, PORTONE_PLAN_PRICES_KRW, readPortOneBillingChannelKey, readPortOnePublicConfig } from '@/lib/billing/portone-public'
 import { isPurchasable } from '@/lib/billing/catalog'
 import { PRICING_FAMILIES, pricingOptions, pricingReturnPath, pricingSelectionFromSearch, purchaseButton, type PricingFamily, type PricingOption, type PricingSelection } from '@/lib/billing/pricing-selection'
 import { useT } from '@/lib/i18n'
@@ -74,7 +77,10 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
   }))
   const triggerRef = useRef<HTMLButtonElement | null>(null)
   const handingOff = useRef(false)
-  const { busy, startCheckout, planChange, setPlanChange } = useCheckout()
+  const { busy: paddleBusy, startCheckout, planChange, setPlanChange } = useCheckout()
+  const portone = usePortOneCheckout()
+  const busy = paddleBusy || portone.busy
+  const [buyerOpen, setBuyerOpen] = useState(false)
   const options = selection ? pricingOptions(selection.family) : []
   const option = selection ? options[selection.index] : undefined
   const copy = selection ? FAMILY_COPY[selection.family] : null
@@ -92,6 +98,8 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
     // React가 선택창과 포커스 잠금을 해제한 뒤 결제창을 연다.
     await new Promise<void>(resolve => requestAnimationFrame(() => requestAnimationFrame(() => resolve())))
   }
+
+  const krwAmount = option ? krwPriceOf(option) : null
 
   const optionLabel = (value: PricingOption) => value.kind === 'plan'
     ? t('{n} min per project', { n: quantityOf(value) })
@@ -134,6 +142,11 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
                     <span className="font-mono text-3xl font-semibold tabular-nums" data-selected-price>{usd(amountOf(option))}</span>
                     <span className="text-sm text-muted-foreground">{t(option.kind === 'plan' ? '/ month' : 'One time')}</span>
                   </p>
+                  {krwAmount !== null && (
+                    <p className="mt-1 font-mono text-sm tabular-nums text-muted-foreground" data-selected-price-krw>
+                      {krw(krwAmount)} {t(option.kind === 'plan' ? '/ month' : 'One time')}
+                    </p>
+                  )}
                   <p className="mt-2 text-sm font-medium">{optionLabel(option)}</p>
                 </div>
                 <div className="rounded-lg border border-border bg-muted/30 p-4">
@@ -211,14 +224,53 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
                   {busy ? <><Loader2 className="size-4 animate-spin motion-reduce:animate-none" />{t('Preparing checkout…')}</> : checkoutEnabled && !isPurchasable(option.item) ? t('Coming soon') : option.kind === 'plan' ? t('Continue with {plan}', { plan: option.item.name }) : countText(t, quantityOf(option), 'Buy 1 Take', 'Buy {n} Takes', { n: quantityOf(option).toLocaleString('en-US') })}
                 </Button>
                 <p className="mt-2 text-center text-xs text-muted-foreground">{t(checkoutEnabled ? 'Pay in USD by card. Review the final total in Paddle.' : 'You can browse plans and Take packs. Purchases are not open yet.')}</p>
+                {krwAmount !== null && portOneOpenFor(option) && (
+                  <Button
+                    size="lg"
+                    variant="secondary"
+                    className="mt-3 w-full"
+                    data-pricing-portone
+                    disabled={busy}
+                    onClick={() => setBuyerOpen(true)}
+                  >
+                    {portone.busy ? <Loader2 className="size-4 animate-spin motion-reduce:animate-none" /> : null}
+                    {t('Pay {amount} by Korean card', { amount: krw(krwAmount) })}
+                  </Button>
+                )}
               </div>
             </>
           )}
         </DialogContent>
       </Dialog>
+      {option && krwAmount !== null && (
+        <PortOneBuyerDialog
+          open={buyerOpen}
+          onOpenChange={setBuyerOpen}
+          amountLabel={krw(krwAmount)}
+          onConfirm={buyer => {
+            setBuyerOpen(false)
+            void portone.start({ kind: option.kind, id: option.item.id, buyer, returnTo: pricingReturnPath(option), onReady: handOff })
+          }}
+        />
+      )}
       <PlanChangeDialog preview={planChange} open={planChange !== null} onOpenChange={open => { if (!open) setPlanChange(null) }} />
     </>
   )
+}
+
+function krwPriceOf(option: PricingOption): number | null {
+  const table: Record<string, number | null> = option.kind === 'plan' ? PORTONE_PLAN_PRICES_KRW : PORTONE_PACK_PRICES_KRW
+  return table[option.item.id] ?? null
+}
+
+function krw(amount: number): string {
+  return `₩${amount.toLocaleString('ko-KR')}`
+}
+
+/** 국내 카드 결제창 키가 있어야 버튼을 그린다. 플랜은 정기결제 채널 키도 있어야 한다. */
+function portOneOpenFor(option: PricingOption): boolean {
+  if (!readPortOnePublicConfig()) return false
+  return option.kind === 'pack' || readPortOneBillingChannelKey() !== null
 }
 
 function Allowance({ icon: Icon, label, value }: { icon: typeof Users; label: string; value: string }) {

@@ -14,6 +14,7 @@ import { AlertTriangle, Check, LogOut, RefreshCw, X } from 'lucide-react'
 import { DashboardHeader } from '@/components/dashboard/dashboard-header'
 import { CheckoutButton } from '@/components/billing/checkout-button'
 import { PortalButton } from '@/components/billing/portal-button'
+import { PortOneCancelButton } from '@/components/billing/portone-cancel-button'
 import { VoucherCard } from '@/components/billing/voucher-card'
 import { DeleteAccountDialog } from '@/components/account/delete-account-dialog'
 import { Button } from '@/components/ui/button'
@@ -207,7 +208,9 @@ export default function AccountPage() {
                   {t('Change plan')}
                 </Link>
               )}
-              {data?.hasPaddleCustomer ? (
+              {data?.portoneSubscription ? (
+                <PortOneCancelButton className={linkButtonClass} accessEndsAt={subscription?.nextBillingAt ?? null} />
+              ) : data?.hasPaddleCustomer ? (
                 <PortalButton target={subscription?.status === 'active' || subscription?.status === 'cancel_scheduled' || subscription?.status === 'past_due' ? 'cancel' : 'overview'} className={linkButtonClass}>
                   {subscription?.status === 'active' || subscription?.status === 'cancel_scheduled' || subscription?.status === 'past_due' ? t('Manage subscription') : t('Billing & receipts')}
                 </PortalButton>
