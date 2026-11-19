@@ -1,27 +1,27 @@
 {
   "source": "Notion 사업운영 > Terms & Conditions > Creem을 위한 버전",
   "importedOn": "2026-10-11",
-  "policyLastUpdated": "9 October 2026",
+  "policyLastUpdated": "19 November 2026",
   "files": {
     "terms-of-service.md": {
-      "sha256": "4c87d071e54aaad8cd421bd825da28bb2160a74ee66b0cb65ac05d90c230cb8c",
-      "characters": 13805
+      "sha256": "992c78ef8534a28386d2427e5472e33742a6614c1958cc0b361d2a533876c271",
+      "characters": 13506
     },
     "refund-policy.md": {
-      "sha256": "4faf2223ce5d2d409c01c4ddd4a35e63eb73aced3ccfb13334257144724a6c18",
-      "characters": 6184
+      "sha256": "3a191744a50b9a3a8018317b64db249aea030776a47ea8c7d867e23c27e90642",
+      "characters": 5827
     },
     "privacy-policy.md": {
-      "sha256": "1b8ea90bdd15ac67fa25c2c31843969cb5f48bb26b65f142c1b8e6765b6d095c",
-      "characters": 13707
+      "sha256": "ef448fd307c44739652a64f48c445bda4f757c0fae7b25019e0b471813d22c96",
+      "characters": 13111
     },
     "acceptable-use-policy.md": {
       "sha256": "4f1563d6664ed7cdcda1157a22d0f4760b77565907a7de53b6392a88ec2f6fe6",
       "characters": 2729
     },
     "footer.md": {
-      "sha256": "ddd2cd7b41802a6102d8f01c190be0ee040bbc35f49710d0eb581a844e539cd4",
-      "characters": 302
+      "sha256": "5489135d95537f2228761f6a3cf641dd93c656ce33641dd523e23323094859d6",
+      "characters": 244
     }
   }
 }
