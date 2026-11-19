@@ -343,7 +343,20 @@ export async function processPortOneCancel(paymentId: string, deps: PortOneDeps)
 // ── 구독 갱신·해지 판정 ────────────────────────────────────────────────────────
 
 export const PORTONE_RENEWAL_MAX_FAILURES = 3
-const RETRY_GAP_MS = 24 * 60 * 60 * 1000
+/** 갱신 청구 시각(한국 시간). 오너 2026-11-19 "하루에 아침 점심 저녁에 하고 무료로 바로 다음날". */
+export const PORTONE_RENEWAL_HOURS_KST = [9, 12, 18] as const
+const KST_OFFSET_MS = 9 * 60 * 60 * 1000
+
+function kst(date: Date): { day: string; hour: number } {
+  const shifted = new Date(date.getTime() + KST_OFFSET_MS)
+  return { day: shifted.toISOString().slice(0, 10), hour: shifted.getUTCHours() }
+}
+
+/** 지금이 청구 시각이면 그 시각의 이름(날짜·시), 아니면 null. */
+function renewalSlot(date: Date): string | null {
+  const { day, hour } = kst(date)
+  return (PORTONE_RENEWAL_HOURS_KST as readonly number[]).includes(hour) ? `${day}T${hour}` : null
+}
 
 /** 매시간 점검이 구독 하나에 대해 할 일. charge = 다음 달 청구, end = 구독을 끝내고 무료로, wait = 아무것도 안 함. */
 export function decidePortOneRenewal(input: {
@@ -355,15 +368,20 @@ export function decidePortOneRenewal(input: {
 }): 'charge' | 'end' | 'wait' {
   const ends = input.currentPeriodEnd ? Date.parse(input.currentPeriodEnd) : NaN
   if (!Number.isFinite(ends) || ends > input.now.getTime()) return 'wait'
+  const slot = renewalSlot(input.now)
   switch (input.status) {
     case 'active':
-      return 'charge'
+      return slot ? 'charge' : 'wait'
     case 'cancel_scheduled':
       return 'end'
     case 'past_due': {
-      if (input.failedAttempts >= PORTONE_RENEWAL_MAX_FAILURES) return 'end'
-      const last = input.lastFailedAt ? Date.parse(input.lastFailedAt) : NaN
-      if (Number.isFinite(last) && input.now.getTime() - last < RETRY_GAP_MS) return 'wait'
+      const last = input.lastFailedAt ? new Date(input.lastFailedAt) : null
+      if (input.failedAttempts >= PORTONE_RENEWAL_MAX_FAILURES) {
+        // 세 번 실패한 그날은 두고, 한국 날짜가 바뀐 뒤 첫 점검에서 끝낸다.
+        return !last || kst(input.now).day > kst(last).day ? 'end' : 'wait'
+      }
+      if (!slot) return 'wait'
+      if (last && renewalSlot(last) === slot) return 'wait'
       return 'charge'
     }
     default:

@@ -104,7 +104,7 @@ export async function runPortOneRenewals(now = new Date()): Promise<RenewalRunSu
       await sendOpsAlert({
         level: 'warn',
         title: 'PortOne 구독 갱신 결제 실패', // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
-        body: `subscription ${subscriptionId} (${plan}) ${failures.count + 1}번째 실패: ${charged.message}. 하루 뒤 다시 청구하고, 세 번 실패하면 무료로 돌린다.`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
+        body: `subscription ${subscriptionId} (${plan}) ${failures.count + 1}번째 실패: ${charged.message}. 한국 시간 9시·12시·18시에 다시 청구하고, 세 번 실패하면 다음 날 무료로 돌린다.`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
       })
       summary.failed += 1
     } catch (err) {

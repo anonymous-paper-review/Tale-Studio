@@ -137,39 +137,48 @@ describe('구독 결제가 취소되면', () => {
 })
 
 describe('매시간 갱신 점검', () => {
-  const now = new Date('2026-12-21T05:00:00Z')
+  // 한국 시간 = UTC+9. 청구 시각은 한국 시간 9시(00 UTC) · 12시(03 UTC) · 18시(09 UTC).
+  const at = (iso: string) => new Date(iso)
+  const ENDED = '2026-12-20T20:00:00Z' // 한국 시간 12/21 05:00 에 기간이 끝났다
 
-  // 왜: 정상 경로 고정. 기간이 끝난 구독은 같은 카드로 다음 달 요금을 청구한다.
-  it('구독 기간이 끝났고 구독 중이면 다음 달 요금을 청구한다', () => {
-    expect(decidePortOneRenewal({ status: 'active', currentPeriodEnd: '2026-12-21T02:59:00Z', now, failedAttempts: 0, lastFailedAt: null })).toBe('charge')
+  // 왜: 정상 경로 고정. 오너 11/19 "하루에 아침 점심 저녁" — 기간이 끝난 구독은 다음 청구 시각에 다음 달 요금을 청구한다.
+  it('구독 기간이 끝났으면 다음 청구 시각(한국 시간 9시·12시·18시)에 다음 달 요금을 청구한다', () => {
+    expect(decidePortOneRenewal({ status: 'active', currentPeriodEnd: ENDED, now: at('2026-12-21T00:15:00Z'), failedAttempts: 0, lastFailedAt: null })).toBe('charge')
+  })
+
+  // 왜: 청구는 정해진 세 시각에만 한다. 새벽에 긁지 않는다.
+  it('청구 시각이 아니면 기간이 끝났어도 기다린다', () => {
+    expect(decidePortOneRenewal({ status: 'active', currentPeriodEnd: ENDED, now: at('2026-12-20T21:15:00Z'), failedAttempts: 0, lastFailedAt: null })).toBe('wait')
   })
 
   // 왜: 기간 중간에 청구하면 같은 달을 두 번 받는다.
   it('구독 기간이 남아 있으면 청구하지 않는다', () => {
-    expect(decidePortOneRenewal({ status: 'active', currentPeriodEnd: '2026-12-22T00:00:00Z', now, failedAttempts: 0, lastFailedAt: null })).toBe('wait')
+    expect(decidePortOneRenewal({ status: 'active', currentPeriodEnd: '2026-12-22T00:00:00Z', now: at('2026-12-21T00:15:00Z'), failedAttempts: 0, lastFailedAt: null })).toBe('wait')
   })
 
-  // 왜: 해지는 "이번 기간까지 쓰고 끝"이다. 기간이 끝나면 청구하지 않고 무료로 돌린다.
+  // 왜: 환불정책 2절 — 해지는 다음 갱신만 멈춘다. 기간이 끝나면 청구하지 않고 무료로 돌린다.
   it('해지 예약된 구독은 기간이 끝나면 청구하지 않고 무료로 돌린다', () => {
-    expect(decidePortOneRenewal({ status: 'cancel_scheduled', currentPeriodEnd: '2026-12-21T02:59:00Z', now, failedAttempts: 0, lastFailedAt: null })).toBe('end')
-    expect(decidePortOneRenewal({ status: 'cancel_scheduled', currentPeriodEnd: '2026-12-22T00:00:00Z', now, failedAttempts: 0, lastFailedAt: null })).toBe('wait')
+    expect(decidePortOneRenewal({ status: 'cancel_scheduled', currentPeriodEnd: ENDED, now: at('2026-12-20T21:15:00Z'), failedAttempts: 0, lastFailedAt: null })).toBe('end')
+    expect(decidePortOneRenewal({ status: 'cancel_scheduled', currentPeriodEnd: '2026-12-22T00:00:00Z', now: at('2026-12-21T00:15:00Z'), failedAttempts: 0, lastFailedAt: null })).toBe('wait')
   })
 
-  // 왜: 한도 초과·잔액 부족은 하루 안에 풀리기도 한다. 매시간 다시 긁으면 카드사가 막는다.
-  it('갱신 결제가 실패한 지 하루가 안 지났으면 다시 청구하지 않는다', () => {
-    expect(decidePortOneRenewal({ status: 'past_due', currentPeriodEnd: '2026-12-21T02:59:00Z', now, failedAttempts: 1, lastFailedAt: '2026-12-21T03:00:00Z' })).toBe('wait')
+  // 왜: 오너 11/19 — 아침에 실패하면 점심에, 점심에 실패하면 저녁에 다시 청구한다.
+  it('갱신 결제가 실패하면 같은 날 다음 청구 시각에 다시 청구한다', () => {
+    const morningFail = '2026-12-21T00:15:00Z'
+    expect(decidePortOneRenewal({ status: 'past_due', currentPeriodEnd: ENDED, now: at('2026-12-21T01:15:00Z'), failedAttempts: 1, lastFailedAt: morningFail })).toBe('wait')
+    expect(decidePortOneRenewal({ status: 'past_due', currentPeriodEnd: ENDED, now: at('2026-12-21T03:15:00Z'), failedAttempts: 1, lastFailedAt: morningFail })).toBe('charge')
   })
 
-  // 왜: 실패한 지 하루가 지나면 한 번 더 청구한다(최대 세 번).
-  it('갱신 결제가 실패한 지 하루가 지났으면 다시 청구한다', () => {
-    const later = new Date('2026-12-22T04:00:00Z')
-    expect(decidePortOneRenewal({ status: 'past_due', currentPeriodEnd: '2026-12-21T02:59:00Z', now: later, failedAttempts: 1, lastFailedAt: '2026-12-21T03:00:00Z' })).toBe('charge')
+  // 왜: 같은 시각에 두 번 긁지 않는다(점검이 그 시각 안에 다시 돌아도).
+  it('같은 청구 시각에 이미 실패했으면 그 시각에는 다시 청구하지 않는다', () => {
+    expect(decidePortOneRenewal({ status: 'past_due', currentPeriodEnd: ENDED, now: at('2026-12-21T00:45:00Z'), failedAttempts: 1, lastFailedAt: '2026-12-21T00:15:00Z' })).toBe('wait')
   })
 
-  // 왜: 끝없이 실패한 카드로 플랜을 계속 쓰게 둘 수 없다.
-  it('갱신 결제가 세 번 실패하면 구독을 끝내고 무료로 돌린다', () => {
-    const later = new Date('2026-12-24T04:00:00Z')
-    expect(decidePortOneRenewal({ status: 'past_due', currentPeriodEnd: '2026-12-21T02:59:00Z', now: later, failedAttempts: 3, lastFailedAt: '2026-12-23T03:00:00Z' })).toBe('end')
+  // 왜: 오너 11/19 "무료로 바로 다음날" — 세 번 실패한 그날은 그대로 두고 다음 날 무료로 돌린다.
+  it('갱신 결제가 세 번 실패하면 다음 날 무료로 돌린다', () => {
+    const eveningFail = '2026-12-21T09:15:00Z' // 한국 시간 12/21 18:15
+    expect(decidePortOneRenewal({ status: 'past_due', currentPeriodEnd: ENDED, now: at('2026-12-21T12:15:00Z'), failedAttempts: 3, lastFailedAt: eveningFail })).toBe('wait')
+    expect(decidePortOneRenewal({ status: 'past_due', currentPeriodEnd: ENDED, now: at('2026-12-21T15:15:00Z'), failedAttempts: 3, lastFailedAt: eveningFail })).toBe('end')
   })
 })
 
