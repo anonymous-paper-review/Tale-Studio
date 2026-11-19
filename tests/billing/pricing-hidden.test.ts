@@ -53,10 +53,10 @@ beforeEach(() => {
   auth.getUser.mockResolvedValue({ data: { user: null } })
 })
 
-// 왜: 2026-11-04 오너 "진입점을 일단 없애줘 나중에 다시 원복할거임". 다시 열 때는 오너가 이 문장을 바꾼다.
-it('지금은 요금표를 숨겨 둔다', async () => {
+// 왜: 2026-11-04 오너가 숨겼다가 2026-11-19 오너 "3번 열고 PG붙일꺼야"로 다시 열었다. PG 심사 담당자가 홈에서 요금표를 찾을 수 있어야 한다.
+it('지금은 요금표를 열어 둔다', async () => {
   const actual = await vi.importActual<typeof import('@/lib/billing/pricing-visibility')>('@/lib/billing/pricing-visibility')
-  expect(actual.PRICING_PAGE_VISIBLE).toBe(false)
+  expect(actual.PRICING_PAGE_VISIBLE).toBe(true)
 })
 
 describe('요금표를 숨겨 둔 동안', () => {
