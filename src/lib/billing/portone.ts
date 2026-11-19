@@ -159,6 +159,8 @@ export interface PortOneDeps {
   revoke(input: { workspaceId: string; grantId: string; amount: number; refId: string; reason: string }): Promise<void>
   /** 구독을 끝내고(상태 canceled · 카드 삭제) 다른 구독이 없으면 무료로 돌린다. */
   endSubscription(input: { workspaceId: string; subscriptionId: string; plan: string }): Promise<void>
+  /** 워크스페이스의 지금 Take 잔액. */
+  balance(workspaceId: string): Promise<number>
 }
 
 export const PORTONE_REF_KIND = 'portone_payment'
@@ -284,9 +286,9 @@ async function settlePlan(
 }
 
 // ── 결제 취소(환불) → Take 회수 ─────────────────────────────────────────────────
-// 오너 2026-11-19 "결제 취소인데 왜 회수가 안돼?" — 취소된 금액 비율만큼 그 결제로 준 Take 를 회수한다.
-//   이미 써 버린 Take 도 줄이지 않고 회수한다: 잔액이 0 아래로 가면 새 생성이 멈춘다(Paddle 환불과 같은 규칙).
-//   구독 결제가 전액 취소되면 그 구독도 끝낸다(다음 달 청구가 나가지 않게).
+// 오너 2026-11-19: 취소된 금액 비율만큼 그 결제로 준 Take 를 회수한다(환불정책 4절: 팩 환불 시 그 팩의 Take 를 뺀다).
+//   잔액을 마이너스로 만들지 않는다 — 이미 써 버려 모자라면 남은 만큼만 회수하고 모자란 만큼은 운영팀에 알린다.
+//   구독 결제 취소는 그 결제로 준 Take 만 회수하고 구독은 건드리지 않는다(환불정책 4절: 구독 환불은 예외뿐).
 
 export type PortOneCancelResult = 'unknown_order' | 'payment_not_found' | 'not_cancelled' | 'nothing_to_revoke' | 'already_revoked' | 'revoked'
 
@@ -307,19 +309,23 @@ export async function processPortOneCancel(paymentId: string, deps: PortOneDeps)
       title: 'PortOne 결제 취소인데 회수할 적립이 없다', // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
       body: `payment ${paymentId}: ${cancelled}/${total} KRW 취소. 적립 기록이 없어 회수하지 않았다.`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
     })
-    if (order.kind === 'plan' && ratio >= 1) await deps.endSubscription({ workspaceId: order.workspaceId, subscriptionId: order.subscriptionId, plan: order.planId })
     return 'nothing_to_revoke'
   }
   if (grants.length !== 1) throw new Error(`Ambiguous grants for PortOne payment ${paymentId}`)
   const grant = grants[0]
   const target = Math.round(grant.delta * ratio)
   const already = await deps.revokedTotalForPayment(paymentId)
-  const amount = Math.min(target, grant.delta) - already
-
-  if (order.kind === 'plan' && ratio >= 1) {
-    await deps.endSubscription({ workspaceId: grant.workspaceId, subscriptionId: order.subscriptionId, plan: order.planId })
+  const owed = Math.min(target, grant.delta) - already
+  if (owed <= 0) return 'already_revoked'
+  const amount = Math.min(owed, Math.max(0, await deps.balance(grant.workspaceId)))
+  if (amount < owed) {
+    await deps.alert({
+      level: 'warn',
+      title: 'PortOne 결제 취소 회수: 잔액이 모자라다', // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
+      body: `workspace ${grant.workspaceId}, payment ${paymentId}: ${owed} Take 를 회수해야 하는데 잔액이 ${amount} 라 ${amount} 만 회수했다. 모자란 ${owed - amount} 은 사람이 판단.`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
+    })
   }
-  if (amount <= 0) return 'already_revoked'
+  if (amount <= 0) return 'revoked'
   try {
     await deps.revoke({
       workspaceId: grant.workspaceId,
