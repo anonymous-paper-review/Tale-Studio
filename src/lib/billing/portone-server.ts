@@ -6,7 +6,9 @@ import 'server-only'
 import { PortOneClient, type Payment } from '@portone/server-sdk'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { webhookDeps } from '@/lib/billing/webhook-deps'
+import { LIVE_SUBSCRIPTION_STATUSES } from '@/lib/billing/subscription-state'
 import {
+  PORTONE_REF_KIND,
   portoneOrderEventId,
   type PortOneDeps,
   type PortOneOrder,
@@ -20,10 +22,11 @@ function client() {
 }
 
 function toPayment(p: Payment.Payment): PortOnePayment {
-  const rec = p as unknown as { status: string; amount?: { total?: number }; currency?: string; paidAt?: string }
+  const rec = p as unknown as { status: string; amount?: { total?: number; cancelled?: number }; currency?: string; paidAt?: string }
   return {
     status: rec.status,
     amountTotal: typeof rec.amount?.total === 'number' ? rec.amount.total : null,
+    amountCancelled: typeof rec.amount?.cancelled === 'number' ? rec.amount.cancelled : 0,
     currency: typeof rec.currency === 'string' ? rec.currency : null,
     paidAt: typeof rec.paidAt === 'string' ? rec.paidAt : null,
   }
@@ -63,6 +66,43 @@ export const portoneDeps: PortOneDeps = {
   alert: webhookDeps.alert,
   setPlan: webhookDeps.setPlan,
   upsertSubscription: webhookDeps.upsertSubscription,
+
+  async findGrantsForPayment(paymentId) {
+    const { data, error } = await supabaseAdmin
+      .from('take_ledger')
+      .select('id, workspace_id, delta')
+      .eq('ref_kind', PORTONE_REF_KIND)
+      .eq('ref_id', paymentId)
+      .in('kind', ['grant_plan', 'grant_purchase'])
+    if (error) throw error
+    return (data ?? []).map((r) => ({ id: r.id as string, workspaceId: r.workspace_id as string, delta: r.delta as number }))
+  },
+
+  async revokedTotalForPayment(paymentId) {
+    const { data, error } = await supabaseAdmin
+      .from('take_ledger')
+      .select('delta')
+      .eq('kind', 'refund_revoke')
+      .eq('ref_kind', 'portone_cancel')
+      .like('ref_id', `${paymentId}:%`)
+    if (error) throw error
+    return (data ?? []).reduce((sum, r) => sum - (r.delta as number), 0)
+  },
+
+  async revoke(input) {
+    const { error } = await supabaseAdmin.from('take_ledger').insert({
+      workspace_id: input.workspaceId,
+      grant_id: input.grantId,
+      delta: -input.amount,
+      kind: 'refund_revoke',
+      ref_kind: 'portone_cancel',
+      ref_id: input.refId,
+      reason: input.reason,
+    })
+    if (error) throw error
+  },
+
+  endSubscription: (input) => endPortOneSubscription(input),
 }
 
 // ── 빌링키(정기결제 카드) ────────────────────────────────────────────────────────
@@ -151,3 +191,34 @@ export async function renewalFailures(subscriptionId: string, periodEnd: string)
   if (error) throw error
   return { count: data?.length ?? 0, lastAt: (data?.[0]?.received_at as string | undefined) ?? null }
 }
+
+/** 구독을 끝낸다: 상태 canceled, 카드 삭제, 다른 살아 있는 구독이 없으면 무료로. */
+export async function endPortOneSubscription(input: { workspaceId: string; subscriptionId: string; plan: string }): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('subscriptions')
+    .update({ status: 'canceled', updated_at: new Date().toISOString() })
+    .eq('mor_subscription_id', input.subscriptionId)
+  if (error) throw error
+
+  const { data: others, error: otherError } = await supabaseAdmin
+    .from('subscriptions')
+    .select('mor_subscription_id')
+    .eq('workspace_id', input.workspaceId)
+    .neq('mor_subscription_id', input.subscriptionId)
+    .in('status', [...LIVE_SUBSCRIPTION_STATUSES])
+    .limit(1)
+  if (otherError) throw otherError
+  if ((others?.length ?? 0) === 0) {
+    // 해지 뒤 새로 산 다른 플랜은 건드리지 않는다: 지금 플랜이 이 구독의 플랜일 때만 무료로 돌린다.
+    const { error: planError } = await supabaseAdmin
+      .from('workspaces')
+      .update({ plan: 'free' })
+      .eq('id', input.workspaceId)
+      .eq('plan', input.plan)
+    if (planError) throw planError
+  }
+
+  const billingKey = await findBillingKey(input.subscriptionId)
+  if (billingKey) await deleteBillingKey(billingKey)
+}
+

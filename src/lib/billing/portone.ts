@@ -116,6 +116,8 @@ export type PortOneOrder =
 export interface PortOnePayment {
   status: string
   amountTotal: number | null
+  /** 지금까지 취소(환불)된 금액 합. */
+  amountCancelled?: number | null
   currency: string | null
   paidAt: string | null
 }
@@ -150,6 +152,13 @@ export interface PortOneDeps {
     status: string
     currentPeriodEnd: string | null
   }): Promise<void>
+  /** 이 결제(paymentId)로 준 적립 행들. */
+  findGrantsForPayment(paymentId: string): Promise<{ id: string; workspaceId: string; delta: number }[]>
+  /** 이 결제에 대해 이미 회수한 Take 합(양수). */
+  revokedTotalForPayment(paymentId: string): Promise<number>
+  revoke(input: { workspaceId: string; grantId: string; amount: number; refId: string; reason: string }): Promise<void>
+  /** 구독을 끝내고(상태 canceled · 카드 삭제) 다른 구독이 없으면 무료로 돌린다. */
+  endSubscription(input: { workspaceId: string; subscriptionId: string; plan: string }): Promise<void>
 }
 
 export const PORTONE_REF_KIND = 'portone_payment'
@@ -274,6 +283,63 @@ async function settlePlan(
   return 'plan_granted'
 }
 
+// ── 결제 취소(환불) → Take 회수 ─────────────────────────────────────────────────
+// 오너 2026-11-19 "결제 취소인데 왜 회수가 안돼?" — 취소된 금액 비율만큼 그 결제로 준 Take 를 회수한다.
+//   이미 써 버린 Take 도 줄이지 않고 회수한다: 잔액이 0 아래로 가면 새 생성이 멈춘다(Paddle 환불과 같은 규칙).
+//   구독 결제가 전액 취소되면 그 구독도 끝낸다(다음 달 청구가 나가지 않게).
+
+export type PortOneCancelResult = 'unknown_order' | 'payment_not_found' | 'not_cancelled' | 'nothing_to_revoke' | 'already_revoked' | 'revoked'
+
+export async function processPortOneCancel(paymentId: string, deps: PortOneDeps): Promise<PortOneCancelResult> {
+  const order = await deps.findOrder(paymentId)
+  if (!order) return 'unknown_order'
+  const payment = await deps.fetchPayment(paymentId)
+  if (!payment) return 'payment_not_found'
+  const cancelled = payment.amountCancelled ?? 0
+  const total = payment.amountTotal ?? order.amountKrw
+  if (cancelled <= 0 || total <= 0) return 'not_cancelled'
+  const ratio = Math.min(1, cancelled / total)
+
+  const grants = await deps.findGrantsForPayment(paymentId)
+  if (grants.length === 0) {
+    await deps.alert({
+      level: 'warn',
+      title: 'PortOne 결제 취소인데 회수할 적립이 없다', // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
+      body: `payment ${paymentId}: ${cancelled}/${total} KRW 취소. 적립 기록이 없어 회수하지 않았다.`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
+    })
+    if (order.kind === 'plan' && ratio >= 1) await deps.endSubscription({ workspaceId: order.workspaceId, subscriptionId: order.subscriptionId, plan: order.planId })
+    return 'nothing_to_revoke'
+  }
+  if (grants.length !== 1) throw new Error(`Ambiguous grants for PortOne payment ${paymentId}`)
+  const grant = grants[0]
+  const target = Math.round(grant.delta * ratio)
+  const already = await deps.revokedTotalForPayment(paymentId)
+  const amount = Math.min(target, grant.delta) - already
+
+  if (order.kind === 'plan' && ratio >= 1) {
+    await deps.endSubscription({ workspaceId: grant.workspaceId, subscriptionId: order.subscriptionId, plan: order.planId })
+  }
+  if (amount <= 0) return 'already_revoked'
+  try {
+    await deps.revoke({
+      workspaceId: grant.workspaceId,
+      grantId: grant.id,
+      amount,
+      refId: `${paymentId}:${cancelled}`,
+      reason: `portone cancel of ${paymentId} (${Math.round(ratio * 100)}%)`,
+    })
+  } catch (err) {
+    if (isUniqueViolation(err)) return 'already_revoked'
+    throw err
+  }
+  await deps.alert({
+    level: 'info',
+    title: 'PortOne 결제 취소 회수', // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
+    body: `workspace ${grant.workspaceId}: ${amount} Take 회수 (payment ${paymentId}, ${Math.round(ratio * 100)}%).`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
+  })
+  return 'revoked'
+}
+
 // ── 구독 갱신·해지 판정 ────────────────────────────────────────────────────────
 
 export const PORTONE_RENEWAL_MAX_FAILURES = 3
@@ -349,12 +415,9 @@ export async function handlePortOneWebhook(input: {
       }
       case 'Transaction.Cancelled':
       case 'Transaction.PartialCancelled': {
-        await input.deps.alert({
-          level: 'warn',
-          title: 'PortOne 결제가 취소됐다', // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
-          body: `payment ${paymentId ?? '?'} (${event.type}). Take 는 자동으로 회수하지 않았다. 필요하면 관리자 조정으로 회수.`, // i18n-ok: 운영 경보(디스코드), 유저 화면 아님
-        })
-        return { status: 200, body: { ok: true, result: 'cancel_alerted' } }
+        if (!paymentId) return { status: 200, body: { ok: true, result: 'ignored' } }
+        const result = await processPortOneCancel(paymentId, input.deps)
+        return { status: 200, body: { ok: true, result } }
       }
       default:
         return { status: 200, body: { ok: true, result: 'ignored' } }

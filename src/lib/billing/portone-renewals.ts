@@ -6,7 +6,6 @@ import 'server-only'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { sendOpsAlert } from '@/lib/ops-alert'
 import { PADDLE_PLANS } from '@/lib/billing/catalog'
-import { LIVE_SUBSCRIPTION_STATUSES } from '@/lib/billing/subscription-state'
 import {
   PORTONE_PLAN_PRICES_KRW,
   PORTONE_SUBSCRIPTION_PREFIX,
@@ -18,7 +17,7 @@ import {
 } from '@/lib/billing/portone'
 import {
   chargeBillingKey,
-  deleteBillingKey,
+  endPortOneSubscription,
   findBillingKey,
   portoneDeps,
   recordPortOneOrder,
@@ -31,35 +30,7 @@ export function portonePlanOrderName(planId: string): string {
   return `Tale Studio ${name} (1 month)`
 }
 
-/** 구독을 끝낸다: 상태 canceled, 카드 삭제, 다른 살아 있는 구독이 없으면 무료로. */
-export async function endPortOneSubscription(input: { workspaceId: string; subscriptionId: string; plan: string }): Promise<void> {
-  const { error } = await supabaseAdmin
-    .from('subscriptions')
-    .update({ status: 'canceled', updated_at: new Date().toISOString() })
-    .eq('mor_subscription_id', input.subscriptionId)
-  if (error) throw error
-
-  const { data: others, error: otherError } = await supabaseAdmin
-    .from('subscriptions')
-    .select('mor_subscription_id')
-    .eq('workspace_id', input.workspaceId)
-    .neq('mor_subscription_id', input.subscriptionId)
-    .in('status', [...LIVE_SUBSCRIPTION_STATUSES])
-    .limit(1)
-  if (otherError) throw otherError
-  if ((others?.length ?? 0) === 0) {
-    // 해지 뒤 새로 산 다른 플랜은 건드리지 않는다: 지금 플랜이 이 구독의 플랜일 때만 무료로 돌린다.
-    const { error: planError } = await supabaseAdmin
-      .from('workspaces')
-      .update({ plan: 'free' })
-      .eq('id', input.workspaceId)
-      .eq('plan', input.plan)
-    if (planError) throw planError
-  }
-
-  const billingKey = await findBillingKey(input.subscriptionId)
-  if (billingKey) await deleteBillingKey(billingKey)
-}
+export { endPortOneSubscription }
 
 export interface RenewalRunSummary {
   charged: number
