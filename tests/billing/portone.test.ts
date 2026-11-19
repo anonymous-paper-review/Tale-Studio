@@ -22,7 +22,7 @@ function paid(overrides: Partial<PortOnePayment> = {}): PortOnePayment {
   return { status: 'PAID', amountTotal: 39000, amountCancelled: 0, currency: 'KRW', paidAt: '2026-11-21T02:59:00Z', ...overrides }
 }
 
-function makeDeps(input: { order?: PortOneOrder | null; payment?: PortOnePayment | null; granted?: boolean; plan?: string } = {}) {
+function makeDeps(input: { order?: PortOneOrder | null; payment?: PortOnePayment | null; granted?: boolean; plan?: string; balance?: number } = {}) {
   const grants: unknown[] = []
   const revokes: { amount: number; refId: string }[] = []
   const alerts: { title: string }[] = []
@@ -59,6 +59,7 @@ function makeDeps(input: { order?: PortOneOrder | null; payment?: PortOnePayment
       revokes.push(row)
     },
     endSubscription: vi.fn(async () => {}),
+    balance: vi.fn(async () => (input.balance ?? 1000) - revokes.reduce((sum, r) => sum + r.amount, 0)),
   }
   return { deps, grants, alerts, processed, revokes }
 }
@@ -232,11 +233,12 @@ describe('결제 알림(웹훅)', () => {
     expect(revokes).toHaveLength(1)
   })
 
-  // 왜: 환불 전에 Take 를 이미 써 버린 경우. 회수를 줄이지 않는다 — 잔액이 0 아래로 가고 새 영상 생성이 멈춘다(Paddle 환불과 같다).
-  it('이미 써 버린 Take 도 잔액과 상관없이 준 만큼 회수한다', async () => {
-    const { deps, revokes } = makeDeps({ payment: paid({ status: 'CANCELLED', amountCancelled: 39000 }), granted: true })
+  // 왜: 오너 11/19 — 환불 전에 Take 를 써 버린 경우(카드사 직접 취소 · 예외 환불). 잔액을 마이너스로 만들지 않는다.
+  it('이미 써 버려 잔액이 모자라면 남은 만큼만 회수하고 모자란 만큼은 운영팀에 알린다', async () => {
+    const { deps, revokes, alerts } = makeDeps({ payment: paid({ status: 'CANCELLED', amountCancelled: 39000 }), granted: true, balance: 20 })
     const body = cancelBody()
     await handlePortOneWebhook({ rawBody: body, headers: signed(body), secret: SECRET, deps })
-    expect(revokes[0]).toEqual(expect.objectContaining({ amount: 50 }))
+    expect(revokes).toEqual([expect.objectContaining({ amount: 20 })])
+    expect(alerts.some((a) => a.title.includes('모자'))).toBe(true)
   })
 })

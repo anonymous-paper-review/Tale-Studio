@@ -76,6 +76,7 @@ function makeDeps(order: PortOneOrder, paymentStatus = 'PAID') {
     endSubscription: async (e) => {
       ended.push(e)
     },
+    balance: async () => 10_000,
   }
   return { deps, grants, subs, plans, ended, revokes }
 }
@@ -118,8 +119,8 @@ describe('구독 결제가 확인되면', () => {
 })
 
 describe('구독 결제가 취소되면', () => {
-  // 왜: 그 달 돈을 돌려줬으면 그 달 Take 와 플랜도 돌려받는다. 남겨 두면 다음 달에 또 청구된다.
-  it('구독 결제가 전액 취소되면 그 달 Take 를 회수하고 구독을 끝낸다', async () => {
+  // 왜: 오너 11/19 — 구독 환불은 중복·잘못된 청구 같은 예외뿐이다(환불정책 4절). 구독을 끝낼지는 해지 버튼이나 오너가 따로 정한다.
+  it('구독 결제가 취소되면 그 결제로 준 Take 만 회수하고 구독은 그대로 둔다', async () => {
     const order: PortOneOrder = {
       kind: 'plan',
       paymentId: 'tale-first',
@@ -132,7 +133,7 @@ describe('구독 결제가 취소되면', () => {
     const { deps, revokes, ended } = makeDeps(order, 'CANCELLED')
     expect(await processPortOneCancel('tale-first', deps)).toBe('revoked')
     expect(revokes).toEqual([expect.objectContaining({ amount: S1_TAKES })])
-    expect(ended).toEqual([{ workspaceId: 'ws-1', subscriptionId: 'portone-sub-1', plan: 's1' }])
+    expect(ended).toEqual([])
   })
 })
 

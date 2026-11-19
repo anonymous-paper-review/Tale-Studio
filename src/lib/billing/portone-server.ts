@@ -7,6 +7,7 @@ import { PortOneClient, type Payment } from '@portone/server-sdk'
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { webhookDeps } from '@/lib/billing/webhook-deps'
 import { LIVE_SUBSCRIPTION_STATUSES } from '@/lib/billing/subscription-state'
+import { takeBalance } from '@/lib/billing/take-ledger'
 import {
   PORTONE_REF_KIND,
   portoneOrderEventId,
@@ -103,6 +104,7 @@ export const portoneDeps: PortOneDeps = {
   },
 
   endSubscription: (input) => endPortOneSubscription(input),
+  balance: (workspaceId) => takeBalance(workspaceId),
 }
 
 // ── 빌링키(정기결제 카드) ────────────────────────────────────────────────────────
