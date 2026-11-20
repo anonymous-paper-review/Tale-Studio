@@ -45,7 +45,9 @@ process.env.SUPABASE_SERVICE_ROLE_KEY ??= 'test-service-role-key'
 // ('[tale · local] 즉시 재조회로 결제를 복구했다'). 알림 전송을 검증하는 파일은 vi.stubEnv 로 가짜 주소를 직접 켠다.
 // 2026-10-11: Creem 프롬프트 검사 키·스위치도 같은 이유로 지운다 — 셸에 키가 있으면 생성 라우트 테스트가
 // 실제 Creem 검사 API 를 부른다(유료 호출 + 외부 의존). 검사를 검증하는 파일은 vi.stubEnv 로 가짜 키를 직접 켠다.
+// 2026-11-19: PortOne(국내 카드) 키도 지운다 — 셸에 키가 있으면 결제창 판정 테스트가 사람마다 달라지고, 실제 PortOne API 를 부른다.
 for (const key of Object.keys(process.env)) {
+  if (key.startsWith('PORTONE_') || key.startsWith('NEXT_PUBLIC_PORTONE_')) delete process.env[key]
   if (key === 'TAKE_BILLING_MODE' || key === 'DISCORD_ALERT_WEBHOOK_URL' || key === 'CREEM_API_KEY' || key === 'CREEM_MODERATION_MODE' || key.startsWith('NEXT_PUBLIC_PADDLE_PRICE_')) delete process.env[key]
 }
 
