@@ -17,6 +17,7 @@
 //     못 붙였다. 여기서는 scenes.location 우선, locations.scene_id 폴백.
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { applyDirectorRefs, directorRefsExcludeWorld, parseDirectorRefs } from '@/lib/director/director-refs'
+import type { PropForRefs } from '@/lib/director/shot-prop-refs'
 
 export { applyDirectorRefs, directorRefsExcludeWorld, parseDirectorRefs, type DirectorRefs } from '@/lib/director/director-refs'
 
@@ -302,6 +303,23 @@ export async function loadSceneWorldRefs(projectId: string, sceneIds: string[]):
     (locs ?? []) as LocationRowForWorld[],
     (variants ?? []) as LocationAppearanceRowForWorld[],
   )
+}
+
+/**
+ * 실사 소품 참고(D7 2단계, 2026-11-22) — 그림이 있는 소품(props 행). 같은 id 의 인물 행이 있는 소품은 뺀다(예전 저장 고장 —
+ *   인물 시트로 이미 붙는다). 호출부는 실패하면 소품 없이 그린다(지금과 같다).
+ */
+export async function loadPropsForReferences(projectId: string): Promise<PropForRefs[]> {
+  const [props, people] = await Promise.all([
+    supabaseAdmin.from('props').select('prop_id, name, image_url').eq('project_id', projectId),
+    supabaseAdmin.from('characters').select('character_id').eq('project_id', projectId),
+  ])
+  if (props.error) throw props.error
+  if (people.error) throw people.error
+  const personIds = new Set(((people.data ?? []) as Array<{ character_id: string }>).map((row) => row.character_id))
+  return ((props.data ?? []) as Array<{ prop_id: string; name: string; image_url: string | null }>)
+    .filter((row) => typeof row.image_url === 'string' && row.image_url.trim() && !personIds.has(row.prop_id))
+    .map((row) => ({ propId: row.prop_id, name: row.name, imageUrl: row.image_url }))
 }
 
 /** URL 비교용 — 캐시버스트(?v=)를 떼고 같은 객체인지 본다. */
