@@ -2021,8 +2021,9 @@ export const KO: Record<string, string> = {
   "The previous shot's video has no generation record, so its last frame can't be carried over. Remake that video to use Continuation.": '앞 샷 영상에 만든 기록이 없어 마지막 장면을 이어 받을 수 없어요. 앞 샷 영상을 다시 만들면 쓸 수 있어요.',
   // 리드 G(2026-11-23) — ③ 까닭도 Cinema 의 다른 곳처럼 "이미지".
   'Remake the images after editing the rough to use Start + middle.': '러프를 고친 뒤 이미지를 다시 만들어야 시작+미들을 쓸 수 있어요.',
-  // fb-director QA B(2026-11-23) — 끝 그림을 쓰지 않은 Take 의 그림 이름. 이력 판의 'Image v{n}'(그림 v{n})과 다른 열쇠.
-  'Image v{version}': '이미지 v{version}',
+  // 리드 2026-11-23 D③ — 채팅이 앞부분만 본 샷 프롬프트의 고침은 [적용] 카드에 넣지 않는다.
+  "I only saw the start of {shot}'s prompt, so I left that change out. Mention the shot (@) and ask again.": '{shot} 프롬프트는 앞부분만 보고 고친 안이라 넣지 않았어요. 그 샷을 @멘션해서 다시 부탁해 주세요.',
+  "{shot}'s prompt is too long to change in chat. Change it in the shot details.": '{shot} 프롬프트는 너무 길어 채팅으로 고칠 수 없어요. 샷 상세에서 고쳐 주세요.',
   "The previous shot's video is still being made.": '앞 샷 영상을 아직 만드는 중이에요.',
   "Getting the last frame of the previous shot's video…": '앞 샷 영상의 마지막 장면을 잡는 중이에요…',
   'Linked to a card in another scene. Click to go there.': '다른 씬 카드와 이어져 있어요. 누르면 그 씬으로 가요',

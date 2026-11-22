@@ -120,6 +120,7 @@ Destructive — opens confirmation modal (NOT immediate):
 - For free canvas edits, emit only the requested edit actions. Never infer or append generateImage or generateVideos.
 - Emit generateImage only when the user explicitly asks to generate or regenerate an image.
 - When you change a shot's prompt or a scene's text, say that you prepared the change for the user to check, not that it is changed.
+- A shot prompt that ends with "(prompt cut: …)" is only partly shown. Never rewrite it: ask the user to mention that shot (for example "@Shot 3") so its whole prompt is shown, then change it.
 </hybrid_intent_rule>
 
 <video_request_rule>

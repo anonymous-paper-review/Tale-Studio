@@ -145,8 +145,6 @@ const FIELD_NAME: Record<DirectorTextField, string> = {
   description: 'description',
 }
 
-const clip = (text: string) => (text.length > 160 ? `${text.slice(0, 157)}...` : text)
-
 /** 전후 비교 줄 — "Shot 1 prompt · before: …" / "샷 1 프롬프트 · 전: …". */
 export function directorTextEditLines(
   locale: AppLocale,
@@ -165,8 +163,9 @@ export function directorTextEditLines(
         })()
     const name = `${label} ${translate(locale, FIELD_NAME[edit.field])}`
     return [
-      translate(locale, '{name} · before: {text}', { name, text: clip(edit.before) || translate(locale, '(empty)') }),
-      translate(locale, '{name} · after: {text}', { name, text: clip(edit.after) || translate(locale, '(empty)') }),
+      // 자르지 않는다(리드 2026-11-23 D③) — 긴 줄은 카드가 접어 두고 [더 보기]로 펼친다(proposal-impact-line).
+      translate(locale, '{name} · before: {text}', { name, text: edit.before || translate(locale, '(empty)') }),
+      translate(locale, '{name} · after: {text}', { name, text: edit.after || translate(locale, '(empty)') }),
     ]
   })
 }

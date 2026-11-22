@@ -11,7 +11,7 @@ import { useT } from '@/lib/i18n'
 import { countText } from '@/lib/i18n/count-text'
 import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
-import { VIDEO_MODELS, VIDEO_MODEL_ASPECT_TEXT, effectiveVideoResolution, videoModelFitsAspectRatio } from '@/lib/video-models'
+import { VIDEO_MODELS, VIDEO_MODEL_ASPECT_TEXT, clampDuration, effectiveVideoResolution, videoModelFitsAspectRatio } from '@/lib/video-models'
 import { videoAspectRatioFromFormat } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { imageChangedForTake, latestShotTake, newTakeRequest, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings } from '@/lib/director/shot-detail'
@@ -78,6 +78,8 @@ export function VideoMakePanel({ shotNodeId, data }: { shotNodeId: string; data:
   const { takes } = shotDetailTakes(nodes, shotNodeId)
   const setup = takeSettings(data, base?.data ?? null)
   const count = takeCostForVideo(setup.model, setup.resolution)
+  // 모델이 받는 길이로 맞춘 영상 길이 — 샷 길이와 다르면 샷 상세 영상 탭과 같은 한 줄로 알린다(fb-video QA 발견 2 · 리드 2026-11-23, 예: Seedance 최소 4초).
+  const videoSeconds = clampDuration(VIDEO_MODELS[setup.model], data.durationSeconds)
   const hasImage = !!shotDetailFrames(data.storyboardImage).start
   const button = newTakeButton({
     hasImage,
@@ -188,6 +190,9 @@ export function VideoMakePanel({ shotNodeId, data }: { shotNodeId: string; data:
       <p className="text-micro text-subtle-foreground">
         {VIDEO_MODELS[setup.model].label} · {effectiveVideoResolution(setup.model, setup.resolution)}
       </p>
+      {videoSeconds !== data.durationSeconds ? (
+        <p className="text-micro text-warning">{t('Length: shot {shot}s → video {video}s', { shot: data.durationSeconds, video: videoSeconds })}</p>
+      ) : null}
       <Button type="button" size="sm" variant="outline" className={PANEL_BUTTON} disabled={disabled} onClick={() => void make()}>
         {label}
       </Button>
