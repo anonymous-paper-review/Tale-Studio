@@ -1,4 +1,4 @@
-// 원작을 그대로 쓰는 작품의 Writer 채팅은 "다시 써줘" · [다시 써 달라고 하기]에 러닝타임 등 조건을 묻지 않고 산문을 고칠 수 없는 까닭과 넘어가는 길을 말한다 (D15 오너 2026-11-22)
+// 원작을 그대로 쓰는 작품의 Writer 채팅은 "다시 써줘" · [다시 써 달라고 하기] · [직접 고칠래요]에 러닝타임 등 조건을 묻거나 고치는 창을 열지 않고 산문을 고칠 수 없는 까닭과 넘어가는 길을 말한다 (D15 오너 2026-11-22)
 import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -62,5 +62,26 @@ describe('원작 그대로와 Writer 채팅의 다시 쓰기', () => {
     useProducerStore.setState({ preserveScript: null, storyText: '자판기 앞에서 벌어진 일' })
     useGlobalChatStore.getState().requestProseRewrite(ko('Ask for a rewrite'))
     expect(useWriterRoomStore.getState().rewriteOpen).toBe(true)
+  })
+
+  it('원작 그대로 쓰는 작품에서 [직접 고칠래요]를 누르면 직접 고치기를 열지 않고, 누른 말과 [다시 써 달라고 하기]와 같은 까닭을 채팅에 남긴다', () => {
+    // 왜: 그대로 쓰는 작품은 산문 도구가 꺼져 있어 [직접 고칠래요]를 눌러도 아무 일이 없었다(조각 1 검토에서 찾음, 리드 2026-11-22 — 옆 단추와 같은 규칙).
+    //   혼자 정한 것(되돌리기 쉬움): 단추를 끄고 까닭을 보이는 안 대신, 옆 [다시 써 달라고 하기]처럼 채팅에 까닭을 남긴다 — 두 단추가 같은 식으로 답한다.
+    useProducerStore.setState({ preserveScript: true, storyText: SCRIPT })
+    useGlobalChatStore.getState().requestProseManualEdit(ko('Edit it myself'))
+    expect(useWriterRoomStore.getState().manualRequest).toBe(0)
+    const messages = useGlobalChatStore.getState().messages
+    expect(messages.at(-2)).toMatchObject({ role: 'user', content: ko('Edit it myself') })
+    expect(messages.at(-1)).toMatchObject({ role: 'model', content: ko(KEPT) })
+    const card = readFileSync(path.join(process.cwd(), 'src/features/prose/writer-next-card.tsx'), 'utf8')
+    expect(card).toContain("requestProseManualEdit(t('Edit it myself'))")
+  })
+
+  it('원작을 그대로 쓰지 않는 작품의 [직접 고칠래요]는 지금처럼 직접 고치기를 연다', () => {
+    // 왜: 정상 경로 고정 — 산문 초안은 화면에서 직접 고칠 수 있다.
+    useProducerStore.setState({ preserveScript: null, storyText: '자판기 앞에서 벌어진 일' })
+    useGlobalChatStore.getState().requestProseManualEdit(ko('Edit it myself'))
+    expect(useWriterRoomStore.getState().manualRequest).toBe(1)
+    expect(useGlobalChatStore.getState().messages).toHaveLength(0)
   })
 })
