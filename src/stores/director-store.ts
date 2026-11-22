@@ -954,6 +954,10 @@ const latestVideoDeleteIntent = new Map<string, number>()
 let hydrationEpoch = 0
 // 진행 중인 재수화 수(Director 배선 1, 2026-09-06 실측): 재수화가 돌고 있으면 로컬 목록이 곧 바뀔 수 있으니 스윅은 기다린다.
 let hydrationsInFlight = 0
+/** 진행 중인 재수화가 모두 끝날 때까지 — 뒤에 시작한 재수화가 앞 재수화의 결과를 버리므로 판을 "다 읽음"으로 적기 전에 기다린다(fb-blur QA 2026-11-23 · board-load). */
+export async function directorHydrationsSettled(): Promise<void> {
+  while (hydrationsInFlight > 0) await new Promise((resolve) => setTimeout(resolve, 50))
+}
 type HydrationLocalSnapshot = {
   position: XYPosition
   label?: string
