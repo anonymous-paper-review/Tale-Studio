@@ -73,7 +73,7 @@ export function createProjectWorkflow(deps: {
       result = await deps.resume()
     } else if (action === 'handoff' && target === 'writer' && !state.writer.started && !state.allowedStages.includes('writer')) {
       // 옛 Producer 관문 항목을 대지 않는다(리드 2026-11-14 H · D) — 지금은 Producer 시작 화면 → Writer 산문 확정 → Artist 순서로 열린다.
-      if (!state.producer.canHandoff) return { status: 'blocked', message: 'The Storyboard screen cannot be started from chat. Follow the screens in order: start the story on the Producer start screen, confirm the prose on the Writer screen, then make the pictures on the Artist screen.', blockers: state.producer.blockers, state }
+      if (!state.producer.canHandoff) return { status: 'blocked', message: 'The Writer Storyboard cannot be started from chat. Follow the screens in order: start the story on the Producer start screen, confirm the prose in the Writer Scene story, then make the pictures on the Artist screen.', blockers: state.producer.blockers, state }
       result = await deps.handoff()
     } else {
       if (!state.allowedStages.includes(target!)) return { status: 'blocked', message: `${target} is not ready to open. Inspect the state and resolve the remaining requirements.`, state }

@@ -71,7 +71,7 @@ export function lockedProducerDirective(producerLocked: unknown): string | null 
     'The user confirmed the prose on the Writer screen, so the prose and the materials behind it (story, settings, cast cards, background cards, art style) are confirmed and locked. They cannot change in this project.',
     'Answer questions about them, summarize or explain them, but do not emit extractedSettings, choices or proposals that change them.',
     'If the user asks for a change, say plainly that the prose is confirmed and locked, that a new project is needed to write a different story,',
-    'and that character and background pictures can still be changed on the Artist screen, and scenes, shots and dialogue can still be edited on the Storyboard screen once it opens.',
+    'and that character and background pictures can still be changed on the Artist screen, and scenes, shots and dialogue can still be edited in the Writer Storyboard once it opens.',
     // 2026-10-27 디자이너 QA 1차 #04: 산문 밖에서(예전 Artist 채팅) 만들어진 인물 카드는 지우기 단추로 지울 수 있다 — "새 프로젝트가 필요해요"와 어긋나지 않게.
     'One exception: a character card that was made outside the prose (for example by the old Artist chat) and is not used by any scene or shot',
     'can be deleted with the trash button on that card in Artist. Say so if the user wants to remove such a card. You cannot delete it from this chat.',
