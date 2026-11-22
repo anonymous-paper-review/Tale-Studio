@@ -21,6 +21,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
 import { CameraBoard } from '@/features/camera/camera-board'
+import { CameraShotDetailDialog } from '@/features/camera/shot-detail-dialog'
 
 export default function CameraPage() {
   const t = useT()
@@ -29,6 +30,12 @@ export default function CameraPage() {
   useEffect(() => {
     if (handoffProjectId) useGlobalChatStore.getState().confirmDirectorHandoff(handoffProjectId, '/studio/camera')
   }, [handoffProjectId])
+
+  // ⤢ 상세는 이 화면의 창에서만 연다 — 다른 화면에서 열어 둔 상세가 들어오자마자 뜨지 않게, 떠날 때도 닫는다.
+  useEffect(() => {
+    useDirectorCanvasStore.getState().closeShotDetail()
+    return () => useDirectorCanvasStore.getState().closeShotDetail()
+  }, [])
 
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   // 프로젝트 init(resetChildStores)이 끝난 뒤에만 시작한다 — 그 전에 시작한 일은 reset 에 지워진다.
@@ -75,6 +82,7 @@ export default function CameraPage() {
           </div>
         </ScrollArea>
       </div>
+      <CameraShotDetailDialog />
     </div>
   )
 }
