@@ -49,7 +49,7 @@ describe('머리 줄(A5)', () => {
     expect(KO['Load · history {count}']).toBe('불러오기 · 기록 {count}')
     expect(KO['Regenerate everything']).toBe('재생성하기')
     expect(KO['Regenerating keeps the earlier version here']).toBe('재생성하면 이전 버전이 여기 남아요')
-    expect(KO['The style cannot be changed after Storyboard opens.']).toBe('Storyboard를 연 뒤에는 스타일을 바꿀 수 없어요.')
+    expect(KO['The style cannot be changed after Storyboard opens.']).toBe('콘티를 연 뒤에는 스타일을 바꿀 수 없어요.')
     expect(KO['Drawing the images. You can change the style once they are done.']).toBe('그림을 그리는 중이에요. 다 그린 뒤에 스타일을 바꿀 수 있어요.')
   })
 
@@ -166,14 +166,14 @@ describe('머리 줄 그려 보기', () => {
     expect(out).toContain('재생성하면 이전 버전이 여기 남아요')
   })
 
-  it('Storyboard를 연 뒤에는 머리 줄의 두 단추가 꺼지고 "Storyboard를 연 뒤에는 스타일을 바꿀 수 없어요."를 보인다', () => {
-    // 왜: 오너 결정(2) — 스타일을 바꾸는 일은 Storyboard 를 열기 전에만 한다.
+  it('콘티를 연 뒤에는 머리 줄의 두 단추가 꺼지고 "콘티를 연 뒤에는 스타일을 바꿀 수 없어요."를 보인다', () => {
+    // 왜: 오너 결정(2) — 스타일을 바꾸는 일은 콘티(옛 Storyboard, D1 2026-11-22 이름 바꿈)를 열기 전에만 한다.
     screenState({ versions: [versionView(1, 'real', false), versionView(2, 'watercolor', true)] })
     const out = html(createElement(StyleVersionBar, { completed: true, drawing: false }))
     expect(out).toContain('작품 스타일 · v2')
     expect(isDisabled(out, 'artist-version-history-open')).toBe(true)
     expect(isDisabled(out, 'artist-regen-open')).toBe(true)
-    expect(out).toContain('Storyboard를 연 뒤에는 스타일을 바꿀 수 없어요.')
+    expect(out).toContain('콘티를 연 뒤에는 스타일을 바꿀 수 없어요.')
   })
 
   it('재생성 그림이 멈추면 머리 줄에 까닭과 [남은 그림 다시 그리기] · [이전 버전으로 돌아가기]가 보이고, [불러오기]는 켜지고 [재생성하기]는 꺼진다', () => {

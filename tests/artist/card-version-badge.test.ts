@@ -72,12 +72,12 @@ describe('판 배지', () => {
 })
 
 describe('큰 Lumi', () => {
-  // 왜: 오너 결정 8 — 단계를 넘기기 전에 묻는 창("완료하고 Storyboard로 넘길까요?")은 큰 Lumi 자리다. 지금 단계(Artist) 옷 · 기본 모습.
+  // 왜: 오너 결정 8 — 단계를 넘기기 전에 묻는 창("완료하고 콘티로 넘길까요?", D1 2026-11-22 이름 바꿈)은 큰 Lumi 자리다. 지금 단계(Artist) 옷 · 기본 모습.
   it('완료 확인 창에는 Artist 옷을 입은 Lumi가 나온다', () => {
     Object.assign(useLocaleStore.getInitialState(), useLocaleStore.getState())
     const out = renderToStaticMarkup(createElement(ArtistCompleteDialog, { open: true, onOpenChange: () => {}, summary: { persons: 2, places: 1, style: null } }))
 
-    expect(out).toContain('완료하고 Storyboard로 넘길까요?')
+    expect(out).toContain('완료하고 콘티로 넘길까요?')
     expect(out).toContain('/lumi/full/artist-idle.webp')
   })
 })
