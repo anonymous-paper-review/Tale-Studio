@@ -18,6 +18,17 @@ import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 export type RoughFrameKey = 'start' | 'direction' | 'end'
 export const ROUGH_FRAME_ORDER: readonly RoughFrameKey[] = ['start', 'direction', 'end']
 
+// 세 장 칸 비율 — 그림이 오기 전에도 자리를 지킨다(2026-11-22 fb-end: 저장 직후 다시 읽는 동안 칸 높이가 0 이 되어 비어 보였다).
+//   저장 · 다시 그리기 뒤 이 줄은 새로 놓이므로(key 에 그림 시각) 마지막으로 잰 비율을 샷마다 기억한다. 잰 적 없으면 16:9.
+//   약속: tests/writer/rough-frames-still-box.test.ts
+const lastFrameAspect = new Map<string, number>()
+export function stillFrameAspect(shotKey: string): number {
+  return lastFrameAspect.get(shotKey) ?? 16 / 9
+}
+export function rememberStillFrameAspect(shotKey: string, width: number, height: number): void {
+  if (width > 0 && height > 0) lastFrameAspect.set(shotKey, width / height)
+}
+
 export function RoughFramesStill({
   projectId,
   shotId,
@@ -34,6 +45,8 @@ export function RoughFramesStill({
 }) {
   const t = useT()
   const [busy, setBusy] = useState<RoughFrameKey | null>(null)
+  const shotKey = `${projectId}:${shotId}`
+  const [aspect, setAspect] = useState(() => stillFrameAspect(shotKey))
   const frames = panel.frames
   if (!frames) return null
   const labels: Record<RoughFrameKey, string> = {
@@ -66,11 +79,15 @@ export function RoughFramesStill({
     <div className="grid grid-cols-3 gap-2" data-testid="rough-frames-still">
       {ROUGH_FRAME_ORDER.map((frame) => (
         <figure key={frame} className="flex min-w-0 flex-col gap-1.5">
-          <div className="relative overflow-hidden rounded-md border border-border bg-muted/30">
+          <div className="relative overflow-hidden rounded-md border border-border bg-muted/30" style={{ aspectRatio: aspect }}>
             <ThumbImage
               src={withCacheBust(frames[frame], panel.generatedAt)}
               alt={labels[frame]}
-              className="block h-auto w-full"
+              className="absolute inset-0 block size-full object-cover"
+              onLoad={(e) => {
+                rememberStillFrameAspect(shotKey, e.currentTarget.naturalWidth, e.currentTarget.naturalHeight)
+                setAspect(stillFrameAspect(shotKey))
+              }}
             />
             <span className="pointer-events-none absolute left-1 top-1 rounded-sm bg-background/70 px-1 text-[9px] uppercase text-muted-foreground">
               {labels[frame]}
