@@ -1,5 +1,7 @@
-// 가우시안 흐림 [일정하게] · [시작 → 끝] — 흐림이 클립 처음에서 끝까지 곧은 줄로 바뀌고, 모니터 · 내보낸 파일 · 저장본 · 자르기 · 가장자리 · 교차 디졸브에서 같은 값을 쓰는지 검사한다 (D14, 2026-11-22)
+// 가우시안 흐림 [일정하게] · [시작 → 끝] — 흐림이 클립 처음에서 끝까지 곧은 줄로 바뀌고, 모니터 · 내보낸 파일 · 저장본 · 자르기 · 가장자리 · 교차 디졸브에서 같은 값을 쓰며, 효과 컨트롤 · Lumi 기능 목록이 두 방식을 보이는지 검사한다 (D14, 2026-11-22)
 import { readFileSync } from 'node:fs'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => {
@@ -13,8 +15,12 @@ vi.mock('@/stores/project-store', () => ({
 }))
 
 import { saveEditorNow, selectFrameAt, selectTimelineLayout, useEditorStore } from '@/stores/editor-store'
+import { useLocaleStore } from '@/stores/locale-store'
 import { drawPlanFrame, type FrameSources } from '@/lib/editor-draft-render'
 import { blurAt, blurMode, hasVideoEffects, videoEffectFilter } from '@/lib/editor/video-effects'
+import { EDITOR_FEATURES, EDITOR_NOT_AVAILABLE, editorFeatureLines, editorMissingLines } from '@/lib/editor/editor-features'
+import { EffectControls } from '@/features/editor/effect-controls'
+import { translate } from '@/lib/i18n/translate'
 import type { PersistedEditor } from '@/lib/editor-persistence'
 import type { ClipEffects, Shot, VideoClip } from '@/types'
 
@@ -70,16 +76,39 @@ function exportFilters(t: number): string[] {
   drawPlanFrame(ctx as unknown as CanvasRenderingContext2D, 1280, 720, selectFrameAt(api(), t), sources())
   return filters
 }
+/** 정적 렌더는 스토어의 처음 값을 읽는다 — 지금 값을 처음 값으로 옮겨 그린다(tests/editor/panels.test.ts 와 같은 방법). */
+function html(el: ReturnType<typeof createElement>) {
+  for (const store of [useLocaleStore, useEditorStore] as Array<{ getState: () => object; getInitialState: () => object }>) Object.assign(store.getInitialState(), store.getState())
+  return renderToStaticMarkup(el)
+}
+/** 그린 글자만 — 태그 · 속성과 스크롤 판이 넣는 <style> 글은 뺀다. */
+const text = (markup: string) =>
+  markup.replace(/<style[^>]*>[\s\S]*?<\/style>/g, ' ').replace(/<[^>]+>/g, ' ').replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/\s+/g, ' ').trim()
+/** 골라져 있는(aria-pressed="true") 칩 글자. */
+const pressed = (markup: string) => [...markup.matchAll(/aria-pressed="true"[^>]*>([^<]*)</g)].map((m) => m[1].trim())
+/**
+ * 흐림 슬라이더 — 손잡이의 화면 읽기 이름 · 범위와 지금 값(이름이 "흐림"으로 시작하는 것만). 서버 그리기의 손잡이에는 지금 값 속성이 없어
+ *   채운 막대의 오른쪽 자리(right: 100 − 값 %, 0 ~ 100 슬라이더)로 읽는다.
+ */
+const blurSliders = (markup: string) =>
+  [...markup.matchAll(/data-slot="slider-range"[^>]*style="left:0%;right:([\d.]+)%"[\s\S]*?<span role="slider" aria-label="([^"]*)" aria-valuemin="([^"]*)" aria-valuemax="([^"]*)"/g)]
+    .map((m) => ({ name: m[2], min: m[3], max: m[4], now: String(100 - Number(m[1])) }))
+    .filter((s) => s.name.startsWith('흐림'))
+/** % 글자의 두 번 누르기 안내(돌아갈 값)와 지금 값 — 흐림 줄만(차례대로). */
+const resetHints = (markup: string) => [...markup.matchAll(/<button type="button" title="([^"]*)"[^>]*>(\d+%)<\/button>/g)].map((m) => [m[1], m[2]])
+const controls = () => html(createElement(EffectControls))
 
 beforeEach(() => {
   localStorage.clear()
   mocks.projectId = 'project-blur'
   vi.stubGlobal('fetch', vi.fn(async () => new Response('{}', { status: 200 })))
+  useLocaleStore.setState({ locale: 'ko' })
   seed()
 })
 afterEach(() => {
   vi.unstubAllGlobals()
   ;(globalThis as { window?: unknown }).window = globalThis
+  useLocaleStore.setState({ locale: 'en' })
   localStorage.clear()
 })
 
@@ -289,5 +318,101 @@ describe('혼자 정한 것', () => {
     // 예전 Editor 의 그리기 — 시각 없이 효과 묶음만 넘긴다.
     expect(videoEffectFilter(effects, 1000)).toBe('blur(12px)')
     expect(effects).toHaveProperty('blurEnd', 0)
+  })
+})
+
+describe('같이 정한 것 — 효과 컨트롤 · Lumi', () => {
+  it('가우시안 흐림을 넣은 클립을 고르면 효과 컨트롤에 [일정하게] · [시작 → 끝] 고르기가 있고 처음은 [일정하게]다', () => {
+    // 왜: D14 "가우시안 블러는 '시작%, 끝%'와 '일정하게'로". 흐림을 넣지 않은 클립에는 고르기가 없다.
+    api().selectClip('B')
+    expect(text(controls())).not.toMatch(/일정하게|시작 → 끝/)
+    api().addVideoEffect('B', 'blur')
+    const markup = controls()
+    expect(text(markup)).toContain('가우시안 흐림 빼기 일정하게 시작 → 끝 흐림 30%')
+    expect(pressed(markup)).toContain('일정하게')
+    expect(pressed(markup)).not.toContain('시작 → 끝')
+    setEffects('B', { blur: 0.3, blurEnd: 0 })
+    const ramp = controls()
+    expect(text(ramp)).toContain('가우시안 흐림 빼기 일정하게 시작 → 끝 시작 30% 끝 0%')
+    expect(pressed(ramp)).toContain('시작 → 끝')
+    expect(pressed(ramp)).not.toContain('일정하게')
+  })
+
+  it('Editor 채팅(Lumi)에는 흐림을 바꾸는 길이 없고, 조언 기능 목록은 흐림 [일정하게] · [시작 → 끝]을 말하며 키프레임이 없다는 줄도 흐림 [시작 → 끝]만은 클립 처음에서 끝까지 바뀐다고 말한다', () => {
+    // 왜: 11/14 답 10(조언만 — 작업물에는 터치 못 하게) · D14. 예전 목록은 "효과는 클립 전체에 값 하나"라고만 해, 물으면 Lumi 가 흐림을
+    //   시간에 따라 바꿀 수 없다고 답했다.
+    const route = read('src/app/api/editor/chat/route.ts')
+    expect(route).not.toMatch(/setVideoEffect|editor-store|tools\s*:/)
+    for (const locale of ['en', 'ko'] as const) {
+      const q = (key: string) => `"${translate(locale, key)}"`
+      const features = editorFeatureLines(locale).join('\n')
+      expect(features).toContain(q('Constant'))
+      expect(features).toContain(q('Start → End'))
+      expect(editorMissingLines(locale).join('\n')).toContain(q('Start → End'))
+    }
+    expect(EDITOR_FEATURES.join('\n')).not.toContain('"Blur" 0 to 100%')
+    expect(EDITOR_NOT_AVAILABLE.join('\n')).not.toMatch(/effects keep one value for the whole clip\)/)
+  })
+})
+
+describe('혼자 정한 것 — 효과 컨트롤', () => {
+  it('[일정하게]면 "흐림" 슬라이더 한 줄, [시작 → 끝]이면 "시작" · "끝" 두 줄이고 모두 0 ~ 100%다', () => {
+    // 왜: 지금 흐림 슬라이더와 같은 부품 · 범위다(숫자 칸을 따로 두지 않는다). 손잡이 이름은 화면 읽기에 무슨 값인지 들리게 "흐림 시작" · "흐림 끝".
+    api().addVideoEffect('B', 'blur')
+    api().selectClip('B')
+    expect(blurSliders(controls())).toEqual([{ name: '흐림', min: '0', max: '100', now: '30' }])
+    setEffects('B', { blur: 0.3, blurEnd: 0 })
+    expect(blurSliders(controls())).toEqual([
+      { name: '흐림 시작', min: '0', max: '100', now: '30' },
+      { name: '흐림 끝', min: '0', max: '100', now: '0' },
+    ])
+  })
+
+  it('% 를 두 번 누르면 [일정하게] · 시작은 30%, 끝은 0%로 돌아간다', () => {
+    // 왜: 넣자마자의 값(30%)과 [시작 → 끝]으로 바꿀 때의 끝 값(0%)이다 — % 글자에 돌아갈 값이 뜬다.
+    api().addVideoEffect('B', 'blur')
+    api().setVideoEffect(['B'], { blur: 0.5 })
+    api().selectClip('B')
+    expect(resetHints(controls())).toContainEqual(['두 번 누르면 30%(으)로 돌아가요', '50%'])
+    setEffects('B', { blur: 0.5, blurEnd: 0.8 })
+    const hints = resetHints(controls())
+    expect(hints).toContainEqual(['두 번 누르면 30%(으)로 돌아가요', '50%'])
+    expect(hints).toContainEqual(['두 번 누르면 0%(으)로 돌아가요', '80%'])
+    const src = read('src/features/editor/effect-controls.tsx')
+    expect(src).toMatch(/resetTo\(effects\.blurEnd !== BLUR_END_DEFAULT, \(\) => setVideoEffect\(targets, \{ blurEnd: BLUR_END_DEFAULT \}\)\)/)
+  })
+
+  it('방식 바꾸기 · 슬라이더 한 번 끌기 · % 두 번 누르기는 되돌리기 한 칸씩이다', () => {
+    // 왜: 효과 컨트롤의 지금 규칙(흑백 켬 · 끔 · 슬라이더와 같다) — 한 번 한 일은 한 번에 되돌린다.
+    api().addVideoEffect('B', 'blur')
+    const steps = api().past.length
+    // 칩 — 방식이 바뀔 때만 한 칸을 쌓고 바꾼다(resetTo).
+    api().pushHistory()
+    api().setVideoEffect(['B'], { blurMode: 'ramp' })
+    // 끝 슬라이더 한 번 끌기 — 처음 바뀔 때 한 칸, 끄는 동안 여러 값.
+    api().pushHistory()
+    for (const v of [0.1, 0.2, 0.4]) api().setVideoEffect(['B'], { blurEnd: v })
+    expect(api().past).toHaveLength(steps + 2)
+    api().undo()
+    expect(clipOf('B')?.effects).toEqual({ blur: 0.3, blurEnd: 0 })
+    api().undo()
+    expect(clipOf('B')?.effects).toEqual({ blur: 0.3 })
+    const src = read('src/features/editor/effect-controls.tsx')
+    expect(src).toMatch(/resetTo\(ramp, \(\) => setVideoEffect\(targets, \{ blurMode: 'constant' \}\)\)/)
+    expect(src).toMatch(/resetTo\(!ramp, \(\) => setVideoEffect\(targets, \{ blurMode: 'ramp' \}\)\)/)
+  })
+
+  it('영어 화면의 흐림 방식 이름은 "Constant" · "Start → End"이고 한국어는 "일정하게" · "시작 → 끝"이다', () => {
+    // 왜: 한국어는 오너 말("일정하게" · "시작%, 끝%") 그대로, 영어는 짧고 프리미어 말에 가까운 이름이다. 영어 화면에 한국어가 나오지 않는다.
+    expect(translate('ko', 'Constant')).toBe('일정하게')
+    expect(translate('ko', 'Start → End')).toBe('시작 → 끝')
+    useLocaleStore.setState({ locale: 'en' })
+    api().addVideoEffect('B', 'blur')
+    api().selectClip('B')
+    expect(text(controls())).toContain('Gaussian blur Remove effect Constant Start → End Blur 30%')
+    setEffects('B', { blur: 0.3, blurEnd: 0 })
+    const ramp = text(controls())
+    expect(ramp).toContain('Gaussian blur Remove effect Constant Start → End Start 30% End 0%')
+    expect(ramp).not.toMatch(/[가-힣]/)
   })
 })
