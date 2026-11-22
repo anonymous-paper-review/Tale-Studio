@@ -1102,9 +1102,10 @@ export function RoughStoryboardView() {
               progress={busy.progress}
               progressLabel={busy.progressLabel}
               footer={busyFooter}
-              // 큰 Lumi(Storyboard 옷, 오너 결정 8) — Artist → Storyboard 로 넘어가며 기다리는 동안 로딩, 실패 안내면 오류 모습(공용 덮개가 정한다).
+              // 큰 Lumi(오너 결정 8) — Artist → 콘티로 넘어가며 기다리는 동안 로딩, 실패 안내면 오류 모습(공용 덮개가 정한다).
+              //   옷은 Writer(콘티는 Writer 탭 안의 칸, 리드 결정 2 2026-11-22 — 옛 Storyboard 옷은 Camera 가 물려받는다).
               //   보드에서 다시 그리는 잠금에는 두지 않는다(lib/writer/board-busy lumi).
-              lumi={busy.lumi ? 'storyboard' : undefined}
+              lumi={busy.lumi ? 'writer' : undefined}
             />,
             document.body,
           )
@@ -1519,7 +1520,7 @@ export function RoughStoryboardView() {
                           // 카드 전체를 덮는다(SYS "그 노드 크기에 맞춘다", 기다림 카드가 스스로 카드를 꽉 채운다) — 덮인 카드도 누르면 지금처럼 고치기 팝업이 열린다.
                           //   좁은 카드(축척 5 · 6열)는 여백 · 사이를 줄이고 설명(샷 이름 · 길이)을 뺀다. 화면 읽기에는 첫 장만 알린다(announce).
                           <NodeWaitCard
-                            lumi="storyboard"
+                            lumi="writer"
                             title={t('Drawing the rough')}
                             description={waitLook === 'card-compact' ? undefined : `${shotLabel} · ${t('{seconds}s', { seconds: shot.durationSeconds })}`}
                             announce={shot.shotId === announcedWaitShotId}

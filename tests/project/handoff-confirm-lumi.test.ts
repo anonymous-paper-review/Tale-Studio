@@ -28,7 +28,8 @@ describe('단계 넘기기 확인 창의 Lumi', () => {
     //   (서버 그리기 · 파일을 다 불러오기 전에는 같은 모습의 그림이라 그림 주소로 옷 · 모습을 본다.)
     expect(renderToStaticMarkup(createElement(ConfirmLumi, { stage: 'artist' }))).toContain('/lumi/full/artist-idle.webp')
     expect(renderToStaticMarkup(createElement(ConfirmLumi, { stage: 'producer' }))).toContain('/lumi/full/writer-idle.webp')
-    expect(renderToStaticMarkup(createElement(ConfirmLumi, { stage: 'writer' }))).toContain('/lumi/full/storyboard-idle.webp')
+    // 콘티(id writer)는 Writer 탭 안의 칸이라 Writer 옷(D1 2026-11-22 · 리드 결정 2).
+    expect(renderToStaticMarkup(createElement(ConfirmLumi, { stage: 'writer' }))).toContain('/lumi/full/writer-idle.webp')
   })
 
   it('Director 에서 다시 만들기 · 영상 만들기를 묻는 확인 창에도 지금 단계(Director) 옷의 같은 Lumi 가 나온다', () => {

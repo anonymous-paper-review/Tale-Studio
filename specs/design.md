@@ -230,7 +230,7 @@ v3 시안에는 테두리가 거의 없다(면 색 차이로 나눈다). 테두�
 | 토큰 | 화면 | 뜻 |
 |---|---|---|
 | `--stage-producer` | Producer (id entry) | 오렌지 골드 · 기획 |
-| `--stage-writer` | Writer (id producer) | 로즈 레드 · 글 |
+| `--stage-writer` | Writer (id producer) · 그 안의 콘티 칸(id writer, D1 2026-11-22 · 리드 결정 2) | 로즈 레드 · 글 · 콘티 |
 | `--stage-artist` | Artist | 일렉트릭 바이올렛 · 그림 |
 | `--stage-storyboard` | Storyboard (id writer) | 딥 블루 · 콘티 |
 | `--stage-director` | Director | 애저 · 연출 |

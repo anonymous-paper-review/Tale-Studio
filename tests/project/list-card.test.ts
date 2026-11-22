@@ -19,7 +19,7 @@ describe('프로젝트 목록 머리와 카드', () => {
     expect(projectStageDot('entry')).toBe('bg-stage-producer')
     expect(projectStageDot('producer')).toBe('bg-stage-writer')
     expect(projectStageDot('artist')).toBe('bg-stage-artist')
-    expect(projectStageDot('writer')).toBe('bg-stage-storyboard')
+    expect(projectStageDot('writer')).toBe('bg-stage-writer') // 콘티 = Writer 탭 안의 칸(D1 2026-11-22 · 리드 결정 2)
     expect(projectStageDot('director')).toBe('bg-stage-director')
     expect(projectStageDot('editor')).toBe('bg-stage-editor')
     // 단계 값이 없거나 모르는 값이면 이름표처럼 Producer 로 본다.
