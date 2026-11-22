@@ -92,6 +92,9 @@ export function resolveExportStage(currentStage: StageId | string | null | undef
     case 'artist':
     case 'director':
       return currentStage
+    // Camera 는 Director 와 같은 샷의 실사 그림 · 영상을 본다(오너 2026-11-22 D2~D5) — 같은 묶음을 내보낸다.
+    case 'camera':
+      return 'director'
     default:
       return null
   }

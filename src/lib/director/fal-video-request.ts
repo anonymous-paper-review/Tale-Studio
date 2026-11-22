@@ -1,7 +1,7 @@
 // fal 영상 요청 만들기·보내기 — 첫 제출(video-submit)과 실패 후 다른 모델로 넘기기(video-fallback)가 함께 쓴다.
 import { FalUnknownKeyError, falKeyById } from '@/lib/fal/keys'
 import { assertModerationReceipt, type ModerationReceipt } from '@/lib/moderation/creem'
-import { VIDEO_MODELS, clampDuration, effectiveVideoResolution, type VideoModelKey } from '@/lib/video-models'
+import { VIDEO_MODELS, clampDuration, effectiveVideoResolution, planModelImages, type VideoModelKey } from '@/lib/video-models'
 
 export type FalVideoSubmitRequest = {
   model: string
@@ -11,7 +11,9 @@ export type FalVideoSubmitRequest = {
 /* ── FAL.ai reference-to-video (레지스트리 기반, #5) ──
    V2 refs(#real-strip 2026-07-22): imageUrls 가 [START, END] 2장이면 시작·끝 구도 고정 —
    전 모델 refParam 이 image_urls 배열이라 스키마 변경 없이 원소만 늘어난다.
-   resolution(오너 2026-10-31): 영상 노드가 고른 해상도. 없거나 모델이 못 내는 값이면 모델 기본 해상도. */
+   resolution(오너 2026-10-31): 영상 노드가 고른 해상도. 없거나 모델이 못 내는 값이면 모델 기본 해상도.
+   roles(2026-11-22): 첫 · 마지막 장면 칸이 있는 모델(Kling O3)은 역할이 있으면 시작 · 끝을 그 칸으로, 나머지만 image_urls 로.
+     역할을 모르면(옛 요청) 지금처럼 모든 그림을 image_urls 로 보낸다. */
 export function buildFalReferenceToVideoRequest(
   modelKey: VideoModelKey,
   prompt: string,
@@ -19,12 +21,18 @@ export function buildFalReferenceToVideoRequest(
   durationSeconds: number,
   aspectRatio: string,
   resolution?: string | null,
+  roles?: readonly string[],
 ): FalVideoSubmitRequest {
   const spec = VIDEO_MODELS[modelKey]
   if (!spec.endpoint) throw new Error('FAL reference-to-video endpoint missing')
-  const input: Record<string, unknown> = {
-    prompt,
-    [spec.refParam]: imageUrls,
+  const input: Record<string, unknown> = { prompt }
+  const slotted = spec.frameSlots ? planModelImages(modelKey, imageUrls, roles) : null
+  if (slotted && spec.frameSlots) {
+    if (slotted.firstFrame) input[spec.frameSlots.start] = slotted.firstFrame
+    if (slotted.lastFrame) input[spec.frameSlots.end] = slotted.lastFrame
+    if (slotted.imageUrls.length) input[spec.refParam] = slotted.imageUrls
+  } else {
+    input[spec.refParam] = imageUrls
   }
   // happy-horse는 negative_prompt 미지원(모델 스키마) — 헛송신 제거(#tfix-fal-wiring 2026-08-11).
   //   고정 negative_prompt 계약 자체는 타 모델에서 유지(존폐는 별도 논의 — 카탈로그 B12).
@@ -50,8 +58,9 @@ export function buildFalReferenceToVideoRequest(
     input.resolution = effectiveVideoResolution(modelKey, resolution)
   }
 
-  // aspect_ratio: kling-o3는 미노출(확실치 않아 omit), 그 외 전달
-  if (modelKey !== 'kling-o3') {
+  // aspect_ratio: 받는 목록이 있는 모델(Kling O3 — 16:9 · 9:16 · 1:1)은 그 안의 값만, 나머지는 늘 전달.
+  //   2026-11-22 전에는 Kling 에 아예 보내지 않아 Kling 기본값(16:9)으로 나왔다 — 세로 · 정사각 프로젝트도 가로였다.
+  if (!spec.aspectRatios || spec.aspectRatios.includes(aspectRatio)) {
     input.aspect_ratio = aspectRatio
   }
 

@@ -12,14 +12,15 @@ import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import type { StageId } from '@/types'
 
-/** 다음 단계(옷 이름) — Editor 다음은 작품 완성. */
-export type StageConfirmNext = 'writer' | 'artist' | 'storyboard' | 'director' | 'editor' | 'complete'
+/** 다음 단계(옷 이름) — Editor 다음은 작품 완성. Camera(오너 2026-11-22 D2~D5)는 옛 Storyboard 아이콘을 쓰지만 하는 일은 촬영이다. */
+export type StageConfirmNext = 'writer' | 'artist' | 'storyboard' | 'camera' | 'director' | 'editor' | 'complete'
 
 const NEXT: Record<StageId, StageConfirmNext> = {
   entry: 'writer',
   producer: 'artist',
   artist: 'storyboard',
-  writer: 'director',
+  writer: 'camera',
+  camera: 'director',
   director: 'editor',
   editor: 'complete',
 }
@@ -28,6 +29,7 @@ const NEXT_LABEL: Record<StageConfirmNext, string> = {
   writer: 'Yes, write the prose',
   artist: 'Yes, draw the images',
   storyboard: 'Yes, plan the storyboard',
+  camera: 'Yes, start shooting',
   director: 'Yes, start directing',
   editor: 'Yes, start editing',
   complete: 'Yes, finish it',
@@ -37,6 +39,7 @@ const NEXT_ICON: Record<StageConfirmNext, ComponentType<SVGProps<SVGSVGElement>>
   writer: WriterIcon,
   artist: ArtistIcon,
   storyboard: StoryboardIcon,
+  camera: StoryboardIcon,
   director: DirectorIcon,
   editor: EditorIcon,
   complete: ExportIcon,

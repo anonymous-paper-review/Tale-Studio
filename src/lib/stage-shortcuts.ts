@@ -1,6 +1,7 @@
 // 스테이지 전환 액세스 키 (#keyboard-only 2026-08-11, Alt+숫자 이관 2026-08-12).
 //
-// Alt(Option) + 1~6 이 STAGES 순서와 1:1 — Producer/Writer/Artist/Storyboard/Director/Editor (리뉴얼 1차 2026-10-19).
+// Alt(Option) + 1~6 이 레일 칸 순서와 1:1 — Producer/Writer/Artist/Camera/Director/Editor (리뉴얼 1차 2026-10-19 → 2026-11-22 오너 D2~D5).
+//   콘티(id writer)는 Writer 칸 안이라 자기 키가 없다(빈 글자 = 단축키 없음).
 //   (구 Alt+QWERT 에서 이관 — 오너 요청 2026-08-12. 숫자가 레일의 P1~P5 배지와도 맞는다.)
 //
 // 오버라이드 조사 (2026-08-12):
@@ -20,7 +21,8 @@ export const STAGE_ACCESS_KEY: Record<StageId, string> = {
   entry: '1',
   producer: '2',
   artist: '3',
-  writer: '4',
+  writer: '',
+  camera: '4',
   director: '5',
   editor: '6',
 }
@@ -39,6 +41,7 @@ export function accessModifierLabel(platform?: string): string {
 const STAGE_BY_CODE = new Map<string, StageId>(
   STAGES.flatMap((s) => {
     const key = STAGE_ACCESS_KEY[s.id as StageId]
+    if (!key) return []
     return [
       [`Digit${key}`, s.id as StageId] as const,
       [`Numpad${key}`, s.id as StageId] as const,

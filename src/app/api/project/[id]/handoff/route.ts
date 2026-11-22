@@ -17,7 +17,8 @@ export async function POST(req: Request, { params }: { params: Promise<{ id: str
     if (!body || typeof body !== 'object') return NextResponse.json({ error: { code: 'bad_request', message: 'Invalid request' } }, { status: 400 })
     const input = body as Record<string, unknown>
     const requestedLocale = parseAppLocale(input.locale)
-    if (!/^[A-Za-z0-9_-]+$/.test(id) || input.targetStage !== 'director' || (input.action !== 'check' && input.action !== 'move') || !requestedLocale) {
+    // Storyboard 다음 단계 = Camera(2026-11-22 오너 D2~D5 — 예전엔 Director). 옛 'director' 요청은 받지 않는다.
+    if (!/^[A-Za-z0-9_-]+$/.test(id) || input.targetStage !== 'camera' || (input.action !== 'check' && input.action !== 'move') || !requestedLocale) {
       return NextResponse.json({ error: { code: 'bad_request', message: 'Invalid handoff request' } }, { status: 400 })
     }
     locale = requestedLocale

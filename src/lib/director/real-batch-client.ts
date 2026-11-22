@@ -443,7 +443,7 @@ async function runRealBatchOnce(projectId: string, opts?: RealBatchOptions): Pro
     //   그새 다른 프로젝트로 갔으면 남기지 않는다(그 프로젝트 채팅에 엉뚱한 줄이 남는다).
     if (imagesDone + imagesFailed > 0 && store.getState().projectId === projectId) {
       const line = translate(useLocaleStore.getState().locale, '{done} images done, {failed} failed', { done: imagesDone, failed: imagesFailed })
-      notifyBatchSummary('director', `${imagesDone > 0 ? '✓' : '⚠'} ${line}`)
+      notifyBatchSummary('camera', `${imagesDone > 0 ? '✓' : '⚠'} ${line}`)
       useLumiNoticeStore.getState().batchEnded({ projectId, kind: 'image', done: imagesDone, failed: imagesFailed })
     }
   } catch (e) {

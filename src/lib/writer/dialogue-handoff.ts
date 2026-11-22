@@ -1,23 +1,28 @@
 import type { DialogueLine, Shot, StageId } from '@/types'
+import { STAGE_LABEL } from '@/lib/constants'
 import { matchStoryboardToDirector, resolveDirectorHandoffIntent } from '@/lib/handoff-intent'
 import type { WriterChatUpdate } from '@/stores/writer-store'
+
+// Storyboard 의 앞으로 넘김을 가리키는 단계 이름 — Camera(탭 이름은 단계 표에서)와 예전 목적지 Director.
+const FORWARD_WORDS = new RegExp(`(?:${STAGE_LABEL.camera.toLowerCase()}|카메라|director|디렉터|디렉타|감독)`, 'i') // i18n-ok: 사용자 목적 단계 이름을 인식한다.
 
 /** 대화에 명시된 목적지를 보존한다. 모델이 제안한 목적지는 사용자의 이동 지시가 아니다. */
 export function dialogueHandoffTarget(
   text: string,
   history: Array<{ role: 'user' | 'model'; content: string }>,
-): Extract<StageId, 'artist' | 'director'> | null {
+): Extract<StageId, 'artist' | 'camera'> | null {
   if (!/(?:전체|모두|모든|all|every)/i.test(text) || !/(?:한국어|korean)/i.test(text)) return null // i18n-ok: 사용자 요청의 전체 범위와 언어를 인식한다.
   if (!/(?:맞추|통일|바꾸|번역|translate|convert|make)/i.test(text)) return null // i18n-ok: 사용자 수정 의도를 인식한다.
-  // 리뉴얼 1차(2026-10-19): Storyboard(id writer) 다음은 Director 다 — 예전 순서(Writer → Artist)의 Artist 목적지는 없다.
-  //   Director 요청 판정은 Storyboard 의 전용 길(resolveDirectorHandoffIntent)과 같은 규칙을 쓴다.
+  // 리뉴얼 1차(2026-10-19): Storyboard(id writer)의 다음 — 예전 순서(Writer → Artist)의 Artist 목적지는 없다.
+  //   2026-11-22(오너 D2~D5): 다음은 Camera 다. "Director로"라고 해도 앞으로 넘김이라 Camera 로 간다.
+  //   요청 판정은 Storyboard 의 전용 길(resolveDirectorHandoffIntent)과 같은 규칙을 쓴다.
   const explicitTarget = (value: string) => {
-    if (/(?:director|디렉터|디렉타|감독)/i.test(value) && (matchStoryboardToDirector(value) || resolveDirectorHandoffIntent(value, 'writer', []))) return 'director' as const // i18n-ok: 사용자 목적 단계 이름을 인식한다.
+    if (FORWARD_WORDS.test(value) && (matchStoryboardToDirector(value) || resolveDirectorHandoffIntent(value, 'writer', []))) return 'camera' as const
     return null
   }
-  const target = explicitTarget(text) ?? [...history].reverse().filter(message => message.role === 'user').map(message => explicitTarget(message.content)).find(Boolean) ?? 'director'
-  // 같은 부정·질문·인용 제외 규칙을 재사용한다. 목적지 생략만 앞선 요청에서 채운다.
-  const request = `${text} ${target}`
+  const target = explicitTarget(text) ?? [...history].reverse().filter(message => message.role === 'user').map(message => explicitTarget(message.content)).find(Boolean) ?? 'camera'
+  // 같은 부정·질문·인용 제외 규칙을 재사용한다. 목적지 생략만 앞선 요청에서 채운다("to Camera" — Camera 는 목적지 꼴로만 알아듣는다).
+  const request = `${text} to ${STAGE_LABEL[target]}`
   return matchStoryboardToDirector(request) ? target : null
 }
 

@@ -71,7 +71,7 @@ export function WriterNextCard({ step, onChatFocus }: { step: 'ask' | 'more'; on
   }
   return (
     <div className="mt-2 flex flex-col items-start gap-1.5 px-1" data-testid="writer-next-more">
-      <Button size="sm" variant="outline" onClick={() => { dismissCurrent(); useWriterRoomStore.getState().openRewrite() }}>
+      <Button size="sm" variant="outline" onClick={() => { dismissCurrent(); useGlobalChatStore.getState().requestProseRewrite(t('Ask for a rewrite')) }}>
         <Sparkles className="size-4" />{t('Ask for a rewrite')}
       </Button>
       <Button size="sm" variant="outline" onClick={() => { dismissCurrent(); useWriterRoomStore.getState().requestManual() }}>

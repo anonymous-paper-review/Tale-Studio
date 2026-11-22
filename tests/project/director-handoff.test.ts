@@ -1,4 +1,4 @@
-// Director로 넘기기 전 저장된 씬·샷·필수 인물 이미지를 확인하고, 이동 저장이 실패하면 완료라고 알리지 않는다.
+// Camera로 넘기기 전 저장된 씬·샷·필수 인물 이미지를 확인하고, 이동 저장이 실패하면 완료라고 알리지 않는다. (2026-11-22 오너 D2~D5 — 넘김 목적지가 Director 앞 새 탭 Camera 로)
 import { beforeEach, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ from: vi.fn(), user: vi.fn() }))
@@ -79,7 +79,7 @@ async function request(action: string = 'check', extra: Row = {}) {
   const { POST } = await import('@/app/api/project/[id]/handoff/route')
   const response = await POST(new Request('http://local/api/project/project/handoff', {
     method: 'POST', headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ targetStage: 'director', action, locale: 'ko', ...extra }),
+    body: JSON.stringify({ targetStage: 'camera', action, locale: 'ko', ...extra }),
   }), { params: Promise.resolve({ id: 'project' }) })
   return { status: response.status, body: await response.json() }
 }
@@ -102,7 +102,7 @@ it('필수 인물 이미지가 없으면 누가 준비되지 않았는지와 Art
   expect(writes).toEqual([])
 })
 
-it('예전 외형 설명이 비어 있어도 기본 모습에 설명이 있는 인물은 이미지가 없으면 Director로 넘기지 않는다.', async () => {
+it('예전 외형 설명이 비어 있어도 기본 모습에 설명이 있는 인물은 이미지가 없으면 Camera로 넘기지 않는다.', async () => {
   rows.characters[1].appearance = null
   rows.character_appearances[1] = {
     character_id: 'friend', is_default: true, appearance: '교복을 입은 학생', sheet_url: null,
@@ -161,7 +161,7 @@ it('예전 대표 이미지가 저장된 프로젝트도 기존 Artist와 같은
   expect(result.body.ready).toBe(true)
 })
 
-it('Director 이동 준비 확인은 저장된 대사의 언어를 바꾸거나 한국어를 강제하지 않는다.', async () => {
+it('Camera 이동 준비 확인은 저장된 대사의 언어를 바꾸거나 한국어를 강제하지 않는다.', async () => {
   rows.shots[0].dialogue_lines = [{ characterId: 'hero', text: 'こんにちは' }]
   const result = await request('check', { locale: 'en' })
   expect(result.status).toBe(200)
@@ -169,18 +169,18 @@ it('Director 이동 준비 확인은 저장된 대사의 언어를 바꾸거나 
   expect(writes).toEqual([])
 })
 
-it('준비된 프로젝트는 Director 단계 저장을 확인한 뒤 실제 이동 경로를 반환한다.', async () => {
+it('준비된 프로젝트는 Camera 단계 저장을 확인한 뒤 실제 이동 경로를 반환한다.', async () => {
   const result = await request('move')
   expect(result.status).toBe(200)
-  expect(result.body).toMatchObject({ ready: true, path: '/studio/director' })
-  expect(writes).toEqual([{ table: 'projects', patch: { current_stage: 'director' }, filters: { id: 'project', current_stage: 'writer' } }])
+  expect(result.body).toMatchObject({ ready: true, path: '/studio/camera' })
+  expect(writes).toEqual([{ table: 'projects', patch: { current_stage: 'camera' }, filters: { id: 'project', current_stage: 'writer' } }])
 })
 
-it('이미 Editor까지 간 프로젝트는 Director로 이동해도 저장된 도달 단계를 뒤로 낮추지 않는다.', async () => {
+it('이미 Editor까지 간 프로젝트는 Camera로 이동해도 저장된 도달 단계를 뒤로 낮추지 않는다.', async () => {
   stage = 'editor'
   const result = await request('move')
   expect(result.status).toBe(200)
-  expect(result.body.path).toBe('/studio/director')
+  expect(result.body.path).toBe('/studio/camera')
   expect(stage).toBe('editor')
   expect(writes).toEqual([])
 })
@@ -202,11 +202,11 @@ it('저장된 행이 없고 단계도 그대로면 이동에 성공했다고 알
   expect(result.body.path).toBeUndefined()
 })
 
-it('동시에 Editor로 이동했다면 재조회로 이를 확인하고 Director로 낮춰 저장하지 않는다.', async () => {
+it('동시에 Editor로 이동했다면 재조회로 이를 확인하고 Camera로 낮춰 저장하지 않는다.', async () => {
   concurrentStage = 'editor'
   const result = await request('move')
   expect(result.status).toBe(200)
-  expect(result.body.path).toBe('/studio/director')
+  expect(result.body.path).toBe('/studio/camera')
   expect(stage).toBe('editor')
   expect(reads.filter(table => table === 'projects')).toHaveLength(2)
 })
@@ -237,7 +237,7 @@ it('프로젝트 소유권 조회가 실패하면 권한 없음으로 단정하�
   expect(writes).toEqual([])
 })
 
-it('로그인하지 않은 공유 방문자는 Director 이동을 확인하거나 저장하지 않는다.', async () => {
+it('로그인하지 않은 공유 방문자는 Camera 이동을 확인하거나 저장하지 않는다.', async () => {
   mocks.user.mockResolvedValue(null)
   const result = await request('move')
   expect(result.status).toBe(401)

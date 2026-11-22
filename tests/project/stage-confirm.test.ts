@@ -12,7 +12,8 @@ import { StageConfirm, stageConfirmNext } from '@/components/controls/stage-conf
 import { ArtistIcon, DirectorIcon, EditorIcon, ExportIcon, StoryboardIcon, WriterIcon } from '@/components/icons/v3-icons'
 import type { StageId } from '@/types'
 
-const STAGES: StageId[] = ['entry', 'producer', 'artist', 'writer', 'director', 'editor']
+// Camera(오너 2026-11-22 D2~D5)는 Storyboard 다음 · Director 앞이다.
+const STAGES: StageId[] = ['entry', 'producer', 'artist', 'writer', 'camera', 'director', 'editor']
 const html = (stage: StageId) => renderToStaticMarkup(createElement(StageConfirm, { stage, onConfirm: () => {}, onRevise: () => {} }))
 type Element = ReactElement<Record<string, unknown>>
 const elements = (node: ReactNode): Element[] =>
@@ -24,7 +25,8 @@ describe('단계 확인 단추', () => {
     expect(html('entry')).toContain('좋아요, 산문 쓰기로')
     expect(html('producer')).toContain('좋아요, 그림 그리기로')
     expect(html('artist')).toContain('좋아요, 콘티 짜기로')
-    expect(html('writer')).toContain('좋아요, 연출하기로')
+    expect(html('writer')).toContain('좋아요, 촬영하기로')
+    expect(html('camera')).toContain('좋아요, 연출하기로')
     expect(html('director')).toContain('좋아요, 편집하기로')
     expect(html('editor')).toContain('좋아요, 완성하기')
     for (const stage of STAGES) expect(html(stage), stage).toContain('아니요, 더 고칠래요')
@@ -32,10 +34,11 @@ describe('단계 확인 단추', () => {
 
   // 왜: 시안의 왼쪽 단추 아이콘은 넘어갈 단계의 아이콘이다(마지막 Editor 다음은 작품 완성 · 내보내기).
   it('단계 확인 단추의 왼쪽 단추는 다음 단계를 가리키고 그 단계 아이콘을 단다(Editor 다음은 작품 완성 · 내보내기 아이콘)', () => {
-    expect(STAGES.map(stageConfirmNext)).toEqual(['writer', 'artist', 'storyboard', 'director', 'editor', 'complete'])
+    expect(STAGES.map(stageConfirmNext)).toEqual(['writer', 'artist', 'storyboard', 'camera', 'director', 'editor', 'complete'])
     expect(html('entry')).toMatch(/data-next="writer"/)
     expect(html('editor')).toMatch(/data-next="complete"/)
-    const icons = [WriterIcon, ArtistIcon, StoryboardIcon, DirectorIcon, EditorIcon, ExportIcon]
+    // Camera 는 옛 Storyboard 아이콘을 받는다(리드 2026-11-22) — Storyboard 다음(Camera)의 아이콘도 StoryboardIcon 이다.
+    const icons = [WriterIcon, ArtistIcon, StoryboardIcon, StoryboardIcon, DirectorIcon, EditorIcon, ExportIcon]
     STAGES.forEach((stage, i) => {
       const [confirm] = elements(StageConfirm({ stage, onConfirm: () => {}, onRevise: () => {} })).filter((node) => node.type === 'button')
       const drawn = elements(confirm.props.children as ReactNode).filter((node) => icons.includes(node.type as (typeof icons)[number]))

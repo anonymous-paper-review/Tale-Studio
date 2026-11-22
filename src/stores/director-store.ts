@@ -133,6 +133,8 @@ import {
   resolveShotFrameImageUrl,
   usableFrameImageUrl,
 } from '@/lib/director/video-frame-inputs'
+import { prepareContinueFrom } from '@/lib/director/video-frame-capture'
+import { isVideoMode, takeOverrideForRequest, videoModeForRequest } from '@/lib/director/video-modes'
 
 // ============================================================================
 // Defaults
@@ -243,6 +245,8 @@ type HydratedVideoTake = {
   video_resolution?: string | null
   /** 지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소(디자이너 11/13 D7 · 리드 B). 모르면 null. */
   made_frames?: unknown
+  /** 지금 영상을 낸 작업의 방식(fb-video 2026-11-22). 모르면 null. */
+  made_video_mode?: unknown
   /** 그 Take 의 마지막 작업을 화면에서 멈춘 때(오너 2026-11-14 7번). 없으면 멈추지 않음. */
   cancelled_at?: string | null
 }
@@ -700,36 +704,8 @@ async function captureVideoThumbnail(videoUrl: string): Promise<Blob | null> {
   return captureVideoFrame(videoUrl, 'start')
 }
 
-async function captureVideoEndFrame(videoUrl: string): Promise<Blob | null> {
-  return captureVideoFrame(videoUrl, 'end')
-}
-
-async function uploadVideoChainFrame(
-  projectId: string,
-  sourceVideoClipId: string,
-  sourceGenerationJobId: string,
-  blob: Blob,
-): Promise<string | null> {
-  if (!projectId || !sourceVideoClipId || !sourceGenerationJobId) return null
-  try {
-    const form = new FormData()
-    form.append('projectId', projectId)
-    form.append('type', 'video')
-    form.append('entityId', sourceVideoClipId)
-    form.append('field', 'chain_frame')
-    form.append('generationJobId', sourceGenerationJobId)
-    form.append('file', blob, `${sourceVideoClipId}_chain-frame.jpg`)
-    const response = await fetch('/api/assets/upload-image', {
-      method: 'POST',
-      body: form,
-    })
-    if (!response.ok) return null
-    const body = (await response.json().catch(() => ({}))) as { publicUrl?: unknown }
-    return usableFrameImageUrl(body.publicUrl)
-  } catch {
-    return null
-  }
-}
+// 이어 붙일 장면(끝 장면) 잡기 · 올리기는 src/lib/director/video-frame-capture.ts 로 옮겼다(방안 고장 2, fb-video 2026-11-22) —
+//   Camera 의 "이어서"와 노드 '이전 영상' 구멍이 같은 규칙(Editor 가 자르는 자리 · 검은 화면 판별)을 쓰게.
 
 // ============================================================================
 // Step 0 (unify-director-store-db): Shot 편집 → DB shots write-through
@@ -1594,9 +1570,11 @@ export function videoLimitRefusal(): { shotNodeId: string } | null {
 /** 테이크 목록의 made_frames(지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소) — 모양이 다르면 모른다(null). */
 function parseMadeFrames(value: unknown): VideoNodeData['madeFrames'] {
   if (!value || typeof value !== 'object') return null
-  const { start, end } = value as { start?: unknown; end?: unknown }
+  const { start, end, middle } = value as { start?: unknown; end?: unknown; middle?: unknown }
   const text = (v: unknown) => (typeof v === 'string' && v ? v : null)
-  return text(start) || text(end) ? { start: text(start), end: text(end) } : null
+  // 미들(③ 시작+미들, fb-video 2026-11-22)은 있을 때만 싣는다.
+  if (!text(start) && !text(end) && !text(middle)) return null
+  return text(middle) ? { start: text(start), end: text(end), middle: text(middle) } : { start: text(start), end: text(end) }
 }
 
 function videoOwnerKey(data: VideoNodeData): string {
@@ -2197,6 +2175,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     // 지금 영상을 낸 작업이 쓴 그림(리드 B) — 해상도와 같은 규칙: 서버가 모를 때도 같은 영상이면 아는 값을 둔다.
                     madeFrames: parseMadeFrames(row.made_frames)
                       ?? (row.url && row.url === existingNode.data.videoUrl ? existingNode.data.madeFrames ?? null : null),
+                    madeVideoMode: isVideoMode(row.made_video_mode)
+                      ? row.made_video_mode
+                      : (row.url && row.url === existingNode.data.videoUrl ? existingNode.data.madeVideoMode ?? null : null),
                     // 화면에서 멈춘 Take(오너 7번) — 서버가 마지막 작업의 멈춤으로 정한다. 방금 멈춰 서버가 아직 모르면 아는 값을 둔다.
                     cancelledAt: typeof row.cancelled_at === 'string'
                       ? row.cancelled_at
@@ -2237,6 +2218,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               data.adherence = (row.adherence as VideoAdherence | null) ?? null
               data.videoResolution = isVideoResolution(row.video_resolution) ? row.video_resolution : null
               data.madeFrames = parseMadeFrames(row.made_frames)
+              data.madeVideoMode = isVideoMode(row.made_video_mode) ? row.made_video_mode : null
               data.cancelledAt = typeof row.cancelled_at === 'string' ? row.cancelled_at : null
               const id = newDirectorId('dn')
               nodes = [...nodes, {
@@ -2894,29 +2876,27 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           return false
         }
 
-        let blob: Blob | null
-        try {
-          blob = await captureVideoEndFrame(sourceVideoUrl)
-        } catch {
-          blob = null
-        }
-        if (!blob) {
+        // 방안 고장 2(fb-video 2026-11-22): Editor 가 자르는 자리(앞 샷 길이)에서 잡고, 검으면 앞으로 가며 다시 잡는다.
+        //   잡는 규칙 · 올리기는 Camera 의 "이어서"와 같은 함수(video-frame-capture)다.
+        const sourceShot = initial.nodes.find((node) => node.id === sourceNode.data.parentShotNodeId)
+        const prepared = await prepareContinueFrom({
+          projectId,
+          source: { videoClipId: sourceClipId, generationJobId: sourceJobId, videoUrl: sourceVideoUrl },
+          plannedSec: sourceShot && isShotData(sourceShot.data) ? sourceShot.data.durationSeconds : null,
+        })
+        if (!prepared.ok) {
           return failure(
             translate(
               useLocaleStore.getState().locale,
-              'Unable to capture the source video last frame.',
+              prepared.reason === 'black_frame'
+                ? 'The previous video ends on a black screen, so there is no scene to continue from.'
+                : prepared.reason === 'upload_failed'
+                  ? 'Unable to upload the source video last frame.'
+                  : 'Unable to capture the source video last frame.',
             ),
           )
         }
-        const publicUrl = await uploadVideoChainFrame(projectId, sourceClipId, sourceJobId, blob)
-        if (!publicUrl) {
-          return failure(
-            translate(
-              useLocaleStore.getState().locale,
-              'Unable to upload the source video last frame.',
-            ),
-          )
-        }
+        const publicUrl = prepared.continueFrom.frameUrl
 
         const latestSource = get().nodes.find((node) => node.id === sourceVideoNodeId)
         const latestTarget = get().nodes.find((node) => node.id === targetVideoNodeId)
@@ -4267,7 +4247,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               // #ref-gate(오너 결정 1번): 선행 산출물(인물 시트·러프)이 없으면 안내 후 대기 → 나타나면 자동 재개.
               //   대기 중엔 노드를 generating(스피너)으로 두고, 사람이 다시 누르지 않아도 이어진다. 20분 상한.
               if (isPrerequisiteMissing(res.status, body)) {
-                notifyPrerequisiteWaiting('director', body)
+                notifyPrerequisiteWaiting('camera', body)
                 releaseAction(`director:storyboard:${shotNodeId}`)
                 const outcome = await waitForPrerequisite(projectId, body, {
                   isCancelled: () => get().projectId !== projectId,
@@ -4281,7 +4261,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   })
                   return get().generateStoryboardImage(shotNodeId, { ...options, resumeDepth: depth + 1 })
                 }
-                if (outcome === 'timeout') notifyPrerequisiteTimeout('director', body)
+                if (outcome === 'timeout') notifyPrerequisiteTimeout('camera', body)
                 get().updateNodeData<'shot'>(shotNodeId, {
                   storyboardImage: {
                     ...kept,
@@ -4330,7 +4310,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               // 채팅에 남는 줄이라 문장 · 이름 모두 채팅 언어(리드 검토 3 — H1).
               const locale = contentLocale()
               const name = stoppedShotName(shot, locale)
-              notifyStoppedResultKept('director', version
+              notifyStoppedResultKept('camera', version
                 ? translate(locale, 'The image you stopped for {shot} finished later and was kept as version v{n}. The current image did not change.', { shot: name, n: version.n })
                 : translate(locale, 'The image you stopped for {shot} finished later and was kept in the versions. The current image did not change.', { shot: name }))
               return { jobId, status: 'cancelled', resultUrl: url }
@@ -4360,7 +4340,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // 스트립 모드(#real-strip)의 frames{start,direction,end}는 잡 result_url(=start)에
             //   실리지 않는다 — DB 진실 재수화로 회수(로컬이 방금 쓴 완료값 그대로면 DB 값 채택).
             await get().hydrateFromDb(projectId).catch(() => {})
-            notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Storyboard')) // 다른 stage에 있을 때만 알림
+            notifyGenerationComplete('camera', translate(useLocaleStore.getState().locale, 'Real image')) // 다른 stage에 있을 때만 알림
             return { jobId, status: 'completed', resultUrl: url, httpStatus: res.status }
           } catch (err) {
             if (get().projectId !== projectId) return { jobId: activeJobId, status: 'skipped' }
@@ -4383,7 +4363,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // 실패한 시도가 1초 창을 붙잡고 있으면 즉시 재시도가 막힌다 — 창을 바로 연다.
             releaseAction(`director:storyboard:${shotNodeId}`)
             // 카드의 작은 빨간 글씨는 스크롤하면 사라진다 — 사유를 채팅에도 남긴다(#double-fire).
-            notifyGenerationFailure('director', translate(useLocaleStore.getState().locale, 'Storyboard image'), message)
+            notifyGenerationFailure('camera', translate(useLocaleStore.getState().locale, 'Real image'), message)
             return { jobId: activeJobId, status: 'failed', error: message }
           }
         }
@@ -4887,6 +4867,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // 샷 Take 의 모델 · 해상도는 [다시 만들기] 단추 값과 같은 함수(takeSettings)로 정한다 — 요청이 따로 세면
         //   한쪽만 바뀌는 날 단추에 적은 Take 값과 실제 요청이 갈라진다(리드 검토 a). 독립 영상은 지금처럼 자기 설정.
         const shotTake = shotNode && isShotData(shotNode.data) ? takeSettings(shotNode.data, videoNode.data) : null
+        // 영상 만드는 방식(fb-video 2026-11-22 D2~D5): Take 에 적힌 방식을 싣는다 — 노드에서 손으로 이은 그림이 있으면 손 배선이 이긴다.
+        //   이어서는 기록된 출처를 그대로 싣는다(앞 샷 영상이 그대로인지는 서버가 본다).
+        const videoMode = shotNode ? videoModeForRequest(videoNode.data.override as VideoOverride, !!chainFrameUrl || hasManualFrameInputs) : undefined
+        const continueFrom = videoMode === 'continue' ? (videoNode.data.override as VideoOverride).continueFrom : undefined
         const requestPayload = {
           projectId,
           ...(shotNode && isShotData(shotNode.data)
@@ -4918,6 +4902,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           frameSource: chainFrameUrl || hasManualFrameInputs ? 'manual' : 'auto',
           ...(referenceImageUrls ? { referenceImageUrls } : {}),
           ...(referenceImageUrls && referenceImageRoles ? { referenceImageRoles } : {}),
+          ...(videoMode ? { videoMode } : {}),
+          ...(continueFrom ? { continueFrom } : {}),
           ...(options?.traceId ? { traceId: options.traceId, actor: 'chat' } : {}),
           ...(shotTake
             ? {
@@ -4925,7 +4911,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 resolution: shotTake.resolution,
                 // 아직 저장 전인 새 테이크는 이 노드의 설정(override)도 보낸다 — 리테이크가 물려받은 해상도 · 모델이
                 //   서버 테이크에도 남아, 다시 읽어 와도 같은 설정으로 보인다(#retake-inherit 의 상속을 DB 까지).
-                ...(videoNode.data.videoClipId ? {} : { override: videoNode.data.override }),
+                ...(videoNode.data.videoClipId ? {} : { override: takeOverrideForRequest(videoNode.data.override, videoMode) }),
               }
             : {}),
         }
@@ -5019,7 +5005,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // #ref-gate(오너 결정 1번): 실사 스토리보드가 아직 없으면 대기 → 나타나면 같은 샷의 영상 생성을 자동 재개.
             //   false 를 돌려주면 호출부가 방금 만든 미저장 take 노드를 롤백하므로, 재개는 새 take 로 다시 시작한다.
             if (isPrerequisiteMissing(res.status, body)) {
-              notifyPrerequisiteWaiting('director', body)
+              notifyPrerequisiteWaiting('camera', body)
               if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
               const depth = options?.resumeDepth ?? 0
               const resumeShotNodeId = shotNode && isShotData(shotNode.data) ? shotNode.id : null
@@ -5037,7 +5023,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   if (outcome === 'ready') {
                     notifyPrerequisiteResumed(resumeBody)
                     void get().generateVideoForShot(resumeShotNodeId, { ...options, resumeDepth: depth + 1 })
-                  } else if (outcome === 'timeout') notifyPrerequisiteTimeout('director', resumeBody)
+                  } else if (outcome === 'timeout') notifyPrerequisiteTimeout('camera', resumeBody)
                 })
               }
               return false
@@ -5134,14 +5120,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 const shot = doneNode && isVideoData(doneNode.data) ? get().nodes.find((n) => n.id === (doneNode.data as VideoNodeData).parentShotNodeId) : undefined
                 // 채팅에 남는 줄이라 문장 · 이름 모두 채팅 언어(리드 검토 3 — H1).
                 const locale = contentLocale()
-                notifyStoppedResultKept('director', translate(locale, 'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.', {
+                notifyStoppedResultKept('camera', translate(locale, 'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.', {
                   shot: stoppedShotName(shot, locale),
                 }))
                 return true
               }
               if (status === 'completed') {
                 // 약속 E4(2026-09-04): 일괄은 러너가 "N개 완료, M개 실패" 한 줄로 남긴다 — 건별 알림은 단건만.
-                if (options?.batch !== true) notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Video'))
+                if (options?.batch !== true) notifyGenerationComplete('camera', translate(useLocaleStore.getState().locale, 'Video'))
                 // #adherence P2: 모션 계약 준수 검사(fire-and-forget) — 브라우저가 첫/끝 프레임을
                 //   캡처해 서버 판정 후 배지 반영. 실패는 조용히 무시(생성 결과에 영향 없음).
                 const doneNode = get().nodes.find((n) => n.id === videoNodeId)

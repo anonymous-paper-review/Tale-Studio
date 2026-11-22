@@ -292,7 +292,7 @@ export async function runVideoBatch(
       done,
       failed: completedFailures,
     })
-    notifyBatchSummary('director', `${done > 0 ? '✓' : '⚠'} ${line}`)
+    notifyBatchSummary('camera', `${done > 0 ? '✓' : '⚠'} ${line}`)
     // 채팅을 접어 둔 Director 면 오른쪽 아래 Lumi 알림 카드도(11/13 시안 D8).
     useLumiNoticeStore.getState().batchEnded({ projectId, kind: 'video', done, failed: completedFailures })
   }

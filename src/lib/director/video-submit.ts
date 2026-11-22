@@ -14,7 +14,6 @@ import {
 import {
   type DialogueLine,
   type DialogueSpeaker,
-  type VideoReferenceImageRole,
   buildVideoPrompt,
 } from '@/lib/director/video-prompt'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
@@ -36,7 +35,9 @@ import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import {
   DEFAULT_VIDEO_RESOLUTION,
+  VIDEO_MODELS,
   effectiveVideoResolution,
+  frameSlotRoles,
   isVideoResolution,
   normalizeProvider,
   type VideoModelKey,
@@ -56,7 +57,30 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { holdTakesForVideoJob } from '@/lib/billing/take-hold'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { hasStoryboardImage } from '@/lib/director/storyboard-image'
-import { resolveVideoReferenceFrames } from '@/lib/director/video-reference-frames'
+import {
+  MAX_REQUEST_REFERENCE_IMAGES,
+  clampReferenceImages,
+  resolveVideoReferenceFrames,
+} from '@/lib/director/video-reference-frames'
+import {
+  DEFAULT_VIDEO_MODE,
+  isTakeVia,
+  isVideoMode,
+  parseContinueFrom,
+  type ContinueFrom,
+  type VideoMode,
+} from '@/lib/director/video-modes'
+import { resolveModeFrames, type LabeledImage, type ModeFramesResult } from '@/lib/director/video-mode-frames'
+import { checkContinueSource } from '@/lib/director/video-continue-source'
+import {
+  MISSING_CHARACTER_SHEETS,
+  directorRefsExcludeWorld,
+  loadSceneWorldRefs,
+  loadShotReferencePlans,
+  missingSheetsMessage,
+  parseDirectorRefs,
+  type ShotRowForReferences,
+} from '@/lib/director/shot-references'
 import type { Json } from '@/types/database'
 import type { CameraConfig, CameraPreset } from '@/types'
 import type { StandaloneVideoConfig } from '@/types/director'
@@ -133,7 +157,9 @@ function snapshotValueMatches(snapshot: Record<string, unknown>, candidate: Reco
 
 // 새 테이크 기록(video_clips.override)에 남길 수 있는 칸 — 영상 노드 설정(VideoOverride)과 같다.
 // changeNote: 샷 상세 영상 고치기의 바꿀 점 — Take 에 기록으로 남아 다음 Take 칸에 미리 채워진다(디자이너 11/13 D7 · 리드 검토 c ③).
-const NEW_TAKE_OVERRIDE_KEYS = ['prompt', 'camera', 'lighting', 'cameraPreset', 'provider', 'resolution', 'changeNote'] as const
+// videoMode · continueFrom: 영상 만드는 방식과 ① 이어서의 출처(오너 2026-11-22 D2~D5) — Take 카드에 적히고 [다시 만들기]가 이어받는다.
+// note · via: Camera 이력 요약(fb-camera, 리드 2026-11-22) — 사람이 쓴 말 · 만든 길(button | chat | batch).
+const NEW_TAKE_OVERRIDE_KEYS = ['prompt', 'camera', 'lighting', 'cameraPreset', 'provider', 'resolution', 'changeNote', 'videoMode', 'continueFrom', 'note', 'via'] as const
 
 /**
  * 새 테이크에 남길 설정(2026-10-31 리뷰). 평범한 객체만 받는다(아니면 undefined → 400, video-takes PATCH 와 같은 규칙).
@@ -150,6 +176,14 @@ export function newTakeOverride(value: unknown): Record<string, Json> | undefine
     if (!Object.hasOwn(source, key)) continue
     if (key === 'resolution' && !isVideoResolution(source.resolution)) continue
     if (key === 'changeNote' && (typeof source.changeNote !== 'string' || source.changeNote.length > 2000)) continue
+    if (key === 'videoMode' && !isVideoMode(source.videoMode)) continue
+    if (key === 'note' && (typeof source.note !== 'string' || source.note.length > 2000)) continue
+    if (key === 'via' && !isTakeVia(source.via)) continue
+    if (key === 'continueFrom') {
+      const continueFrom = parseContinueFrom(source.continueFrom)
+      if (continueFrom) kept.continueFrom = { ...continueFrom }
+      continue
+    }
     if (isJsonValue(source[key])) kept[key] = source[key]
   }
   return kept
@@ -355,6 +389,74 @@ async function readVideoReplay(
   return { existingReplay, exactReplay }
 }
 
+/** 방식대로 그림을 고를 때 읽는 샷 행(영상 준비의 shots select). */
+type ModeShotRow = ShotRowForReferences & { storyboard_image?: unknown; rough_storyboard?: unknown }
+
+/**
+ * ② 레퍼런스의 소품 그림 — fb-artist 의 샷별 소품 그림 함수가 fb1120 에 들어오면 그것을 부른다(리드 2026-11-22).
+ *   그 전에는 빈 목록이다. 소품의 자리(배경 뒤 · 가장 먼저 덜어 냄)는 tests/director/video-mode-rules.test.ts 가 못 박는다.
+ */
+async function loadShotPropReferenceImages(): Promise<LabeledImage[]> {
+  return []
+}
+
+const MODE_FRAME_ERRORS: Record<Exclude<ModeFramesResult, { ok: true }>['code'], { status: 400 | 409; error: string }> = {
+  missing_storyboard: { status: 409, error: 'The live-action storyboard is missing for this shot. Generate it before the video.' },
+  missing_middle_frame: { status: 409, error: 'The middle (direction) frame for this shot is missing. Draw the rough storyboard first.' },
+  missing_reference_images: { status: 409, error: 'This shot has no images to use as references.' },
+  missing_continue_frame: { status: 400, error: 'Invalid request: continueFrom is required for continue' },
+}
+
+/**
+ * 영상 만드는 방식(오너 2026-11-22 D2~D5)대로 그림을 고른다 — ① 이어서 출처 확인 · ② 인물 시트 · 배경 · 소품 · ③ 미들.
+ *   막히면 Take 를 잡기 전에 응답(400 · 409, code 포함)을 돌려준다. 그림 고르는 규칙 자체는 video-mode-frames(순수 함수).
+ */
+async function selectModeFrames(
+  mode: VideoMode,
+  input: { projectId: string; workspaceId: string; writerShotId: string; shot: ModeShotRow; continueFrom: ContinueFrom | null },
+): Promise<Extract<ModeFramesResult, { ok: true }> | Response> {
+  const { projectId, workspaceId, writerShotId, shot } = input
+  let continueFrameUrl: string | null = null
+  if (mode === 'continue' && input.continueFrom) {
+    const check = await checkContinueSource({ projectId, workspaceId, shotId: writerShotId, sceneId: shot.scene_id ?? null, continueFrom: input.continueFrom })
+    if (!check.ok) return NextResponse.json({ error: check.error, code: check.code, shotId: writerShotId }, { status: check.status })
+    continueFrameUrl = check.frameUrl
+  }
+  let references: Parameters<typeof resolveModeFrames>[0]['references'] = null
+  if (mode === 'reference') {
+    const plan = (await loadShotReferencePlans(projectId, [shot])).get(writerShotId)
+    if (plan?.missing.length) {
+      return NextResponse.json(
+        { error: missingSheetsMessage(plan.missing), code: MISSING_CHARACTER_SHEETS, shotId: writerShotId, missing: plan.missing },
+        { status: 409 },
+      )
+    }
+    // 인물 목록이 없는 샷은 계획이 없다 — 배경만 따로 읽는다(사람이 배경을 뺀 샷은 빼고).
+    const worldRef = plan
+      ? plan.worldRef
+      : shot.scene_id && !directorRefsExcludeWorld(parseDirectorRefs(shot.director_refs))
+        ? (await loadSceneWorldRefs(projectId, [shot.scene_id])).get(shot.scene_id) ?? null
+        : null
+    references = {
+      characters: (plan?.characterRefs ?? []).map((ref) => ({ url: ref.url, label: `character sheet: ${ref.name}` })),
+      world: worldRef ? { url: worldRef, label: 'the location' } : null,
+      props: await loadShotPropReferenceImages(),
+    }
+  }
+  const selected = resolveModeFrames({
+    mode,
+    storyboardImage: shot.storyboard_image,
+    roughStoryboard: shot.rough_storyboard,
+    continueFrameUrl,
+    references,
+  })
+  if (!selected.ok) {
+    const { status, error } = MODE_FRAME_ERRORS[selected.code]
+    return NextResponse.json({ error, code: selected.code, shotId: writerShotId }, { status })
+  }
+  return selected
+}
+
 export interface PreparedDirectorVideoSubmission {
   ownerId: string
   projectId: string
@@ -428,6 +530,10 @@ async function prepareVideoRequest(
       frameSource?: 'manual' | 'auto'
       /** 영상 노드가 고른 해상도(오너 2026-10-31) — '720p' | '1080p', 없으면 720p. */
       resolution?: unknown
+      /** 영상 만드는 방식(오너 2026-11-22 D2~D5) — 없으면 지금 규칙 그대로(frameSource · 손 배선). */
+      videoMode?: unknown
+      /** ① 이어서의 출처 — videoMode 'continue' 일 때 필수. */
+      continueFrom?: unknown
     }
     let {
       prompt,
@@ -460,23 +566,30 @@ async function prepareVideoRequest(
     }
     // V2 refs(#real-strip): [START, END] 등 다중 레퍼런스. referenceImageUrl(단일)과 병행 수신 —
     //   단일은 I2V 판별·스냅샷 하위호환 축, 배열은 실제 제출 레퍼런스로 우선.
-    const clientReferenceImageUrls = Array.isArray(body.referenceImageUrls)
-      ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u).slice(0, 4)
+    // 방안 고장 1(2026-11-22): 예전에는 그림을 앞 4장만 남기고 역할이 4개를 넘으면 역할을 통째로 버려, 참고 그림을
+    //   세 장 넘게 이으면 끝 그림이 빠지고 역할을 잃은 시작 앞에 DB 시작이 또 붙었다. 이제 역할째 받아 시작 · 끝은 남기고
+    //   참고 그림만 덜어 MAX_REQUEST_REFERENCE_IMAGES 안으로 받는다(모델별 상한은 모델이 정해진 뒤 한 번 더).
+    const rawClientReferenceImageUrls = Array.isArray(body.referenceImageUrls)
+      ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u)
       : undefined
     const referenceImageRolesV2 = Array.isArray(body.referenceImageRoles)
-      ? body.referenceImageRoles.length <= 4 &&
-        body.referenceImageRoles.every(
-          (role): role is VideoReferenceImageRole =>
+      ? body.referenceImageRoles.every(
+          // 화면이 보내는 역할은 셋뿐 — 미들('direction')은 서버가 방식대로 고를 때만 생긴다.
+          (role): role is 'start' | 'end' | 'ref' =>
             role === 'start' || role === 'end' || role === 'ref',
         )
         ? body.referenceImageRoles
         : undefined
       : undefined
-    const clientAlignedRoles =
-      clientReferenceImageUrls?.length &&
-      referenceImageRolesV2?.length === clientReferenceImageUrls.length
-        ? referenceImageRolesV2
-        : undefined
+    const requestImages = rawClientReferenceImageUrls?.length
+      ? clampReferenceImages(
+          rawClientReferenceImageUrls,
+          referenceImageRolesV2?.length === rawClientReferenceImageUrls.length ? referenceImageRolesV2 : undefined,
+          MAX_REQUEST_REFERENCE_IMAGES,
+        )
+      : null
+    const clientReferenceImageUrls = requestImages ? requestImages.urls : rawClientReferenceImageUrls
+    const clientAlignedRoles = requestImages?.roles
     let writerShotId = body.writerShotId ?? body.shotId
     projectId = body.projectId ?? ''
     if (
@@ -495,6 +608,16 @@ async function prepareVideoRequest(
     if (body.resolution != null && !isVideoResolution(body.resolution)) {
       return NextResponse.json({ error: 'Invalid request: resolution must be 720p or 1080p' }, { status: 400 })
     }
+    // 영상 만드는 방식(오너 2026-11-22 D2~D5): 모르는 이름은 어떤 그림을 보낼지 정한 적이 없다 — Take 를 잡기 전에 거절한다.
+    //   독립 영상(샷 없음)은 방식이 없다(설정 전체를 그 영상이 갖는다) — 보내도 쓰지 않는다.
+    if (body.videoMode != null && !isVideoMode(body.videoMode)) {
+      return NextResponse.json({ error: 'Invalid request: videoMode must be start_end, continue, reference, start_middle or start_prompt' }, { status: 400 })
+    }
+    const videoMode: VideoMode | null = !standalone && isVideoMode(body.videoMode) ? body.videoMode : null
+    const continueFrom = videoMode === 'continue' ? parseContinueFrom(body.continueFrom) : null
+    if (videoMode === 'continue' && !continueFrom) {
+      return NextResponse.json({ error: 'Invalid request: continueFrom is required for continue' }, { status: 400 })
+    }
     const newTakeSettings = newTakeOverride(override)
     if (!newTakeSettings) {
       return NextResponse.json({ error: 'Invalid request: override must be a plain JSON object or null' }, { status: 400 })
@@ -510,7 +633,8 @@ async function prepareVideoRequest(
       // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
       standalone
         ? Promise.resolve({ data: null, error: null })
-        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref, dialogue_lines, character_appearance_keys, prompt, storyboard_image').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
+        // 방식(2026-11-22): 씬 · 순서(① 앞 샷) · 인물 · 무대(② 참고 그림) · 러프(③ 미들)도 같이 읽는다.
+        : supabaseAdmin.from('shots').select('shot_id, scene_id, sort_order, dynamic_spec, design_ref, dialogue_lines, character_appearance_keys, characters, static_spec, director_refs, prompt, storyboard_image, rough_storyboard').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
     ])
     if (projectError) throw projectError
     if (shotError) throw shotError
@@ -545,10 +669,20 @@ async function prepareVideoRequest(
       referenceImageRoles: clientAlignedRoles,
       storyboardImage: standalone ? null : shot!.storyboard_image,
     })
-    const generationMethod: GenerationMethod = frames.generationMethod
-    const referenceImageUrl = frames.referenceImageUrl ?? undefined
-    const referenceImageUrlsV2 = frames.referenceImageUrls
-    const alignedReferenceImageRoles = frames.referenceImageRoles
+    // 영상 만드는 방식(오너 2026-11-22 D2~D5): 방식을 보낸 요청의 그림은 서버가 DB 에서 그 방식대로 고른다(화면이 보낸 목록은 쓰지 않는다).
+    const modeSelection = videoMode && shot ? await selectModeFrames(videoMode, {
+      projectId,
+      workspaceId: project.workspace_id as string,
+      writerShotId: writerShotId!,
+      shot: shot as unknown as ModeShotRow,
+      continueFrom,
+    }) : null
+    if (modeSelection instanceof Response) return modeSelection
+    const chosenFrames = modeSelection
+      ? { generationMethod: 'I2V' as const, referenceImageUrl: modeSelection.urls[0] ?? null, referenceImageUrls: modeSelection.urls, referenceImageRoles: modeSelection.roles }
+      : frames
+    const generationMethod: GenerationMethod = chosenFrames.generationMethod
+    const referenceImageUrl = chosenFrames.referenceImageUrl ?? undefined
     let standaloneConfig: StandaloneVideoConfig | null = null
     if (standalone) {
       const { data: clip, error } = await supabaseAdmin
@@ -612,6 +746,18 @@ async function prepareVideoRequest(
     // 모델 이름은 무엇이 와도 fal 카탈로그 키로만 정규화된다 — 지운 'local' 은 기본 모델로.
     const modelKey: VideoModelKey = normalizeProvider(model ?? '')
     const dur = durationSeconds ?? 5
+    // 방안 고장 1: 모델이 받는 장 수 안으로 — 시작 · 끝은 남기고 참고 그림만 뒤에서부터 덜어 낸다. 덜어 낸 수는 기록 · 응답에 남긴다.
+    //   첫 · 마지막 장면 칸이 있는 모델(Kling)은 그 칸으로 가는 시작 · 끝을 세지 않는다.
+    const modelImages = chosenFrames.referenceImageUrls?.length
+      ? clampReferenceImages(chosenFrames.referenceImageUrls, chosenFrames.referenceImageRoles, VIDEO_MODELS[modelKey].maxImageUrls, frameSlotRoles(modelKey))
+      : null
+    const referenceImageUrlsV2 = modelImages ? modelImages.urls : chosenFrames.referenceImageUrls
+    const alignedReferenceImageRoles = modelImages ? modelImages.roles : chosenFrames.referenceImageRoles
+    const droppedReferenceImages = modelImages?.dropped ?? 0
+    // ② 레퍼런스 그림 이름은 그림과 같이 덜어 낸다(덜어 낸 배경의 이름이 글에 남지 않게).
+    const referenceLabels = modeSelection?.labels
+      ? (modelImages ? modelImages.keptIndices.map((index) => modeSelection.labels![index]!) : modeSelection.labels)
+      : null
 
     // #motion-contract: 모션 계약 소스 해석 — shots.dynamic_spec(신규 persist) 우선,
     //   구버전 프로젝트는 writer_runs.state.shotDesign 을 design_ref 로 조인(러프보드와 동일 패턴).
@@ -751,6 +897,10 @@ async function prepareVideoRequest(
       dialogueLines,
       dialogueSpeakers, // #g7-speakers
       characterNames: motivationTargetNames, // #camera-motivation
+      // 방식 문장(2026-11-22 D2~D5) — 기본(시작+끝)이면 지금 글 그대로.
+      videoMode,
+      referenceLabels,
+      middleSource: modeSelection?.middleSource ?? null,
     })
     // #creem-moderation(2026-10-11): 최종 프롬프트가 확정된 직후·자리 예약(submitPreparedVideo) 전에
     //   사용자 글만 검사한다 — 샷 산문(모션 프롬프트 포함)과 대사. 모션 계약·카메라 기재·negative_prompt
@@ -779,7 +929,7 @@ async function prepareVideoRequest(
       }
     }
     const falSubmitRequest = submitRefUrls
-      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio, resolution)
+      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio, resolution, alignedReferenceImageRoles)
       : buildFalT2VFallbackRequest(fullPrompt, dur, effectiveAspectRatio)
     const falCapture = buildBestEffortFalRequestCapturePatch(falSubmitRequest.input, falSubmitRequest.model)
     const normalizedNewTakeMetadata = {
@@ -805,6 +955,14 @@ async function prepareVideoRequest(
       // 배열 키는 존재할 때만 — 구버전 예약 잡의 리플레이 비교(snapshotValueMatches)와 호환.
       ...(referenceImageUrlsV2?.length ? { reference_image_urls: referenceImageUrlsV2 } : {}),
       ...(alignedReferenceImageRoles ? { reference_image_roles: alignedReferenceImageRoles } : {}),
+      // 덜어 낸 그림이 있을 때만 적는다 — 덜지 않은 요청은 이 기능 전 작업과 같은 기록 모양(재생 비교 보호).
+      ...(droppedReferenceImages > 0 ? { dropped_reference_images: droppedReferenceImages } : {}),
+      // 방식(2026-11-22): 기본이 아닐 때만 적는다 — 기본은 이 기능 전 작업과 같은 기록 모양(재생 비교 보호, resolution 과 같은 규칙).
+      ...(videoMode && videoMode !== DEFAULT_VIDEO_MODE ? { video_mode: videoMode } : {}),
+      ...(videoMode === 'continue' && continueFrom
+        ? { continue_from: { video_clip_id: continueFrom.videoClipId, generation_job_id: continueFrom.generationJobId, frame_url: continueFrom.frameUrl } }
+        : {}),
+      ...(referenceLabels ? { reference_labels: referenceLabels } : {}),
       movement_preset: movementPreset ?? null,
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),
@@ -941,7 +1099,15 @@ async function submitPreparedVideo(
     }
     const reservedJob = await getGenerationJobById(reservation.job_id)
     if (!reservedJob) throw new Error('Reserved video job not found')
-    const response = { shotId: writerShotId, jobId: reservation.job_id, videoClipId: reservation.video_clip_id, takeNumber: reservation.take_number, replayed: reservation.replayed, provider: reservedJob.provider ?? 'fal', model: reservedJob.model, taskId: reservedJob.request_id.startsWith('reserved:') ? undefined : reservedJob.request_id }
+    const droppedImages = typeof inputSnapshot.dropped_reference_images === 'number' ? inputSnapshot.dropped_reference_images : 0
+    const madeMode = isVideoMode(inputSnapshot.video_mode) ? inputSnapshot.video_mode : null
+    const sentImages = madeMode && Array.isArray(inputSnapshot.reference_image_urls)
+      ? (inputSnapshot.reference_image_urls as unknown[]).map((url, index) => ({
+          role: Array.isArray(inputSnapshot.reference_image_roles) ? (inputSnapshot.reference_image_roles as unknown[])[index] ?? 'ref' : 'ref',
+          url,
+        }))
+      : null
+    const response = { shotId: writerShotId, jobId: reservation.job_id, videoClipId: reservation.video_clip_id, takeNumber: reservation.take_number, replayed: reservation.replayed, provider: reservedJob.provider ?? 'fal', model: reservedJob.model, taskId: reservedJob.request_id.startsWith('reserved:') ? undefined : reservedJob.request_id, ...(droppedImages > 0 ? { droppedImages } : {}), ...(madeMode ? { videoMode: madeMode, images: sentImages } : {}) }
     if (reservedJob.status !== 'queued') {
       return NextResponse.json({ ...response, status: reservedJob.status })
     }

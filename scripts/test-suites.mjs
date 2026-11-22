@@ -36,6 +36,7 @@ const FOLDERS = {
   producer: 'Producer: 입력 카드·게이트·Writer 넘김',
   writer: 'Writer: 대본·무대·러프 그림·샷·단계 전환',
   artist: 'Artist: 캐릭터·배경 이미지·모습·스타일 앵커',
+  camera: 'Camera: 씬 단추·샷 줄·실사 그림·영상 이력·단계 등록(오너 2026-11-22 D2~D5)',
   director: 'Director: 캔버스·선·실사·영상 생성',
   editor: 'Editor: 클립·자막·내보내기·미디어 저장',
   chat: '채팅 공통: 블록·선택지·승인 카드·추적',

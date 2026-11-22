@@ -10,12 +10,20 @@ import { hasNonRequestContext, withoutMediaGenerationProhibition } from '@/lib/h
 import { parseProducerDraft, useProducerStore } from './producer-store'
 import { useProjectStore, type WriterStatusAssets } from './project-store'
 import type { StageId } from '@/types'
+import { STAGE_LABEL } from '@/lib/constants'
 
-const stages = ['producer', 'writer', 'artist', 'director', 'editor']
+// 채팅 작업 흐름이 쓰는 단계 순서 — 산문 실행 기준의 옛 순서라 writer 가 artist 앞이다. Camera(오너 2026-11-22 D2~D5)는 Director 앞.
+const stages = ['producer', 'writer', 'artist', 'camera', 'director', 'editor']
+
+/** 저장된 단계 값이 floor 단계 이상인가 — 모르는 단계 값이면 아니다. 약속: tests/camera/stage.test.ts */
+export function workflowStageReached(stage: string | null | undefined, floor: string): boolean {
+  const at = stages.indexOf(stage ?? '')
+  return at >= 0 && at >= stages.indexOf(floor)
+}
 
 /** 현황 스냅샷의 화면 이름 표 — 순서 · 도구 대상 이름 ↔ 사용자가 보는 화면 이름. */
 const SCREEN_NAMES = {
-  order: 'Producer (start) > Writer (prose) > Artist > Storyboard (scenes and shots) > Director > Editor',
+  order: `Producer (start) > Writer (prose) > Artist > Storyboard (scenes and shots) > ${STAGE_LABEL.camera} (real images and videos per shot) > Director > Editor`,
   producer: 'Writer screen (prose)',
   writer: 'Storyboard screen (scenes and shots)',
   artist: 'Artist screen',
@@ -83,8 +91,8 @@ export function createStudioWorkflow(options: {
     // 새 프로젝트의 트리트먼트 초안(2026-10-02 시안 v04)은 아직 넘기지 않은 실행이다 — 넘긴 Writer 로 치지 않는다.
     const handedOff = status.started === true && status.draft !== true
     const allowed = ['producer']
-    if (handedOff || stages.indexOf(reached) >= stages.indexOf('writer')) allowed.push('writer')
-    if (stages.indexOf(reached) >= stages.indexOf('artist') && status.assets.images_ready) allowed.push('artist')
+    if (handedOff || workflowStageReached(reached, 'writer')) allowed.push('writer')
+    if (workflowStageReached(reached, 'artist') && status.assets.images_ready) allowed.push('artist')
     last = {
       projectId: options.projectId, currentStage: useProjectStore.getState().currentStage, reachedStage: reached, allowedStages: allowed,
       // 키 이름은 시험이 못 박아 그대로 둔다 — blockers · softWarnings 는 지금 화면 흐름에 막힌 점이 없어 비어 있다(옛 관문 항목은 note 가 막힌 점이 아니라고 적는다).
@@ -115,7 +123,7 @@ export function createStudioWorkflow(options: {
     if (stages.includes(state.reachedStage)) useProjectStore.getState().unlockThrough(state.reachedStage as StageId)
     if (state.writer.started) useProjectStore.getState().unlockThrough('writer')
     // Writer 가 시작됐거나 DB 단계가 producer 를 넘었으면 Producer 는 잠긴다(2026-10-01).
-    if (state.writer.started || stages.indexOf(state.reachedStage) > stages.indexOf('producer')) useProjectStore.getState().lockProducer()
+    if (state.writer.started || workflowStageReached(state.reachedStage, 'writer')) useProjectStore.getState().lockProducer()
   }
   return createProjectWorkflow({
     read, refresh, isCurrent: () => options.isCurrent() && !options.signal.aborted,
@@ -129,7 +137,7 @@ export function createStudioWorkflow(options: {
         if (saved.error) return { status: 'failed', message: `Writer exists, but its stage could not be saved: ${saved.error.message}` }
         const current = saved.data ?? (await createClient().from('projects').select('current_stage').eq('id', options.projectId).maybeSingle()).data
         check()
-        if (!current || stages.indexOf(current.current_stage) < stages.indexOf('writer')) return { status: 'unverified', message: 'Writer exists, but its saved stage could not be confirmed. Query again before opening.' }
+        if (!current || !workflowStageReached(current.current_stage, 'writer')) return { status: 'unverified', message: 'Writer exists, but its saved stage could not be confirmed. Query again before opening.' }
         last = { ...last, reachedStage: current.current_stage }
       }
       if (last) await refresh(last)

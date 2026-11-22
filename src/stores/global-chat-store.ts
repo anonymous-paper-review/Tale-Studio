@@ -28,6 +28,8 @@ import { answersRestoredImageQuestion, characterPickOptions, imageRoleOptions, i
 import { CHAT_IMAGE_ROLE_CONSENT, CHAT_STYLE_CONFIRM_CONSENT, CHAT_STYLE_REQUEST_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import { producerBusyKind, type BoardBusy } from '@/lib/producer/busy'
+import { sceneStoryView } from '@/lib/producer/scene-story'
+import { nearestOfferedStyle } from '@/lib/style-offer'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
 import {
   requireDefaultAppearanceKey,
@@ -92,6 +94,7 @@ import { cannedFor } from '@/lib/demo/canned'
 import { editorChatContext } from '@/lib/editor/chat-context'
 import { useEditorStore } from '@/stores/editor-store'
 import { handoffMarker } from '@/lib/chat-blocks'
+import { shotMediaStage } from '@/lib/generation-batches'
 import {
   buildChatTrace,
   createChatTraceId,
@@ -208,6 +211,8 @@ interface GlobalChatState {
   /** 시작 화면에서 만화 쪽을 그대로로 시작한 프로젝트면 Writer 산문이 나온 뒤 채팅에서 채팅 길과 같은 그림체 질문을 칩으로 묻는다(2026-11-11 오너).
    *  물었으면 true. 이미 답했거나 확정했거나 서버가 물을 쪽이 없다고 하면(다듬기 · 만화 아님 · 그림체 있음) 묻지 않는다. */
   offerStartComicStyle: (projectId: string) => Promise<boolean>
+  /** Writer 산문 다시 쓰기 단추([다시 써 달라고 하기]) — 원작 그대로 쓰는 작품이면 조건 창 대신 누른 말과 까닭을 남기고, 아니면 조건 창을 연다(D15 오너 2026-11-22). */
+  requestProseRewrite: (said: string) => void
   /** 트리트먼트에 미리 보이는 안(v1 · v2 · v3). 채팅 카드와 트리트먼트가 같은 값을 읽는다. */
   sceneStoryVariantPreview: { projectId: string; proposalId: string; variantId: string } | null
   previewSceneStoryVariant: (proposalId: string, variantId: string) => void
@@ -673,6 +678,34 @@ function styleAttachmentAnswer(text: string): 'style' | 'reference' | null {
 async function retryComicScript(get: () => GlobalChatState, retry: ComicRetry): Promise<void> {
   const comic = await runComicAdaptation(get, retry.pages, { consent: retry.consent, skipStyle: true, then: retry.then, ...(retry.rewriteDraft ? { rewriteDraft: true } : {}) })
   if (comic.scriptSet && retry.then?.startTreatment) await startCreationTreatment(retry.then.locale)
+}
+
+/** 채팅이 고른 스타일을 찾지 못했을 때의 답 — 고르는 곳은 그림을 만들 때 Artist 스타일 창(리드 2026-11-22 결정 3: 팔레트 아이콘은 지금 없는 단추였다). */
+const STYLE_NOT_FOUND_REPLY = "Couldn't find that art style. Tell me the feel again, or pick one of the four styles in the style window in Artist when you make the images."
+
+/** 없어진 스타일로 정해 달라는 말에 하는 답 — 정하지 않고 네 가지 중 가장 가까운 것과 고르는 곳을 말한다(D6 오너 2026-11-22). 짝을 모르면 null. */
+function retiredStyleReply(key: string): string | null {
+  const voice = contentLocale()
+  const anchors = useProducerStore.getState().styleAnchors
+  const retired = anchors.find((anchor) => anchor.key === key)
+  const nearestKey = nearestOfferedStyle({ key, medium: retired?.medium ?? null })
+  const nearest = nearestKey ? anchors.find((anchor) => anchor.key === nearestKey) : undefined
+  if (!retired || !nearest) return null
+  const style = styleAnchorName(retired, voice)
+  const closest = styleAnchorName(nearest, voice)
+  return fixKoreanParticles(
+    translate(voice, '{style} is no longer offered. Of the four styles, {nearest} is the closest. You can pick it in the style window in Artist when you make the images.', { style, nearest: closest }),
+    [style, closest],
+  )
+}
+
+/** 원작 그대로 쓰는 작품의 Writer 산문은 다시 쓰지 않는다 — 다시 써 달라는 말 · 단추에 하는 답(D15 오너 2026-11-22, 서버 preserved_script 거절과 같은 문장). */
+const PRESERVED_PROSE_NOTE = 'This project keeps the original script as is, so the prose cannot be changed. When you have read it, press [Run breakdown] to move on.'
+
+/** Writer 산문이 원작 그대로인가 — 산문 화면(use-prose · sceneStoryView)과 같은 판정. */
+function proseKeepsOriginal(): boolean {
+  const producer = useProducerStore.getState()
+  return sceneStoryView({ preserveScript: producer.preserveScript, storyText: producer.storyText, locked: false, streamed: [], saved: [] }).kind === 'original'
 }
 
 /**
@@ -1273,6 +1306,11 @@ function saveChoiceStateMarker(suggestion: ChatSuggestion | null): void {
 function saveChoiceClearMarker(stage: StageId): void {
   const { projectId } = projectChatStage()
   if (projectId) saveChatMessage(projectId, stage, 'model', choiceSuggestionMarker(null))
+}
+
+/** 알림 줄의 단계 — 실사 그림 · 영상의 집(camera)이면 지금 보는 화면에 맞춘다(lib/generation-batches shotMediaStage). 그 밖은 그대로. */
+function noticeStage(stage: StageId, currentStage: StageId | null | undefined): StageId {
+  return stage === 'camera' ? shotMediaStage(currentStage) : stage
 }
 
 function flushCompletion(stage: StageId, label: string): void {
@@ -2308,6 +2346,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
   },
 
+  // Storyboard(id writer) → Camera 넘김(2026-11-22 오너 D2~D5 — 예전 Storyboard → Director). 이름 · 상태 키는 옛 이름 그대로다.
   requestDirectorHandoff: async (mode, resumeId) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) {
@@ -2327,7 +2366,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     try {
       const response = await fetch(`/api/project/${projectId}/handoff`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' }, signal: controller.signal,
-        body: JSON.stringify({ targetStage: 'director', action: mode === 'check' ? 'check' : 'move', locale: contentLocale() }),
+        body: JSON.stringify({ targetStage: 'camera', action: mode === 'check' ? 'check' : 'move', locale: contentLocale() }),
       })
       const result = await response.json()
       if (!active()) return
@@ -2339,23 +2378,23 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (!result.ready) {
         const blockers = Array.isArray(result.blockers) ? result.blockers : []
         const details = blockers.map((blocker: { label?: string; action?: string }) => [blocker.label, blocker.action].filter(Boolean).join(' — ')).join('\n')
-        const notice = translate(contentLocale(), "Can't move to {stage} yet. Please fill these in first:", { stage: 'Director' })
+        const notice = translate(contentLocale(), "Can't move to {stage} yet. Please fill these in first:", { stage: STAGE_LABEL.camera })
           + '\n' + (details || translate(contentLocale(), 'Could not check the handoff requirements. Please try again.'))
-          + (keepWaiting ? '\n\n' + translate(contentLocale(), 'I will check again and open Director when it is ready. Say cancel to stop waiting.') : '')
+          + (keepWaiting ? '\n\n' + translate(contentLocale(), 'I will check again and open {stage} when it is ready. Say cancel to stop waiting.', { stage: STAGE_LABEL.camera }) : '')
         if (notice !== previous?.notice) get().notifyIssue('writer', notice)
         set({ loading: false, directorHandoff: keepWaiting ? { id, projectId, phase: 'waiting', notice } : null })
         return
       }
       if (mode === 'check') {
-        get().notifyIssue('writer', translate(contentLocale(), 'Director is ready. I checked {scenes} saved scenes and {shots} saved shots. Ask me to hand over when you are ready.', { scenes: result.counts.scenes, shots: result.counts.shots }))
+        get().notifyIssue('writer', translate(contentLocale(), '{stage} is ready. I checked {scenes} saved scenes and {shots} saved shots. Ask me to hand over when you are ready.', { stage: STAGE_LABEL.camera, scenes: result.counts.scenes, shots: result.counts.shots }))
         set({ loading: false, directorHandoff: keepWaiting ? { id, projectId, phase: 'waiting' } : null })
         return
       }
-      if (result.path !== '/studio/director') throw new Error(translate(contentLocale(), 'Could not save the stage change. Please try again.'))
+      if (result.path !== '/studio/camera') throw new Error(translate(contentLocale(), 'Could not save the stage change. Please try again.'))
       // 서버가 저장한 개방만 반영한다. 현재 화면과 성공 안내는 실제 경로 도착 뒤에 바뀐다.
-      useProjectStore.getState().unlockThrough('director')
-      get().notifyIssue('writer', translate(contentLocale(), 'The saved scenes and shots are ready. Opening Director.'))
-      set({ loading: false, directorHandoff: { id, projectId, phase: 'navigating' }, pendingNavigatePath: withDemoShare(`/studio/director?projectId=${encodeURIComponent(projectId)}`) })
+      useProjectStore.getState().unlockThrough('camera')
+      get().notifyIssue('writer', translate(contentLocale(), 'The saved scenes and shots are ready. Opening {stage}.', { stage: STAGE_LABEL.camera }))
+      set({ loading: false, directorHandoff: { id, projectId, phase: 'navigating' }, pendingNavigatePath: withDemoShare(`/studio/camera?projectId=${encodeURIComponent(projectId)}`) })
     } catch (error) {
       if (!active()) return
       const detail = error instanceof Error && error.name !== 'AbortError' ? error.message : translate(contentLocale(), 'Could not check the handoff requirements. Please try again.')
@@ -2372,18 +2411,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     await get().requestDirectorHandoff('whenReady', pending.id)
   },
 
+  // Camera 화면이 붙으면 그 화면이 부른다(2026-11-22 — 예전엔 Director 화면).
   confirmDirectorHandoff: (projectId, pathname) => {
     const pending = get().directorHandoff
-    if (pending?.phase !== 'navigating' || pending.projectId !== projectId || projectId !== useProjectStore.getState().projectId || pathname !== '/studio/director') return
+    if (pending?.phase !== 'navigating' || pending.projectId !== projectId || projectId !== useProjectStore.getState().projectId || pathname !== '/studio/camera') return
     set({ directorHandoff: null, pendingNavigatePath: null })
-    get().notifyIssue('writer', translate(contentLocale(), 'Director is now open.'))
-    get().notifyIssue('writer', handoffMarker('writer', 'director'))
+    get().notifyIssue('writer', translate(contentLocale(), '{stage} is now open.', { stage: STAGE_LABEL.camera }))
+    get().notifyIssue('writer', handoffMarker('writer', 'camera'))
   },
 
   failDirectorHandoff: () => {
     if (get().directorHandoff?.phase !== 'navigating') return
     set({ directorHandoff: null, pendingNavigatePath: null, loading: false })
-    get().notifyIssue('writer', translate(contentLocale(), 'Could not open Director. Your work is saved. Select Director on the left or ask me to try again.'))
+    get().notifyIssue('writer', translate(contentLocale(), 'Could not open {stage}. Your work is saved. Select {stage} on the left or ask me to try again.', { stage: STAGE_LABEL.camera }))
   },
 
   requestNextStep: async () => {
@@ -2888,6 +2928,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     return run
   },
 
+  requestProseRewrite: (said) => {
+    // 원작 그대로 쓰는 작품은 조건 창이 열리지 않는다(산문 도구가 꺼져 있다) — 누른 말과 까닭 · 넘어가는 길을 채팅에 남긴다(D15 오너 2026-11-22).
+    if (proseKeepsOriginal()) {
+      get().appendLocalExchange('producer', said, translate(contentLocale(), PRESERVED_PROSE_NOTE))
+      return
+    }
+    useWriterRoomStore.getState().openRewrite()
+  },
+
   resolveSceneStoryUndo: async (action, undoId) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId || !undoId || get().sceneStoryEdit || sceneGateInFlight.has(projectId) || sceneStoryRequests.has(projectId)) return false
@@ -2992,6 +3041,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const intent = writerChatIntent(trimmed, { proseDraft: writerProse })
       if (intent === 'breakdown' || (intent === 'rewrite' && writerProse)) {
         if (sceneSuggestion?.stage === 'producer') get().dismissSuggestion({ implicit: true })
+        // 원작 그대로 쓰는 작품은 다시 쓰지 않는다 — 러닝타임 등 조건을 묻지 않고 까닭과 넘어가는 길을 말한다(D15 오너 2026-11-22).
+        if (intent === 'rewrite' && proseKeepsOriginal()) {
+          get().appendLocalExchange('producer', trimmed, translate(contentLocale(), PRESERVED_PROSE_NOTE))
+          return
+        }
         if (intent === 'rewrite') useWriterRoomStore.getState().openRewrite()
         else useWriterRoomStore.getState().openConfirm()
         get().appendLocalExchange('producer', trimmed, translate(contentLocale(), intent === 'rewrite'
@@ -4125,17 +4179,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             { styleAnchorKey: key },
             outcome === 'applied'
               ? 'ok'
-              : outcome === 'unknown_key'
+              : outcome === 'unknown_key' || outcome === 'retired'
                 ? 'invalid_input'
                 : 'unverified',
             styleError,
           )
           if (outcome !== 'applied') {
             patchTrace({ skippedCount: 1 })
-            styleAnchorFailure = translate(
-              contentLocale(),
-              "Couldn't find that art style in the catalog. Tell me the feel again or choose one using the palette icon below the chat input.",
-            )
+            // 없어진 스타일은 정하지 않고 네 가지 중 가장 가까운 것을 권한다(D6 오너 2026-11-22). 고르는 곳은 Artist 스타일 창(리드 결정 3 — 팔레트 아이콘은 없다).
+            styleAnchorFailure = (outcome === 'retired' ? retiredStyleReply(key) : null) ?? translate(contentLocale(), STYLE_NOT_FOUND_REPLY)
           } else {
             patchTrace({ appliedCount: 1 })
           }
@@ -4741,7 +4793,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           set({ loading: false })
           return
         }
-        if (dialogueTarget === 'director') {
+        if (dialogueTarget === 'camera') {
           get().notifyIssue('writer', translate(contentLocale(), 'All dialogue changes are saved.'))
           await get().requestDirectorHandoff('move')
           return
@@ -6015,8 +6067,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
   // 백그라운드 생성 완료 통지 (Phase 2). 유저가 *다른* stage에 있을 때만 알린다(보고 있으면 불필요).
   //   배지는 매번 bump(가벼운 카운트), 채팅 메시지는 stage당 10초 스로틀(배치 스팸 방지).
-  notifyCompletion: (stage, label) => {
+  notifyCompletion: (shotOrStage, label) => {
     const currentStage = useProjectStore.getState().currentStage
+    // 실사 그림 · 영상 알림('camera')은 Director 를 보고 있으면 Director 것으로 본다 — 같은 샷을 보는 두 화면(오너 2026-11-22 D2~D5).
+    const stage = noticeStage(shotOrStage, currentStage)
     if (currentStage === stage) return // 이미 해당 stage를 보고 있음 → 알림 불필요
 
     // 배지는 더 이상 여기서 올리지 않는다(약속 D3) — 사이드바가 서버 완료 기록에서 파생한다(lib/stage-seen).
@@ -6046,7 +6100,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     )
   },
 
-  notifyIssue: (stage, content) => {
+  notifyIssue: (shotOrStage, content) => {
+    // 실사 그림 · 영상 알림('camera')은 지금 보는 화면 구간에 남긴다 — Director 를 보면 Director 구간(오너 2026-11-22 D2~D5).
+    const stage = noticeStage(shotOrStage, useProjectStore.getState().currentStage)
     // 같은 문구 연속 중복 방지 — 병렬 생성이 같은 사유로 무더기 실패하면 스레드가 도배된다.
     const last = get().messages[get().messages.length - 1]
     if (last && last.role === 'model' && last.content === content) return
