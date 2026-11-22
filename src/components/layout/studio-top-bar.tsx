@@ -19,16 +19,21 @@ import type { StageId } from '@/types'
 
 const ACTIONS_ID = 'studio-top-bar-actions'
 
+/** 이름 칸 — 최소 폭(4.5rem: 연필과 두어 글자)을 갖고 이름 길이까지만 늘어난다. 한 줄에 그 폭도 남지 않으면 막대가 줄을 바꿔
+ *  이 칸이 다음 줄로 내려가고, 그 줄보다 긴 이름은 말줄임으로 준다 — Writer [씬 스토리 | 콘티]가 자리를 차지하는 좁은 폭에서
+ *  이름이 0 폭이 되고 연필이 막대 밖으로 밀렸다(리드 2026-11-23 QA ①). 약속: tests/project/top-bar-title.test.ts */
 function CurrentProjectTitle() {
   const t = useT()
   const projectTitle = useProjectStore((s) => s.projectTitle)
   return (
-    <ProjectTitleField
-      title={projectTitle}
-      onRename={(next) => void useProjectStore.getState().renameProject(next).then((saved) => {
-        if (!saved) toast.error(t("Couldn't save the title. Please try again."))
-      })}
-    />
+    <div className="flex min-w-0 max-w-max grow basis-[4.5rem]" data-testid="top-bar-title">
+      <ProjectTitleField
+        title={projectTitle}
+        onRename={(next) => void useProjectStore.getState().renameProject(next).then((saved) => {
+          if (!saved) toast.error(t("Couldn't save the title. Please try again."))
+        })}
+      />
+    </div>
   )
 }
 
@@ -48,7 +53,8 @@ export function StudioTopBar({
   return (
     <header
       className={cn(
-        'sticky top-0 z-sticky flex min-h-[50px] shrink-0 items-center gap-3 bg-background pb-1 pl-6 pr-5 pt-2',
+        // 좁은 폭에서는 줄을 바꾼다(flex-wrap) — 칸이 막대 밖으로 밀리거나 이름이 0 폭이 되지 않게(리드 2026-11-23 QA ①).
+        'sticky top-0 z-sticky flex min-h-[50px] shrink-0 flex-wrap items-center gap-x-3 gap-y-1 bg-background pb-1 pl-6 pr-5 pt-2',
         className,
       )}
       data-testid="studio-top-bar"
