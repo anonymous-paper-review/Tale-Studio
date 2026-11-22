@@ -282,11 +282,14 @@ export function ShotStatusFilterMenu({
   counts,
   value,
   onChange,
+  countShown = true,
   className,
 }: {
   counts: Record<ShotStatusFilter, number>
   value: ShotStatusFilter
   onChange: (next: ShotStatusFilter) => void
+  /** false = 판을 다 읽기 전 · 못 불러옴 — 읽다 만 판으로 센 수를 적지 않는다(리드 11/23 판 읽기 뒷마무리, 고르기 줄과 같다). */
+  countShown?: boolean
   className?: string
 }) {
   const t = useT()
@@ -301,7 +304,7 @@ export function ShotStatusFilterMenu({
         )}
       >
         <span>{t(SHOT_STATUS_FILTER_LABEL[value])}</span>
-        <span className="font-num tabular-nums text-muted-foreground">{counts[value]}</span>
+        {countShown && <span className="font-num tabular-nums text-muted-foreground">{counts[value]}</span>}
         <ChevronDown className="size-3.5 text-muted-foreground" />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[220px]">
@@ -315,7 +318,7 @@ export function ShotStatusFilterMenu({
           >
             <StatusFilterRowMark row={row} />
             <span className="flex-1">{t(row.label)}</span>
-            <span className="font-num tabular-nums text-muted-foreground">{row.count}</span>
+            {countShown && <span className="font-num tabular-nums text-muted-foreground">{row.count}</span>}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

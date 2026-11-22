@@ -12,7 +12,7 @@ vi.mock('@/lib/i18n', async () => {
 })
 
 import { DirectorCanvasLoadNote, canvasCreateAllowed, directorCanvasNote, noShotsNoteAllowed } from '@/features/director/canvas-load-note'
-import { PickAllBar } from '@/features/director/shot-status'
+import { PickAllBar, ShotStatusFilterMenu } from '@/features/director/shot-status'
 import { markBoardLoad, retryBoardLoad, useBoardLoadStore } from '@/stores/board-load-store'
 
 const PAGE = 'src/app/studio/director/page.tsx'
@@ -175,5 +175,23 @@ describe('판 읽기 뒷마무리 — 같이 정한 것(리드 11/23)', () => {
     lang.locale = 'en'
     expect(renderToStaticMarkup(createElement(PickAllBar, { total: 0, picked: 0, countShown: false, onToggleAll: () => {}, onClear: () => {} }))).toContain('>All</span>')
     expect(page()).toMatch(/<PickAllBar\s+total=\{visibleShotIds\.length\}\s+picked=\{picked\.size\}\s+countShown=\{!boardOff\}/)
+  })
+})
+
+describe('판 읽기 뒷마무리 2 — 같이 정한 것(리드 11/23)', () => {
+  it('다 읽기 전 · 못 불러옴일 때 위쪽 상태 고르기 메뉴도 "전체 0 ▾" 대신 숫자를 적지 않는다', () => {
+    // 왜: 고르기 줄과 같은 숫자다 — 읽다 만 판으로 센 "전체 0"은 샷이 없는 것처럼 보인다(리드 11/23, 찾은 것).
+    const counts = { all: 0, image_needed: 0, image_generating: 0, image_done: 0, video_generating: 0, video_done: 0, video_failed: 0 }
+    const shown = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    const off = renderToStaticMarkup(createElement(ShotStatusFilterMenu, { counts, value: 'all', onChange: () => {}, countShown: false }))
+    expect(shown(off)).toBe('전체')
+    // 다 읽은 뒤는 지금 그대로("전체 0").
+    const on = renderToStaticMarkup(createElement(ShotStatusFilterMenu, { counts, value: 'all', onChange: () => {} }))
+    expect(shown(on)).toBe('전체 0')
+    // 펼친 목록의 상태별 수도 다 읽기 전에는 적지 않는다.
+    const menu = readFileSync('src/features/director/shot-status.tsx', 'utf8')
+    expect(menu).toMatch(/\{countShown && <span className="font-num tabular-nums text-muted-foreground">\{counts\[value\]\}<\/span>\}/)
+    expect(menu).toMatch(/\{countShown && <span className="font-num tabular-nums text-muted-foreground">\{row\.count\}<\/span>\}/)
+    expect(page()).toMatch(/<ShotStatusFilterMenu counts=\{statusCounts\} value=\{statusFilter\} onChange=\{setStatusFilter\} countShown=\{!boardOff\} \/>/)
   })
 })
