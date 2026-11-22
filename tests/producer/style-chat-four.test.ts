@@ -79,7 +79,8 @@ describe('채팅과 네 가지 스타일', () => {
     const saved: Array<string | null> = []
     useProducerStore.setState({ styleAnchors: CATALOG, setStyleAnchor: async (key) => { saved.push(key); return true } })
     vi.stubGlobal('fetch', vi.fn().mockResolvedValue(Response.json({ reply: '그림체를 확인했어요.', extractedSettings: { styleAnchorKey: 'real_3d' } })))
-    await useGlobalChatStore.getState().sendMessage('3D 애니메이션 그림체로 해줘')
+    // 스타일 낱말이 없는 말 — 낱말이 있으면 앱 앞단이 모델에 보내기 전에 답한다(tests/chat/retired-style-name). 여기서는 모델이 키를 낸 길을 본다.
+    await useGlobalChatStore.getState().sendMessage('입체 애니메이션 느낌으로 해줘')
     expect(saved).toEqual([])
     const reply = useGlobalChatStore.getState().messages.at(-1)?.content ?? ''
     expect(reply).toContain('3D 애니메이션은 이제 고를 수 없어요')

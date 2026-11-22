@@ -28,7 +28,7 @@ import { answersRestoredImageQuestion, characterPickOptions, imageRoleOptions, i
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import { producerBusyKind, type BoardBusy } from '@/lib/producer/busy'
 import { sceneStoryView } from '@/lib/producer/scene-story'
-import { nearestOfferedStyle } from '@/lib/style-offer'
+import { mentionsStyleWord, nearestOfferedStyle, retiredStyleMention } from '@/lib/style-offer'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
 import {
   requireDefaultAppearanceKey,
@@ -2709,6 +2709,20 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
     // 그림이 실린 말 · 떠 있는 그림 질문의 답은 아래 Writer 산문 고침(다시 쓰기 · 브레이크다운 말 포함)보다 먼저 그림 쪽이 받는다(점검 C05~C09).
     const imageFirst = stage === 'producer' && imageTurnFirst(get(), { text: trimmed, hasImages: (attachmentImageUrls?.length ?? 0) > 0, hidden: opts?.silentUser === true, projectId })
+
+    // 없어진 스타일을 이름으로 부르면(스타일 낱말과 함께) Writer · Artist 채팅은 모델에 보내지 않고 앱이 바로 답한다 — 이제 고를 수 없다 ·
+    //   네 가지 중 가장 가까운 것 · 고르는 곳(D6 오너 2026-11-22 "숨긴 스타일은 가장 가까운 4종 중 하나를 제안해줘"). 말로만 권하고 값은 바꾸지 않는다.
+    //   Artist 에서 그 스타일로 "돌아가자"는 말은 지금처럼 이전 버전 불러오기 카드가 받는다(아래 작품 스타일 기록 — 안 1 바탕).
+    if ((stage === 'producer' || stage === 'artist') && !opts?.silentUser && !imageFirst && thumbUrls.length === 0 && !(attachmentImageUrls?.length) && mentionsStyleWord(trimmed) &&
+      !(stage === 'artist' && styleReturnRequest(trimmed, artistStyleNames()))) {
+      if (useProducerStore.getState().styleAnchors.length === 0) await useProducerStore.getState().loadStyleAnchors()
+      const retiredKey = retiredStyleMention(trimmed, useProducerStore.getState().styleAnchors, { visualOnly: stage === 'producer' })
+      const reply = retiredKey ? retiredStyleReply(retiredKey) : null
+      if (reply && isCurrentSession()) {
+        get().appendLocalExchange(stage, trimmed, reply)
+        return
+      }
+    }
 
     const sceneSuggestion = get().suggestion
     const sceneChoices = sceneSuggestion?.id === `scene-story-edit:${projectId}`
