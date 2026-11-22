@@ -2851,6 +2851,7 @@ export const KO: Record<string, string> = {
   'Appears in: scenes {scenes} · shots {shots}': '씬 {scenes} · 샷 {shots}에 나와요',
   'Not in any shot yet': '아직 샷에 나오지 않아요',
   'Prop image': '소품 이미지',
+  'Regenerate the prop image': '소품 이미지 다시 그리기',
   'Style changed': '그림체 바뀜',
   'What to change (optional)': '바꿀 점(선택)',
   '{name} · Prop': '{name} · 소품',

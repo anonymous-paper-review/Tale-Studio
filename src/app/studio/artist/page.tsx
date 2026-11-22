@@ -51,6 +51,7 @@ import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-d
 import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
 import { completeVersionBlock, useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
 import { regenOverlayDescription, regenStepLines, versionStyleLabel } from '@/lib/artist/style-versions'
+import { propsAutoDrawOpen } from '@/lib/artist/props'
 import { ARTIST_SECTIONS, activeArtistSection, artistSectionCounts, artistSectionId, jumpToArtistSection, keyScrollsArtistBoard, shownArtistSection, type ArtistSection } from '@/lib/artist/card-filter'
 
 /** 움직임 줄이기 설정 — 켜져 있으면 바로가기가 미끄러지지 않는다(D13). */
@@ -471,6 +472,13 @@ export default function VisualPage() {
   useEffect(() => {
     if (drawDecision === 'continue') void useArtistStore.getState().continueMissingImages()
   }, [drawDecision])
+  // 소품 그림 이어 그리기(D7 · 리드 결정 2) — 인물 · 배경 그림을 다 그린 뒤, 서버 첫 그림이 자리 때문에 건너뛴 소품을 이 화면이 채운다.
+  //   [완료하기] 전(카드 단계)에만 — 완료한 프로젝트를 열었다고 저절로 그리지 않는다. 실패한 소품은 카드의 [다시 그리기]를 기다린다.
+  const propsAuto = propsAutoDrawOpen({ phase, done: progress.done, demo: isDemoSession() })
+  const propsMissing = propAssets.filter((prop) => !prop.imageUrl).length
+  useEffect(() => {
+    if (projectId && propsAuto && propsMissing > 0) void useArtistStore.getState().continueMissingProps()
+  }, [projectId, propsAuto, propsMissing])
   const redrawButton = drawDecision === 'stop' && missingCount > 0 ? (
     <Button size="sm" onClick={() => void useArtistStore.getState().redrawMissingImages()} data-testid="artist-redraw-missing">
       {t('Draw the {count} missing images', { count: missingCount })}
