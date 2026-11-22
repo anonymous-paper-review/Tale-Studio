@@ -22,6 +22,7 @@ import { type EntryDraft } from '@/lib/entry/draft'
 import {
   CHAT_QUESTION,
   EXAMPLES_PER_PAGE,
+  KEEP_LENGTH_NOTE,
   MOODS,
   RATIOS,
   RUNTIMES,
@@ -46,7 +47,7 @@ import {
 import { useEntryStore } from './entry-store'
 import { AgentBubble, FileChip, RecommendedBadge, UploadingChip, UserBubble, WhyLine } from './entry-parts'
 import { moodRecommendation, ratioRecommendation } from './series'
-import { summaryRows } from './summary'
+import { chatConfirmNote, summaryRows } from './summary'
 
 export function EntryChat() {
   const t = useT()
@@ -119,8 +120,9 @@ function ChipsBar({ draft, sent, t }: { draft: EntryDraft; sent: boolean; t: Tra
             key={chip.key}
             type="button"
             onClick={() => void reask(chip.key)}
-            disabled={!chip.value}
-            title={chip.value ? t('Click to choose again') : undefined}
+            // 원작 그대로의 길이 칸은 다시 고를 수 없다 — 누르면 까닭만 보인다(D15 오너 2026-11-22).
+            disabled={!chip.value || chip.locked}
+            title={chip.locked ? t(KEEP_LENGTH_NOTE) : chip.value ? t('Click to choose again') : undefined}
             aria-current={current ? 'step' : undefined}
             // 지금 묻는 칸은 지금 단계 색 테두리 · 18% 바탕(v3 고른 칩과 같은 규칙), 아직 못 정한 칸은 흐린 글자.
             className={cn(
@@ -129,7 +131,7 @@ function ChipsBar({ draft, sent, t }: { draft: EntryDraft; sent: boolean; t: Tra
               chip.value ? 'hover:bg-card' : null,
             )}
           >
-            {chip.key === 'ratio' ? <Lock className="size-3 text-subtle-foreground" aria-hidden /> : null}
+            {chip.key === 'ratio' || chip.locked ? <Lock className="size-3 text-subtle-foreground" aria-hidden /> : null}
             <span className="text-subtle-foreground">{chip.label}</span>
             <span className={chip.value ? 'font-semibold text-foreground' : 'text-subtle-foreground'}>{chip.value ?? t('Not yet')}</span>
           </button>
@@ -314,7 +316,8 @@ function QuestionCard({ question, draft, t }: { question: ChatQuestionKey | 'con
         <StageConfirm stage="entry" tone="chat" disabled={starting} onConfirm={() => void start()} onRevise={revise} />
         <p className="flex items-start gap-1.5 text-caption text-muted-foreground">
           <Lock className="mt-0.5 size-3 shrink-0" aria-hidden />
-          <span>{t('When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make the length 1 minute".')}</span>
+          {/* 원작 그대로면 길이 예시 대신 장르 예시(D15) — 그대로는 길이를 말해도 원작 길이를 따른다. */}
+          <span>{t(chatConfirmNote(draft.picks.level))}</span>
         </p>
       </AgentBubble>
     )

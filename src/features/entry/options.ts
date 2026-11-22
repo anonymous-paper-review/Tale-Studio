@@ -259,6 +259,9 @@ export function levelQuestion(isScript: boolean): string {
   return isScript ? 'How shall we use the script?' : 'How much may AI change your text?'
 }
 
+/** 원작 그대로면 길이는 원작을 따른다 — 설정 판 · 채팅 칩 · 말로 한 길이 · 확인 창이 같은 문장을 쓴다(D15 오너 2026-11-22). */
+export const KEEP_LENGTH_NOTE = 'When the original is kept as is, the length follows the original.'
+
 /** "그대로"를 고를 수 없을 때의 이유 — 화면(1안)은 여는 방법을, 채팅(2안)은 다른 단계를 권한다. */
 export function keepUnavailableNote(where: 'form' | 'chat'): string {
   return where === 'form'
@@ -291,9 +294,12 @@ export type ChatQuestionKey = 'file' | PickKey
 export const PICK_KEYS: readonly PickKey[] = ['mood', 'runtime', 'level', 'ratio']
 export const CHAT_QUESTION_KEYS: readonly ChatQuestionKey[] = ['file', 'mood', 'runtime', 'level', 'ratio']
 
-/** 파일을 올린 사람은 "어떻게 쓸까요"(= 바꿈 정도)를 먼저, 글만 쓴 사람은 장르 → 길이 → 바꿈 정도. 화면 비율은 마지막. */
-export function chatQuestionOrder(hasFile: boolean): ChatQuestionKey[] {
-  return hasFile ? ['file', 'mood', 'runtime', 'ratio'] : ['mood', 'runtime', 'level', 'ratio']
+/** 파일을 올린 사람은 "어떻게 쓸까요"(= 바꿈 정도)를 먼저, 글만 쓴 사람은 장르 → 길이 → 바꿈 정도. 화면 비율은 마지막.
+ *  원작 그대로(keep)면 길이는 원작이 정한다 — 길이는 묻지 않는다(D15 오너 2026-11-22). 글만 쓴 사람의 순서는 그대로라
+ *  길이를 답한 뒤 그대로를 고르면 그 길이 문답은 순서에서 빠진다(대화 · 칩에도 남지 않는다). */
+export function chatQuestionOrder(hasFile: boolean, level: LevelKey | null = null): ChatQuestionKey[] {
+  const order: ChatQuestionKey[] = hasFile ? ['file', 'mood', 'runtime', 'ratio'] : ['mood', 'runtime', 'level', 'ratio']
+  return level === 'keep' ? order.filter((key) => key !== 'runtime') : order
 }
 
 export function nextChatQuestion(order: readonly ChatQuestionKey[], answered: Partial<Record<ChatQuestionKey, boolean>>): ChatQuestionKey | 'confirm' {

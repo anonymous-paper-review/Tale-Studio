@@ -3,7 +3,7 @@
 //   약속: tests/producer/entry-screens.test.ts · tests/producer/entry-series-screen.test.ts
 import { fileHasText, type EntryDraft } from '@/lib/entry/draft'
 import type { AppLocale } from '@/lib/locale'
-import { QUESTION_NAME, moodOf, runtimeOf } from './options'
+import { KEEP_LENGTH_NOTE, QUESTION_NAME, moodOf, runtimeOf, type LevelKey } from './options'
 import { levelOptionsOf, type Translator } from './chat-flow'
 import { dialogueLanguageName, type EntrySeries } from './series'
 
@@ -18,6 +18,19 @@ export interface SummaryRow {
 }
 
 export const RATIO_LOCK_NOTE = 'It cannot be changed after you start'
+
+/** 1안 확인 창 아래 안내(영어 원문 = 사전 키) — 원작 그대로면 길이는 원작을 따른다고만 말한다(D15 오너 2026-11-22):
+ *  그대로 쓰는 작품은 Writer 에서 산문 · 길이를 바꿀 수 없다. 약속: tests/producer/entry-keep-chat.test.ts */
+export function startConfirmNote(level: LevelKey | null): string {
+  return level === 'keep' ? KEEP_LENGTH_NOTE : 'You can change the genre and mood and the length again in Writer.'
+}
+
+/** 2안 정리 카드 아래 안내 — 말로 고치는 예시가 원작 그대로면 길이가 아니라 장르다(D15, 혼자 정한 것). */
+export function chatConfirmNote(level: LevelKey | null): string {
+  return level === 'keep'
+    ? 'When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make it a comedy".'
+    : 'When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make the length 1 minute".'
+}
 
 /**
  * 확인 창 · 정리 카드(mode confirm)는 "시작하면 끝까지 바꿀 수 없어요"를 비율 옆에 붙이고,

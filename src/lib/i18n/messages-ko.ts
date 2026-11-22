@@ -2728,6 +2728,8 @@ export const KO: Record<string, string> = {
   '"{text}": I did not quite get that. Please choose with the buttons.': '"{text}": 잘 못 알아들었어요. 버튼으로 골라 주세요.',
   'I will start like this.': '이렇게 시작할게요.',
   'When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make the length 1 minute".': '누르면 화면 비율이 잠겨요. 고치고 싶으면 위쪽 항목을 누르거나 "길이는 1분으로"처럼 말해 주세요.',
+  // D15(오너 2026-11-22): 원작 그대로면 길이는 원작을 따른다 — 정리 카드의 말로 고치기 예시는 장르로.
+  'When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make it a comedy".': '누르면 화면 비율이 잠겨요. 고치고 싶으면 위쪽 항목을 누르거나 "장르는 코미디로"처럼 말해 주세요.',
   // 예시
   'Office comedy': '직장 코미디',
   'The hallway vending machine breaks and cans pour out, but Minho is the only one who does not get a single can': '회사 복도 자판기가 고장 나서 캔이 우르르 쏟아지는데, 주인공 민호만 하나도 못 먹는 이야기',

@@ -28,6 +28,7 @@ import { answersRestoredImageQuestion, characterPickOptions, imageRoleOptions, i
 import { CHAT_IMAGE_ROLE_CONSENT, CHAT_STYLE_CONFIRM_CONSENT, CHAT_STYLE_REQUEST_CONSENT, COMIC_ANALYSIS_CONSENT, CREATION_ANALYSIS_CONSENT, STYLE_PICKER_CONSENT } from '@/lib/style-facets/consent'
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import { producerBusyKind, type BoardBusy } from '@/lib/producer/busy'
+import { sceneStoryView } from '@/lib/producer/scene-story'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
 import {
   requireDefaultAppearanceKey,
@@ -208,6 +209,8 @@ interface GlobalChatState {
   /** 시작 화면에서 만화 쪽을 그대로로 시작한 프로젝트면 Writer 산문이 나온 뒤 채팅에서 채팅 길과 같은 그림체 질문을 칩으로 묻는다(2026-11-11 오너).
    *  물었으면 true. 이미 답했거나 확정했거나 서버가 물을 쪽이 없다고 하면(다듬기 · 만화 아님 · 그림체 있음) 묻지 않는다. */
   offerStartComicStyle: (projectId: string) => Promise<boolean>
+  /** Writer 산문 다시 쓰기 단추([다시 써 달라고 하기]) — 원작 그대로 쓰는 작품이면 조건 창 대신 누른 말과 까닭을 남기고, 아니면 조건 창을 연다(D15 오너 2026-11-22). */
+  requestProseRewrite: (said: string) => void
   /** 트리트먼트에 미리 보이는 안(v1 · v2 · v3). 채팅 카드와 트리트먼트가 같은 값을 읽는다. */
   sceneStoryVariantPreview: { projectId: string; proposalId: string; variantId: string } | null
   previewSceneStoryVariant: (proposalId: string, variantId: string) => void
@@ -673,6 +676,15 @@ function styleAttachmentAnswer(text: string): 'style' | 'reference' | null {
 async function retryComicScript(get: () => GlobalChatState, retry: ComicRetry): Promise<void> {
   const comic = await runComicAdaptation(get, retry.pages, { consent: retry.consent, skipStyle: true, then: retry.then, ...(retry.rewriteDraft ? { rewriteDraft: true } : {}) })
   if (comic.scriptSet && retry.then?.startTreatment) await startCreationTreatment(retry.then.locale)
+}
+
+/** 원작 그대로 쓰는 작품의 Writer 산문은 다시 쓰지 않는다 — 다시 써 달라는 말 · 단추에 하는 답(D15 오너 2026-11-22, 서버 preserved_script 거절과 같은 문장). */
+const PRESERVED_PROSE_NOTE = 'This project keeps the original script as is, so the prose cannot be changed. When you have read it, press [Run breakdown] to move on.'
+
+/** Writer 산문이 원작 그대로인가 — 산문 화면(use-prose · sceneStoryView)과 같은 판정. */
+function proseKeepsOriginal(): boolean {
+  const producer = useProducerStore.getState()
+  return sceneStoryView({ preserveScript: producer.preserveScript, storyText: producer.storyText, locked: false, streamed: [], saved: [] }).kind === 'original'
 }
 
 /**
@@ -2888,6 +2900,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     return run
   },
 
+  requestProseRewrite: (said) => {
+    // 원작 그대로 쓰는 작품은 조건 창이 열리지 않는다(산문 도구가 꺼져 있다) — 누른 말과 까닭 · 넘어가는 길을 채팅에 남긴다(D15 오너 2026-11-22).
+    if (proseKeepsOriginal()) {
+      get().appendLocalExchange('producer', said, translate(contentLocale(), PRESERVED_PROSE_NOTE))
+      return
+    }
+    useWriterRoomStore.getState().openRewrite()
+  },
+
   resolveSceneStoryUndo: async (action, undoId) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId || !undoId || get().sceneStoryEdit || sceneGateInFlight.has(projectId) || sceneStoryRequests.has(projectId)) return false
@@ -2992,6 +3013,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const intent = writerChatIntent(trimmed, { proseDraft: writerProse })
       if (intent === 'breakdown' || (intent === 'rewrite' && writerProse)) {
         if (sceneSuggestion?.stage === 'producer') get().dismissSuggestion({ implicit: true })
+        // 원작 그대로 쓰는 작품은 다시 쓰지 않는다 — 러닝타임 등 조건을 묻지 않고 까닭과 넘어가는 길을 말한다(D15 오너 2026-11-22).
+        if (intent === 'rewrite' && proseKeepsOriginal()) {
+          get().appendLocalExchange('producer', trimmed, translate(contentLocale(), PRESERVED_PROSE_NOTE))
+          return
+        }
         if (intent === 'rewrite') useWriterRoomStore.getState().openRewrite()
         else useWriterRoomStore.getState().openConfirm()
         get().appendLocalExchange('producer', trimmed, translate(contentLocale(), intent === 'rewrite'
