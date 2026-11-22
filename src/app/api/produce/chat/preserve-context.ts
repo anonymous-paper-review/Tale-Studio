@@ -28,7 +28,7 @@ export function fixedStyleDirective(styleLocked: unknown): string | null {
   return [
     '[Fixed Art Style]',
     "The project's art style was extracted from a picture the user uploaded and chose as the art style. It is fixed for this project.",
-    'Do not emit styleAnchorKey or styleAnchorFromAttachment, and do not suggest choosing another style or the palette icon.',
+    'Do not emit styleAnchorKey or styleAnchorFromAttachment, and do not suggest choosing another style.',
     "If the user asks to change the art style, say plainly that it comes from the picture they chose and can't be changed in this project.",
   ].join('\n')
 }

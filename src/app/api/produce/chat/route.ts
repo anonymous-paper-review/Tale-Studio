@@ -26,6 +26,7 @@ import { buildReferenceDigest, getProjectReferenceId } from '@/lib/reference-imp
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 import { styleCatalogLine } from '@/lib/style-anchor-name'
+import { offeredStyles, retiredStylesContext } from '@/lib/style-offer'
 
 
 
@@ -235,10 +236,11 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     //   고정된 그림체면 목록을 주지 않는다 — 보면 바꾸자고 권한다.
     const anchorCatalog = styleLocked !== true ? await listStyleAnchorCatalog() : []
     if (anchorCatalog.length > 0) {
-      contextParts.push(
-        // 키 · 한국어 이름 · 영어 이름 · 매체 — 영어로 답할 때 한국어 이름을 쓰지 않게(10/21).
-        `[Style Anchor Catalog]\n${anchorCatalog.map((a) => styleCatalogLine(a)).join('\n')}`,
-      )
+      // 키 · 한국어 이름 · 영어 이름 · 매체 — 영어로 답할 때 한국어 이름을 쓰지 않게(10/21).
+      //   고를 수 있는 것은 네 가지뿐이다(D6 오너 2026-11-22) — 없어진 스타일은 가장 가까운 짝 표로만 준다(정하지 않고 권한다).
+      contextParts.push(`[Style Anchor Catalog]\n${offeredStyles(anchorCatalog).map((a) => styleCatalogLine(a)).join('\n')}`)
+      const retired = retiredStylesContext(anchorCatalog)
+      if (retired) contextParts.push(retired)
     }
 
     // 핸드오프 가부의 단일 판정자 = 코드 게이트. LLM 이 자기 기준으로 "준비 완료"를 선언하지 않도록

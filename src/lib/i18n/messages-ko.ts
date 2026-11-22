@@ -1454,9 +1454,12 @@ export const KO: Record<string, string> = {
     '좋아요, Writer로 넘어갈게요! 재료를 넘기고 씬·샷 설계를 시작해요.',
   'On it, re-running the Writer with your current source. This can take a while.':
     '좋아요, 지금 원천 그대로 Writer를 다시 실행할게요! 시간이 좀 걸릴 수 있어요.',
-  // D12 — 채팅이 이름/느낌으로 스타일 앵커를 직접 반영 (2026-08-31 오너)
-  "Couldn't find that art style in the catalog. Tell me the feel again or choose one using the palette icon below the chat input.":
-    '그 그림체는 목록에서 못 찾았어요. 느낌을 다시 말해 주거나 채팅 입력창 아래의 팔레트 아이콘을 눌러 골라 주세요.',
+  // D12 — 채팅이 이름/느낌으로 스타일 앵커를 직접 반영 (2026-08-31 오너). 고르는 곳은 Artist 스타일 창(리드 2026-11-22 결정 3 — 팔레트 아이콘은 없다).
+  "Couldn't find that art style. Tell me the feel again, or pick one of the four styles in the style window in Artist when you make the images.":
+    '그 그림체는 찾지 못했어요. 느낌을 다시 말해 주거나, 그림을 만들 때 Artist 스타일 창에서 네 가지 중 하나를 골라 주세요.',
+  // D6(오너 2026-11-22) — 없어진 스타일은 정하지 않고 네 가지 중 가장 가까운 것을 권한다. 조사는 이름에 맞춰 고친다(fixKoreanParticles).
+  '{style} is no longer offered. Of the four styles, {nearest} is the closest. You can pick it in the style window in Artist when you make the images.':
+    '{style}은 이제 고를 수 없어요. 네 가지 중에서는 {nearest}가 가장 가까워요. 그림을 만들 때 Artist 스타일 창에서 고를 수 있어요.',
   "The previous Writer run didn't finish (no scenes/shots)": '이전 Writer 실행이 완료되지 않았어요 (씬/샷 없음)',
   'Check the story and settings, then re-run to generate scenes/shots and fill in Director/Editor.': '스토리·설정을 확인하고 다시 실행하면 씬·샷이 생성돼 Director/Editor 가 채워집니다.',
   'Suggest re-running Writer': 'Writer 다시 실행 제안',
@@ -1775,6 +1778,9 @@ export const KO: Record<string, string> = {
   'Save screen as JPEG': '화면 JPEG로 저장',
   'Save master sheet as image': '마스터 시트 이미지로 저장',
   'Remove my art style': '내 그림체 지우기',
+  // D6(오너 2026-11-22) — 고를 수 있는 스타일은 네 가지. 없어진 스타일은 이 작품이 쓰는 칸 하나만 남고, 정해 둔 것이 없어졌으면 가장 가까운 것을 골라 둔다.
+  'No longer offered': '새로 고를 수 없음',
+  '{style} is no longer offered, so I picked the closest style, {nearest}.': '{style}은 이제 고를 수 없어서 가장 가까운 {nearest}를 골라 뒀어요.',
   'Remove my art style? You can pick another style after removing it.': '내 그림체를 지울까요? 지우면 다른 스타일을 고를 수 있어요.',
   'Could not remove my art style. Please try again.': '내 그림체를 지우지 못했어요. 다시 시도해 주세요.',
   'Could not remove my art style: {message}': '내 그림체를 지우지 못했어요: {message}',

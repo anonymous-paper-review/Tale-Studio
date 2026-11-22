@@ -29,6 +29,7 @@ import { CHAT_IMAGE_ROLE_CONSENT, CHAT_STYLE_CONFIRM_CONSENT, CHAT_STYLE_REQUEST
 import type { PendingCreation } from '@/stores/pending-creation-store'
 import { producerBusyKind, type BoardBusy } from '@/lib/producer/busy'
 import { sceneStoryView } from '@/lib/producer/scene-story'
+import { nearestOfferedStyle } from '@/lib/style-offer'
 import { backgroundMentions, castMentions } from '@/lib/card-mention'
 import {
   requireDefaultAppearanceKey,
@@ -676,6 +677,25 @@ function styleAttachmentAnswer(text: string): 'style' | 'reference' | null {
 async function retryComicScript(get: () => GlobalChatState, retry: ComicRetry): Promise<void> {
   const comic = await runComicAdaptation(get, retry.pages, { consent: retry.consent, skipStyle: true, then: retry.then, ...(retry.rewriteDraft ? { rewriteDraft: true } : {}) })
   if (comic.scriptSet && retry.then?.startTreatment) await startCreationTreatment(retry.then.locale)
+}
+
+/** 채팅이 고른 스타일을 찾지 못했을 때의 답 — 고르는 곳은 그림을 만들 때 Artist 스타일 창(리드 2026-11-22 결정 3: 팔레트 아이콘은 지금 없는 단추였다). */
+const STYLE_NOT_FOUND_REPLY = "Couldn't find that art style. Tell me the feel again, or pick one of the four styles in the style window in Artist when you make the images."
+
+/** 없어진 스타일로 정해 달라는 말에 하는 답 — 정하지 않고 네 가지 중 가장 가까운 것과 고르는 곳을 말한다(D6 오너 2026-11-22). 짝을 모르면 null. */
+function retiredStyleReply(key: string): string | null {
+  const voice = contentLocale()
+  const anchors = useProducerStore.getState().styleAnchors
+  const retired = anchors.find((anchor) => anchor.key === key)
+  const nearestKey = nearestOfferedStyle({ key, medium: retired?.medium ?? null })
+  const nearest = nearestKey ? anchors.find((anchor) => anchor.key === nearestKey) : undefined
+  if (!retired || !nearest) return null
+  const style = styleAnchorName(retired, voice)
+  const closest = styleAnchorName(nearest, voice)
+  return fixKoreanParticles(
+    translate(voice, '{style} is no longer offered. Of the four styles, {nearest} is the closest. You can pick it in the style window in Artist when you make the images.', { style, nearest: closest }),
+    [style, closest],
+  )
 }
 
 /** 원작 그대로 쓰는 작품의 Writer 산문은 다시 쓰지 않는다 — 다시 써 달라는 말 · 단추에 하는 답(D15 오너 2026-11-22, 서버 preserved_script 거절과 같은 문장). */
@@ -4151,17 +4171,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             { styleAnchorKey: key },
             outcome === 'applied'
               ? 'ok'
-              : outcome === 'unknown_key'
+              : outcome === 'unknown_key' || outcome === 'retired'
                 ? 'invalid_input'
                 : 'unverified',
             styleError,
           )
           if (outcome !== 'applied') {
             patchTrace({ skippedCount: 1 })
-            styleAnchorFailure = translate(
-              contentLocale(),
-              "Couldn't find that art style in the catalog. Tell me the feel again or choose one using the palette icon below the chat input.",
-            )
+            // 없어진 스타일은 정하지 않고 네 가지 중 가장 가까운 것을 권한다(D6 오너 2026-11-22). 고르는 곳은 Artist 스타일 창(리드 결정 3 — 팔레트 아이콘은 없다).
+            styleAnchorFailure = (outcome === 'retired' ? retiredStyleReply(key) : null) ?? translate(contentLocale(), STYLE_NOT_FOUND_REPLY)
           } else {
             patchTrace({ appliedCount: 1 })
           }
