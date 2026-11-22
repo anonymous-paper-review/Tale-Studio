@@ -31,12 +31,14 @@ import { moderationRejectionResponse, recordModerationPass } from '@/lib/api/mod
 import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
 import { realCineLine } from '@/lib/director/real-cine-line'
 import {
+  loadPropsForReferences,
   loadShotReferencePlans,
   missingSheetsMessage,
   stripUrlQuery,
   MISSING_CHARACTER_SHEETS,
   type ShotRowForReferences,
 } from '@/lib/director/shot-references'
+import { planShotPropRefs, propRefRoom, propReferenceLines, type ShotPropRef } from '@/lib/director/shot-prop-refs'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
@@ -181,6 +183,11 @@ export async function POST(req: Request) {
     const characterRefLabels = serverPlan
       ? serverPlan.characterRefs.map((r) => ({ name: r.name, position: r.position, pose: r.pose }))
       : undefined
+    // 소품 참고(D7 2단계, 2026-11-22) — 그 샷 소품 칸에 나오는 소품의 그림(한 샷 2장까지). 소품 그림을 못 읽으면 소품 없이 그린다(지금과 같다).
+    const shotPropPlan: ShotPropRef[] = shot
+      ? planShotPropRefs((shot as { static_spec?: unknown }).static_spec, await loadPropsForReferences(projectId).catch(() => []))
+      : []
+    let propRefs: ShotPropRef[] = []
 
     // #u17-2(2026-08-31 오너 지시): 수동 샷(shots.prompt=NULL)의 한국어 액션 원문 유출 방어 —
     //   영상 라우트(#w-c)와 동일하게 서버 최종 방어로 EN 파생. 이미 영어면 LLM 없이 통과,
@@ -284,8 +291,14 @@ export async function POST(req: Request) {
       if (upErr) throw upErr
       stripRefUrl = `${mediaPublicUrl(refPath)}?v=${Date.now()}`
 
-      // 레퍼런스 계약(buildRealStripPrompt 와 합치): [스트립, ...캐릭터/월드, 앵커?].
+      // 레퍼런스 계약(buildRealStripPrompt 와 합치): [스트립, ...캐릭터/월드, 소품?, 앵커?].
       //   applyStyleAnchor 는 앵커를 1번에 놓아 스트립 프롬프트와 충돌 → 스트립 모드는 수동 조립.
+      //   소품(D7 2단계)은 인물 · 배경 · 추가 입력 뒤, 화풍 앞 — 지금 번호는 그대로이고 화풍은 여전히 마지막이다. 상한을 넘으면 소품부터 뺀다.
+      const styleRefCount = anchor ? (anchor.usePreviewRef && anchor.previewUrl ? 2 : 1) : 0
+      propRefs = shotPropPlan
+        .filter((ref) => !assembledRefs.some((url) => stripUrlQuery(url) === stripUrlQuery(ref.url)))
+        .slice(0, propRefRoom(1 + assembledRefs.length + styleRefCount))
+      const propLines = propReferenceLines(2 + assembledRefs.length, propRefs)
       finalOpts = {
         prompt: buildRealStripPrompt(guardedPrompt, {
           // #ref-gate: 서버가 붙인 인물·배경·추가 입력의 경계. 레거시 샷(characters 미정의)만 클라 경계.
@@ -301,7 +314,7 @@ export async function POST(req: Request) {
           styleRefCount: anchor?.usePreviewRef && anchor.previewUrl ? 2 : 1,
           frameAxis: composed.geometry.frameAxis,
           cineLine,
-        }),
+        }) + (propLines.length ? `\n${propLines.join('\n')}` : ''),
         // #real-strip-guard(2026-08-06)→#fal-canvas→#sheet-formats(2026-08-17): 캔버스는 합성이
         //   고른 지오메트리를 따른다 — 레퍼런스·캔버스·프롬프트 축·크롭이 한 시트 계약으로 정합.
         //   (ed5bd4a 전까지 image_size 는 타입에 없어 버려지고 'auto'가 전송되고 있었다 —
@@ -310,6 +323,7 @@ export async function POST(req: Request) {
         reference_image_urls: [
           stripRefUrl,
           ...assembledRefs,
+          ...propRefs.map((ref) => ref.url),
           ...(anchor ? [anchor.imageUrl] : []),
           ...(anchor?.usePreviewRef && anchor.previewUrl ? [anchor.previewUrl] : []),
         ],
@@ -372,6 +386,7 @@ export async function POST(req: Request) {
           continuityPrevText,
           ...(characterRefLabels ?? []).flatMap((r) => [r.name, r.pose]),
           cineLine,
+          ...propRefs.map((ref) => ref.name),
         ],
         { projectId, kind: 'shot_storyboard', userId: access.userId },
       )

@@ -32,7 +32,8 @@ import {
   type CharacterRefLabel,
 } from '@/lib/director/storyboard-strip'
 import { realCineLine } from '@/lib/director/real-cine-line'
-import { applyDirectorRefs, directorRefsExcludeWorld, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking, readOffFrame } from '@/lib/director/shot-references'
+import { applyDirectorRefs, directorRefsExcludeWorld, loadPropsForReferences, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking, readOffFrame } from '@/lib/director/shot-references'
+import { planSheetPropRefs, propRefRoom, propReferenceLines } from '@/lib/director/shot-prop-refs'
 import { loadSeriesFirstShotContinuity, seriesContinuityPromptLine } from '@/lib/series/continuity'
 import { parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
@@ -76,6 +77,8 @@ interface EligibleShot {
   roughGeneratedAt: number | null
   /** D5(2026-11-22): 러프 가운데 장 글씨 칸이 나르던 빛 · 색 · 렌즈 · 초점 — 샷 설계에서 만든 글(없으면 null). */
   cineLine: string | null
+  /** 소품 참고(D7 2단계): 칸마다 소품 칸(static_spec.prop_placement)을 읽는다. */
+  staticSpec: unknown
 }
 
 class CharacterAppearanceContractError extends Error {}
@@ -236,6 +239,7 @@ export async function POST(req: NextRequest) {
         frames: { start: f.start, direction: f.direction, end: f.end },
         blocking: readCharacterBlocking(s.static_spec),
         cineLine: realCineLine(s.static_spec),
+        staticSpec: s.static_spec,
       })
     }
 
@@ -342,6 +346,8 @@ export async function POST(req: NextRequest) {
     // 시리즈 연속성(2026-10-26): "앞 화 마지막 장면에서 이어 시작하기"로 만든 화의 첫 샷이 이 시트에 들어 있을 때만 —
     //   앞 화 끝 장면을 인물 · 배경 뒤(화풍 참고 앞)에 한 장 더 붙이고 그 칸을 가리키는 연속성 한 줄을 더한다.
     const continuity = await loadSeriesFirstShotContinuity(projectId, project)
+    // 소품 참고(D7 2단계, 2026-11-22) — 그림이 있는 소품. 못 읽으면 소품 없이 그린다(지금과 같다).
+    const projectProps = await loadPropsForReferences(projectId).catch(() => [])
 
     const webhookUrl = resolveWebhookUrl()
     const submitted: Array<{ jobId: string; shotIds: string[] }> = []
@@ -413,6 +419,17 @@ export async function POST(req: NextRequest) {
       const worldRef = group.every((s) => s.excludeWorld) ? null : (worldRefByScene.get(group[0].scene_id) ?? null)
       const seriesFrameColumn = continuity ? group.findIndex((s) => s.shot_id === continuity.firstShotId) : -1
       const seriesFrameUrl = continuity && seriesFrameColumn >= 0 ? continuity.frameUrl : null
+      // 소품(D7 2단계): 칸마다 그 칸에 나오는 소품 — 한 장에 3장까지, 나오는 칸이 많은 것 먼저. 인물 · 배경 · 앞 화 장면 뒤, 화풍 앞.
+      //   참고 그림 상한을 넘으면 소품부터 뺀다.
+      const sheetProps = planSheetPropRefs(group.map((s) => s.staticSpec), projectProps)
+      const otherRefCount = 1 + groupRefs.length + (worldRef ? 1 : 0) + (seriesFrameUrl ? 1 : 0) + (anchor ? (anchorTwoRef ? 2 : 1) : 0)
+      const propRefs = sheetProps.refs.slice(0, propRefRoom(otherRefCount))
+      const keptProps = new Set(propRefs.map((ref) => ref.propId))
+      const propLines = propReferenceLines(
+        2 + groupRefs.length + (worldRef ? 1 : 0) + (seriesFrameUrl ? 1 : 0),
+        propRefs,
+        sheetProps.columnProps.map((column) => column.filter((ref) => keptProps.has(ref.propId))),
+      )
       const prompt = buildRealGridPrompt(group.length, {
         characterRefCount: groupRefs.length,
         worldRefCount: worldRef ? 1 : 0,
@@ -426,12 +443,13 @@ export async function POST(req: NextRequest) {
         styleAnchors: userStyleFacets?.probeAnchors ?? null,
         styleAvoid: userStyleFacets?.negative ?? null,
         cineLines: group.map((s) => s.cineLine),
-      }) + (seriesFrameUrl ? `\n- ${seriesContinuityPromptLine(seriesFrameColumn + 1)}` : '')
+      }) + (seriesFrameUrl ? `\n- ${seriesContinuityPromptLine(seriesFrameColumn + 1)}` : '') + (propLines.length ? `\n${propLines.join('\n')}` : '')
       const referenceImageUrls = [
         refUrl,
         ...groupRefs.map((r) => r.url),
         ...(worldRef ? [worldRef] : []),
         ...(seriesFrameUrl ? [seriesFrameUrl] : []),
+        ...propRefs.map((ref) => ref.url),
         ...(anchor ? [anchor.imageUrl] : []),
         ...(anchorTwoRef ? [anchor!.previewUrl as string] : []),
       ]
@@ -445,6 +463,7 @@ export async function POST(req: NextRequest) {
         moderation = await assertUserTextAllowed(
           [
             ...columnCharacters.flatMap((column) => column.flatMap((c) => [c.name, c.pose, c.position])),
+            ...propRefs.map((ref) => ref.name),
             sceneLighting,
             ...group.map((s) => s.cineLine),
           ],

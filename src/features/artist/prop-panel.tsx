@@ -12,6 +12,7 @@ import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { PropViewDialog, usePropStyleId } from '@/features/artist/prop-view-dialog'
 import { propImageStale } from '@/lib/artist/prop-image'
 import { isMentionModifierClick } from '@/lib/card-mention'
+import { isDemoSession } from '@/lib/demo/context'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
@@ -38,6 +39,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
   const propFailures = useArtistStore((s) => s.propFailures)
   const mentionedRefs = useChatUiStore((s) => s.mentionedRefs)
   const styleId = usePropStyleId()
+  const demo = isDemoSession()
   // 그림 창(D7) — 그림을 누르거나 카드를 두 번 누르면 연다(인물 · 배경 카드와 같다).
   const [viewing, setViewing] = useState<string | null>(null)
   const noteSelection = (propId: string) => {
@@ -139,8 +141,9 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
           <ImagePlaceholder label={t('Prop')} aspectRatio="square" imageUrl={prop.imageUrl} generating={generating} hideCaption />
         </button>
 
-        {/* 그리기 · 다시 그리기(무료) — 실패했거나 바뀌었으면 다시 그리기, 그림이 없으면 그리기. 그리는 중에는 숨긴다(두 번 그리지 않게). */}
-        {generating ? null : failure || (prop.imageUrl && stale !== 'fresh') ? (
+        {/* 그리기 · 다시 그리기(무료) — 실패했거나 바뀌었으면 다시 그리기, 그림이 없으면 그리기. 그리는 중에는 숨긴다(두 번 그리지 않게).
+            데모(보기 전용 공유)는 그리지 않으므로 단추를 보이지 않는다. */}
+        {generating || demo ? null : failure || (prop.imageUrl && stale !== 'fresh') ? (
           <Button size="sm" variant="outline" className="mt-2.5" onClick={draw} data-testid="artist-prop-redraw">
             <RefreshCw className="size-3.5" />{t('Redraw')}
           </Button>
