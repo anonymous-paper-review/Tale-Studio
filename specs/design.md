@@ -544,6 +544,7 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
   11/5 색: 지금 단계 아이콘 = 그 단계 색(`text-stage`) · 이름 #F5F4EE, 다른 단계 아이콘 #C2C0B6(`text-muted-foreground`) · 이름은 끝냄 #C2C0B6 · 안 연 #8E8B82, 끝낸 단계 체크 크림 #F5F4EE. 아래 단추는 아이콘 · 글 사이 4(`FooterIconItem`).
 - **위 막대** `src/components/layout/studio-top-bar.tsx` `StudioTopBar`: 단계 칩(`StageChip`) · 프로젝트 제목 + 연필(`ProjectTitleField`, 이름 바꾸기) · 오른쪽 자리. 스튜디오 레이아웃이 모든 단계 화면 위에 놓고(위에 붙는 sticky), Producer 시작 화면은 탭이 든 자기 막대를 같은 컴포넌트로 그린다. 화면이 오른쪽 자리에 단추를 놓을 때는 `<TopBarActions>`(포털).
   Writer 두 화면(씬 스토리 · 콘티, D1 2026-11-22)은 칩 바로 오른쪽에 [씬 스토리 | 콘티] 묶음 탭(`Tabs` default, 높이 32, `features/writer/writer-part-switch.tsx`)을 둔다 — **시안 없음**(부품 · 토큰으로 맞춤). 화면 이름은 이 칸이 보여 주고 두 화면 머리(`PageHeader`)의 큰 제목은 읽기 프로그램에만 남긴다. 아직 안 열린 콘티 칸은 꺼지고 까닭을 `title` 로 보인다.
+  좁은 폭(리드 2026-11-23 QA ①): 막대는 줄을 바꾼다(`flex-wrap`, 줄 사이 4). 이름 칸은 최소 4.5rem(연필 + 두어 글자)이라 한 줄에 그 폭도 남지 않으면 다음 줄로 내려가고, 그 줄보다 긴 이름은 말줄임 — 이름이 0 폭이 되거나 연필이 막대 밖으로 밀리지 않는다. 오른쪽 자리 단추도 넘치면 다음 줄 오른쪽으로 간다. 넓은 화면은 한 줄 그대로.
 - **대시보드 머리** `src/components/dashboard/dashboard-header.tsx` `DashboardHeader`: 스튜디오 밖(/projects · /projects/new · /playground · /queue · /account) 공용 — `TaleLockup` · 탭 묶음 · 오른쪽 자리(새 프로젝트 등).
   11/5 R2~R6: 막대 바탕은 페이지 바탕을 따르고(이 화면들은 `bg-lobby`) 아래 선이 없다. 높이 78(위아래 20) · 로고 묶음 26 · 로고와 탭 사이 89.
   탭은 알약 하나(`bg-side` · 안쪽 4 · 사이 2, 칸 13px · 위아래 7 · 양옆 14, 고른 칸 `bg-tab-selected` 600 · 나머지 500 흐린 글자).
