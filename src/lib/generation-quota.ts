@@ -47,6 +47,7 @@ export const IMAGE_JOB_KINDS: readonly GenerationJobKind[] = [
   'image_generation',
   'storyboard_real_grid',
   'shot_rough_storyboard',
+  'prop_image',
 ]
 
 // 유저 1명이 동시에 큐에 올릴 수 있는 최대 생성 작업 수 (레벨 0) — 카테고리별.

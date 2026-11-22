@@ -493,6 +493,49 @@ function worldFailuresFromStatus(
   return out
 }
 
+/** 소품 그림 실패(D7) — 생성 상태 창구의 propFailures → propId 별 실패. 배경 worldFailuresFromStatus 와 같은 모양. */
+function propFailuresFromStatus(
+  rows: Array<{ propId: string; error: string | null; failCount: number; safeFailCount: number; moderation: boolean }> | undefined,
+): Record<string, ViewFailure> {
+  const out: Record<string, ViewFailure> = {}
+  for (const f of rows ?? []) out[f.propId] = { error: f.error, moderation: f.moderation, failCount: f.failCount, safeFailCount: f.safeFailCount }
+  return out
+}
+
+/** 소품 행 하나를 다시 읽는다(D7) — 다 그린 그림 · 그림 지문 · 생김새를 카드에 넣는다(best-effort). */
+async function refreshPropRow(
+  projectId: string,
+  propId: string,
+  set: (fn: (state: ArtistState) => Partial<ArtistState>) => void,
+): Promise<void> {
+  try {
+    const { data } = await createClient()
+      .from('props')
+      .select('prop_id, name, appearance, appearance_native, image_url, source_hash, origin')
+      .eq('project_id', projectId)
+      .eq('prop_id', propId)
+      .maybeSingle()
+    if (!data || useProjectStore.getState().projectId !== projectId) return
+    const [fresh] = propAssetsFromRows([data as PropRow], new Set())
+    if (!fresh) return
+    set((state) => ({ propAssets: state.propAssets.map((p) => (p.propId === propId ? fresh : p)) }))
+  } catch {
+    /* best-effort */
+  }
+}
+
+/** 시도 뒤 소품 실패 상태 재조회(D7) — 배지 · 다시 그리기 단추가 새로고침 없이 최신화(best-effort). */
+async function refreshPropFailures(projectId: string, set: (patch: Partial<ArtistState>) => void): Promise<void> {
+  try {
+    const res = await fetch(`/api/artist/generation-status?projectId=${encodeURIComponent(projectId)}`)
+    if (!res.ok) return
+    const { propFailures } = (await res.json()) as { propFailures?: Parameters<typeof propFailuresFromStatus>[0] }
+    set({ propFailures: propFailuresFromStatus(propFailures) })
+  } catch {
+    /* best-effort */
+  }
+}
+
 /** 시도 뒤 배경 실패 상태 재조회 — 배지·우회 버튼이 reload 없이 최신화(best-effort). */
 async function refreshWorldFailures(
   projectId: string,
@@ -618,6 +661,18 @@ interface ArtistState {
   propUsage: PropUsage
   selectedPropId: string | null
   selectProp: (id: string) => void
+  /** 그리는 중인 소품(propId) — D7. 화면이 보낸 것 + 서버가 그리는 것(생성 상태의 대기 작업). */
+  generatingProps: string[]
+  /** 소품 그림 실패(reload-survivable) — 배경 worldFailures 와 같은 모양. 키 = propId. */
+  propFailures: Record<string, ViewFailure>
+  /** 소품 그림 한 장 그리기(D7) — 지시문은 서버가 짓는다(소품 행 + 작품 그림체). auto = 빈칸 채우기(그림이 있으면 서버가 건너뛴다). */
+  generateProp: (
+    propId: string,
+    actor?: GenerationActor,
+    options?: GenerationRequestOptions & { instruction?: string; model?: ImageModelKey; safeMode?: boolean },
+  ) => Promise<void>
+  /** 소품 생김새(원천) 고치기 — 그림은 그대로 둔다(다시 그리기 전까지 "설명 바뀜"). */
+  updatePropAppearance: (propId: string, appearance: string) => Promise<void>
   selectedCharacterId: string | null
   selectedLocationId: string | null
   selectedLocationAppearances: Record<string, string>
@@ -781,6 +836,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   propAssets: [],
   propUsage: {},
   selectedPropId: null,
+  generatingProps: [],
+  propFailures: {},
   selectedCharacterId: null,
   chatSelection: null,
   setChatSelection: selection => {
@@ -1269,6 +1326,71 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectLocation: (id) => set({ selectedLocationId: id }),
   selectProp: (id) => set({ selectedPropId: id }),
 
+  generateProp: async (propId, actor = 'ui', options) => {
+    if (isDemoSession()) return
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId || !get().propAssets.some((p) => p.propId === propId)) return
+    if (get().generatingProps.includes(propId)) return
+    set((state) => ({ generatingProps: [...state.generatingProps, propId], error: null }))
+    const locale = useLocaleStore.getState().locale
+    try {
+      const res = await fetch('/api/artist/generate-prop', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          projectId,
+          propId,
+          actor,
+          ...(options?.instruction?.trim() ? { instruction: options.instruction.trim() } : {}),
+          ...(options?.model ? { model: options.model } : {}),
+          ...(options?.safeMode ? { safeMode: true } : {}),
+          ...(options?.traceId ? { traceId: options.traceId } : {}),
+        }),
+      })
+      const body = (await res.json().catch(() => ({}))) as { jobId?: string; deduped?: boolean; skipped?: boolean; error?: string }
+      if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
+      if (body.jobId) {
+        options?.onJob?.({ jobId: body.jobId, status: 'queued' })
+        await pollGenerationJob(body.jobId, { onStatus: options?.onJob })
+        if (useProjectStore.getState().projectId !== projectId) return
+        await refreshPropRow(projectId, propId, set)
+        notifyGenerationComplete('artist', translate(locale, 'Prop image'))
+      } else if (body.deduped) {
+        // 다른 창 · 서버가 이미 그리는 중 — 그 작업을 이어 받는다(생성 상태의 대기 작업).
+        void get().syncGenerationStatus(projectId)
+      }
+      void refreshPropFailures(projectId, set)
+    } catch (err) {
+      if (useProjectStore.getState().projectId !== projectId) return
+      const raw = err instanceof Error ? err.message : String(err)
+      // 그리는 중에서 빼기 전에 실패로 먼저 적는다 — 실패 기록을 다시 읽기 전 사이에 이어 그리기가 다시 요청하지 않게(배경과 같다).
+      set((state) => ({ error: raw || 'Prop image failed', propFailures: { ...state.propFailures, [propId]: state.propFailures[propId] ?? { error: raw, moderation: false, failCount: 1, safeFailCount: 0 } } }))
+      options?.onJob?.({ jobId: null, status: 'failed', error: raw })
+      notifyGenerationFailed('artist', translate(locale, 'Prop image'), raw)
+      void refreshPropFailures(projectId, set)
+    } finally {
+      set((state) => ({ generatingProps: state.generatingProps.filter((id) => id !== propId) }))
+    }
+  },
+
+  updatePropAppearance: async (propId, appearance) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to update a prop')
+    const res = await fetch('/api/artist/appearance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, characterId: propId, appearance }),
+    })
+    const body = (await res.json().catch(() => ({}))) as { appearance?: string; appearanceNative?: string | null; error?: string }
+    if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
+    if (useProjectStore.getState().projectId !== projectId) return
+    set((state) => ({
+      propAssets: state.propAssets.map((p) =>
+        p.propId === propId ? { ...p, appearance: body.appearance ?? appearance, appearanceNative: body.appearanceNative?.trim() ? body.appearanceNative : (body.appearance ?? appearance) } : p,
+      ),
+    }))
+  },
+
   // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
   generateCharacterView: async (characterId, appearanceKey, view, actor = 'ui', instruction, safeMode, model, options) => {
     if (isDemoSession()) return null
@@ -1464,8 +1586,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         `/api/artist/generation-status?projectId=${encodeURIComponent(projectId)}`,
       )
       if (!res.ok) return
-      const { failures, queuedMain, worldFailures, queuedWorld, capacitySkips } = (await res.json()) as {
+      const { failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps } = (await res.json()) as {
         capacitySkips?: Record<string, 'user' | 'global'>
+        propFailures?: Parameters<typeof propFailuresFromStatus>[0]
+        queuedProps?: Array<{ propId: string; jobId: string }>
         failures: Array<{
           characterId: string
           appearanceKey: string
@@ -1497,7 +1621,23 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           safeFailCount: f.safeFailCount,
         }
       }
-      set({ worldFailures: worldFailuresFromStatus(worldFailures), viewFailures: vf, capacitySkips: capacitySkips ?? {} })
+      set({ worldFailures: worldFailuresFromStatus(worldFailures), viewFailures: vf, capacitySkips: capacitySkips ?? {}, propFailures: propFailuresFromStatus(propFailures) })
+      // 서버가 그리는 중인 소품(D7) — 그리는 중으로 세고 작업 확인(reconcile)으로 마무리해 카드에 바로 넣는다(배경과 같다).
+      for (const { propId, jobId } of queuedProps ?? []) {
+        if (get().generatingProps.includes(propId)) continue
+        set((state) => ({ generatingProps: [...state.generatingProps, propId] }))
+        void pollGenerationJob(jobId)
+          .then(() => refreshPropRow(projectId, propId, set))
+          .catch(() => {
+            if (useProjectStore.getState().projectId !== projectId) return
+            set((state) => ({ propFailures: { ...state.propFailures, [propId]: state.propFailures[propId] ?? { error: 'failed', moderation: false, failCount: 1, safeFailCount: 0 } } }))
+            void refreshPropFailures(projectId, set)
+          })
+          .finally(() => {
+            if (useProjectStore.getState().projectId !== projectId) return
+            set((state) => ({ generatingProps: state.generatingProps.filter((id) => id !== propId) }))
+          })
+      }
       for (const { locationId, appearanceKey, jobId } of queuedWorld ?? []) {
         const slotKey = worldFailureKey(locationId, appearanceKey)
         if (get().generatingLocations.includes(slotKey)) continue
@@ -2556,6 +2696,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   propAssets: [],
   propUsage: {},
   selectedPropId: null,
+  generatingProps: [],
+  propFailures: {},
       selectedCharacterId: null,
       selectedLocationId: null,
       selectedLocationAppearances: {},
