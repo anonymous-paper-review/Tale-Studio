@@ -132,7 +132,7 @@ describe('그림체 분석 창구는 닫혔다', () => {
     mocks.reads = 0
   })
 
-  it('그림체 분석 창구는 분석 결과를 그림체에 저장하지 않고 410 으로 거절한다', async () => {
+  it('그림체 분석 창구는 분석 결과를 그림체에 저장하지 않고, 이제 없는 기능이라고 거절한다', async () => {
     // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 옛 탭 · 직접 요청도 분석을 돌리지 못하게 창구에서 막는다.
     const res = await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))
     expect(res.status).toBe(410)

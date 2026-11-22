@@ -89,7 +89,7 @@ describe('채팅에서 없어진 스타일 이름', () => {
     expect(lastModel()).toContain('2D 일본 애니')
   })
 
-  it('영어 화면에서 영어 이름으로 말해도 같은 답을 영어로 한다', async () => {
+  it('영어 작품에서 영어 이름으로 말해도 같은 답을 영어로 한다', async () => {
     // 왜: 영어 화면의 스타일 이름은 영어다(American Cartoon) — 한국어 이름만 알아들으면 영어 사용자는 모델로 새어 나간다.
     artistScreen('en')
     await send('Make it American Cartoon style')
