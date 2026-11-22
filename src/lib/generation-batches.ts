@@ -12,6 +12,7 @@ export type GenerationLane = 'artist' | 'writer-rough' | 'director-storyboard' |
 export const LANE_OF_KIND: Record<GenerationJobKind, GenerationLane | null> = {
   character_view: 'artist',
   world_shot: 'artist',
+  prop_image: 'artist',
   shot_rough_storyboard: 'writer-rough',
   shot_storyboard: 'director-storyboard',
   image_generation: null,

@@ -4,9 +4,13 @@
 //   카드 = 이름 · "소품" 꼬리표 · 그림(정사각 한 장) · 생김새 한 줄 · 나오는 씬 · 샷 수. 배경 카드(world-panel)와 같은 판 모양이다.
 //   ⌘/Ctrl+클릭 = 채팅 @멘션 + 비행(D9, 인물 · 배경 카드와 같다). columns · onZoomStep 은 세 묶음 공용 축척(D13).
 //   약속: tests/artist/prop-cards.test.ts
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { Paintbrush, RefreshCw } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
+import { Button } from '@/components/ui/button'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
+import { PropViewDialog, usePropStyleId } from '@/features/artist/prop-view-dialog'
+import { propImageStale } from '@/lib/artist/prop-image'
 import { isMentionModifierClick } from '@/lib/card-mention'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { useT } from '@/lib/i18n'
@@ -30,7 +34,12 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
   const propAssets = useArtistStore((s) => s.propAssets)
   const propUsage = useArtistStore((s) => s.propUsage)
   const selectedPropId = useArtistStore((s) => s.selectedPropId)
+  const generatingProps = useArtistStore((s) => s.generatingProps)
+  const propFailures = useArtistStore((s) => s.propFailures)
   const mentionedRefs = useChatUiStore((s) => s.mentionedRefs)
+  const styleId = usePropStyleId()
+  // 그림 창(D7) — 그림을 누르거나 카드를 두 번 누르면 연다(인물 · 배경 카드와 같다).
+  const [viewing, setViewing] = useState<string | null>(null)
   const noteSelection = (propId: string) => {
     if (projectId) useArtistStore.getState().setChatSelection({ projectId, target: 'prop', id: propId, appearanceKey: DEFAULT_LOCATION_APPEARANCE_KEY, source: 'card' })
   }
@@ -63,9 +72,17 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
 
   const card = (prop: PropAsset) => {
     const usage = propUsage[prop.propId] ?? { scenes: 0, shots: 0 }
+    const generating = generatingProps.includes(prop.propId)
+    const failure = propFailures[prop.propId] ?? null
+    // 바뀜(D7 · 리드 결정 3): 생김새가 바뀌었거나("설명 바뀜") 작품 그림체가 바뀌었다("그림체 바뀜") — 그림체 재생성은 소품을 함께 다시 그리지 않는다.
+    const stale = prop.imageUrl ? propImageStale(prop.sourceHash, prop.appearance, styleId) : 'fresh'
     const select = () => {
       useArtistStore.getState().selectProp(prop.propId)
       noteSelection(prop.propId)
+    }
+    const draw = (e: React.MouseEvent) => {
+      e.stopPropagation()
+      void useArtistStore.getState().generateProp(prop.propId, 'ui')
     }
     return (
       <div
@@ -88,6 +105,8 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
           e.stopPropagation()
           mentionPropCard(prop.name, e.clientX, e.clientY)
         }}
+        // 두 번 누르기 = 그림 누르기와 같다(인물 · 배경 카드와 같다) — 그림 창.
+        onDoubleClick={() => setViewing(prop.propId)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') select()
         }}
@@ -101,12 +120,35 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
           {/* 좁은 카드에서 이름이 잘리지 않게 두 줄까지 보인다(배경 카드와 같다). */}
           <span className="line-clamp-2 min-w-0 break-words text-body font-semibold">{prop.name}</span>
           <Badge variant="tag">{t('Prop')}</Badge>
+          {failure ? <Badge variant="destructive" className="text-[10px]">{t('Image failed')}</Badge> : null}
+          {stale === 'edited' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Description changed')}</Badge> : null}
+          {stale === 'style' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Style changed')}</Badge> : null}
         </div>
 
-        {/* 소품 = 그림 한 장(정사각, 물건만). */}
-        <div className="relative block w-full overflow-hidden rounded-[14px]">
-          <ImagePlaceholder label={t('Prop')} aspectRatio="square" imageUrl={prop.imageUrl} hideCaption />
-        </div>
+        {/* 소품 = 그림 한 장(정사각, 물건만). 누르면 그림 창. */}
+        <button
+          type="button"
+          title={t('Prop: click to view or redraw')}
+          onClick={(e) => {
+            e.stopPropagation()
+            select()
+            setViewing(prop.propId)
+          }}
+          className="relative block w-full overflow-hidden rounded-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
+        >
+          <ImagePlaceholder label={t('Prop')} aspectRatio="square" imageUrl={prop.imageUrl} generating={generating} hideCaption />
+        </button>
+
+        {/* 그리기 · 다시 그리기(무료) — 실패했거나 바뀌었으면 다시 그리기, 그림이 없으면 그리기. 그리는 중에는 숨긴다(두 번 그리지 않게). */}
+        {generating ? null : failure || (prop.imageUrl && stale !== 'fresh') ? (
+          <Button size="sm" variant="outline" className="mt-2.5" onClick={draw} data-testid="artist-prop-redraw">
+            <RefreshCw className="size-3.5" />{t('Redraw')}
+          </Button>
+        ) : !prop.imageUrl ? (
+          <Button size="sm" variant="outline" className="mt-2.5" onClick={draw} data-testid="artist-prop-draw">
+            <Paintbrush className="size-3.5" />{t('Draw')}
+          </Button>
+        ) : null}
 
         {/* 생김새 한 줄(화면 말) — 배경 카드의 설명 줄과 같은 자리. */}
         {prop.appearanceNative ? (
@@ -124,6 +166,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
   return (
     <div ref={wheelRef} data-testid="artist-prop-cards">
       <div className={gridClass}>{propAssets.map(card)}</div>
+      <PropViewDialog propId={viewing} onClose={() => setViewing(null)} />
     </div>
   )
 }

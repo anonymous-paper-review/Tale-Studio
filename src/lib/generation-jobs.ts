@@ -22,6 +22,7 @@ export type GenerationJobKind =
   | 'shot_rough_storyboard'
   | 'shot_video'
   | 'shot_previz_video'
+  | 'prop_image' // 소품 그림 한 장(D7 2026-11-22) — props.image_url 갱신
 export type GenerationJobStatus = 'queued' | 'completed' | 'failed'
 /** 잡 트리거 주체 — ui(직접 조작) | chat(글로벌 채팅 updates) | writer(핸드오프 파이프라인) */
 export type GenerationJobActor = 'ui' | 'chat' | 'writer'
@@ -35,6 +36,8 @@ export interface GenerationJobTarget {
   column?: string // character_view: view_* / world_shot: wide_shot|establishing_shot
   // world_shot: locations[column] 갱신
   locationId?: string
+  // prop_image: props.image_url 갱신(D7 2026-11-22)
+  propId?: string
   // shot_video: legacy jobs may mirror shots.video_url; v2 linked jobs target a logical video take.
   shotId?: string
   writerShotId?: string
