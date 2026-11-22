@@ -11,17 +11,17 @@ import {
 } from '@/lib/stage-transition'
 
 describe('stageIndexFromPathname', () => {
-  it('단계 주소를 열면 정해진 순서의 위치를 알아낸다', () => {
-    // 리뉴얼 1차 순서: /studio/start(Producer) · /studio/producer(Writer) · artist · /studio/writer(Storyboard) · camera · director · editor
+  it('단계 주소를 열면 레일 칸 순서의 위치를 알아내고, 씬 스토리 · 콘티 주소는 같은 Writer 칸이다', () => {
+    // 레일 칸 순서(D1 오너 2026-11-22): /studio/start(Producer) · Writer(/studio/producer 씬 스토리 · /studio/writer 콘티) · artist · camera · director · editor
     //   (Camera 는 오너 2026-11-22 D2~D5 로 Director 앞에 섰다.)
     expect(stageIndexFromPathname('/studio/start')).toBe(0)
     expect(stageIndexFromPathname('/studio/producer')).toBe(1)
-    expect(stageIndexFromPathname('/studio/writer')).toBe(3)
-    expect(stageIndexFromPathname('/studio/camera')).toBe(4)
-    expect(stageIndexFromPathname('/studio/editor')).toBe(6)
+    expect(stageIndexFromPathname('/studio/writer')).toBe(1)
+    expect(stageIndexFromPathname('/studio/camera')).toBe(3)
+    expect(stageIndexFromPathname('/studio/editor')).toBe(5)
   })
   it('주소 뒤에 추가 경로가 붙어도 같은 단계로 알아본다', () => {
-    expect(stageIndexFromPathname('/studio/director')).toBe(5)
+    expect(stageIndexFromPathname('/studio/director')).toBe(4)
   })
   it('단계가 아닌 주소는 해당 위치가 없다고 알린다', () => {
     expect(stageIndexFromPathname('/login')).toBe(-1)

@@ -147,7 +147,9 @@ describe('Artist에서 Director로 넘길 때 준비가 덜 된 샷을 팝업으
     expect(texts()).toEqual([])
   })
 
-  it('Writer가 아직 끝나지 않았으면 그래도 진행으로도 Director로 넘기지 않는다', async () => {
+  it('Artist 에서 콘티로 넘길 때는 씬 · 샷을 나누는 중이어도 [완료하기]와 같은 검사만 거친다', async () => {
+    // 왜(리드 2026-11-22 결정, D1): Artist 다음은 Writer 의 콘티다. [완료하기] 단추는 씬 · 샷을 나누는 중에도 콘티를 연다(10/20, 나누는 동안 콘티는
+    //   잠금 표시) — 다음 단계 넘김 · 채팅 넘김도 같은 서버 검사(artist-complete)만 거친다. 예전에는 옛 Director 준비 검사가 "Writer가 아직 작업 중"으로 막았다.
     readiness.load.mockResolvedValue(incomplete)
     useProjectStore.setState({
       lifecycleStatus: {
@@ -156,9 +158,12 @@ describe('Artist에서 Director로 넘길 때 준비가 덜 된 샷을 팝업으
         director: { ready: false, blockers: [{ field: 'writer:active', label: 'Writer가 아직 작업 중이에요.' }, ...artistBlocked.blockers], warnings: [] },
       },
     })
+    const fetchSpy = vi.spyOn(globalThis, 'fetch').mockImplementation(async (url: RequestInfo | URL) =>
+      String(url) === '/api/writer/artist-complete' ? Response.json({ ok: true }) : Response.json({}))
     await useGlobalChatStore.getState().requestNextStep()
-    expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
-    expect(nav.handoffToStage).not.toHaveBeenCalled()
-    expect(texts().join('\n')).toContain('Writer가 아직 작업 중이에요.')
+    expect(fetchSpy.mock.calls.some(([url]) => String(url) === '/api/writer/artist-complete')).toBe(true)
+    expect(nav.handoffToStage).toHaveBeenCalledWith('writer')
+    expect(texts().join('\n')).not.toContain('Writer가 아직 작업 중이에요.')
+    fetchSpy.mockRestore()
   })
 })

@@ -35,11 +35,12 @@ export const STAGES = [
     nextStage: 'writer',
   },
   {
-    // 화면 이름 Storyboard(가칭) — 씬 · 샷 · 러프 스토리보드. 예전 Writer 화면 그대로 Artist 뒤로 옮겼다.
+    // 콘티(옛 화면 이름 Storyboard) — 씬 · 샷 · 러프 콘티. 예전 Writer 화면 그대로 Artist 뒤로 옮겼다.
+    //   2026-11-22(오너 D1): Writer 탭 안의 콘티 칸이다 — 레일은 Writer 칸 하나로 보인다(lib/stage-rail RAIL_ITEMS). 이름표 · 담당도 Writer.
     //   2026-11-22(오너 D2~D5): 다음 단계는 Director 앞에 선 새 탭 Camera 다.
     id: 'writer',
-    name: 'The Storyboard Room',
-    agent: 'Storyboard',
+    name: "The Writers' Room",
+    agent: 'Writer',
     path: '/studio/writer',
     handoffLabel: `Next: ${CAMERA_LABEL}`,
     nextStage: 'camera',
@@ -80,11 +81,11 @@ export const DEFAULT_SHOT_DURATION = 8
 
 // ── GlobalChat: stage 이름 + 색 (design.md §2.9). 단일 source — 컴포넌트는 import만 ──
 
-// 화면에 보이는 단계 이름 — id 와 다르다(리뉴얼 1차): producer 는 Writer, writer 는 Storyboard 로 보인다.
+// 화면에 보이는 단계 이름 — id 와 다르다(리뉴얼 1차): producer 는 Writer. writer(콘티)도 Writer 다 — Writer 탭 안의 칸(D1 2026-11-22).
 export const STAGE_LABEL: Record<StageId, string> = {
   entry: 'Producer',
   producer: 'Writer',
-  writer: 'Storyboard',
+  writer: 'Writer',
   artist: 'Artist',
   camera: CAMERA_LABEL,
   director: 'Director',
@@ -99,7 +100,7 @@ export const STAGE_LABEL: Record<StageId, string> = {
 export const STAGE_AGENT_NAME: Record<StageId, string> = {
   entry: 'Producer',
   producer: 'Writer',
-  writer: 'Storyboard',
+  writer: 'Writer',
   artist: 'Concept Artist',
   camera: CAMERA_AGENT,
   director: 'Director',

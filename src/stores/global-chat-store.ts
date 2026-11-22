@@ -2044,7 +2044,9 @@ function handoffBlockers(spec: HandoffSpec, opts?: { acceptIncomplete?: boolean 
     }
     return { hard: [], soft }
   }
-  // Artist → 콘티(id writer): 아래 옛 준비 검사를 지난 뒤 runHandoff 가 [완료하기]와 같은 서버 검사(completeArtistForConti)를 한 번 더 거친다.
+  // Artist → 콘티(id writer): [완료하기]와 같은 서버 검사(runHandoff → completeArtistForConti)만 거친다 — 옛 Director 준비 검사로 막지 않는다
+  //   (리드 2026-11-22 결정, D1). [완료하기]는 씬 · 샷 나누기가 끝나기 전에도 콘티를 연다(나누는 동안 콘티는 잠금 표시, 2026-10-20).
+  if (spec.from === 'artist' && spec.to === 'writer') return { hard: [], soft: [] }
   if (spec.from === 'artist') {
     const gate = useProjectStore.getState().lifecycleStatus.director
     // "그래도 진행"(acceptIncomplete)은 Artist 쪽 빈 곳만 넘어간다 — Writer 가 안 끝났으면 넘길 샷이 없다.

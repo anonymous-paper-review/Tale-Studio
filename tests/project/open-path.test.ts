@@ -39,11 +39,12 @@ describe('목록에서 프로젝트 열기', () => {
 
 describe('목록의 단계 이름표', () => {
   it('홈 목록의 단계 이름표는 새 화면 이름으로 보인다', () => {
-    // 왜: 단계 값은 예전 이름(producer = Writer, writer = Storyboard)이라 그대로 보이면 사람이 엉뚱한 단계로 읽는다.
+    // 왜: 단계 값은 예전 이름(producer = Writer, writer = 콘티)이라 그대로 보이면 사람이 엉뚱한 단계로 읽는다.
+    //   D1(2026-11-22): 콘티(writer)는 Writer 탭 안의 칸이라 목록 이름표도 레일처럼 Writer 다.
     expect(projectStageLabel('entry')).toBe('Producer')
     expect(projectStageLabel('producer')).toBe('Writer')
     expect(projectStageLabel('artist')).toBe('Artist')
-    expect(projectStageLabel('writer')).toBe('Storyboard')
+    expect(projectStageLabel('writer')).toBe('Writer')
     expect(projectStageLabel('director')).toBe('Director')
   })
 
