@@ -895,7 +895,8 @@ export const KO: Record<string, string> = {
   // ── director-store ──
   'Go live': '실사화',
   'New video take': '새 영상 테이크',
-  Storyboard: '스토리보드',
+  // Writer 탭의 콘티 칸 이름(D1 오너 2026-11-22 "storyboard란 명칭은 콘티로") — 영어 화면은 Storyboard 그대로.
+  Storyboard: '콘티',
   'Storyboard image': '스토리보드 이미지',
   'Timed out (90s)': '시간 초과 (90s)',
   'Video is taking longer than expected. It may still finish in the background.': '영상 만들기가 예상보다 오래 걸립니다. 뒤에서 계속 진행 중일 수 있습니다.',
@@ -3731,4 +3732,7 @@ export const KO: Record<string, string> = {
   Revoked: '해지',
   'In use': '이용 중',
   'End access': '해지',
+
+  // ── Writer 콘티(D1 오너 2026-11-22, fb1120 fb-conti) — 위 막대 [씬 스토리 | 콘티] ──
+  'Opens when you press Complete in Artist': 'Artist에서 완료하기를 누르면 열려요',
 }

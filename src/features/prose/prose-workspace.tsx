@@ -5,6 +5,8 @@
 //   v3(오너 결정 7): 고치기 방식 전환(화면에서 고치기 · 채팅으로 고치기)이 없는 한 화면이다 — 화면 머리 [직접 작성] · [AI 다시 쓰기] ·
 //   [브레이크다운하기], 조건 칩, 산문, 오른쪽 채팅. 문단을 누르면 그 문단이 채팅 입력칸 위에 붙어 그 문단만 고친다(lib/prose/paragraph-pick).
 //   AI 가 일하는 동안(초안 쓰기 · 다시 쓰기 · 수정안)은 화면 전체를 진행 표시로 덮는다 — 초안을 쓰는 동안은 큰 Lumi(오너 결정 8).
+//   D1(오너 2026-11-22): 이 화면은 Writer 탭의 씬 스토리 칸이다 — 화면 이름은 위 막대 [씬 스토리 | 콘티]가 보여 주고(리드 결정 1, 시안 없음),
+//   머리의 큰 제목("산문")은 읽기 프로그램에만 남긴다(꼬리표 · 숫자 · 단추만 보인다).
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowRight, Check, Loader2, Lock } from 'lucide-react'
@@ -162,7 +164,7 @@ export function ProseWorkspace() {
         {/* v3 W1 — 화면 머리 · 조건 칩 · 산문 판 · 안내가 820 폭 한 줄로 쌓인다(간격 18). */}
         <div className="mx-auto flex max-w-[820px] flex-col gap-[18px]">
           <PageHeader
-            title={t('Prose')}
+            title={<span className="sr-only">{t('Scene story')}</span>}
             tag={prose.locked ? <span className="inline-flex items-center gap-1"><Lock className="size-3" aria-hidden />{t('Confirmed')}</span> : undefined}
             meta={sceneCount > 0 ? t('Scenes {count}', { count: sceneCount }) : undefined}
             actions={actions}
