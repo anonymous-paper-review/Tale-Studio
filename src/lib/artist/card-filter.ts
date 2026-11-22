@@ -1,24 +1,60 @@
-// Artist 걸러 보기(v3 A5, 오너 2026-11-03) — 모두 · 인물 · 배경. 인물 칸은 예전 등장인물 탭과 같은 카드(사람 · 예전 흐름의 사물),
-//   배경 칸은 예전 배경 탭과 같은 카드다. 칸의 숫자는 그 칸을 골랐을 때 보이는 카드 수(보관 카드 포함).
-//   고른 칸은 artist-store 의 uiTab 이 기억한다(약속 D15). 약속: tests/artist/card-filter.test.ts
-//   칸을 바꿔도 계속 보이는 묶음은 새로 그리지 않는다(검토 A M1) — 묶음마다 이름이 고정이라 그 카드의 채팅 대상 · 고른 모습이 남는다.
-export const ARTIST_FILTERS = ['all', 'characters', 'world'] as const
-export type ArtistFilter = (typeof ARTIST_FILTERS)[number]
+// Artist 묶음(D13, 오너 2026-11-22 "인물, 배경, 소품을 한 페이지에 다 담아주고 버튼을 누르면 그 섹션으로 바로 이동") —
+//   예전 걸러 보기(v3 A5 모두 · 인물 · 배경, 2026-11-03)를 바꿨다. 묶음은 늘 함께 보이고, 위의 단추는 그 묶음으로 가는 바로가기다.
+//   마지막에 간 묶음은 artist-store 의 uiTab 이 기억한다(약속 D15). 묶음은 늘 그려져 있어 카드의 채팅 대상 · 고른 모습이 남는다(검토 A M1).
+//   약속: tests/artist/card-filter.test.ts · tests/artist/section-jump.test.ts
+export const ARTIST_SECTIONS = ['characters', 'world', 'props'] as const
+export type ArtistSection = (typeof ARTIST_SECTIONS)[number]
 
-/** 그 칸을 고르면 어느 카드 묶음을 보이나. */
-export function artistFilterShows(filter: ArtistFilter): { characters: boolean; world: boolean } {
-  return { characters: filter !== 'world', world: filter !== 'characters' }
+/** 묶음 머리 자리의 문서 id — 바로가기 단추가 이 자리로 스크롤한다. */
+export function artistSectionId(section: ArtistSection): string {
+  return `artist-section-${section}`
 }
 
-/** 칸을 prev 에서 next 로 바꿀 때 보이는 묶음(인물 · 배경 순서). key 는 묶음 이름이라 계속 보이는 묶음은 그대로 남는다.
- *  entering = 앞 칸에서는 안 보이다 이번에 보이게 된 묶음 — 미끄러짐 효과는 이 묶음에만 준다. */
-export function artistFilterPanels(prev: ArtistFilter, next: ArtistFilter): { key: 'characters' | 'world'; entering: boolean }[] {
-  const before = artistFilterShows(prev)
-  const after = artistFilterShows(next)
-  return (['characters', 'world'] as const).filter((key) => after[key]).map((key) => ({ key, entering: !before[key] }))
+/** 묶음마다 카드 수 — 단추 숫자 · 묶음 머리 숫자(보관 카드 포함). */
+export function artistSectionCounts(input: { characters: number; worlds: number; props: number }): Record<ArtistSection, number> {
+  return { characters: input.characters, world: input.worlds, props: input.props }
 }
 
-/** 칸마다 보이는 카드 수 — 인물 카드 수 · 배경 카드 수에서. */
-export function artistFilterCounts(input: { characters: number; worlds: number }): Record<ArtistFilter, number> {
-  return { all: input.characters + input.worlds, characters: input.characters, world: input.worlds }
+/** 바로가기 움직임 — 움직임 줄이기 설정이면 미끄러지지 않고 바로 간다. */
+export function artistJumpBehavior(reducedMotion: boolean): ScrollBehavior {
+  return reducedMotion ? 'auto' : 'smooth'
+}
+
+/** 단추 → 그 묶음 머리로 스크롤한다(머리 위 여백은 묶음의 scroll-margin 이 맡는다). 자리를 못 찾으면 false. */
+export function jumpToArtistSection(
+  section: ArtistSection,
+  deps: { getElement: (id: string) => { scrollIntoView: (options: ScrollIntoViewOptions) => void } | null; reducedMotion: boolean },
+): boolean {
+  const element = deps.getElement(artistSectionId(section))
+  if (!element) return false
+  element.scrollIntoView({ behavior: artistJumpBehavior(deps.reducedMotion), block: 'start' })
+  return true
+}
+
+/**
+ * 지금 보는 묶음 — 붙어 있는 단추 줄 바로 아래(scrollTop + offset)에 머리가 닿은 마지막 묶음.
+ *   맨 아래까지 내렸으면 마지막 묶음이다(짧은 마지막 묶음은 머리가 위쪽까지 올라오지 못한다). 자리를 모르면 첫 묶음.
+ *   top 은 스크롤 칸 안의 좌표(맨 위 = 0)다.
+ */
+export function activeArtistSection(
+  tops: ReadonlyArray<{ section: ArtistSection; top: number }>,
+  view: { scrollTop: number; clientHeight: number; scrollHeight: number; offset: number },
+): ArtistSection {
+  if (tops.length === 0) return ARTIST_SECTIONS[0]
+  const ordered = [...tops].sort((a, b) => a.top - b.top)
+  if (view.scrollTop + view.clientHeight >= view.scrollHeight - 1) return ordered[ordered.length - 1].section
+  const line = view.scrollTop + view.offset
+  let current = ordered[0].section
+  for (const entry of ordered) if (entry.top <= line) current = entry.section
+  return current
+}
+
+/** 켜 둘 단추 — 누른 묶음(pinned)이 있으면 그것, 없으면 잰 묶음. 짧은 페이지에서 누른 묶음이 "맨 아래" 규칙에 밀리지 않게 한다. */
+export function shownArtistSection(pinned: ArtistSection | null, measured: ArtistSection): ArtistSection {
+  return pinned ?? measured
+}
+
+/** 사람이 판을 직접 스크롤하는 키인가 — 이 키를 누르면 누른 단추 고정을 푼다. 좌우 화살표(Alt+←/→ 묶음 이동)는 스크롤이 아니다. */
+export function keyScrollsArtistBoard(key: string): boolean {
+  return key === 'ArrowDown' || key === 'ArrowUp' || key === 'PageDown' || key === 'PageUp' || key === 'Home' || key === 'End' || key === ' '
 }
