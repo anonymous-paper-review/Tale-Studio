@@ -1528,6 +1528,10 @@ export const KO: Record<string, string> = {
   'The videos for {shots} failed, and your Takes were returned. You can make them again. Leave them out and they join Editor once their videos are ready.': '{shots} 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.',
   'The video for {shots} failed. You can make it again. Leave it out and it joins Editor once its video is ready.': '{shots} 영상은 만들다 실패했어요. 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.',
   'The videos for {shots} failed. You can make them again. Leave them out and they join Editor once their videos are ready.': '{shots} 영상은 만들다 실패했어요. 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.',
+  'The video for {shots} failed, and your Takes were returned. You can make it again.': '{shots} 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들 수 있어요.',
+  'The videos for {shots} failed, and your Takes were returned. You can make them again.': '{shots} 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들 수 있어요.',
+  'The video for {shots} failed. You can make it again.': '{shots} 영상은 만들다 실패했어요. 다시 만들 수 있어요.',
+  'The videos for {shots} failed. You can make them again.': '{shots} 영상은 만들다 실패했어요. 다시 만들 수 있어요.',
   'Leave out and go to Editor': '빼고 Editor로',
   'Make {shots} again': '{shots} 다시 만들기',
   // 검토 b 고침(2026-11-14) — 영상 막이 · 글 카드에 묶인 생성 · Take 확인 · 승인 단계
