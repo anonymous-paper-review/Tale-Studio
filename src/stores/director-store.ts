@@ -135,7 +135,7 @@ import {
   usableFrameImageUrl,
 } from '@/lib/director/video-frame-inputs'
 import { prepareContinueFrom } from '@/lib/director/video-frame-capture'
-import { isVideoMode, takeOverrideForRequest, videoModeForRequest } from '@/lib/director/video-modes'
+import { isVideoMode, takeOverrideForRequest, videoModeForRequest, type TakeVia } from '@/lib/director/video-modes'
 
 // ============================================================================
 // Defaults
@@ -1298,7 +1298,8 @@ interface DirectorCanvasState {
    *  opts.onAccepted — 접수 알림: 서버가 2xx 로 받아 jobId 를 준 때 한 번. 2xx 가 아니면(몸에 jobId · queued 가 실려 와도 — 4xx · 503 결과 모름)
    *  · 500 · 연결 끊김 · 실패 알림은 아니다(리드 결정 — 결과를 모르는 것은 부른 쪽이 새 Take 가 만드는 중으로 남았는지로 따로 말한다).
    *  Lumi 는 이것으로 다음 샷을 보낸다(board 검토 b · entry D8 이 같이 쓴다). opts.onJob — 진행 알림 그대로. 둘 다 없으면 지금 그대로. */
-  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void }) => Promise<string | null>
+  /*  opts.takeNote — 새 Take 에 적을 사람 말 · 만든 길(채팅으로 부탁한 다시 만들기, Camera 이력 요약 2026-11-22). 없으면 적지 않는다(앞 Take 의 말도 잇지 않는다). */
+  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void; takeNote?: { note: string; via: TakeVia } }) => Promise<string | null>
   generateVideoForShot: (
     shotNodeId: string,
     options?: DirectorGenerationRequestOptions,
@@ -4590,8 +4591,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               }
             }
           : undefined
-        const options = latest || onJob
-          ? { ...(latest ? { inheritFromVideoNodeId: latest.id } : {}), ...(onJob ? { onJob } : {}) }
+        const options = latest || onJob || opts?.takeNote
+          ? {
+              ...(latest ? { inheritFromVideoNodeId: latest.id } : {}),
+              ...(onJob ? { onJob } : {}),
+              ...(opts?.takeNote ? { videoOverride: { note: opts.takeNote.note, via: opts.takeNote.via } } : {}),
+            }
           : undefined
         return get().generateVideoForShot(shotNodeId, options)
       },
