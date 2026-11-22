@@ -40,6 +40,8 @@ const contextSent = (fetchMock: ReturnType<typeof vi.fn>) => {
   const call = fetchMock.mock.calls.find(([url]) => String(url).includes('/api/director/chat')) as [string, RequestInit] | undefined
   return (JSON.parse(String(call?.[1].body)) as { canvasContext: string }).canvasContext
 }
+/** 이 턴에 부른 주소들(그림 · 영상 만들기 요청이 나갔는지 본다). */
+const urlsCalled = (fetchMock: ReturnType<typeof vi.fn>) => fetchMock.mock.calls.map(([url]) => String(url))
 const promptOf = (id: string) => (director.getState().nodes.find((n) => n.id === id)!.data as { promptOverride: string | null }).promptOverride
 const saidAll = () => chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content).join('\n')
 /** 보드: 씬 하나에 샷 n 개, 샷마다 같은 길이의 프롬프트. */
@@ -154,5 +156,23 @@ describe('혼자 정한 것(되돌리기 쉬움)', () => {
     expect(chat.getState().pendingProposal).toBeNull()
     expect(promptOf('s1')).toBeNull()
     expect(saidAll()).toContain("Shot 1's prompt is too long to change in chat. Change it in the shot details.")
+  })
+
+  it('일부만 본 프롬프트의 고침을 뺄 때, 같은 답에서 그 고침을 바라고 부탁한 그 샷의 그림 · 영상도 만들지 않는다', async () => {
+    // 왜: 고침이 빠졌는데 그 샷의 그림 · 영상을 만들면 옛 글로 만들어 Take 만 쓴다 — 그 샷을 @멘션해 다시 부탁하면 고침과 함께 다시 온다.
+    board(12, 2000)
+    const image = { status: 'completed', url: 'https://example.test/s12.png', version: 1 }
+    director.setState({ nodes: director.getState().nodes.map((n) => (n.id === 's12' ? ({ ...n, data: { ...n.data, storyboardImage: image } } as DirectorNode) : n)) })
+    const fetchMock = reply([
+      { type: 'updateShot', id: 's12', patch: { prompt: 'A rewritten prompt from the first 60 characters' } },
+      { type: 'generateImage', id: 's12' },
+      { type: 'generateVideos', shotIds: ['s12'] },
+    ])
+    await chat.getState().sendMessage('Make it warmer, then redraw it and make its video')
+    expect(chat.getState().pendingProposal).toBeNull()
+    expect(urlsCalled(fetchMock).filter((url) => !url.includes('/api/director/chat'))).toEqual([])
+    expect((director.getState().nodes.find((n) => n.id === 's12')!.data as { storyboardImage: unknown }).storyboardImage).toEqual(image)
+    const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
+    expect(said.filter((line) => line !== 'Okay.')).toEqual(["I only saw the start of Shot 12's prompt, so I left that change out. Mention the shot (@) and ask again."])
   })
 })
