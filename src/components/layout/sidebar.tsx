@@ -44,11 +44,13 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { directorHasFinishedVideo, railEditorViaHandoff } from '@/lib/director/shot-state'
 
 // 아이콘은 화면 이름을 따른다(리뉴얼 1차) — v3 채움 아이콘: Producer(entry)=전구, Writer(producer)=책, Storyboard(writer)=네 칸.
+//   Camera(오너 2026-11-22 D2~D5)는 옛 Storyboard 아이콘을 받는다(리드 11/22, 시안 없음).
 const STAGE_ICONS: Record<StageId, React.ElementType> = {
   entry: ProducerIcon,
   producer: WriterIcon,
   writer: StoryboardIcon,
   artist: ArtistIcon,
+  camera: StoryboardIcon,
   director: DirectorIcon,
   editor: EditorIcon,
 }
@@ -280,7 +282,7 @@ export function Sidebar() {
                     </span>
                   )}
                   {/* 액세스 키 배지 — Alt(Option) 를 누르고 있는 동안만. 잠긴 탭 · AI 가 일하는 동안은 갈 수 없으니 안 보인다. */}
-                  {accessKeysVisible && !isLocked && !busyBlocked && (
+                  {accessKeysVisible && !isLocked && !busyBlocked && STAGE_ACCESS_KEY[stage.id] && (
                     <span className="absolute left-0.5 top-0.5 rounded border border-border bg-card px-1 font-num text-[9px] font-semibold leading-[1.35] text-foreground shadow-sm">
                       {STAGE_ACCESS_KEY[stage.id]}
                     </span>

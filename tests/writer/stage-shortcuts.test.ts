@@ -22,10 +22,13 @@ const ev = (code: string, mods: Partial<Record<'altKey' | 'ctrlKey' | 'metaKey' 
 
 describe('stageForShortcut', () => {
   it('Alt 숫자 1~6을 누르면 해당 단계로 이동하고 숫자 키패드도 똑같이 동작한다', () => {
-    const got = STAGES.map((s) => stageForShortcut(ev(`Digit${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
-    expect(got).toEqual(STAGES.map((s) => s.id))
-    const numpad = STAGES.map((s) => stageForShortcut(ev(`Numpad${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
-    expect(numpad).toEqual(STAGES.map((s) => s.id))
+    // 왜: 레일 여섯 칸(Producer · Writer · Artist · Camera · Director · Editor, 오너 2026-11-22 D2~D5)과 숫자가 맞는다 — 콘티(id writer)는 Writer 칸 안이라 자기 키가 없다.
+    const keyed = STAGES.filter((s) => STAGE_ACCESS_KEY[s.id])
+    expect(keyed.map((s) => s.id)).toEqual(['entry', 'producer', 'artist', 'camera', 'director', 'editor'])
+    const got = keyed.map((s) => stageForShortcut(ev(`Digit${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
+    expect(got).toEqual(keyed.map((s) => s.id))
+    const numpad = keyed.map((s) => stageForShortcut(ev(`Numpad${STAGE_ACCESS_KEY[s.id]}`, { altKey: true })))
+    expect(numpad).toEqual(keyed.map((s) => s.id))
   })
 
   it('Alt 없이 숫자를 입력하면 단계 이동 없이 글자로 입력된다', () => {

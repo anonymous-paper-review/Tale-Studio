@@ -76,7 +76,8 @@ describe('이미지 일괄이 끝났을 때', () => {
   // 왜: 영상 일괄은 끝나면 채팅에 한 줄을 남기는데(약속 E4) 이미지 일괄은 잠깐 뜨는 알림뿐이었다 — 채팅이 열려 있으면 이 줄로 알린다(시안 D8 · 추천).
   it('이미지 일괄이 끝나면 채팅에 "이미지 N장 완료, M장 실패" 한 줄이 남는다', async () => {
     await run()
-    expect(shared.notify).toHaveBeenCalledWith('director', '✓ 2 images done, 1 failed')
+    // 끝 줄은 실사 · 영상의 집 Camera 로 낸다(2026-11-22 오너 D2~D5 — 예전엔 'director'). Director 를 보고 있으면 채팅이 받는 곳에서 Director 구간에 남긴다.
+    expect(shared.notify).toHaveBeenCalledWith('camera', '✓ 2 images done, 1 failed')
   })
 
   // 왜: 시안 D8 — 채팅을 접어 둔 채 끝나면 오른쪽 아래 카드로 끝난 수 · 실패 수를 알린다.

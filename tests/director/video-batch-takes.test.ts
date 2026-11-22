@@ -243,9 +243,10 @@ describe('약속 E — 영상 일괄 생성은 Take를 미리 센다', () => {
     expect(mockStore.state.generateVideoForShot).not.toHaveBeenCalled()
     await new Promise((r) => setTimeout(r, 5))
     expect(notifyMock.notifyBatchSummary).toHaveBeenCalledTimes(1)
-    expect(notifyMock.notifyBatchSummary.mock.calls[0]).toEqual(['director', '✓ 1 videos done, 2 failed'])
+    // 끝 줄은 실사 · 영상의 집 Camera 로 낸다(2026-11-22 오너 D2~D5 — 예전엔 'director').
+    expect(notifyMock.notifyBatchSummary.mock.calls[0]).toEqual(['camera', '✓ 1 videos done, 2 failed'])
     // 일괄 모드에서는 건별 완료 알림을 내지 않아 줄이 하나다.
-    expect(read('src/stores/director-store.ts')).toMatch(/if \(options\?\.batch !== true\) notifyGenerationComplete\('director'/)
+    expect(read('src/stores/director-store.ts')).toMatch(/if \(options\?\.batch !== true\) notifyGenerationComplete\('camera'/)
     expect(read('src/lib/i18n/messages-ko.ts')).toMatch(/'\{done\} videos done, \{failed\} failed': '영상 \{done\}개 완료, \{failed\}개 실패'/)
   })
 })

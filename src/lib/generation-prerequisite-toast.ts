@@ -117,7 +117,7 @@ export function notifyPrerequisiteTimeout(stage: StageId, body: PrerequisiteBody
  */
 export function notifyIfPrerequisiteMissing(status: number, body: unknown): boolean {
   if (!isPrerequisiteMissing(status, body)) return false
-  notifyPrerequisiteWaiting('director', body)
+  notifyPrerequisiteWaiting('camera', body)
   return true
 }
 

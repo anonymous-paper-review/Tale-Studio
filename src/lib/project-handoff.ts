@@ -19,7 +19,8 @@ export interface ProjectHandoffResult {
   blockers: ProjectHandoffIssue[]
   warnings: ProjectHandoffIssue[]
   counts: { scenes: number; shots: number }
-  path?: '/studio/director'
+  // Storyboard 다음은 Camera 다(2026-11-22 오너 D2~D5 — 예전엔 Director). 준비 확인(Writer · Artist 그림)은 그대로.
+  path?: '/studio/camera'
 }
 
 export class ProjectHandoffError extends Error {
@@ -143,22 +144,22 @@ export async function prepareProjectHandoff(
   }
   if (!result.ready || action === 'check') return result
 
-  const directorIndex = STAGES.findIndex(stage => stage.id === 'director')
+  const cameraIndex = STAGES.findIndex(stage => stage.id === 'camera')
   const currentIndex = STAGES.findIndex(stage => stage.id === project.current_stage)
   if (currentIndex < 0) throw new ProjectHandoffError('handoff_conflict', 409, translate(locale, CONFLICT))
-  if (currentIndex < directorIndex) {
-    const saved = await supabaseAdmin.from('projects').update({ current_stage: 'director' })
+  if (currentIndex < cameraIndex) {
+    const saved = await supabaseAdmin.from('projects').update({ current_stage: 'camera' })
       .eq('id', projectId).eq('current_stage', project.current_stage).select('id, current_stage').maybeSingle()
     if (saved.error) throw new ProjectHandoffError('handoff_save_failed', 503, translate(locale, SAVE_FAILED))
     if (!saved.data) {
       // 다른 요청이 이미 더 멀리 전진했을 때만 재조회한 저장본을 근거로 성공한다.
       const latest = await readProject(projectId, locale)
-      if (STAGES.findIndex(stage => stage.id === latest.current_stage) < directorIndex) {
+      if (STAGES.findIndex(stage => stage.id === latest.current_stage) < cameraIndex) {
         throw new ProjectHandoffError('handoff_conflict', 409, translate(locale, CONFLICT))
       }
-    } else if (saved.data.current_stage !== 'director') {
+    } else if (saved.data.current_stage !== 'camera') {
       throw new ProjectHandoffError('handoff_save_failed', 503, translate(locale, SAVE_FAILED))
     }
   }
-  return { ...result, path: '/studio/director' }
+  return { ...result, path: '/studio/camera' }
 }

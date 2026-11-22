@@ -137,11 +137,13 @@ describe('채팅 아바타 · Lumi 그림', () => {
 
   it('단계마다 화면 이름과 같은 Lumi 옷을 입는다', () => {
     // 왜: 단계 id 는 옛 이름이다(entry=Producer, producer=Writer, writer=Storyboard) — id 그대로 옷을 고르면 Writer 화면에 Producer Lumi 가 나온다.
+    //   Camera(오너 2026-11-22 D2~D5)는 옛 Storyboard 옷을 받는다(리드 2026-11-22).
     expect(STAGE_PERSONA).toEqual({
       entry: 'producer',
       producer: 'writer',
       artist: 'artist',
       writer: 'storyboard',
+      camera: 'storyboard',
       director: 'director',
       editor: 'editor',
     })

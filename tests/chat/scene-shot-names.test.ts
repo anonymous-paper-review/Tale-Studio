@@ -187,7 +187,8 @@ describe('혼자 정한 것', () => {
     expect(store).not.toMatch(/prettyNodeLabel\(shot\.data\.label/)
     expect(store).toMatch(/function stoppedShotName\([\s\S]{0,400}?directorNodeLabel\([\s\S]{0,200}?boardNodeNames\(writer\.sceneManifest, writer\.shots \?\? \[\], locale\)/)
     expect(store).toMatch(/const locale = contentLocale\(\)\s*\n\s*const name = stoppedShotName\(shot, locale\)/)
-    expect(store).toMatch(/const locale = contentLocale\(\)\s*\n\s*notifyStoppedResultKept\('director', translate\(locale, 'The Take you stopped for \{shot\}/)
+    // 알림의 단계는 실사 · 영상의 집 Camera 다(2026-11-22 오너 D2~D5 — 예전엔 'director').
+    expect(store).toMatch(/const locale = contentLocale\(\)\s*\n\s*notifyStoppedResultKept\('camera', translate\(locale, 'The Take you stopped for \{shot\}/)
   })
 
   // 왜: 모든 단계가 함께 쓰는 답 규칙이 "한국어 응답에서도 이 영문 표기를 그대로 쓴다"고 가르쳤다(8/26 단일형). 이제는 목록에 적힌 보드 이름 그대로 —

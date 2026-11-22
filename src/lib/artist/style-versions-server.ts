@@ -142,7 +142,8 @@ export function nextStamp(previous: string | null | undefined): string {
 
 /** Storyboard 를 열었나([완료하기] 뒤 · 예전 흐름으로 샷까지 만든 프로젝트) — 화면 artistCompleted 와 같은 기준(stage-gate). */
 export async function artistStyleLocked(project: Pick<VersionProject, 'id' | 'current_stage'>): Promise<boolean> {
-  if (project.current_stage === 'writer' || project.current_stage === 'director' || project.current_stage === 'editor') return true
+  // Camera(오너 2026-11-22 D2~D5)는 Storyboard 와 Director 사이다 — 빠뜨리면 Camera 단계 프로젝트의 그림체가 다시 풀린다.
+  if (['writer', 'camera', 'director', 'editor'].includes(project.current_stage ?? '')) return true
   const { data: shots, error } = await supabaseAdmin.from('shots').select('shot_id').eq('project_id', project.id).limit(1)
   if (error) throw new Error(`shots read failed: ${error.message}`)
   if (rowsOf(shots).length === 0) return false

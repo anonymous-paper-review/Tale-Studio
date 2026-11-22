@@ -1,10 +1,10 @@
-// 전체 대사 수정은 실제 저장이 끝난 뒤 남은 씬을 이어 처리하고, 모두 끝나야 다음 단계로 넘긴다.
+// 전체 대사 수정은 실제 저장이 끝난 뒤 남은 씬을 이어 처리하고, 모두 끝나야 다음 단계로 넘긴다. (2026-11-22 오너 D2~D5 — 다음 단계가 Director 에서 Camera 로)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Scene, Shot } from '@/types'
 
 const { writes, saveFailures, missingRows, saveWaits, handoff } = vi.hoisted(() => ({
   writes: [] as Array<{ id: string; lines: unknown }>, saveFailures: new Set<string>(), missingRows: new Set<string>(), saveWaits: new Map<string, Promise<void>>(),
-  handoff: vi.fn().mockResolvedValue('/studio/director'),
+  handoff: vi.fn().mockResolvedValue('/studio/camera'),
 }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 vi.mock('@/lib/stage-nav', () => ({ handoffToStage: vi.fn() }))
@@ -40,7 +40,7 @@ function respond(batches: unknown[][]) {
       if (gate?.ready === false) return Response.json({ ready: false, blockers: gate.blockers.map(blocker => ({ label: blocker.label, action: 'Artist에서 인물 이미지를 준비해 주세요.' })) }, { status: 409 })
       // 실제 서버 이동 요청과 완료 판정을 대신하는 응답 fixture다.
       handoff(JSON.parse(String(init?.body)).targetStage)
-      return Response.json({ ready: true, blockers: [], counts: { scenes: 6, shots: 47 }, path: '/studio/director' })
+      return Response.json({ ready: true, blockers: [], counts: { scenes: 6, shots: 47 }, path: '/studio/camera' })
     }
     if (url === '/api/writer/chat') {
       requests.push(JSON.parse(String(init?.body)))
@@ -57,19 +57,19 @@ beforeEach(() => {
   useProjectStore.setState({ projectId: 'dialogue-handoff', currentStage: 'writer', reachedStage: 'director', projectLocale: 'ko', projectLocaleLocked: true, lifecycleStatus: structuredClone(EMPTY_LIFECYCLE_STATUS) })
   useWriterStore.setState({ sceneManifest: { scenes: [1,2,3,4,5,6].map(scene), characters: [], locations: [] }, shots: [1,2,3,4,5,6].map(shot), error: null })
   useGlobalChatStore.setState({ messages: [
-    { id: 'request-director', stage: 'writer', role: 'user', content: 'Director로 넘겨주세요' },
+    { id: 'request-camera', stage: 'writer', role: 'user', content: 'Camera로 넘겨주세요' },
     { id: 'ask-language', stage: 'writer', role: 'model', content: '한국어와 일본어가 섞여 있어요. 전체 한국어로 맞출까요?' },
   ] })
 })
 afterEach(() => { vi.clearAllTimers(); useGlobalChatStore.getState().reset(); useWriterStore.getState().reset(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('대사 전체 수정 완료에 따른 이어가기', () => {
-  it('전체 한국어로 맞추고 넘겨 달라고 하면 일부 씬 저장 뒤 남은 씬을 자동 처리하고 모두 저장된 뒤 Director로 넘긴다', async () => {
+  it('전체 한국어로 맞추고 넘겨 달라고 하면 일부 씬 저장 뒤 남은 씬을 자동 처리하고 모두 저장된 뒤 Camera로 넘긴다', async () => {
     respond([[update(1), update(2), update(3)], [update(4)], [update(5)]])
     await useGlobalChatStore.getState().sendMessage('전체 한국어로 맞추고 넘겨줘')
     expect(writes.map(write => write.id)).toEqual(['shot_1','shot_2','shot_3','shot_4','shot_5'])
     expect(requests).toHaveLength(3)
-    expect(handoff).toHaveBeenCalledExactlyOnceWith('director')
+    expect(handoff).toHaveBeenCalledExactlyOnceWith('camera')
     expect(useGlobalChatStore.getState().messages.map(message => message.content).join('\n')).toContain('모든 대사')
     expect(useWriterStore.getState().shots[5].dialogueLines[0].text).toBe('이미 한국어예요.')
   })
@@ -134,7 +134,7 @@ it('대사 통일 중 중단하면 저장을 마친 부분을 유지하고 나�
 it('번역 응답에서 말투 정보가 빠져도 원래 화자와 말투를 보존한다', async () => {
   const updates = [1,2,3,4,5].map(n => ({ type: 'updateShot', id: `shot_${n}`, patch: { dialogueLines: [{ characterId: 'char_a', text: `안녕하세요 ${n}.` }] } }))
   respond([updates])
-  await useGlobalChatStore.getState().sendMessage('전체 한국어로 맞추고 Director로 넘겨줘')
+  await useGlobalChatStore.getState().sendMessage('전체 한국어로 맞추고 Camera로 넘겨줘')
   expect(writes).toHaveLength(5)
   expect(writes[0].lines).toEqual([{ characterId: 'char_a', text: '안녕하세요 1.', emotion: 'calm', delivery: 'soft', durationHint: 1 }])
   expect(handoff).toHaveBeenCalledOnce()
@@ -157,7 +157,7 @@ it('남은 한 씬도 여러 번 나뉘어 돌아오면 저장한 샷을 빼고 
 })
 
 
-it('모든 대사를 저장했어도 Director 준비 조건이 부족하면 완료 내역을 남기고 이동을 보류한다', async () => {
+it('모든 대사를 저장했어도 Camera 준비 조건이 부족하면 완료 내역을 남기고 이동을 보류한다', async () => {
   useProjectStore.setState({ lifecycleStatus: { ...structuredClone(EMPTY_LIFECYCLE_STATUS), director: { ready: false, blockers: [{ field: 'missing-image', label: '인물 이미지가 필요해요.' }], warnings: [] } } })
   respond([[update(1),update(2),update(3),update(4),update(5)]])
   await useGlobalChatStore.getState().sendMessage('전체 한국어로 맞추고 넘겨줘')
@@ -204,12 +204,12 @@ it('47샷의 대사를 처리해도 같은 요청의 진행 안내는 한 줄만
   expect(handoff).toHaveBeenCalledOnce()
 })
 
-it('Director 이동 질문 뒤 대사 통일과 이동을 요청하면 저장 후 서버의 현재 조건을 확인한다', async () => {
-  useGlobalChatStore.setState({ messages: [{ id: 'question', stage: 'writer', role: 'user', content: '디렉터러 넘길수잇어?' }] })
+it('Camera 이동 질문 뒤 대사 통일과 이동을 요청하면 저장 후 서버의 현재 조건을 확인한다', async () => {
+  useGlobalChatStore.setState({ messages: [{ id: 'question', stage: 'writer', role: 'user', content: '카메라로 넘길수잇어?' }] })
   respond([[update(1), update(2), update(3), update(4), update(5)]])
   await useGlobalChatStore.getState().sendMessage('전체 한국어로 맞추고 넘겨줘')
   expect(writes).toHaveLength(5)
-  expect(handoff).toHaveBeenCalledExactlyOnceWith('director')
+  expect(handoff).toHaveBeenCalledExactlyOnceWith('camera')
   expect(useGlobalChatStore.getState().messages.some(message => message.content.includes('⇄'))).toBe(false)
   expect(useGlobalChatStore.getState().directorHandoff?.phase).toBe('navigating')
 })

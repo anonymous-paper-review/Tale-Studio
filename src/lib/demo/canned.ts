@@ -14,6 +14,7 @@ export const CANNED_CHAT: Record<StageId, string> = {
   producer: PRODUCER_REPLY,
   writer: 'This is a shared preview. In the real project, you review and edit the scene structure and rough storyboard here.',
   artist: 'This is a shared preview. In the real project, you create and refine character and world cards here.',
+  camera: 'This is a shared preview. In the real project, you make real images and videos shot by shot here and keep every version.',
   director: 'This is a shared preview. In the real project, you direct shots, camera and video on the canvas here.',
   editor: 'This is a shared preview. In the real project, you edit cuts on the timeline here.',
 }

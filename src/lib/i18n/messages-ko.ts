@@ -3739,4 +3739,23 @@ export const KO: Record<string, string> = {
   Revoked: '해지',
   'In use': '이용 중',
   'End access': '해지',
+  // ── Camera 탭(오너 2026-11-22 D2~D5) — 이름(Camera)은 단계 표에서 {stage} 로 받는다 ──
+  "E.g. make shot 3's video again, a bit slower": '예: 샷 3 영상을 조금 더 천천히 다시 만들어 줘',
+  'Looking over the shot history': '샷 이력을 살피는 중',
+  'Yes, start shooting': '좋아요, 촬영하기로',
+  'Please hand over to {stage}': '{stage}로 넘겨주세요',
+  'Move on to {stage}?': '{stage}로 넘어갈까요?',
+  'The saved scenes and shots are ready. Opening {stage}.': '저장된 씬과 샷, 이동 조건을 확인했어요. {stage} 화면을 여는 중이에요.',
+  'Could not open {stage}. Your work is saved. Select {stage} on the left or ask me to try again.':
+    '{stage} 화면을 열지 못했어요. 작업은 저장되어 있어요. 왼쪽 {stage}를 선택하거나 다시 넘겨 달라고 말씀해 주세요.',
+  '{stage} is ready. I checked {scenes} saved scenes and {shots} saved shots. Ask me to hand over when you are ready.':
+    '{stage}로 이동할 수 있어요. 저장된 씬 {scenes}개와 샷 {shots}개를 확인했어요. 넘겨 달라고 하시면 이동할게요.',
+  'I will check again and open {stage} when it is ready. Say cancel to stop waiting.':
+    '준비 상태를 다시 확인하고 완료되면 {stage}를 열게요. 기다리지 않으려면 취소라고 말씀해 주세요.',
+  'Real image': '실사 이미지',
+  'Make the shots in {stage} first.': '{stage}에서 먼저 샷을 만들어 주세요.',
+  "Make real images and videos shot by shot. Every image and video stays in the shot's history.":
+    '샷마다 실사 이미지와 영상을 만들어요. 만든 이미지와 영상은 모두 그 샷의 이력에 남아요.',
+  'This is a shared preview. In the real project, you make real images and videos shot by shot here and keep every version.':
+    '공유 미리보기 모드예요. 실제로는 샷마다 실사 이미지와 영상을 만들고 모든 판을 남겨요.',
 }

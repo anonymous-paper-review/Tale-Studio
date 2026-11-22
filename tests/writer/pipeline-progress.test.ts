@@ -417,7 +417,8 @@ describe('queueWorks — 다른 화면에서도 진행 알림을 보여준다', 
     expect(works).toHaveLength(2)
     expect(works[0]).toMatchObject({ stage: 'artist', total: 2 })
     expect(works[0].label).toContain('Concept Artist')
-    expect(works[1]).toMatchObject({ stage: 'director', total: 1 })
-    expect(works[1].label).toContain('Director')
+    // 영상은 Camera 의 일이고 Cinematographer 가 만든다(2026-11-22 오너 D2~D5 — 예전엔 Director).
+    expect(works[1]).toMatchObject({ stage: 'camera', total: 1 })
+    expect(works[1].label).toContain('Cinematographer')
   })
 })
