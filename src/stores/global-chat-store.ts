@@ -266,7 +266,8 @@ interface GlobalChatState {
   finishWorkflowNavigation: (arrived: boolean) => void
   directorHandoff: { id: string; projectId: string; phase: 'checking' | 'waiting' | 'navigating'; notice?: string } | null
   /** 다음 단계 버튼·채팅 넘김이 연 확인 창(2026-10-01 오너). producerLock = Writer 로 넘기기 전 확정(넘기면 Producer 잠금),
-   *  directorReadiness = 준비가 덜 된 샷 목록과 "그래도 진행". Writer→Artist·Director→Editor 는 창이 없다. */
+   *  directorReadiness = 준비가 덜 된 샷 목록과 "그래도 진행"(옛 Artist → Director 넘김의 창 — D1 뒤로 Artist 다음 단계 단추는 열지 않는다).
+   *  Writer→Artist · Artist→콘티 · Director→Editor 는 창이 없다. */
   handoffConfirm: HandoffConfirm | null
   /** 단계 화면 오른쪽 위 "다음 단계" 버튼 — 버튼 = 넘김 문장 타이핑. 확인 창이 필요한 넘김은 창을 먼저 연다. */
   requestNextStep: () => Promise<void>
@@ -2198,24 +2199,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     }
     // 버튼 = 그 문장을 타이핑한 것(#handoff-to-chat). 버튼의 언어는 화면(UI) 언어다 — 예전 채팅 위 칩과 같다.
     const utterance = translate(useLocaleStore.getState().locale, action.utterance)
-    if (action.from === 'artist' && writerSideBlockers().length === 0) {
-      // 준비가 덜 된 샷이 있으면 넘기지 않고 목록 창을 연다(2026-10-01 오너 "director 넘어갈 때 미완성 팝업").
-      const readiness = await directorReadinessOf(projectId)
-      if (useProjectStore.getState().projectId !== projectId) return
-      if (readiness.incomplete) {
-        set({ handoffConfirm: { kind: 'directorReadiness', projectId, report: readiness.report, gateGaps: readiness.gateGaps, via: 'button' } })
-        return
-      }
-      await get().sendMessage(utterance, undefined, { consentedHandoff: true, acceptIncomplete: true })
-      return
-    }
+    // Artist → 콘티는 창 없이 넘김 문장으로 간다 — 넘김(runHandoff)이 [완료하기] 단추와 같은 서버 검사를 거친다(리드 2026-11-22 결정, D1).
+    //   옛 "Director 준비가 덜 된 샷" 창(2026-10-01)은 Artist 다음이 Director 이던 때의 것이다 — 샷 준비 확인은 콘티 → Camera 넘김이 맡는다.
     // Director→Editor: 영상 없는 샷이 있을 때만 넘기기 창(D8, 오너 2026-11-14 답 8번 · 페이지 추천) — 다 있으면 지금처럼 바로(10/1).
     //   완성 영상이 하나도 없으면 창을 열지 않는다 — 넘김 게이트(handoffBlockers)가 "완성된 영상이 하나 있으면…"으로 먼저 막는다(set 검토 a 낮음 7).
     if (action.from === 'director' && directorHasFinishedVideo(useDirectorCanvasStore.getState().nodes) && directorMissingVideos().length > 0) {
       set({ handoffConfirm: { kind: 'editorMissingVideos', projectId, via: 'button' } })
       return
     }
-    // Writer→Artist · Director→Editor(영상이 다 있음)는 창 없이 바로(2026-10-01 오너 "그 2구간은 일단 없이").
+    // Writer→Artist · Artist→콘티 · Director→Editor(영상이 다 있음)는 창 없이 바로(2026-10-01 오너 "그 2구간은 일단 없이", Artist→콘티는 D1).
     await get().sendMessage(utterance, undefined, { consentedHandoff: true, ...(action.from === 'director' ? { acceptMissingVideos: true } : {}) })
   },
 
