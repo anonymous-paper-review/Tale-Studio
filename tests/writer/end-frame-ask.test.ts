@@ -179,15 +179,18 @@ describe('연출 탭의 읽은 한 줄', () => {
   const render = (directionRead: unknown) =>
     renderToStaticMarkup(createElement(DirectingArrowEditor, { projectId: 'p1', shotId: 'sh_1', panel: panel(directionRead), onSaved: () => {}, onRedrawEnd: () => {} }))
 
-  // 왜(리드 Q-b · Q-a): 물음 창을 닫은 뒤에도 줄을 보고 고칠 수 있게 연출 탭 편집기 아래에 둔다. [그대로]를 고른 줄은 끝 장 · 영상에 아직 안 쓰였다고 알린다.
-  it('연출 탭 편집기 아래에 지금 연출 장을 읽은 줄과 [고쳐서 끝 장 다시 그리기]가 보이고, 아직 끝 장에 안 쓴 줄이면 그렇다고 알린다', () => {
+  // 왜(리드 Q-b · D2): 물음 창을 닫은 뒤에도 줄을 보고 고칠 수 있게 연출 탭 편집기 아래에 둔다. [그대로]를 고른 줄은 영상에는 이미 들어가지만
+  //   (리드 D2 2026-11-23 — 영상은 지금 연출 장을 읽은 줄을 쓴다) 끝 장 · 실사에는 아직 안 쓰였다 — 실사는 끝 장을 그 줄로 그린 뒤에만 줄을 싣는다.
+  //   2026-11-23 문장 바꿈(리드 D2): 예전 '…아직 끝 장에 안 쓴 줄이면 그렇다고 알린다' — 그때 알림은 "아직 쓰지 않은 줄이에요(끝 장 · 영상)"였다.
+  it('연출 탭 편집기 아래에 지금 연출 장을 읽은 줄과 [고쳐서 끝 장 다시 그리기]가 보이고, 아직 끝 장에 안 쓴 줄이면 영상에는 들어가고 끝 장 · 실사는 다시 그려야 맞는다고 알린다', () => {
     const unused = render({ ...LINE, direction: 'https://media.test/r/direction.png' })
     expect(unused).toContain(LINE.en) // 시험은 영어 화면(기본 말)이다.
     expect(unused).toContain('Edit and redraw the end frame')
-    expect(unused).toContain('Not used yet. Redraw the end frame to use it for the end frame and video.')
+    expect(unused).toContain('Videos use this line. To match, redraw the end frame with it, then the live-action images.')
+    expect(messagesKo['Videos use this line. To match, redraw the end frame with it, then the live-action images.']).toBe('영상에는 이 줄이 들어가요. 끝 장을 이 줄로 다시 그린 뒤 실사도 다시 그려야 맞아요.')
     const used = render({ ...LINE, direction: 'https://media.test/r/direction.png', endDrawn: 'https://media.test/r/end.png' })
     expect(used).toContain(LINE.en)
-    expect(used).not.toContain('Not used yet.')
+    expect(used).not.toContain('Videos use this line.')
     // 줄이 없거나 낡았으면(옛 연출 장을 읽은 줄) 보이지 않는다.
     expect(render({ ...LINE, direction: 'https://media.test/r/old-direction.png' })).not.toContain(LINE.en)
     for (const rel of ['src/features/writer/storyboard-shot-dialog.tsx', 'src/features/writer/shot-detail-dialog.tsx']) {

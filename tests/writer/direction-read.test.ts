@@ -1,4 +1,4 @@
-// 연출 장을 읽은 한 줄이 연출 장이 그대로이고 그 줄로 끝 장을 그렸을 때만 지시에 쓰이는지 검사한다(D10 ② · 2026-11-22 오너 Q4 · 리드 Q-a)
+// 연출 장을 읽은 한 줄이 언제 쓰이는지 검사한다 — 실사는 그 줄로 끝 장을 그렸을 때만, 영상은 연출 장이 그대로이면(D10 ② · 2026-11-22 오너 Q4 · 리드 Q-a · 2026-11-23 리드 D2)
 import { describe, expect, it } from 'vitest'
 import { freshDirectionLine, freshDirectionRead, withEndDrawn } from '@/lib/writer/direction-read'
 
@@ -15,7 +15,8 @@ const READ = { en: 'The figure on the left walks out of frame to the right.', ko
 const DRAWN = { ...READ, endDrawn: END }
 
 describe('연출 장을 읽은 줄', () => {
-  // 왜: 영상 지시(fb-video)는 끝 그림에 쓴 줄만 싣는다 — 끝 그림과 영상 글이 다른 움직임을 말하면 사용자 Take 가 버려진다(오너 Q4 · 리드 Q-a 2026-11-22).
+  // 왜: 실사 지시(오너 R1)는 끝 장을 그 줄로 그렸을 때만 줄을 싣는다 — 실사에는 끝 칸이 있어 끝 장과 다른 움직임을 말하면 한 장 안에서 어긋난다
+  //   (리드 Q-a 2026-11-22 · D2 2026-11-23). 영상은 2026-11-23 부터 이 함수가 아니라 아래 freshDirectionRead 의 줄을 쓴다(리드 D2 — 시작+끝 영상이 없어져 끝 그림이 영상에 안 간다).
   //   2026-11-22 문장 바꿈(리드 Q-a): 예전 '연출 장을 읽은 줄은 그 연출 장이 지금 연출 장일 때만 영어 줄을 돌려준다'.
   it('연출 장을 읽은 줄은 연출 장이 그대로이고 그 줄로 끝 장을 그려 끼웠을 때만 영어 줄을 돌려준다', () => {
     expect(freshDirectionLine(rough(DRAWN))).toBe('The figure on the left walks out of frame to the right.')
@@ -25,14 +26,15 @@ describe('연출 장을 읽은 줄', () => {
     expect(freshDirectionLine(rough({ ...DRAWN, endDrawn: 'https://media.test/ws/p1/shots/sh_1_end.png?v=100' }))).toBeNull()
   })
 
-  // 왜(리드 Q-a): [그대로]를 고르거나 끝 장 작업이 실패 · 버려지면 그 줄은 아직 쓰이지 않은 줄이다 — 편집기 아래 줄에는 남아
-  //   나중에 [고쳐서 끝 장 다시 그리기]로 쓸 수 있지만, 영상에는 실리지 않는다.
-  it('[그대로]를 골라 그 줄로 끝 장을 그리지 않았으면 그 줄은 화면에만 남고 영상 지시에는 쓰지 않는다', () => {
+  // 왜(리드 Q-a · D2): [그대로]를 고르거나 끝 장 작업이 실패 · 버려지면 끝 장은 그 줄로 그려지지 않았다 — 실사에는 싣지 않는다.
+  //   그래도 지금 연출 장을 읽은 줄이라 편집기 아래 줄에 남고, 영상은 이 줄을 쓴다(리드 D2 2026-11-23).
+  //   2026-11-23 문장 바꿈(리드 D2): 예전 '[그대로]를 골라 그 줄로 끝 장을 그리지 않았으면 그 줄은 화면에만 남고 영상 지시에는 쓰지 않는다'.
+  it('[그대로]를 골라 그 줄로 끝 장을 그리지 않았으면 그 줄은 실사 지시에는 쓰지 않고, 지금 연출 장을 읽은 줄(영상이 쓰는 줄)로는 남는다', () => {
     expect(freshDirectionLine(rough(READ))).toBeNull()
     expect(freshDirectionRead(rough(READ))).toMatchObject({ en: READ.en, ko: READ.ko, source: 'ai', direction: DIRECTION, endDrawn: null })
   })
 
-  // 왜: 그 줄로 그린 끝 장을 끼울 때 표시를 남겨야 영상 지시가 그 줄을 쓴다 — 줄이 그새 바뀌었으면(사람이 고침) 새 줄에는 남기지 않는다.
+  // 왜: 그 줄로 그린 끝 장을 끼울 때 표시를 남겨야 실사 지시가 그 줄을 쓴다 — 줄이 그새 바뀌었으면(사람이 고침) 새 줄에는 남기지 않는다.
   it('그 줄로 그린 끝 장을 끼우면 러프 기록에 그 줄로 그렸다는 표시가 남는다', () => {
     const drawn = withEndDrawn(rough(READ).directionRead, { en: READ.en, direction: DIRECTION }, END)
     expect(freshDirectionLine(rough(drawn))).toBe(READ.en)
@@ -47,7 +49,7 @@ describe('연출 장을 읽은 줄', () => {
     expect(freshDirectionRead(saved)).toBeNull()
   })
 
-  // 왜(정상 경로 고정): 줄이 없는 옛 러프 · 연출 장이 없는 러프 · 망가진 기록에서도 영상 지시가 깨지지 않고 줄 없이 간다.
+  // 왜(정상 경로 고정): 줄이 없는 옛 러프 · 연출 장이 없는 러프 · 망가진 기록에서도 실사 · 영상 지시가 깨지지 않고 줄 없이 간다.
   it('읽은 줄이 없거나 모양이 틀리면 지시에 쓸 줄이 없다', () => {
     for (const value of [null, undefined, 'text', 42, [], {}, rough(undefined), rough(DRAWN, { end: END }), rough({ ...DRAWN, en: '   ' }), rough({ ...DRAWN, en: 7 }), rough({ ...DRAWN, direction: null })]) {
       expect(freshDirectionLine(value)).toBeNull()

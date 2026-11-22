@@ -692,7 +692,8 @@ export const KO: Record<string, string> = {
   'Redrawing the end frame, which takes over a minute': '끝 장을 다시 그리는 중이에요. 1분 넘게 걸려요.',
   'The AI could not read the arrows, so the end frame was not redrawn. Write the motion in the directing tab.': 'AI 가 화살표를 읽지 못해 끝 장을 다시 그리지 않았어요. 연출 탭에서 움직임을 직접 적어 주세요.',
   'Could not translate the motion line. Try again.': '움직임 줄을 영어로 옮기지 못했어요. 다시 시도해 주세요.',
-  'Not used yet. Redraw the end frame to use it for the end frame and video.': '아직 쓰지 않은 줄이에요. 끝 장을 다시 그리면 끝 장 · 영상에 쓰여요.',
+  // 리드 D2(2026-11-23): 영상은 지금 연출 장을 읽은 줄을 바로 쓰고, 실사는 끝 장을 그 줄로 그린 뒤에만 싣는다 — 그래서 순서를 적는다.
+  'Videos use this line. To match, redraw the end frame with it, then the live-action images.': '영상에는 이 줄이 들어가요. 끝 장을 이 줄로 다시 그린 뒤 실사도 다시 그려야 맞아요.',
   'Edit and redraw the end frame': '고쳐서 끝 장 다시 그리기',
   // ── writer 스테이지: add-item-dialog ──
   'Low angle (looking up)': '로우앵글 (아래에서 위로)',

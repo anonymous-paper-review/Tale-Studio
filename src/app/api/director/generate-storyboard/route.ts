@@ -215,7 +215,8 @@ export async function POST(req: Request) {
         : null
     // D5(2026-11-22): 러프 가운데 장 글씨를 옮기지 않으니, 그 글씨가 나르던 빛 · 색 · 렌즈 · 초점을 샷 설계에서 글로 싣는다(스트립 길만).
     const cineLine = stripFrames ? realCineLine((shot as { static_spec?: unknown } | null)?.static_spec) : null
-    // D10 ②(2026-11-22 오너 R1): 사람이 고친 화살표를 읽고 그 줄로 끝 장을 다시 그린 샷만 — 그 줄을 움직임으로 싣는다(영상과 같은 조건).
+    // D10 ②(2026-11-22 오너 R1): 사람이 고친 화살표를 읽고 그 줄로 끝 장을 다시 그린 샷만 — 그 줄을 움직임으로 싣는다.
+    //   실사에는 끝 칸이 있어 끝 장을 그린 줄만 쓴다(영상은 리드 D2 2026-11-23 부터 끝 장과 상관없이 읽은 줄을 쓴다 — 조건이 다르다).
     const directionLine = stripFrames ? freshDirectionLine(shot?.rough_storyboard) : null
     // #ref-gate(2026-09-02 오너 결정): writer 샷인데 러프 3프레임이 없으면 단일 이미지로 조용히 강등하지
     //   않고 409 code 로 막는다 — 클라가 러프 완성을 기다렸다가 자동 재개한다. shots 행이 없는 캔버스 전용

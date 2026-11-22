@@ -123,7 +123,8 @@ export function DirectingArrowEditor({
 }) {
   const t = useT()
   const locale = useLocaleStore((s) => s.locale)
-  // 지금 연출 장을 읽은 줄(낡은 줄은 안 보인다). 그 줄로 그린 끝 장이 지금 끝 장이 아니면 끝 장 · 영상에 아직 안 쓴 줄이다(리드 Q-a).
+  // 지금 연출 장을 읽은 줄(낡은 줄은 안 보인다). 영상은 이 줄을 바로 쓴다(리드 D2 2026-11-23). 그 줄로 그린 끝 장이 지금 끝 장이 아니면
+  //   끝 장 · 실사에는 아직 안 쓴 줄이다 — 실사는 끝 장을 그 줄로 그린 뒤에만 줄을 싣는다(리드 Q-a · 오너 R1).
   const directionRead = freshDirectionRead(panel)
   const readUnused = !!directionRead && directionRead.endDrawn !== (panel.frames?.end ?? null)
   const directionUrl = panel.frames?.direction
@@ -585,13 +586,14 @@ export function DirectingArrowEditor({
         </Button>
       </div>
 
-      {/* AI 가 읽은 움직임(D10 ② · 리드 Q-b) — 물음 창을 닫은 뒤에도 보고 고친다. 끝 장 · 영상에 아직 안 쓴 줄이면 그렇다고 알린다(리드 Q-a). */}
+      {/* AI 가 읽은 움직임(D10 ② · 리드 Q-b) — 물음 창을 닫은 뒤에도 보고 고친다. 끝 장에 아직 안 쓴 줄이면 영상에는 들어가고
+          끝 장 · 실사는 이 줄로 다시 그려야 맞는다고 알린다(리드 D2 2026-11-23 — 끝 장을 먼저 그려야 실사에 줄이 실린다). */}
       {directionRead ? (
         <div className="flex flex-col gap-1.5 rounded-lg bg-card px-3 py-2.5" data-testid="directing-read-line">
           <span className="text-caption font-semibold text-subtle-foreground">{t('Motion the AI read')}</span>
           <p className="break-keep text-caption text-foreground">{askLineText(directionRead, locale)}</p>
           {readUnused ? (
-            <p className="break-keep text-caption text-muted-foreground">{t('Not used yet. Redraw the end frame to use it for the end frame and video.')}</p>
+            <p className="break-keep text-caption text-muted-foreground">{t('Videos use this line. To match, redraw the end frame with it, then the live-action images.')}</p>
           ) : null}
           {onRedrawEnd ? (
             <Button size="sm" variant="outline" className="self-start" disabled={busy} onClick={onRedrawEnd} data-testid="directing-read-line-redraw">

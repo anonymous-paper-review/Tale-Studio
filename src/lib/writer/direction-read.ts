@@ -1,12 +1,13 @@
 // 연출 장을 읽은 한 줄(D10 ② · 2026-11-22 오너 Q1 · Q3 · Q4) — 러프 기록(shots.rough_storyboard.directionRead)에 남는 모양과 "낡음" 규칙.
-//   읽는 AI(Gemini 3.6 Flash)가 시작 장과 연출 장을 보고 움직임을 한 줄로 읽는다 → 끝 장 그리기(GPT Image 2)와 영상 지시(fb-video)가 쓴다.
+//   읽는 AI(Gemini 3.6 Flash)가 시작 장과 연출 장을 보고 움직임을 한 줄로 읽는다 → 끝 장 그리기(GPT Image 2) · 실사 지시(오너 R1) · 영상 지시(fb-video)가 쓴다.
 //   줄을 읽은(사람이 고친) 연출 장 주소(?v= 포함)를 같이 둔다 — 지금 연출 장 주소와 다르면 낡은 줄이라 어디에도 쓰지 않는다(리드 2026-11-22).
 //   저장 · 연출 장 다시 그리기는 주소(?v=)를 바꾸고, 러프 전체 다시 그리기는 기록을 통째로 새로 써서 줄이 없어진다.
-//   영상 지시는 끝 그림에 쓴 줄만 싣는다(리드 Q-a 2026-11-22) — 그 줄로 그린 끝 장 주소(endDrawn)가 지금 끝 장일 때만.
-//     [그대로]를 고르거나 끝 장 작업이 실패 · 버려지면 그 줄은 화면(편집기 아래 줄)에만 남는다.
+//   실사 지시는 끝 그림에 쓴 줄만 싣는다(리드 Q-a 2026-11-22 · 오너 R1) — 그 줄로 그린 끝 장 주소(endDrawn)가 지금 끝 장일 때만(freshDirectionLine).
+//     [그대로]를 고르거나 끝 장 작업이 실패 · 버려지면 그 줄은 끝 장 · 실사에는 안 쓰이고 화면(편집기 아래 줄)과 영상에만 쓰인다.
+//   영상 지시는 2026-11-23 리드 D2 부터 끝 장과 상관없이 지금 연출 장을 읽은 줄(freshDirectionRead 의 en)을 쓴다 — 시작+끝 영상이 없어져 끝 그림이 영상에 가지 않는다.
 //   브라우저 · 서버 어디서나 불러도 되는 순수 파일이다(서버 전용 부품을 들이지 않는다). 약속: tests/writer/direction-read.test.ts
 export interface DirectionRead {
-  /** 지시(끝 장 그리기 · 영상)에 싣는 영어 줄. */
+  /** 지시(끝 장 그리기 · 실사 · 영상)에 싣는 영어 줄. */
   en: string
   /** 한국어 화면에 보이는 줄 — 읽는 AI 가 같이 준 것, 사람이 한국어로 고치면 그 글. 없으면 null(영어 줄을 보인다). */
   ko: string | null
@@ -16,7 +17,7 @@ export interface DirectionRead {
   direction: string
   /** 읽은(고친) 시각(ms). */
   at: number
-  /** 이 줄로 그려 끼운 끝 장 주소(?v= 포함) — 아직 그리지 않았으면 null. 지금 끝 장과 같을 때만 영상 지시에 쓴다. */
+  /** 이 줄로 그려 끼운 끝 장 주소(?v= 포함) — 아직 그리지 않았으면 null. 지금 끝 장과 같을 때만 실사 지시에 쓴다. */
   endDrawn: string | null
 }
 
@@ -24,7 +25,7 @@ function record(value: unknown): Record<string, unknown> | null {
   return value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null
 }
 
-/** 지금 연출 장을 읽은 줄 — 줄이 없거나 모양이 틀리거나 낡았으면 null. 화면(물음 창 · 편집기 아래 줄)이 쓴다. */
+/** 지금 연출 장을 읽은 줄 — 줄이 없거나 모양이 틀리거나 낡았으면 null. 화면(물음 창 · 편집기 아래 줄)과 영상 지시(fb-video, 리드 D2 2026-11-23 — en)가 쓴다. */
 export function freshDirectionRead(rough: unknown): DirectionRead | null {
   const r = record(rough)
   const read = record(r?.directionRead)
@@ -42,7 +43,8 @@ export function freshDirectionRead(rough: unknown): DirectionRead | null {
   }
 }
 
-/** 지시에 실을 영어 줄 — 지금 연출 장을 읽은 줄이고, 그 줄로 그린 끝 장이 지금 끝 장일 때만. 아니면 null. 영상 지시(fb-video)가 부른다. */
+/** 실사 지시에 실을 영어 줄 — 지금 연출 장을 읽은 줄이고, 그 줄로 그린 끝 장이 지금 끝 장일 때만. 아니면 null.
+ *  실사 두 길(한 샷 · 네 샷 시트, 오너 R1)이 부른다. 영상은 리드 D2(2026-11-23)부터 이 함수가 아니라 freshDirectionRead 의 en 을 쓴다. */
 export function freshDirectionLine(rough: unknown): string | null {
   const read = freshDirectionRead(rough)
   const end = record(record(rough)?.frames)?.end

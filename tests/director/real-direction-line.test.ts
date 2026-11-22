@@ -41,7 +41,8 @@ describe('실사 지시의 읽은 줄', () => {
     expect(batch).toMatch(/directionLines: group\.map\(\(s\) => s\.directionLine\),/)
   })
 
-  // 왜(오너 R1 · 리드 Q-a): 영상과 같은 조건 — 끝 장에 쓴 줄만 싣는다. 줄이 없거나 낡았거나 [그대로]를 골라 아직 안 쓴 줄이면 지금 지시 그대로다.
+  // 왜(오너 R1 · 리드 Q-a · D2): 실사에는 끝 칸이 있어 끝 장에 쓴 줄만 싣는다. 줄이 없거나 낡았거나 [그대로]를 골라 아직 끝 장에 안 쓴 줄이면 지금 지시 그대로다.
+  //   (영상은 2026-11-23 리드 D2 부터 끝 장과 상관없이 지금 연출 장을 읽은 줄을 쓴다 — 조건이 다르다.)
   it('읽은 줄이 없거나 낡았거나 아직 끝 장에 안 쓴 줄이면 실사 지시에 싣지 않는다', () => {
     expect(strip({ directionLine: null })).toBe(strip())
     expect(strip({ directionLine: '   ' })).toBe(strip())

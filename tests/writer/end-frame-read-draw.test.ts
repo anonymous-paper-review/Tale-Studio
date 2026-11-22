@@ -232,7 +232,7 @@ describe('끝 장 끼우기', () => {
   const job = (target: Record<string, unknown>) => ({ id: 'job-1', project_id: PROJECT, kind: 'image_generation', target }) as never
   const TARGET = { writerShotId: 'sh_1', workspaceId: WS, roughEnd: { generatedAt: 100, direction: FRAMES.direction, line: LINE_EN } }
 
-  // 왜: 끝 장만 바꾸고 시작 · 연출 장은 그대로(약속 I). 그 줄로 그린 끝 장이 지금 끝 장이 되어야 영상 지시가 그 줄을 쓴다(리드 Q-a).
+  // 왜: 끝 장만 바꾸고 시작 · 연출 장은 그대로(약속 I). 그 줄로 그린 끝 장이 지금 끝 장이 되어야 실사 지시가 그 줄을 쓴다(리드 Q-a · D2).
   it('그림이 오면 끝 장만 다른 두 장 크기로 바꿔 끼우고 그 줄로 그렸다는 표시를 남긴다', async () => {
     shotRow.rough_storyboard = { ...(shotRow.rough_storyboard as object), directionRead: { en: LINE_EN, ko: LINE_KO, source: 'ai', direction: FRAMES.direction, at: 1, endDrawn: null } }
     const url = await finalizeRoughEndFrameJob(job(TARGET), 'https://fal.test/out.png')
