@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
-import { UnsavedArrowsConfirm, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
+import { EndRedrawAsk, UnsavedArrowsConfirm, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { StoryboardShotDialog } from '@/features/writer/storyboard-shot-dialog'
 import { useWriterStore } from '@/stores/writer-store'
@@ -100,6 +100,7 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
                 onSaved={() => void loadProject()}
                 ref={guard.editorRef}
                 onDirtyChange={guard.setDirty}
+                onArrowsSaved={() => guard.askEnd({ projectId, shotId: shot.shotId, onRedrawn: () => loadProject() })}
               />
           </>
         ) : (
@@ -110,6 +111,7 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
       </DialogContent>
     </Dialog>
     <UnsavedArrowsConfirm {...guard.confirm} />
+    <EndRedrawAsk {...guard.endAsk} />
     </>
   )
 }

@@ -31,6 +31,7 @@ import {
   realSheetCanvas,
   type CharacterRefLabel,
 } from '@/lib/director/storyboard-strip'
+import { realCineLine } from '@/lib/director/real-cine-line'
 import { applyDirectorRefs, directorRefsExcludeWorld, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking, readOffFrame } from '@/lib/director/shot-references'
 import { loadSeriesFirstShotContinuity, seriesContinuityPromptLine } from '@/lib/series/continuity'
 import { parseProjectFormat } from '@/types/project'
@@ -73,6 +74,8 @@ interface EligibleShot {
   excludeWorld: boolean
   /** 약속 I4: 참조한 러프의 generatedAt. */
   roughGeneratedAt: number | null
+  /** D5(2026-11-22): 러프 가운데 장 글씨 칸이 나르던 빛 · 색 · 렌즈 · 초점 — 샷 설계에서 만든 글(없으면 null). */
+  cineLine: string | null
 }
 
 class CharacterAppearanceContractError extends Error {}
@@ -232,6 +235,7 @@ export async function POST(req: NextRequest) {
         roughGeneratedAt: (s.rough_storyboard as { generatedAt?: number } | null)?.generatedAt ?? null,
         frames: { start: f.start, direction: f.direction, end: f.end },
         blocking: readCharacterBlocking(s.static_spec),
+        cineLine: realCineLine(s.static_spec),
       })
     }
 
@@ -421,6 +425,7 @@ export async function POST(req: NextRequest) {
         styleRefCount: anchorTwoRef ? 2 : 1,
         styleAnchors: userStyleFacets?.probeAnchors ?? null,
         styleAvoid: userStyleFacets?.negative ?? null,
+        cineLines: group.map((s) => s.cineLine),
       }) + (seriesFrameUrl ? `\n- ${seriesContinuityPromptLine(seriesFrameColumn + 1)}` : '')
       const referenceImageUrls = [
         refUrl,
@@ -441,6 +446,7 @@ export async function POST(req: NextRequest) {
           [
             ...columnCharacters.flatMap((column) => column.flatMap((c) => [c.name, c.pose, c.position])),
             sceneLighting,
+            ...group.map((s) => s.cineLine),
           ],
           { projectId, kind: 'storyboard_real_grid', userId: access.userId },
         )

@@ -11,7 +11,7 @@ import { ChoiceChip } from '@/components/controls/choice-chip'
 import { Input } from '@/components/ui/input'
 import { Slider } from '@/components/ui/slider'
 import { AUDIO_FADE_LABEL, TRANSITION_CHOICES, TRANSITION_LABEL, edgeTransition, type TransitionEdge } from '@/lib/editor/transition'
-import { VIDEO_EFFECTS, VIDEO_EFFECT_DEFAULT, VIDEO_EFFECT_LABEL } from '@/lib/editor/video-effects'
+import { BLUR_END_DEFAULT, VIDEO_EFFECTS, VIDEO_EFFECT_DEFAULT, VIDEO_EFFECT_LABEL, blurMode } from '@/lib/editor/video-effects'
 import { TITLE_PLACES, TITLE_PLACE_LABEL, TITLE_SIZE_DEFAULT, TITLE_SIZE_MAX, TITLE_SIZE_MIN } from '@/lib/editor/title-clip'
 import { clipDisplayName, clipSpanLine } from '@/features/editor/editor-labels'
 import { useT } from '@/lib/i18n'
@@ -67,6 +67,7 @@ export function armOnStepKey(history: { arm: () => void }, e: { key: string; rep
 /** 슬라이더 한 줄 — 끄기 · 화살표로 값이 처음 바뀔 때 되돌리기 칸 하나(onStart), % 글자를 두 번 누르면 처음 값. */
 function SliderRow({
   label,
+  ariaLabel,
   value,
   min,
   max,
@@ -77,6 +78,8 @@ function SliderRow({
   onReset,
 }: {
   label: string
+  /** 손잡이의 화면 읽기 이름 — 줄 이름만으로 무슨 값인지 모를 때(흐림 [시작 → 끝]의 "시작" · "끝"). 없으면 줄 이름. */
+  ariaLabel?: string
   value: number
   min: number
   max: number
@@ -99,7 +102,7 @@ function SliderRow({
         onPointerDown={history.arm}
         onKeyDown={(e) => armOnStepKey(history, e)}
         onValueChange={([v]) => history.change(() => onChange(v))}
-        aria-label={label}
+        aria-label={ariaLabel ?? label}
       />
       <button
         type="button"
@@ -292,6 +295,8 @@ export function EffectControls() {
     return { name: how ? `${name} · ${t(how)}` : name, lengthSec: transition.durationSec }
   }
   const bc = effects.brightnessContrast ?? VIDEO_EFFECT_DEFAULT.brightnessContrast
+  // 흐림 방식(D14) — [일정하게] 값 하나 · [시작 → 끝] 클립 처음 값에서 끝 값까지 곧게. 머리 클립의 방식을 보인다.
+  const ramp = blurMode(effects) === 'ramp'
 
   return (
     <div className="flex flex-col gap-4 px-4 py-3">
@@ -409,16 +414,54 @@ export function EffectControls() {
                     <RemoveButton label={t('Remove effect')} onClick={() => removeVideoEffect(targets, kind)} />
                   </div>
                   {kind === 'blur' ? (
-                    <SliderRow
-                      label={t('Blur')}
-                      value={percent(effects.blur ?? 0)}
-                      min={0}
-                      max={100}
-                      resetTitle={t('Double-click to reset to {value}', { value: `${percent(VIDEO_EFFECT_DEFAULT.blur)}%` })}
-                      onStart={() => pushHistory()}
-                      onChange={(v) => setVideoEffect(targets, { blur: v / 100 })}
-                      onReset={() => resetTo(effects.blur !== VIDEO_EFFECT_DEFAULT.blur, () => setVideoEffect(targets, { blur: VIDEO_EFFECT_DEFAULT.blur }))}
-                    />
+                    <>
+                      {/* [일정하게] · [시작 → 끝](D14, 시안 없음 — 흑백 [켬] · [끔]과 같은 칩). 머리 줄에 넣으면 좁은 판에서 영어 이름이 잘려 따로 한 줄. */}
+                      <div className="flex flex-wrap items-center gap-1.5">
+                        <ChoiceChip selected={!ramp} onClick={() => resetTo(ramp, () => setVideoEffect(targets, { blurMode: 'constant' }))}>
+                          {t('Constant')}
+                        </ChoiceChip>
+                        <ChoiceChip selected={ramp} onClick={() => resetTo(!ramp, () => setVideoEffect(targets, { blurMode: 'ramp' }))}>
+                          {t('Start → End')}
+                        </ChoiceChip>
+                      </div>
+                      {ramp ? (
+                        <>
+                          <SliderRow
+                            label={t('Start')}
+                            ariaLabel={t('Blur start')}
+                            value={percent(effects.blur ?? 0)}
+                            min={0}
+                            max={100}
+                            resetTitle={t('Double-click to reset to {value}', { value: `${percent(VIDEO_EFFECT_DEFAULT.blur)}%` })}
+                            onStart={() => pushHistory()}
+                            onChange={(v) => setVideoEffect(targets, { blur: v / 100 })}
+                            onReset={() => resetTo(effects.blur !== VIDEO_EFFECT_DEFAULT.blur, () => setVideoEffect(targets, { blur: VIDEO_EFFECT_DEFAULT.blur }))}
+                          />
+                          <SliderRow
+                            label={t('End')}
+                            ariaLabel={t('Blur end')}
+                            value={percent(effects.blurEnd ?? BLUR_END_DEFAULT)}
+                            min={0}
+                            max={100}
+                            resetTitle={t('Double-click to reset to {value}', { value: `${percent(BLUR_END_DEFAULT)}%` })}
+                            onStart={() => pushHistory()}
+                            onChange={(v) => setVideoEffect(targets, { blurEnd: v / 100 })}
+                            onReset={() => resetTo(effects.blurEnd !== BLUR_END_DEFAULT, () => setVideoEffect(targets, { blurEnd: BLUR_END_DEFAULT }))}
+                          />
+                        </>
+                      ) : (
+                        <SliderRow
+                          label={t('Blur')}
+                          value={percent(effects.blur ?? 0)}
+                          min={0}
+                          max={100}
+                          resetTitle={t('Double-click to reset to {value}', { value: `${percent(VIDEO_EFFECT_DEFAULT.blur)}%` })}
+                          onStart={() => pushHistory()}
+                          onChange={(v) => setVideoEffect(targets, { blur: v / 100 })}
+                          onReset={() => resetTo(effects.blur !== VIDEO_EFFECT_DEFAULT.blur, () => setVideoEffect(targets, { blur: VIDEO_EFFECT_DEFAULT.blur }))}
+                        />
+                      )}
+                    </>
                   ) : null}
                   {kind === 'brightnessContrast' ? (
                     <>

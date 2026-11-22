@@ -8,6 +8,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
 import { ARTIST_VERSION_CODES, buildRegenPlan, parseCustomStyle, styleLookTokens } from '@/lib/artist/style-versions'
+import { isOfferedStyle } from '@/lib/style-offer'
 import {
   artistStyleLocked,
   clearLeavingMark,
@@ -34,7 +35,8 @@ export const maxDuration = 300
 
 const reject = (code: string, error: string, status = 409) => NextResponse.json({ error, code }, { status })
 
-/** 고른 스타일 — 지금 스타일(직접 올린 그림체 포함)이거나 쓸 수 있는 카탈로그 스타일. medium = 그림 지시 그림체 값을 고를 매체. */
+/** 고른 스타일 — 지금 스타일(직접 올린 그림체 · 이제 고를 수 없는 스타일 포함)이거나, 고를 수 있는 네 가지 중 켜진 카탈로그 스타일(D6 오너 2026-11-22).
+ *  medium = 그림 지시 그림체 값을 고를 매체. 이미 그 스타일로 그린 작품은 같은 스타일로 다시 만들 수 있다(리드 2026-11-22 안 1 바탕). */
 async function chosenStyle(project: VersionProject, key: string): Promise<{ key: string; custom: unknown; medium: string | null } | null> {
   const custom = parseCustomStyle(project.custom_style_anchor)
   if (key === project.style_anchor_key && custom) return { key, custom: project.custom_style_anchor, medium: custom.medium }
@@ -43,7 +45,7 @@ async function chosenStyle(project: VersionProject, key: string): Promise<{ key:
   if (error) throw new Error(`style read failed: ${error.message}`)
   const row = data as { is_active?: boolean; medium?: string | null } | null
   if (key === project.style_anchor_key) return { key, custom: null, medium: row?.medium ?? null }
-  return row?.is_active ? { key, custom: null, medium: row.medium ?? null } : null
+  return row?.is_active && isOfferedStyle(key) ? { key, custom: null, medium: row.medium ?? null } : null
 }
 
 export async function POST(req: Request) {

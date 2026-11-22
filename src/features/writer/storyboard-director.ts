@@ -4,7 +4,7 @@
 //   저장된 조건(Writer 실행 완료 · 씬 · 샷 · Artist 그림)을 확인한 뒤 Director 를 연다. 모자라면 채팅이 이유를 말한다.
 //   D0(2026-11-14): 창에서 "넘어가면서 이미지 만들기"를 골랐으면 Director 가 열린 뒤 실사 일괄을 한 번 시작하게 표시해 둔다.
 import { clearImagesOnDirectorEntry, requestImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
-import { translate } from '@/lib/i18n/translate'
+import { storyboardForwardUtterance } from '@/lib/handoff-intent'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -13,9 +13,10 @@ export async function handOverToDirector(opts: { makeImages?: boolean } = {}): P
   const projectId = useProjectStore.getState().projectId
   if (opts.makeImages && projectId) requestImagesOnDirectorEntry(projectId)
   // 버튼의 언어는 화면(UI) 언어다 — 다음 단계 버튼(requestNextStep)이 넘김 문장을 고르는 방식과 같다.
-  const utterance = translate(useLocaleStore.getState().locale, 'Please hand over to Director')
+  //   목적지는 Camera 다(2026-11-22 오너 D2~D5 — 예전엔 Director). 함수 이름은 옛 이름 그대로.
+  const utterance = storyboardForwardUtterance(useLocaleStore.getState().locale)
   await useGlobalChatStore.getState().sendMessage(utterance)
-  // 넘김이 바로 막혔으면(채팅이 이유를 말함) 표시를 지운다 — 나중에 다른 길로 Director 에 들어갔을 때 갑자기 만들지 않게.
+  // 넘김이 바로 막혔으면(채팅이 이유를 말함) 표시를 지운다 — 나중에 다른 길로 Camera 에 들어갔을 때 갑자기 만들지 않게.
   const chat = useGlobalChatStore.getState()
-  if (opts.makeImages && !chat.directorHandoff && !chat.pendingNavigatePath?.includes('/studio/director')) clearImagesOnDirectorEntry()
+  if (opts.makeImages && !chat.directorHandoff && !chat.pendingNavigatePath?.includes('/studio/camera')) clearImagesOnDirectorEntry()
 }

@@ -4,7 +4,7 @@
 //   화면이 완료를 직접 봤는지와 무관하게(다른 탭·새로고침·닫았다 열기) 큐의 완료 기록에서 파생한다.
 //   마지막으로 본 시각은 프로젝트별로 localStorage 에 남겨 새로고침에도 숫자가 그대로다(약속 D2).
 import { useCallback, useEffect, useSyncExternalStore } from 'react'
-import { deriveStageBadges } from '@/lib/generation-batches'
+import { deriveStageBadges, stagesSeenTogether } from '@/lib/generation-batches'
 import { useGenerationCompletions } from '@/lib/generation-queue'
 import type { StageId } from '@/types'
 
@@ -57,16 +57,20 @@ function useStageSeen(projectId: string | null): Partial<Record<StageId, number>
 export function useStageBadges(projectId: string | null, currentStage: StageId | null): Partial<Record<StageId, number>> {
   const completions = useGenerationCompletions(projectId)
   const seen = useStageSeen(projectId)
+  // Camera 와 Director 는 같은 샷을 본다 — 둘 중 하나를 보면 둘 다 본 것으로 남긴다(오너 2026-11-22 D2~D5).
+  const watching = currentStage ? stagesSeenTogether(currentStage) : []
   const latestVisibleCompletion = completions.reduce((latest, completion) =>
-    completion.stage === currentStage ? Math.max(latest, completion.at) : latest, 0)
+    watching.includes(completion.stage) ? Math.max(latest, completion.at) : latest, 0)
   // 진입 시각만 남기면 보는 동안 완료된 결과가 떠난 직후 다시 미확인이 된다.
   // 실제 받은 완료 시각까지만 읽음으로 남겨 다음 단계에서 새로 끝난 결과는 보존한다.
   useEffect(() => {
     if (!projectId || !currentStage) return
-    const lastSeen = read(projectId)[currentStage]
-    // 완료 0개인 첫 방문도 남긴다. 미방문(undefined)과 구분해야 떠난 뒤 첫 완료를 셀 수 있다.
-    if (lastSeen !== undefined && latestVisibleCompletion <= lastSeen) return
-    markStageSeen(projectId, currentStage, latestVisibleCompletion)
+    for (const stage of stagesSeenTogether(currentStage)) {
+      const lastSeen = read(projectId)[stage]
+      // 완료 0개인 첫 방문도 남긴다. 미방문(undefined)과 구분해야 떠난 뒤 첫 완료를 셀 수 있다.
+      if (lastSeen !== undefined && latestVisibleCompletion <= lastSeen) continue
+      markStageSeen(projectId, stage, latestVisibleCompletion)
+    }
   }, [projectId, currentStage, latestVisibleCompletion])
   return deriveStageBadges(completions, seen, currentStage)
 }

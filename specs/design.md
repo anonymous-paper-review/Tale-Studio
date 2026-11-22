@@ -185,6 +185,7 @@ v3 시안에는 테두리가 거의 없다(면 색 차이로 나눈다). 테두�
 
 **Director 생성 상태**(오너 2026-11-14 "추천대로", 시안 R 416:4941) — Director 본 화면(카드 · 노드 · 상태 고르기 · 진행 막대)과
 샷 상세(팝업 · 왼쪽 패널)의 점 · 진행 막대(시안 D6 · D7)만 쓰는 예외.
+2026-11-22(오너 D2~D5, 리드 b): 옛 Director 스토리보드 보기의 일을 받은 **Camera 화면**(샷 줄 · 이력 판 · 상태 고르기 · 진행 막대)도 같은 예외를 쓴다(시안 없음).
 색 = 단계(파랑 이미지 · 보라 영상 · 초록 완성), 테두리만 있는 고리 = 만드는 중, 꽉 찬 점 = 끝남. 판정은 `src/lib/director/shot-state.ts` 한 곳.
 
 | 상태 | 색(토큰) | 카드 · 노드 |
@@ -232,13 +233,15 @@ v3 시안에는 테두리가 거의 없다(면 색 차이로 나눈다). 테두�
 | `--stage-producer` | Producer (id entry) | 오렌지 골드 · 기획 |
 | `--stage-writer` | Writer (id producer) · 그 안의 콘티 칸(id writer, D1 2026-11-22 · 리드 결정 2) | 로즈 레드 · 글 · 콘티 |
 | `--stage-artist` | Artist | 일렉트릭 바이올렛 · 그림 |
-| `--stage-storyboard` | Storyboard (id writer) | 딥 블루 · 콘티 |
+| `--stage-storyboard` | Storyboard (id writer) · Camera (id camera) | 딥 블루 · 콘티 → 촬영 |
 | `--stage-director` | Director | 애저 · 연출 |
 | `--stage-editor` | Editor | 민트 틸 · 편집 |
 
 같이 따라오는 것: `--stage-badge-{화면}`(위 막대 단계 칩 그라데이션, 좌→우), `--stage-gradient-{화면}`(단계 카드 그라데이션, 진한 → 연한), `--pearl-vivid`(브랜드 그라데이션 — 로고 · 홈 헤드라인 · 앱 아이콘 · 작품 완성 순간에만), `--text-gradient`(홈 헤드라인 글자).
 
 Tailwind: `bg-stage-{화면}` · `text-stage-{화면}` (+ 알파), `bg-stage-badge` · `bg-stage-gradient` · `bg-pearl-vivid` · `text-gradient`(@utility).
+Camera(id camera, 오너 2026-11-22 D2~D5)는 옛 Storyboard 자리의 딥 블루 · storyboard Lumi 옷 · Storyboard 아이콘을 받는다(리드 11/22 — 콘티가 Writer 칸 안으로
+들어가며 비는 레일 칸, 시안 없음). 토큰 이름은 그대로 둔다(새 토큰 금지, §1 규칙 6). 콘티(id writer)의 색 · 옷은 Writer 것으로 바뀐다(fb-conti).
 단계 id → 화면 이름 매핑은 `src/lib/lumi.ts` `STAGE_PERSONA` 한 곳. 옛 색 매핑(`STAGE_BADGE_CLASS` / `STAGE_FACE_COLOR`, constants.ts)은 그대로 화면 이름 색을 가리킨다.
 
 ### 2.10 채팅 색 (Lumi 개발 가이드)

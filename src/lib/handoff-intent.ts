@@ -9,6 +9,9 @@
 //   결정적 게이트가 판정하고, 여기는 "넘어가자고 말했는가"만 본다.
 
 import type { StageId } from '@/types'
+import type { AppLocale } from '@/lib/locale'
+import { STAGE_LABEL } from '@/lib/constants'
+import { translate } from '@/lib/i18n/translate'
 
 export interface HandoffSpec {
   from: StageId
@@ -23,9 +26,9 @@ export interface HandoffSpec {
 //   stage page 의 handoff 넛지)이 t()/translate() 로 번역한다. utterance 는 번역된 문장 그대로
 //   채팅에 전송되므로, 번역 후에도 MOVE_WORDS(예: 'handover')·STAGE_WORDS 매칭 토큰을 포함해야
 //   matchHandoffIntent 가 여전히 인식한다 — "Please hand over to {Stage}" 형태로 고정.
-// 리뉴얼 1차(2026-10-19): 넘김 순서 = Writer(id producer) → Artist → Storyboard(id writer) → Director → Editor.
+// 리뉴얼 1차(2026-10-19): 넘김 순서 = Writer(id producer) → Artist → Storyboard(id writer) → Camera → Director → Editor.
 //   Producer(id entry) → Writer 는 시작 화면의 [시작] 버튼이 맡아 채팅 넘김이 없다.
-//   Storyboard → Director 는 아래 resolveDirectorHandoffIntent 전용 길이라 이 표에 없다.
+//   Storyboard → Camera(2026-11-22 오너 D2~D5, 예전 Storyboard → Director)는 아래 resolveDirectorHandoffIntent 전용 길이라 이 표에 없다.
 export const HANDOFFS: readonly HandoffSpec[] = [
   {
     from: 'producer',
@@ -39,8 +42,15 @@ export const HANDOFFS: readonly HandoffSpec[] = [
     utterance: 'Please hand over to Storyboard',
     label: 'Hand over to Storyboard',
   },
-  // Storyboard(id writer) → Director 는 일반 넘김이 아니다: 대사 저장 마무리 · 서버 준비 확인을 하는
-  //   resolveDirectorHandoffIntent 전용 길(예전부터 Writer 채팅의 Director 요청이 쓰던 길)이 맡는다.
+  // Storyboard(id writer) → Camera 는 일반 넘김이 아니다: 대사 저장 마무리 · 서버 준비 확인을 하는
+  //   resolveDirectorHandoffIntent 전용 길(예전 Storyboard → Director 길, 이름은 옛 이름 그대로)이 맡는다.
+  {
+    // Camera → Director 는 조건 없이 넘긴다(리드 2026-11-22 f — 같은 샷을 보는 두 화면).
+    from: 'camera',
+    to: 'director',
+    utterance: 'Please hand over to Director',
+    label: 'Next: Director',
+  },
   {
     from: 'director',
     to: 'editor',
@@ -71,13 +81,32 @@ export function nextStepAction(stage: StageId, opts: { producerLocked: boolean }
 //   화면 이름을 따른다(리뉴얼 1차): "Writer"·"작가"는 id producer, "Storyboard"·"스토리보드"는 id writer.
 //   D1(오너 2026-11-22): id writer 는 Writer 탭의 콘티다 — "콘티" · "conti" 도 writer 를 가리키고, Artist 다음은 Writer 의 콘티라
 //   writer 를 목적지로 볼 때(Artist 에서 넘길 때)는 "Writer" · "작가"도 콘티로 읽는다. 옛 이름 "스토리보드"도 그대로 알아듣는다.
+//   Camera(오너 2026-11-22 D2~D5)의 영어 낱말은 탭 이름(STAGE_LABEL)에서 가져온다 — 이름이 바뀌면 따라간다.
 const STAGE_WORDS: Record<StageId, readonly string[]> = {
   entry: ['producer', '프로듀서'],
   producer: ['writer', '작가', '라이터'],
   writer: ['storyboard', '스토리보드', 'conti', '콘티', 'writer', '작가'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
   artist: ['artist', '아티스트', '컨셉아티스트'],
+  camera: [STAGE_LABEL.camera.toLowerCase(), '카메라'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
   director: ['director', '디렉터', '디렉타', '감독'],
   editor: ['editor', '에디터', '편집'],
+}
+
+// "카메라"는 샷을 고칠 때 늘 쓰는 낱말이다("카메라를 왼쪽으로 이동해줘") — 이런 단계는 목적지 꼴(…로 · …으로 · to …)일 때만 단계 이름으로 본다.
+const DESTINATION_ONLY_STAGES: ReadonlySet<StageId> = new Set<StageId>(['camera'])
+
+/** 다듬은 말(t)이 그 단계를 가리키는가 — 목적지 꼴만 보는 단계는 "…로 · …으로 · to …"일 때만. */
+function mentionsStage(t: string, stage: StageId): boolean {
+  return STAGE_WORDS[stage].some((word) => {
+    const w = normalize(word)
+    if (!DESTINATION_ONLY_STAGES.has(stage)) return t.includes(w)
+    return t.includes(`${w}로`) || t.includes(`${w}으로`) || t.includes(`to${w}`) || t.includes(`tothe${w}`) // i18n-ok: 목적격 조사로 목적지를 인식한다.
+  })
+}
+
+/** Storyboard(id writer)의 앞으로 넘김 말 — 콘티 [다음] · 넘기기 창 [넘어가기] = 이 말을 친 것(#handoff-to-chat). 이름은 단계 표에서. */
+export function storyboardForwardUtterance(locale: AppLocale): string {
+  return translate(locale, 'Please hand over to {stage}', { stage: STAGE_LABEL.camera })
 }
 
 // "넘어가자" 계열만. '진행'·'시작' 같은 범용 동사는 넣지 않는다 — director 에서 "편집 진행해줘"
@@ -139,15 +168,16 @@ export function matchHandoffIntent(text: string, stage: StageId): HandoffSpec | 
   return matchHandoffSpec(text, spec)
 }
 
-/** Storyboard(id writer) → Director 이동 요청을 일반 넘김과 같은 규칙(부정 · 인용 · 이동 말 · 목적지)으로 읽는다.
- *  Director 넘김은 HANDOFFS 에 없는 전용 길이라(대사 저장 마무리 · 서버 준비 확인) 대사 통일 경로가 목적지를 알아낼 때 쓴다. */
+/** Storyboard(id writer)의 앞으로 넘김 요청을 일반 넘김과 같은 규칙(부정 · 인용 · 이동 말 · 목적지)으로 읽는다 — 목적지는 Camera 다.
+ *  "Director로"라고 해도 앞으로 넘김이다(2026-11-22 오너 D2~D5: 옛 Director 스토리보드 보기의 일을 Camera 가 받았다). 이름은 옛 이름 그대로.
+ *  HANDOFFS 에 없는 전용 길이라(대사 저장 마무리 · 서버 준비 확인) 대사 통일 경로가 목적지를 알아낼 때 쓴다. */
 export function matchStoryboardToDirector(text: string): boolean {
-  return matchHandoffSpec(text, {
+  return (['camera', 'director'] as const).some((to) => matchHandoffSpec(text, {
     from: 'writer',
-    to: 'director',
-    utterance: 'Please hand over to Director',
-    label: 'Hand over to Director',
-  }) !== null
+    to,
+    utterance: to === 'camera' ? 'Please hand over to {stage}' : 'Please hand over to Director',
+    label: 'Hand over to {stage}',
+  }) !== null)
 }
 
 // 영어 "go / move / head to (the) next step · stage"(리드 2026-11-14 F(1)) — 이 꼴이 넘김으로 읽히지 않아
@@ -168,12 +198,13 @@ function matchHandoffSpec(text: string, spec: HandoffSpec): HandoffSpec | null {
   if (englishGoNext(request, spec)) return spec
   const t = normalize(request)
   if (!MOVE_WORDS.some((w) => t.includes(normalize(w)))) return null
-  const mentionsTarget = STAGE_WORDS[spec.to].some((w) => t.includes(normalize(w)))
+  const mentionsTarget = mentionsStage(t, spec.to)
   const mentionsNextStep = NEXT_STEP_WORDS.some((w) => t.includes(w))
   return mentionsTarget || mentionsNextStep ? spec : null
 }
 
-/** Writer의 명시적 Director 요청. 모델의 이동 예고를 실행 근거로 사용하지 않는다. */
+/** Storyboard(id writer)의 명시적 앞으로 넘김 요청 — 목적지는 Camera(예전 Director, 오너 2026-11-22 D2~D5). "Director로"라고 해도 같은 요청이다.
+ *  모델의 이동 예고를 실행 근거로 사용하지 않는다. 이름은 옛 이름 그대로. */
 export function resolveDirectorHandoffIntent(
   text: string,
   stage: StageId,
@@ -191,7 +222,7 @@ export function resolveDirectorHandoffIntent(
   const namedStage = (value: string) => {
     const normalized = normalize(value)
     const mentions = (Object.keys(STAGE_WORDS) as StageId[]).flatMap(target => STAGE_WORDS[target]
-      .filter(word => normalized.includes(word))
+      .filter(word => DESTINATION_ONLY_STAGES.has(target) ? mentionsStage(normalized, target) && normalized.includes(word) : normalized.includes(word))
       .map(word => ({ target, index: normalized.lastIndexOf(word), destination: normalized.includes(`${word}로`) || normalized.includes(`${word}으로`) || normalized.includes(`to${word}`) }))) // i18n-ok: 목적격 단계 이름을 출발 단계보다 우선한다.
     return mentions.sort((a, b) => Number(b.destination) - Number(a.destination) || b.index - a.index)[0]?.target
   }
@@ -207,7 +238,7 @@ export function resolveDirectorHandoffIntent(
       if (target) break
     }
   }
-  if (target !== 'director') return null
+  if (target !== 'camera' && target !== 'director') return null
   if (/[?？]|수\s*있|수\s*잇|수\s*없|가능|왜|어떻게|\b(?:can|could|why|how)\b/i.test(request)) return { mode: 'check' } // i18n-ok: 확인 질문은 완료 후 이동 예약에도 우선한다.
   if (/다되면|다끝나면|완료되면|준비되면|when.*(?:ready|done|finished)/i.test(compact)) return { mode: 'whenReady' } // i18n-ok: 준비 완료 후 이동 요청.
   return { mode: 'move' }

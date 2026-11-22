@@ -36,7 +36,7 @@ import { CHAT_PERMISSION_ANSWER, fileReadLine, isScriptDraft, levelOptionsOf } f
 import { useEntryStore } from './entry-store'
 import { FileChip, OPTION_OFF_CLASS, OptionGroup, UploadingChip, WhyLine, WithOffReason } from './entry-parts'
 import { dialogueLanguageName, moodRecommendation, ratioRecommendation } from './series'
-import { summaryRows } from './summary'
+import { startConfirmNote, summaryRows } from './summary'
 
 export function EntryForm() {
   const formStep = useEntryStore((s) => s.formStep)
@@ -365,7 +365,8 @@ function SettingsStep() {
               </div>
             ))}
           </dl>
-          <p className="text-caption text-subtle-foreground">{t('You can change the genre and mood and the length again in Writer.')}</p>
+          {/* 원작 그대로면 길이는 원작을 따른다 — Writer 에서 바꿀 수 있다고 하지 않는다(D15 오너 2026-11-22). */}
+          <p className="text-caption text-subtle-foreground">{t(startConfirmNote(picks.level))}</p>
           <DialogFooter>
             <Button variant="secondary" onClick={() => setConfirmOpen(false)}>
               {t('No, let me fix it')}

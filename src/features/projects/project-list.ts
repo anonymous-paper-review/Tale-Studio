@@ -75,6 +75,8 @@ const STAGE_DOT: Record<StageId, string> = {
   artist: 'bg-stage-artist',
   // 콘티(id writer)는 Writer 탭 안의 칸 — Writer 색(D1 2026-11-22 · 리드 결정 2).
   writer: 'bg-stage-writer',
+  // Camera 는 옛 Storyboard 색(리드 2026-11-22, design.md §2.9).
+  camera: 'bg-stage-storyboard',
   director: 'bg-stage-director',
   editor: 'bg-stage-editor',
 }

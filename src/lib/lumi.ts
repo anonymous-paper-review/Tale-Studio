@@ -32,12 +32,14 @@ export function lumiBox(size: LumiSize | number, variant: LumiVariant = 'full'):
 }
 
 /** 단계 id → 화면 이름과 같은 Lumi 옷. id 는 옛 이름이다(entry=Producer, producer=Writer, writer=Storyboard → 콘티).
- *  D1(오너 2026-11-22) · 리드 결정 2: 콘티(id writer)는 Writer 탭 안의 칸이라 Writer 옷 · 색이다 — 옛 Storyboard 옷은 Camera 가 물려받는다. */
+ *  D1(오너 2026-11-22) · 리드 결정 2: 콘티(id writer)는 Writer 탭 안의 칸이라 Writer 옷 · 색이다.
+ *  Camera(오너 2026-11-22 D2~D5)는 옛 Storyboard 옷 · 색을 받는다(리드 11/22 — 콘티가 Writer 칸 안으로 들어가며 비는 자리, 시안 없음). */
 export const STAGE_PERSONA: Record<StageId, LumiStagePersona> = {
   entry: 'producer',
   producer: 'writer',
   artist: 'artist',
   writer: 'writer',
+  camera: 'storyboard',
   director: 'director',
   editor: 'editor',
 }

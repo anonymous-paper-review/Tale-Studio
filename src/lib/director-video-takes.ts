@@ -3,6 +3,7 @@ import { classifyJobError } from '@/lib/generation-jobs'
 import { cancelledJobsById } from '@/lib/director/job-cancellations'
 import { releaseTakesForJob } from '@/lib/billing/take-hold'
 import type { Json, Tables } from '@/types/database'
+import { DEFAULT_VIDEO_MODE, isVideoMode, type VideoMode } from '@/lib/director/video-modes'
 export {
   compareDirectorVideoTakeOrder,
   selectHandoffTake,
@@ -155,8 +156,10 @@ export async function updateDirectorVideoTakeMetadata(
 /** 영상 테이크 + 지금 영상이 1080p 로 만들어졌으면 '1080p'(모르거나 아니면 null) — 노드의 1080p 표시 근거(2026-10-31 리뷰). */
 export type LiveDirectorVideoTake = DirectorVideoTake & {
   video_resolution: '1080p' | null
-  /** 지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소(리드 B). 모르면 null. */
-  made_frames: { start: string | null; end: string | null } | null
+  /** 지금 영상을 낸 작업이 쓴 시작 · 끝(· 미들) 그림 주소(리드 B). 모르면 null. */
+  made_frames: { start: string | null; end: string | null; middle?: string | null } | null
+  /** 지금 영상을 낸 작업의 방식(2026-11-22 D2~D5) — 적히지 않은 작업은 기본(start_end), 모르면 null. */
+  made_video_mode: VideoMode | null
   /** 그 Take 의 마지막 작업을 화면에서 멈춘 때(오너 2026-11-14 7번). 멈추지 않았으면 없음. */
   cancelled_at?: string
 }
@@ -171,10 +174,11 @@ type LastAttemptJob = {
   reference_image_url?: string | null
   reference_image_urls?: unknown
   reference_image_roles?: unknown
+  video_mode?: unknown
 }
 
 const LIVE_TAKE_WITH_LAST_JOB =
-  '*, last_attempt_job:generation_jobs!video_clips_last_attempt_job_fkey(id, status, model, result_url, resolution:input_snapshot->>resolution, reference_image_url:input_snapshot->>reference_image_url, reference_image_urls:input_snapshot->reference_image_urls, reference_image_roles:input_snapshot->reference_image_roles)'
+  '*, last_attempt_job:generation_jobs!video_clips_last_attempt_job_fkey(id, status, model, result_url, resolution:input_snapshot->>resolution, reference_image_url:input_snapshot->>reference_image_url, reference_image_urls:input_snapshot->reference_image_urls, reference_image_roles:input_snapshot->reference_image_roles, video_mode:input_snapshot->>video_mode)'
 
 /** 지금 영상 파일을 그 작업이 냈는가 — 다시 만드는 중 · 다시 만들기 실패면 지금 영상은 예전 작업 것이다. */
 function madeByJob(take: Pick<DirectorVideoTake, 'url' | 'storage_path'>, job: LastAttemptJob | null | undefined): job is LastAttemptJob {
@@ -189,14 +193,29 @@ function madeByJob(take: Pick<DirectorVideoTake, 'url' | 'storage_path'>, job: L
 export function madeFrames(
   take: Pick<DirectorVideoTake, 'url' | 'storage_path'>,
   job: LastAttemptJob | null | undefined,
-): { start: string | null; end: string | null } | null {
+): { start: string | null; end: string | null; middle?: string | null } | null {
   if (!madeByJob(take, job)) return null
   const urls = Array.isArray(job.reference_image_urls) ? job.reference_image_urls.filter((u): u is string => typeof u === 'string') : []
   const roles = Array.isArray(job.reference_image_roles) ? job.reference_image_roles : []
-  const start = job.reference_image_url || (roles[0] === 'start' ? urls[0] : null) || null
-  const endAt = roles.indexOf('end')
-  const end = endAt >= 0 ? urls[endAt] ?? null : null
-  return start || end ? { start, end } : null
+  const at = (role: string) => {
+    const index = roles.indexOf(role)
+    return index >= 0 ? urls[index] ?? null : null
+  }
+  // 역할이 적힌 작업은 역할로 읽는다 — ② 레퍼런스의 첫 그림(reference_image_url)은 참고일 뿐 시작 장면이 아니다(2026-11-22).
+  const start = roles.length ? at('start') : job.reference_image_url || null
+  const end = at('end')
+  const middle = at('direction')
+  if (!start && !end && !middle) return null
+  return middle ? { start, end, middle } : { start, end }
+}
+
+/** 지금 영상을 낸 작업의 방식(2026-11-22 D2~D5) — 다시 만드는 중 · 실패한 시도면 모른다(null). 방식이 적히지 않은 작업은 기본. */
+export function madeVideoMode(
+  take: Pick<DirectorVideoTake, 'url' | 'storage_path'>,
+  job: LastAttemptJob | null | undefined,
+): VideoMode | null {
+  if (!madeByJob(take, job)) return null
+  return isVideoMode(job.video_mode) ? job.video_mode : DEFAULT_VIDEO_MODE
 }
 
 /**
@@ -227,14 +246,14 @@ export async function listLiveDirectorVideoTakes(projectId: string): Promise<Liv
   const withJob = await selectLiveTakes(projectId, LIVE_TAKE_WITH_LAST_JOB)
   if (!withJob.error) {
     const takes = ((withJob.data ?? []) as unknown as Array<DirectorVideoTake & { last_attempt_job?: LastAttemptJob | null }>)
-      .map(({ last_attempt_job: job, ...take }) => ({ ...take, video_resolution: madeVideoResolution(take, job), made_frames: madeFrames(take, job) }))
+      .map(({ last_attempt_job: job, ...take }) => ({ ...take, video_resolution: madeVideoResolution(take, job), made_frames: madeFrames(take, job), made_video_mode: madeVideoMode(take, job) }))
     return withCancellations(takes)
   }
   // 작업 기록을 함께 읽지 못해도 캔버스의 영상 테이크는 떠야 한다 — 해상도 표시만 빠진다.
   console.error('[director-video-takes] last attempt job embed failed:', withJob.error.message)
   const { data, error } = await selectLiveTakes(projectId, '*')
   if (error) throw error
-  return withCancellations(((data ?? []) as unknown as DirectorVideoTake[]).map((take) => ({ ...take, video_resolution: null, made_frames: null })))
+  return withCancellations(((data ?? []) as unknown as DirectorVideoTake[]).map((take) => ({ ...take, video_resolution: null, made_frames: null, made_video_mode: null })))
 }
 
 /** 화면에서 멈춘 Take(마지막 작업이 멈춤 표에 있음)에 멈춘 때를 붙인다 — 읽지 못하면 그대로(종전 동작). */
