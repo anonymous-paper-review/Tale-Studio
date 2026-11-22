@@ -72,6 +72,7 @@ import {
 } from '@/lib/director/video-modes'
 import { resolveModeFrames, type LabeledImage, type ModeFramesResult } from '@/lib/director/video-mode-frames'
 import { checkContinueSource } from '@/lib/director/video-continue-source'
+import { dialogueFingerprint } from '@/lib/director/dialogue-fingerprint'
 import {
   MISSING_CHARACTER_SHEETS,
   directorRefsExcludeWorld,
@@ -830,6 +831,9 @@ async function prepareVideoRequest(
         ? `${writerMotionPrompt} ${promptEn}`
         : promptEn
     const dialogueLines = !standalone && Array.isArray(shot!.dialogue_lines) ? (shot!.dialogue_lines as DialogueLine[]) : null
+    // 대사 지문(오너 2026-11-22 E3): 만들 때의 대사(화자 · 글)를 남겨 "이 Take 를 만든 뒤 대사가 바뀌었나"를 알린다.
+    //   영상 준비 한 곳이라 한 Take · 일괄 · 이어서 · 다시 만들기가 같은 자리에서 남긴다. 독립 영상(샷 없음)은 대사가 없다.
+    const dialogueFingerprintValue = standalone ? null : dialogueFingerprint(dialogueLines)
     let dialogueSpeakers: Record<string, DialogueSpeaker> | null = null
     const speakerIds = [...new Set(
       (dialogueLines ?? [])
@@ -963,6 +967,7 @@ async function prepareVideoRequest(
         ? { continue_from: { video_clip_id: continueFrom.videoClipId, generation_job_id: continueFrom.generationJobId, frame_url: continueFrom.frameUrl } }
         : {}),
       ...(referenceLabels ? { reference_labels: referenceLabels } : {}),
+      ...(dialogueFingerprintValue ? { dialogue_fingerprint: dialogueFingerprintValue } : {}),
       movement_preset: movementPreset ?? null,
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),
