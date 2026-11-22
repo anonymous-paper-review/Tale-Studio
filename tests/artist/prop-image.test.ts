@@ -99,6 +99,17 @@ describe('소품 그림 지시문', () => {
     expect(planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true }).submit.prompt).toContain(FACET_NO_TEXT)
   })
 
+  // 왜: 첫 시험(2026-11-22)에서 스위치를 켜도 그림체 줄(그림체 조각)이 끝에 "No text, no letters"를 붙여, 글씨만 적고 낱말은 적지 않은 "펼친 편지"가 빈 종이로 나왔다.
+  //   인물 시트가 칸 이름 때문에 그 줄을 빼는 것과 같은 까닭으로 — 켰을 때만 뺀다(덧붙인 글씨 금지는 소품 줄에 그대로 있다). 끄면(기본) 지금처럼 붙는다.
+  it('글씨 스위치를 켜면 그림체 기준 그림이 있는 그림체에서도 그림체 줄의 글자 금지가 설명의 글씨를 막지 않는다', () => {
+    const on = planPropImageSubmit({ ...prop, anchor, styleWithoutReference: false, textRule: 'described' })
+    expect(on.submit.prompt).not.toContain(FACET_NO_TEXT)
+    expect(on.submit.prompt).toMatch(/Writing that the description says is on the object stays on it/)
+    expect(on.submit.prompt).toContain('no logo and no watermark')
+    const off = planPropImageSubmit({ ...prop, anchor, styleWithoutReference: false })
+    expect(off.submit.prompt).toContain(FACET_NO_TEXT)
+  })
+
   // 왜: 작품 그림체와 같은 그림이어야 샷 이미지에서 겉돌지 않는다. 소품에는 사람이 없어 인물 조각(Figure rules · Priority)은 효과가 없다(사물 시트 규칙과 같다).
   it('그림체 기준 그림이 있으면 소품 그림에 붙이되 인물 조각은 싣지 않는다', () => {
     const plan = planPropImageSubmit({ ...prop, anchor, styleWithoutReference: false })

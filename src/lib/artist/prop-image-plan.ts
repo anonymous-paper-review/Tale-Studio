@@ -39,7 +39,8 @@ export function planPropImageSubmit(input: {
     aspect_ratio: PROP_IMAGE_ASPECT,
     ...(withoutReference ? { image_size: imageSizeForAspect(PROP_IMAGE_ASPECT) } : {}),
   }
-  const submit = input.anchor ? applyStyleAnchor(input.anchor, base, 'single', { people: false }) : base
+  // 글씨 스위치를 켜면 그림체 줄의 전면 글자 금지도 빼야 설명의 글씨가 남는다(첫 시험: 펼친 편지가 빈 종이로 나옴).
+  const submit = input.anchor ? applyStyleAnchor(input.anchor, base, 'single', { people: false, ...(textRule === 'described' ? { describedText: true } : {}) }) : base
   const model = resolveImageEndpoint(modelKey, !!submit.reference_image_urls?.length).endpoint
   return { submit: { ...submit, model }, model, modelKey }
 }
