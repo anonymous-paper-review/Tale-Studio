@@ -4,7 +4,7 @@
 //   (그림 판 · Take 가 만든 차례대로, 오래된 것 왼쪽 → 새것 오른쪽, 처음엔 맨 오른쪽이 보이게 — 리드 11/22). 대사는 읽기만(고치기는 콘티, D1).
 //   줄 테두리 = 샷 상태 색(design.md §2.5 생성 상태 색, Camera 로 넓힘). 규칙: shot-history.ts.
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { ImageIcon, Maximize2, Play } from 'lucide-react'
+import { AlertTriangle, ImageIcon, Maximize2, Play } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import { shotDetailTakes } from '@/lib/director/shot-detail'
@@ -18,7 +18,7 @@ import { useStoryboardImageGeneration } from '@/features/director/hooks/use-stor
 import { ShotPipelineRow } from '@/features/director/shot-status'
 import { HistoryCard } from './history-card'
 import { ImageFixPanel, VideoMakePanel } from './fix-panel'
-import { dialogueRowLines, shotHistory, type ImageWork } from './shot-history'
+import { dialogueRowLines, finalTakeDialogueChanged, shotHistory, type ImageWork } from './shot-history'
 import { cameraMentionLabel, mentionOnModifierClick, stopModifierPointerDown } from './mention'
 
 const FIX_BUTTON = 'inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-micro font-semibold transition-colors'
@@ -51,7 +51,8 @@ export function CameraShotRow({ node, label, state }: { node: DirectorNode; labe
     ? { phase: 'drawing' }
     : batchWaiting ? { phase: 'waiting' }
       : image?.status === 'failed' ? { phase: 'failed', message: image.errorMessage } : null
-  const entries = data ? shotHistory({ image, takes, final, shot: data, imageWork, videoLine }) : []
+  // 대사 바뀜(오너 E3)은 그 샷의 지금 대사로 판정한다 — Writer 샷이 없는 손으로 더한 샷은 묻지 않는다.
+  const entries = data ? shotHistory({ image, takes, final, shot: data, imageWork, videoLine, dialogueLines: writerShot ? writerShot.dialogueLines ?? [] : undefined }) : []
   const lines = dialogueRowLines(writerShot?.dialogueLines ?? [], nameById)
   const description = writerShot?.actionDescription?.trim() || null
   const seconds = typeof data?.durationSeconds === 'number' && data.durationSeconds > 0 ? Math.round(data.durationSeconds) : null
@@ -128,6 +129,13 @@ export function CameraShotRow({ node, label, state }: { node: DirectorNode; labe
               </li>
             ))}
           </ul>
+        ) : null}
+        {/* ★ 최종 Take 를 만든 뒤 대사가 바뀌었다(오너 E3) — 대사 바로 아래 한 줄, 막지 않는다. */}
+        {finalTakeDialogueChanged(entries) ? (
+          <p className="flex items-start gap-1 text-micro leading-snug text-muted-foreground" data-testid="shot-dialogue-changed">
+            <AlertTriangle className="mt-px size-3 shrink-0 text-warning" aria-hidden />
+            {t('The dialogue changed. Make a new Take to match.')}
+          </p>
         ) : null}
         {/* 고치기(오너 D2~D5 "버튼으로 수정") — 한 번에 한 칸. 누른 단추를 다시 누르면 닫는다. */}
         <div className="mt-auto flex flex-wrap gap-1.5 pt-1">

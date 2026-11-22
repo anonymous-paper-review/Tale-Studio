@@ -4,7 +4,7 @@
 //   판 이름 · 지금 쓰는 표시(지금 그림 = 이미지 파랑, ★ = 완성 초록 — design.md §2.5 생성 상태 색, Camera 로 넓힘) · 무엇이 바뀌었나 한두 줄 · 할 수 있는 일.
 //   안 쓴 판은 점선 · 흐림(참고 페이지의 "시도했지만 안 쓴 판"). 규칙은 shot-history.ts.
 import { useRef, useState } from 'react'
-import { Play } from 'lucide-react'
+import { AlertTriangle, Play } from 'lucide-react'
 import { toast } from 'sonner'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
@@ -111,6 +111,13 @@ export function HistoryCard({ entry, shotNodeId, shotName, writerShotId, activeJ
       </div>
       {summary ? (
         <p className="line-clamp-2 text-micro leading-snug text-muted-foreground" title={summary}>{summary}</p>
+      ) : null}
+      {/* 이 Take 를 만든 뒤 대사가 바뀌었다(오너 E3) — 알리기만 하고 막지 않는다. 주의 색 아이콘 + 흐린 글자(빨강 아님). */}
+      {entry.kind === 'take' && entry.dialogueChanged ? (
+        <p className="flex items-start gap-1 text-micro leading-snug text-muted-foreground" data-testid="take-dialogue-changed">
+          <AlertTriangle className="mt-px size-3 shrink-0 text-warning" aria-hidden />
+          {t('The dialogue changed. Make a new Take to match.')}
+        </p>
       ) : null}
       <div className="mt-auto flex flex-wrap gap-1.5">
         {stop ? <StopMakingButton target={stop} kind={kind} /> : null}
