@@ -2445,6 +2445,10 @@ export type Database = {
         Args: { p_redemption: string }
         Returns: Json
       }
+      admin_set_account_takes: {
+        Args: { p_redemption: string; p_target: number }
+        Returns: Json
+      }
       admin_update_voucher_redemption: {
         Args: {
           p_ends_at: string

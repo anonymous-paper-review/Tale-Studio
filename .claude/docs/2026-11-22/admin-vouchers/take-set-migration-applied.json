@@ -1,0 +1,26 @@
+{
+  "migrationVersion": "20261122080000",
+  "migrationName": "admin_set_account_takes",
+  "sha256": "7af3e9b62cd0d5d5e526d6109489ec8218a37f68847458de87b7ef4dc2c0bc18",
+  "ownerDecision": "2026-11-22 오너: 등록 고객 계정의 남은 Take가 보이고 그 수를 관리자가 강제로 바꿀 수 있게. 같은 요청에서 요금표 탭을 다시 열고, 구매 버튼은 눌러도 Take 충전처럼 아직 안 된다고 뜨게.",
+  "development": {
+    "project": "pbiumddivadgbzxuymak",
+    "appliedAt": "2026-11-22T08:03:12.489Z",
+    "appliedWith": "node scripts/apply-dev-migration.mjs",
+    "historyRecorded": true,
+    "verifiedWith": "node scripts/test-admin-voucher-dev-db.mjs — 되돌리는 트랜잭션 21건 통과(새 Take 수 바꾸기 7건은 적용 전 --baseline 에서 실패 먼저 확인). 로컬 화면에서 테스트 계정 296 → 400 으로 바꾼 뒤 [해지]로 266 원래대로 되돌림, 테스트 코드 TALEV27VQ8RE 삭제"
+  },
+  "production": {
+    "project": "qnjnrihfpqkdhjuzvepy",
+    "appliedAt": "2026-11-22T08:14:33.932Z",
+    "appliedBefore": "main 배포 전 — 새 함수만 더하므로 지금 배포된 코드에는 영향이 없다.",
+    "appliedWith": "Supabase Management API database/query 로 파일 그대로 실행 + supabase_migrations.schema_migrations 이력 행 (20261122041500 과 같은 방식)",
+    "historyRecorded": true,
+    "beforeCounts": { "vouchers": 92, "redemptions": 3, "adminLedgerRows": 0, "ledgerRows": 168 },
+    "afterCounts": { "vouchers": 92, "redemptions": 3, "adminLedgerRows": 0, "ledgerRows": 168 },
+    "functionExecute": {
+      "admin_set_account_takes": { "anon": false, "authenticated": false, "service_role": true }
+    }
+  },
+  "productionChanged": true
+}

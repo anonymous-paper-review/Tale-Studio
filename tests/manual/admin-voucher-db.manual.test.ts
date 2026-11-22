@@ -1,4 +1,4 @@
-// 관리자가 등록 고객 줄에서 [저장]·[해지]를 누르면 바우처 Take와 계정 요금제가 정해진 규칙대로 바뀐다. 개발 DB에서 돌리고 전부 되돌린다.
+// 관리자가 등록 고객 줄에서 [저장]·[해지]를 누르거나 남은 Take 수를 직접 바꾸면 Take와 계정 요금제가 정해진 규칙대로 바뀐다. 개발 DB에서 돌리고 전부 되돌린다.
 import { readFileSync } from 'node:fs'
 import { Client } from 'pg'
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest'
@@ -7,7 +7,10 @@ import { takeBreakdown, type LedgerRow } from '@/lib/billing/account-summary'
 const connectionString = process.env.ADMIN_VOUCHER_TEST_DATABASE_URL
 if (!connectionString || !process.env.ADMIN_VOUCHER_TEST_CA) throw new Error('Run node scripts/test-admin-voucher-dev-db.mjs')
 const client = new Client({ connectionString, ssl: { ca: process.env.ADMIN_VOUCHER_TEST_CA, rejectUnauthorized: true }, connectionTimeoutMillis: 20000 })
-const MIGRATION = 'supabase/migrations/20261122041500_admin_voucher_save_moves_takes.sql'
+const MIGRATIONS = [
+  'supabase/migrations/20261122041500_admin_voucher_save_moves_takes.sql',
+  'supabase/migrations/20261122080000_admin_set_account_takes.sql',
+]
 const CODE = 'ADMINTEST0001'
 const DAY = 86_400_000
 const query = (sql: string, values: unknown[] = []) => client.query(sql, values)
@@ -22,15 +25,16 @@ beforeAll(async () => {
   await query("set local statement_timeout = '20s'")
   // 이번 변경 전 함수로 돌려 보려면 --baseline. 파일의 바깥 begin/commit 은 검사 트랜잭션을 끝내면 안 된다.
   if (process.env.ADMIN_VOUCHER_TEST_BASELINE !== 'true') {
-    await query(readFileSync(MIGRATION, 'utf8').replace(/^(?:begin|commit);\s*$/gim, ''))
+    for (const file of MIGRATIONS) await query(readFileSync(file, 'utf8').replace(/^(?:begin|commit);\s*$/gim, ''))
   }
   const pair = (await query(`
     select w.id, w.owner_id from public.workspaces w
      where w.owner_id is not null
        and not exists (select 1 from public.subscriptions s where s.workspace_id = w.id)
        and not exists (select 1 from public.voucher_redemptions r where r.redeemed_workspace_id = w.id)
+       and not exists (select 1 from public.take_ledger l where l.workspace_id = w.id)
      order by w.created_at limit 2`)).rows
-  if (pair.length < 2) throw new Error('need two workspaces without subscriptions or vouchers on development DB')
+  if (pair.length < 2) throw new Error('need two workspaces without subscriptions, vouchers or Takes on development DB')
   ;[a, b] = pair
   await query("update public.workspaces set plan = 'free' where id = any($1::uuid[])", [[a.id, b.id]])
   await query(`insert into public.vouchers (code, plan, note, max_uses, duration_days, active)
@@ -83,6 +87,28 @@ async function spend(redemption: string, n: number) {
 }
 async function save(redemption: string, tier: string, endsAt: string) {
   return (await query('select public.admin_update_voucher_redemption($1, $2, $3::timestamptz, false) as r', [redemption, tier, endsAt])).rows[0].r
+}
+async function setTakes(redemption: string, target: number) {
+  return (await query('select public.admin_set_account_takes($1, $2) as r', [redemption, target])).rows[0].r
+}
+/** 아직 만료되지 않고 남은 게 있는 계정의 모든 적립 — 종류 · 출처 · 남은 수 · 기한.
+ *  한 트랜잭션 안의 적립은 만든 시각이 같아 종류 · 출처 이름 순으로 줄세운다. */
+async function lots(workspace: string) {
+  const rows = (await query(`
+    select g.kind, g.ref_kind, g.delta + coalesce(sum(c.delta), 0) as remaining, g.expires_at
+      from public.take_ledger g left join public.take_ledger c on c.grant_id = g.id
+     where g.workspace_id = $1 and g.kind like 'grant_%' and (g.expires_at is null or g.expires_at > now())
+     group by g.id, g.kind, g.ref_kind, g.delta, g.expires_at
+    having g.delta + coalesce(sum(c.delta), 0) > 0
+     order by g.kind, g.ref_kind`, [workspace])).rows
+  return rows.map((r) => ({ kind: r.kind, ref: r.ref_kind, remaining: Number(r.remaining), expiresAt: r.expires_at?.toISOString() ?? null }))
+}
+async function buyPack(workspace: string, takes: number) {
+  await query(`insert into public.take_ledger (workspace_id, delta, kind, expires_at, ref_kind, ref_id, reason)
+    values ($1, $2, 'grant_purchase', now() + interval '365 days', 'admin_voucher_test', gen_random_uuid()::text, 'rollback test')`, [workspace, takes])
+}
+async function redemptionEnd(redemption: string) {
+  return ((await query('select plan_ends_at from public.voucher_redemptions where id = $1', [redemption])).rows[0].plan_ends_at as Date).toISOString()
 }
 async function subscribe(workspace: string) {
   await query(`insert into public.subscriptions (workspace_id, mor_subscription_id, plan, status)
@@ -217,6 +243,70 @@ describe('관리자 [저장] — 구독 중인 고객', () => {
     expect(await save(redemption, 'p15', future(45))).toEqual({ status: 'updated', moved_takes: 0, revoked_takes: 20, granted_takes: 200 })
     expect(await plan(a.id)).toBe('p10')
     expect(await balance(a.id) - start).toBe(200)
+  })
+})
+
+describe('관리자 Take 수 직접 바꾸기', () => {
+  // 왜: 체험 고객에게 Take를 더 주거나 줄여 줄 때 늘린 몫이 체험 뒤에도 남으면 바우처 기간 밖의 공짜 Take가 된다.
+  it('바우처를 이용 중인 고객의 Take를 늘리면 늘린 만큼 바우처 Take로 들어가 바우처 종료일에 함께 끝난다', async () => {
+    const { redemption } = await redeem(a)
+    expect(await setTakes(redemption, 100)).toEqual({ status: 'updated', before: 30, after: 100 })
+    expect(await balance(a.id)).toBe(100)
+    const endsAt = await redemptionEnd(redemption)
+    expect(await lots(a.id)).toEqual([
+      { kind: 'grant_plan', ref: 'voucher_admin_plan', remaining: 70, expiresAt: endsAt },
+      { kind: 'grant_plan', ref: 'voucher_redemption', remaining: 30, expiresAt: endsAt },
+    ])
+  })
+  // 왜: 바우처가 끝난 고객에게는 따라 끝날 기간이 없다. 관리자가 정한 수가 그대로 남아야 한다.
+  it('바우처가 끝난 고객의 Take를 늘리면 기한 없는 보너스 Take로 들어간다', async () => {
+    const { redemption } = await redeem(a)
+    await query('select public.admin_end_voucher_redemption($1)', [redemption])
+    expect(await setTakes(redemption, 40)).toEqual({ status: 'updated', before: 0, after: 40 })
+    expect(await balance(a.id)).toBe(40)
+    expect(await lots(a.id)).toEqual([{ kind: 'grant_bonus', ref: 'admin_take_set', remaining: 40, expiresAt: null }])
+  })
+  // 왜: 고객이 돈 내고 산 Take보다 관리자가 준 바우처 Take를 먼저 줄여야 한다.
+  it('Take를 줄이면 바우처 Take에서 먼저 빼고 산 Take는 남긴다', async () => {
+    const { redemption } = await redeem(a)
+    await buyPack(a.id, 50)
+    expect(await setTakes(redemption, 60)).toEqual({ status: 'updated', before: 80, after: 60 })
+    expect(await balance(a.id)).toBe(60)
+    expect((await lots(a.id)).map(({ kind, remaining }) => ({ kind, remaining }))).toEqual([
+      { kind: 'grant_plan', remaining: 10 },
+      { kind: 'grant_purchase', remaining: 50 },
+    ])
+  })
+  // 왜: 바우처 Take만으로 모자라면 관리자가 정한 수를 맞추려고 나머지에서도 빼야 한다.
+  it('바우처 Take보다 많이 줄이면 나머지는 영상 만들 때 쓰는 순서대로 빼서 정한 수를 맞춘다', async () => {
+    const { redemption } = await redeem(a)
+    await buyPack(a.id, 50)
+    expect(await setTakes(redemption, 20)).toEqual({ status: 'updated', before: 80, after: 20 })
+    expect(await balance(a.id)).toBe(20)
+    expect((await lots(a.id)).map(({ kind, remaining }) => ({ kind, remaining }))).toEqual([{ kind: 'grant_purchase', remaining: 20 }])
+  })
+  // 왜: 고객 화면과 영상 생성 확인이 다른 수를 보면 남은 Take가 있는데 생성이 막히거나 그 반대가 된다.
+  it('바꾼 뒤 다시 같은 수로 바꾸면 DB도 이미 그 수로 보고 Take 기록이 늘지 않는다', async () => {
+    const { redemption } = await redeem(a)
+    await spend(redemption, 10)
+    await setTakes(redemption, 7)
+    const rows = await ledgerCount(a.id)
+    expect(await setTakes(redemption, 7)).toEqual({ status: 'updated', before: 7, after: 7 })
+    expect(await ledgerCount(a.id)).toBe(rows)
+    expect(await balance(a.id)).toBe(7)
+  })
+  // 왜: 직접 늘린 바우처 Take도 체험 연장 · 해지 규칙을 따라야 관리자가 따로 챙기지 않아도 된다.
+  it('직접 늘린 바우처 Take도 종료일을 옮기면 함께 옮겨지고 [해지]하면 함께 회수된다', async () => {
+    const { redemption } = await redeem(a)
+    await setTakes(redemption, 100)
+    expect(await save(redemption, 's2', future(45))).toEqual({ status: 'updated', moved_takes: 100, revoked_takes: 0, granted_takes: 0 })
+    expect((await query('select public.admin_end_voucher_redemption($1) as r', [redemption])).rows[0].r).toEqual({ status: 'ended', revoked_takes: 100 })
+    expect(await balance(a.id)).toBe(0)
+  })
+  // 왜: 음수 잔액은 환불 빚을 뜻한다. 관리자가 실수로 음수를 넣어 고객의 생성을 막으면 안 된다.
+  it('0보다 작은 수로는 바꿀 수 없다', async () => {
+    const { redemption } = await redeem(a)
+    await expect(setTakes(redemption, -1)).rejects.toThrow(/invalid take target/)
   })
 })
 

@@ -46,6 +46,33 @@ export function showVoucherCard(account: { plan: string; unlimited: boolean }): 
   return account.plan === 'free' && !account.unlimited
 }
 
+/** 관리자가 등록 고객에게 직접 정할 수 있는 남은 Take 수의 상한. DB 함수 admin_set_account_takes 와 같다. */
+export const ADMIN_TAKE_LIMIT = 1_000_000
+
+/** 관리자가 넣은 남은 Take 수 — 0에서 상한까지의 정수만. */
+export function validAdminTakeTarget(value: unknown): value is number {
+  return typeof value === 'number' && Number.isInteger(value) && value >= 0 && value <= ADMIN_TAKE_LIMIT
+}
+
+interface RedemptionForm {
+  plan: string
+  /** 종료일 YYYY-MM-DD */
+  endDate: string
+  /** 남은 Take 수. 계정이 없거나 칸이 비면 null */
+  takes: number | null
+}
+
+/**
+ * 등록 고객 줄의 [저장]이 보낼 것 — 바뀐 칸만. 티어·종료일이 그대로면 이용 기간을 다시 저장하지 않는다
+ * (같은 날짜라도 저장 시각이 달라 기한을 옮기고 고객 내역에 회수·지급 줄이 쌓인다). 이용 기간을 먼저 저장한 뒤 Take 수를 맞춘다.
+ */
+export function redemptionSaveSteps(original: RedemptionForm, form: RedemptionForm): { access: boolean; takes: number | null } {
+  return {
+    access: form.plan !== original.plan || form.endDate !== original.endDate,
+    takes: form.takes !== null && form.takes !== original.takes ? form.takes : null,
+  }
+}
+
 /** 서버가 돌려준 실패 코드 → 화면 문장(영어 원문 = 사전 키). */
 export function voucherFailureMessage(code: unknown): string {
   if (code === 'invalid') return 'This code is not valid. Check it and try again.'

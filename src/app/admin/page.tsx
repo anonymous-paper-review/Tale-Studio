@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button'
 import { PADDLE_PLANS } from '@/lib/billing/catalog'
 import { useT } from '@/lib/i18n'
 import { countText } from '@/lib/i18n/count-text'
+import { redemptionSaveSteps, validAdminTakeTarget, ADMIN_TAKE_LIMIT } from '@/lib/billing/voucher'
 
 type Voucher = {
   id: string
@@ -32,8 +33,12 @@ type Redemption = {
   redeemed_at: string
   expires_at: string
   revoked_at: string | null
+  /** 고객 계정 화면과 같은 남은 Take. 계정이 지워진 등록은 null */
+  takes: number | null
   status: string
 }
+
+type RedemptionForm = { plan: string; endDate: string; takes: number | null }
 
 type AdminData = { vouchers: Voucher[]; redemptions: Redemption[] }
 
@@ -133,16 +138,28 @@ export default function AdminPage() {
     }
   }
 
-  async function updateRedemption(row: Redemption, plan: string, expiresAt: string) {
+  // 바뀐 칸만 보낸다. 이용 기간(티어·종료일)을 먼저 저장하고 그 뒤에 남은 Take를 정한 수로 맞춘다.
+  async function saveRedemption(row: Redemption, form: RedemptionForm) {
+    const steps = redemptionSaveSteps({ plan: row.plan, endDate: dateOnly(row.expires_at), takes: row.takes }, form)
+    if (!steps.access && steps.takes === null) return
+    if (steps.takes !== null && !window.confirm(t('Change Takes for {email} from {from} to {to}?', { email: row.email, from: row.takes ?? 0, to: steps.takes }))) return
     setBusy(true)
     setError('')
     try {
-      const response = await fetch(`/api/admin/vouchers/redemptions/${row.id}`, {
-        method: 'PATCH', headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ plan, expiresAt: new Date(`${expiresAt}T23:59:59.999Z`).toISOString() }),
-      })
-      if (!response.ok) throw new Error(t('Could not save the account access.'))
-      setNotice(t('Saved access for {email}.', { email: row.email }))
+      if (steps.access) {
+        const response = await fetch(`/api/admin/vouchers/redemptions/${row.id}`, {
+          method: 'PATCH', headers: { 'content-type': 'application/json' },
+          body: JSON.stringify({ plan: form.plan, expiresAt: new Date(`${form.endDate}T23:59:59.999Z`).toISOString() }),
+        })
+        if (!response.ok) throw new Error(t('Could not save the account access.'))
+      }
+      if (steps.takes !== null) {
+        const response = await fetch(`/api/admin/vouchers/redemptions/${row.id}/takes`, {
+          method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ takes: steps.takes }),
+        })
+        if (!response.ok) throw new Error(t('Could not change the Takes.'))
+      }
+      setNotice(steps.access ? t('Saved access for {email}.', { email: row.email }) : t('Changed Takes for {email} to {n}.', { email: row.email, n: steps.takes ?? 0 }))
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('Could not save the account access.'))
@@ -158,7 +175,8 @@ export default function AdminPage() {
     try {
       const response = await fetch(`/api/admin/vouchers/redemptions/${row.id}`, { method: 'DELETE' })
       if (!response.ok) throw new Error(t('Could not end the account access.'))
-      setNotice(t('Moved {email} to free access.', { email: row.email }))
+      // 구독 중인 고객은 해지해도 구독 요금제가 남는다. "무료로 전환"이라고 알리지 않는다.
+      setNotice(t('Ended voucher access for {email}.', { email: row.email }))
       await load()
     } catch (err) {
       setError(err instanceof Error ? err.message : t('Could not end the account access.'))
@@ -256,16 +274,16 @@ export default function AdminPage() {
 
         <section className="space-y-3">
           <div className="flex flex-wrap items-end justify-between gap-3">
-            <div><h2 className="text-lg font-semibold">{t('Customers who redeemed')}</h2><p className="text-sm text-muted-foreground">{t('Adjust the tier and end date for each account, or end paid access.')}</p></div>
+            <div><h2 className="text-lg font-semibold">{t('Customers who redeemed')}</h2><p className="text-sm text-muted-foreground">{t('Adjust the tier, end date, and remaining Takes for each account, or end paid access.')}</p></div>
             <input value={query} onChange={(event) => setQuery(event.target.value)} aria-label={t('Search customers')} placeholder={t('Search by email or name')} className="w-full max-w-xs rounded-md border border-input bg-background px-3 py-2 text-sm" />
           </div>
           <div className="overflow-x-auto rounded-lg border border-border bg-card">
-            <table className="w-full min-w-[1000px] text-left text-sm">
-              <thead className="border-b border-border-subtle text-muted-foreground"><tr><th className="px-4 py-3">{t('Account')}</th><th className="px-4 py-3">{t('Voucher')}</th><th className="px-4 py-3">{t('Tier')}</th><th className="px-4 py-3">{t('Redeemed on')}</th><th className="px-4 py-3">{t('Access ends')}</th><th className="px-4 py-3">{t('Status')}</th><th className="px-4 py-3">{t('Manage')}</th></tr></thead>
+            <table className="w-full min-w-[1100px] text-left text-sm">
+              <thead className="border-b border-border-subtle text-muted-foreground"><tr><th className="px-4 py-3">{t('Account')}</th><th className="px-4 py-3">{t('Voucher')}</th><th className="px-4 py-3">{t('Tier')}</th><th className="px-4 py-3">{t('Redeemed on')}</th><th className="px-4 py-3">{t('Access ends')}</th><th className="px-4 py-3">{t('Takes')}</th><th className="px-4 py-3">{t('Status')}</th><th className="px-4 py-3">{t('Manage')}</th></tr></thead>
               <tbody>
-                {filteredRedemptions.map((row) => <RedemptionRow key={`${row.id}-${row.plan}-${row.expires_at}-${row.revoked_at}`} row={row} voucher={data.vouchers.find((item) => item.id === row.voucher_id)} busy={busy} onSave={(plan, expiry) => void updateRedemption(row, plan, expiry)} onRevoke={() => void revokeRedemption(row)} />)}
-                {!loading && filteredRedemptions.length === 0 && <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground">{t('No customers have redeemed a voucher yet.')}</td></tr>}
-                {loading && <tr><td colSpan={7} className="px-4 py-8 text-center text-muted-foreground"><LoaderCircle className="mr-2 inline size-4 animate-spin" />{t('Loading…')}</td></tr>}
+                {filteredRedemptions.map((row) => <RedemptionRow key={`${row.id}-${row.plan}-${row.expires_at}-${row.revoked_at}-${row.takes}`} row={row} voucher={data.vouchers.find((item) => item.id === row.voucher_id)} busy={busy} onSave={(form) => void saveRedemption(row, form)} onRevoke={() => void revokeRedemption(row)} />)}
+                {!loading && filteredRedemptions.length === 0 && <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground">{t('No customers have redeemed a voucher yet.')}</td></tr>}
+                {loading && <tr><td colSpan={8} className="px-4 py-8 text-center text-muted-foreground"><LoaderCircle className="mr-2 inline size-4 animate-spin" />{t('Loading…')}</td></tr>}
               </tbody>
             </table>
           </div>
@@ -301,11 +319,16 @@ function VoucherRow({ voucher, editing, busy, onEdit, onSave, onToggle, onDelete
 }
 
 function RedemptionRow({ row, voucher, busy, onSave, onRevoke }: {
-  row: Redemption; voucher?: Voucher; busy: boolean; onSave: (plan: string, expiry: string) => void; onRevoke: () => void
+  row: Redemption; voucher?: Voucher; busy: boolean; onSave: (form: RedemptionForm) => void; onRevoke: () => void
 }) {
   const t = useT()
   const [plan, setPlan] = useState(row.plan)
   const [expiry, setExpiry] = useState(dateOnly(row.expires_at))
+  const [takesText, setTakesText] = useState(row.takes === null ? '' : String(row.takes))
+  const takes = takesText.trim() === '' ? null : Number(takesText)
+  const takesValid = takes === null || validAdminTakeTarget(takes)
+  const steps = redemptionSaveSteps({ plan: row.plan, endDate: dateOnly(row.expires_at), takes: row.takes }, { plan, endDate: expiry, takes: takesValid ? takes : null })
+  const changed = steps.access || steps.takes !== null
   const status = row.status === 'expired' ? t('Expired') : row.status === 'revoked' ? t('Revoked') : t('In use')
   return <tr className="border-b border-border-subtle last:border-0">
     <td className="px-4 py-3"><span>{row.name || '—'}</span><p className="mt-1 text-xs text-muted-foreground">{row.email}</p></td>
@@ -313,7 +336,8 @@ function RedemptionRow({ row, voucher, busy, onSave, onRevoke }: {
     <td className="px-4 py-3"><select value={plan} onChange={(event) => setPlan(event.target.value)} className="rounded border border-input bg-background px-2 py-1">{PADDLE_PLANS.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}</select></td>
     <td className="px-4 py-3">{new Date(row.redeemed_at).toLocaleDateString('ko-KR')}</td>
     <td className="px-4 py-3"><input type="date" value={expiry} onChange={(event) => setExpiry(event.target.value)} className="rounded border border-input bg-background px-2 py-1" /></td>
+    <td className="px-4 py-3"><input type="number" min={0} max={ADMIN_TAKE_LIMIT} step={1} inputMode="numeric" value={takesText} disabled={row.takes === null} onChange={(event) => setTakesText(event.target.value)} aria-label={t('Remaining Takes for {email}', { email: row.email })} aria-invalid={!takesValid} className="w-24 rounded border border-input bg-background px-2 py-1 font-mono tabular-nums aria-[invalid=true]:border-destructive" /></td>
     <td className="px-4 py-3 text-muted-foreground">{status}</td>
-    <td className="px-4 py-3"><div className="flex gap-2"><Button size="sm" variant="outline" disabled={busy || !expiry} onClick={() => onSave(plan, expiry)}>{t('Save')}</Button><Button size="sm" variant="ghost" disabled={busy || !!row.revoked_at} onClick={onRevoke}>{t('End access')}</Button></div></td>
+    <td className="px-4 py-3"><div className="flex gap-2"><Button size="sm" variant="outline" disabled={busy || !expiry || !takesValid || !changed} onClick={() => onSave({ plan, endDate: expiry, takes })}>{t('Save')}</Button><Button size="sm" variant="ghost" disabled={busy || !!row.revoked_at} onClick={onRevoke}>{t('End access')}</Button></div></td>
   </tr>
 }

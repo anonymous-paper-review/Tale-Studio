@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { isAdminEmail } from '@/lib/admin'
 import { PADDLE_PLANS } from '@/lib/billing/catalog'
 import { normalizeVoucherCode, VOUCHER_CODE_PATTERN } from '@/lib/billing/voucher'
+import { takeBalance } from '@/lib/billing/take-ledger'
 
 const planIds = new Set(PADDLE_PLANS.map((item) => item.id))
 const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789'
@@ -43,13 +44,16 @@ export async function GET() {
       return [id, data.user] as const
     }))
     const people = new Map(users.map(([id, user]) => [id, user]))
+    // 고객 계정 화면과 같은 계산(takeBalance)으로 계정마다 남은 Take 를 읽는다.
+    const workspaceIds = [...new Set((redemptions ?? []).map((r) => r.redeemed_workspace_id).filter(Boolean))] as string[]
+    const balances = new Map(await Promise.all(workspaceIds.map(async (id) => [id, await takeBalance(id)] as const)))
     const counts = new Map<string, number>()
     for (const row of redemptions ?? []) counts.set(row.code, (counts.get(row.code) ?? 0) + 1)
     return NextResponse.json({
       vouchers: (vouchers ?? []).map((v) => ({ id: v.code, code: v.code, label: v.note ?? '', plan: v.plan, duration_days: v.duration_days, max_uses: v.max_uses, redemption_count: counts.get(v.code) ?? 0, active: v.active, deleted_at: v.deleted_at, created_at: v.created_at })),
       redemptions: (redemptions ?? []).map((r) => {
         const user = r.redeemed_by ? people.get(r.redeemed_by) : null
-        return { id: r.id, voucher_id: r.code, workspace_id: r.redeemed_workspace_id, user_id: r.redeemed_by, email: user?.email ?? '', name: String(user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? ''), plan: r.plan, redeemed_at: r.redeemed_at, expires_at: r.plan_ends_at, revoked_at: r.plan_ended_at, status: Date.parse(r.plan_ends_at) <= Date.now() ? 'expired' : r.plan_ended_at ? 'revoked' : 'active' }
+        return { id: r.id, voucher_id: r.code, workspace_id: r.redeemed_workspace_id, user_id: r.redeemed_by, email: user?.email ?? '', name: String(user?.user_metadata?.full_name ?? user?.user_metadata?.name ?? ''), plan: r.plan, redeemed_at: r.redeemed_at, expires_at: r.plan_ends_at, revoked_at: r.plan_ended_at, takes: r.redeemed_workspace_id ? balances.get(r.redeemed_workspace_id) ?? null : null, status: Date.parse(r.plan_ends_at) <= Date.now() ? 'expired' : r.plan_ended_at ? 'revoked' : 'active' }
       }),
     })
   } catch (error) {
