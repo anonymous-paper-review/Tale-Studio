@@ -7,6 +7,9 @@ import { countText } from '@/lib/i18n/count-text'
 import { STAGE_LABEL } from '@/lib/constants'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import { retryBoardLoad, useBoardLoadStatus } from '@/stores/board-load-store'
+import { cameraBoardView } from '@/lib/director/board-load'
+import { BoardLoadState } from '@/components/board-load-state'
 import { isShotData } from '@/types/director'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
@@ -21,8 +24,16 @@ export function CameraBoard({ scene, place }: { scene: CameraSceneView | null; p
   const states = useDirectorShotStates()
   const locale = useLocaleStore((s) => s.locale)
   const shotCount = useDirectorCanvasStore((s) => s.nodes.filter((node) => isShotData(node.data)).length)
+  // 판을 DB 에서 다 읽기 전 · 못 읽었으면 "아직 샷이 없어요" 대신 그 상태를 세운다 — 이 브라우저에 남은 옛 샷 줄이 있어도(fb-blur QA 2026-11-23).
+  const projectId = useDirectorCanvasStore((s) => s.projectId)
+  const load = useBoardLoadStatus(projectId)
+  const view = cameraBoardView({ status: load, shotCount, hasScene: !!scene })
 
-  if (shotCount === 0 || !scene) {
+  if (view === 'loading' || view === 'failed') {
+    return <BoardLoadState status={view} onRetry={retryBoardLoad} />
+  }
+
+  if (view === 'empty' || !scene) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-2 py-24 text-center">
         <p className="text-body font-semibold text-foreground">{t('No shots yet')}</p>

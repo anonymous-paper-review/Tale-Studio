@@ -2000,6 +2000,11 @@ export const KO: Record<string, string> = {
   // 씬만 세는 위쪽 만들기 줄의 확인 창 제목(오너 2026-11-22 E2)
   'Make 1 video in {scene}?': '{scene}의 영상 1개를 만들까요?',
   'Make {count} videos in {scene}?': '{scene}의 영상 {count}개를 만들까요?',
+  // 판 읽기(fb-blur QA 2026-11-23) — 다 읽기 전 · 못 읽었을 때 "아직 샷이 없어요" 대신.
+  'Loading the shots.': '샷을 불러오고 있어요.',
+  'Could not load the shots.': '샷 정보를 불러오지 못했어요.',
+  'Your shots are still there. Try loading them again.': '샷은 그대로 있어요. 다시 불러와 주세요.',
+  'Load again': '다시 불러오기',
   'Make the images in {scene}, then their videos?': '{scene}의 이미지를 만들고 이어서 영상도 만들까요?',
   'How to make the video': '영상 만드는 방식',
   'Start + end': '시작+끝',

@@ -6,8 +6,11 @@ import { cardsUnmovedSince, isAutoPlacedCandidate, isFirstEntrySettled, projectH
 import { useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useAssetStorageStore } from '@/stores/asset-storage-store'
+import { forgetBoardLoad, markBoardLoad } from '@/stores/board-load-store'
+import { writerProjectHasNoScenes } from '@/lib/director/board-load'
 import {
   useDirectorCanvasStore,
+  directorHydrationsSettled,
   hasPendingDirectorPositionSaves,
   nextScenePosition,
   nextShotPosition,
@@ -142,6 +145,23 @@ async function retrySyncOperation(operation: () => Promise<void>, label: string)
   }
   throw error
 }
+/**
+ * [다시 불러오기](fb-blur QA 2026-11-23): 새로 고치지 않고 그 자리에서 다시 읽는다 — 기다리던 자동 다시 시도는 지우고 그 몫도 새로 센다.
+ * 훅 밖 함수인 까닭: 훅의 effect 가 부르는 scheduleRetry 가 훅 안 함수를 잡으면 effect 의존이 매번 바뀐다.
+ */
+function retryBoardNow(
+  retryProjectId: string,
+  retry: { timers: Map<string, ReturnType<typeof setTimeout>>; attempts: Map<string, number>; rerun: () => void },
+) {
+  if (useProjectStore.getState().projectId !== retryProjectId) return
+  const timer = retry.timers.get(retryProjectId)
+  if (timer) clearTimeout(timer)
+  retry.timers.delete(retryProjectId)
+  retry.attempts.delete(retryProjectId)
+  markBoardLoad(retryProjectId, 'loading')
+  retry.rerun()
+}
+
 // Concurrent Director mounts share only pending work. Successful hydration belongs to
 // each hook instance so a later unmount/remount reads the current canonical state.
 const videoTakeHydrationPromises = new Map<string, Promise<void>>()
@@ -210,12 +230,33 @@ export function useWriterDirectorSync() {
   const shotConfigPromiseRef = useRef<{ projectId: string; promise: Promise<void> } | null>(null)
   // 처음 정렬(오너 2026-11-16): projectId별 점검. check = undefined(아직 시작 전) · null(후보 아님) · 점검(DB 읽는 중). 효과가 다시 돌아도 이어 쓰고, 정렬은 한 번만 요청한다.
   const firstEntryRef = useRef<{ projectId: string; requested: boolean; check: FirstEntryCheck | null | undefined } | null>(null)
+  // 판 읽기 상태(fb-blur QA 2026-11-23 · stores/board-load-store): 이 화면에서 다 읽은 프로젝트(그림 · Take 까지, 또는 씬이 정말 없음).
+  //   다 읽기 전 · 못 읽었을 때 Cinema 가 "아직 샷이 없어요" 대신 불러오는 중 · 못 불러옴을 보이고 만들기 단추를 끈다.
+  const boardReadyProjectIdRef = useRef<string | null>(null)
+  const boardReady = (readyProjectId: string) => {
+    boardReadyProjectIdRef.current = readyProjectId
+    markBoardLoad(readyProjectId, 'ready')
+  }
+  // 떠난 화면의 늦은 실패가 새로 들어온 화면(같은 프로젝트)의 판 읽기 상태를 "못 불러옴"으로 덮지 않게 — 떠난 뒤에는 다시 시도도 하지 않는다.
+  const mountedRef = useRef(true)
+  useEffect(() => {
+    mountedRef.current = true
+    return () => {
+      mountedRef.current = false
+    }
+  }, [])
   const scheduleRetry = (retryProjectId: string, label: string) => {
+    if (!mountedRef.current) return
     if (useProjectStore.getState().projectId !== retryProjectId) return
     if (retryTimersRef.current.has(retryProjectId)) return
     const attempts = retryAttemptsRef.current.get(retryProjectId) ?? 0
     if (attempts >= 3) {
       console.error(`[director] ${label} retry budget exhausted for ${retryProjectId}`)
+      markBoardLoad(retryProjectId, 'failed', () => retryBoardNow(retryProjectId, {
+        timers: retryTimersRef.current,
+        attempts: retryAttemptsRef.current,
+        rerun: () => setRetryEpoch((epoch) => epoch + 1),
+      }))
       return
     }
     retryAttemptsRef.current.set(retryProjectId, attempts + 1)
@@ -231,6 +272,8 @@ export function useWriterDirectorSync() {
   useEffect(() => () => {
     for (const timer of retryTimersRef.current.values()) clearTimeout(timer)
     retryTimersRef.current.clear()
+    // 떠나거나 프로젝트가 바뀌면 판 읽기 기록을 지운다 — 다음에 들어올 때 옛 "다 읽음"으로 읽기 전 판을 보이지 않게.
+    forgetBoardLoad(projectId)
   }, [projectId])
 
   // #ref-gate(2026-09-02): 에셋 하이드레이트는 프로젝트당 1회라, Artist 가 다른 탭에서 시트를 만드는 동안
@@ -259,11 +302,18 @@ export function useWriterDirectorSync() {
     // 이 메서드는 director 직행/새로고침 경로에서 호출되지 않는다. manifest가 비어있고
     // projectId가 있으면 여기서 1회 로드한다 — sceneManifest가 채워지면 selector 변경으로
     // 이 effect가 재실행되어 아래 Pass들이 진행된다.
+    // 판 읽기: 이 화면에서 아직 다 읽지 않은 프로젝트면 "불러오는 중"(다 읽기 전 판을 "샷 없음"으로 보이지 않게).
+    const boardProjectId = useDirectorCanvasStore.getState().projectId
+    if (boardProjectId && boardReadyProjectIdRef.current !== boardProjectId) markBoardLoad(boardProjectId, 'loading')
     if (!manifest) {
       const pid = useProjectStore.getState().projectId
       if (pid && writerLoadedProjectIdRef.current !== pid && writerLoadPromiseRef.current?.projectId !== pid) {
         const promise = retrySyncOperation(
-          () => useWriterStore.getState().loadProject(),
+          async () => {
+            await useWriterStore.getState().loadProject()
+            // loadProject 는 읽기 실패를 삼키고 씬이 없을 때와 똑같이 끝난다 — 씬이 정말 없는지 한 번 더 세어 "없음"과 "못 읽음"을 가른다.
+            if (!useWriterStore.getState().sceneManifest && !(await writerProjectHasNoScenes(pid))) throw new Error('Writer data did not load')
+          },
           `failed to load Writer data for ${pid}`,
         )
         writerLoadPromiseRef.current = { projectId: pid, promise }
@@ -273,6 +323,8 @@ export function useWriterDirectorSync() {
               writerLoadedProjectIdRef.current = pid
               writerLoadPromiseRef.current = null
               retryAttemptsRef.current.delete(pid)
+              // 씬이 정말 하나도 없는 프로젝트 — 더 읽을 판이 없으니 다 읽음("아직 샷이 없어요").
+              if (!useWriterStore.getState().sceneManifest) boardReady(pid)
             }
           },
           (error) => {
@@ -495,6 +547,11 @@ export function useWriterDirectorSync() {
         if (!cancelled) {
           videoTakeHydratedProjectIdRef.current = projectId
           retryAttemptsRef.current.delete(projectId)
+          // 같이 돈 재수화(복귀 재수화 등)가 이 재수화를 덮었으면 결과는 그쪽이 적는다 — 모두 끝난 뒤에 다 읽음(그 사이 그림 · Take 없는 줄이 서지 않게).
+          //   이 차례가 다시 돌아도(cancelled) 다 읽음은 남아야 하므로 화면이 붙어 있고 프로젝트가 같은지만 본다.
+          void directorHydrationsSettled().then(() => {
+            if (mountedRef.current && useDirectorCanvasStore.getState().projectId === projectId) boardReady(projectId)
+          })
         }
       } catch (error) {
         console.error(`[director] video takes remain unavailable for ${projectId}; sync will retry`, error)
@@ -529,7 +586,12 @@ export function useWriterDirectorSync() {
     // storyboardImage(실사)를 자동 생성하지 않는다. 실사화는 사용자의 명시적
     // 생성 버튼(generateStoryboardImage)으로만 트리거한다. 재진입 시
     // 완료된 storyboardImage는 Pass 2.5 hydrate로 그대로 복원된다(멱등 보존).
-    })().finally(() => {
+    })().catch((error) => {
+      // 동기화가 코드 오류로 멈추면 다시 시도로 보낸다 — 몫을 다 쓰면 못 불러옴(영영 "불러오는 중"에 머물지 않게, fb-blur QA 2026-11-23).
+      const syncProjectId = useDirectorCanvasStore.getState().projectId
+      console.error(`[director] sync stopped for ${syncProjectId}`, error)
+      if (syncProjectId && !cancelled) scheduleRetry(syncProjectId, 'Director sync')
+    }).finally(() => {
       releaseHistorySuppression()
     })
 

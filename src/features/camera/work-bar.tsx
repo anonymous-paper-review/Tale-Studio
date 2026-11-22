@@ -46,6 +46,8 @@ import {
   workScopeStates,
 } from '@/lib/director/toolbar-work'
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import { useBoardLoadStatus } from '@/stores/board-load-store'
+import { boardLoadBlockText } from '@/lib/director/board-load'
 import { useProjectStore } from '@/stores/project-store'
 import { isShotData } from '@/types/director'
 import { scopeShotStates } from './work-scope'
@@ -102,16 +104,20 @@ export function CameraWorkBar({ scope, sceneLabel }: { scope: readonly string[] 
   // 꺼진 단추와 까닭 — 일괄이 도는 동안은 눌러도 새 판이 서지 않으니 끈다. 멈춘 이미지 판은 정리 중일 뿐이라 끄지 않는다.
   const imageBlock = imageWorkBlock(workStates, picked, realBatchBusy && !realBatchCancelled, false)
   const videoBlock = videoWorkBlock(workStates, picked, videoLive, false)
+  // 판을 DB 에서 다 읽기 전 · 못 읽었으면 만들기 단추를 끄고 그 까닭만 보인다 — 읽기 전 숫자로 세면 있는 그림을 "없음"으로 센다(fb-blur QA 2026-11-23).
+  const boardProjectId = useDirectorCanvasStore((s) => s.projectId)
+  const boardLoadLine = boardLoadBlockText(useBoardLoadStatus(boardProjectId))
+  const boardOff = boardLoadLine !== null
   // Take 잔액 — 못 읽었으면 Take 를 쓰는 단추가 시작하지 않고 단추 아래 까닭을 보인다(리드 11/14).
   const takeState = useTakeBalance()
   const [takesUnknown, setTakesUnknown] = useState(false)
-  const blockLine = takesUnknown && takeState.failed ? t(TAKES_UNKNOWN_TEXT) : workBlockLine(imageBlock, videoBlock, t)
+  const blockLine = boardLoadLine ? t(boardLoadLine) : takesUnknown && takeState.failed ? t(TAKES_UNKNOWN_TEXT) : workBlockLine(imageBlock, videoBlock, t)
   // [다음: Director]를 크림으로 칠하는 것은 보드 전체에 만들 것이 없고 만드는 중이 아닐 때만 — Director 로는 조건 없이 넘긴다(리드 11/22 f).
   const boardWorkLeft = imageWorkShotIds(shotStates, null).length + videoWorkShotIds(shotStates, null).length
   const primary = primaryWorkAction({
-    imageCount: imageBlock === null ? imageWork.length : 0,
-    videoCount: videoBlock === null ? videoWork.length : 0,
-    canHandOff: !making && boardWorkLeft === 0,
+    imageCount: imageBlock === null && !boardOff ? imageWork.length : 0,
+    videoCount: videoBlock === null && !boardOff ? videoWork.length : 0,
+    canHandOff: !boardOff && !making && boardWorkLeft === 0,
   })
   // 확인 창에 만들 영상 수 · 필요한 Take · 가진 Take(약속 E1 · E2) — 채팅 승인 카드와 같은 계산.
   const videoPlan = planVideoBatch(videoBatchTakeCosts(nodes, videoWork), takeState.balance, takeState.mode)
@@ -146,6 +152,7 @@ export function CameraWorkBar({ scope, sceneLabel }: { scope: readonly string[] 
   }
   // [이미지 만들기 · N]: 빈 샷은 일괄, 실패한 샷 · 손으로 더한 샷은 한 장씩. Take 를 쓰지 않아 확인 없이 바로.
   const runImages = async () => {
+    if (boardOff) return
     if (imageMode.mode === 'remake') {
       setConfirmRemake(true)
       return
@@ -200,6 +207,7 @@ export function CameraWorkBar({ scope, sceneLabel }: { scope: readonly string[] 
   }
   // [영상 만들기 · N]: Take 를 쓰니 확인 창을 거친다(약속 E) — 누를 때 잔액을 다시 읽고, 못 읽으면 창을 열지 않는다.
   const runVideos = async () => {
+    if (boardOff) return
     if (videoWork.length === 0) return
     if (!(await takesReadable())) {
       setTakesUnknown(true)
@@ -305,7 +313,7 @@ export function CameraWorkBar({ scope, sceneLabel }: { scope: readonly string[] 
                 <span>{stopping ? t('Stopping') : t('Stop all')}</span>
               </button>
             </div>
-          ) : estimate ? (
+          ) : estimate && !boardOff ? (
             <span data-testid="camera-estimate" className="truncate text-[12.5px] font-medium text-muted-foreground">{estimate}</span>
           ) : null}
         </div>
@@ -328,26 +336,35 @@ export function CameraWorkBar({ scope, sceneLabel }: { scope: readonly string[] 
             <button
               type="button"
               onClick={() => void runImages()}
-              disabled={imageBlock !== null}
-              aria-describedby={imageBlock !== null ? 'camera-work-block' : undefined}
+              disabled={imageBlock !== null || boardOff}
+              aria-describedby={imageBlock !== null || boardOff ? 'camera-work-block' : undefined}
               className={workButtonClass(primary === 'image')}
             >
               <ImageIcon className="size-3.5" />
               <span>{imageMode.mode === 'remake' ? t('Make images again') : chainVideoAfterImage ? t('Make images + videos') : t('Make images')}</span>
-              <span aria-hidden className="opacity-60">·</span>
-              <span className="font-num tabular-nums">{imageMode.shotIds.length}</span>
+              {/* 다 읽기 전 · 못 읽었으면 숫자를 적지 않는다 — 읽기 전 판으로 센 숫자라 사실과 다르다. */}
+              {!boardOff && (
+                <>
+                  <span aria-hidden className="opacity-60">·</span>
+                  <span className="font-num tabular-nums">{imageMode.shotIds.length}</span>
+                </>
+              )}
             </button>
             <button
               type="button"
               onClick={() => void runVideos()}
-              disabled={videoBlock !== null}
-              aria-describedby={videoBlock !== null ? 'camera-work-block' : undefined}
+              disabled={videoBlock !== null || boardOff}
+              aria-describedby={videoBlock !== null || boardOff ? 'camera-work-block' : undefined}
               className={workButtonClass(primary === 'video')}
             >
               <Play className="size-3.5 fill-current" />
               <span>{t('Make videos')}</span>
-              <span aria-hidden className="opacity-60">·</span>
-              <span className="font-num tabular-nums">{videoWork.length}</span>
+              {!boardOff && (
+                <>
+                  <span aria-hidden className="opacity-60">·</span>
+                  <span className="font-num tabular-nums">{videoWork.length}</span>
+                </>
+              )}
             </button>
           </div>
           {blockLine && (
