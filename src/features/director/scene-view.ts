@@ -278,3 +278,9 @@ export function linkCardName(
   }
   return directorFullLabel(card.data, names)
 }
+
+/** 만들기 확인 창 제목 앞에 지금 씬 이름(오너 E2 2026-11-22) — "씬 2 · 영상을 만들까요?". 씬이 없는 캔버스면 제목 그대로. */
+export function sceneDialogTitle(sceneLabel: string | null | undefined, title: string): string {
+  const name = sceneLabel?.trim()
+  return name ? `${name} · ${title}` : title
+}
