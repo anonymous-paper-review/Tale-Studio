@@ -10,7 +10,8 @@
 import { storyboardImageEndFrame, storyboardImageStartFrame } from '@/lib/director/storyboard-image'
 
 export type VideoFrameSource = 'manual' | 'auto'
-export type VideoReferenceRole = 'start' | 'end' | 'ref'
+/** 'direction' = ③ 시작+미들의 미들(연출 · 의도 스케치, 2026-11-22) — 서버가 방식대로 고를 때만 생긴다(화면은 보내지 않는다). */
+export type VideoReferenceRole = 'start' | 'end' | 'ref' | 'direction'
 
 export interface VideoReferenceFramesInput {
   frameSource: VideoFrameSource | undefined
@@ -38,6 +39,8 @@ export interface ClampedReferenceImages {
   roles: VideoReferenceRole[] | undefined
   /** 덜어 낸 그림 수 — 화면이 "N장은 이 모델이 받지 않아 뺐어요"를 보일 근거. */
   dropped: number
+  /** 남긴 그림의 원래 자리 — 같은 순서의 다른 목록(② 레퍼런스의 이름표)을 같이 덜 때 쓴다. */
+  keptIndices: number[]
 }
 
 /**
@@ -53,9 +56,10 @@ export function clampReferenceImages(
   uncounted: ReadonlySet<VideoReferenceRole> = new Set(),
 ): ClampedReferenceImages {
   const limit = Number.isFinite(max) && max >= 1 ? Math.floor(max) : 1
+  const all = urls.map((_, i) => i)
   if (roles && roles.length === urls.length) {
     let counted = roles.filter((role) => !uncounted.has(role)).length
-    if (counted <= limit) return { urls, roles, dropped: 0 }
+    if (counted <= limit) return { urls, roles, dropped: 0, keptIndices: all }
     const keep = urls.map(() => true)
     for (let i = urls.length - 1; i >= 0 && counted > limit; i -= 1) {
       if (roles[i] === 'ref' && !uncounted.has('ref')) {
@@ -64,11 +68,11 @@ export function clampReferenceImages(
       }
     }
     const keptUrls = urls.filter((_, i) => keep[i])
-    return { urls: keptUrls, roles: roles.filter((_, i) => keep[i]), dropped: urls.length - keptUrls.length }
+    return { urls: keptUrls, roles: roles.filter((_, i) => keep[i]), dropped: urls.length - keptUrls.length, keptIndices: all.filter((i) => keep[i]) }
   }
-  if (urls.length <= limit) return { urls, roles: undefined, dropped: 0 }
-  const kept = limit === 1 ? [urls[0]!] : [...urls.slice(0, limit - 1), urls[urls.length - 1]!]
-  return { urls: kept, roles: undefined, dropped: urls.length - kept.length }
+  if (urls.length <= limit) return { urls, roles: undefined, dropped: 0, keptIndices: all }
+  const keptIndices = limit === 1 ? [0] : [...all.slice(0, limit - 1), urls.length - 1]
+  return { urls: keptIndices.map((i) => urls[i]!), roles: undefined, dropped: urls.length - keptIndices.length, keptIndices }
 }
 
 export function resolveVideoReferenceFrames(input: VideoReferenceFramesInput): VideoReferenceFrames {
