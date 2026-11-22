@@ -1,4 +1,4 @@
-// Camera 샷 줄 안에서 고치기 — [이미지 고치기]의 바꿀 점 · [영상 만들기]의 새 Take · 만드는 중 [멈추기] · 차례 [먼저 하기]가 지금 샷 상세 · 스토리보드 카드와 같은 규칙으로 되는지 검사한다 (오너 2026-11-22 D2~D5 · 11/14 약속)
+// Cinema 샷 줄 안에서 고치기 — [이미지 고치기]의 바꿀 점 · [영상 만들기]의 새 Take · 만드는 중 [멈추기] · 차례 [먼저 하기]가 지금 샷 상세 · 스토리보드 카드와 같은 규칙으로 되는지 검사한다 (오너 2026-11-22 D2~D5 · 11/14 약속)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { newTakeButton } from '@/features/camera/new-take'

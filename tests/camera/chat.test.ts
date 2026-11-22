@@ -1,4 +1,4 @@
-// Camera 채팅(Lumi)과 ⌘/Ctrl+클릭 멘션 — Camera 에서 말로 고치면 Director 채팅과 같은 엔진 · 같은 막이로 바로 하고 채팅방 Camera 구간에 남으며, 샷 줄 · 판 · 씬을 ⌘/Ctrl+클릭하면 @이름이 날아 들어가는지 검사한다 (오너 2026-11-22 D2~D5 "채팅 및 버튼으로 수정" · D9)
+// Cinema 채팅(Lumi)과 ⌘/Ctrl+클릭 멘션 — Cinema 에서 말로 고치면 Director 채팅과 같은 엔진 · 같은 막이로 바로 하고 채팅방 Cinema 구간에 남으며, 샷 줄 · 판 · 씬을 ⌘/Ctrl+클릭하면 @이름이 날아 들어가는지 검사한다 (오너 2026-11-22 D2~D5 "채팅 및 버튼으로 수정" · D9)
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
@@ -23,8 +23,8 @@ afterEach(() => {
   vi.unstubAllGlobals()
 })
 
-describe('Camera 채팅', () => {
-  it('Camera 에서도 채팅이 켜져 있고, 보낸 말과 Lumi 의 답은 채팅방의 Camera 구간에 쌓이며 AI 에게 Camera 화면이라고 알린다', async () => {
+describe('Cinema 채팅', () => {
+  it('Cinema 에서도 채팅이 켜져 있고, 보낸 말과 Lumi 의 답은 채팅방의 Cinema 구간에 쌓이며 AI 에게 Cinema 화면이라고 알린다', async () => {
     // 왜: 오너 D2~D5 "채팅 및 버튼으로 수정" — Director 채팅과 같은 엔진(바로 실행 · Take 막이, 11/14 9번)을 쓰되 화면은 Camera 다.
     expect(CHAT_SUPPORTED_STAGES.has('camera')).toBe(true)
     await useGlobalChatStore.getState().sendMessage('Make shot 2 a little darker')
@@ -34,7 +34,7 @@ describe('Camera 채팅', () => {
     expect(useGlobalChatStore.getState().messages.map((m) => m.stage)).toEqual(['camera', 'camera'])
   })
 
-  it('Camera 의 빠른 칩은 Director 와 같은 말이고 AI 를 거치지 않고 바로 해서 답도 Camera 구간에 남는다', async () => {
+  it('Cinema 의 빠른 칩은 Director 와 같은 말이고 AI 를 거치지 않고 바로 해서 답도 Cinema 구간에 남는다', async () => {
     // 왜: 11/14 시안 D5 — 칩 말은 지금 보드 상태로 바로 한다(잘못 읽을 일 · 채팅 비용 없음).
     await useGlobalChatStore.getState().sendMessage('How far along is it?')
     expect(fetchMock.mock.calls.some((call) => String(call[0]).includes('/api/director/chat'))).toBe(false)
@@ -43,7 +43,7 @@ describe('Camera 채팅', () => {
     expect(new Set(messages.map((m) => m.stage))).toEqual(new Set(['camera']))
   })
 
-  it('Camera 채팅이 낸 글 고침 [적용] 카드 · 되묻기 · 칩 줄 · 지금 하는 일 줄은 Camera 화면에서 답하고 보인다', () => {
+  it('Cinema 채팅이 낸 글 고침 [적용] 카드 · 되묻기 · 칩 줄 · 지금 하는 일 줄은 Cinema 화면에서 답하고 보인다', () => {
     // 왜: 카드 단계가 Director 면 Camera 에서 "Director 화면에서 답해 주세요"가 뜨고 "응"이 먹지 않는다.
     const store = readFileSync('src/stores/global-chat-store.ts', 'utf8')
     expect(store).toMatch(/stage: directorChatStage\(stage\),\s*kind: 'directorTextEdit'/)
@@ -54,7 +54,7 @@ describe('Camera 채팅', () => {
     expect(chat).toMatch(/isDirectorChatStage\(currentStage\) && \(/)
   })
 
-  it('Camera 화면이라는 것을 AI 에게 알릴 때는 노드 · 캔버스 말 대신 샷 줄과 그림 · 영상 판으로 말하게 하고, 기록 단계도 Camera 로 남긴다', () => {
+  it('Cinema 화면이라는 것을 AI 에게 알릴 때는 노드 · 캔버스 말 대신 샷 줄과 그림 · 영상 판으로 말하게 하고, 기록 단계도 Cinema 로 남긴다', () => {
     // 왜: Director 채팅 안내문은 노드 그래프를 전제로 한다 — Camera 사용자에게 "캔버스의 노드"라고 말하면 화면과 어긋난다.
     const route = readFileSync('src/app/api/director/chat/route.ts', 'utf8')
     expect(route).toMatch(/screen === 'camera' \? CAMERA_SCREEN_NOTE : ''/)
@@ -96,7 +96,7 @@ describe('⌘/Ctrl+클릭 멘션 (D9)', () => {
     expect(readFileSync('src/components/layout/global-chat.tsx', 'utf8')).toMatch(/\[\.\.\.mentionItems\.map\(\(m\) => m\.label\), \.\.\.cameraCardLabels\]/)
   })
 
-  it('채팅의 @ 고르기 목록에는 Camera 에서 실사 씬 · 샷이 나온다', () => {
+  it('채팅의 @ 고르기 목록에는 Cinema 에서 실사 씬 · 샷이 나온다', () => {
     // 왜: 카드로 넣은 @이름과 고르기 목록의 이름이 같아야 입력칸에서 멘션으로 알아본다.
     const chat = readFileSync('src/components/layout/global-chat.tsx', 'utf8')
     expect(chat).toMatch(/if \(currentStage === 'camera'\) \{[\s\S]{0,300}sceneShotMentions\(targets, 'real', locale\)/)

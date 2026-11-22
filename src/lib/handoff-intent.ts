@@ -87,7 +87,8 @@ const STAGE_WORDS: Record<StageId, readonly string[]> = {
   producer: ['writer', '작가', '라이터'],
   writer: ['storyboard', '스토리보드', 'conti', '콘티', 'writer', '작가'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
   artist: ['artist', '아티스트', '컨셉아티스트'],
-  camera: [STAGE_LABEL.camera.toLowerCase(), '카메라'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
+  // 탭 이름(Cinema · 시네마, 오너 E1)과 옛 이름(Camera · 카메라)을 다 알아듣는다 — 목적지 꼴일 때만(카메라 움직임 말과 섞이지 않게).
+  camera: [STAGE_LABEL.camera.toLowerCase(), '시네마', 'camera', '카메라'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
   director: ['director', '디렉터', '디렉타', '감독'],
   editor: ['editor', '에디터', '편집'],
 }

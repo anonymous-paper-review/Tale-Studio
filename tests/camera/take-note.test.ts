@@ -1,4 +1,4 @@
-// Camera 이력의 Take 판이 그 Take 를 만들 때 적은 사람 말(바꿀 점 · 채팅 부탁)을 보이고, [다시 만들기] · 일괄로 만든 새 Take 가 앞 Take 의 말을 이어받지 않는지 검사한다 (오너 2026-11-22 결정 4 · 리드 11/22 ⑥)
+// Cinema 이력의 Take 판이 그 Take 를 만들 때 적은 사람 말(바꿀 점 · 채팅 부탁)을 보이고, [다시 만들기] · 일괄로 만든 새 Take 가 앞 Take 의 말을 이어받지 않는지 검사한다 (오너 2026-11-22 결정 4 · 리드 11/22 ⑥)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { shotHistory } from '@/features/camera/shot-history'

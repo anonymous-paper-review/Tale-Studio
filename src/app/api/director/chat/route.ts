@@ -56,7 +56,7 @@ IMPORTANT: When suggesting camera or lighting changes, include a JSON block at t
 const CAMERA_SCREEN_NOTE = `
 
 <screen>
-The user is on the Camera screen, not on the node canvas. Camera shows one row per shot: the shot's details on the left and its history on the right, every image version (Image v1, v2, ...) and every video take (Take 1, 2, ...) from oldest to newest.
+The user is on the Cinema screen, not on the node canvas. Cinema shows one row per shot: the shot's details on the left and its history on the right, every image version (Image v1, v2, ...) and every video take (Take 1, 2, ...) from oldest to newest.
 Talk about shots, images and takes. Never mention nodes, edges, wiring, the canvas or dragging, and do not emit selectNode.
 The user may point at one card by adding it to a shot name, e.g. "@Real Shot 3 · Image v2", "@Real Shot 3 · Take 4", "@실사 샷 3 · 그림 v2" or "@실사 샷 3 · Take 4". The target is that shot.
 Choosing which image version is current and marking the final take are done with the buttons on the card ([Use this image] and the star). You cannot do those from chat, so tell the user which button to press.

@@ -1,4 +1,4 @@
-// 채팅 AI 에게 주는 지시문 · 도구 안내 · 현황 스냅샷은 사용자가 보는 화면 이름과 순서(Producer 시작 → Writer 씬 스토리 → Artist → Writer 콘티 → Camera → Director → Editor)로 말한다 (리드 2026-11-14 D · H-3, D1 2026-11-22)
+// 채팅 AI 에게 주는 지시문 · 도구 안내 · 현황 스냅샷은 사용자가 보는 화면 이름과 순서(Producer 시작 → Writer 씬 스토리 → Artist → Writer 콘티 → Cinema → Director → Editor)로 말한다 (리드 2026-11-14 D · H-3, D1 2026-11-22)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -37,8 +37,8 @@ describe('지시문 · 도구 안내', () => {
   it('Producer · Writer · Artist 채팅이 함께 받는 지시문에 화면 순서가 적히고 Artist 다음은 Writer 의 콘티(Storyboard)다', () => {
     // 왜: Artist 채팅이 "다음은 Director"라고 안내하고 "Writer 단계가 아직 시작되지 않았다"고 말했다(11/14 채팅 점검 D · H). 화면 이름과 순서를 모르는 채 옛 이름으로 답했다.
     //   Camera(오너 2026-11-22 D2~D5)는 콘티와 Director 사이다. D1(2026-11-22): 옛 Storyboard 화면은 Writer 탭의 콘티 칸이다 — 한국어로는 "콘티"라고 부른다.
-    expect(CHAT_AGENT_GUIDE).toContain('Producer (the start screen), Writer > Scene story (the prose), Artist, Writer > Storyboard (scenes and shots), Camera (real images and videos for each shot), Director, Editor')
-    expect(CHAT_AGENT_GUIDE).toContain('After Artist the next screen is the Writer Storyboard, never Camera or Director.')
+    expect(CHAT_AGENT_GUIDE).toContain('Producer (the start screen), Writer > Scene story (the prose), Artist, Writer > Storyboard (scenes and shots), Cinema (real images and videos for each shot), Director, Editor')
+    expect(CHAT_AGENT_GUIDE).toContain('After Artist the next screen is the Writer Storyboard, never Cinema or Director.')
     expect(CHAT_AGENT_GUIDE).toContain('In Korean the Writer Storyboard is called "콘티"')
     for (const route of ['produce', 'writer', 'artist']) {
       expect(readFileSync(`src/app/api/${route}/chat/route.ts`, 'utf8')).toContain('CHAT_AGENT_GUIDE')
@@ -106,7 +106,7 @@ describe('현황 스냅샷', () => {
       state: {
         writer: { started: false, savedScenes: 0, savedShots: 0 },
         screens: {
-          order: 'Producer (start) > Writer: Scene story (prose) > Artist > Writer: Storyboard (scenes and shots) > Camera (real images and videos per shot) > Director > Editor',
+          order: 'Producer (start) > Writer: Scene story (prose) > Artist > Writer: Storyboard (scenes and shots) > Cinema (real images and videos per shot) > Director > Editor',
           producer: 'Writer screen, Scene story part (prose)',
           writer: 'Writer screen, Storyboard part (scenes and shots)',
           artist: 'Artist screen',

@@ -1,4 +1,4 @@
-// 영상 Take 목록은 그 영상을 만든 방식과 실제로 쓴 시작 · 끝 · 미들 그림을 알려준다 — Camera 이력 카드가 방식을 적는다 (오너 2026-11-22 D2~D5)
+// 영상 Take 목록은 그 영상을 만든 방식과 실제로 쓴 시작 · 끝 · 미들 그림을 알려준다 — Cinema 이력 카드가 방식을 적는다 (오너 2026-11-22 D2~D5)
 import { describe, expect, it } from 'vitest'
 import { madeFrames, madeVideoMode } from '@/lib/director-video-takes'
 

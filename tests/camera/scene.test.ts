@@ -1,4 +1,4 @@
-// Camera 위 씬 단추 — 고른 씬의 샷만 보드 차례대로 서고, 지금 보는 씬을 Director 노드 보기와 같이 기억하며, 씬 단추로 멘션 · 앞뒤 이동이 되는지 검사한다 (오너 2026-11-22 D2~D5 · D8 · D9, 리드 답 b · g)
+// Cinema 위 씬 단추 — 고른 씬의 샷만 보드 차례대로 서고, 지금 보는 씬을 Director 노드 보기와 같이 기억하며, 씬 단추로 멘션 · 앞뒤 이동이 되는지 검사한다 (오너 2026-11-22 D2~D5 · D8 · D9, 리드 답 b · g)
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { cameraScene } from '@/features/camera/scene'
@@ -38,7 +38,7 @@ beforeEach(() => {
 })
 
 describe('씬 단추와 한 씬 보기', () => {
-  it('Camera 위에는 씬 단추가 있고, 고른 씬의 샷만 아래에 보드 차례대로 세로로 선다', () => {
+  it('Cinema 위에는 씬 단추가 있고, 고른 씬의 샷만 아래에 보드 차례대로 세로로 선다', () => {
     // 왜: 오너 D2~D5 "위에 씬별 버튼, 아래에 그 씬의 샷이 세로로" — 샷이 많은 프로젝트도 한 씬씩 본다.
     expect(cameraScene(nodes, names, 'sc_a')).toMatchObject({ key: 'sc_a', nodeId: 'n-sc-a', label: '씬 1' })
     expect(cameraScene(nodes, names, 'sc_a')?.shots.map((n) => n.id)).toEqual(['n-w1', 'n-w2'])
@@ -49,7 +49,7 @@ describe('씬 단추와 한 씬 보기', () => {
     expect(page()).toMatch(/<CameraBoard scene=\{scene\}/)
   })
 
-  it('Camera 와 Director 노드 보기는 지금 보는 씬을 같이 기억한다 — Camera 에서 씬을 바꾸면 Director 도 그 씬으로 열리고, 다시 들어와도 그 씬이다', () => {
+  it('Cinema 와 Director 노드 보기는 지금 보는 씬을 같이 기억한다 — Cinema 에서 씬을 바꾸면 Director 도 그 씬으로 열리고, 다시 들어와도 그 씬이다', () => {
     // 왜: 리드 11/22 답 b · g — 두 화면이 같은 샷을 씬별로 보므로 오가며 씬을 다시 고르지 않게 한다(프로젝트마다 하나, 이 브라우저에만).
     switchDirectorScene('p-1', 'sc_b')
     const remembered = useCurrentSceneStore.getState().sceneByProject['p-1']

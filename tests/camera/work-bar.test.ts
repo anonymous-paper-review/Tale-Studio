@@ -1,4 +1,4 @@
-// Camera 위쪽 만들기 줄 — [이미지 만들기 · N] · [영상 만들기 · N] · 진행 · [모두 멈추기] · 영상까지 이어서가 Director 툴바와 같은 규칙 · 같은 러너로 되고, 세는 범위를 한 곳에서 정하는지 검사한다 (오너 2026-11-22 D2~D5 · 리드 답 a · 약속 E)
+// Cinema 위쪽 만들기 줄 — [이미지 만들기 · N] · [영상 만들기 · N] · 진행 · [모두 멈추기] · 영상까지 이어서가 Director 툴바와 같은 규칙 · 같은 러너로 되고, 세는 범위를 한 곳에서 정하는지 검사한다 (오너 2026-11-22 D2~D5 · 리드 답 a · 약속 E)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { scopeShotStates } from '@/features/camera/work-scope'

@@ -20,7 +20,7 @@ import {
   WriterIcon,
 } from '@/components/icons/v3-icons'
 import { cn } from '@/lib/utils'
-import { STAGES, STAGE_LABEL, SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
+import { STAGES, STAGE_FULL_NAME, STAGE_LABEL, SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { RAIL_ITEMS, railItemBadge, railItemOf, railStageState, railTarget } from '@/lib/stage-rail'
 import { STAGE_ACCESS_KEY, stageForShortcut } from '@/lib/stage-shortcuts'
@@ -320,7 +320,8 @@ export function Sidebar() {
                 </button>
               </TooltipTrigger>
               <TooltipContent side="right" className="flex flex-col">
-                <span className="font-medium">{stage.name}</span>
+                {/* 이름 줄 — 줄여 쓴 탭 이름은 풀네임(오너 E1: Cinema → Cinematographer). 아래 줄이 같은 이름이면 다시 적지 않는다. */}
+                <span className="font-medium">{STAGE_FULL_NAME[stage.id] ?? stage.name}</span>
                 {badge > 0 ? <span>{t('Unseen completions: {count}', { count: badge })}</span> : null}
                 <span className="text-xs text-muted-foreground">
                   {busyBlocked
@@ -331,7 +332,7 @@ export function Sidebar() {
                         : stage.id === 'editor' && reachedStage === 'director' && visibleStage === 'director'
                           ? t('A finished video lets you move on.')
                           : t('Complete previous step first')
-                      : stage.agent}
+                      : stage.agent === (STAGE_FULL_NAME[stage.id] ?? stage.name) ? null : stage.agent}
                 </span>
                 {/* 단축키 표기는 Alt 홀드 배지가 전담(#feedback 2026-08-11) — 툴팁에서 제거. */}
               </TooltipContent>

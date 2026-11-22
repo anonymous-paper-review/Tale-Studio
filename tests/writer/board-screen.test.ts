@@ -72,9 +72,9 @@ describe('콘티 화면 머리', () => {
   })
 
   // 왜: 콘티(옛 Storyboard)의 다음 단계는 Director 앞에 선 새 탭 Camera 다(오너 2026-11-22 D2~D5) — 단추 글은 단계 표의 다음 단계 이름을 따른다.
-  it('머리 오른쪽에는 [다음: Camera로] 버튼이 있다', () => {
+  it('머리 오른쪽에는 [다음: Cinema로] 버튼이 있다', () => {
     const html = renderToStaticMarkup(createElement(WriterHeader))
-    expect(html).toContain('다음: Camera로')
+    expect(html).toContain('다음: Cinema로')
     expect(html).not.toContain('다음: Director로')
     expect(html).toContain('data-testid="storyboard-next-director"')
   })

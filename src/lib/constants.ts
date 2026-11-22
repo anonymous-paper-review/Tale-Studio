@@ -1,8 +1,8 @@
 import type { StageConfig, StageId } from '@/types'
 
-// Camera 탭 이름(오너 2026-11-22 D2~D5 — 가칭, 오너가 바꿀 수 있다. id 'camera' 는 그대로). 레일 이름 · 문장 속 이름은 여기 한 곳에서만 정하고,
-//   이름이 들어가는 문구는 모두 STAGE_LABEL · STAGE_AGENT_NAME 을 {stage} · {agent} 로 받는다(리드 11/22 "문구 키 한 곳에").
-const CAMERA_LABEL = 'Camera'
+// Cinema 탭 이름(오너 2026-11-22 E1 — 탭 이름 Cinema · 두 말 모두, 마우스를 올리면 풀네임 Cinematographer. 내부 id 'camera' · 주소 /studio/camera 는 그대로).
+//   레일 이름 · 문장 속 이름은 여기 한 곳에서만 정하고, 이름이 들어가는 문구는 모두 STAGE_LABEL · STAGE_AGENT_NAME 을 {stage} · {agent} 로 받는다(리드 11/22 "문구 키 한 곳에").
+const CAMERA_LABEL = 'Cinema'
 const CAMERA_AGENT = 'Cinematographer'
 
 export const STAGES = [
@@ -49,7 +49,8 @@ export const STAGES = [
     // 화면 이름 Camera(가칭, 오너 2026-11-22 D2~D5) — 씬마다 샷의 실사 그림 · 영상 이력. 옛 Director 스토리보드 보기의 일을 받았다.
     //   Director 로는 조건 없이 넘긴다(리드 11/22 f).
     id: 'camera',
-    name: `The ${CAMERA_LABEL} Room`,
+    // 레일 칸 툴팁 · 문서의 이름 줄 = 풀네임(오너 E1).
+    name: CAMERA_AGENT,
     agent: CAMERA_AGENT,
     path: '/studio/camera',
     handoffLabel: 'Next: Director',
@@ -90,6 +91,11 @@ export const STAGE_LABEL: Record<StageId, string> = {
   camera: CAMERA_LABEL,
   director: 'Director',
   editor: 'Editor',
+}
+
+/** 줄여 쓴 탭 이름의 풀네임 — 레일 칸 툴팁의 이름 줄 · 위 막대 칩의 설명(마우스를 올리면)에 보인다(오너 2026-11-22 E1: Cinema → Cinematographer). */
+export const STAGE_FULL_NAME: Partial<Record<StageId, string>> = {
+  camera: CAMERA_AGENT,
 }
 
 /**

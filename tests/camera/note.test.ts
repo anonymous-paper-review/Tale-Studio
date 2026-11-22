@@ -1,4 +1,4 @@
-// 그림 판에 사람이 쓴 말(바꿀 점 · 채팅으로 부탁한 말)이 남아 Camera 이력 판의 요약에 보이는지 검사한다 (오너 2026-11-22 결정 4 "요약에 사람이 쓴 말 남기기" · 리드 답 e)
+// 그림 판에 사람이 쓴 말(바꿀 점 · 채팅으로 부탁한 말)이 남아 Cinema 이력 판의 요약에 보이는지 검사한다 (오너 2026-11-22 결정 4 "요약에 사람이 쓴 말 남기기" · 리드 답 e)
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { useDirectorCanvasStore } from '@/stores/director-store'
@@ -88,7 +88,7 @@ const image = (versions: StoryboardImageVersion[]): StoryboardImage => {
 const summaries = (entries: HistoryEntry[]) => entries.map((entry) => entry.summary.map((p) => translate('ko', p.key, p.params)).join(' · '))
 
 describe('이력 판의 요약', () => {
-  it('Camera 이력 판의 요약은 아는 사실 뒤에 "바꿀 점: …" · "채팅으로 부탁: …"을 붙이고, 사람 말이 없는 판(일괄 · 바꿀 점 없이 다시)은 지금처럼 아는 사실만 보인다', () => {
+  it('Cinema 이력 판의 요약은 아는 사실 뒤에 "바꿀 점: …" · "채팅으로 부탁: …"을 붙이고, 사람 말이 없는 판(일괄 · 바꿀 점 없이 다시)은 지금처럼 아는 사실만 보인다', () => {
     // 왜: 참고 페이지 결 "무엇이 문제였고 무엇을 바꿨나" — 사람 말이 있으면 그 말이 핵심이다. LLM 요약은 부르지 않는다(결정 4).
     const entries = shotHistory({
       image: image([
