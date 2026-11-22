@@ -12,6 +12,7 @@ import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { DescriptionBox, DetailFrame, DetailSection } from '@/features/artist/detail-parts'
 import { propImageStale } from '@/lib/artist/prop-image'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
+import { isDemoSession } from '@/lib/demo/context'
 import { styleIdOf } from '@/lib/series/snapshot'
 import { useT } from '@/lib/i18n'
 import { useArtistStore } from '@/stores/artist-store'
@@ -38,6 +39,8 @@ function PropDetailLeft({ propId }: { propId: string }) {
   const t = useT()
   const { prop, generating, failure, stale } = usePropImageState(propId)
   const [instruction, setInstruction] = useState('')
+  // 데모(보기 전용 공유)는 그리지 않는다 — 그림 · 바뀜 표시만 보인다.
+  const demo = isDemoSession()
   if (!prop) return null
   const redraw = (safeMode = false) => {
     void useArtistStore.getState().generateProp(propId, 'ui', { instruction, safeMode })
@@ -51,31 +54,35 @@ function PropDetailLeft({ propId }: { propId: string }) {
         {stale === 'style' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Style changed')}</Badge> : null}
       </div>
       <ImagePlaceholder label={t('Prop')} aspectRatio="square" imageUrl={prop.imageUrl} generating={generating} />
-      <Textarea
-        value={instruction}
-        onChange={(e) => setInstruction(e.target.value)}
-        rows={2}
-        placeholder={t('What to change (optional)')}
-        aria-label={t('What to change (optional)')}
-        data-testid="prop-detail-instruction"
-      />
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {failure?.moderation ? (
-          <Button
-            variant="outline"
-            size="sm"
-            disabled={generating || failure.safeFailCount >= SAFE_RETRY_CAP}
-            onClick={() => redraw(true)}
-            data-testid="prop-detail-safe-retry"
-          >
-            {t('Retry with a softer prompt')}
-          </Button>
-        ) : null}
-        <Button size="sm" disabled={generating} onClick={() => redraw()} data-testid="prop-detail-redraw">
-          {generating ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
-          {t(prop.imageUrl ? 'Redraw' : 'Draw')}
-        </Button>
-      </div>
+      {demo ? null : (
+        <>
+          <Textarea
+            value={instruction}
+            onChange={(e) => setInstruction(e.target.value)}
+            rows={2}
+            placeholder={t('What to change (optional)')}
+            aria-label={t('What to change (optional)')}
+            data-testid="prop-detail-instruction"
+          />
+          <div className="flex flex-wrap items-center justify-end gap-2">
+            {failure?.moderation ? (
+              <Button
+                variant="outline"
+                size="sm"
+                disabled={generating || failure.safeFailCount >= SAFE_RETRY_CAP}
+                onClick={() => redraw(true)}
+                data-testid="prop-detail-safe-retry"
+              >
+                {t('Retry with a softer prompt')}
+              </Button>
+            ) : null}
+            <Button size="sm" disabled={generating} onClick={() => redraw()} data-testid="prop-detail-redraw">
+              {generating ? <Loader2 className="size-3.5 animate-spin" /> : <RefreshCw className="size-3.5" />}
+              {t(prop.imageUrl ? 'Redraw' : 'Draw')}
+            </Button>
+          </div>
+        </>
+      )}
       {failure ? (
         <p className="text-xs text-muted-foreground" role="status">
           {failure.moderation
@@ -98,6 +105,7 @@ function PropDetailRight({ propId }: { propId: string }) {
         <DescriptionBox
           caption={t('It is made from the description below. The style stays the same.')}
           value={prop.appearanceNative}
+          readOnly={isDemoSession()}
           changed={stale === 'edited'}
           onApply={(next) => useArtistStore.getState().updatePropAppearance(propId, next)}
           testId="prop-detail-description"
