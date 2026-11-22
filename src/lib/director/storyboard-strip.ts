@@ -196,6 +196,11 @@ export async function composeRoughReferenceGrid(
   return sharp(template).composite(await Promise.all(cells)).png().toBuffer()
 }
 
+/** 실사 지시문 마지막 줄(D5 · 2026-11-22 피드백 3): 어느 칸에도 글자 없음 + 연필 그림의 흔적(선 · 빗금 · 종이 질감 · 손글씨) 없음.
+ *  연필 러프는 구도 · 자세 · 화살표만 나르고 결과에는 남지 않는다. 한 샷 · 네 샷 지시문이 같은 줄을 쓴다. 약속: tests/director/real-handwriting.test.ts */
+const REAL_NO_TEXT_LINE =
+  '- No text, letters or numbers anywhere in the sheet. Nothing of the pencil drawing may remain: no pencil lines, hatching, sketch outlines, paper texture or handwriting in any panel.'
+
 /** 4샷 그리드 일괄 리페인트 프롬프트 — strip 문안의 grid 일반화 (#real-grid 실험 문안 그대로). */
 export function buildRealGridPrompt(
   shotCount: number,
@@ -279,7 +284,9 @@ export function buildRealGridPrompt(
     '',
     `Repaint this exact sheet as ${target}:`,
     `- The output MUST be the same single 4x3 sheet — keep the sheet layout and every panel border exactly where they are; draw only inside the panels; never add any decoration outside the sheet.`,
-    `- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles — arrows and labels redrawn boldly only in row 2.`,
+    // D5(2026-11-22 피드백 3): 예전엔 "arrows and labels redrawn boldly" — 러프 손글씨(DOLLY IN · COOL 6200K · 인물 이름)가 실사에 남았다.
+    //   가운데 행은 화살표만 얇게, 글씨는 옮기지 않는다. 글씨가 나르던 빛 · 색 뜻은 칸별 시네 줄(cineLines)이 글로 넘긴다.
+    `- Each column stays the same shot: same camera setup, framing, composition and poses as its reference column. Rows keep their START/DIRECTION/END roles. Row 2 is row 1's picture with only the direction ARROWS from reference row 2 drawn as thin, clean overlay lines — copy no words, labels or notes from the reference; its handwriting is an instruction for you, not part of the picture.`,
     // #end-fidelity(2026-08-25, 9d562ada 14샷 전수 감사): 스트립 프롬프트의 #tfix-repaint-prompt
     //   END 강화절이 그리드에는 이식돼 있지 않았다 — 실사 END 가 러프 END 를 배신한 5건(카메라
     //   반전 MCU 발명·push-in 2.3×·모션량 감쇠)이 전부 그리드 산이었다. 같은 계약을 행 단위로
@@ -305,7 +312,7 @@ export function buildRealGridPrompt(
       : []),
     ...renderGridCineBlock(cineLines),
     ...(hasStyleRef && opts.styleAvoid?.trim() ? [`- ${opts.styleAvoid.trim()}`] : []),
-    `- No text anywhere except row 2's arrow labels.`,
+    REAL_NO_TEXT_LINE,
   ].join('\n')
 }
 
@@ -484,7 +491,8 @@ export function buildRealStripPrompt(
     // #tfix-repaint-prompt 2026-08-11: A1 실측 체계 결함 2건 보강 —
     //   ④ 정지 샷(sh_02_10)에 없던 화살표가 3반복 모두 추가됨 → 원본에 없는 주석 발명 금지.
     //   ③ 2동작 샷(sh_01_09)의 END 패널이 3반복 전부 실패 → 도착 상태 전건 완료 재현 명시.
-    `- Middle panel: the exact same image as the ${p1.toLowerCase()} panel, with the SAME direction arrows and labels from reference panel 2 redrawn boldly on top as an annotation overlay, clearly visible. This is the only panel with text. Never invent arrows or labels that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.`,
+    // D5(2026-11-22): 가운데 칸은 화살표만 얇게 — 러프 손글씨는 옮기지 않는다(그리드와 같은 규칙).
+    `- Middle panel: the exact same image as the ${p1.toLowerCase()} panel, with only the SAME direction ARROWS from reference panel 2 drawn on top as thin, clean overlay lines. Copy no words, labels or notes from reference panel 2 — its handwriting is an instruction for you, not part of the picture. Never invent arrows that are not in reference panel 2 — if the rough sheet has no arrows (a static hold), the middle panel stays clean with no annotation.`,
     `- ${p3} panel: full-quality repaint of the END frame — the same shot after the motion completes, matching reference panel 3's composition exactly. Reproduce panel 3's arrived state faithfully: every element the motion changed (a drawer now open, a figure now moved or turned, an object now displaced) must be shown in its completed end state. If the shot contains two or more movements, show ALL of them completed — never repeat the ${p1.toLowerCase()} panel's state.`,
     // #end-fidelity: 그리드 쪽과 동일 — 샷 사이즈 불변(재프레이밍 금지) 명시.
     `- Every panel keeps its reference panel's exact shot size and camera distance — never push in, pull out or reframe: an extreme close-up stays an extreme close-up, a full shot stays a full shot, and each figure's size within the frame stays the same as in the reference.`,
@@ -522,7 +530,7 @@ export function buildRealStripPrompt(
           `- Cinematography — realize these lighting, focus, lens and color intents the pencil cannot show; apply them WITHOUT changing framing, composition or poses: ${cineLine.trim()}`,
         ]
       : []),
-    `- No text anywhere except the middle panel's arrow labels.`,
+    REAL_NO_TEXT_LINE,
   ]
   return lines.join('\n')
 }

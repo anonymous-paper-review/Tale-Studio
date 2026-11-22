@@ -29,6 +29,7 @@ import { appendCheckConstraints, parseCheckConstraints } from '@/lib/writer/chec
 import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
 import { moderationRejectionResponse, recordModerationPass } from '@/lib/api/moderation'
 import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
+import { realCineLine } from '@/lib/director/real-cine-line'
 import {
   loadShotReferencePlans,
   missingSheetsMessage,
@@ -198,6 +199,8 @@ export async function POST(req: Request) {
       roughFrames?.start && roughFrames.direction && roughFrames.end
         ? { start: roughFrames.start, direction: roughFrames.direction, end: roughFrames.end }
         : null
+    // D5(2026-11-22): 러프 가운데 장 글씨를 옮기지 않으니, 그 글씨가 나르던 빛 · 색 · 렌즈 · 초점을 샷 설계에서 글로 싣는다(스트립 길만).
+    const cineLine = stripFrames ? realCineLine((shot as { static_spec?: unknown } | null)?.static_spec) : null
     // #ref-gate(2026-09-02 오너 결정): writer 샷인데 러프 3프레임이 없으면 단일 이미지로 조용히 강등하지
     //   않고 409 code 로 막는다 — 클라가 러프 완성을 기다렸다가 자동 재개한다. shots 행이 없는 캔버스 전용
     //   샷만 종전 단일 경로.
@@ -291,6 +294,7 @@ export async function POST(req: Request) {
           anchorKeepsGrade: anchor?.anchorKind === 'sublook',
           styleRefCount: anchor?.usePreviewRef && anchor.previewUrl ? 2 : 1,
           frameAxis: composed.geometry.frameAxis,
+          cineLine,
         }),
         // #real-strip-guard(2026-08-06)→#fal-canvas→#sheet-formats(2026-08-17): 캔버스는 합성이
         //   고른 지오메트리를 따른다 — 레퍼런스·캔버스·프롬프트 축·크롭이 한 시트 계약으로 정합.
@@ -361,6 +365,7 @@ export async function POST(req: Request) {
           ...parseCheckConstraints((shot as { check_notes?: unknown } | null)?.check_notes),
           continuityPrevText,
           ...(characterRefLabels ?? []).flatMap((r) => [r.name, r.pose]),
+          cineLine,
         ],
         { projectId, kind: 'shot_storyboard', userId: access.userId },
       )
