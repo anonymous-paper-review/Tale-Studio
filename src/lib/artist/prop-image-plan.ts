@@ -1,7 +1,7 @@
 // 소품 그림 제출 계획(서버) — 지시문에 작품 그림체를 붙이고 모델 갈래를 고른다. DB · 외부 호출 없이 순수하다.
 //   그림체 기준 그림이 있으면 참고 그림으로 붙이되 인물 조각(Figure rules · Priority)은 싣지 않는다 — 소품에는 사람이 없다(사물 시트 규칙과 같다).
 //   기준 그림 없이 그리는 그림체(실사, 2026-10-13 오너)는 배경과 같이 글자 금지 줄을 붙이고 크기로 비율을 정한다
-//   (글씨 스위치를 켜면 — 설명에 적힌 글씨만 남김 — 글자 금지 줄은 붙이지 않는다. 덧붙인 글씨 금지는 지시문 안에 있다).
+//   (글씨 스위치가 켜져 있으면 — 오너 P1 기본, 설명에 적힌 글씨만 남김 — 글자 금지 줄은 붙이지 않는다. 덧붙인 글씨 금지는 지시문 안에 있다).
 //   약속: tests/artist/prop-image.test.ts
 import { buildPropImagePrompt, PROP_TEXT_RULE, type PropTextRule } from '@/lib/artist/prop-image'
 import { imageSizeForAspect } from '@/lib/fal/aspect-size'
