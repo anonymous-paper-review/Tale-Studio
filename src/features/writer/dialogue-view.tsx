@@ -11,6 +11,7 @@
 //   샷마다 붙은 연필 단추가 여는 샷 고치기 팝업에서 한다(팝업은 러프 보드가 그린다 — 연 샷 id 만 board-ui-store 로 넘긴다).
 //   샷 번호는 보드 카드와 같은 전체 번호(boardShots)다.
 //   v3(2026-11-03 오너 "v3로 적용"): 화면 머리 · 알약 탭은 러프 보드와 같고, 인물 칩은 32px 알약, 씬마다 큰 내용 판(panel). 동작은 그대로.
+//   D15(오너 2026-11-22): 원본 그대로(대본 보존) 프로젝트는 [대사 생성 · 다시 생성]을 두지 않는다(서버도 막는다) — 대사 줄 손으로 고치기는 그대로.
 //   D9(오너 2026-11-22): 샷 줄(스토리 · 대사 줄)을 ⌘/Ctrl+클릭하면 고치기 대신 채팅에 "@샷 N", 씬 이름은 "@씬 N"(lib/writer/conti-mention, 보드 카드와 같은 이름).
 
 import { useEffect, useMemo, useRef, useState } from 'react'
@@ -72,7 +73,9 @@ interface LineSave extends LineDraft {
   saved: string
 }
 
-export function DialogueView() {
+/** preserved = 원본 그대로(대본 보존) 프로젝트 — 워크스페이스가 프로듀서 스토어로 판별해 넘긴다(lib/writer/preserved-run scriptKeptAsWritten).
+ *  이 화면은 프로듀서 스토어를 직접 부르지 않는다(사전을 일부만 흉내 내는 시험 화면이 깨지지 않게). */
+export function DialogueView({ preserved = false }: { preserved?: boolean } = {}) {
   const t = useT()
   // 씬 · 샷 이름은 화면 언어(오너 2026-11-14 답 7).
   const locale = useLocaleStore((s) => s.locale)
@@ -312,6 +315,8 @@ export function DialogueView() {
           <span className="text-caption text-subtle-foreground">{t('No dialogue yet')}</span>
         )}
 
+        {/* 원본 그대로면 AI 가 대사를 새로 쓰는 단추를 두지 않는다(D15) — 대사 줄은 아래에서 그대로 고친다. */}
+        {preserved ? null : (
         <div className="ml-auto flex items-center gap-2">
           {confirming && !generating && (
             <span className="text-caption text-subtle-foreground">
@@ -342,6 +347,7 @@ export function DialogueView() {
                 : t('Generate dialogue')}
           </Button>
         </div>
+        )}
       </div>
       {error && (
         <p className="mx-7 mt-2 rounded-lg bg-destructive/10 px-3 py-1.5 text-caption text-destructive">{error}</p>
@@ -479,7 +485,7 @@ export function DialogueView() {
             <div className="flex flex-col items-center gap-2 py-10 text-center">
               <MessageSquareText className="size-6 text-subtle-foreground" />
               <p className="text-caption text-muted-foreground">
-                {(() => {
+                {preserved ? t('This project uses the script as written, so dialogue is not written anew. Add a line with the pencil button on each shot.') : (() => {
                   const [l1, l2] = t(
                     'No shot dialogue yet. Press "Generate dialogue" above to design character voices{br}and write shot-by-shot dialogue that follows the scene.',
                   ).split('{br}')

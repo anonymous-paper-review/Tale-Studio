@@ -3735,4 +3735,7 @@ export const KO: Record<string, string> = {
 
   // ── Writer 콘티(D1 오너 2026-11-22, fb1120 fb-conti) — 위 막대 [씬 스토리 | 콘티] ──
   'Opens when you press Complete in Artist': 'Artist에서 완료하기를 누르면 열려요',
+  // D15 — 원본 그대로 프로젝트의 콘티 대사 탭(대사를 AI 로 새로 쓰지 않음)
+  'This project uses the script as written, so dialogue is not written anew. Add a line with the pencil button on each shot.':
+    '원본 대본 그대로 만드는 프로젝트라 대사를 새로 쓰지 않아요. 샷마다 연필 단추로 대사를 더할 수 있어요.',
 }
