@@ -4,7 +4,8 @@
 //   - 고른 씬의 샷 · Take · 그 샷에 이은 프롬프트를 그린다. 씬 밖 카드(Director 에서 만든 이미지 노드 · 샷 없는 영상 · 안 이은 프롬프트)는 어느 씬에서나.
 //   - 인물 · 배경 열은 그 씬 샷이 쓰는 것만, 그 씬 샷 열 왼쪽에 그릴 때만 놓는다(에셋 카드는 끌 수 없고 자리를 DB 에 저장하지 않는다).
 //   - 다른 씬 카드와 이어진 선은 그리지 않고 꼬리표(links)로 남긴다.
-//   약속: tests/director/scene-view.test.ts
+//   - 영상의 옛 끝(END) 칸 선은 그리지 않는다 — 구멍이 없다(오너 2026-11-22 밤). 저장된 배선은 스토어에 그대로.
+//   약속: tests/director/scene-view.test.ts · tests/director/end-frame-retired.test.ts
 import type { Viewport, XYPosition } from '@xyflow/react'
 import type { SceneButtonItem } from '@/components/scene-buttons'
 import { countText } from '@/lib/i18n/count-text'
@@ -142,6 +143,8 @@ export function sceneCanvas(
   const visibleEdges: DirectorEdge[] = []
   const links: CrossSceneLink[] = []
   for (const e of edges) {
+    // 옛 끝(END) 칸 선 — 닿을 구멍이 없어 그리면 React Flow 가 "구멍 없음" 경고를 찍는다(혼자 정한 것 h1). 꼬리표도 달지 않는다.
+    if (e.data?.category === 'frame' && e.targetHandle === 'frame-end') continue
     const sourceShown = shownIds.has(e.source)
     const targetShown = shownIds.has(e.target)
     if (sourceShown && targetShown) {

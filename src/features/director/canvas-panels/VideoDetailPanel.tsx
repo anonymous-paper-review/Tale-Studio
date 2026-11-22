@@ -19,7 +19,9 @@ import {
   isShotData,
   type VideoNodeData,
 } from '@/types/director'
-import { FAL_VIDEO_MODEL_ORDER, VIDEO_MODELS, normalizeProvider } from '@/lib/video-models'
+import { normalizeProvider, VIDEO_MODEL_ASPECT_TEXT } from '@/lib/video-models'
+import { videoModelButtons } from '@/features/director/video-model-buttons'
+import { modelBlockedByAspect, projectVideoAspect } from '@/features/director/video-aspect'
 import { VideoResolutionButtons, VideoTakeCost } from '@/features/director/video-resolution-buttons'
 import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { useT } from '@/lib/i18n'
@@ -139,6 +141,9 @@ export function VideoDetailPanel({
     : null
   const motherPrompt = mother ? effectivePrompt(mother) : null
   const videoModel = normalizeProvider(effective.provider)
+  // 정사각 프로젝트에서 Veo 로 고른 영상은 만들 수 없다(오너 2026-11-22 V3) — 노드의 [영상 리테이크]와 같은 막이(혼자 정한 것 5c).
+  //   까닭은 모델 단추 아래 줄이 말한다. 고른 값은 사람이 바꾼다(저절로 안 바꿈).
+  const modelBlocked = modelBlockedByAspect(effective.provider, projectFormat)
 
   const commitLabel = () => {
     setLabelDraft({ nodeId, value: label, dirty: false })
@@ -394,36 +399,22 @@ export function VideoDetailPanel({
       </PanelSection>
 
       {/* #ui-cleanup 2026-08-31: 카메라/조명 UI 제거 — 영상 노드엔 fal 영상 모델만. */}
+      {/* 프로젝트 화면비에 맞지 않는 모델(정사각 프로젝트의 Veo)은 꺼지고 까닭 한 줄(오너 2026-11-22 V3). */}
       <PanelSection title={t('Video generation model')}>
-        <div className="grid grid-cols-2 gap-2">
-          {FAL_VIDEO_MODEL_ORDER.map((p) => {
-            const spec = VIDEO_MODELS[p]
-            return (
-              <button
-                type="button"
-                key={p}
-                onClick={() => {
-                  if (isStandalone) {
-                    updateNodeData<'video'>(nodeId, {
-                      override: { ...effective, provider: p },
-                    })
-                  } else {
-                    applyVideoOverride(nodeId, { provider: p })
-                  }
-                }}
-                className={cn(
-                  'rounded-md border px-3 py-1.5 text-left text-xs transition-colors',
-                  effective.provider === p
-                    ? 'border-primary bg-primary/10'
-                    : 'border-border hover:bg-accent',
-                )}
-                aria-pressed={effective.provider === p}
-              >
-                <span className="block font-medium">{spec.label}</span>
-              </button>
-            )
-          })}
-        </div>
+        {videoModelButtons({
+          value: effective.provider,
+          aspectRatio: projectVideoAspect(projectFormat),
+          onSelect: (p) => {
+            if (isStandalone) {
+              updateNodeData<'video'>(nodeId, {
+                override: { ...effective, provider: p },
+              })
+            } else {
+              applyVideoOverride(nodeId, { provider: p })
+            }
+          },
+          t,
+        })}
       </PanelSection>
 
       {/* 해상도(오너 2026-10-31): 모델 단추 바로 아래 — 영상 팝업과 같은 단추. 독립 영상은 설정 전체를 그 영상이
@@ -442,7 +433,8 @@ export function VideoDetailPanel({
         <Button
           size="sm"
           onClick={() => void handleRegenerate()}
-          disabled={isGenerating || standalonePromptMissing || checkingIds.has(nodeId)}
+          disabled={isGenerating || standalonePromptMissing || modelBlocked || checkingIds.has(nodeId)}
+          title={modelBlocked ? t(VIDEO_MODEL_ASPECT_TEXT) : undefined}
           className="gap-1.5"
         >
           {isGenerating ? (

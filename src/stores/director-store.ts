@@ -86,7 +86,7 @@ import {
   type GenerationJobObserver,
   type GenerationJobReceipt,
 } from '@/lib/generation-jobs-client'
-import { notifyGenerationComplete, notifyGenerationFailure, notifyStoppedResultKept } from '@/lib/generation-notify'
+import { notifyGenerationComplete, notifyGenerationFailure, notifyRefusedChange, notifyStoppedResultKept } from '@/lib/generation-notify'
 import { claimAction, releaseAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -105,6 +105,7 @@ import {
 } from '@/features/director/canvas-layout'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { ASSET_CARD_WIDTH } from '@/features/director/asset-column'
+import { modelBlockedByAspect } from '@/features/director/video-aspect'
 import type { ShotStatusFilter } from '@/lib/director/shot-state'
 import {
   DEFAULT_VIDEO_MODEL,
@@ -112,6 +113,7 @@ import {
   isVideoModelKey,
   isVideoResolution,
   normalizeProvider,
+  VIDEO_MODEL_ASPECT_TEXT,
   type VideoResolution,
 } from '@/lib/video-models'
 import {
@@ -1328,7 +1330,7 @@ interface DirectorCanvasState {
     shotNodeId: string,
     targetHandle: DirectorImageTargetHandle,
   ) => void
-  /** 이미지 소스를 Video START/END/REF 입력에 수동 와이어링한다. */
+  /** 이미지 소스를 Video START/REF 입력에 수동 와이어링한다. 끝(END) 칸은 없앴다 — 'frame-end' 는 받지 않는다(오너 2026-11-22 밤). */
   wireFrameToVideo: (
     sourceNodeId: string,
     videoNodeId: string,
@@ -2695,11 +2697,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       wireFrameToVideo: (sourceNodeId, videoNodeId, targetHandle) => {
         if (isDemoSession()) return
-        if (
-          targetHandle !== 'frame-start' &&
-          targetHandle !== 'frame-end' &&
-          targetHandle !== 'frame-ref'
-        ) {
+        // 끝(END) 칸으로는 새로 잇지 않는다(오너 2026-11-22 밤 "Start, End 프레임 생성 방식은 일단 폐기") — 손 · 채팅 모두 여기를 지난다.
+        //   이미 저장된 끝 배선(frameInputs.end)은 지우지 않는다 — 서버가 쓰지 않는다(fb-video H1). 약속: tests/director/end-frame-retired.test.ts
+        if (targetHandle !== 'frame-start' && targetHandle !== 'frame-ref') {
           return
         }
         const state = get()
@@ -2723,11 +2723,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             edge.target === videoNodeId &&
             edge.targetHandle === targetHandle,
         )
-        const slot = targetHandle === 'frame-start'
-          ? 'start'
-          : targetHandle === 'frame-end'
-            ? 'end'
-            : 'refs'
+        const slot = targetHandle === 'frame-start' ? 'start' : 'refs'
         const alreadyWired =
           existingEdge &&
           (slot === 'refs'
@@ -2746,7 +2742,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           const nextInputs: VideoNodeData['frameInputs'] = {
             ...frameInputs,
             ...(slot === 'start' ? { start: sourceNodeId } : {}),
-            ...(slot === 'end' ? { end: sourceNodeId } : {}),
             ...(slot === 'refs' && !frameInputs.refs.includes(sourceNodeId)
               ? { refs: [...frameInputs.refs, sourceNodeId] }
               : {}),
@@ -5456,6 +5451,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const resolveId = (id: string): string => tempIdMap.get(id) ?? id
         const result: DirectorCanvasUpdateResult = { applied: 0, skipped: [], resolvedIds: {} }
         const api = get()
+        // 이번 답에서 프로젝트 화면비로 못 만드는 모델 바꿈을 받지 않았는가 — 까닭 줄은 끝에서 한 번(q2).
+        let modelRefused = false
 
         const findNodeOrSkip = (id: string, u: DirectorCanvasUpdate): boolean => {
           if (!get().nodes.find((n) => n.id === id)) {
@@ -5529,11 +5526,21 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   result.skipped.push({ update: u, reason: 'not a Shot' })
                   break
                 }
-                const { prompt, ...shotPatch } = u.patch
-                api.updateNodeData<'shot'>(id, {
+                const { prompt, provider, ...shotPatch } = u.patch
+                // 프로젝트 화면비로 못 만드는 모델(정사각 프로젝트의 Veo)은 받지 않는다 — 받아 두면 다음 영상이 Take 전에 거절된다(리드 11/23 q2).
+                //   다른 바꿈(이름 · 프롬프트)은 그대로 받는다. 까닭은 채팅에 한 줄 — 아래 끝에서 한 번만.
+                const providerRefused = provider !== undefined && modelBlockedByAspect(provider, useProjectFormatStore.getState().format)
+                if (providerRefused) {
+                  result.skipped.push({ update: u, reason: 'model_aspect_unsupported' })
+                  modelRefused = true
+                }
+                const acceptedPatch = {
                   ...shotPatch,
+                  ...(provider !== undefined && !providerRefused ? { provider } : {}),
                   ...(prompt !== undefined ? { promptOverride: prompt } : {}),
-                })
+                }
+                if (Object.keys(acceptedPatch).length === 0) break
+                api.updateNodeData<'shot'>(id, acceptedPatch)
                 result.applied += 1
                 break
               }
@@ -5548,7 +5555,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   break
                 }
                 if (u.tempId) tempIdMap.set(u.tempId, newId)
-                if (u.override) api.applyVideoOverride(newId, u.override)
+                if (u.override) {
+                  // 새 Take 의 모델 바꿈도 같은 막이(q2) — Take 는 더하고 모델은 마더 샷 것 그대로.
+                  const { provider, ...overrideRest } = u.override
+                  const providerRefused = provider !== undefined && modelBlockedByAspect(provider, useProjectFormatStore.getState().format)
+                  if (providerRefused) {
+                    result.skipped.push({ update: u, reason: 'model_aspect_unsupported' })
+                    modelRefused = true
+                  }
+                  const acceptedOverride = providerRefused ? overrideRest : u.override
+                  if (Object.keys(acceptedOverride).length > 0) api.applyVideoOverride(newId, acceptedOverride)
+                }
                 result.applied += 1
                 break
               }
@@ -5711,11 +5728,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               case 'connectFrame': {
                 const s = resolveId(u.sourceId)
                 const t = resolveId(u.targetId)
-                if (
-                  u.targetHandle !== 'frame-start' &&
-                  u.targetHandle !== 'frame-end' &&
-                  u.targetHandle !== 'frame-ref'
-                ) {
+                // 끝(END) 칸은 없앴다(오너 2026-11-22 밤) — 서버도 거르지만 옛 답 · 잘못된 답이 끝 칸을 살리지 않게 여기서도 거른다(h5).
+                if (u.targetHandle !== 'frame-start' && u.targetHandle !== 'frame-ref') {
                   result.skipped.push({
                     update: u,
                     reason: 'invalid frame target handle',
@@ -5753,9 +5767,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   wiredInputs !== null &&
                   (u.targetHandle === 'frame-start'
                     ? wiredInputs.start === s
-                    : u.targetHandle === 'frame-end'
-                      ? wiredInputs.end === s
-                      : wiredInputs.refs.includes(s))
+                    : wiredInputs.refs.includes(s))
                 const edgeMatches = get().edges.some(
                   (edge) =>
                     edge.data?.category === 'frame' &&
@@ -5918,6 +5930,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           }
         }
         result.resolvedIds = Object.fromEntries(tempIdMap)
+        // 받지 않은 모델 바꿈의 까닭 한 줄(리드 11/23 q2) — 채팅에 남는 줄이라 채팅 언어. ⚠ 는 상태 행 표지(번역 밖).
+        //   영상 알림은 Cinema 로 낸다 — 채팅이 받는 곳이 보고 있는 Director 면 Director 구간에 둔다(오너 D2~D5).
+        if (modelRefused) notifyRefusedChange('camera', `⚠ ${translate(contentLocale(), VIDEO_MODEL_ASPECT_TEXT)}`)
         return result
       },
 
@@ -6163,8 +6178,8 @@ export function serializeDirectorCanvasContext(
           const ovKeys = Object.keys(vData.override).join(',') || '-'
           const frameInputs = normalizeFrameInputs(vData.frameInputs)
           const frameSlots = [
+            // 끝(END) 입력은 싣지 않는다 — 영상은 끝 그림을 쓰지 않는다(오너 2026-11-22 밤, 혼자 정한 것 h4). 저장된 값은 그대로 둔다.
             frameInputs.start ? `START=${frameInputs.start}` : null,
-            frameInputs.end ? `END=${frameInputs.end}` : null,
             frameInputs.refs.length > 0
               ? `REF=${frameInputs.refs.join(',')}`
               : null,

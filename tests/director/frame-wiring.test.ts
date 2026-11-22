@@ -1,4 +1,4 @@
-// 영상에 연결한 시작·끝 장면과 참고 이미지를 다시 불러와도 그대로 유지한다
+// 영상에 연결한 시작 장면과 참고 이미지를 다시 불러와도 그대로 유지한다 (끝 장면 칸은 2026-11-22 밤 오너 "Start, End 프레임 생성 방식은 일단 폐기"로 없앴다)
 import { beforeEach, describe, expect, it } from 'vitest'
 import {
   isShotImageData,
@@ -23,7 +23,8 @@ function seedVideo() {
 }
 
 describe('Director 영상의 장면 연결', () => {
-  it('START와 END에는 각각 한 장면을 연결하고 같은 장면도 둘 다 쓸 수 있다', () => {
+  // 2026-11-23 오너 결정(11/22 밤 "시작+끝 방식 폐기")으로 바꾼 문장 — 예전: 「START와 END에는 각각 한 장면을 연결하고 같은 장면도 둘 다 쓸 수 있다」.
+  it('START 에는 한 장면을 연결하고, 끝 칸으로는 새로 잇지 않는다', () => {
     const { sourceShotId, videoId } = seedVideo()
 
     api().wireFrameToVideo(sourceShotId, videoId, 'frame-start')
@@ -32,17 +33,18 @@ describe('Director 영상의 장면 연결', () => {
     const video = api().nodes.find((node) => node.id === videoId)
     expect(video && isVideoData(video.data) ? video.data.frameInputs : null).toEqual({
       start: sourceShotId,
-      end: sourceShotId,
+      end: null,
       refs: [],
     })
     expect(
       api().edges.filter(
         (edge) => edge.data?.category === 'frame' && edge.target === videoId,
       ),
-    ).toHaveLength(2)
+    ).toHaveLength(1)
   })
 
-  it('START와 END를 다시 연결하면 이전 장면을 바꾸고 REF에는 여러 장면을 중복 없이 남긴다', () => {
+  // 2026-11-23 오너 결정으로 이름만 바꿈(끝 칸이 없다) — 예전: 「START와 END를 다시 연결하면 이전 장면을 바꾸고 REF에는 여러 장면을 중복 없이 남긴다」.
+  it('START를 다시 연결하면 이전 장면을 바꾸고 REF에는 여러 장면을 중복 없이 남긴다', () => {
     const { sourceShotId, targetShotId, videoId } = seedVideo()
     const secondSourceId = api().addShotNode(
       api().nodes.find((node) => node.id === targetShotId)?.data.kind === 'shot'
