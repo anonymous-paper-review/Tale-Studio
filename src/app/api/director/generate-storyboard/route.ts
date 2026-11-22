@@ -45,6 +45,7 @@ import { isChatTraceId } from '@/lib/chat-trace'
 import { isImageModelKey, normalizeImageModelKey, resolveImageEndpoint, resolveSheetImageModel } from '@/lib/image-models'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 import { existingStoryboardJobId } from '@/lib/director/storyboard-active-job'
+import { readImageNote } from '@/lib/director/image-note'
 import { loadSeriesFirstShotContinuity, seriesContinuityPromptLine } from '@/lib/series/continuity'
 
 export const runtime = 'nodejs'
@@ -54,7 +55,7 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId, imageModel, characterRefCount: bodyCharCount, worldRefCount: bodyWorldCount } =
+    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId, imageModel, characterRefCount: bodyCharCount, worldRefCount: bodyWorldCount, note, via } =
       (await req.json()) as {
         projectId?: string
         writerShotId?: string
@@ -65,6 +66,9 @@ export async function POST(req: Request) {
         imageModel?: string
         characterRefCount?: number
         worldRefCount?: number
+        /** 사람 말(바꿀 점 · 채팅 부탁) — 검사는 readImageNote. */
+        note?: unknown
+        via?: unknown
       }
     // #image-model-select: 화이트리스트 밖 모델명은 400 — 임의 fal 경로 주입 방지.
     //   실제 엔드포인트는 reference 유무가 정해지는 submit 시점에 고른다(#registry-merge).
@@ -72,6 +76,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unknown imageModel' }, { status: 400 })
     }
     const requestedModelKey = imageModel !== undefined ? normalizeImageModelKey(imageModel) : null
+    // 사람 말(바꿀 점 · 채팅 부탁, 오너 2026-11-22 결정 4) — 잘못 왔으면 남기지 않고 그림은 그대로 만든다. 완료가 그림 판에 옮긴다.
+    const imageNote = readImageNote(note, via)
 
     if (!projectId || !writerShotId || !prompt) {
       return NextResponse.json(
@@ -391,6 +397,7 @@ export async function POST(req: Request) {
           writerShotId,
           ...(stripFrames ? { gridVariant: 'strip1' as const } : {}),
           ...(typeof roughGeneratedAt === 'number' ? { roughGeneratedAt } : {}),
+          ...(imageNote ? { imageNote } : {}),
         },
       })
     } catch (err) {

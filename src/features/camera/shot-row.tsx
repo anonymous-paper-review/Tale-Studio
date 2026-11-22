@@ -61,10 +61,30 @@ export function CameraShotRow({ node, label, state }: { node: DirectorNode; labe
   const mentionLabel = cameraMentionLabel({ kind: 'shot', label }, locale)
 
   // 처음 열 때와 판이 늘 때 맨 오른쪽(새 판)이 보이게 — 사람이 옆으로 넘겨 둔 자리는 판 수가 그대로면 건드리지 않는다.
+  //   맨 오른쪽에 붙어 있던 줄은 창 폭이 바뀌어도(넓게 열고 좁힘) 맨 오른쪽을 지킨다 — 새 판이 오른쪽으로 숨지 않게.
   const stripRef = useRef<HTMLOListElement>(null)
+  const pinnedRef = useRef(true)
   useEffect(() => {
     const strip = stripRef.current
-    if (strip) strip.scrollLeft = strip.scrollWidth
+    if (!strip) return
+    const onScroll = () => {
+      pinnedRef.current = strip.scrollLeft >= strip.scrollWidth - strip.clientWidth - 4
+    }
+    const observer = new ResizeObserver(() => {
+      if (pinnedRef.current) strip.scrollLeft = strip.scrollWidth
+    })
+    strip.addEventListener('scroll', onScroll, { passive: true })
+    observer.observe(strip)
+    return () => {
+      strip.removeEventListener('scroll', onScroll)
+      observer.disconnect()
+    }
+  }, [])
+  useEffect(() => {
+    const strip = stripRef.current
+    if (!strip) return
+    strip.scrollLeft = strip.scrollWidth
+    pinnedRef.current = true
   }, [entries.length])
 
   if (!data) return null

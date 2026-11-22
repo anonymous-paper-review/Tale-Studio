@@ -104,6 +104,10 @@ export type StoryboardImageVersion = {
   roughGeneratedAt?: number | null
   /** 화면에서 멈춘 작업이 뒤늦게 끝난 그림 — 기록에만 있고 저절로 지금 그림이 되지 않는다(오너 7번). */
   cancelled?: true
+  /** 이 판을 부탁한 사람 말(오너 2026-11-22 결정 4) — [이미지 고치기]의 바꿀 점 · 채팅에 부탁한 말. 없으면 칸이 없다. lib/director/image-note */
+  note?: string
+  /** 그 말을 한 곳 — 'button' = 바꿀 점 칸, 'chat' = 채팅(Lumi). note 와 같이만 있다. */
+  via?: 'button' | 'chat'
 }
 
 // ─── Scene Node ────────────────────────────────────────────────────────────
