@@ -5,6 +5,7 @@
 //   Producer 사물은 늘 함께 간다 — 합쳐 많아야 5개(KEY_PROP_LIMIT), 자리가 없으면 모델을 부르지 않는다.
 //   사람 · Producer 사물 · 배경과 같은 것, 장면에 안 나오는 것은 버린다. 실패(모델 오류 · 꼴이 틀린 답)는 [만들기]를 멈추지 않는다 — 소품 없이 간다.
 //   모델: 디자인과 같은 V축. 이름 · 생김새는 작품 언어로 쓰고, 그림용 영어 생김새는 저장(persist_manifest)이 인물과 같이 옮긴다.
+//   뜻을 나르는 글씨(간판 · 책 제목 · 편지)는 생김새에 따옴표로 적게 한다 — 소품 그림은 설명에 적힌 글씨만 그린다(오너 P1, prop-image.ts).
 //   약속: tests/artist/key-props.test.ts
 import { z } from 'zod'
 import { generateJson, type LlmAxisConfig } from '@/lib/writer/llm/dispatch'
@@ -146,7 +147,8 @@ export function buildKeyPropsPrompt(input: {
 - 사람 · 동물 · 장소(배경) · 건물 · 날씨 · 몸에 입은 옷 전체는 고르지 않는다. "이미 있는 사물"과 같은 물건도 다시 고르지 않는다.
 - 많아야 ${input.room}개, 중요한 순서로. 이야기에 그만한 물건이 없으면 적게 고르고, 하나도 없으면 빈 목록을 낸다. 채우려고 지어내지 않는다.
 - id: 영어 소문자 snake_case(아래 목록의 id 와 겹치지 않게). name · appearance: ${language}.
-- appearance: 재질 · 색 · 크기 · 낡음처럼 눈에 보이는 생김새만 한두 문장.
+- appearance: 재질 · 색 · 크기 · 낡음처럼 눈에 보이는 생김새만 한두 문장. 간판 · 책 제목 · 편지처럼 물건에 적힌 글씨가 이야기에서 뜻을 나르는 글씨이면
+  그 글씨를 따옴표로 그대로 적는다. 이야기에 없는 글씨는 지어내지 않는다.
 - scenes: 그 물건이 화면에 나오는 장면의 scene_id — 아래 장면 목록에 있는 것만.`
   const scenes = input.scenes.scenes.map((scene) => ({
     scene_id: scene.scene_id,

@@ -42,7 +42,7 @@ vi.mock('@/lib/writer/run-store', () => ({ getActiveRun: vi.fn(), saveRunState: 
 vi.mock('@/lib/writer/llm/raw_collector', () => ({ getPendingRawCalls: vi.fn(() => []) }))
 vi.mock('@/lib/artist/draft-trigger', () => ({ triggerAssetDrafts: mocks.triggerAssetDrafts }))
 
-import { KEY_PROP_LIMIT, keyPropRoom, mergeKeyProps, pickKeyProps } from '@/lib/writer/pipeline/stages/key_props'
+import { buildKeyPropsPrompt, KEY_PROP_LIMIT, keyPropRoom, mergeKeyProps, pickKeyProps } from '@/lib/writer/pipeline/stages/key_props'
 import { WRITER_STEPS } from '@/lib/writer/pipeline/steps'
 import type { Characters, Scenes, StoryCharacter, StoryScene } from '@/lib/writer/types/pipeline'
 
@@ -225,6 +225,16 @@ describe('[만들기] 때 중요한 소품 고르기', () => {
     expect(patch.characters?.characters.map((c) => c.id)).toContain('old_letter')
     expect(patch.scenes?.scenes.find((s) => s.scene_id === 'sc_02')?.characters_in_scene).toContain('old_letter')
     expect(patch.keyProps).toEqual({ added: [{ id: 'old_letter', name: '누런 편지', scenes: ['sc_02'] }], dropped: [] })
+  })
+
+  // 왜: 혼자 정한 것(쉬움, 리드 승인 2026-11-22) — 오너 P1(b) 로 소품 그림은 설명에 적힌 글씨만 그린다. AI 가 고른 소품의 생김새에 글씨가 없으면
+  //   간판 · 책 표지 · 편지도 글씨 없이 그려진다. 그래서 이야기에서 뜻을 나르는 글씨는 따옴표로 그대로 적게 하고, 이야기에 없는 글씨는 지어내지 않게 한다.
+  it('AI 가 소품을 고를 때 이야기에서 뜻을 나르는 글씨(간판 · 책 제목 · 편지)는 생김새에 따옴표로 그대로 적고, 없는 글씨는 지어내지 않게 한다', () => {
+    const { systemInstruction } = buildKeyPropsPrompt({ characters: CHARACTERS, scenes: SCENES, locations: LOCATIONS, story: '수아는 \'하동역\' 간판 아래에서 편지를 읽는다.', locale: 'ko', room: 4 })
+    expect(systemInstruction).toMatch(/뜻을 나르는 글씨/)
+    expect(systemInstruction).toMatch(/간판 · 책 제목 · 편지/)
+    expect(systemInstruction).toMatch(/따옴표로 그대로 적/)
+    expect(systemInstruction).toMatch(/이야기에 없는 글씨는 지어내지 않는다/)
   })
 
   // 왜: 혼자 정한 것 — 장면이 없으면 고를 근거도 이을 곳도 없다. 모델을 부르지 않고 실행 상태도 바꾸지 않는다.
