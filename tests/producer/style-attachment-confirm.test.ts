@@ -1,4 +1,4 @@
-// 채팅 모델이 첨부 그림을 그림체로 쓰자고 하면 바로 정하지 않고 묻고, 고르면 새 프로젝트 · 채팅과 같은 길로 고정 · 분석한다 (오너 결정 2026-10-10)
+// 채팅 모델이 첨부 그림을 그림체로 쓰자고 해도 앱은 묻지도 정하지도 않고, 그림은 참고 자료로만 쓴다 (오너 결정 2026-10-10 → 그림체 추출은 D6 2026-11-22 로 없앰)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
@@ -51,69 +51,57 @@ afterEach(() => {
 })
 
 describe('채팅 모델이 첨부 그림을 그림체로 쓰자고 할 때', () => {
-  it('채팅 모델이 첨부 그림을 그림체로 쓰자고 하면 바로 정하지 않고, 분석 모델로 보내고 고정된다는 안내와 함께 그림체로 쓸지 묻는다', async () => {
-    // 왜: 10/10 운영 806e2cc2 — 모델이 정한 그림체는 고정도 분석도 없이 들어갔다. 그림체는 사용자가 골라야 고정된다(10/9 오너).
+  it('채팅 모델이 첨부 그림을 그림체로 쓰자고 해도 그림체로 쓸지 묻지 않고, 그림을 분석 모델로도 보내지 않는다', async () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 그림체는 그림을 만들 때 Artist 에서 네 가지 중 고른다.
     stub()
     await proposeStyle()
     expect(calls('/api/produce/anchor-medium')).toHaveLength(0)
     expect(calls('/api/produce/style-anchor')).toHaveLength(0)
-    const s = chat.getState().suggestion
-    expect(s?.id.startsWith('style-attachment:')).toBe(true)
-    expect(s?.content).toMatch(/분석 모델/)
-    expect(s?.content).toMatch(/고정/)
-    expect(s?.action?.kind === 'choices' ? s.action.options.map((o) => o.label) : []).toEqual(['그림체로 쓰기', '참고 자료로 두기'])
-  })
-
-  it('그림체로 쓰기를 고르면 새 프로젝트 · 채팅과 같은 길로 매체를 고르고 고정한 뒤 분석한다', async () => {
-    // 왜: 10/10 오너 "프로젝트 생성 시 입력하는 플로우랑 채팅으로 나중에 입력하는 플로우 모두 똑같은 기능으로".
-    stub()
-    await proposeStyle()
-    await chat.getState().sendMessage(ko('Use it as the art style'))
-    await vi.waitFor(() => expect(calls('/api/produce/style-facets')).toHaveLength(1))
-    expect(calls('/api/produce/anchor-medium')[0]).toMatchObject({ imageUrl: LOOK.thumbUrl, consent: 'chat-style-confirm-v1' })
-    expect(calls('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: LOOK.thumbUrl, lock: true })
-    expect(calls('/api/produce/style-facets')[0]).toMatchObject({ consent: 'chat-style-confirm-v1' })
-    expect(producer.getState().customStyleAnchor?.locked).toBe(true)
+    expect(chat.getState().suggestion?.id ?? '').not.toMatch(/^style-attachment:/)
     expect(chat.getState().styleAttachmentGate).toBeNull()
   })
 
-  it('모델이 고른 그림이 여러 조각으로 잘린 그림의 한 조각이면 그 그림의 원본을 그림체로 쓴다', async () => {
-    // 왜: 긴 그림은 조각으로 잘려 모델에 간다. 조각 하나를 그림체로 삼으면 그림의 일부만 그림체가 된다(806e2cc2 의 앵커가 s000 조각이었다).
+  it('채팅 모델의 첨부 그림체 제안 뒤에 "그림체로 써 주세요"라고 해도 그림체로 정하지 않는다', async () => {
+    // 왜: 그림에서 그림체를 정하는 길이 없어졌다(D6) — 묻던 질문의 칩 말을 쳐도 그림체가 정해지면 안 된다.
+    stub()
+    await proposeStyle()
+    await chat.getState().sendMessage(ko('Use it as the art style'))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(calls('/api/produce/style-anchor')).toHaveLength(0)
+    expect(calls('/api/produce/style-facets')).toHaveLength(0)
+    expect(producer.getState().customStyleAnchor).toBeNull()
+  })
+
+  it('모델이 잘린 그림의 한 조각을 그림체로 쓰자고 해도 원본이든 조각이든 그림체로 정하지 않는다', async () => {
+    // 왜: 긴 그림은 조각으로 잘려 모델에 간다 — 어느 조각을 짚어도 그림체를 정하는 길은 없다(D6).
     stub(1)
     await proposeStyle()
     await chat.getState().sendMessage(ko('Use it as the art style'))
-    await vi.waitFor(() => expect(calls('/api/produce/style-anchor')).toHaveLength(1))
-    expect(calls('/api/produce/style-anchor')[0].imageUrl).toBe(LOOK.thumbUrl)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(calls('/api/produce/style-anchor')).toHaveLength(0)
   })
 
-  it('참고 자료로 두기를 고르면 그림체를 정하지 않는다', async () => {
-    // 정상 경로 고정 — 고르지 않은 그림체는 들어가지 않는다.
+  it('채팅 모델이 첨부 그림을 그림체로 쓰자고 한 뒤에도 그 그림은 이번 말과 함께 참고 자료로만 모델에 갔다', async () => {
+    // 정상 경로 고정 — 그림을 붙여 보낸 말은 그 그림을 참고 자료로 싣고 간다. 그림체 제안이 와도 더 할 일이 없다.
     stub()
     await proposeStyle()
-    await chat.getState().sendMessage(ko('Use it as reference only'))
-    expect(calls('/api/produce/style-anchor')).toHaveLength(0)
+    expect(calls('/api/produce/chat')[0].attachmentImageUrls).toEqual(LOOK.sliceUrls)
     expect(producer.getState().customStyleAnchor).toBeNull()
-    expect(chat.getState().messages.at(-1)?.content).toBe('참고 자료로 둘게요.')
+    expect(chat.getState().messages.some((m) => m.content === '참고 자료로 둘게요.')).toBe(false)
   })
 
-  it('그림체로 쓸지 물었을 때 "응"이라고 답하면 그림체로 쓰고, "아니"라고 답하면 참고 자료로 둔다', async () => {
-    // 왜: 예 · 아니오로 묻는 말에는 짧게 답한다 — 단추 문구를 그대로 쓰지 않아도 알아들어야 한다.
+  it('채팅 모델의 첨부 그림체 제안 뒤에 "응" · "아니"라고 답해도 그림체 질문의 답으로 읽지 않고 평소대로 채팅이 받는다', async () => {
+    // 왜: 묻는 질문이 없어졌다(D6) — 짧은 답도 평소 대화로 간다.
     stub()
     await proposeStyle()
     await chat.getState().sendMessage('응')
-    await vi.waitFor(() => expect(calls('/api/produce/style-anchor')).toHaveLength(1))
-    chat.getState().reset()
-    producer.getState().reset()
-    project.setState({ projectId: 'proj-1', currentStage: 'producer', reachedStage: 'producer' })
-    stub()
-    await proposeStyle()
     await chat.getState().sendMessage('아니')
+    expect(calls('/api/produce/chat')).toHaveLength(3)
     expect(calls('/api/produce/style-anchor')).toHaveLength(0)
-    expect(chat.getState().messages.at(-1)?.content).toBe('참고 자료로 둘게요.')
   })
 
-  it('답하지 않고 다른 말을 하면 그림체를 정하지 않고 그 말을 이어서 처리한다', async () => {
-    // 왜: 묻는 말 때문에 대화가 막히면 안 된다 — 그림은 이미 참고 자료로 갔다.
+  it('채팅 모델의 첨부 그림체 제안 뒤에 다른 말을 하면 그 말을 이어서 처리한다', async () => {
+    // 정상 경로 고정 — 그림체 제안 때문에 대화가 막히면 안 된다.
     stub()
     await proposeStyle()
     await chat.getState().sendMessage('주인공은 고양이야')
@@ -122,12 +110,21 @@ describe('채팅 모델이 첨부 그림을 그림체로 쓰자고 할 때', () 
     expect(chat.getState().styleAttachmentGate).toBeNull()
   })
 
-  it('채팅 모델에게 첨부 그림을 그림체로 정했다고 말하지 말고 그림체로 쓸지 묻겠다고 말하라고 이른다', () => {
-    // 왜: 앱이 묻기 전에 모델이 "정했어요"라고 하면 거짓말이 된다. 고정되면 나중에 바꿀 수도 없다.
+  it('채팅 모델이 지시를 어기고 첨부 그림을 그림체로 쓰자고 하면 그림에서 그림체를 가져올 수 없다는 말을 한 줄 덧붙인다', async () => {
+    // 왜(혼자 정한 것, 되돌리기 쉬움): 모델 답만 남으면 그 그림체로 그려지는 줄 안다 — 예전에도 그림체를 못 정하면 채팅에 알렸다(D6).
+    stub()
+    await proposeStyle()
+    const models = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
+    expect(models.at(-1)).toBe(ko("I can't take an art style from a picture. Pick one of the four styles (Live Action, 2D Japanese Anime, Watercolor, Stop Motion) in the style window in Artist when you make the images."))
+  })
+
+  it('채팅 모델에게 첨부 그림에서 그림체를 가져올 수 없다고 말하고 그림체 필드를 내지 말라고 이른다', () => {
+    // 왜: 모델이 "이 그림체로 잡았어요"라고 하면 거짓말이 된다 — 그림체는 그림을 만들 때 Artist 에서 네 가지 중 고른다(D6).
     for (const locale of ['ko', 'en'] as const) {
       const system = buildProducerSystem(locale)
-      expect(system).toContain('does NOT set the style')
-      expect(system).not.toContain('say they can change it any time')
+      expect(system).toContain('taking an art style from a picture is not available')
+      expect(system).toContain('Do not emit styleAnchorFromAttachment')
+      expect(system).not.toContain('does NOT set the style')
     }
   })
 })

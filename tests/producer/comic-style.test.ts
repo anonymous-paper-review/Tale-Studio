@@ -1,4 +1,4 @@
-// 만화 그림체를 분석기(경량 facet)로 조각 네 개로 만들어, 동의가 있을 때만 이 프로젝트 그림체에 싣는다 (2026-10-09 오너)
+// 그림체 분석기(facet) 자료와 결과를 다루는 규칙은 남아 있지만, 그림체 분석 창구는 D6(2026-11-22)로 닫혀 그림을 분석하지도 저장하지도 않는다 (2026-10-09 오너)
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -121,7 +121,7 @@ describe('그림체 분석 결과 확인', () => {
   })
 })
 
-describe('그림체 분석 창구', () => {
+describe('그림체 분석 창구는 닫혔다', () => {
   beforeEach(() => {
     mocks.getUser.mockReset().mockResolvedValue({ id: 'user-1' })
     mocks.userOwnsProject.mockReset().mockResolvedValue(true)
@@ -132,52 +132,38 @@ describe('그림체 분석 창구', () => {
     mocks.reads = 0
   })
 
-  it('분석 결과는 이 프로젝트 그림체에 동의 기록과 함께 저장한다', async () => {
-    const facets = liteFacetsFromCompile(compileText(), { model: 'm', extractedAt: 'now' })
-    mocks.extractLiteFacets.mockResolvedValueOnce({ facets, attempts: [] })
+  it('그림체 분석 창구는 분석 결과를 그림체에 저장하지 않고 410 으로 거절한다', async () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 옛 탭 · 직접 요청도 분석을 돌리지 못하게 창구에서 막는다.
     const res = await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))
-    expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ ok: true, facets: true, figure: true })
-    expect(mocks.extractLiteFacets).toHaveBeenCalledWith(MEDIA)
-    expect(mocks.updates[0]).toMatchObject({
-      custom_style_anchor: {
-        url: MEDIA,
-        facets: { version: LITE_FACET_VERSION, probe_anchors: facets!.probe_anchors },
-        analysis_consent: { wording: 'comic-choice-v1', at: expect.any(String) },
-      },
-    })
+    expect(res.status).toBe(410)
+    expect(await res.json()).toEqual({ error: 'style_extraction_retired' })
+    expect(mocks.extractLiteFacets).not.toHaveBeenCalled()
+    expect(mocks.updates).toHaveLength(0)
   })
 
-  it('분석 동의 표시가 없으면 그림을 분석 모델에 보내지 않는다', async () => {
-    // 왜: 인계 같이 정한 것 — 유저가 올린 이미지는 분석 동의가 있을 때만 facet 추출 모델에 보낸다.
-    expect((await POST(post({ projectId: 'proj-1' }))).status).toBe(400)
+  it('분석 동의가 있어도 없어도 그림체 분석 창구는 그림을 분석 모델에 보내지 않는다', async () => {
+    // 왜: 예전에는 동의가 있으면 보냈다 — 이제는 어떤 요청도 그림을 분석 모델에 보내지 않는다(D6).
+    expect((await POST(post({ projectId: 'proj-1' }))).status).toBe(410)
+    expect((await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))).status).toBe(410)
     expect(mocks.extractLiteFacets).not.toHaveBeenCalled()
   })
 
-  it('분석이 실패하면 저장하지 않고 그림만 그림체로 남긴다', async () => {
-    mocks.extractLiteFacets.mockResolvedValueOnce({ facets: null, attempts: [] })
-    const res = await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))
-    expect(await res.json()).toMatchObject({ ok: false, facets: false })
-    expect(mocks.updates).toHaveLength(0)
+  it('이미 그림체를 올린 작품도 그림체 분석 창구가 그 그림을 다시 분석하지 않는다', async () => {
+    // 왜: 이미 올린 그림체는 그대로 쓰지만(리드 2026-11-22 안 1 바탕) 분석을 새로 돌리는 길은 없다(D6).
+    expect(mocks.project).toMatchObject({ custom_style_anchor: { url: MEDIA } })
+    await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))
+    expect(mocks.reads).toBe(0)
+    expect(mocks.extractLiteFacets).not.toHaveBeenCalled()
   })
 
-  it('분석하는 동안 그림체를 다른 것으로 바꿨으면 결과를 저장하지 않는다', async () => {
-    // 왜: 1~2분 사이에 유저가 프리셋을 고르면, 늦게 끝난 분석이 그 선택을 덮으면 안 된다.
-    const facets = liteFacetsFromCompile(compileText(), { model: 'm', extractedAt: 'now' })
-    mocks.extractLiteFacets.mockResolvedValueOnce({ facets, attempts: [] })
-    mocks.reread = { url: mediaPublicUrl('ws-1/proj-1/uploads/other/original.png') }
-    const res = await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))
-    expect(await res.json()).toMatchObject({ ok: false, reason: 'anchor_changed' })
-    expect(mocks.updates).toHaveLength(0)
-  })
-
-  it('사용자 그림체가 없거나 로그인 · 내 프로젝트가 아니면 분석하지 않는다', async () => {
+  it('로그인 · 내 프로젝트 여부와 상관없이 그림체 분석 창구는 분석하지 않는다', async () => {
+    // 왜: 닫힌 창구는 누구의 요청이든 같은 답을 한다(D6).
     mocks.project = { custom_style_anchor: null }
-    expect((await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))).status).toBe(409)
+    expect((await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))).status).toBe(410)
     mocks.getUser.mockResolvedValueOnce(null)
-    expect((await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))).status).toBe(401)
+    expect((await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))).status).toBe(410)
     mocks.userOwnsProject.mockResolvedValueOnce(false)
-    expect((await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))).status).toBe(403)
+    expect((await POST(post({ projectId: 'proj-1', consent: 'comic-choice-v1' }))).status).toBe(410)
     expect(mocks.extractLiteFacets).not.toHaveBeenCalled()
   })
 })

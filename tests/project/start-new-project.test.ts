@@ -233,24 +233,14 @@ describe('Producer에서 이어서 하기', () => {
     expect(startBody()).toMatchObject({ preserveScript: true, story: SCRIPT })
   })
 
-  it('만화 원고의 트리트먼트는 그림체 분석이 끝나기를 기다리지 않는다', async () => {
-    // 왜: 10/9 로컬 시험에서 트리트먼트가 대본 옮기기 · 카드 채우기 뒤가 아니라 그림체 분석(약 2분)이 끝난 뒤에야 시작됐다. 트리트먼트는 분석 결과를 쓰지 않는다.
-    let releaseFacets!: () => void
-    const facetsGate = new Promise<void>((resolve) => { releaseFacets = resolve })
-    const base = fetchMock.getMockImplementation() as (url: string, init?: RequestInit) => Promise<Response>
-    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
-      if (url === '/api/produce/style-facets') {
-        await facetsGate
-        return Response.json({ ok: true, facets: true, figure: true })
-      }
-      return base(url, init)
-    })
+  it('만화 원고의 트리트먼트는 그림체 분석 없이 대본을 옮긴 뒤 바로 시작한다', async () => {
+    // 왜: 예전에는 그림체 분석(약 2분)을 기다리지 않게 따로 돌렸다(10/9). 그림체 분석은 D6(2026-11-22)로 없어져 기다릴 것도, 부를 것도 없다.
     await createProjectForNewFlow({ title: '만화' })
     await beginTreatment({ projectId: 'proj-new', format: 'horizontal_16:9', idea: '', comicStyle: 'lock', files: [img('comic_1.webp', 'comic')] as never })
-    const run = runPending()
+    await runPending()
     await vi.waitFor(() => expect(calls('/api/writer/start')).toHaveLength(1))
-    releaseFacets()
-    await run
+    expect(calls('/api/produce/style-facets')).toHaveLength(0)
+    expect(calls('/api/produce/anchor-medium')).toHaveLength(0)
   })
 
   it('자료를 올리느라 프로젝트를 먼저 만들었어도 시작할 때의 아이디어 · 자료로 제목을 다시 정한다', async () => {
@@ -331,14 +321,14 @@ describe('Producer에서 이어서 하기', () => {
     expect(startBody()).toMatchObject({ preserveScript: true, story: SCRIPT })
   })
 
-  it('새 프로젝트에서 만화 원고의 각색을 고르면 만화 그림을 그림체로 쓰지 않고 스타일 고르기 창을 띄운 뒤 대본을 옮겨 트리트먼트를 쓴다', async () => {
-    // 왜: 각색은 만화 그림체를 쓰지 않는다 — 실사 등 만들 스타일은 사용자가 고른다(10/9 오너).
+  it('새 프로젝트에서 만화 원고의 각색을 골라도 스타일 고르기 창 요청 없이 대본을 옮겨 트리트먼트를 쓴다', async () => {
+    // 왜: 스타일은 그림을 만들 때 Artist 스타일 창에서 네 가지 중 고른다(D6 2026-11-22) — 받을 창이 없는 요청을 띄우지 않는다.
     await createProjectForNewFlow({ title: '만화' })
     await beginTreatment({ projectId: 'proj-new', format: 'horizontal_16:9', idea: '', comicStyle: 'adapt', files: [img('comic_1.webp', 'comic')] as never })
     await runPending()
     expect(calls('/api/produce/anchor-medium')).toHaveLength(0)
     expect(calls('/api/produce/style-anchor')).toHaveLength(0)
-    expect(useChatUiStore.getState().stylePickerRequest?.projectId).toBe('proj-new')
+    expect(useChatUiStore.getState().stylePickerRequest).toBeNull()
     expect(startBody()).toMatchObject({ preserveScript: true, story: SCRIPT })
   })
 
@@ -353,26 +343,24 @@ describe('Producer에서 이어서 하기', () => {
     expect(saved).toContainEqual(expect.objectContaining({ role: 'user', content: '결말은 꼭 지켜 줘' }))
   })
 
-  it('그림체로 고른 그림은 매체를 고르고 그림체로 정한 뒤 그림체 분석기로 분석한다', async () => {
-    // 왜: 사용자가 그 그림체를 바탕으로 아이디에이션 · 작품 작업을 할 수 있다(10/9 오너 "분석기 돌려줘").
+  it('그림체로 고른 그림은 그림체로 정하지 않고 분석 모델에도 보내지 않는다', async () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 그림체는 그림을 만들 때 Artist 에서 네 가지 중 고른다.
     await createProjectForNewFlow({ title: '그림체' })
     await beginTreatment({ projectId: 'proj-new', purposeId: 'short_film', idea: '두 아이 이야기', files: [img('look.png', 'style')] as never })
     await runPending()
-    const body = (url: string) => calls(url).map(([, init]) => JSON.parse(String((init as RequestInit).body)))
-    expect(body('/api/produce/anchor-medium')[0]).toMatchObject({ projectId: 'proj-new', imageUrl: 'https://img.test/look.png', consent: 'creation-choice-v1' })
-    expect(body('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: 'https://img.test/look.png', medium: '2d_anime' })
-    expect(body('/api/produce/style-facets')[0]).toMatchObject({ projectId: 'proj-new', consent: 'creation-choice-v1' })
-    expect(useProducerStore.getState().styleAnchorKey).toBe('custom_abc')
+    expect(calls('/api/produce/anchor-medium')).toHaveLength(0)
+    expect(calls('/api/produce/style-anchor')).toHaveLength(0)
+    expect(calls('/api/produce/style-facets')).toHaveLength(0)
+    expect(useProducerStore.getState().styleAnchorKey).toBeFalsy()
   })
 
-  it('그림체로 고른 그림이 있으면 만화 첫 쪽 대신 그 그림을 그림체로 쓴다', async () => {
-    // 왜: 그림체 그림은 한 장이고, 사용자가 직접 고른 것이 만화 첫 쪽보다 우선이다.
+  it('만화 원고와 그림체로 고른 그림이 함께 있어도 어느 쪽도 그림체로 정하지 않는다', async () => {
+    // 왜: 예전에는 고른 그림이 만화 첫 쪽보다 앞서 그림체가 됐다 — 둘 다 그림체를 정하지 않는다(D6).
     await createProjectForNewFlow({ title: '만화' })
     await beginTreatment({ projectId: 'proj-new', format: 'horizontal_16:9', idea: '', files: [img('comic_1.webp', 'comic'), img('look.png', 'style')] as never })
     await runPending()
-    const anchors = calls('/api/produce/style-anchor').map(([, init]) => JSON.parse(String((init as RequestInit).body)))
-    expect(anchors).toHaveLength(1)
-    expect(anchors[0].imageUrl).toBe('https://img.test/look.png')
+    expect(calls('/api/produce/style-anchor')).toHaveLength(0)
+    expect(useProducerStore.getState().customStyleAnchor).toBeNull()
   })
 })
 

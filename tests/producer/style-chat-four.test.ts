@@ -59,6 +59,8 @@ describe('채팅과 네 가지 스타일', () => {
     expect(route).toMatch(/styleLocked !== true[\s\S]{0,200}listStyleAnchorCatalog/)
     expect(route).toContain('offeredStyles(anchorCatalog).map((a) => styleCatalogLine(a))')
     expect(route).toContain('retiredStylesContext(anchorCatalog)')
+    // 그림에서 그림체를 정하는 길이 없어져(D6) 채팅 모델에게 그림체 매체 목록도 주지 않는다.
+    expect(route).not.toContain('[Allowed Style Mediums]')
     expect(retiredStylesContext(offeredStyles(CATALOG))).toBeNull()
   })
 

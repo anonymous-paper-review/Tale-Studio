@@ -2,13 +2,11 @@
 import type { AppLocale } from '@/lib/locale'
 
 /**
- * locale 파라미터화(#i18n-s5-batch6-chat) — styleAnchorFromAttachment.label 예시 문구가
- *   "짧은 한국어 이름"으로 고정돼 있어 en 프로젝트에서도 모델이 한국어 라벨을 지어내는 버그가
- *   있었다(#132행 구 버전). locale 미상 시엔 종전 동작(ko) 그대로 유지 — 호출부에서 명시.
+ * locale 파라미터화(#i18n-s5-batch6-chat) — 예시 문구를 locale 로 갈아끼운다. locale 미상 시엔 종전 동작(ko) 그대로 유지 — 호출부에서 명시.
+ *   (첨부 그림을 그림체로 쓰자는 styleAnchorFromAttachment 와 그 이름 예시는 D6 2026-11-22 로 없앴다 — 그림에서 그림체를 가져오지 않는다.)
  *   대사 언어는 발화 언어에서 추정하지 않는다. 아래 예시에도 사용자가 고르지 않은 언어는 넣지 않는다.
  */
 export function buildProducerSystem(locale: AppLocale): string {
-  const labelExample = locale === 'ko' ? '짧은 한국어 이름' : 'short English name'
   // #choices-locale(2026-08-24 실측): en 프로젝트에서 응답 본문은 영어인데 [CHOICES] 칩만
   //   "30초 숏폼|60초|…" 한글로 새던 편향 — 지시 블록의 한글 플레이스홀더·예시를 모델이 그대로
   //   따라했다. 예시를 locale 로 갈아끼우고(아래), 규칙에 응답 언어 강제를 명시한다.
@@ -169,26 +167,12 @@ MATERIAL to adapt. That means:
   transcript of every bubble.
 - Extract characters[] and backgrounds[] you can actually see. Describe appearance from the art.
 
-When the user instead signals they want the project drawn in the LOOK of an attached image
-("이 그림체로 가줘", "이런 느낌으로 그려줘", "이 화풍 써줘"), propose that image as the project's art
-style by emitting styleAnchorFromAttachment in the JSON block:
-
-{"extractedSettings": {"styleAnchorFromAttachment": {"imageIndex": 0, "label": "${labelExample}", "medium": "<one of the allowed mediums>"}}}
-
-- imageIndex is 0-based into the attached images of THIS message, in the order given. Pick the ONE
-  image whose look best represents the style. Prefer a panel showing rendering (linework, shading,
-  color) over a text-heavy or near-empty one. Never emit a URL — only the index.
-- medium MUST be one of the allowed mediums listed in the [Allowed Style Mediums] context line.
-  Choose the closest match. Getting this wrong makes the script pipeline fight the art direction.
-- label is what the user will see as their style name. Describe the look, not the source work
-  (write "거친 선 수채" — never a title, franchise or creator name).
-- Emitting this does NOT set the style. The app then asks the user whether to use the picture as the
-  art style: if they agree, the picture goes to an analysis model and the art style is fixed for this
-  project, so it cannot be changed later. Describe the look concretely in your reply (medium,
-  linework, shading, palette, mood) and say you will ask whether to use it as the art style. Never
-  say the style is set, and never say it can be changed later.
-- Emit this ONLY when the user wants the project rendered that way. A user who attached a webtoon
-  to adapt its story is not asking for this — read it as source material instead.
+When the user instead wants the project drawn in the LOOK of an attached image ("이 그림체로 가줘",
+"이런 느낌으로 그려줘", "이 화풍 써줘"): taking an art style from a picture is not available. Say so plainly,
+and say that the art style is one of four (Live Action, 2D Japanese Anime, Watercolor, Stop Motion), picked in
+the style window in Artist when you make the images. Do not emit styleAnchorFromAttachment or any other style
+field for it, and never say the picture's style is set or will be used.
+- A user who attached a webtoon to adapt its story is not asking for this — read it as source material instead.
 
 Never invent panels you cannot see. If slices were truncated, say the material is partial.
 Never claim to recognize or name real people from an image.
