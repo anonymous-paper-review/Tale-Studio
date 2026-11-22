@@ -20,6 +20,8 @@ import { StoryboardImageButton } from '@/features/director/storyboard-image-butt
 import { newTakeButton } from './new-take'
 
 const PANEL = 'flex flex-col gap-2 rounded-[12px] bg-card p-2.5'
+// 줄 왼쪽 칸(폭 240)에 든 단추 — 긴 이름("시작·끝 이미지 다시 만들기 · Takes 0")이 칸 밖으로 잘리지 않게 줄을 바꾼다(조각 6 화면 확인).
+const PANEL_BUTTON = 'h-auto min-h-8 w-full whitespace-normal py-1.5 text-left leading-snug'
 
 export function ImageFixPanel({ shotNodeId, data }: { shotNodeId: string; data: ShotNodeData }) {
   const t = useT()
@@ -38,6 +40,7 @@ export function ImageFixPanel({ shotNodeId, data }: { shotNodeId: string; data: 
         nodeId={shotNodeId}
         data={data}
         changeNote={imageChange}
+        className={PANEL_BUTTON}
         idleLabel={hasImage ? t('Remake start and end images · Takes 0') : t('Make start and end images · Takes 0')}
       />
     </div>
@@ -109,7 +112,7 @@ export function VideoMakePanel({ shotNodeId, data }: { shotNodeId: string; data:
       <p className="text-micro text-subtle-foreground">
         {VIDEO_MODELS[setup.model].label} · {effectiveVideoResolution(setup.model, setup.resolution)}
       </p>
-      <Button type="button" size="sm" variant="outline" disabled={button.disabled} onClick={() => void make()}>
+      <Button type="button" size="sm" variant="outline" className={PANEL_BUTTON} disabled={button.disabled} onClick={() => void make()}>
         {label}
       </Button>
       {button.reason ? <p className="text-micro text-subtle-foreground">{t(button.reason)}</p> : null}

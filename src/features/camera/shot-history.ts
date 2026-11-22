@@ -66,12 +66,24 @@ const ms = (value: string | null | undefined): number => {
   return Number.isFinite(parsed) ? parsed : 0
 }
 
-function imageSummary(version: StoryboardImageVersion, previous: StoryboardImageVersion | null): HistoryPhrase[] {
-  if (version.source === 'upload') return [{ key: 'Uploaded image' }]
-  if (version.cancelled) return [{ key: 'Finished after it was stopped' }]
-  if (!previous) return [{ key: 'First image' }]
+/** 그 판을 부탁한 사람 말(오너 2026-11-22 결정 4) — 아는 사실 뒤에 붙는다. 없으면 null. */
+function notePhrase(version: StoryboardImageVersion): HistoryPhrase | null {
+  const note = version.note?.trim()
+  if (!note) return null
+  return version.via === 'chat' ? { key: 'Asked in chat: {note}', params: { note } } : { key: 'Change: {note}', params: { note } }
+}
+
+function imageFacts(version: StoryboardImageVersion, previous: StoryboardImageVersion | null): HistoryPhrase {
+  if (version.source === 'upload') return { key: 'Uploaded image' }
+  if (version.cancelled) return { key: 'Finished after it was stopped' }
+  if (!previous) return { key: 'First image' }
   const roughChanged = typeof version.roughGeneratedAt === 'number' && typeof previous.roughGeneratedAt === 'number' && version.roughGeneratedAt !== previous.roughGeneratedAt
-  return [{ key: roughChanged ? 'Redrawn after the rough changed' : 'Drawn again' }]
+  return { key: roughChanged ? 'Redrawn after the rough changed' : 'Drawn again' }
+}
+
+function imageSummary(version: StoryboardImageVersion, previous: StoryboardImageVersion | null): HistoryPhrase[] {
+  const said = notePhrase(version)
+  return said ? [imageFacts(version, previous), said] : [imageFacts(version, previous)]
 }
 
 /** 그 Take 의 사실 — 모델 · 실제 해상도 · 쓴 그림 판(시작 그림 기준). */

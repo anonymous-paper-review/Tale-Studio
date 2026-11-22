@@ -1,4 +1,5 @@
 // Camera 샷 줄의 이력 — 실사 그림 판과 영상 Take 가 만든 차례대로 한 줄에 쌓이고, 판마다 무엇이 바뀌었는지 · 지금 쓰는 것 · 안 쓴 것을 가리는지 검사한다 (오너 2026-11-22 D2~D5)
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { dialogueRowLines, historyActions, shotHistory, type HistoryEntry, type HistoryPhrase } from '@/features/camera/shot-history'
 import { translate } from '@/lib/i18n/translate'
@@ -172,5 +173,15 @@ describe('샷 줄 왼쪽 정보', () => {
       { speaker: '하윤', text: '여기야.' },
       { speaker: 'V.O.', text: '그날 밤.' },
     ])
+  })
+})
+
+describe('이력 줄이 보이는 자리', () => {
+  it('이력 줄은 처음 열 때 · 판이 늘 때 맨 오른쪽(새 판)이 보이고, 맨 오른쪽에 있던 줄은 창 폭이 바뀌어도 맨 오른쪽을 지키며, 사람이 옆으로 넘겨 둔 자리는 그대로 둔다', () => {
+    // 왜: 리드 11/22 "처음엔 맨 오른쪽이 보이게" — 넓은 창에서 열고 좁히면 새 판이 오른쪽으로 숨었다(조각 6 화면 확인).
+    const row = readFileSync('src/features/camera/shot-row.tsx', 'utf8')
+    expect(row).toMatch(/pinnedRef\.current = strip\.scrollLeft >= strip\.scrollWidth - strip\.clientWidth - 4/)
+    expect(row).toMatch(/new ResizeObserver\(\(\) => \{\s*if \(pinnedRef\.current\) strip\.scrollLeft = strip\.scrollWidth/)
+    expect(row).toMatch(/\}, \[entries\.length\]\)/)
   })
 })

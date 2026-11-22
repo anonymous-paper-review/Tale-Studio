@@ -4553,6 +4553,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             else return true
             return false
           })
+            // 채팅으로 다시 그린 그림 판에는 사용자가 쓴 부탁이 남는다(오너 2026-11-22 결정 4) — 모델이 낸 값은 서버 검사가 이미 버렸다.
+            .map((update) => (update.type === 'generateImage' && update.id ? { ...update, askedInChat: trimmed } : update))
           const result = useDirectorCanvasStore.getState().applyUpdates(immediate, { traceId, onJob: observeGeneration })
           const resolvedIds = result.resolvedIds ?? {}
           const resolve = (id: string) => (Object.hasOwn(resolvedIds, id) ? resolvedIds[id] : id)

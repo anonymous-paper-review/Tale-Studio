@@ -3756,6 +3756,7 @@ export const KO: Record<string, string> = {
   'Image v{n}': '그림 v{n}',
   'Continued from the previous video': '앞 영상에서 이어서',
   'Change: {note}': '바꿀 점: {note}',
+  'Asked in chat: {note}': '채팅으로 부탁: {note}',
   'Made again': '다시 만듦',
   'Failed: {reason}': '실패: {reason}',
   'Remake failed: {reason}': '다시 만들기 실패: {reason}',

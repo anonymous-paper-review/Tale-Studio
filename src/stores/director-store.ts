@@ -58,6 +58,7 @@ import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { parseDirectorRefs } from '@/lib/director/director-refs'
 import { latestShotTake, promptWithChange, takeSettings } from '@/lib/director/shot-detail'
 import { currentStoryboardVersion, keptStoryboardImage, selectStoryboardVersion, storyboardImageVersions, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { imageNoteFor } from '@/lib/director/image-note'
 import {
   isEmptyStableFrameInputs,
   parseStableFrameInputs,
@@ -168,6 +169,8 @@ export type DirectorGenerationRequestOptions = {
   inheritFromVideoNodeId?: string
   /** 샷 상세의 "바꾸고 싶은 점"(디자이너 11/13 D6) — 이번 이미지 다시 만들기에만 프롬프트 끝에 붙인다. 샷 프롬프트는 그대로. */
   changeNote?: string
+  /** 채팅(Lumi)에 이 그림을 부탁한 말 — 프롬프트에는 붙이지 않고 다 그린 그림 판에 남긴다(오너 2026-11-22 결정 4, lib/director/image-note). */
+  askedInChat?: string
   /** 샷 상세의 영상 고치기(디자이너 11/13 D7) — 바꾼 모델 · 해상도 · 바꿀 점을 새 Take 설정에만 얹는다(이어받은 설정 위에). */
   videoOverride?: VideoOverride
 }
@@ -1440,7 +1443,8 @@ export type DirectorCanvasUpdate =
   | { type: 'generateVideo'; id: string }
   // #c5 (2026-08-27): 진입 자동 실사 생성을 끄면서 채팅 경로를 열었다. id 를 주면 그 샷만,
   //   생략하면 미생성 전체를 일괄로 — 버튼과 같은 경로(generateStoryboardImage / runRealBatch)를 탄다.
-  | { type: 'generateImage'; id?: string }
+  //   askedInChat = 채팅에서 이 그림을 부탁한 사용자 말(오너 2026-11-22 결정 4) — 서버 검사가 모델 값은 버리고 채팅 상점이 붙인다. 다 그린 판에 남는다.
+  | { type: 'generateImage'; id?: string; askedInChat?: string }
   // 영상 일괄 — shotIds 가 있으면 그 샷만, 없으면 남은 샷 전부. 채팅은 확인 카드 없이 바로 시작한다(오너 2026-11-14 9번 —
   //   global-chat-store 의 startChatVideos 가 막이 · Take 셈 뒤 runVideoBatch 를 부른다. 이 스토어의 applyUpdates 는 돌리지 않는다).
   | { type: 'generateVideos'; shotIds?: string[] }
@@ -4174,6 +4178,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // 만드는 중 · 실패 · 기다림 표시에도 지금 그림의 프레임 · 버전은 그대로(디자이너 11/13 D6 — 버전 줄 · 끝 그림이 사라지지 않게).
         const kept = keptStoryboardImage(data.storyboardImage)
         const prompt = promptWithChange(effectivePrompt(data) || data.label, options?.changeNote ?? '')
+        const said = imageNoteFor(options)
 
         const storyboardAlreadyGenerating = api.nodes.some(
           (candidate) =>
@@ -4236,6 +4241,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 // #image-model-select: 샷이 고른 fal 이미지 모델 (미지정 = 서버 기본)
                 ...(data.imageModel ? { imageModel: data.imageModel } : {}),
                 ...(options?.traceId ? { traceId: options.traceId } : {}),
+                // 사람 말(바꿀 점 · 채팅 부탁) — 다 그린 그림 판에 남는다(오너 2026-11-22 결정 4).
+                ...(said ? { note: said.note, via: said.via } : {}),
               }),
             })
             if (get().projectId !== projectId) return { jobId: null, status: 'skipped' }
@@ -5646,8 +5653,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   })
                   break
                 }
-                const imageGeneration = options
-                  ? get().generateStoryboardImage(imgId, options)
+                const said = u.askedInChat ? { ...options, askedInChat: u.askedInChat } : options
+                const imageGeneration = said
+                  ? get().generateStoryboardImage(imgId, said)
                   : get().generateStoryboardImage(imgId)
                 void imageGeneration
                 result.applied += 1
