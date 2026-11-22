@@ -53,6 +53,12 @@ export interface VideoModelSpec {
   defaultResolution: string
   /** 오디오 없을 때 초당 대략 가격 (UI 힌트, USD). 0 = 미표기 */
   pricePerSecNoAudio: number
+  /**
+   * image_urls 에 한 번에 보낼 수 있는 그림 수(방안 고장 1, 2026-11-22 — fal 스키마 11/22 확인).
+   *   Seedance 2.0 9 · Happy Horse 1~9 · Seedance 2.5 는 30 까지 받지만 다른 모델과 같은 9 · Veo 는 fal 표에 상한이 없어
+   *   구글 문서의 참고 그림 3장 · Kling 은 "영상 넣을 때 4" 문장을 따라 4. 넘으면 참고 그림만 뒤에서부터 덜어 낸다.
+   */
+  maxImageUrls: number
 }
 
 // 2026-08-31 오너 확정: 기본 생성기를 Seedance 2.0 으로 전환 (종전 happy-horse).
@@ -81,6 +87,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['720p', '1080p'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.14,
+    maxImageUrls: 9,
   },
   seedance: {
     key: 'seedance',
@@ -93,6 +100,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['480p', '720p', '1080p'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.3024,
+    maxImageUrls: 9,
   },
   // 2026-11-01 오너: 디렉터 영상 모델에 Seedance 2.5 를 더한다. fal 에는 미국 서버 입구(us)만 있다.
   //   fal 은 30초까지 받지만 Take 가 길이와 상관없는 한 편 값이라 다른 모델과 같은 15초에서 끊는다. 4k 는 없다.
@@ -108,6 +116,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['480p', '720p', '1080p'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.4622,
+    maxImageUrls: 9,
   },
   'kling-o3': {
     key: 'kling-o3',
@@ -120,6 +129,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: [],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.112,
+    maxImageUrls: 4,
   },
   veo: {
     key: 'veo',
@@ -132,6 +142,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['720p', '1080p', '4k'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.2,
+    maxImageUrls: 3,
   },
 }
 

@@ -36,6 +36,7 @@ import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import {
   DEFAULT_VIDEO_RESOLUTION,
+  VIDEO_MODELS,
   effectiveVideoResolution,
   isVideoResolution,
   normalizeProvider,
@@ -56,7 +57,11 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { holdTakesForVideoJob } from '@/lib/billing/take-hold'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { hasStoryboardImage } from '@/lib/director/storyboard-image'
-import { resolveVideoReferenceFrames } from '@/lib/director/video-reference-frames'
+import {
+  MAX_REQUEST_REFERENCE_IMAGES,
+  clampReferenceImages,
+  resolveVideoReferenceFrames,
+} from '@/lib/director/video-reference-frames'
 import type { Json } from '@/types/database'
 import type { CameraConfig, CameraPreset } from '@/types'
 import type { StandaloneVideoConfig } from '@/types/director'
@@ -460,23 +465,29 @@ async function prepareVideoRequest(
     }
     // V2 refs(#real-strip): [START, END] 등 다중 레퍼런스. referenceImageUrl(단일)과 병행 수신 —
     //   단일은 I2V 판별·스냅샷 하위호환 축, 배열은 실제 제출 레퍼런스로 우선.
-    const clientReferenceImageUrls = Array.isArray(body.referenceImageUrls)
-      ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u).slice(0, 4)
+    // 방안 고장 1(2026-11-22): 예전에는 그림을 앞 4장만 남기고 역할이 4개를 넘으면 역할을 통째로 버려, 참고 그림을
+    //   세 장 넘게 이으면 끝 그림이 빠지고 역할을 잃은 시작 앞에 DB 시작이 또 붙었다. 이제 역할째 받아 시작 · 끝은 남기고
+    //   참고 그림만 덜어 MAX_REQUEST_REFERENCE_IMAGES 안으로 받는다(모델별 상한은 모델이 정해진 뒤 한 번 더).
+    const rawClientReferenceImageUrls = Array.isArray(body.referenceImageUrls)
+      ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u)
       : undefined
     const referenceImageRolesV2 = Array.isArray(body.referenceImageRoles)
-      ? body.referenceImageRoles.length <= 4 &&
-        body.referenceImageRoles.every(
+      ? body.referenceImageRoles.every(
           (role): role is VideoReferenceImageRole =>
             role === 'start' || role === 'end' || role === 'ref',
         )
         ? body.referenceImageRoles
         : undefined
       : undefined
-    const clientAlignedRoles =
-      clientReferenceImageUrls?.length &&
-      referenceImageRolesV2?.length === clientReferenceImageUrls.length
-        ? referenceImageRolesV2
-        : undefined
+    const requestImages = rawClientReferenceImageUrls?.length
+      ? clampReferenceImages(
+          rawClientReferenceImageUrls,
+          referenceImageRolesV2?.length === rawClientReferenceImageUrls.length ? referenceImageRolesV2 : undefined,
+          MAX_REQUEST_REFERENCE_IMAGES,
+        )
+      : null
+    const clientReferenceImageUrls = requestImages ? requestImages.urls : rawClientReferenceImageUrls
+    const clientAlignedRoles = requestImages?.roles
     let writerShotId = body.writerShotId ?? body.shotId
     projectId = body.projectId ?? ''
     if (
@@ -547,8 +558,6 @@ async function prepareVideoRequest(
     })
     const generationMethod: GenerationMethod = frames.generationMethod
     const referenceImageUrl = frames.referenceImageUrl ?? undefined
-    const referenceImageUrlsV2 = frames.referenceImageUrls
-    const alignedReferenceImageRoles = frames.referenceImageRoles
     let standaloneConfig: StandaloneVideoConfig | null = null
     if (standalone) {
       const { data: clip, error } = await supabaseAdmin
@@ -612,6 +621,13 @@ async function prepareVideoRequest(
     // 모델 이름은 무엇이 와도 fal 카탈로그 키로만 정규화된다 — 지운 'local' 은 기본 모델로.
     const modelKey: VideoModelKey = normalizeProvider(model ?? '')
     const dur = durationSeconds ?? 5
+    // 방안 고장 1: 모델이 받는 장 수 안으로 — 시작 · 끝은 남기고 참고 그림만 뒤에서부터 덜어 낸다. 덜어 낸 수는 기록 · 응답에 남긴다.
+    const modelImages = frames.referenceImageUrls?.length
+      ? clampReferenceImages(frames.referenceImageUrls, frames.referenceImageRoles, VIDEO_MODELS[modelKey].maxImageUrls)
+      : null
+    const referenceImageUrlsV2 = modelImages ? modelImages.urls : frames.referenceImageUrls
+    const alignedReferenceImageRoles = modelImages ? modelImages.roles : frames.referenceImageRoles
+    const droppedReferenceImages = modelImages?.dropped ?? 0
 
     // #motion-contract: 모션 계약 소스 해석 — shots.dynamic_spec(신규 persist) 우선,
     //   구버전 프로젝트는 writer_runs.state.shotDesign 을 design_ref 로 조인(러프보드와 동일 패턴).
@@ -805,6 +821,8 @@ async function prepareVideoRequest(
       // 배열 키는 존재할 때만 — 구버전 예약 잡의 리플레이 비교(snapshotValueMatches)와 호환.
       ...(referenceImageUrlsV2?.length ? { reference_image_urls: referenceImageUrlsV2 } : {}),
       ...(alignedReferenceImageRoles ? { reference_image_roles: alignedReferenceImageRoles } : {}),
+      // 덜어 낸 그림이 있을 때만 적는다 — 덜지 않은 요청은 이 기능 전 작업과 같은 기록 모양(재생 비교 보호).
+      ...(droppedReferenceImages > 0 ? { dropped_reference_images: droppedReferenceImages } : {}),
       movement_preset: movementPreset ?? null,
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),
@@ -941,7 +959,8 @@ async function submitPreparedVideo(
     }
     const reservedJob = await getGenerationJobById(reservation.job_id)
     if (!reservedJob) throw new Error('Reserved video job not found')
-    const response = { shotId: writerShotId, jobId: reservation.job_id, videoClipId: reservation.video_clip_id, takeNumber: reservation.take_number, replayed: reservation.replayed, provider: reservedJob.provider ?? 'fal', model: reservedJob.model, taskId: reservedJob.request_id.startsWith('reserved:') ? undefined : reservedJob.request_id }
+    const droppedImages = typeof inputSnapshot.dropped_reference_images === 'number' ? inputSnapshot.dropped_reference_images : 0
+    const response = { shotId: writerShotId, jobId: reservation.job_id, videoClipId: reservation.video_clip_id, takeNumber: reservation.take_number, replayed: reservation.replayed, provider: reservedJob.provider ?? 'fal', model: reservedJob.model, taskId: reservedJob.request_id.startsWith('reserved:') ? undefined : reservedJob.request_id, ...(droppedImages > 0 ? { droppedImages } : {}) }
     if (reservedJob.status !== 'queued') {
       return NextResponse.json({ ...response, status: reservedJob.status })
     }
