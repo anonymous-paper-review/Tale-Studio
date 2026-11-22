@@ -75,10 +75,10 @@ interface EligibleShot {
   excludeWorld: boolean
   /** 약속 I4: 참조한 러프의 generatedAt. */
   roughGeneratedAt: number | null
-  /** 소품 참고(D7 2단계): 칸마다 소품 칸(static_spec.prop_placement)을 읽는다. */
-  staticSpec: unknown
   /** D5(2026-11-22): 러프 가운데 장 글씨 칸이 나르던 빛 · 색 · 렌즈 · 초점 — 샷 설계에서 만든 글(없으면 null). */
   cineLine: string | null
+  /** 소품 참고(D7 2단계): 칸마다 소품 칸(static_spec.prop_placement)을 읽는다. */
+  staticSpec: unknown
 }
 
 class CharacterAppearanceContractError extends Error {}
@@ -238,8 +238,8 @@ export async function POST(req: NextRequest) {
         roughGeneratedAt: (s.rough_storyboard as { generatedAt?: number } | null)?.generatedAt ?? null,
         frames: { start: f.start, direction: f.direction, end: f.end },
         blocking: readCharacterBlocking(s.static_spec),
-        staticSpec: s.static_spec,
         cineLine: realCineLine(s.static_spec),
+        staticSpec: s.static_spec,
       })
     }
 

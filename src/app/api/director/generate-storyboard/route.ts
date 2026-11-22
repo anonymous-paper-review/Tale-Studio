@@ -385,8 +385,8 @@ export async function POST(req: Request) {
           ...parseCheckConstraints((shot as { check_notes?: unknown } | null)?.check_notes),
           continuityPrevText,
           ...(characterRefLabels ?? []).flatMap((r) => [r.name, r.pose]),
-          ...propRefs.map((ref) => ref.name),
           cineLine,
+          ...propRefs.map((ref) => ref.name),
         ],
         { projectId, kind: 'shot_storyboard', userId: access.userId },
       )
