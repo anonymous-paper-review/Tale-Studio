@@ -1,4 +1,5 @@
 // 한국어 화면에서 옛 Storyboard 화면 · 러프 스토리보드를 "콘티" · "러프 콘티"로 부르는지 검사한다 (D1 오너 2026-11-22 "storyboard란 명칭은 콘티로")
+import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { KO } from '@/lib/i18n/messages-ko'
 import { translate } from '@/lib/i18n/translate'
@@ -71,5 +72,15 @@ describe('한국어 화면의 콘티 이름', () => {
     // 왜(혼자 정한 것 h): 영어 사용자에게 conti 는 낯선 말이다 — 영어 원문(사전 키)은 그대로 둔다.
     expect(translate('en', 'Complete · to Storyboard')).toBe('Complete · to Storyboard')
     expect(translate('en', 'Rough storyboard')).toBe('Rough storyboard')
+  })
+})
+
+describe('콘티 넘김 안내', () => {
+  it('콘티 러프가 다 그려져도 옛 순서 말("Artist로 넘어가 캐릭터 · 배경 컨셉을…")은 채팅에 뜨지 않는다', () => {
+    // 왜(혼자 정한 것 q): 리뉴얼 전 순서(Storyboard → Artist)의 안내가 코드에 남아 있었다 — 넘김 표(HANDOFFS)에 콘티 → Camera 가 들어오는 순간
+    //   "Artist로 넘어가자"는 틀린 말로 살아난다. 콘티의 앞으로 넘김은 머리의 [다음: Camera로]와 채팅 말이 맡는다.
+    const board = readFileSync('src/features/writer/rough-storyboard-view.tsx', 'utf8')
+    expect(board).not.toContain('Ready to move to Artist')
+    expect(board).not.toMatch(/handoffFrom\('writer'\)/)
   })
 })

@@ -34,8 +34,6 @@ import { Button } from '@/components/ui/button'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { fetchDebugPrompts } from '@/lib/use-debug-prompts'
 import { ADHERENCE_START_ENABLED } from '@/lib/adherence/core'
-import { handoffFrom } from '@/lib/handoff-intent'
-import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { NodeWaitCard } from '@/components/feedback/node-wait'
 import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
@@ -264,15 +262,10 @@ export function RoughStoryboardView() {
     if (projectId) void loadProject()
   }, [projectId, loadProject])
 
-  // Artist 핸드오프(#handoff-to-chat 2026-07-31) — 탭 하단 'Hand over to Concept Artist' 버튼을
-  //   걷어내고 채팅 제안으로 옮겼다. 옛 버튼은 게이트 없이 항상 활성이었으므로 여기서도 막지 않고,
-  //   러프 보드가 다 그려졌을 때(= 검토할 게 생겼을 때) 버튼을 띄운다. 채팅에 직접 말하면 언제든 된다.
-  const artistNudgeRef = useRef<string | null>(null)
+  // 러프가 다 그려졌나 — 아래 Artist 그림 채우기가 본다. 옛 "Artist로 넘어가자" 넘김 안내(리뉴얼 전 순서 Storyboard → Artist)는
+  //   2026-11-22 지웠다(혼자 정한 것 q) — 콘티의 앞으로 넘김은 머리의 [다음: Camera로]와 채팅 말이 맡는다.
   const roughAllReady =
     shots.length > 0 && shots.every((s) => s.roughStoryboard?.status === 'completed')
-  // 이미 수락된 핸드오프는 다시 권하지 않는다(#handoff-once 2026-08-12) — 진실은 DB 의
-  //   reachedStage(projects.current_stage). 탭 왕복·새로고침마다 "다음 단계" 문구가 반복되던 문제.
-  const reachedStage = useProjectStore((s) => s.reachedStage)
 
   // 러프보드 완주 → artist 빈 인물(오픈캐스트)·배경 이미지를 백그라운드로 채운다
   //   (#writer-to-artist-backfill 2026-08-12). 유저가 artist 탭에 도착했을 때 이미 그림이
@@ -307,23 +300,6 @@ export function RoughStoryboardView() {
       })
     })()
   }, [projectId, roughAllReady])
-  useEffect(() => {
-    if (!projectId || !roughAllReady) return
-    if (!shouldOfferHandoffNudge('writer', reachedStage)) return
-    if (artistNudgeRef.current === projectId) return
-    artistNudgeRef.current = projectId
-    const spec = handoffFrom('writer')
-    if (!spec) return
-    offerSuggestion({
-      id: `handoff:writer:${projectId}`,
-      stage: 'writer',
-      content: translate(
-        locale,
-        'The rough storyboard is all ready. Ready to move to Artist and work out character and background concepts?',
-      ),
-      action: { kind: 'handoff', utterance: translate(locale, spec.utterance), label: translate(locale, spec.label) },
-    })
-  }, [projectId, roughAllReady, offerSuggestion, reachedStage, locale])
 
   // 파이프라인이 이 화면을 보는 중에 완료되면 씬/샷을 1회 재로드.
   useEffect(() => {

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/page-header'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
+import { STAGES, STAGE_LABEL } from '@/lib/constants'
 import { WriterTabs } from '@/features/writer/writer-tabs'
 import { WriterEnginePicker } from '@/features/writer/writer-engine-picker'
 import { useLocale, useT } from '@/lib/i18n'
@@ -21,6 +22,9 @@ import { boardStats, boardStatsLabel } from '@/lib/writer/board-summary'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
+
+// 콘티의 다음 단계(단계 표) — 2026-11-22 오너 D2~D5 부터 Camera. 단추 글은 그 이름을 따른다(이름이 바뀌면 같이 바뀐다).
+const CONTI_NEXT_STAGE = STAGES.find((stage) => stage.id === 'writer')?.nextStage ?? 'camera'
 
 interface WriterHeaderProps {
   description?: string
@@ -71,7 +75,7 @@ export function WriterHeader({ description, tools, actions, hideNextStep = false
               onClick={() => openDirectorConfirm(true)}
               data-testid="storyboard-next-director"
             >
-              {t('Next: Director')}
+              {t('Next: {stage}', { stage: STAGE_LABEL[CONTI_NEXT_STAGE] })}
               <ArrowRight className="size-4" />
             </Button>
           ) : undefined
