@@ -38,6 +38,7 @@ import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/generation-slots'
 import { DRAW_CONTINUE_MAX_ROUNDS, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, missingDrawTargets, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import type { ArtistSection } from '@/lib/artist/card-filter'
+import { orderPropsByUsage, propAssetsFromRows, propUsage, type PropRow, type PropUsage } from '@/lib/artist/props'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -593,7 +594,8 @@ function scheduleCharacterPatch(
 /** 작업 배열을 동시 N개 제한으로 실행 (캐릭터/월드 병렬 생성용). */
 export interface ArtistChatSelection {
   projectId: string
-  target: 'character' | 'background'
+  /** prop = 소품 카드(D7, 2026-11-22) — 모습이 하나라 appearanceKey 는 'default'. */
+  target: 'character' | 'background' | 'prop'
   id: string
   appearanceKey: string
   source: 'card' | 'appearance' | 'image'
@@ -610,8 +612,12 @@ interface ArtistState {
   /** 최종 룩 요약(art_style + color_meaning) — 온보딩 버블 카피용. 룩 미반영이면 null. */
   lookSummary: ArtistLookSummary | null
   worldAssets: WorldAsset[]
-  /** 소품 카드(D7) — props 행. 예전 흐름의 사물(characters 표 행)은 characterAssets 에 남는다. */
+  /** 소품 카드(D7) — props 행. 예전 흐름의 사물(characters 표 행)은 characterAssets 에 남는다. 나오는 샷이 많은 순. */
   propAssets: PropAsset[]
+  /** 소품마다 나오는 씬 · 샷 수(lib/artist/props propUsage). */
+  propUsage: PropUsage
+  selectedPropId: string | null
+  selectProp: (id: string) => void
   selectedCharacterId: string | null
   selectedLocationId: string | null
   selectedLocationAppearances: Record<string, string>
@@ -773,19 +779,26 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   lookSummary: null,
   worldAssets: [],
   propAssets: [],
+  propUsage: {},
+  selectedPropId: null,
   selectedCharacterId: null,
   chatSelection: null,
   setChatSelection: selection => {
     if (selection === null) { set({ chatSelection: null });return }
     if (selection.projectId !== useProjectStore.getState().projectId) return
-    const exists = selection.target === 'character'
-      ? get().characterAssets.some(c => c.characterId === selection.id && c.appearances.some(a => a.appearanceKey === selection.appearanceKey))
-      : get().worldAssets.some(w => w.locationId === selection.id && (selection.appearanceKey === DEFAULT_LOCATION_APPEARANCE_KEY || w.appearances?.some(a => a.appearanceKey === selection.appearanceKey)))
+    const prop = selection.target === 'prop' ? get().propAssets.find(p => p.propId === selection.id) : undefined
+    const exists = selection.target === 'prop'
+      ? !!prop && selection.appearanceKey === DEFAULT_LOCATION_APPEARANCE_KEY
+      : selection.target === 'character'
+        ? get().characterAssets.some(c => c.characterId === selection.id && c.appearances.some(a => a.appearanceKey === selection.appearanceKey))
+        : get().worldAssets.some(w => w.locationId === selection.id && (selection.appearanceKey === DEFAULT_LOCATION_APPEARANCE_KEY || w.appearances?.some(a => a.appearanceKey === selection.appearanceKey)))
     if (exists) {
       const world = get().worldAssets.find(w => w.locationId === selection.id)
-      const url = selection.target === 'character'
-        ? get().characterAssets.find(c => c.characterId === selection.id)?.appearances.find(a => a.appearanceKey === selection.appearanceKey)?.sheetUrl
-        : selection.appearanceKey === DEFAULT_LOCATION_APPEARANCE_KEY ? world?.wideShot : world?.appearances?.find(a => a.appearanceKey === selection.appearanceKey)?.wideShot
+      const url = selection.target === 'prop'
+        ? prop?.imageUrl
+        : selection.target === 'character'
+          ? get().characterAssets.find(c => c.characterId === selection.id)?.appearances.find(a => a.appearanceKey === selection.appearanceKey)?.sheetUrl
+          : selection.appearanceKey === DEFAULT_LOCATION_APPEARANCE_KEY ? world?.wideShot : world?.appearances?.find(a => a.appearanceKey === selection.appearanceKey)?.wideShot
       set({ chatSelection: { ...selection, imageRevision: inspectionImageRevision(url) } })
     }
   },
@@ -828,6 +841,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           { data: dbAppearances },
           { data: dbLocCandidates },
           { data: dbLocAppearances },
+          { data: dbProps },
+          { data: dbShotProps },
         ] = await Promise.all([
           supabase
             .from('scenes')
@@ -868,6 +883,16 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .select('location_id, appearance_key, label, narrative_time, visual_description, visual_description_native, wide_shot')
             .eq('project_id', projectId)
             .order('created_at'),
+          // 소품(D7, 2026-11-22) — props 행 · 샷마다 소품 칸(나오는 샷 수를 센다). 소유자 SELECT 정책(20260827200000)이 있다.
+          supabase
+            .from('props')
+            .select('prop_id, name, appearance, appearance_native, image_url, source_hash, origin')
+            .eq('project_id', projectId)
+            .order('created_at'),
+          supabase
+            .from('shots')
+            .select('shot_id, scene_id, prop_placement:static_spec->prop_placement')
+            .eq('project_id', projectId),
         ])
         if (useProjectStore.getState().projectId !== projectId) return
         const locCandidatesByLocation = groupLocationCandidates(dbLocCandidates ?? [])
@@ -1011,6 +1036,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             }
           })
 
+          // 소품 카드(D7) — 같은 id 의 인물 행이 있으면 빼고, 나오는 샷이 많은 순으로.
+          const props = propAssetsFromRows((dbProps ?? []) as PropRow[], new Set(characterAssets.map((c) => c.characterId)))
+          const usage = propUsage(props, dbScenes, (dbShotProps ?? []).map((row) => ({ shotId: String(row.shot_id), sceneId: (row as { scene_id?: string | null }).scene_id ?? null, propPlacement: (row as { prop_placement?: unknown }).prop_placement })))
+          const propAssets = orderPropsByUsage(props, usage)
+
           // 룩 요약(온보딩 카피용) — design_tokens.l1.art_style + design_tokens.color_meaning(top-level).
           const dtFull = (project?.design_tokens ?? null) as
             | (LookTokens & { color_meaning?: Record<string, string> })
@@ -1019,6 +1049,9 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             sceneManifest: manifest,
             characterAssets,
             worldAssets,
+            propAssets,
+            propUsage: usage,
+            selectedPropId: keepSelection(get().selectedPropId, propAssets.map((p) => p.propId)),
             lookSummary: dtFull
               ? { artStyle: dtFull.l1?.art_style ?? null, colorMeaning: dtFull.color_meaning ?? null }
               : null,
@@ -1234,6 +1267,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectCharacter: (id) => set({ selectedCharacterId: id }),
 
   selectLocation: (id) => set({ selectedLocationId: id }),
+  selectProp: (id) => set({ selectedPropId: id }),
 
   // 단일 뷰 생성 (crop 폐기, 2026-06-05). main=T2I, 방향=main 기반 i2i. 서버가 해당 뷰 컬럼만 갱신.
   generateCharacterView: async (characterId, appearanceKey, view, actor = 'ui', instruction, safeMode, model, options) => {
@@ -2520,6 +2554,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       lookSummary: null,
       worldAssets: [],
   propAssets: [],
+  propUsage: {},
+  selectedPropId: null,
       selectedCharacterId: null,
       selectedLocationId: null,
       selectedLocationAppearances: {},

@@ -2846,6 +2846,9 @@ export const KO: Record<string, string> = {
   'Backgrounds {count}': '배경 {count}',
   // D13 · D7(2026-11-22): Artist 한 페이지 묶음(인물 · 배경 · 소품)과 바로가기 단추.
   'Props {count}': '소품 {count}',
+  Prop: '소품',
+  'Appears in: scenes {scenes} · shots {shots}': '씬 {scenes} · 샷 {shots}에 나와요',
+  'Not in any shot yet': '아직 샷에 나오지 않아요',
   'Characters · backgrounds · props': '인물 · 배경 · 소품',
   'Characters {persons} · backgrounds {places} · props {props}': '인물 {persons} · 배경 {places} · 소품 {props}',
   'Jump to a section': '묶음으로 바로 가기',
