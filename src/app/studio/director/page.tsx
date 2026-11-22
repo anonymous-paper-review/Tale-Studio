@@ -984,6 +984,8 @@ function CanvasInner() {
         }}
         onPaneContextMenu={(event) => {
           event.preventDefault()
+          // 다 읽기 전 · 못 불러옴이면 만들기 메뉴를 열지 않는다 — 두 번 누르기와 같다(리드 11/23 판 읽기 뒷마무리, 누르는 그때의 상태).
+          if (!canvasCreateAllowed(boardLoadStatusOf(useBoardLoadStore.getState(), useDirectorCanvasStore.getState().projectId))) return
           const native = event as unknown as { clientX: number; clientY: number }
           setContextMenu({
             type: 'pane',
@@ -1424,13 +1426,16 @@ function PaletteBar() {
           </button>
 
           {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
+          {/* 다 읽기 전 · 못 불러옴이면 꺼지고 만들지 않는다 — 읽지 못한 판 위에 카드를 만들지 않는다(리드 11/23 판 읽기 뒷마무리). */}
           <button
             type="button"
-            onClick={() =>
+            disabled={boardOff}
+            onClick={() => {
+              if (boardOff) return
               addPromptNode(promptNodePlace(useDirectorCanvasStore.getState().viewport, promptCount))
-            }
+            }}
             title={t('Adds a standalone prompt node. Connect its right handle to a Shot\'s T input to sync the Shot prompt.')}
-            className={TOOLBAR_PILL}
+            className={cn(TOOLBAR_PILL, 'disabled:cursor-not-allowed disabled:opacity-50')}
           >
             <Plus className="size-3.5" />
             <span>{t('Prompt node')}</span>
@@ -1450,6 +1455,7 @@ function PaletteBar() {
           <PickAllBar
             total={visibleShotIds.length}
             picked={picked.size}
+            countShown={!boardOff}
             onToggleAll={() => setPickedShots(nextPickAll(visibleShotIds, [...picked]))}
             onClear={clearPickedShots}
           />

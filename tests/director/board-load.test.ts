@@ -12,6 +12,7 @@ vi.mock('@/lib/i18n', async () => {
 })
 
 import { DirectorCanvasLoadNote, canvasCreateAllowed, directorCanvasNote, noShotsNoteAllowed } from '@/features/director/canvas-load-note'
+import { PickAllBar } from '@/features/director/shot-status'
 import { markBoardLoad, retryBoardLoad, useBoardLoadStore } from '@/stores/board-load-store'
 
 const PAGE = 'src/app/studio/director/page.tsx'
@@ -140,5 +141,39 @@ describe('Director 판 읽기 — 혼자 정한 것(되돌리기 쉬움)', () =>
     // 크림(가장 밝은 단추)은 읽기 전이면 어디에도 칠하지 않는다 — 셈 줄은 그대로 두고 결과만 비운다.
     expect(source).toMatch(/const primary = boardOff \? null : primaryWorkAction\(\{/)
     expect(source).toMatch(/\{estimate && !boardOff && \(/)
+  })
+})
+
+describe('판 읽기 뒷마무리 — 같이 정한 것(리드 11/23)', () => {
+  it('다 읽기 전 · 못 불러옴일 때 캔버스 오른쪽 누르기 메뉴의 카드 만들기와 툴바 [+ 프롬프트 노드]는 카드를 만들지 않는다', () => {
+    // 왜: 두 번 누르기와 같은 위험 — 읽지 못한 판 위에 새 카드가 생기면 다시 읽은 판과 섞인다(리드 11/23, 찾은 것).
+    const source = page()
+    // 빈 캔버스 오른쪽 누르기: 브라우저 메뉴는 막고, 판을 다 읽지 않았으면 만들기 메뉴를 열지 않는다(누르는 그때의 상태).
+    const menu = body(source, 'onPaneContextMenu={(event) => {', '\n        }}\n')
+    expect(menu).toMatch(/event\.preventDefault\(\)\s*\n\s*(?:\/\/[^\n]*\n\s*)*if \(!canvasCreateAllowed\(boardLoadStatusOf\(useBoardLoadStore\.getState\(\), useDirectorCanvasStore\.getState\(\)\.projectId\)\)\) return[\s\S]*setContextMenu\(\{\s*type: 'pane'/)
+    // 툴바 [+ 프롬프트 노드]: 꺼지고, 눌러도 만들지 않는다.
+    const prompt = body(source, "t('Adds a standalone prompt node.", "</button>")
+    const button = source.slice(source.lastIndexOf('<button', source.indexOf("t('Adds a standalone prompt node.")), source.indexOf("t('Adds a standalone prompt node."))
+    expect(button).toMatch(/disabled=\{boardOff\}/)
+    expect(button).toMatch(/onClick=\{\(\) => \{\s*if \(boardOff\) return\s*addPromptNode\(promptNodePlace\(/)
+    expect(prompt).toContain("t('Prompt node')")
+  })
+
+  it('다 읽기 전 · 못 불러옴일 때 고르기 줄은 "전체 0개" 대신 숫자를 적지 않는다', () => {
+    // 왜: 읽다 만 판으로 센 "전체 0개"는 샷이 없는 것처럼 보인다(리드 11/23, 찾은 것).
+    const off = renderToStaticMarkup(createElement(PickAllBar, { total: 0, picked: 0, countShown: false, onToggleAll: () => {}, onClear: () => {} }))
+    // 화면에 보이는 글만(속성 · 모양 이름의 숫자는 빼고) 본다.
+    const shown = (html: string) => html.replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim()
+    expect(off).toContain('>전체</span>')
+    expect(shown(off)).toBe('전체')
+    const offPicked = renderToStaticMarkup(createElement(PickAllBar, { total: 3, picked: 1, countShown: false, onToggleAll: () => {}, onClear: () => {} }))
+    expect(offPicked).toContain('>전체</span>')
+    expect(shown(offPicked)).not.toMatch(/\d/)
+    // 다 읽은 뒤는 지금 그대로.
+    const on = renderToStaticMarkup(createElement(PickAllBar, { total: 3, picked: 0, onToggleAll: () => {}, onClear: () => {} }))
+    expect(on).toContain('전체 3개')
+    lang.locale = 'en'
+    expect(renderToStaticMarkup(createElement(PickAllBar, { total: 0, picked: 0, countShown: false, onToggleAll: () => {}, onClear: () => {} }))).toContain('>All</span>')
+    expect(page()).toMatch(/<PickAllBar\s+total=\{visibleShotIds\.length\}\s+picked=\{picked\.size\}\s+countShown=\{!boardOff\}/)
   })
 })
