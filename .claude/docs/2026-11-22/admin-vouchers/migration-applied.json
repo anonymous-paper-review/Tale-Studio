@@ -1,0 +1,28 @@
+{
+  "migrationVersion": "20261118090000",
+  "migrationName": "admin_voucher_controls",
+  "sha256": "cd37bc1feb9814717743ba247fb3d73e7d32c4d2111e61c54d690841c3d36954",
+  "development": {
+    "project": "pbiumddivadgbzxuymak",
+    "appliedAt": "2026-11-18 (기록 이력 있음, 파일과 내용 같음 — 공백 · 주석 빼고 대조)",
+    "historyRecorded": true,
+    "verifiedWith": "node scripts/test-admin-voucher-dev-db.mjs — 되돌리는 트랜잭션 14건 통과(등록 · 중지 코드 거절 · 티어 변경 회수 20 + 지급 150 · 해지 회수 150 → 무료 · 만료 정리)"
+  },
+  "production": {
+    "project": "qnjnrihfpqkdhjuzvepy",
+    "appliedAt": "2026-11-22T03:47:41.263Z",
+    "appliedBefore": "main 배포 전 — 새 코드가 vouchers.duration_days · active · deleted_at 을 읽으므로 DB 먼저. 옛 코드도 새 함수와 같은 인자로 그대로 돈다.",
+    "appliedWith": "Supabase Management API database/query 로 파일 그대로 실행 + supabase_migrations.schema_migrations 에 이력 행 (11-12 43727d13 과 같은 방식)",
+    "historyRecorded": true,
+    "beforeCounts": { "vouchers": 92, "redemptions": 3 },
+    "afterCounts": { "vouchers": 92, "redemptions": 3, "activeWithDefault30Days": 92 },
+    "existingRedemptionsPlanBackfilled": ["s2", "p10", "p10"],
+    "functionExecute": {
+      "redeem_voucher": { "anon": false, "authenticated": false, "service_role": true },
+      "voucher_plan_expire_due": { "anon": false, "authenticated": false, "service_role": true },
+      "admin_update_voucher_redemption": { "anon": false, "authenticated": false, "service_role": true },
+      "admin_end_voucher_redemption": { "anon": false, "authenticated": false, "service_role": true }
+    }
+  },
+  "productionChanged": true
+}
