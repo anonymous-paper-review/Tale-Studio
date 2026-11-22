@@ -62,6 +62,7 @@ import { writerChatIntent } from '@/lib/prose/writer-chat'
 import { answerToNextStep } from '@/lib/prose/next-answer'
 import { paragraphLabel } from '@/lib/prose/paragraph-pick'
 import { styleReturnCard, styleReturnRequest, versionStyleLabel } from '@/lib/artist/style-versions'
+import { artistPropContextLines } from '@/lib/artist/props'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { stageIndex } from '@/lib/stage-gate'
 import { useArtistVersionStore } from '@/stores/artist-version-store'
@@ -3810,6 +3811,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           })
           return [header, '  외형 타임라인:', ...appearanceLines]
         })
+        const propLines = artistPropContextLines(a.propAssets)
         const worldLines = a.worldAssets.flatMap((w) => {
           const header = `- ${w.name} (${w.locationId}) — ${w.wideShot ? 'has image' : 'no image'}`
           const variants = w.appearances ?? []
@@ -3828,6 +3830,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           ...(charLines.length ? charLines : ['- (없음)']),
           `### 장소 (${a.worldAssets.length})`,
           ...(worldLines.length ? worldLines : ['- (없음)']),
+          // D7(2026-11-22): 소품 — 정확한 id 와 그림 유무(regenerateProp 의 근거).
+          `### 소품 (${a.propAssets.length})`,
+          ...(propLines.length ? propLines : ['- (없음)']),
         ].join('\n')
         endpoint = '/api/artist/chat'
         body = {
@@ -4308,7 +4313,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const updates = data.updates as ArtistUpdate[]
         const artistProposals: PendingProposal[] = []
         const costUpdates = updates.filter((u) =>
-          u.type === 'regenerateCharacter' || u.type === 'regenerateWorldAsset'
+          u.type === 'regenerateCharacter' || u.type === 'regenerateWorldAsset' || u.type === 'regenerateProp'
         )
         // 새 인물 카드는 채팅으로 만들지 않는다(2026-10-27 디자이너 QA 1차 #04 · 오너 "채팅 추가 막고 안내") — 예전 서버가 보낸 만들기 명령도 버린다.
         const ignoredNewCards = (data.updates as Array<{ type?: unknown } | null>).filter((u) => u?.type === 'createCharacter').length
@@ -4328,10 +4333,34 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               ? artistState.worldAssets.find((w) => w.locationId === costUpdate.locationId)
                   ?.name || costUpdate.locationId
               : null
+          const propName =
+            costUpdate.type === 'regenerateProp'
+              ? artistState.propAssets.find((p) => p.propId === costUpdate.propId)?.name || costUpdate.propId
+              : null
           // createPendingProposal 의 렌더 지점은 아직 t() 를 안 태운다 — producer-store 와 같은
           //   방식으로 여기서 미리 완역해 넘긴다(#i18n-s5-batch4, ko 출력은 기존과 동일).
           const locale = contentLocale()
-          const proposal = costUpdate.type === 'regenerateCharacter'
+          const proposal = costUpdate.type === 'regenerateProp'
+            // D7(2026-11-22): 소품 그림 다시 그리기 — 인물 · 배경과 같은 승인 카드. 승인하면 그 소품만 다시 그린다.
+            ? createPendingProposal({
+                traceId,
+                stage: 'artist',
+                kind: 'artistRegenerateProp',
+                target: propName ?? costUpdate.propId,
+                action: translate(locale, 'Regenerate the prop image'),
+                impact: [
+                  translate(locale, 'Costs money to generate the image.'),
+                  translate(locale, 'The currently selected image stays until the new one is done.'),
+                  translate(locale, 'Regeneration does not start until you approve.'),
+                ],
+                payload: {
+                  propId: costUpdate.propId,
+                  ...(costUpdate.instruction ? { instruction: costUpdate.instruction } : {}),
+                  ...(costUpdate.model ? { model: costUpdate.model } : {}),
+                  ...(costUpdate.safeMode ? { safeMode: true } : {}),
+                },
+              })
+            : costUpdate.type === 'regenerateCharacter'
             ? createPendingProposal({
                 traceId,
                 stage: 'artist',
@@ -5825,6 +5854,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             onJob: observeGeneration,
           })
         if (receipt?.status === 'failed' || receipt?.status === 'timed_out') return false
+      } else if (proposal.kind === 'artistRegenerateProp') {
+        // D7(2026-11-22): 승인한 소품 그림 다시 그리기 — 카드 · 창의 [다시 그리기]와 같은 창구(그림은 무료, 그림 동시 자리만 쓴다).
+        const propId = proposal.payload.propId
+        if (typeof propId !== 'string') throw new Error('propId missing')
+        if (!useArtistStore.getState().propAssets.some((prop) => prop.propId === propId)) throw new Error(`Prop ${propId} was not found`)
+        const outcome = await useArtistStore.getState().generateProp(propId, 'chat', {
+          instruction: typeof proposal.payload.instruction === 'string' ? proposal.payload.instruction : undefined,
+          model: isImageModelKey(proposal.payload.model) ? proposal.payload.model : undefined,
+          safeMode: proposal.payload.safeMode === true,
+          traceId: traceId ?? undefined,
+          onJob: observeGeneration,
+        })
+        if (outcome === 'failed' || outcome === 'quota') return false
       } else if (proposal.kind === 'artistRegenerateWorldAsset') {
         const locationId = proposal.payload.locationId
         if (typeof locationId !== 'string') throw new Error('locationId missing')

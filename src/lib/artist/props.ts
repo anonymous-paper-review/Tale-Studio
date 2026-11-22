@@ -89,3 +89,24 @@ export function orderPropsByUsage<T extends Pick<PropAsset, 'propId'>>(props: re
     })
     .map(({ prop }) => prop)
 }
+
+/** 화면이 소품을 저절로 이어 그리는 때(리드 결정 2) — [만들기] 뒤 · [완료하기] 전(카드 단계)이고 인물 · 배경 그림이 다 그려진 뒤.
+ *  완료한 프로젝트를 열었다고 저절로 그리지 않는다(빈 그림 이어 그리기와 같은 규칙). 데모는 그리지 않는다. */
+export function propsAutoDrawOpen(input: { phase: string; done: boolean; demo: boolean }): boolean {
+  return input.phase === 'cards' && input.done && !input.demo
+}
+
+/** 저절로 그릴 소품 — 그림이 없고 · 그리는 중이 아니고 · 실패하지 않았고(실패는 사람의 [다시 그리기]) · 이번에 아직 청하지 않은 것. 카드 순서대로. */
+export function propsToAutoDraw(
+  props: ReadonlyArray<Pick<PropAsset, 'propId' | 'imageUrl'>>,
+  state: { generating: readonly string[]; failures: Readonly<Record<string, unknown>>; tried: ReadonlySet<string> },
+): string[] {
+  return props
+    .filter((prop) => !prop.imageUrl && !state.generating.includes(prop.propId) && !state.failures[prop.propId] && !state.tried.has(prop.propId))
+    .map((prop) => prop.propId)
+}
+
+/** Artist 채팅 문맥의 소품 줄 — "- 이름 (id) — has image|no image". 인물 · 장소 줄과 같은 꼴(모델이 id 를 지어내지 않게). */
+export function artistPropContextLines(props: ReadonlyArray<Pick<PropAsset, 'propId' | 'name' | 'imageUrl'>>): string[] {
+  return props.map((prop) => `- ${prop.name} (${prop.propId}) — ${prop.imageUrl ? 'has image' : 'no image'}`)
+}

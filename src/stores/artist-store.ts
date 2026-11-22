@@ -38,7 +38,7 @@ import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/generation-slots'
 import { DRAW_CONTINUE_MAX_ROUNDS, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, missingDrawTargets, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import type { ArtistSection } from '@/lib/artist/card-filter'
-import { orderPropsByUsage, propAssetsFromRows, propUsage, type PropRow, type PropUsage } from '@/lib/artist/props'
+import { orderPropsByUsage, propAssetsFromRows, propUsage, propsToAutoDraw, type PropRow, type PropUsage } from '@/lib/artist/props'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -153,6 +153,16 @@ export type ArtistUpdate =
       appearance: string
       narrativeTime?: NarrativeTime
     }
+  /** D7(2026-11-22): 소품 그림 한 장 다시 그리기 — 채팅은 승인 카드(artistRegenerateProp)를 거친다. */
+  | { type: 'regenerateProp'; propId: string; instruction?: string; model?: ImageModelKey; safeMode?: boolean }
+
+/** 소품 그리기 한 번의 결과(D7) — 그렸다 · 건너뜀(이미 그림이 있거나 그리는 중) · 자리 없음(429, 실패 아님) · 실패. */
+export type PropDrawOutcome = 'drawn' | 'skipped' | 'quota' | 'failed'
+
+/** 이어 그리기가 이번에 청한 소품(프로젝트별) — 같은 화면에서 같은 소품을 끝없이 다시 청하지 않는다. */
+const propAutoTried = new Map<string, Set<string>>()
+/** 소품 이어 그리기를 한 번에 함께 청하는 수 — 인물 · 배경을 다 그린 뒤라 사람당 그림 자리(6)의 반만 쓴다. */
+const PROP_AUTO_BATCH = 3
 
 /** 생성 트리거 주체. `auto`는 Artist 자동 first-fill 내부 표식이며 서버 job actor 로는 ui 처리된다. */
 export type GenerationActor = 'ui' | 'chat' | 'auto'
@@ -670,7 +680,9 @@ interface ArtistState {
     propId: string,
     actor?: GenerationActor,
     options?: GenerationRequestOptions & { instruction?: string; model?: ImageModelKey; safeMode?: boolean },
-  ) => Promise<void>
+  ) => Promise<PropDrawOutcome>
+  /** 그림 없는 소품 이어 그리기(D7 · 리드 결정 2) — 인물 · 배경을 다 그린 뒤 화면이 부른다. 실패한 소품은 건너뛰고, 자리가 없으면(429) 멈춘다. */
+  continueMissingProps: () => Promise<void>
   /** 소품 생김새(원천) 고치기 — 그림은 그대로 둔다(다시 그리기 전까지 "설명 바뀜"). */
   updatePropAppearance: (propId: string, appearance: string) => Promise<void>
   selectedCharacterId: string | null
@@ -1327,10 +1339,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectProp: (id) => set({ selectedPropId: id }),
 
   generateProp: async (propId, actor = 'ui', options) => {
-    if (isDemoSession()) return
+    if (isDemoSession()) return 'skipped'
     const projectId = useProjectStore.getState().projectId
-    if (!projectId || !get().propAssets.some((p) => p.propId === propId)) return
-    if (get().generatingProps.includes(propId)) return
+    if (!projectId || !get().propAssets.some((p) => p.propId === propId)) return 'skipped'
+    if (get().generatingProps.includes(propId)) return 'skipped'
     set((state) => ({ generatingProps: [...state.generatingProps, propId], error: null }))
     const locale = useLocaleStore.getState().locale
     try {
@@ -1348,28 +1360,54 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         }),
       })
       const body = (await res.json().catch(() => ({}))) as { jobId?: string; deduped?: boolean; skipped?: boolean; error?: string }
+      // 자리가 없다(사람당 그림 자리 · 모두의 자리) — 그림 실패가 아니다. 카드의 [그리기]로 남긴다.
+      if (res.status === 429) return 'quota'
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
       if (body.jobId) {
         options?.onJob?.({ jobId: body.jobId, status: 'queued' })
         await pollGenerationJob(body.jobId, { onStatus: options?.onJob })
-        if (useProjectStore.getState().projectId !== projectId) return
+        if (useProjectStore.getState().projectId !== projectId) return 'drawn'
         await refreshPropRow(projectId, propId, set)
         notifyGenerationComplete('artist', translate(locale, 'Prop image'))
-      } else if (body.deduped) {
+        void refreshPropFailures(projectId, set)
+        return 'drawn'
+      }
+      if (body.deduped) {
         // 다른 창 · 서버가 이미 그리는 중 — 그 작업을 이어 받는다(생성 상태의 대기 작업).
         void get().syncGenerationStatus(projectId)
       }
       void refreshPropFailures(projectId, set)
+      return 'skipped'
     } catch (err) {
-      if (useProjectStore.getState().projectId !== projectId) return
+      if (useProjectStore.getState().projectId !== projectId) return 'failed'
       const raw = err instanceof Error ? err.message : String(err)
       // 그리는 중에서 빼기 전에 실패로 먼저 적는다 — 실패 기록을 다시 읽기 전 사이에 이어 그리기가 다시 요청하지 않게(배경과 같다).
       set((state) => ({ error: raw || 'Prop image failed', propFailures: { ...state.propFailures, [propId]: state.propFailures[propId] ?? { error: raw, moderation: false, failCount: 1, safeFailCount: 0 } } }))
       options?.onJob?.({ jobId: null, status: 'failed', error: raw })
       notifyGenerationFailed('artist', translate(locale, 'Prop image'), raw)
       void refreshPropFailures(projectId, set)
+      return 'failed'
     } finally {
       set((state) => ({ generatingProps: state.generatingProps.filter((id) => id !== propId) }))
+    }
+  },
+
+  continueMissingProps: async () => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId || isDemoSession()) return
+    const tried = propAutoTried.get(projectId) ?? new Set<string>()
+    propAutoTried.set(projectId, tried)
+    for (;;) {
+      if (useProjectStore.getState().projectId !== projectId) return
+      const targets = propsToAutoDraw(get().propAssets, { generating: get().generatingProps, failures: get().propFailures, tried }).slice(0, PROP_AUTO_BATCH)
+      if (targets.length === 0) return
+      for (const propId of targets) tried.add(propId)
+      const outcomes = await Promise.all(targets.map((propId) => get().generateProp(propId, 'auto')))
+      // 자리가 없으면 거기서 멈춘다 — 남은 소품은 카드의 [그리기]로 남는다(다음에 이 화면을 열면 다시 이어 그린다).
+      if (outcomes.includes('quota')) {
+        for (const propId of targets) tried.delete(propId)
+        return
+      }
     }
   },
 
@@ -2433,6 +2471,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         else await get().generateWorldAsset(u.locationId, 'chat')
       } else if (u.type === 'createAppearance') {
         await get().createAppearance(u.characterId, u.label, u.appearance, u.narrativeTime)
+      } else if (u.type === 'regenerateProp') {
+        await get().generateProp(u.propId, 'chat', { instruction: u.instruction, model: u.model, safeMode: u.safeMode })
       }
     }
   },
