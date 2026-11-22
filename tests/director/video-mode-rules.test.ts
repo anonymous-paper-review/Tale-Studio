@@ -1,6 +1,10 @@
 // 영상 만드는 방식마다 어떤 그림을 어떤 순서로 쓰고, 언제 그 방식을 고를 수 없는지 정한다 (오너 2026-11-22 D2~D5)
 import { describe, expect, it } from 'vitest'
 import {
+  DEFAULT_VIDEO_MODE,
+  START_MIDDLE_SOURCE,
+  VIDEO_MODES,
+  isVideoMode,
   previousShotInScene,
   takeOverrideForRequest,
   videoModeAvailability,
@@ -21,6 +25,23 @@ const references = {
   props: [{ url: LANTERN, label: 'prop: lantern' }],
 }
 
+describe('같이 정한 것', () => {
+  // 왜: 오너 2026-11-22 "기존에 있던 Start, End 프레임 생성 방식은 일단 폐기" — 남는 방식은 오너 D2~D5 의 넷이다.
+  //   기본(아무것도 안 고름)은 시작+프롬프트다(리드 제안, 오너 확인 중 — 이 상수 하나로 바꿔 끼운다).
+  it('영상 만드는 방식은 넷이다 — 이어서 · 레퍼런스 · 시작+미들 · 시작+프롬프트, 시작+끝은 고를 수 없다', () => {
+    expect(VIDEO_MODES).toEqual(['continue', 'reference', 'start_middle', 'start_prompt'])
+    expect(isVideoMode('start_end')).toBe(false)
+    expect(DEFAULT_VIDEO_MODE).toBe('start_prompt')
+  })
+
+  // 왜: 오너 V2 "실사 미들로 해줘" — 영상에는 실사 그림만 들어간다(러프 = 목각 인형). 미들은 실사 시트의 가운데 장(시작 그림 + 화살표 · 글자)이다.
+  it('시작+미들의 미들은 실사 시트의 가운데 장이다', () => {
+    expect(START_MIDDLE_SOURCE).toBe('real')
+    expect(resolveModeFrames({ mode: 'start_middle', storyboardImage: STORYBOARD, roughStoryboard: ROUGH }))
+      .toMatchObject({ ok: true, urls: [START, REAL_DIRECTION], roles: ['start', 'direction'], middleSource: 'real' })
+  })
+})
+
 describe('혼자 정한 것', () => {
   // 왜: "앞에서 생성된 영상"은 같은 씬의 바로 앞 샷 영상이다 — 화면과 서버가 같은 순서(샷 읽기 순서 sort_order)로 앞 샷을 찾아야 한다.
   it('같은 씬의 바로 앞 샷을 씬 안 순서로 찾고, 씬의 첫 샷이면 앞 샷이 없다고 한다', () => {
@@ -37,7 +58,7 @@ describe('혼자 정한 것', () => {
   // 왜: 씬이 바뀌면 장소 · 시간이 바뀐다 — 앞 씬 마지막 샷에서 잇지 않는다(대신 기본 방식으로 만든다).
   it('씬의 첫 샷에서는 이어서를 고를 수 없다', () => {
     expect(videoModeAvailability('continue', { ...READY, firstShotInScene: true })).toEqual({ enabled: false, reason: 'first_shot_in_scene' })
-    expect(videoModeAvailability('start_end', { ...READY, firstShotInScene: true }).enabled).toBe(true)
+    expect(videoModeAvailability('start_prompt', { ...READY, firstShotInScene: true }).enabled).toBe(true)
   })
 
   // 왜: 앞 영상이 끝나길 기다렸다 저절로 만들면 사람이 모르는 사이 Take 가 쓰인다 — 막고 까닭을 다르게 보인다.
@@ -47,14 +68,22 @@ describe('혼자 정한 것', () => {
     expect(videoModeAvailability('continue', READY).enabled).toBe(true)
   })
 
-  // 왜: 러프는 화면이 열려 있을 때만 그려진다 — 미들이 아직 없으면 시작+미들은 보낼 그림이 없다.
+  // 왜: 미들은 실사 시트의 가운데 장이다(V2) — 가운데 장이 없는 옛 실사면 시작+미들은 보낼 그림이 없다.
   it('미들이 없으면 시작+미들을 고를 수 없다', () => {
     expect(videoModeAvailability('start_middle', { ...READY, hasMiddle: false })).toEqual({ enabled: false, reason: 'middle_missing' })
   })
 
+  // 왜: 러프 화살표를 고친 뒤 실사를 다시 그리지 않으면 실사 가운데 장은 고치기 전 움직임이고, 영상 지시의 읽은 줄은 고친 뒤 움직임이다 —
+  //   보내는 그림과 글이 다른 움직임을 말하지 않게 그때는 끄고 까닭을 보인다(리드 D1, 2026-11-22). 판정은 "러프 바뀜"(classifyRoughChanged).
+  it('시작+미들은 실사 시트에 가운데 장이 있고, 러프를 고친 뒤 다시 그린 실사일 때만 고를 수 있다', () => {
+    expect(videoModeAvailability('start_middle', { ...READY, middleOutdated: true })).toEqual({ enabled: false, reason: 'middle_outdated' })
+    expect(videoModeAvailability('start_middle', { ...READY, middleOutdated: false })).toEqual({ enabled: true, reason: null })
+    expect(videoModeAvailability('start_prompt', { ...READY, middleOutdated: true }).enabled).toBe(true)
+  })
+
   // 왜: 지금 약속(#ref-gate) — 샷의 실사 영상은 실사 시작 그림이 있어야 만든다. 방식이 늘어도 같다.
   it('실사 시작 그림이 없으면 어느 방식도 고를 수 없다', () => {
-    for (const mode of ['start_end', 'continue', 'reference', 'start_middle', 'start_prompt'] as const) {
+    for (const mode of VIDEO_MODES) {
       expect(videoModeAvailability(mode, { ...READY, hasStoryboard: false })).toEqual({ enabled: false, reason: 'storyboard_missing' })
     }
   })
@@ -106,11 +135,13 @@ describe('혼자 정한 것', () => {
     expect(roughMiddleFrame({ ...ROUGH, status: 'generating' })).toBeNull()
   })
 
-  // 왜: 이어서에도 이번 샷의 실사 끝 그림이 있으면 끝으로 같이 보낸다(지금 노드 이음과 같다). 이어 붙일 장면이 없으면 만들지 않는다.
-  it('이어서는 이어 붙일 장면을 시작으로, 이번 샷 실사 끝 그림을 끝으로 쓴다', () => {
+  // 왜: 오너 2026-11-22 "앞에서 생성된 영상의 마지막 프레임을 참조" · 시작+끝 폐기 — 이번 샷의 실사 끝 그림은 실사 끝이 있어도 보내지 않는다.
+  //   이어 붙일 장면이 없으면 만들지 않는다.
+  it('이어서는 이어 붙일 장면만 시작으로 쓰고, 이번 샷의 끝 그림은 보내지 않는다', () => {
     const frame = 'https://media.test/chain.jpg'
     expect(resolveModeFrames({ mode: 'continue', storyboardImage: STORYBOARD, continueFrameUrl: frame }))
-      .toMatchObject({ ok: true, urls: [frame, END], roles: ['start', 'end'] })
+      .toMatchObject({ ok: true, urls: [frame], roles: ['start'] })
+    expect(STORYBOARD.frames.end).toBe(END)
     expect(resolveModeFrames({ mode: 'continue', storyboardImage: STORYBOARD, continueFrameUrl: null }))
       .toEqual({ ok: false, code: 'missing_continue_frame' })
   })

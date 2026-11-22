@@ -188,7 +188,8 @@ describe('같이 정한 것', () => {
     await submitAndReadHold(prepared)
     expect(mocks.submit).toHaveBeenCalledWith(
       'bytedance/seedance-2.0/reference-to-video',
-      expect.objectContaining({ input: expect.objectContaining({ resolution: '1080p', image_urls: [START, END] }) }),
+      // 끝 그림은 오너 시작+끝 폐기(2026-11-22)로 보내지 않는다.
+      expect.objectContaining({ input: expect.objectContaining({ resolution: '1080p', image_urls: [START] }) }),
     )
   })
 

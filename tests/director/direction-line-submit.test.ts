@@ -118,6 +118,17 @@ describe('혼자 정한 것', () => {
     expect(String(after.inputSnapshot.full_prompt)).toContain(STORED_PROMPT)
   })
 
+  // 왜: 리드 D2(2026-11-22) — 끝 그림이 영상에서 빠져 "줄과 끝 그림이 맞아야 한다"(리드 Q-a)의 까닭이 영상에는 없어졌다.
+  //   화살표를 고치고 끝 장을 [그대로] 두어도 영상은 고친 연출을 따라야 D10 의 처음 문제("화살표를 고쳐도 안 바뀜")가 생기지 않는다.
+  //   실사(R1)는 지금처럼 끝 장을 그린 줄만 쓴다(실사 시트에는 끝 칸이 있다) — 이 시험은 영상 쪽만 본다.
+  it('영상은 지금 연출 장을 읽은 줄이면 끝 장을 그 줄로 그리지 않았어도 싣는다', async () => {
+    for (const endDrawn of [null, `${ROUGH.frames.end}?v=old`]) {
+      seed({ ...ROUGH, directionRead: { ...FRESH_READ, endDrawn } })
+      const prepared = await prepare()
+      expect({ endDrawn, line: prepared.inputSnapshot.direction_read }).toEqual({ endDrawn, line: LINE })
+    }
+  })
+
   // 왜: 읽은 줄에는 사람이 연출 장에 쓴 손글씨나 사람이 고친 글이 옮겨진다 — 다른 사용자 글처럼 생성처에 보내기 전에 검사한다.
   it('읽은 줄도 사용자 글처럼 내용 검사에 넣는다', async () => {
     seed({ ...ROUGH, directionRead: FRESH_READ })

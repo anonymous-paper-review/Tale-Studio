@@ -82,18 +82,18 @@ export function buildVideoBatchInputs(
     }
 
     const frameInputs = normalizeFrameInputs(take?.data.frameInputs)
-    const hasManualFrameInputs =
-      !!frameInputs.start || !!frameInputs.end || frameInputs.refs.length > 0
+    // 끝 그림은 영상에 보내지 않는다(오너 2026-11-22 "Start, End 프레임 생성 방식 폐기") — 끝 칸만 이은 Take 는 손 배선으로 치지 않고,
+    //   끝 칸 배선은 풀 수 없어도 그 샷을 빼지 않는다(쓰지 않으니까).
+    const hasManualFrameInputs = !!frameInputs.start || frameInputs.refs.length > 0
     const storyboard = mother.storyboardImage
     const sbFrames = storyboard?.status === 'completed' ? storyboard.frames : undefined
     const automaticStart = resolveShotFrameImageUrl(mother, 'start')
-    const automaticEnd = sbFrames ? resolveShotFrameImageUrl(mother, 'end') : null
     const automaticReferenceImageUrl =
       (storyboard?.status === 'completed' ? usableFrameImageUrl(storyboard.url) : null) ??
       resolveShotFrameImageUrl(mother, 'ref')
 
     let referenceImageUrls: string[] | undefined
-    let referenceImageRoles: Array<'start' | 'end' | 'ref'> | undefined
+    let referenceImageRoles: Array<'start' | 'ref'> | undefined
 
     if (chainFrameUrl || hasManualFrameInputs || sbFrames) {
       let start: string | null = null
@@ -117,22 +117,13 @@ export function buildVideoBatchInputs(
         refs.push(resolved)
       }
 
-      let end: string | null = null
-      if (frameInputs.end) {
-        const resolved = resolveFrameInputImageUrl(nodes as DirectorNode[], frameInputs.end, 'end')
-        if (!resolved) manualUnresolved = true
-        end = resolved
-      } else {
-        end = automaticEnd
-      }
-
       if (manualUnresolved) {
         skipped.push({ shotId: writerShotId, reason: 'unresolvable_manual_wiring' })
         continue
       }
 
       const urls: string[] = []
-      const roles: Array<'start' | 'end' | 'ref'> = []
+      const roles: Array<'start' | 'ref'> = []
       if (start) {
         urls.push(start)
         roles.push('start')
@@ -140,10 +131,6 @@ export function buildVideoBatchInputs(
       for (const url of refs) {
         urls.push(url)
         roles.push('ref')
-      }
-      if (end) {
-        urls.push(end)
-        roles.push('end')
       }
       if (urls.length > 0) {
         referenceImageUrls = urls
