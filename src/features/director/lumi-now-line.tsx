@@ -16,6 +16,7 @@ import { DEFAULT_VIDEO_MODEL } from '@/lib/video-models'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useProjectStore } from '@/stores/project-store'
+import { nextStepAction } from '@/lib/handoff-intent'
 
 export function LumiNowLine() {
   const t = useT()
@@ -27,6 +28,10 @@ export function LumiNowLine() {
   const realBatchRemaining = useDirectorCanvasStore((s) => s.realBatchRemaining)
   const chain = useDirectorCanvasStore((s) => s.chainVideoAfterImage)
   const projectId = useProjectStore((s) => s.projectId)
+  // 끝 줄 "다음: …로"는 지금 화면의 [다음] 단추와 같은 말 — Cinema 는 "다음: Director로", Director 는 "다음: Editor로"(리드 F 2026-11-23).
+  const stage = useProjectStore((s) => s.currentStage)
+  const producerLocked = useProjectStore((s) => s.producerLocked)
+  const nextAction = nextStepAction(stage, { producerLocked })
   const batches = useGenerationBatches(projectId ?? null)
   const takes = useTakeBalance()
 
@@ -47,6 +52,7 @@ export function LumiNowLine() {
     takesFor: (ids) => videoBatchTakeCosts(nodes, ids).reduce((sum, n) => sum + n, 0),
     // 잔액을 잠깐 못 읽은 것은 과금 꺼짐이 아니다 — Take 값은 그대로 보이고, 정말 꺼졌을 때만 숨긴다(툴바 · D0 · D8 과 같은 판단).
     takesShown: takeValuesShown(takes),
+    next: nextAction ? t(nextAction.label) : undefined,
   }, t)
   if (!line) return null
   return (

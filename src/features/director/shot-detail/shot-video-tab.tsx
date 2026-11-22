@@ -30,7 +30,7 @@ import {
   newTakeRequest,
   shotDetailFrames,
   shotDetailTakes,
-  takeImageVersions,
+  takeImageLabel,
   takePhaseOf,
   takeSettings,
   type ShotDetailTake,
@@ -78,10 +78,10 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
   const portrait = !!w && !!h && w < h
 
   // "시작 v1 + 끝 v1"(D7 · 리드 B) — 그 Take 를 만든 작업이 쓴 그림을 지금 버전 목록과 맞춘다. 모르면 비운다.
+  //   끝 그림을 따로 쓴 옛 Take 만 "시작 + 끝", 끝을 쓰지 않은 새 Take 는 "이미지 v1"(fb-director QA B 2026-11-23).
   const madeWith = (take: ShotDetailTake): string | null => {
-    const used = takeImageVersions(data.storyboardImage, take.data)
-    if (!used?.start) return null
-    return t('Start v{start} + End v{end}', { start: used.start, end: used.end ?? used.start })
+    const named = takeImageLabel(data.storyboardImage, take.data)
+    return named ? t(named.key, named.params) : null
   }
 
   const markFinal = async (take: ShotDetailTake, next: boolean) => {

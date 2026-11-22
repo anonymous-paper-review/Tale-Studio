@@ -25,6 +25,8 @@ export interface LumiNowInput {
   takesFor: (shotNodeIds: readonly string[]) => number
   /** Take 를 쓰는 계정이다(과금 꺼짐 · 잔액을 못 읽으면 Take 수를 쓰지 않는다). */
   takesShown: boolean
+  /** 다음 단계로 가자는 말(번역된 것) — 지금 화면의 [다음] 단추와 같은 말(Cinema "다음: Director로", 리드 F 2026-11-23). 없으면 "다음: Editor로". */
+  next?: string
 }
 
 /** "지금 할 일 · …" 한 줄. 샷이 없거나 가리킬 일이 없으면 null(줄을 보이지 않는다). */
@@ -61,7 +63,7 @@ export function lumiNowLine(input: LumiNowInput, t: Translate): string | null {
       making: false,
     }, t)
   } else if (input.canHandOff) {
-    work = t('Next: Editor')
+    work = input.next ?? t('Next: Editor')
   }
   return work ? t('Up next · {work}', { work }) : null
 }

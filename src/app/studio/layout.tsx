@@ -224,7 +224,8 @@ export default function StudioLayout({
           className={stageFrameClass(shownStage)}
         >
           {/* 위 막대(v3) — 단계 칩 · 프로젝트 제목 · 연필. Producer 시작 화면은 탭이 든 자기 막대를 같은 모양으로 그린다. */}
-          {pathname.startsWith('/studio/start') ? null : <StudioTopBar stage={shownStage} />}
+          {/* Cinema 는 좁은 화면에서 [다음: Director로]가 잘리지 않게 위 막대가 줄을 바꾼다(리드 2026-11-23 QA C) — 다른 단계 위 막대는 그대로. */}
+          {pathname.startsWith('/studio/start') ? null : <StudioTopBar stage={shownStage} className={shownStage === 'camera' ? 'flex-wrap' : undefined} />}
           {children}
         </div>
       </main>

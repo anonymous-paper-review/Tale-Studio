@@ -317,8 +317,9 @@ export function CameraWorkBar({ scope, sceneLabel }: { scope: readonly string[] 
             <span data-testid="camera-estimate" className="truncate text-[12.5px] font-medium text-muted-foreground">{estimate}</span>
           ) : null}
         </div>
-        <div className="ml-auto flex shrink-0 flex-col items-end gap-1">
-          <div className="flex items-center gap-2">
+        {/* 좁으면 단추가 줄을 바꾼다 — 오른쪽 끝에서 잘리지 않게(리드 2026-11-23 QA C). 넓으면 지금처럼 한 줄. */}
+        <div className="ml-auto flex min-w-0 max-w-full flex-col items-end gap-1">
+          <div className="flex flex-wrap items-center justify-end gap-2">
             <button
               type="button"
               role="switch"

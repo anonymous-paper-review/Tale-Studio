@@ -15,6 +15,8 @@ import { useLocaleStore } from '@/stores/locale-store'
 import { isShotData, type DirectorNode } from '@/types/director'
 import { useActiveGenerationJobs } from '@/lib/generation-queue'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
+import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboard'
+import { classifyRoughChanged } from '@/lib/image-provenance'
 import { ShotPipelineRow } from '@/features/director/shot-status'
 import { HistoryCard } from './history-card'
 import { ImageFixPanel, VideoMakePanel } from './fix-panel'
@@ -45,6 +47,9 @@ export function CameraShotRow({ node, label, state }: { node: DirectorNode; labe
   const { takes, final } = shotDetailTakes(nodes, node.id)
   const image = data?.storyboardImage ?? null
   const hasImage = !!image?.url
+  // 러프 바뀜(fb-end QA 4 · 리드 2026-11-23) — Director 노드와 같은 판정(같은 함수 · Writer 샷의 러프 · 샷의 지금 실사). 지금 이미지 판에만 단다.
+  const rough = useRoughStoryboard(writerShotId)
+  const roughChanged = classifyRoughChanged(rough, data?.storyboardImage)
   const batchWaiting = realBatchBusy && !realBatchCancelled && image?.status !== 'failed' &&
     (realBatchShotIds === null ? !hasImage : !!writerShotId && realBatchShotIds.includes(writerShotId))
   const imageWork: ImageWork | null = imageGeneration.generating
@@ -91,13 +96,14 @@ export function CameraShotRow({ node, label, state }: { node: DirectorNode; labe
   if (!data) return null
   return (
     <article
-      className={cn('flex gap-4 rounded-2xl border-[1.5px] bg-background p-3 shadow-node', tone.frame ?? 'border-transparent', imageRemakeFailed(image) && 'border-destructive')}
+      // 판이 좁으면(30rem 보다 좁음) 이력 판이 샷 줄 아래로 내려와 접혀 다 보이고, 넓으면 지금처럼 옆에 서서 옆으로 민다(리드 2026-11-23 QA C).
+      className={cn('flex flex-col gap-3 @min-[30rem]:flex-row @min-[30rem]:gap-4 rounded-2xl border-[1.5px] bg-background p-3 shadow-node', tone.frame ?? 'border-transparent', imageRemakeFailed(image) && 'border-destructive')}
       data-shot-state={state}
       data-testid="camera-shot-row"
     >
       {/* 왼쪽 칸만 샷 멘션을 받는다 — 판 카드는 자기 이름(· 그림 vN · Take N)으로 멘션한다(캡처는 바깥이 먼저라 줄 전체에 걸면 카드를 덮는다). */}
       <div
-        className="flex w-60 shrink-0 flex-col gap-2"
+        className="flex w-full shrink-0 flex-col gap-2 @min-[30rem]:w-60"
         onPointerDownCapture={stopModifierPointerDown}
         onClickCapture={(event) => mentionOnModifierClick(event, mentionLabel)}
       >
@@ -161,13 +167,13 @@ export function CameraShotRow({ node, label, state }: { node: DirectorNode; labe
         {open === 'image' ? <ImageFixPanel shotNodeId={node.id} data={data} /> : null}
         {open === 'video' ? <VideoMakePanel shotNodeId={node.id} data={data} /> : null}
       </div>
-      <ol ref={stripRef} className="flex min-w-0 flex-1 items-start gap-3 overflow-x-auto pb-1" aria-label={t('{shot} history', { shot: label })}>
+      <ol ref={stripRef} className="flex min-w-0 flex-1 flex-wrap items-start gap-3 pb-1 @min-[30rem]:flex-nowrap @min-[30rem]:overflow-x-auto" aria-label={t('{shot} history', { shot: label })}>
         {entries.length === 0 ? (
           <li className="flex items-center text-caption text-subtle-foreground">{t('No image or video yet.')}</li>
         ) : (
           entries.map((entry) => (
             <li key={`${entry.kind}:${entry.id}`} className="flex">
-              <HistoryCard entry={entry} shotNodeId={node.id} shotName={label} writerShotId={writerShotId} activeJobs={activeJobs} />
+              <HistoryCard entry={entry} shotNodeId={node.id} shotName={label} writerShotId={writerShotId} activeJobs={activeJobs} roughChanged={roughChanged && entry.kind === 'image' && entry.current} />
             </li>
           ))
         )}

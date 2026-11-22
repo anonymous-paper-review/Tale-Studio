@@ -120,6 +120,21 @@ export function takeImageVersions(image: StoryboardImage | null | undefined, tak
   return versionOfFrames(image, take.madeFrames ?? null)
 }
 
+/**
+ * 샷 상세 Take 줄의 그림 이름(D7 · 리드 B, fb-director QA B 2026-11-23) — 끝 그림을 따로 쓴 옛 Take 만 "시작 v{s} + 끝 v{e}",
+ * 그 밖(끝을 쓰지 않은 새 Take · 끝 그림을 모르는 Take)은 "이미지 v{n}". 쓴 그림을 모르면 null. 영어 원문 = i18n 키.
+ */
+export function takeImageLabel(
+  image: StoryboardImage | null | undefined,
+  take: Pick<VideoNodeData, 'madeFrames'>,
+): { key: string; params: Record<string, number> } | null {
+  const used = takeImageVersions(image, take)
+  if (!used?.start) return null
+  return used.end != null
+    ? { key: 'Start v{start} + End v{end}', params: { start: used.start, end: used.end } }
+    : { key: 'Image v{version}', params: { version: used.start } }
+}
+
 /** 보던 Take 와 지금 이미지가 다른가 — Take 가 쓴 버전을 알면 버전으로(되돌린 옛 버전도 "바뀜"), 모르면 만든 때와 그린 때로. */
 export function imageChangedForTake(image: StoryboardImage | null | undefined, take: Pick<VideoNodeData, 'madeFrames' | 'createdAt' | 'lastAttemptAt'>): boolean {
   if (!image) return false

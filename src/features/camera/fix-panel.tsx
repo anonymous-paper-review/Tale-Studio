@@ -24,7 +24,7 @@ import { prepareContinueFrom } from '@/lib/director/video-frame-capture'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { newTakeButton } from './new-take'
-import { CAMERA_VIDEO_MODES, VIDEO_MODE_BLOCK_TEXT, VIDEO_MODE_HINT, VIDEO_MODE_LABEL, cameraModeFacts, defaultVideoMode, freshTakeFields } from './video-mode'
+import { CAMERA_VIDEO_MODES, VIDEO_MODE_HINT, VIDEO_MODE_LABEL, cameraModeFacts, defaultVideoMode, freshTakeFields, videoModeBlockText } from './video-mode'
 
 const PANEL = 'flex flex-col gap-2 rounded-[12px] bg-card p-2.5'
 // 줄 왼쪽 칸(폭 240)에 든 단추 — 긴 이름("시작·끝 이미지 다시 만들기 · Takes 0")이 칸 밖으로 잘리지 않게 줄을 바꾼다(조각 6 화면 확인).
@@ -73,7 +73,7 @@ export function VideoMakePanel({ shotNodeId, data }: { shotNodeId: string; data:
   const [notice, setNotice] = useState<string | null>(null)
   // 방식(오너 D2~D5) — 처음엔 가장 새 Take 의 방식(없으면 기본). 고를 수 없는 방식은 까닭과 함께 꺼진다(fb-video videoModeAvailability).
   const [mode, setMode] = useState<VideoMode>(() => defaultVideoMode(base?.data ?? null))
-  const { facts, previous } = useMemo(() => cameraModeFacts({ shotNodeId, nodes, writerShots: writerShots ?? [] }), [shotNodeId, nodes, writerShots])
+  const { facts, previous, previousNoRecord } = useMemo(() => cameraModeFacts({ shotNodeId, nodes, writerShots: writerShots ?? [] }), [shotNodeId, nodes, writerShots])
   const modeState = videoModeAvailability(mode, facts)
   const { takes } = shotDetailTakes(nodes, shotNodeId)
   const setup = takeSettings(data, base?.data ?? null)
@@ -92,7 +92,7 @@ export function VideoMakePanel({ shotNodeId, data }: { shotNodeId: string; data:
   // 단추 값이 곧 동의인 자리 — 잔액을 못 읽어도 값을 보이고, 숨기는 것은 과금이 꺼졌을 때뿐이다(entry D8 과 같은 말).
   //   방식은 Take 값을 바꾸지 않는다(값 = 모델 · 해상도).
   const label = takeValuesShown(takeBalance) ? countText(t, count, button.label.one, button.label.many, { count }) : t(button.label.plain)
-  const blockedReason = button.reason ?? (modeState.enabled ? null : VIDEO_MODE_BLOCK_TEXT[modeState.reason])
+  const blockedReason = button.reason ?? (modeState.enabled ? null : videoModeBlockText(modeState.reason, { previousNoRecord }))
   const disabled = button.disabled || !modeState.enabled || capturing
 
   const make = async () => {
@@ -153,7 +153,7 @@ export function VideoMakePanel({ shotNodeId, data }: { shotNodeId: string; data:
               aria-checked={chosen}
               // 막힌 방식도 지금 고른 것이면 누를 수 있게 둔다(까닭을 보고 다른 방식으로 바꾼다).
               disabled={!state.enabled && !chosen}
-              title={state.enabled ? t(VIDEO_MODE_HINT[option]) : t(VIDEO_MODE_BLOCK_TEXT[state.reason])}
+              title={state.enabled ? t(VIDEO_MODE_HINT[option]) : t(videoModeBlockText(state.reason, { previousNoRecord }))}
               onClick={() => setMode(option)}
               className={cn(
                 'h-6 rounded-full px-2 text-micro font-semibold transition-colors disabled:cursor-not-allowed disabled:opacity-40',
@@ -172,7 +172,7 @@ export function VideoMakePanel({ shotNodeId, data }: { shotNodeId: string; data:
         if (state.enabled || state.reason === 'storyboard_missing' || option === mode) return null
         return (
           <p key={option} className="text-micro leading-snug text-subtle-foreground">
-            {t(VIDEO_MODE_LABEL[option])} · {t(VIDEO_MODE_BLOCK_TEXT[state.reason])}
+            {t(VIDEO_MODE_LABEL[option])} · {t(videoModeBlockText(state.reason, { previousNoRecord }))}
           </p>
         )
       })}

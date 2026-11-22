@@ -14,10 +14,12 @@ function dropChatFocus() {
   if (active?.closest?.('[data-chat-panel]')) active.blur?.()
 }
 
-export function useHoldChatClosed(holder: string) {
+/** active = 닫아 둘 때만(Cinema 는 좁은 화면에서만, 리드 2026-11-23 QA C). 꺼지면 들어오기 전 모습으로 돌아간다. 기본은 늘 닫아 둔다. */
+export function useHoldChatClosed(holder: string, active = true) {
   useEffect(() => {
+    if (!active) return
     useChatUiStore.getState().holdChatClosed(holder)
     dropChatFocus()
     return () => useChatUiStore.getState().releaseChatHold(holder)
-  }, [holder])
+  }, [holder, active])
 }
