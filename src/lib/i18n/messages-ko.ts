@@ -685,6 +685,8 @@ export const KO: Record<string, string> = {
   'Could not redraw the end frame. It stays as it was.': '끝 장을 다시 그리지 못했어요. 끝 장은 그대로예요.',
   // 끝 장 ②: 읽은 한 줄(D10 · 2026-11-22 오너 Q1 · Q3 · 리드 Q-a · Q-b)
   'Motion the AI read': 'AI 가 읽은 움직임',
+  // 사람이 고친 줄(source user)의 이름표(리드 2026-11-23).
+  'Edited movement': '고친 움직임',
   'Reading the arrows…': '화살표를 읽는 중…',
   'The AI could not read the arrows. Write the motion yourself.': 'AI 가 화살표를 읽지 못했어요. 움직임을 직접 적어 주세요.',
   // 리드 (A) · D2(2026-11-23): [그대로]를 골라도 영상에는 이 줄이 들어간다 — 고친 줄은 [그대로]에서도 남는다.
