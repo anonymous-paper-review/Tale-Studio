@@ -3,6 +3,7 @@
 //   save: 편집기가 평탄화한 PNG 를 direction 프레임 경로에 upsert + 캐시버스트
 //   read-direction: 읽는 AI 가 지금 연출 장을 한 줄로 읽는다(이미 있으면 다시 읽지 않음) — 끝 장 물음 창 · 편집기 아래 줄(D10 ②)
 //   regenerate-end · regenerate-frame(end): 끝 장 ② 작업을 내고 작업 번호를 돌려준다(그림은 작업 틀이 끼운다, D10 ②)
+//   keep-line: 물음 창 [그대로] + 고친 줄 — 끝 장은 그리지 않고 고친 줄만 남긴다(영상이 쓴다, 리드 (A) · D2 2026-11-23)
 // 얇은 라우트 — 인증·검증만 하고 lib(directing-edit)에 위임.
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
@@ -15,6 +16,7 @@ import {
   DirectionUnreadableError,
   ForeignMediaPathError,
   StaleDirectionError,
+  keepEditedDirectionLine,
   readDirection,
   separateArrowLayer,
   saveDirectingFrame,
@@ -60,6 +62,15 @@ const BodySchema = z.discriminatedUnion('action', [
     frame: z.enum(['start', 'direction', 'end']),
     line: z.object({ text: z.string().trim().min(1).max(600), lang: z.enum(['ko', 'en']) }).nullish(),
   }),
+  z.object({
+    // 리드 (A) 2026-11-23: 물음 창 [그대로] + 고친 줄 — 끝 장은 그리지 않고 고친 줄만 남긴다. 그림 파일을 건드리지 않는다.
+    action: z.literal('keep-line'),
+    projectId: z.string().uuid(),
+    shotId: z.string().min(1),
+    line: z.object({ text: z.string().trim().min(1).max(600), lang: z.enum(['ko', 'en']) }),
+    // 화면이 본 연출 장 주소(읽은 줄의 주소) — 지금 연출 장과 다르면 옛 화살표에 대한 줄이라 409. 못 읽은 샷은 안 보낸다.
+    direction: z.string().max(4000).optional(),
+  }),
 ])
 
 export async function POST(req: Request) {
@@ -82,6 +93,10 @@ export async function POST(req: Request) {
     }
     if (body.action === 'read-direction') {
       const read = await readDirection(body.projectId, body.shotId)
+      return NextResponse.json({ data: { read } })
+    }
+    if (body.action === 'keep-line') {
+      const read = await keepEditedDirectionLine(body.projectId, body.shotId, body.line, undefined, { expectDirection: body.direction })
       return NextResponse.json({ data: { read } })
     }
     if (body.action === 'regenerate-end' || (body.action === 'regenerate-frame' && body.frame === 'end')) {
