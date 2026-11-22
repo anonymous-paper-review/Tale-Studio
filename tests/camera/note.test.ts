@@ -67,7 +67,7 @@ describe('서버 · 완료', () => {
     expect(IMAGE_NOTE_MAX).toBe(500)
   })
 
-  it('다 그린 그림 판(멈춘 뒤 끝난 판 포함)에 사람 말이 note · via 로 남고, 말이 없던 작업의 판에는 두 칸이 없다', () => {
+  it('다 그린 그림 판(멈춘 뒤 끝난 판 포함)에 사람 말과 어디서 왔는지가 남고, 말이 없던 작업의 판에는 남지 않는다', () => {
     // 왜: 결정 4 — 새 표 없이 이미 있는 판 목록(versions[])에 키 둘을 더한다. 멈춘 판도 무엇을 바꾸려 했는지 읽혀야 한다.
     expect(versionNoteFields({ note: '더 밝게', via: 'button' })).toEqual({ note: '더 밝게', via: 'button' })
     expect(versionNoteFields(undefined)).toEqual({})
