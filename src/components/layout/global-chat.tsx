@@ -44,6 +44,7 @@ import { handoffToStage } from '@/lib/stage-nav'
 import { cn } from '@/lib/utils'
 import { ThumbImage } from '@/components/thumb-image'
 import { MarkdownText } from '@/components/layout/markdown-text'
+import { ProposalImpactLine } from '@/components/layout/proposal-impact-line'
 import { scrubInternalIdsInProse } from '@/lib/display-names'
 import { enterAcceptsCard } from '@/lib/chat-enter-key'
 import { roughRedrawOfferHere } from '@/lib/writer/chat-rough-redraw'
@@ -1712,7 +1713,7 @@ export function GlobalChat() {
                     {pendingProposal.impact.length > 0 && (
                       <ul className="mt-2 list-disc space-y-0.5 pl-4 text-muted-foreground">
                         {pendingProposal.impact.map((item) => (
-                          <li key={item}><MarkdownText text={scrubProse(item)} /></li>
+                          <ProposalImpactLine key={item} text={scrubProse(item)} />
                         ))}
                       </ul>
                     )}

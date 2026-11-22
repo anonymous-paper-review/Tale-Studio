@@ -38,10 +38,15 @@ import {
 } from '@/stores/artist-store'
 import {
   useDirectorCanvasStore,
+  effectivePrompt,
   serializeDirectorCanvasContext,
   videoLimitRefusal,
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
+import { PROMPT_CUT_TEXT, cutPromptShots, fullPromptShotIds, guardCutPromptEdits } from '@/lib/director/chat-prompt-budget'
+import { orderedScenes } from '@/features/director/scene-view'
+import { resolveCurrentScene } from '@/lib/current-scene'
+import { useCurrentSceneStore } from '@/stores/current-scene-store'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { directorHasFinishedVideo, type DirectorShotState } from '@/lib/director/shot-state'
 import { editorHandoverView, type RemakeResult } from '@/lib/director/editor-handover'
@@ -3431,6 +3436,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     let body: Record<string, unknown>
     // 러프 그림에 보이는 칸의 턴 시작 모습 — 턴 끝과 견줘 실제로 바뀐 것만 [러프 다시 그리기]를 묻는다(2026-11-01 리뷰 M3).
     let roughBefore: RoughVisibleState | null = null
+    // 이 턴의 보드 요약에 앞부분만 실은 샷 프롬프트(노드 id → 글자 수, 리드 2026-11-23 D③) — 그 샷의 프롬프트 고침은 [적용] 카드에 넣지 않는다.
+    let promptCut: ReadonlyMap<string, number> = new Map()
 
     // 문단을 붙인 채 보낸 물음(오너 2026-11-14 B ①)은 붙은 문단의 이름(S2)과 글을 함께 싣는다 — AI 는 화면의 S번호를 모르므로 "이 문단에서 …?"에 바르게 답하려면 둘 다 필요하다(리드 11/14).
     //   채팅 줄에는 사용자가 쓴 물음만 남는다. 이 프로젝트에 붙은 문단일 때만 싣는다.
@@ -3532,7 +3539,22 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const writerBoard = useWriterStore.getState()
         // 샷마다 이미지가 있는지(있음 · 그리는 중 · 없음)를 덧붙인다 — 이미지 없는 샷의 영상을 약속하지 않게(리드 11/14 영어 재점검 B3).
         const shotImages = directorShotImages()
-        const canvasContext = [serializeDirectorCanvasContext(canvasState, boardNodeNames(writerBoard.sceneManifest, writerBoard.shots, contentLocale()), shotImages), shotImages.size > 0 ? SHOT_IMAGES_NOTE : ''].filter(Boolean).join('\n\n')
+        // 샷 프롬프트는 처음부터 끝까지 싣는다(리드 2026-11-23 D③ — 예전엔 앞 60자만 실어 [적용]이 원래 글 뒷부분을 지웠다).
+        //   한 턴 상한을 넘으면 이번 말에서 부른 샷 → 고른 샷 → 지금 보는 씬 → 나머지 차례로 싣고(chat-prompt-budget), 못 실은 샷은 적어 둔다.
+        const boardNames = boardNodeNames(writerBoard.sceneManifest, writerBoard.shots, contentLocale())
+        const promptShots = canvasState.nodes.flatMap((node) => (isShotData(node.data) ? [{ id: node.id, prompt: effectivePrompt(node.data), sceneNodeId: node.data.parentSceneNodeId }] : []))
+        const namedNumbers = namedShotNumbers(trimmed)
+        const namedShots = new Set(directorShotRefs(canvasState.nodes, boardNames).filter((ref) => ref.shotNo !== null && namedNumbers.has(ref.shotNo)).map((ref) => ref.nodeId))
+        const sceneEntries = orderedScenes(canvasState.nodes, boardNames)
+        const lookingKey = resolveCurrentScene(sceneEntries.map((entry) => entry.key), projectId ? useCurrentSceneStore.getState().sceneByProject[projectId] : null)
+        const fullPrompts = fullPromptShotIds({
+          shots: promptShots,
+          named: namedShots,
+          selected: canvasState.selectedNodeId,
+          currentScene: sceneEntries.find((entry) => entry.key === lookingKey)?.nodeId ?? null,
+        })
+        promptCut = cutPromptShots(promptShots, fullPrompts)
+        const canvasContext = [serializeDirectorCanvasContext(canvasState, boardNodeNames(writerBoard.sceneManifest, writerBoard.shots, contentLocale()), shotImages, fullPrompts), shotImages.size > 0 ? SHOT_IMAGES_NOTE : ''].filter(Boolean).join('\n\n')
         endpoint = '/api/director/chat'
         body = {
           message: trimmed,
@@ -4270,7 +4292,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           // 그림을 "남은 것 전부"로 부탁하면 만들기 전에 몇 장인지 센다(만들기 시작하면 상태가 바뀐다).
           const missingImages = before.nodes.filter(blank).length
           // 예전 모양(Take 노드 하나의 영상)이 와도 그 샷의 영상 부탁으로 읽어 같은 막이를 거친다.
-          const videoRequests: Array<string[] | null> = updates.flatMap((update) => {
+          const rawVideoRequests: Array<string[] | null> = updates.flatMap((update) => {
             if (update.type === 'generateVideos') return [Array.isArray(update.shotIds) ? update.shotIds : null]
             if (update.type === 'generateVideo') {
               const take = before.nodes.find((node) => node.id === update.id)
@@ -4282,7 +4304,18 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             updates.filter((update) => update.type !== 'generateVideos' && update.type !== 'generateVideo'),
             before.nodes,
           )
-          const edits = split.edits
+          // 일부만 본 프롬프트는 [적용]이 통째로 바꾸지 않는다(리드 2026-11-23 D③) — 그 고침은 카드에 넣지 않고, 그 샷을 멘션해 다시 부탁해 달라고 한다
+          //   (한 샷 상한을 넘으면 샷 상세에서 고치라고). 그 고침을 바라고 같이 부탁한 그 샷의 그림 · 영상도 옛 글로 만들지 않게 뺀다.
+          const promptGuard = guardCutPromptEdits(split.edits, promptCut)
+          const edits = promptGuard.kept
+          const droppedPromptShots = new Set(promptGuard.dropped.map((entry) => entry.nodeId))
+          for (const entry of promptGuard.dropped) {
+            const shotName = shotListLabel(contentLocale(), [shotLabelOf(before.nodes.find((node) => node.id === entry.nodeId), names)])
+            lumiSays(translate(contentLocale(), entry.tooLong ? PROMPT_CUT_TEXT.tooLong : PROMPT_CUT_TEXT.partial, { shot: shotName }))
+          }
+          const videoRequests = droppedPromptShots.size === 0
+            ? rawVideoRequests
+            : rawVideoRequests.map((ids) => (ids ? ids.filter((id) => !droppedPromptShots.has(id)) : null)).filter((ids) => ids === null || ids.length > 0)
           // 글 고침이 걸린 샷의 그림 · 영상은 바로 만들지 않고 글 카드 [적용]에 묶는다 — 옛 글로 만들어 Take 를 쓰지 않게(검토 b 보통 1).
           //   글이 걸리지 않은 샷은 지금처럼 바로. "빈 샷 전부" 그림은 글이 걸린 빈 샷이 하나라도 있으면 통째로 묶는다.
           const bound = textBoundShotIds(edits, before.nodes)
@@ -4292,6 +4325,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const toWaitingCard: HeldDirectorWork = { images: [], allBlankImages: false, videos: [] }
           const immediate = split.immediate.filter((update) => {
             if (update.type !== 'generateImage') return true
+            if (update.id && droppedPromptShots.has(update.id)) return false
             if (update.id) {
               if (bound.has(update.id)) held.images.push(update.id)
               else if (waitingCard?.bound.has(update.id)) toWaitingCard.images.push(update.id)

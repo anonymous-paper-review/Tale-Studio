@@ -80,6 +80,7 @@ import { orderedScenes } from '@/features/director/scene-view'
 import { resolveCurrentScene } from '@/lib/current-scene'
 import { useCurrentSceneStore } from '@/stores/current-scene-store'
 import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
+import { promptForContext } from '@/lib/director/chat-prompt-budget'
 import { isDemoSession } from '@/lib/demo/context'
 import {
   pollGenerationJob,
@@ -6103,6 +6104,8 @@ export function serializeDirectorCanvasContext(
   boardNames?: BoardNodeNames | null,
   /** 샷마다 이미지(있음 · 그리는 중 · 없음) — 샷 줄에 붙인다(Lumi 가 이미지 없는 샷의 영상을 약속하지 않게, 리드 11/14 B3). 판정은 부르는 쪽(보드와 같은 근거). */
   shotImages?: ReadonlyMap<string, 'ready' | 'drawing' | 'missing'> | null,
+  /** 프롬프트를 다 싣는 샷(리드 2026-11-23 D③, chat-prompt-budget) — 나머지는 앞 60자와 잘렸다는 표시만. 고르는 일은 부르는 쪽. */
+  fullPrompts?: ReadonlySet<string> | null,
 ): string {
   const { nodes, edges, selectedNodeId } = state
   const imageWord = (id: string) => ({ ready: 'image ready', drawing: 'image being made', missing: 'no image' } as const)[shotImages?.get(id) ?? 'missing']
@@ -6158,9 +6161,8 @@ export function serializeDirectorCanvasContext(
       childShots.forEach((sh) => {
         if (!isShotData(sh.data)) return
         const shData = sh.data
-        const prompt = effectivePrompt(shData)
-        const promptSnippet =
-          prompt.length > 60 ? `${prompt.slice(0, 60)}…` : prompt
+        // 고칠 샷의 프롬프트는 처음부터 끝까지 싣는다(리드 2026-11-23 D③) — 예전엔 앞 60자만 실어 Lumi 가 그 60자로 전체를 다시 썼다.
+        const promptSnippet = promptForContext(effectivePrompt(shData), fullPrompts?.has(sh.id) ?? false)
         const camActive = (
           ['horizontal', 'vertical', 'pan', 'tilt', 'roll', 'zoom'] as const
         ).filter((k) => shData.camera[k] !== 0).length
