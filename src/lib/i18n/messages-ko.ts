@@ -2005,6 +2005,8 @@ export const KO: Record<string, string> = {
   'Could not load the shots.': '샷 정보를 불러오지 못했어요.',
   'Your shots are still there. Try loading them again.': '샷은 그대로 있어요. 다시 불러와 주세요.',
   'Load again': '다시 불러오기',
+  // 판 읽기 뒷마무리(리드 11/23) — 다 읽기 전 · 못 불러옴일 때 채팅 빠른 칩이 아무것도 만들지 않고 하는 답.
+  "The shots haven't finished loading yet. Please ask again once they're loaded.": '샷을 아직 다 불러오지 못했어요. 불러온 뒤 다시 말해 주세요.',
   'Make the images in {scene}, then their videos?': '{scene}의 이미지를 만들고 이어서 영상도 만들까요?',
   'How to make the video': '영상 만드는 방식',
   'Start + end': '시작+끝',

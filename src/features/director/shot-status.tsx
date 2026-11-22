@@ -327,11 +327,14 @@ export function ShotStatusFilterMenu({
 export function PickAllBar({
   total,
   picked,
+  countShown = true,
   onToggleAll,
   onClear,
 }: {
   total: number
   picked: number
+  /** false = 판을 다 읽기 전 · 못 불러옴 — 읽다 만 판으로 센 숫자를 적지 않고 "전체"만(리드 11/23 판 읽기 뒷마무리). */
+  countShown?: boolean
   onToggleAll: () => void
   onClear: () => void
 }) {
@@ -355,7 +358,7 @@ export function PickAllBar({
         {state === 'mixed' && <span className="h-0.5 w-2.5 rounded-full bg-current" />}
       </button>
       <span className="whitespace-nowrap text-[14px] font-semibold text-foreground">
-        {picked === 0 ? countText(t, total, 'All 1 shot', 'All {count} shots', { count: total }) : t('{picked} of {total} picked', { picked, total })}
+        {!countShown ? t('All') : picked === 0 ? countText(t, total, 'All 1 shot', 'All {count} shots', { count: total }) : t('{picked} of {total} picked', { picked, total })}
       </span>
       {picked > 0 && (
         <button

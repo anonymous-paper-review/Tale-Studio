@@ -18,6 +18,7 @@ import { createPendingProposal, combinePendingProposals, isApprovalUtterance, is
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { detectScript, parseScript } from '@/lib/writer/script/parse'
 import { useProjectStore } from '@/stores/project-store'
+import { useBoardLoadStore } from '@/stores/board-load-store'
 import { extractedChangesProducer, useProducerStore, type ExtractedSettings } from '@/stores/producer-store'
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
@@ -1601,6 +1602,13 @@ async function runDirectorQuickChip(input: {
 }): Promise<void> {
   const locale = contentLocale()
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
+  // 이 프로젝트 판을 다 읽기 전 · 못 불러옴이면 아무것도 만들지 않는다 — 위쪽 만들기 단추를 끈 것과 같은 까닭(리드 11/23 판 읽기 뒷마무리).
+  //   판 읽기 기록이 없으면(판을 읽는 화면이 없을 때) 막지 않는다. 약속: tests/director/board-load-chat.test.ts
+  const boardLoad = useBoardLoadStore.getState()
+  if (boardLoad.projectId === input.projectId && boardLoad.status !== 'ready') {
+    input.say(t("The shots haven't finished loading yet. Please ask again once they're loaded."))
+    return
+  }
   const canvas = useDirectorCanvasStore.getState()
   // 보드를 아직 안 읽었거나 다른 프로젝트 보드면 샷이 없는 것으로 본다(엉뚱한 보드의 샷을 만들지 않는다).
   const nodes = canvas.projectId === input.projectId ? canvas.nodes : []
