@@ -14,3 +14,10 @@ export function isPreservedScriptRun(state: Pick<WriterRunState, 'input' | 'scen
   const scenes = (state.scenes as { scenes?: Array<{ provenance?: { source?: string } }> } | undefined)?.scenes ?? []
   return state.input?.preserveScript === true || scenes.some((scene) => scene.provenance?.source === 'script')
 }
+
+/** 원작 그대로면 콘티 채팅(api/writer/chat)에 싣는 지시 — 사용자가 짚은 줄 · 새로 준 글만 고치고 대사를 통째로 새로 쓰지 않는다(D15, 리드 2026-11-22).
+ *  원작 그대로가 아니면 빈 글(지시 없음). LLM 프롬프트라 한국어로 둔다. 약속: tests/writer/preserved-dialogue-chat.test.ts */
+export function preservedScriptChatDirective(preserved: boolean): string {
+  if (!preserved) return ''
+  return '\n\n[원작 그대로] 이 작품은 원작 대본의 대사를 그대로 쓴다. 대사(dialogueLines)는 사용자가 짚은 줄 · 새로 준 글만 고친다 — 다른 줄의 글은 그대로 두고, 대사를 통째로 새로 쓰지 않는다. 사용자가 대사를 새로 지어 달라고 하면 고치지 말고, 원작 대사를 지키는 작품이라 AI가 대사를 새로 쓰지 않으며 줄을 눌러 직접 고칠 수 있다고 알려라.' // i18n-ok: LLM 프롬프트 디렉티브
+}

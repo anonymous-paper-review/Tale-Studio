@@ -58,12 +58,20 @@ describe('원본 그대로 프로젝트의 대사 탭', () => {
     expect(line).not.toContain('aria-disabled="true"')
   })
 
-  it('원본 그대로 프로젝트에 대사가 하나도 없으면 [대사 생성]을 권하지 않고 샷 고치기 창에서 대사를 더할 수 있다고 알린다', () => {
-    // 왜(혼자 정한 것): 빈 대사 안내가 "위의 대사 생성을 누르라"고 하면 없는 단추를 가리킨다.
+  it('원작 그대로 프로젝트의 대사 탭에는 "원작 대사를 그대로 쓰는 작품이라 AI가 대사를 새로 쓰지 않아요. 줄을 눌러 직접 고칠 수 있어요."가 단추 자리에 보인다', () => {
+    // 왜: D15 — 단추가 사라진 까닭과 대신 할 수 있는 일을 알린다(문구는 fb-style 제안, 리드 2026-11-22).
+    data.preserved = true
+    expect(html()).toContain('원작 대사를 그대로 쓰는 작품이라 AI가 대사를 새로 쓰지 않아요. 줄을 눌러 직접 고칠 수 있어요.')
+    data.preserved = false
+    expect(html()).not.toContain('원작 대사를 그대로 쓰는 작품이라')
+  })
+
+  it('원작 그대로 프로젝트에 대사가 하나도 없으면 [대사 생성]을 권하지 않고 샷마다 연필 단추로 대사를 더할 수 있다고 알린다', () => {
+    // 왜(혼자 정한 것): 빈 대사 안내가 "위의 대사 생성을 누르라"고 하면 없는 단추를 가리킨다 — 줄이 없으니 연필 단추(샷 고치기 창)로 더한다.
     data.preserved = true
     data.writer.shots = [{ ...data.writer.shots[0], dialogueLines: [] }]
     const out = html()
-    expect(out).toContain('원본 대본 그대로 만드는 프로젝트라 대사를 새로 쓰지 않아요. 샷마다 연필 단추로 대사를 더할 수 있어요.')
+    expect(out).toContain('원작에 아직 대사가 없어요. 샷마다 연필 단추로 대사를 더할 수 있어요.')
     expect(out).not.toContain('위의 &quot;대사 생성&quot;')
   })
 

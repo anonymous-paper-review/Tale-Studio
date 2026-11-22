@@ -315,8 +315,12 @@ export function DialogueView({ preserved = false }: { preserved?: boolean } = {}
           <span className="text-caption text-subtle-foreground">{t('No dialogue yet')}</span>
         )}
 
-        {/* 원본 그대로면 AI 가 대사를 새로 쓰는 단추를 두지 않는다(D15) — 대사 줄은 아래에서 그대로 고친다. */}
-        {preserved ? null : (
+        {/* 원작 그대로면 AI 가 대사를 새로 쓰는 단추를 두지 않고 그 자리에 까닭을 적는다(D15, 문구는 fb-style 제안) — 대사 줄은 아래에서 그대로 고친다. */}
+        {preserved ? (
+          <p className="ml-auto max-w-sm text-right text-caption text-subtle-foreground" data-testid="dialogue-preserved-note">
+            {t('This work keeps the original dialogue, so AI does not write new lines. Click a line to edit it yourself.')}
+          </p>
+        ) : (
         <div className="ml-auto flex items-center gap-2">
           {confirming && !generating && (
             <span className="text-caption text-subtle-foreground">
@@ -485,7 +489,7 @@ export function DialogueView({ preserved = false }: { preserved?: boolean } = {}
             <div className="flex flex-col items-center gap-2 py-10 text-center">
               <MessageSquareText className="size-6 text-subtle-foreground" />
               <p className="text-caption text-muted-foreground">
-                {preserved ? t('This project uses the script as written, so dialogue is not written anew. Add a line with the pencil button on each shot.') : (() => {
+                {preserved ? t('There is no dialogue in the original yet. Add a line with the pencil button on each shot.') : (() => {
                   const [l1, l2] = t(
                     'No shot dialogue yet. Press "Generate dialogue" above to design character voices{br}and write shot-by-shot dialogue that follows the scene.',
                   ).split('{br}')
