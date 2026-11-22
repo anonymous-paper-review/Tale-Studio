@@ -7,7 +7,8 @@ import { NextResponse } from 'next/server'
 
 export const runtime = 'nodejs'
 
-/** 받은 요청(_req)은 보지 않는다 — Next 라우트 손잡이 모양만 지킨다. */
+/** 받은 요청(_req)은 보지 않는다 — Next 와 시험이 요청 하나를 넘기므로 손잡이 모양만 지킨다. */
+// eslint-disable-next-line @typescript-eslint/no-unused-vars -- 요청을 읽지 않는 닫힌 창구(위 설명)
 export async function POST(_req: Request): Promise<Response> {
   return NextResponse.json({ error: 'style_extraction_retired' }, { status: 410 })
 }

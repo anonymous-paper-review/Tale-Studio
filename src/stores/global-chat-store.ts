@@ -22,7 +22,7 @@ import { extractedChangesProducer, useProducerStore, type ExtractedSettings } fr
 import { evaluateProducerGate } from '@/lib/producer-gate'
 import { selectedProducerDialogueLanguage } from '@/lib/producer-dialogue-language'
 import { fixKoreanParticles } from '@/lib/korean-particles'
-import { coerceCardFill, matchImageUseAnswer, matchImageUseInText, matchYesNo, type CardFill, type ImageUseAnswer } from '@/lib/producer/image-role'
+import { coerceCardFill, matchImageUseAnswer, matchImageUseInText, type CardFill, type ImageUseAnswer } from '@/lib/producer/image-role'
 import { MAX_COMIC_PAGES, comicRewriteQuestion, imageBatchQuestion, matchBatchImageAnswer, matchComicAnswer, matchComicIntentInText, sortComicPages } from '@/lib/producer/comic-intake'
 import { answersRestoredImageQuestion, characterPickOptions, imageRoleOptions, isImageQuestionId, matchCharacterPick, matchWriterBatch, matchWriterComicRewrite, matchWriterImageUse } from '@/lib/producer/chip-answer'
 import type { PendingCreation } from '@/stores/pending-creation-store'
