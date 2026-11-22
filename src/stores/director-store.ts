@@ -129,6 +129,7 @@ import {
   resolveShotFrameImageUrl,
   usableFrameImageUrl,
 } from '@/lib/director/video-frame-inputs'
+import { prepareContinueFrom } from '@/lib/director/video-frame-capture'
 
 // ============================================================================
 // Defaults
@@ -696,36 +697,8 @@ async function captureVideoThumbnail(videoUrl: string): Promise<Blob | null> {
   return captureVideoFrame(videoUrl, 'start')
 }
 
-async function captureVideoEndFrame(videoUrl: string): Promise<Blob | null> {
-  return captureVideoFrame(videoUrl, 'end')
-}
-
-async function uploadVideoChainFrame(
-  projectId: string,
-  sourceVideoClipId: string,
-  sourceGenerationJobId: string,
-  blob: Blob,
-): Promise<string | null> {
-  if (!projectId || !sourceVideoClipId || !sourceGenerationJobId) return null
-  try {
-    const form = new FormData()
-    form.append('projectId', projectId)
-    form.append('type', 'video')
-    form.append('entityId', sourceVideoClipId)
-    form.append('field', 'chain_frame')
-    form.append('generationJobId', sourceGenerationJobId)
-    form.append('file', blob, `${sourceVideoClipId}_chain-frame.jpg`)
-    const response = await fetch('/api/assets/upload-image', {
-      method: 'POST',
-      body: form,
-    })
-    if (!response.ok) return null
-    const body = (await response.json().catch(() => ({}))) as { publicUrl?: unknown }
-    return usableFrameImageUrl(body.publicUrl)
-  } catch {
-    return null
-  }
-}
+// 이어 붙일 장면(끝 장면) 잡기 · 올리기는 src/lib/director/video-frame-capture.ts 로 옮겼다(방안 고장 2, fb-video 2026-11-22) —
+//   Camera 의 "이어서"와 노드 '이전 영상' 구멍이 같은 규칙(Editor 가 자르는 자리 · 검은 화면 판별)을 쓰게.
 
 // ============================================================================
 // Step 0 (unify-director-store-db): Shot 편집 → DB shots write-through
@@ -2878,29 +2851,27 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           return false
         }
 
-        let blob: Blob | null
-        try {
-          blob = await captureVideoEndFrame(sourceVideoUrl)
-        } catch {
-          blob = null
-        }
-        if (!blob) {
+        // 방안 고장 2(fb-video 2026-11-22): Editor 가 자르는 자리(앞 샷 길이)에서 잡고, 검으면 앞으로 가며 다시 잡는다.
+        //   잡는 규칙 · 올리기는 Camera 의 "이어서"와 같은 함수(video-frame-capture)다.
+        const sourceShot = initial.nodes.find((node) => node.id === sourceNode.data.parentShotNodeId)
+        const prepared = await prepareContinueFrom({
+          projectId,
+          source: { videoClipId: sourceClipId, generationJobId: sourceJobId, videoUrl: sourceVideoUrl },
+          plannedSec: sourceShot && isShotData(sourceShot.data) ? sourceShot.data.durationSeconds : null,
+        })
+        if (!prepared.ok) {
           return failure(
             translate(
               useLocaleStore.getState().locale,
-              'Unable to capture the source video last frame.',
+              prepared.reason === 'black_frame'
+                ? 'The previous video ends on a black screen, so there is no scene to continue from.'
+                : prepared.reason === 'upload_failed'
+                  ? 'Unable to upload the source video last frame.'
+                  : 'Unable to capture the source video last frame.',
             ),
           )
         }
-        const publicUrl = await uploadVideoChainFrame(projectId, sourceClipId, sourceJobId, blob)
-        if (!publicUrl) {
-          return failure(
-            translate(
-              useLocaleStore.getState().locale,
-              'Unable to upload the source video last frame.',
-            ),
-          )
-        }
+        const publicUrl = prepared.continueFrom.frameUrl
 
         const latestSource = get().nodes.find((node) => node.id === sourceVideoNodeId)
         const latestTarget = get().nodes.find((node) => node.id === targetVideoNodeId)
