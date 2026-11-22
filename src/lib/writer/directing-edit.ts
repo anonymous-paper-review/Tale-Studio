@@ -674,7 +674,7 @@ export async function regenerateEndFrame(
 
 /**
  * 끝 장 작업 끼우기(완료 처리 갈래) — 그림을 다른 두 장 크기로 맞춰 끝 장 자리에 올리고, 끝 장만 바꾼다(약속 I).
- *   그 줄로 그렸다는 표시(directionRead.endDrawn)를 남겨야 영상 지시가 그 줄을 쓴다(리드 Q-a).
+ *   그 줄로 그렸다는 표시(directionRead.endDrawn)를 남겨야 실사 지시가 그 줄을 쓴다(리드 Q-a · 오너 R1 · 리드 D2).
  *   그사이 러프가 통째로 바뀌었거나 연출 장이 다시 저장됐으면 끼우지 않는다 — 작업은 실패로 남고 화면이 다시 하라고 알린다.
  */
 export async function finalizeRoughEndFrameJob(job: GenerationJob, falImageUrl: string): Promise<string> {
