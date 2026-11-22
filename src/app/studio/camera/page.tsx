@@ -5,7 +5,7 @@
 //   이 화면이 하는 일: Storyboard → Camera 넘김 마무리 · 넘어가면서 이미지 만들기(D0) · 영상 묶음 되살리기 · 동기화 훅.
 //   만들기 줄(work-bar · 위 막대 [다음: Director]) · 샷 줄과 이력 줄(camera-board · shot-row) · ⤢ 상세 창은 features/camera.
 //   약속: tests/camera/* · tests/writer/director-handover-images.test.ts
-import { useEffect } from 'react'
+import { useEffect, useMemo } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { SceneButtons } from '@/components/scene-buttons'
 import { StageHelpBadge } from '@/components/stage-help-badge'
@@ -63,6 +63,8 @@ export default function CameraPage() {
 
   // 씬 단추 · 지금 보는 씬(오너 D2~D5 · D8) — Director 노드 보기와 같은 기억을 쓴다. 씬을 바꾸면 Director 도 그 씬으로 열린다.
   const { items: sceneItems, sceneKey, scene, place, projectId: sceneProjectId } = useCameraScene()
+  // 위쪽 만들기 줄은 지금 보는 씬의 샷만 센다(오너 2026-11-22 E2 — [전체] 없음, [모두 멈추기]는 씬과 상관없이 전부).
+  const sceneShotIds = useMemo(() => scene?.shots.map((node) => node.id) ?? [], [scene])
 
   // D0(디자이너 1110 확정 · 2026-11-14): Storyboard 넘기기 창에서 "넘어가면서 이미지 만들기"를 고르고 넘어온 경우에만 실사 일괄을 한 번 시작한다.
   //   들어오기만 해서는 만들지 않는다(8/27 #c5).
@@ -89,8 +91,8 @@ export default function CameraPage() {
               <StageHelpBadge text={t("Make real images and videos shot by shot. Every image and video stays in the shot's history.")} />
             </div>
           </div>
-          {/* 위쪽 만들기 줄 — 세는 범위는 지금 모든 씬(씬 범위는 오너 답 뒤, work-scope). [다음: Director]도 이 줄이 위 막대에 단다. */}
-          <CameraWorkBar scope={null} />
+          {/* 위쪽 만들기 줄 — 지금 보는 씬의 샷만 센다(오너 E2, work-scope). [다음: Director]도 이 줄이 위 막대에 단다. */}
+          <CameraWorkBar scope={sceneShotIds} sceneLabel={scene?.label ?? null} />
         </div>
         {/* 씬을 바꾸면 샷 줄 목록이 맨 위에서 시작한다(앞 씬에서 내려간 자리를 새 씬에 남기지 않는다). */}
         <ScrollArea key={sceneKey ?? 'none'} className="min-h-0 flex-1">

@@ -81,8 +81,9 @@ describe('씬 단추와 한 씬 보기', () => {
     expect(page()).toMatch(/<ScrollArea key=\{sceneKey \?\? 'none'\}/)
   })
 
-  it('위쪽 만들기 줄은 씬을 바꿔도 오너 답 전까지 모든 씬의 샷을 센다', () => {
-    // 왜: 리드 11/22 — 씬 범위로 좁힐지는 오너 답 뒤(Director 툴바와 한 질문). 그때 범위만 넘기면 된다(work-scope).
-    expect(page()).toMatch(/<CameraWorkBar scope=\{null\} \/>/)
+  it('위쪽 만들기 줄은 지금 보는 씬의 샷만 센다 — 씬을 바꾸면 단추 숫자 · 예상 칸이 그 씬 것이 되고 [전체]는 없다', () => {
+    // 왜: 오너 2026-11-22 E2 "씬만 세기(추천대로)" — 씬 단추로 고른 씬이 곧 만들 범위다. 범위는 work-scope 한 곳으로 넘긴다.
+    expect(page()).toMatch(/const sceneShotIds = useMemo\(\(\) => scene\?\.shots\.map\(\(node\) => node\.id\) \?\? \[\], \[scene\]\)/)
+    expect(page()).toMatch(/<CameraWorkBar scope=\{sceneShotIds\} sceneLabel=\{scene\?\.label \?\? null\} \/>/)
   })
 })
