@@ -7,6 +7,7 @@
 //   약속: tests/camera/* · tests/writer/director-handover-images.test.ts
 import { useEffect } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { SceneButtons } from '@/components/scene-buttons'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 import { STAGE_LABEL } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
@@ -18,7 +19,9 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
+import { switchDirectorScene } from '@/features/director/hooks/use-scene-view'
 import { CameraBoard } from '@/features/camera/camera-board'
+import { useCameraScene } from '@/features/camera/use-camera-scene'
 import { CameraShotDetailDialog } from '@/features/camera/shot-detail-dialog'
 import { CameraWorkBar } from '@/features/camera/work-bar'
 
@@ -58,6 +61,9 @@ export default function CameraPage() {
     return () => document.removeEventListener('visibilitychange', restore)
   }, [projectId, stageReady])
 
+  // 씬 단추 · 지금 보는 씬(오너 D2~D5 · D8) — Director 노드 보기와 같은 기억을 쓴다. 씬을 바꾸면 Director 도 그 씬으로 열린다.
+  const { items: sceneItems, sceneKey, scene, place, projectId: sceneProjectId } = useCameraScene()
+
   // D0(디자이너 1110 확정 · 2026-11-14): Storyboard 넘기기 창에서 "넘어가면서 이미지 만들기"를 고르고 넘어온 경우에만 실사 일괄을 한 번 시작한다.
   //   들어오기만 해서는 만들지 않는다(8/27 #c5).
   useEffect(() => {
@@ -68,17 +74,28 @@ export default function CameraPage() {
   return (
     <div className="flex flex-1 flex-col overflow-hidden pb-2">
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-canvas-bg" data-testid="camera-page">
-        <div className="flex shrink-0 flex-col gap-3 px-4 pb-3 pt-4">
-          <div className="flex items-center gap-2">
-            <h1 className="shrink-0 text-[15px] font-bold text-foreground">{STAGE_LABEL.camera}</h1>
-            <StageHelpBadge text={t("Make real images and videos shot by shot. Every image and video stays in the shot's history.")} />
+        <div className="@container flex shrink-0 flex-col gap-3 px-4 pb-3 pt-4">
+          <div className="flex min-w-0 items-center gap-3">
+            {/* 씬 단추(오너 D2~D5 · D8) — 누르면 그 씬의 샷만 아래에 선다. ⌘/Ctrl+클릭은 @멘션(D9), Alt+←/→ 는 앞 · 뒤 씬. */}
+            <SceneButtons
+              items={sceneItems}
+              value={sceneKey}
+              onChange={(key) => { if (sceneProjectId) switchDirectorScene(sceneProjectId, key) }}
+              cycleWithAltArrows
+              className="max-w-[min(640px,60cqw)]"
+            />
+            <div className="flex min-w-0 items-center gap-2">
+              <h1 className="shrink-0 text-[15px] font-bold text-foreground">{STAGE_LABEL.camera}</h1>
+              <StageHelpBadge text={t("Make real images and videos shot by shot. Every image and video stays in the shot's history.")} />
+            </div>
           </div>
           {/* 위쪽 만들기 줄 — 세는 범위는 지금 모든 씬(씬 범위는 오너 답 뒤, work-scope). [다음: Director]도 이 줄이 위 막대에 단다. */}
           <CameraWorkBar scope={null} />
         </div>
-        <ScrollArea className="min-h-0 flex-1">
+        {/* 씬을 바꾸면 샷 줄 목록이 맨 위에서 시작한다(앞 씬에서 내려간 자리를 새 씬에 남기지 않는다). */}
+        <ScrollArea key={sceneKey ?? 'none'} className="min-h-0 flex-1">
           <div className="px-4 pb-6">
-            <CameraBoard />
+            <CameraBoard scene={scene} place={place} />
           </div>
         </ScrollArea>
       </div>

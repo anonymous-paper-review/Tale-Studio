@@ -1962,6 +1962,7 @@ export const KO: Record<string, string> = {
   // ── 씬 단추(오너 D8 2026-11-22) — Director 노드 보기 · Camera 공용 ──
   Scenes: '씬',
   '1 shot': '샷 1개',
+  'No shots in this scene yet.': '이 씬에는 아직 샷이 없어요.',
   'Linked to a card in another scene. Click to go there.': '다른 씬 카드와 이어져 있어요. 누르면 그 씬으로 가요',
   'This scene has no shots yet.': '이 씬에는 아직 샷이 없어요',
 
