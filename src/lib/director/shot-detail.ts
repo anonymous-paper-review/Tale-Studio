@@ -92,6 +92,8 @@ export function newTakeRequest(input: {
   change: string
   provider?: VideoModelKey
   resolution?: VideoResolution
+  /** 새 Take 마다 이어받지 않고 새로 적을 칸(Camera 2026-11-22 — 방식 · 사람 말 · 만든 길, features/camera/video-mode). 없으면 지금 그대로. */
+  fresh?: VideoOverride
 }): { inheritFromVideoNodeId?: string; videoOverride?: VideoOverride } {
   const note = input.change.trim()
   const inherited = ((input.take?.override ?? {}) as VideoOverride).changeNote?.trim() ?? ''
@@ -99,6 +101,7 @@ export function newTakeRequest(input: {
     ...(input.provider ? { provider: input.provider } : {}),
     ...(input.resolution ? { resolution: input.resolution } : {}),
     ...(note !== inherited ? { changeNote: note } : {}),
+    ...(input.fresh ?? {}),
   }
   return {
     ...(input.takeId ? { inheritFromVideoNodeId: input.takeId } : {}),
