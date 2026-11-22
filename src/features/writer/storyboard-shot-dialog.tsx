@@ -313,6 +313,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
                   ref={guard.editorRef}
                   onDirtyChange={guard.setDirty}
                   onArrowsSaved={() => guard.askEnd({ projectId, shotId: shot.shotId, onRedrawn: () => loadProject() })}
+                  onRedrawEnd={() => guard.askEnd({ projectId, shotId: shot.shotId, onRedrawn: () => loadProject() })}
                 />
               ) : (
                 bigFrame(tab === 'start' ? frames?.start : frames?.direction, t(tab === 'start' ? 'Start' : 'Directing'))

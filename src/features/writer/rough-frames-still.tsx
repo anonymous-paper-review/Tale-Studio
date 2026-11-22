@@ -14,6 +14,8 @@ import { withCacheBust } from '@/components/rough-frame-cycle'
 import type { RoughStoryboardImage } from '@/types/shot'
 import { useT } from '@/lib/i18n'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
+import { redrawEndFrame } from '@/lib/writer/end-frame-ask'
+import { endRedrawDeps } from '@/features/writer/unsaved-arrows-confirm'
 
 export type RoughFrameKey = 'start' | 'direction' | 'end'
 export const ROUGH_FRAME_ORDER: readonly RoughFrameKey[] = ['start', 'direction', 'end']
@@ -58,6 +60,11 @@ export function RoughFramesStill({
   const regenerate = async (frame: RoughFrameKey) => {
     setBusy(frame)
     try {
+      // 끝 장은 ②(읽은 한 줄 + 시작 장) 작업 — 물음의 [다시 그리기]와 같은 길로 그리고, 작업이 끝날 때까지 단추가 돈다(D10 · 1분 넘게).
+      if (frame === 'end') {
+        await redrawEndFrame(projectId, shotId, endRedrawDeps({ projectId, shotId, onRedrawn: onRegenerated }, t))
+        return
+      }
       toast.info(t('Redrawing the {frame}, about 30 seconds', { frame: labels[frame] }))
       const res = await fetch('/api/writer/rough-directing-edit', {
         method: 'POST',

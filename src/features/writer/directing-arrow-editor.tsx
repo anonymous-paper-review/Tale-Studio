@@ -17,7 +17,8 @@ import { cn } from '@/lib/utils'
 import type { RoughStoryboardImage } from '@/types'
 import { translate, useT } from '@/lib/i18n'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
-import { endAskAfterSave } from '@/lib/writer/end-frame-ask'
+import { askLineText, endAskAfterSave } from '@/lib/writer/end-frame-ask'
+import { freshDirectionRead } from '@/lib/writer/direction-read'
 import { warnBeforeLeaving } from '@/features/writer/unsaved-arrows-confirm'
 import { useLocaleStore } from '@/stores/locale-store'
 
@@ -105,6 +106,7 @@ export function DirectingArrowEditor({
   onSaved,
   onDirtyChange,
   onArrowsSaved,
+  onRedrawEnd,
   ref,
 }: {
   projectId: string
@@ -115,9 +117,15 @@ export function DirectingArrowEditor({
   onDirtyChange?: (dirty: boolean) => void
   /** 그린 화살표를 저장한 뒤 — 창이 끝 장도 다시 그릴지 묻는다(D10). 고를 때까지 저장이 끝나지 않는다([적용] · [저장하고 닫기]는 고른 뒤 닫힌다). */
   onArrowsSaved?: () => Promise<void> | void
+  /** 편집기 아래 "AI 가 읽은 움직임" 줄의 [고쳐서 끝 장 다시 그리기] — 창이 끝 장 물음을 연다(D10 ② · 리드 Q-b). */
+  onRedrawEnd?: () => void
   ref?: React.Ref<DirectingArrowEditorHandle>
 }) {
   const t = useT()
+  const locale = useLocaleStore((s) => s.locale)
+  // 지금 연출 장을 읽은 줄(낡은 줄은 안 보인다). 그 줄로 그린 끝 장이 지금 끝 장이 아니면 끝 장 · 영상에 아직 안 쓴 줄이다(리드 Q-a).
+  const directionRead = freshDirectionRead(panel)
+  const readUnused = !!directionRead && directionRead.endDrawn !== (panel.frames?.end ?? null)
   const directionUrl = panel.frames?.direction
     ? withCacheBust(panel.frames.direction, panel.generatedAt)
     : null
@@ -576,6 +584,22 @@ export function DirectingArrowEditor({
           {t('Save')}
         </Button>
       </div>
+
+      {/* AI 가 읽은 움직임(D10 ② · 리드 Q-b) — 물음 창을 닫은 뒤에도 보고 고친다. 끝 장 · 영상에 아직 안 쓴 줄이면 그렇다고 알린다(리드 Q-a). */}
+      {directionRead ? (
+        <div className="flex flex-col gap-1.5 rounded-lg bg-card px-3 py-2.5" data-testid="directing-read-line">
+          <span className="text-caption font-semibold text-subtle-foreground">{t('Motion the AI read')}</span>
+          <p className="break-keep text-caption text-foreground">{askLineText(directionRead, locale)}</p>
+          {readUnused ? (
+            <p className="break-keep text-caption text-muted-foreground">{t('Not used yet. Redraw the end frame to use it for the end frame and video.')}</p>
+          ) : null}
+          {onRedrawEnd ? (
+            <Button size="sm" variant="outline" className="self-start" disabled={busy} onClick={onRedrawEnd} data-testid="directing-read-line-redraw">
+              {t('Edit and redraw the end frame')}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

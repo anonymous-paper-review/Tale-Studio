@@ -101,6 +101,7 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
                 ref={guard.editorRef}
                 onDirtyChange={guard.setDirty}
                 onArrowsSaved={() => guard.askEnd({ projectId, shotId: shot.shotId, onRedrawn: () => loadProject() })}
+                onRedrawEnd={() => guard.askEnd({ projectId, shotId: shot.shotId, onRedrawn: () => loadProject() })}
               />
           </>
         ) : (
