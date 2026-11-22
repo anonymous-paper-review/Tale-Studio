@@ -1,4 +1,4 @@
-// 영상 경로(샷 영상·목각 previz)는 Creem 검사에 막히면 자리 예약도 Take 잡음도 제출도 하지 않는다
+// 샷 영상 경로는 Creem 검사에 막히면 자리 예약도 Take 잡음도 제출도 하지 않는다 (목각 previz 영상 길은 오너 T1 2026-11-22 로 닫혀 그 시험 2개는 지웠다)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 // 영상은 가장 비싼 생성이다 — 검사는 최종 프롬프트가 확정된 직후, 예약 RPC·Take hold·provider 제출보다
@@ -76,7 +76,6 @@ vi.mock('@/lib/writer/llm/fal', () => ({ falVideoSubmit: mocks.falVideoSubmit })
 vi.mock('@/lib/api/guard', () => ({ requireProjectAccess: mocks.requireProjectAccess }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 
-import { POST as previzPOST } from '@/app/api/director/generate-previz-video/route'
 import { ModerationBlockedError, ModerationUnavailableError } from '@/lib/moderation/creem'
 import { prepareDirectorVideoSubmission, submitPreparedDirectorVideo } from '@/lib/director/video-submit'
 
@@ -117,14 +116,6 @@ function videoRequest(extra: Record<string, unknown> = {}) {
       idempotencyKey: IDEMPOTENCY_KEY,
       ...extra,
     }),
-  })
-}
-
-function previzRequest() {
-  return new Request('http://localhost/api/director/generate-previz-video', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({ projectId: PROJECT_ID, writerShotId: 'sh_01' }),
   })
 }
 
@@ -183,17 +174,6 @@ describe('영상 경로의 내용 규칙 차단', () => {
       'generation_submit_rejected_content_policy',
       expect.objectContaining({ kind: 'shot_video', decision: 'deny' }),
     )
-  })
-
-  // 왜: previz 는 러프 액션 설명을 그대로 싣는 또 하나의 유료 영상 입구다.
-  it('목각 previz 영상이 검사에 막히면 작업 기록도 Take 잡음도 제출도 하지 않는다', async () => {
-    const response = await previzPOST(previzRequest())
-
-    expect(response.status).toBe(400)
-    await expect(response.json()).resolves.toMatchObject({ code: 'content_policy_blocked' })
-    expect(mocks.createGenerationJob).not.toHaveBeenCalled()
-    expect(mocks.holdTakesForVideoJob).not.toHaveBeenCalled()
-    expect(mocks.falVideoSubmit).not.toHaveBeenCalled()
   })
 
   // 왜: 검사 장애를 통과로 보면 장애 시간대의 영상이 전부 검사 없이 나간다.
@@ -311,27 +291,5 @@ describe('영상 경로가 검사에 보내는 글과 영수증', () => {
     })
     expect(mocks.reserveTake).not.toHaveBeenCalled()
     expect(mocks.submit).not.toHaveBeenCalled()
-  })
-
-  // 왜: previz 는 같은 요구 안에서 바로 제출한다 — 영수증은 작업 기록 이벤트에 남고 제출 인자로 넘어간다.
-  it('previz 영상은 액션 설명만 보내고 통과한 검사를 작업 id 와 함께 기록한다', async () => {
-    mocks.falVideoSubmit.mockResolvedValue({ request_id: 'fal-1', model: 'happy-horse', fal_key_id: 'key-1' })
-
-    await previzPOST(previzRequest())
-
-    expect(mocks.assertUserTextAllowed.mock.calls[0][0]).toEqual(['a man walks'])
-    expect(mocks.createGenerationJob.mock.calls[0][0].inputSnapshot).not.toHaveProperty('moderation')
-    expect(mocks.recordObservability).toHaveBeenCalledWith(
-      PROJECT_ID,
-      'generation_submit_moderation_passed',
-      expect.objectContaining({ jobId: 'job-1', kind: 'shot_previz_video', moderationId: 'mod_ok', decision: 'allow' }),
-      expect.objectContaining({ generationJobId: 'job-1' }),
-    )
-    // 검사가 제출보다 먼저다. 제출 인자에는 영수증이 섞이지 않는다(fal 로는 보낼 입력만 간다) —
-    //   검사를 건너뛴 제출은 타입 표식이 없어 타입 오류가 난다.
-    expect(mocks.assertUserTextAllowed.mock.invocationCallOrder[0]).toBeLessThan(
-      mocks.falVideoSubmit.mock.invocationCallOrder[0],
-    )
-    expect(mocks.falVideoSubmit.mock.calls[0][0]).not.toHaveProperty('moderation')
   })
 })
