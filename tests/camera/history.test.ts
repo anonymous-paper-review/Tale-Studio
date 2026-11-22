@@ -1,4 +1,4 @@
-// Camera 샷 줄의 이력 — 실사 그림 판과 영상 Take 가 만든 차례대로 한 줄에 쌓이고, 판마다 무엇이 바뀌었는지 · 지금 쓰는 것 · 안 쓴 것을 가리는지 검사한다 (오너 2026-11-22 D2~D5)
+// Cinema 샷 줄의 이력 — 실사 그림 판과 영상 Take 가 만든 차례대로 한 줄에 쌓이고, 판마다 무엇이 바뀌었는지 · 지금 쓰는 것 · 안 쓴 것을 가리는지 검사한다 (오너 2026-11-22 D2~D5)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { dialogueRowLines, historyActions, shotHistory, type HistoryEntry, type HistoryPhrase } from '@/features/camera/shot-history'

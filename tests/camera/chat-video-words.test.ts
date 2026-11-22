@@ -1,4 +1,4 @@
-// 채팅(Lumi)으로 만든 영상 Take 에 부탁한 말과 "채팅"이 남아 Camera 이력 판에 "채팅으로 부탁: …"으로 보이는지 검사한다 (오너 2026-11-22 D2~D5 "채팅 및 버튼으로 수정 + 이력 사이 변경 요약" · 리드 11/22 결정 ②)
+// 채팅(Lumi)으로 만든 영상 Take 에 부탁한 말과 "채팅"이 남아 Cinema 이력 판에 "채팅으로 부탁: …"으로 보이는지 검사한다 (오너 2026-11-22 D2~D5 "채팅 및 버튼으로 수정 + 이력 사이 변경 요약" · 리드 11/22 결정 ②)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { buildVideoBatchInputs } from '@/lib/director/video-batch-inputs'

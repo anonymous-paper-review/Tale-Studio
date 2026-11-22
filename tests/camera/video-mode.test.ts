@@ -1,4 +1,4 @@
-// Camera [영상 만들기]의 방식 다섯 — 고를 수 없는 방식은 까닭과 함께 꺼지고, 이어서는 앞 샷의 Editor 로 가는 영상 끝 장면으로, 새 Take 마다 사람 말 · 만든 길을 새로 적는지 검사한다 (오너 2026-11-22 D2~D5 · fb-video 계약 fd0e8e56 · 리드 11/22 ⑤)
+// Cinema [영상 만들기]의 방식 다섯 — 고를 수 없는 방식은 까닭과 함께 꺼지고, 이어서는 앞 샷의 Editor 로 가는 영상 끝 장면으로, 새 Take 마다 사람 말 · 만든 길을 새로 적는지 검사한다 (오너 2026-11-22 D2~D5 · fb-video 계약 fd0e8e56 · 리드 11/22 ⑤)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {

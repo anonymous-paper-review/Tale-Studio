@@ -14,7 +14,7 @@ describe('왼쪽 레일 단계 칸', () => {
     expect(railStageState('artist', { active: 'artist', reached: 'artist' })).toBe('current')
   })
 
-  it('지금까지 연 가장 먼 단계보다 앞의 단계에는 끝낸 단계 체크를 달고, Writer 칸은 콘티까지 지나야(Camera 가 열려야) 체크가 붙는다', () => {
+  it('지금까지 연 가장 먼 단계보다 앞의 단계에는 끝낸 단계 체크를 달고, Writer 칸은 콘티까지 지나야(Cinema 가 열려야) 체크가 붙는다', () => {
     // 왜: 넘어간 단계는 잠금이 아니라 "완료"다(리뉴얼 1차). D1(2026-11-22) — Writer 칸은 Artist 를 마치면 콘티로 다시 돌아오는 칸이라,
     //   처음 Artist 에 있을 때는 아직 하는 칸(체크 없음)이다(혼자 정한 것 b — v3 시안 A5 는 합치기 전 그림).
     expect(states('artist', 'artist')).toEqual(['done', 'open', 'current', 'upcoming', 'upcoming', 'upcoming'])

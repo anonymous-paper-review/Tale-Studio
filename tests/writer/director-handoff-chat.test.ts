@@ -1,4 +1,4 @@
-// Camera 이동은 저장된 준비 상태를 확인하고 실제 화면이 열린 뒤에만 완료로 알린다. (2026-11-22 오너 D2~D5 — Storyboard 다음 단계가 Director 에서 Camera 로)
+// Cinema 이동은 저장된 준비 상태를 확인하고 실제 화면이 열린 뒤에만 완료로 알린다. (2026-11-22 오너 D2~D5 — Storyboard 다음 단계가 Director 에서 Cinema 로)
 import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 vi.mock('@/lib/chat-persistence',()=>({saveChatMessage:vi.fn(),saveChatTrace:vi.fn(),saveChatTracePatch:vi.fn(),loadLatestChatTrace:vi.fn()}))
 import {useGlobalChatStore} from '@/stores/global-chat-store'
@@ -10,7 +10,7 @@ beforeEach(()=>{useGlobalChatStore.getState().reset();useProjectStore.setState({
 afterEach(()=>{useGlobalChatStore.getState().reset();vi.unstubAllGlobals()})
 const text=()=>useGlobalChatStore.getState().messages.map(m=>m.content).join('\n')
 
-it('Camera 이동 요청은 모델의 답변을 기다리지 않고 저장된 조건을 확인해 화면 이동을 요청한다.',async()=>{
+it('Cinema 이동 요청은 모델의 답변을 기다리지 않고 저장된 조건을 확인해 화면 이동을 요청한다.',async()=>{
  await useGlobalChatStore.getState().sendMessage('카메라로 넘겨줘')
  expect(fetchMock.mock.calls.map(c=>c[0])).toEqual(['/api/project/handoff-test/handoff'])
  expect(JSON.parse(fetchMock.mock.calls[0][1].body).action).toBe('move')
@@ -19,14 +19,14 @@ it('Camera 이동 요청은 모델의 답변을 기다리지 않고 저장된 �
  expect(text()).not.toContain('⇄')
  expect(useProjectStore.getState().currentStage).toBe('writer')
 })
-it('실제 Camera 화면이 열렸음을 확인하면 이동 완료를 한 번만 알린다.',async()=>{
+it('실제 Cinema 화면이 열렸음을 확인하면 이동 완료를 한 번만 알린다.',async()=>{
  await useGlobalChatStore.getState().sendMessage('Camera로 넘겨줘')
  useGlobalChatStore.getState().confirmDirectorHandoff('handoff-test','/studio/writer')
  expect(text()).not.toContain('⇄')
  useGlobalChatStore.getState().confirmDirectorHandoff('handoff-test','/studio/camera')
  useGlobalChatStore.getState().confirmDirectorHandoff('handoff-test','/studio/camera')
  expect(text().match(/⇄/g)).toHaveLength(1)
- expect(text()).toContain('Camera 화면을 열었어요')
+ expect(text()).toContain('Cinema 화면을 열었어요')
 })
 it('이동 조건이 부족하면 이유와 필요한 작업을 알리고 이동하지 않는다.',async()=>{
  fetchMock.mockResolvedValue(Response.json({ready:false,blockers:[{code:'missing_image',label:'코마츠: 기본 이미지 필요',action:'Artist에서 코마츠 이미지를 준비해 주세요.',stage:'artist'}],counts:{scenes:6,shots:61},warnings:[]},{status:409}))
@@ -37,7 +37,7 @@ it('이동 조건이 부족하면 이유와 필요한 작업을 알리고 이동
  expect(useGlobalChatStore.getState().pendingNavigatePath).toBeNull()
  expect(useProjectStore.getState().reachedStage).toBe('writer')
 })
-it('이동 가능한지 확인한 뒤 넘겨 달라고 하면 사용자 목적지인 Camera로 실행한다.',async()=>{
+it('이동 가능한지 확인한 뒤 넘겨 달라고 하면 사용자 목적지인 Cinema로 실행한다.',async()=>{
  await useGlobalChatStore.getState().sendMessage('카메라로 넘길수잇어?')
  expect(JSON.parse(fetchMock.mock.calls[0][1].body).action).toBe('check')
  expect(useGlobalChatStore.getState().pendingNavigatePath).toBeNull()

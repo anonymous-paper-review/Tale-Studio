@@ -233,14 +233,14 @@ v3 시안에는 테두리가 거의 없다(면 색 차이로 나눈다). 테두�
 | `--stage-producer` | Producer (id entry) | 오렌지 골드 · 기획 |
 | `--stage-writer` | Writer (id producer) · 그 안의 콘티 칸(id writer, D1 2026-11-22 · 리드 결정 2) | 로즈 레드 · 글 · 콘티 |
 | `--stage-artist` | Artist | 일렉트릭 바이올렛 · 그림 |
-| `--stage-storyboard` | Camera (id camera, 오너 2026-11-22 D2~D5) | 딥 블루 · 촬영 |
+| `--stage-storyboard` | Cinema (id camera, 오너 2026-11-22 D2~D5 · 이름 E1 — 마우스를 올리면 Cinematographer) | 딥 블루 · 촬영 |
 | `--stage-director` | Director | 애저 · 연출 |
 | `--stage-editor` | Editor | 민트 틸 · 편집 |
 
 같이 따라오는 것: `--stage-badge-{화면}`(위 막대 단계 칩 그라데이션, 좌→우), `--stage-gradient-{화면}`(단계 카드 그라데이션, 진한 → 연한), `--pearl-vivid`(브랜드 그라데이션 — 로고 · 홈 헤드라인 · 앱 아이콘 · 작품 완성 순간에만), `--text-gradient`(홈 헤드라인 글자).
 
 Tailwind: `bg-stage-{화면}` · `text-stage-{화면}` (+ 알파), `bg-stage-badge` · `bg-stage-gradient` · `bg-pearl-vivid` · `text-gradient`(@utility).
-Camera(id camera, 오너 2026-11-22 D2~D5)는 옛 Storyboard 화면의 딥 블루 · storyboard Lumi 옷 · Storyboard 아이콘을 받는다(리드 11/22 — 콘티가 Writer 칸 안으로
+Cinema(id camera, 오너 2026-11-22 D2~D5 · 탭 이름 E1, 풀네임 Cinematographer)는 옛 Storyboard 화면의 딥 블루 · storyboard Lumi 옷 · Storyboard 아이콘을 받는다(리드 11/22 — 콘티가 Writer 칸 안으로
 들어가며 비는 레일 칸, 시안 없음). 토큰 · 옷 이름은 그대로 둔다(새 토큰 금지, §1 규칙 6 — 옷 이름 = 색 이름, `lumiStageTheme`). 콘티(id writer)는 Writer 색 · 옷을 쓴다(fb-conti).
 단계 id → 화면 이름 매핑은 `src/lib/lumi.ts` `STAGE_PERSONA` 한 곳. 옛 색 매핑(`STAGE_BADGE_CLASS` / `STAGE_FACE_COLOR`, constants.ts)은 그대로 화면 이름 색을 가리킨다.
 

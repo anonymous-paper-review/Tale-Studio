@@ -1,4 +1,4 @@
-// 왼쪽 레일이 Producer · Writer · Artist · Camera · Director · Editor 여섯 칸이고, Writer 칸이 씬 스토리 · 콘티를 함께 맡는지(누르기 · Alt 숫자 · 움직임 · 숫자 배지 · 이름) 검사한다 (D1 오너 2026-11-22)
+// 왼쪽 레일이 Producer · Writer · Artist · Cinema · Director · Editor 여섯 칸이고, Writer 칸이 씬 스토리 · 콘티를 함께 맡는지(누르기 · Alt 숫자 · 움직임 · 숫자 배지 · 이름) 검사한다 (D1 오너 2026-11-22)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { STAGES, STAGE_AGENT_NAME, STAGE_LABEL } from '@/lib/constants'
@@ -12,9 +12,9 @@ const alt = (key: string) => stageForShortcut({ code: `Digit${key}`, altKey: tru
 const can = (open: StageId[]) => (stage: StageId) => open.includes(stage)
 
 describe('레일 칸', () => {
-  it('왼쪽 레일에는 Producer · Writer · Artist · Camera · Director · Editor 칸만 있고 Storyboard 칸은 없다', () => {
+  it('왼쪽 레일에는 Producer · Writer · Artist · Cinema · Director · Editor 칸만 있고 Storyboard 칸은 없다', () => {
     // 왜: D1 — Storyboard 는 Writer 탭 안의 콘티가 됐다(리드 단계 구조). 단계(id)는 일곱이지만 레일 칸은 여섯이다.
-    expect(RAIL_ITEMS.map((item) => STAGE_LABEL[item.id])).toEqual(['Producer', 'Writer', 'Artist', 'Camera', 'Director', 'Editor'])
+    expect(RAIL_ITEMS.map((item) => STAGE_LABEL[item.id])).toEqual(['Producer', 'Writer', 'Artist', 'Cinema', 'Director', 'Editor'])
     expect(RAIL_ITEMS.find((item) => item.id === 'producer')?.stages).toEqual(['producer', 'writer'])
     // 모든 단계가 꼭 한 칸에 든다 — 새 단계를 칸 표에 빠뜨리면 레일에서 사라진다.
     const placed = RAIL_ITEMS.flatMap((item) => item.stages)
@@ -37,13 +37,13 @@ describe('레일 칸', () => {
     expect(sidebar).toMatch(/goToRailItem\(target\)/)
   })
 
-  it('Alt 숫자는 레일 칸 순서다 — 1 Producer · 2 Writer · 3 Artist · 4 Camera · 5 Director · 6 Editor', () => {
+  it('Alt 숫자는 레일 칸 순서다 — 1 Producer · 2 Writer · 3 Artist · 4 Cinema · 5 Director · 6 Editor', () => {
     // 왜(혼자 정한 것 c): 숫자가 레일 칸과 맞아야 외울 수 있다. 콘티는 Writer 칸 안이라 Alt+2 로 간다.
     expect(RAIL_ITEMS.map((item) => STAGE_ACCESS_KEY[item.id])).toEqual(['1', '2', '3', '4', '5', '6'])
     expect(alt('2')).toBe('producer')
   })
 
-  it('단계를 옮길 때의 세로 움직임은 레일 칸 순서를 따른다 — Artist 에서 콘티로 가면 위로, 콘티에서 Camera 로 가면 아래로 움직이고, 씬 스토리 · 콘티 사이는 세로로 움직이지 않는다', () => {
+  it('단계를 옮길 때의 세로 움직임은 레일 칸 순서를 따른다 — Artist 에서 콘티로 가면 위로, 콘티에서 Cinema 로 가면 아래로 움직이고, 씬 스토리 · 콘티 사이는 세로로 움직이지 않는다', () => {
     // 왜(혼자 정한 것 d): 화면 움직임은 레일에서 칸이 옮겨 가는 쪽을 따라야 한다 — 콘티는 레일에서 Artist 위(Writer 칸)에 있다.
     const at = (path: string) => stageIndexFromPathname(path)
     expect(at('/studio/writer')).toBe(at('/studio/producer'))

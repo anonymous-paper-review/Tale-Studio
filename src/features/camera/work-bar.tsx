@@ -4,7 +4,8 @@
 //   진행(Lumi · 이미지 · 영상 끝난 수/전체 · 실패) · [모두 멈추기] … 영상까지 이어서 · [이미지 만들기 · N] · [영상 만들기 · N] · 꺼진 까닭 한 줄 · 예상 칸 ·
 //   위 막대 [다음: Director](만들 것이 없을 때만 가장 밝게). 규칙 · 러너는 Director 툴바와 같은 함수를 그대로 쓴다
 //   (lib/director/toolbar-work · stop-work · stop-all-client · real-batch-client · video-batch-client · video-batch-plan) — Director 파일은 건드리지 않는다.
-//   세는 범위는 work-scope 한 곳(지금은 모든 씬 — 씬 범위는 오너 답 뒤). 고른 샷 · 상태 고르기는 아직 없다.
+//   세는 범위는 work-scope 한 곳 — 지금 보는 씬의 샷만(오너 2026-11-22 E2, [전체] 없음). 확인 창 제목에 씬 이름. [모두 멈추기]는 씬과 상관없이 전부.
+//   고른 샷 · 상태 고르기는 없다.
 //   약속: tests/camera/work-bar.test.ts
 import { useEffect, useState } from 'react'
 import { ImageIcon, Loader2, Play, Square } from 'lucide-react'
@@ -62,8 +63,10 @@ function workButtonClass(primary: boolean): string {
   )
 }
 
-export function CameraWorkBar({ scope }: { scope: readonly string[] | null }) {
+export function CameraWorkBar({ scope, sceneLabel }: { scope: readonly string[] | null; sceneLabel?: string | null }) {
   const t = useT()
+  // 확인 창 제목에 붙일 지금 씬 이름(오너 E2 — "씬 2의 영상 5개를 만들까요?"). 씬이 없으면(샷도 없어 창이 열리지 않는다) 씬 없는 옛 제목.
+  const sceneName = sceneLabel ?? null
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
@@ -358,7 +361,7 @@ export function CameraWorkBar({ scope }: { scope: readonly string[] | null }) {
       <RegenerateConfirmDialog
         open={confirmChain}
         onOpenChange={setConfirmChain}
-        title={t('Make images, then their videos?')}
+        title={sceneName ? t('Make the images in {scene}, then their videos?', { scene: sceneName }) : t('Make images, then their videos?')}
         description={countText(t, imageWork.length, 'Makes 1 image, and its video starts by itself when the image is done.', 'Makes {count} images, and each video starts by itself when its image is done.', { count: imageWork.length })}
         impact={[
           countText(t, chainPlan.total, 'Costs money for every generated video: 1 video.', 'Costs money for every generated video: {count} videos.', { count: chainPlan.total }),
@@ -394,7 +397,7 @@ export function CameraWorkBar({ scope }: { scope: readonly string[] | null }) {
       <RegenerateConfirmDialog
         open={confirmVideoBatch}
         onOpenChange={setConfirmVideoBatch}
-        title={t('Generate videos for eligible shots?')}
+        title={sceneName ? countText(t, videoPlan.total, 'Make 1 video in {scene}?', 'Make {count} videos in {scene}?', { count: videoPlan.total, scene: sceneName }) : t('Generate videos for eligible shots?')}
         description={countText(t, videoPlan.total, 'Generate a video for 1 eligible shot.', 'Generate videos for {count} eligible shots.', { count: videoPlan.total })}
         impact={[
           countText(t, videoPlan.runCount, 'Costs money for every generated video: 1 video.', 'Costs money for every generated video: {count} videos.', { count: videoPlan.runCount }),
