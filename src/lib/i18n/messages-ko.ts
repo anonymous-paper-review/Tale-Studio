@@ -662,8 +662,6 @@ export const KO: Record<string, string> = {
   'Discard and remake': '버리고 다시 만들기',
   'Could not create a canvas context': '캔버스 컨텍스트 생성 실패',
   'Saved the DIRECTING frame': 'DIRECTING 프레임을 저장했어요',
-  'Redrawing the END frame, about 30 seconds': 'END 프레임을 다시 그리는 중이에요. 30초쯤 걸려요',
-  'Saved DIRECTING and regenerated the END frame': 'DIRECTING 저장 + END 프레임 재생성 완료',
   'Save failed': '저장 실패',
   'You need a 3-frame rough set to edit. Generate a panel first.': '3프레임 러프 세트가 있어야 편집할 수 있어요. 패널을 먼저 생성해주세요.',
   'Re-separate layer': '레이어 다시 분리',
@@ -681,8 +679,6 @@ export const KO: Record<string, string> = {
   'Scrape the top layer with the eraser to reveal the arrow-free layer underneath. Draw new arrows with the pen.': '지우개로 위층을 긁으면 화살표 없는 밑층이 드러나요. 펜으로 새 화살표를 그려요.',
   'The pen works right away. To erase existing arrows, separate the layers first.': '펜은 바로 쓸 수 있어요. 기존 화살표를 지우려면 먼저 레이어 분리를 눌러주세요.',
   Save: '저장',
-  'Redraw the END frame based on the saved DIRECTING frame (1 image generation)': '저장한 DIRECTING 프레임을 기준으로 END 프레임을 다시 그려요 (이미지 생성 1회)',
-  'Save, then regenerate END': '저장 후 END 재생성',
   // 가운데 장 저장 뒤 끝 장 물음(D10 · 2026-11-22)
   'Redraw the end frame to match these arrows?': '끝 장도 이 화살표대로 다시 그릴까요?',
   'The start and directing frames stay as they are. Only the end frame is redrawn.': '시작 · 연출 장은 그대로 두고 끝 장만 다시 그려요.',
