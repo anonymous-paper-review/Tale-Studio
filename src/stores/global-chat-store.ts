@@ -63,6 +63,7 @@ import { styleReturnCard, styleReturnRequest, versionStyleLabel } from '@/lib/ar
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { stageIndex } from '@/lib/stage-gate'
 import { useArtistVersionStore } from '@/stores/artist-version-store'
+import { completeArtistForConti } from '@/lib/writer/artist-complete-handoff'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
@@ -2005,6 +2006,7 @@ function handoffBlockers(spec: HandoffSpec, opts?: { acceptIncomplete?: boolean 
     }
     return { hard: [], soft }
   }
+  // Artist → 콘티(id writer): 아래 옛 준비 검사를 지난 뒤 runHandoff 가 [완료하기]와 같은 서버 검사(completeArtistForConti)를 한 번 더 거친다.
   if (spec.from === 'artist') {
     const gate = useProjectStore.getState().lifecycleStatus.director
     // "그래도 진행"(acceptIncomplete)은 Artist 쪽 빈 곳만 넘어간다 — Writer 가 안 끝났으면 넘길 샷이 없다.
@@ -2084,6 +2086,14 @@ async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: strin
     if (ok && useProducerStore.getState().lastHandoffGated) return { ok: true, path: null, gated: true }
     const path = ok ? await handoffToStage(spec.to, { verify: true }) : null
     return { ok: ok && !!path, path }
+  }
+  // Artist → 콘티: [완료하기] 단추와 같은 서버 검사를 거친다(리드 2026-11-22 — 예전에는 검사 없이 단계만 올렸다).
+  if (spec.from === 'artist' && spec.to === 'writer') {
+    if (!projectId) return { ok: false, path: null }
+    const completed = await completeArtistForConti(projectId)
+    if (!completed.ok) return { ok: false, path: null, error: completed.error }
+    if (useProjectStore.getState().projectId !== projectId) return { ok: false, path: null }
+    return { ok: true, path: await handoffToStage('writer') }
   }
   if (spec.from === 'writer' && spec.to === 'artist') {
     const path = await handoffToStage(spec.to, { verify: true })
