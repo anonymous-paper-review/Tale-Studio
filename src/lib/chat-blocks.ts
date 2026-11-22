@@ -154,6 +154,8 @@ const STAGE_IDS: ReadonlySet<string> = new Set([
   'producer',
   'writer',
   'artist',
+  // Camera(오너 2026-11-22 D2~D5) — Storyboard → Camera · Camera → Director 넘김 표시.
+  'camera',
   'director',
   'editor',
 ])

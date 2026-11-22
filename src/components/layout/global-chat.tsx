@@ -1456,7 +1456,7 @@ export function GlobalChat() {
             (#chat-continuity) — 구간 구분선이 단계를 가른다. 답을 기다리는 동안 Lumi 는 생각하는 모습. */}
         <div className="flex shrink-0 items-center gap-2 pb-3 pl-5 pr-3.5 pt-4">
           <LumiAvatar persona={STAGE_PERSONA[currentStage]} state={chatLumiState({ loading, error: !!error })} size={28} />
-          <h2 className="min-w-0 flex-1 truncate text-label font-semibold text-foreground">{t(STAGE_CHAT_TITLE[currentStage])}</h2>
+          <h2 className="min-w-0 flex-1 truncate text-label font-semibold text-foreground">{t(STAGE_CHAT_TITLE[currentStage], { stage: STAGE_LABEL[currentStage] })}</h2>
           {/* 다음 단계 호출 칩(#owner-handoff-reentry 2026-08-31)은 2026-10-01 오너 지시("채팅 위의 버튼은 없애줘")로
               각 단계 화면 오른쪽 위 NextStepButton 으로 옮겼다 — 같은 문장을 채팅에 입력해 넘긴다. */}
           <Button

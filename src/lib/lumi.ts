@@ -31,12 +31,14 @@ export function lumiBox(size: LumiSize | number, variant: LumiVariant = 'full'):
   return { width, height: variant === 'full' ? Math.round(width * LUMI_BOX_RATIO) : width }
 }
 
-/** 단계 id → 화면 이름과 같은 Lumi 옷. id 는 옛 이름이다(entry=Producer, producer=Writer, writer=Storyboard). */
+/** 단계 id → 화면 이름과 같은 Lumi 옷. id 는 옛 이름이다(entry=Producer, producer=Writer, writer=Storyboard).
+ *  Camera(오너 2026-11-22 D2~D5)는 옛 Storyboard 옷 · 색을 받는다(리드 11/22 — 콘티가 Writer 칸 안으로 들어가며 비는 자리, 시안 없음). */
 export const STAGE_PERSONA: Record<StageId, LumiStagePersona> = {
   entry: 'producer',
   producer: 'writer',
   artist: 'artist',
   writer: 'storyboard',
+  camera: 'storyboard',
   director: 'director',
   editor: 'editor',
 }

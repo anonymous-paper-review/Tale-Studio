@@ -7,8 +7,9 @@ import { reachedStageFromFacts, canEnterStage, proseLockedFromFacts, type StageF
 const fresh: StageFacts = { storedStage: 'producer', treatmentStarted: false, runContinued: false, hasShots: false }
 
 describe('리뉴얼 단계 열림', () => {
-  it('단계는 Producer, Writer, Artist, Storyboard, Director, Editor 순서로 보인다', () => {
-    expect(STAGES.map((s) => STAGE_LABEL[s.id])).toEqual(['Producer', 'Writer', 'Artist', 'Storyboard', 'Director', 'Editor'])
+  it('단계는 Producer, Writer, Artist, Storyboard, Camera, Director, Editor 순서로 보인다', () => {
+    // 왜: 오너 2026-11-22 D2~D5 — Director 앞에 새 탭 Camera 가 선다.
+    expect(STAGES.map((s) => STAGE_LABEL[s.id])).toEqual(['Producer', 'Writer', 'Artist', 'Storyboard', 'Camera', 'Director', 'Editor'])
   })
 
   it('새 프로젝트는 Producer만 열려 있다', () => {

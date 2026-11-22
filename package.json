@@ -15,6 +15,7 @@
     "test:producer": "node scripts/test-suites.mjs producer",
     "test:writer": "node scripts/test-suites.mjs writer",
     "test:artist": "node scripts/test-suites.mjs artist",
+    "test:camera": "node scripts/test-suites.mjs camera",
     "test:director": "node scripts/test-suites.mjs director",
     "test:editor": "node scripts/test-suites.mjs editor",
     "test:chat": "node scripts/test-suites.mjs chat",

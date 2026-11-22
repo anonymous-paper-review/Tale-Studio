@@ -117,7 +117,8 @@ describe('같이 정한 것', () => {
     await vi.advanceTimersByTimeAsync(3000)
 
     const line = translate(useLocaleStore.getState().locale, '{done} videos done, {failed} failed', { done: 1, failed: 0 })
-    expect(notices.line).toHaveBeenCalledExactlyOnceWith('director', `✓ ${line}`)
+    // 끝 줄은 실사 · 영상의 집 Camera 로 낸다(2026-11-22 오너 D2~D5 — 예전엔 'director'). 보고 있는 화면에 맞추는 일은 채팅이 받는 곳이 한다.
+    expect(notices.line).toHaveBeenCalledExactlyOnceWith('camera', `✓ ${line}`)
     expect(notices.card).toHaveBeenCalledExactlyOnceWith({ projectId: 'project-1', kind: 'video', done: 1, failed: 0 })
   })
 })

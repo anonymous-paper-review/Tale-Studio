@@ -4251,7 +4251,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               // #ref-gate(오너 결정 1번): 선행 산출물(인물 시트·러프)이 없으면 안내 후 대기 → 나타나면 자동 재개.
               //   대기 중엔 노드를 generating(스피너)으로 두고, 사람이 다시 누르지 않아도 이어진다. 20분 상한.
               if (isPrerequisiteMissing(res.status, body)) {
-                notifyPrerequisiteWaiting('director', body)
+                notifyPrerequisiteWaiting('camera', body)
                 releaseAction(`director:storyboard:${shotNodeId}`)
                 const outcome = await waitForPrerequisite(projectId, body, {
                   isCancelled: () => get().projectId !== projectId,
@@ -4265,7 +4265,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   })
                   return get().generateStoryboardImage(shotNodeId, { ...options, resumeDepth: depth + 1 })
                 }
-                if (outcome === 'timeout') notifyPrerequisiteTimeout('director', body)
+                if (outcome === 'timeout') notifyPrerequisiteTimeout('camera', body)
                 get().updateNodeData<'shot'>(shotNodeId, {
                   storyboardImage: {
                     ...kept,
@@ -4314,7 +4314,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               // 채팅에 남는 줄이라 문장 · 이름 모두 채팅 언어(리드 검토 3 — H1).
               const locale = contentLocale()
               const name = stoppedShotName(shot, locale)
-              notifyStoppedResultKept('director', version
+              notifyStoppedResultKept('camera', version
                 ? translate(locale, 'The image you stopped for {shot} finished later and was kept as version v{n}. The current image did not change.', { shot: name, n: version.n })
                 : translate(locale, 'The image you stopped for {shot} finished later and was kept in the versions. The current image did not change.', { shot: name }))
               return { jobId, status: 'cancelled', resultUrl: url }
@@ -4344,7 +4344,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // 스트립 모드(#real-strip)의 frames{start,direction,end}는 잡 result_url(=start)에
             //   실리지 않는다 — DB 진실 재수화로 회수(로컬이 방금 쓴 완료값 그대로면 DB 값 채택).
             await get().hydrateFromDb(projectId).catch(() => {})
-            notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Storyboard')) // 다른 stage에 있을 때만 알림
+            notifyGenerationComplete('camera', translate(useLocaleStore.getState().locale, 'Real image')) // 다른 stage에 있을 때만 알림
             return { jobId, status: 'completed', resultUrl: url, httpStatus: res.status }
           } catch (err) {
             if (get().projectId !== projectId) return { jobId: activeJobId, status: 'skipped' }
@@ -4367,7 +4367,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // 실패한 시도가 1초 창을 붙잡고 있으면 즉시 재시도가 막힌다 — 창을 바로 연다.
             releaseAction(`director:storyboard:${shotNodeId}`)
             // 카드의 작은 빨간 글씨는 스크롤하면 사라진다 — 사유를 채팅에도 남긴다(#double-fire).
-            notifyGenerationFailure('director', translate(useLocaleStore.getState().locale, 'Storyboard image'), message)
+            notifyGenerationFailure('camera', translate(useLocaleStore.getState().locale, 'Real image'), message)
             return { jobId: activeJobId, status: 'failed', error: message }
           }
         }
@@ -5003,7 +5003,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // #ref-gate(오너 결정 1번): 실사 스토리보드가 아직 없으면 대기 → 나타나면 같은 샷의 영상 생성을 자동 재개.
             //   false 를 돌려주면 호출부가 방금 만든 미저장 take 노드를 롤백하므로, 재개는 새 take 로 다시 시작한다.
             if (isPrerequisiteMissing(res.status, body)) {
-              notifyPrerequisiteWaiting('director', body)
+              notifyPrerequisiteWaiting('camera', body)
               if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
               const depth = options?.resumeDepth ?? 0
               const resumeShotNodeId = shotNode && isShotData(shotNode.data) ? shotNode.id : null
@@ -5021,7 +5021,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   if (outcome === 'ready') {
                     notifyPrerequisiteResumed(resumeBody)
                     void get().generateVideoForShot(resumeShotNodeId, { ...options, resumeDepth: depth + 1 })
-                  } else if (outcome === 'timeout') notifyPrerequisiteTimeout('director', resumeBody)
+                  } else if (outcome === 'timeout') notifyPrerequisiteTimeout('camera', resumeBody)
                 })
               }
               return false
@@ -5118,14 +5118,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 const shot = doneNode && isVideoData(doneNode.data) ? get().nodes.find((n) => n.id === (doneNode.data as VideoNodeData).parentShotNodeId) : undefined
                 // 채팅에 남는 줄이라 문장 · 이름 모두 채팅 언어(리드 검토 3 — H1).
                 const locale = contentLocale()
-                notifyStoppedResultKept('director', translate(locale, 'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.', {
+                notifyStoppedResultKept('camera', translate(locale, 'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.', {
                   shot: stoppedShotName(shot, locale),
                 }))
                 return true
               }
               if (status === 'completed') {
                 // 약속 E4(2026-09-04): 일괄은 러너가 "N개 완료, M개 실패" 한 줄로 남긴다 — 건별 알림은 단건만.
-                if (options?.batch !== true) notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Video'))
+                if (options?.batch !== true) notifyGenerationComplete('camera', translate(useLocaleStore.getState().locale, 'Video'))
                 // #adherence P2: 모션 계약 준수 검사(fire-and-forget) — 브라우저가 첫/끝 프레임을
                 //   캡처해 서버 판정 후 배지 반영. 실패는 조용히 무시(생성 결과에 영향 없음).
                 const doneNode = get().nodes.find((n) => n.id === videoNodeId)

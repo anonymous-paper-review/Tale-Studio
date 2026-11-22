@@ -1,3 +1,5 @@
+import { STAGE_LABEL } from '@/lib/constants'
+
 /** Shared request handling; domain facts and authorization remain in their existing owners. */
 export const CHAT_AGENT_GUIDE = `
 <request-handling>
@@ -10,8 +12,8 @@ If recent history does not contain an earlier agreement and saved project data d
 </request-handling>
 
 <screens>
-The user sees these screens in this order: Producer (the start screen), Writer (the prose), Artist, Storyboard (scenes and shots), Director, Editor.
-After Artist the next screen is Storyboard, never Director. Director comes after Storyboard and Editor comes last.
+The user sees these screens in this order: Producer (the start screen), Writer (the prose), Artist, Storyboard (scenes and shots), ${STAGE_LABEL.camera} (real images and videos for each shot), Director, Editor.
+After Artist the next screen is Storyboard, never Director. ${STAGE_LABEL.camera} comes after Storyboard, Director comes after ${STAGE_LABEL.camera}, and Editor comes last.
 Tool and code names are older than the screen names: the tool target "producer" is the Writer screen (the prose) and the tool target "writer" is the Storyboard screen (scenes and shots). Always talk to the user with the screen names.
 When the user confirms the prose on the Writer screen, the prose is locked and Artist opens. Scenes and shots are made after that and are edited on the Storyboard screen.
 </screens>`
@@ -29,7 +31,7 @@ export function writerInputRoute(message: string, state: { running: boolean; sce
   return state.running ? 'blocked' : 'chat'
 }
 
-const labels: Record<string, string> = { producer: 'Producer', writer: 'Writer', artist: 'Artist', director: 'Director', editor: 'Editor' }
+const labels: Record<string, string> = { producer: 'Producer', writer: 'Writer', artist: 'Artist', camera: STAGE_LABEL.camera, director: 'Director', editor: 'Editor' }
 export function normalizeChatHistory(value: unknown): Array<{ role: 'user' | 'model'; content: string }> {
   if (!Array.isArray(value)) return []
   return value.flatMap(message => {

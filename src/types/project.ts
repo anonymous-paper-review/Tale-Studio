@@ -4,8 +4,9 @@
 //     producer = Writer     (예전 Producer 의 산문 · 씬 스토리 작업공간)
 //     artist   = Artist
 //     writer   = Storyboard (예전 Writer 의 씬 · 샷 · 러프 스토리보드)
+//     camera   = Camera     (2026-11-22 오너 D2~D5 — Director 앞 새 탭: 씬마다 샷의 실사 그림 · 영상 이력. 이름은 바뀔 수 있고 id 는 그대로)
 //   화면에 보이는 이름은 STAGE_LABEL(constants.ts) 한 곳에서만 정한다.
-export type StageId = 'entry' | 'producer' | 'writer' | 'artist' | 'director' | 'editor'
+export type StageId = 'entry' | 'producer' | 'writer' | 'artist' | 'camera' | 'director' | 'editor'
 
 export interface StageConfig {
   id: StageId
