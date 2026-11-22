@@ -727,7 +727,6 @@ export const KO: Record<string, string> = {
   'Choose where to add it on the left.': '왼쪽에서 추가할 위치를 골라주세요.',
   // ── writer 스테이지: rough-storyboard-view ──
   'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nLet me know which scene or shot you\'d like to revise or add.\nPress "@" to pick a scene or shot (Ctrl+click a card does the same).': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
-  'The rough storyboard is all ready. Ready to move to Artist and work out character and background concepts?': '러프 콘티가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?',
   '{count} panels stopped auto-generating after repeated failures. Use "Retry" on the card to regenerate them.': '패널 {count}개는 반복 실패로 자동 생성을 멈췄어요. 카드의 "다시 시도"로 재생성할 수 있어요.',
   'Generation failed': '생성 실패',
   'Rough storyboard generation request failed': '러프 콘티 생성 요청 실패',
@@ -3823,6 +3822,8 @@ export const KO: Record<string, string> = {
 
   // ── Writer 콘티(D1 오너 2026-11-22, fb1120 fb-conti) — 위 막대 [씬 스토리 | 콘티] ──
   'Opens when you press Complete in Artist': 'Artist에서 완료하기를 누르면 열려요',
+  // 콘티 머리 [다음: {stage}로] — 다음 단계 이름은 단계 표에서(2026-11-22 오너 D2~D5 부터 Camera)
+  'Next: {stage}': '다음: {stage}로',
   // D15 — 원작 그대로 프로젝트의 콘티 대사 탭(대사를 AI 로 새로 쓰지 않음, 문구는 fb-style 제안 · 리드 2026-11-22)
   'This work keeps the original dialogue, so AI does not write new lines. Click a line to edit it yourself.':
     '원작 대사를 그대로 쓰는 작품이라 AI가 대사를 새로 쓰지 않아요. 줄을 눌러 직접 고칠 수 있어요.',

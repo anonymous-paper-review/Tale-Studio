@@ -23,9 +23,10 @@ export function workflowStageReached(stage: string | null | undefined, floor: st
 
 /** 현황 스냅샷의 화면 이름 표 — 순서 · 도구 대상 이름 ↔ 사용자가 보는 화면 이름. */
 const SCREEN_NAMES = {
-  order: `Producer (start) > Writer (prose) > Artist > Storyboard (scenes and shots) > ${STAGE_LABEL.camera} (real images and videos per shot) > Director > Editor`,
-  producer: 'Writer screen (prose)',
-  writer: 'Storyboard screen (scenes and shots)',
+  // D1(오너 2026-11-22): Writer 화면 = 씬 스토리(producer) + 콘티(writer, 영어 Storyboard) 두 칸.
+  order: `Producer (start) > Writer: Scene story (prose) > Artist > Writer: Storyboard (scenes and shots) > ${STAGE_LABEL.camera} (real images and videos per shot) > Director > Editor`,
+  producer: 'Writer screen, Scene story part (prose)',
+  writer: 'Writer screen, Storyboard part (scenes and shots)',
   artist: 'Artist screen',
 }
 
@@ -102,7 +103,7 @@ export function createStudioWorkflow(options: {
         savedDraft: saved ? { settings: saved.settings, storyReady: saved.storyReady, savedAt: saved.savedAt } : null,
         committed: { settings: project.data.settings, storyPresent: !!project.data.story_text }, styleAnchorKey: project.data.style_anchor_key },
       // 키 이름은 시험이 못 박아 그대로 둔다 — writer 는 Storyboard 화면의 씬 · 샷 실행이고 산문 Writer 화면이 아니다(screens 표가 화면 이름을 말한다).
-      writer: { started: handedOff, treatmentDraft: status.draft === true, status: status.current_status, stage: status.current_stage, error: status.error, completed: status.pipeline_completed, progress: status.progress_percent, savedScenes: scenes.count, savedShots: shots.count, note: 'This writer entry is the Storyboard screen scene and shot run, not the prose Writer screen. No execution record does not imply missing script. Saved scene and shot counts are independent of the execution history.' },
+      writer: { started: handedOff, treatmentDraft: status.draft === true, status: status.current_status, stage: status.current_stage, error: status.error, completed: status.pipeline_completed, progress: status.progress_percent, savedScenes: scenes.count, savedShots: shots.count, note: 'This writer entry is the Writer Storyboard scene and shot run, not the Writer Scene story (prose). No execution record does not imply missing script. Saved scene and shot counts are independent of the execution history.' },
       // 서버가 준 숫자 키(chars_ready · chars_total …)는 그대로 두고, 그린 그림 수와 그림 카드 수를 목록 수와 따로 이름 붙여 더한다.
       artist: {
         ...status.assets,

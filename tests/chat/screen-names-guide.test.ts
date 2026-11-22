@@ -1,4 +1,4 @@
-// 채팅 AI 에게 주는 지시문 · 도구 안내 · 현황 스냅샷은 사용자가 보는 화면 이름과 순서(Producer 시작 → Writer 산문 → Artist → Storyboard → Director → Editor)로 말한다 (리드 2026-11-14 D · H-3)
+// 채팅 AI 에게 주는 지시문 · 도구 안내 · 현황 스냅샷은 사용자가 보는 화면 이름과 순서(Producer 시작 → Writer 씬 스토리 → Artist → Writer 콘티 → Camera → Director → Editor)로 말한다 (리드 2026-11-14 D · H-3, D1 2026-11-22)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -34,35 +34,36 @@ afterEach(() => vi.unstubAllGlobals())
 const options = () => ({ projectId: 'p', stage: 'artist', message: '상태 알려줘', signal: new AbortController().signal, isCurrent: () => true, requiresEdit: false, outcomes: () => [], navigate: vi.fn(async () => ({ status: 'navigation_requested' })), handoff: vi.fn(async () => ({ status: 'approval_required' })) })
 
 describe('지시문 · 도구 안내', () => {
-  it('Producer · Writer · Storyboard · Artist 채팅이 함께 받는 지시문에 화면 순서가 적히고 Artist 다음은 Storyboard 다', () => {
+  it('Producer · Writer · Artist 채팅이 함께 받는 지시문에 화면 순서가 적히고 Artist 다음은 Writer 의 콘티(Storyboard)다', () => {
     // 왜: Artist 채팅이 "다음은 Director"라고 안내하고 "Writer 단계가 아직 시작되지 않았다"고 말했다(11/14 채팅 점검 D · H). 화면 이름과 순서를 모르는 채 옛 이름으로 답했다.
-    //   Camera(오너 2026-11-22 D2~D5)는 Storyboard 와 Director 사이다.
-    expect(CHAT_AGENT_GUIDE).toContain('Producer (the start screen), Writer (the prose), Artist, Storyboard (scenes and shots), Camera (real images and videos for each shot), Director, Editor')
-    expect(CHAT_AGENT_GUIDE).toContain('After Artist the next screen is Storyboard, never Director.')
+    //   Camera(오너 2026-11-22 D2~D5)는 콘티와 Director 사이다. D1(2026-11-22): 옛 Storyboard 화면은 Writer 탭의 콘티 칸이다 — 한국어로는 "콘티"라고 부른다.
+    expect(CHAT_AGENT_GUIDE).toContain('Producer (the start screen), Writer > Scene story (the prose), Artist, Writer > Storyboard (scenes and shots), Camera (real images and videos for each shot), Director, Editor')
+    expect(CHAT_AGENT_GUIDE).toContain('After Artist the next screen is the Writer Storyboard, never Camera or Director.')
+    expect(CHAT_AGENT_GUIDE).toContain('In Korean the Writer Storyboard is called "콘티"')
     for (const route of ['produce', 'writer', 'artist']) {
       expect(readFileSync(`src/app/api/${route}/chat/route.ts`, 'utf8')).toContain('CHAT_AGENT_GUIDE')
     }
   })
 
-  it('도구 안내가 도구 대상 이름과 화면 이름의 짝을 적고 Artist 다음은 Storyboard 라고 적는다', () => {
-    // 왜: 도구는 producer · writer 라는 옛 이름을 쓴다 — producer 는 Writer 산문 화면, writer 는 Storyboard 화면이다.
-    expect(CHAT_TOOL_GUIDE).toContain('targetStage "producer" is the Writer screen (the prose)')
-    expect(CHAT_TOOL_GUIDE).toContain('"writer" is the Storyboard screen (scenes and shots)')
-    expect(CHAT_TOOL_GUIDE).toContain('The next screen after Artist is Storyboard, not Director.')
+  it('도구 안내가 도구 대상 이름과 화면 이름의 짝을 적고 Artist 다음은 Writer 의 콘티(Storyboard)라고 적는다', () => {
+    // 왜: 도구는 producer · writer 라는 옛 이름을 쓴다 — producer 는 Writer 의 씬 스토리(산문), writer 는 Writer 의 콘티(Storyboard)다(D1 2026-11-22).
+    expect(CHAT_TOOL_GUIDE).toContain('targetStage "producer" is the Writer Scene story (the prose)')
+    expect(CHAT_TOOL_GUIDE).toContain('"writer" is the Writer Storyboard (scenes and shots)')
+    expect(CHAT_TOOL_GUIDE).toContain('The next screen after Artist is the Writer Storyboard, not Camera or Director.')
     const tool = prepareChatTools('artist', true, [], true)?.tools.find((t) => t.name === 'project_workflow')
-    expect(tool?.description).toContain('Storyboard')
+    expect(tool?.description).toContain('Writer Storyboard')
   })
 
-  it('도구 안내가 처음 시작하는 넘김을 옛 이름(handoff to Writer)이 아니라 Storyboard 실행(targetStage "writer")으로 말한다', () => {
-    // 왜: "handoff to Writer"는 옛 이름이다 — 도구 대상 writer 는 Storyboard 화면의 씬 · 샷 실행이고 산문 Writer 화면이 아니다(리드 검토 11/14 낮음 2).
+  it('도구 안내가 처음 시작하는 넘김을 옛 이름(handoff to Writer)이 아니라 Writer 콘티 실행(targetStage "writer")으로 말한다', () => {
+    // 왜: "handoff to Writer"는 옛 이름이다 — 도구 대상 writer 는 Writer 콘티(Storyboard)의 씬 · 샷 실행이고 산문(씬 스토리)이 아니다(리드 검토 11/14 낮음 2 · D1 2026-11-22).
     expect(CHAT_TOOL_GUIDE).not.toContain('handoff to Writer')
-    expect(CHAT_TOOL_GUIDE).toContain('handoff to the Storyboard run (targetStage "writer") uses the existing start approval when no run exists')
+    expect(CHAT_TOOL_GUIDE).toContain('handoff to the Writer Storyboard run (targetStage "writer") uses the existing start approval when no run exists')
   })
 
-  it('도구 안내가 실행 기록이 없다는 말도 옛 이름(No Writer execution record)이 아니라 Storyboard 실행(targetStage "writer")으로 말한다', () => {
-    // 왜: "Writer execution record"의 Writer 는 옛 이름이다 — 도구 대상 writer 는 Storyboard 화면의 씬 · 샷 실행이라, 실행 기록이 없다는 말도 그 이름으로 해야 산문 Writer 화면과 섞이지 않는다(리드 11/14).
+  it('도구 안내가 실행 기록이 없다는 말도 옛 이름(No Writer execution record)이 아니라 Writer 콘티 실행(targetStage "writer")으로 말한다', () => {
+    // 왜: "Writer execution record"의 Writer 는 옛 이름이다 — 도구 대상 writer 는 Writer 콘티의 씬 · 샷 실행이라, 실행 기록이 없다는 말도 그 이름으로 해야 산문(씬 스토리)과 섞이지 않는다(리드 11/14 · D1 2026-11-22).
     expect(CHAT_TOOL_GUIDE).not.toContain('No Writer execution record')
-    expect(CHAT_TOOL_GUIDE).toContain('No Storyboard run record (targetStage "writer") is not proof of missing script')
+    expect(CHAT_TOOL_GUIDE).toContain('No Writer Storyboard run record (targetStage "writer") is not proof of missing script')
   })
 
   it('잠긴 산문 지시문은 "Writer 로 넘겼다"가 아니라 산문을 확정했다고 지금 화면 이름으로 말한다', () => {
@@ -72,7 +73,7 @@ describe('지시문 · 도구 안내', () => {
     expect(directive).not.toContain('handed over to Writer')
     expect(directive).toContain('confirmed the prose on the Writer screen')
     expect(directive).toContain('Artist screen')
-    expect(directive).toContain('Storyboard screen')
+    expect(directive).toContain('Writer Storyboard')
     expect(lockedProducerDirective(false)).toBeNull()
   })
 
@@ -105,9 +106,9 @@ describe('현황 스냅샷', () => {
       state: {
         writer: { started: false, savedScenes: 0, savedShots: 0 },
         screens: {
-          order: 'Producer (start) > Writer (prose) > Artist > Storyboard (scenes and shots) > Camera (real images and videos per shot) > Director > Editor',
-          producer: 'Writer screen (prose)',
-          writer: 'Storyboard screen (scenes and shots)',
+          order: 'Producer (start) > Writer: Scene story (prose) > Artist > Writer: Storyboard (scenes and shots) > Camera (real images and videos per shot) > Director > Editor',
+          producer: 'Writer screen, Scene story part (prose)',
+          writer: 'Writer screen, Storyboard part (scenes and shots)',
           artist: 'Artist screen',
         },
       },
