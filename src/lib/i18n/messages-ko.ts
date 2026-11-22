@@ -1363,6 +1363,8 @@ export const KO: Record<string, string> = {
   'Previous video chain frame is unavailable.': '이전 영상의 마지막 프레임을 사용할 수 없습니다.',
   'Unable to capture the source video last frame.': '이전 영상의 마지막 프레임을 캡처하지 못했습니다.',
   'Unable to upload the source video last frame.': '이전 영상의 마지막 프레임을 업로드하지 못했습니다.',
+  // 방안 고장 2(fb-video 2026-11-22): 앞 영상 끝 1초가 전부 검으면 이어 붙이지 않는다.
+  'The previous video ends on a black screen, so there is no scene to continue from.': '앞 영상이 검은 화면으로 끝나서 이어 붙일 장면을 찾지 못했어요.',
   'The source video changed while its last frame was captured.': '마지막 프레임을 캡처하는 동안 이전 영상이 바뀌었습니다.',
   'Video chain connection failed.': '이전 영상 연결에 실패했습니다.',
   '{started}/{total} videos generated, {failed} failed.': '{started}/{total}개 영상 생성, {failed}개 실패.',
