@@ -29,7 +29,6 @@ import { Loader2,
 
 import { toast } from 'sonner'
 import { afterStoppedRealBatch, cancelRealBatchResume, cancelWaitingRealBatch, runRealBatch, startSingleImage } from '@/lib/director/real-batch-client'
-import { takeImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
 import {
   runVideoBatch,
   restoreVideoBatch,
@@ -1643,11 +1642,7 @@ export default function DirectorCanvasPage() {
       useDirectorCanvasStore.getState().setChainVideoAfterImage(false)
     }
   }, [])
-  const handoffProjectId = useProjectStore((s) => s.projectId)
-  // 라우터 요청이 아닌 실제 Director 화면의 mount가 이동 완료를 확인한다.
-  useEffect(() => {
-    if (handoffProjectId) useGlobalChatStore.getState().confirmDirectorHandoff(handoffProjectId, '/studio/director')
-  }, [handoffProjectId])
+  // 콘티 → 다음 단계 넘김의 이동 완료 확인은 Camera 화면이 한다(c1b34820 camera 등록, 2026-11-22) — 예전에는 이 화면이 했다.
   const t = useT()
   // 오너 D2~D5(2026-11-22): Director 에는 노드 보기만 있다 — 스토리보드(러프 · 실사) 보기는 새 Camera 탭이 맡는다.
   //   이 브라우저에 옛 스토리보드 보기가 기억돼 있어도 노드 보기로 연다(옛 값이면 왼쪽 상세 패널이 안 열린다, h22). 보기 값은 Camera 가 격자를 다시 쓸 때를 위해 스토어에 남긴다.
@@ -1685,12 +1680,8 @@ export default function DirectorCanvasPage() {
     return () => document.removeEventListener('visibilitychange', restore)
   }, [guideProjectId, stageReady])
 
-  // D0(디자이너 1110 확정 · 2026-11-14): Storyboard 넘기기 창에서 "넘어가면서 이미지 만들기"를 고르고 [넘어가기] 를 누른 경우에만,
-  //   Director 가 준비된 뒤 실사 일괄을 한 번 시작한다 — 사람이 창에서 고른 것이라 8/27 진입 자동 채움(아래 #c5 주석)과 다른 길이다.
-  useEffect(() => {
-    if (!stageReady || !guideProjectId || guideProjectId === 'default') return
-    if (takeImagesOnDirectorEntry(guideProjectId)) void runRealBatch(guideProjectId)
-  }, [guideProjectId, stageReady])
+  // D0(디자이너 1110 확정 · 2026-11-14) "넘어가면서 이미지 만들기"의 실사 일괄 시작은 Camera 화면이 한다(2026-11-22) — 이 화면은 그 표시를 읽지 않는다
+  //   (한 번 읽으면 지워지는 표시라, Director 가 먼저 읽으면 Camera 에서 시작하지 못한다).
 
   // SHOT VIDEO 재생 상태(#video-pause 2026-08-12) — playingNodeId 가 스토어에 남아 탭을
   //   떠났다 오면 <video autoPlay> 가 재마운트되며 저절로 재생됐다. 떠날 때(unmount)와
