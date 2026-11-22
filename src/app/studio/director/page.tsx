@@ -83,6 +83,9 @@ import {
 } from '@/features/director/scene-view'
 import { switchDirectorScene, useDirectorSceneView } from '@/features/director/hooks/use-scene-view'
 import { SceneLinksProvider, type SceneLinkChip } from '@/features/director/scene-links'
+import { DirectorCanvasLoadNote, canvasCreateAllowed, directorCanvasNote, noShotsNoteAllowed } from '@/features/director/canvas-load-note'
+import { boardLoadBlockText } from '@/lib/director/board-load'
+import { boardLoadStatusOf, retryBoardLoad, useBoardLoadStatus, useBoardLoadStore } from '@/stores/board-load-store'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
@@ -357,6 +360,9 @@ function NodeStatusEmptyNote({ shotIds }: { shotIds: readonly string[] }) {
 // 고른 씬에 샷이 없으면 캔버스 가운데 한 줄(씬별 보기, 혼자 정한 것 h18 · 시안 없음) — 빈 판만 보이면 고장으로 보인다.
 function SceneEmptyNote() {
   const t = useT()
+  // 다 읽은 뒤에만 — 다 읽기 전 · 못 불러옴이면 읽지 않은 씬이 샷 없는 씬으로 보인다(리드 11/23 같이 정한 것 2 와 같은 뜻, 혼자 정한 것).
+  const boardLoad = useBoardLoadStatus(useDirectorCanvasStore((s) => s.projectId))
+  if (!noShotsNoteAllowed(boardLoad)) return null
   return (
     <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
       <span className="rounded-full bg-background px-3.5 py-1.5 text-label text-muted-foreground shadow-node">
@@ -396,6 +402,8 @@ const edgeTypes = {
 
 function CanvasInner() {
   const t = useT()
+  // 판 읽기 상태(fb-blur QA 2026-11-23 · 리드, Cinema 와 같은 상태): 다 읽기 전 · 못 불러옴이면 빈 캔버스 안내 대신 그 글, 두 번 눌러 만들기도 막는다.
+  const boardLoad = useBoardLoadStatus(useDirectorCanvasStore((s) => s.projectId))
   // 씬별 보기(오너 D8 2026-11-22): 캔버스에는 고른 씬의 카드만 그린다(거르기는 화면에서만 — 스토어 · DB 는 프로젝트 통째, scene-view.ts).
   const { scenes, sceneNodeId, view } = useDirectorSceneView()
   const sceneNodeIdRef = useRef(sceneNodeId)
@@ -894,6 +902,9 @@ function CanvasInner() {
         target?.closest('.react-flow__pane') !== null
       const isInsideNode = target?.closest('.react-flow__node') !== null
       if (!isPane || isInsideNode) return
+      // 다 읽기 전 · 못 불러옴이면 만들지 않는다 — 읽지 못한 판 위에 새 카드가 생기면 다시 읽은 판과 섞인다(리드 11/23 같이 정한 것 4).
+      //   누르는 그때의 상태를 읽는다(훅 deps 에 넣지 않는다).
+      if (!canvasCreateAllowed(boardLoadStatusOf(useBoardLoadStore.getState(), useDirectorCanvasStore.getState().projectId))) return
 
       const position = screenToFlowPosition({
         x: event.clientX,
@@ -934,6 +945,8 @@ function CanvasInner() {
     return chips
   }, [view.links, nodes, boardNames, goToScene])
   const sceneHasShots = !sceneNodeId || view.nodes.some((n) => isShotData(n.data) && n.data.parentSceneNodeId === sceneNodeId)
+  // 캔버스 가운데 글 — "없음" 안내는 다 읽은 뒤에만, 다 읽기 전 · 못 불러옴은 그 글(canvas-load-note).
+  const canvasNote = directorCanvasNote({ status: boardLoad, nodeCount: nodes.length })
 
   return (
     // B-D1 fix: wrapper div에 onDoubleClick 등록해 ReactFlow 내부 처리와 독립적으로 캐처
@@ -1044,7 +1057,7 @@ function CanvasInner() {
       </ReactFlow>
       </SceneLinksProvider>
 
-      {nodes.length === 0 && (
+      {canvasNote === 'empty' && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
           <div className="text-center text-label text-muted-foreground">
             {t('Scenes come in automatically once you create them in Writer.')}
@@ -1053,6 +1066,11 @@ function CanvasInner() {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 샷 정보를 다 읽기 전 · 못 불러옴 — 빈 캔버스 안내 자리(노드가 남아 있으면 캔버스 가운데)에 Cinema 와 같은 글 · [다시 불러오기](리드 11/23). */}
+      {(canvasNote === 'loading' || canvasNote === 'failed' || canvasNote === 'failed-over-canvas') && (
+        <DirectorCanvasLoadNote note={canvasNote} onRetry={retryBoardLoad} />
       )}
 
       {nodes.length > 0 && !sceneHasShots && <SceneEmptyNote />}
@@ -1147,10 +1165,15 @@ function PaletteBar() {
   // Take 잔액(오너 답 11) — 못 읽었으면 Take 를 쓰는 단추가 시작하지 않고 단추 아래 까닭을 보인다(리드 11/14, D8 과 같은 말).
   const takeState = useTakeBalance()
   const [takesUnknown, setTakesUnknown] = useState(false)
-  const blockLine = takesUnknown && takeState.failed ? t(TAKES_UNKNOWN_TEXT) : workBlockLine(imageBlock, videoBlock, t)
+  // 판을 DB 에서 다 읽기 전 · 못 읽었으면 만들기 단추를 끄고 숫자를 적지 않으며 그 까닭만 보인다 — 읽기 전 판으로 센 숫자는 사실과 다르다(리드 11/23, Cinema 와 같게).
+  const boardProjectId = useDirectorCanvasStore((s) => s.projectId)
+  const boardLoadLine = boardLoadBlockText(useBoardLoadStatus(boardProjectId))
+  const boardOff = boardLoadLine !== null
+  const blockLine = boardLoadLine ? t(boardLoadLine) : takesUnknown && takeState.failed ? t(TAKES_UNKNOWN_TEXT) : workBlockLine(imageBlock, videoBlock, t)
   // 넘기기 크림은 보드 전체에 만들 것이 없을 때만 — 상태 고르기 · 고른 샷으로 좁혀 보일 때 크림이 넘기기로 튀지 않게.
   const boardWorkLeft = imageWorkShotIds(shotStates, null).length + videoWorkShotIds(shotStates, null).length
-  const primary = primaryWorkAction({
+  // 다 읽기 전 · 못 불러옴이면 크림을 어디에도 칠하지 않는다 — 읽기 전 판으로 센 일이다(Cinema 와 같게).
+  const primary = boardOff ? null : primaryWorkAction({
     imageCount: imageBlock === null ? imageWork.length : 0,
     videoCount: videoBlock === null ? videoWork.length : 0,
     // 만드는 중에는 넘기기를 크림으로 칠하지 않는다 — 지금 할 일은 기다림이다(단추는 켜진 채 보조).
@@ -1190,6 +1213,7 @@ function PaletteBar() {
   }
   // [이미지 만들기 · N]: 빈 샷은 일괄(빈칸만), 실패한 샷 · 손으로 더한 샷은 한 장씩 다시. Take 는 쓰지 않아 확인 없이 바로(Takes 0).
   const runImages = async () => {
+    if (boardOff) return
     if (imageMode.mode === 'remake') {
       setConfirmRemake(true)
       return
@@ -1249,6 +1273,7 @@ function PaletteBar() {
   // [영상 만들기 · N]: Take 를 쓰니 지금처럼 확인창을 거친다(약속 E).
   //   누를 때 잔액을 다시 읽고, 그래도 못 읽으면 확인 창을 열지 않는다 — 못 읽은 채 열면 Take 줄 없이 전부 시작했다(리드 11/14).
   const runVideos = async () => {
+    if (boardOff) return
     if (videoWork.length === 0) return
     if (!(await takesReadable())) {
       setTakesUnknown(true)
@@ -1363,7 +1388,7 @@ function PaletteBar() {
           </div>
 
           {/* 예상 칸(시안 D1 "이미지 4장 · 약 2분 · Takes 안 써요") — 시작 전 예상만, 만드는 중에는 남은 시간을 쓰지 않는다(8/26). */}
-          {estimate && (
+          {estimate && !boardOff && (
             <span
               data-testid="director-estimate"
               className="hidden truncate rounded-full bg-background px-3 py-1 text-[12.5px] font-medium text-muted-foreground shadow-node @6xl:inline"
@@ -1513,26 +1538,35 @@ function PaletteBar() {
           <button
             type="button"
             onClick={() => void runImages()}
-            disabled={imageBlock !== null}
-            aria-describedby={imageBlock !== null ? 'director-work-block' : undefined}
+            disabled={imageBlock !== null || boardOff}
+            aria-describedby={imageBlock !== null || boardOff ? 'director-work-block' : undefined}
             className={workButtonClass(primary === 'image')}
           >
             <ImageIcon className="size-3.5" />
             <span>{imageMode.mode === 'remake' ? t('Make images again') : chainVideoAfterImage ? t('Make images + videos') : t('Make images')}</span>
-            <span aria-hidden className="opacity-60">·</span>
-            <span className="font-num tabular-nums">{imageMode.shotIds.length}</span>
+            {/* 다 읽기 전 · 못 불러옴이면 숫자를 적지 않는다 — 읽기 전 판으로 센 숫자라 사실과 다르다. */}
+            {!boardOff && (
+              <>
+                <span aria-hidden className="opacity-60">·</span>
+                <span className="font-num tabular-nums">{imageMode.shotIds.length}</span>
+              </>
+            )}
           </button>
           <button
             type="button"
             onClick={() => void runVideos()}
-            disabled={videoBlock !== null}
-            aria-describedby={videoBlock !== null ? 'director-work-block' : undefined}
+            disabled={videoBlock !== null || boardOff}
+            aria-describedby={videoBlock !== null || boardOff ? 'director-work-block' : undefined}
             className={workButtonClass(primary === 'video')}
           >
             <Play className="size-3.5 fill-current" />
             <span>{t('Make videos')}</span>
-            <span aria-hidden className="opacity-60">·</span>
-            <span className="font-num tabular-nums">{videoWork.length}</span>
+            {!boardOff && (
+              <>
+                <span aria-hidden className="opacity-60">·</span>
+                <span className="font-num tabular-nums">{videoWork.length}</span>
+              </>
+            )}
           </button>
         </div>
           {/* 꺼진 단추 아래 이유 한 줄(결정 페이지 추천) — 마우스를 올리지 않아도 · 키보드 · 터치로도 보인다. */}
