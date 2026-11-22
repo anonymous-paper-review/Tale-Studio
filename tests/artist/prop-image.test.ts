@@ -74,39 +74,45 @@ afterEach(() => {
 })
 
 describe('소품 그림 지시문', () => {
-  // 왜: 혼자 정한 것 — 실사 샷 이미지의 참고 그림으로 쓸 때 물건만 또렷하고 사람이 섞이지 않게. 오너 "소품도 한 장"(여러 각도 시트가 아니다).
-  it('소품 그림은 물건 하나만 정면으로 빈 배경에 그리고, 사람 · 손 · 글자는 그리지 않는다', () => {
+  // 왜: 실사 샷 이미지의 참고 그림으로 쓸 때 물건만 또렷하고 사람이 섞이지 않게(혼자 정한 것). 오너 "소품도 한 장"(여러 각도 시트가 아니다).
+  //   글씨는 오너 P1(2026-11-22 "추천대로" = (b)) — 편지 · 간판 · 책 표지처럼 설명에 적힌 글씨는 남기고, 모델이 덧붙이는 이름 · 라벨 · 로고는 막는다.
+  it('소품 그림은 물건 하나만 정면으로 빈 배경에 그리고, 사람 · 손을 그리지 않고, 글씨는 설명에 적힌 것만 그리며, 덧붙인 이름 · 라벨 · 로고는 그리지 않는다', () => {
     const text = buildPropImagePrompt(prop)
     expect(text).toContain('은반지')
     expect(text).toContain('a thin silver ring with a small blue stone')
     expect(text).toMatch(/alone/i)
     expect(text).toMatch(/front/i)
     expect(text).toMatch(/plain neutral background/i)
-    for (const word of ['No people', 'no hands', 'no text']) expect(text).toContain(word)
+    for (const word of ['No people', 'no hands', 'no labels', 'no names', 'no logo']) expect(text).toContain(word)
+    expect(text).toMatch(/Writing that the description says is on the object stays on it/)
+    expect(text).not.toContain('no text,')
   })
 
-  // 왜: 오너 결정 대기(리드 2026-11-22 "(c)") — 글씨가 뜻을 나르는 소품(편지 · 간판 · 책 표지)은 글씨를 빼면 다른 물건이 된다(실측: 번진 잉크 글씨 편지 → 글씨 없는 봉투).
-  //   스위치 하나로 (b)를 켜 볼 수 있게 하고, 기본은 지금처럼 글자 없음 (a). 켜도 모델이 덧붙이는 이름 · 라벨 · 로고 · 워터마크는 계속 막는다.
-  it('글씨 스위치는 기본으로 꺼져 있고, 켜면 설명에 적힌 글씨만 남기고 덧붙인 이름 · 라벨 · 로고는 그리지 않는다', () => {
-    expect(PROP_TEXT_RULE).toBe('none')
-    expect(buildPropImagePrompt(prop)).toBe(buildPropImagePrompt({ ...prop, textRule: 'none' }))
-    const described = buildPropImagePrompt({ ...prop, textRule: 'described' })
+  // 왜: 오너 P1(2026-11-22 "추천대로" = (b)) — 글씨가 뜻을 나르는 소품(편지 · 간판 · 책 표지)은 글씨를 빼면 다른 물건이 된다(실측: 번진 잉크 글씨 편지 → 글씨 없는 봉투).
+  //   기본을 (b)로 켠다. 스위치는 남겨 둔다 — 끄면 예전 (a)처럼 글자를 하나도 그리지 않는다. 켜도 모델이 덧붙이는 이름 · 라벨 · 로고 · 워터마크는 계속 막는다.
+  it('글씨 스위치는 기본으로 켜져 있고, 끄면 예전처럼 소품 그림에 글자를 하나도 그리지 않는다', () => {
+    expect(PROP_TEXT_RULE).toBe('described')
+    expect(buildPropImagePrompt(prop)).toBe(buildPropImagePrompt({ ...prop, textRule: 'described' }))
+    const described = buildPropImagePrompt(prop)
     expect(described).not.toContain('no text,')
     expect(described).toMatch(/Writing that the description says is on the object stays on it/)
     for (const word of ['No people', 'no hands', 'no labels', 'no logo', 'no watermark']) expect(described).toContain(word)
-    // 기준 그림 없이 그리는 그림체(실사)도 켰을 때는 글자 금지 줄을 붙이지 않는다 — 꺼져 있으면 지금처럼 붙인다.
-    expect(planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true, textRule: 'described' }).submit.prompt).not.toContain(FACET_NO_TEXT)
-    expect(planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true }).submit.prompt).toContain(FACET_NO_TEXT)
+    const none = buildPropImagePrompt({ ...prop, textRule: 'none' })
+    expect(none).toContain('no text, no labels, no logo')
+    expect(none).not.toMatch(/Writing that the description says/)
+    // 기준 그림 없이 그리는 그림체(실사)도 켜져 있으면(기본) 글자 금지 줄을 붙이지 않는다 — 끄면 붙인다.
+    expect(planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true }).submit.prompt).not.toContain(FACET_NO_TEXT)
+    expect(planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true, textRule: 'none' }).submit.prompt).toContain(FACET_NO_TEXT)
   })
 
   // 왜: 첫 시험(2026-11-22)에서 스위치를 켜도 그림체 줄(그림체 조각)이 끝에 "No text, no letters"를 붙여, 글씨만 적고 낱말은 적지 않은 "펼친 편지"가 빈 종이로 나왔다.
-  //   인물 시트가 칸 이름 때문에 그 줄을 빼는 것과 같은 까닭으로 — 켰을 때만 뺀다(덧붙인 글씨 금지는 소품 줄에 그대로 있다). 끄면(기본) 지금처럼 붙는다.
+  //   인물 시트가 칸 이름 때문에 그 줄을 빼는 것과 같은 까닭으로 — 켰을 때만 뺀다(덧붙인 글씨 금지는 소품 줄에 그대로 있다). 끄면 붙는다(오너 P1 뒤 기본은 켜짐).
   it('글씨 스위치를 켜면 그림체 기준 그림이 있는 그림체에서도 그림체 줄의 글자 금지가 설명의 글씨를 막지 않는다', () => {
     const on = planPropImageSubmit({ ...prop, anchor, styleWithoutReference: false, textRule: 'described' })
     expect(on.submit.prompt).not.toContain(FACET_NO_TEXT)
     expect(on.submit.prompt).toMatch(/Writing that the description says is on the object stays on it/)
     expect(on.submit.prompt).toContain('no logo and no watermark')
-    const off = planPropImageSubmit({ ...prop, anchor, styleWithoutReference: false })
+    const off = planPropImageSubmit({ ...prop, anchor, styleWithoutReference: false, textRule: 'none' })
     expect(off.submit.prompt).toContain(FACET_NO_TEXT)
   })
 
@@ -121,11 +127,13 @@ describe('소품 그림 지시문', () => {
     expect(plan.model).toBe('openai/gpt-image-2/edit')
   })
 
-  // 왜: 실사는 기준 그림 없이 그린다(2026-10-13 오너) — 배경과 같이 글자 금지 줄을 붙이고 크기로 비율을 정한다.
+  // 왜: 실사는 기준 그림 없이 그린다(2026-10-13 오너) — 크기로 비율을 정한다. 글씨는 오너 P1(설명에 적힌 것만)이라 배경의 전면 글자 금지 줄 대신
+  //   소품 줄의 "덧붙인 글씨 · 라벨 · 로고 · 워터마크 금지"가 막는다.
   it('기준 그림 없이 그리는 그림체(실사)는 소품 그림도 기준 그림 없이 정사각으로 그린다', () => {
     const plan = planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true })
     expect(plan.submit.reference_image_urls).toBeUndefined()
-    expect(plan.submit.prompt).toContain(FACET_NO_TEXT)
+    expect(plan.submit.prompt).not.toContain(FACET_NO_TEXT)
+    expect(plan.submit.prompt).toContain('no logo and no watermark')
     expect(plan.submit.image_size).toBe('square_hd')
     expect(plan.model).toBe('openai/gpt-image-2')
   })
