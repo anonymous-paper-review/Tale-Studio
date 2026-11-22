@@ -6,7 +6,7 @@ import type {
   GenerationMethod,
 } from '@/types/shot'
 import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
-import type { ContinueFrom, TakeVia, VideoMode } from '@/lib/director/video-modes'
+import type { ContinueFrom, MadeVideoMode, TakeVia, VideoMode } from '@/lib/director/video-modes'
 
 // ============================================================================
 // Director Canvas Types
@@ -245,7 +245,7 @@ type VideoNodeCommonData = {
    *  화면이 샷의 이미지 버전과 맞춰 "시작 v1 + 끝 v1"을 낸다. */
   madeFrames?: { start: string | null; end: string | null; middle?: string | null } | null
   /** 지금 영상을 낸 작업의 방식(2026-11-22) — 작업 기록 기준. 모르면 null/없음, 적히지 않은 작업은 기본(start_end). */
-  madeVideoMode?: VideoMode | null
+  madeVideoMode?: MadeVideoMode | null
   /** 지금 영상을 낸 작업의 대사 지문(오너 2026-11-22 E3) — dialogueChangedSince(이 노드 데이터, 지금 대사)로 바뀜을 본다. 모르면 null/없음. */
   madeDialogueFingerprint?: string | null
   /** 지금 영상을 낸 작업의 모델(리드 2026-11-22) — 판의 모델 이름은 이것을 먼저 쓴다. 다시 만들 때 · 다음 Take 의 모델은

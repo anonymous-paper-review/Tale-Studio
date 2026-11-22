@@ -34,10 +34,17 @@ describe('혼자 정한 것', () => {
   })
 
   // 왜: Take 카드에 방식을 적는 근거는 지금 영상을 낸 작업의 기록이다 — 다시 만드는 중 · 실패한 시도의 방식은 지금 영상의 방식이 아니다.
-  //   기록에 방식이 없는 작업(기본 방식 · 이 기능 전 작업)은 기본(시작+끝)이다.
-  it('지금 영상을 낸 작업의 방식을 알리고, 방식이 적히지 않은 작업은 기본으로 본다', () => {
+  //   오너 2026-11-22 시작+끝 폐기 뒤로는 기본 방식도 작업 기록에 적는다 — 방식이 없는 작업은 그 전(기본 = 시작+끝)에 만든 옛 작업이다.
+  it('지금 영상을 낸 작업의 방식을 알리고, 방식이 적히지 않은 옛 작업은 시작+끝으로 본다', () => {
     expect(madeVideoMode(take, job({ video_mode: 'continue' }))).toBe('continue')
+    expect(madeVideoMode(take, job({ video_mode: 'start_prompt' }))).toBe('start_prompt')
     expect(madeVideoMode(take, job({}))).toBe('start_end')
     expect(madeVideoMode(take, job({ status: 'queued', video_mode: 'continue' }))).toBeNull()
+  })
+
+  // 왜: 노드에서 손으로 이은 그림으로 만든 Take 는 방식이 없다(손 배선이 방식을 이긴다) — 폐기 뒤에 만든 손 배선 작업까지 "시작+끝"으로 읽으면
+  //   끝 그림을 보낸 적 없는 Take 이력에 없어진 방식이 적힌다. 손 배선 작업은 그 표시를 작업 기록에 남기고, 방식은 모른다(null)로 읽는다.
+  it('손으로 이어 만든 새 작업은 이력에서 시작+끝으로 읽지 않는다', () => {
+    expect(madeVideoMode(take, job({ frame_source: 'manual' }))).toBeNull()
   })
 })

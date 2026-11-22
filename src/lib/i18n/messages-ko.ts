@@ -1382,6 +1382,11 @@ export const KO: Record<string, string> = {
   'Unable to upload the source video last frame.': '이전 영상의 마지막 프레임을 업로드하지 못했습니다.',
   // 방안 고장 2(fb-video 2026-11-22): 앞 영상 끝 1초가 전부 검으면 이어 붙이지 않는다.
   'The previous video ends on a black screen, so there is no scene to continue from.': '앞 영상이 검은 화면으로 끝나서 이어 붙일 장면을 찾지 못했어요.',
+  // 영상 방식 · 모델 막힘(fb-video 2026-11-22 — 시작+끝 폐기 · V2 · V3 · 실사 그림만)
+  'Redraw the live-action storyboard after editing the rough to use Start + middle.': '러프를 고친 뒤 실사를 다시 그려야 시작+미들을 쓸 수 있어요.',
+  'Veo 3.1 makes only 16:9 or 9:16 videos. Choose another model for this project.': 'Veo 3.1 은 가로(16:9) · 세로(9:16) 영상만 만들어요. 이 프로젝트에서는 다른 모델을 골라 주세요.',
+  'Rough (wooden mannequin) images cannot be used to make a video.': '러프(목각 인형) 그림은 영상에 쓸 수 없어요.',
+  "This shot's live-action storyboard has no middle (direction) panel. Generate the live-action storyboard again first.": '이 샷의 실사 스토리보드에 가운데(연출) 장이 없어요. 실사를 다시 만들어 주세요.',
   'The source video changed while its last frame was captured.': '마지막 프레임을 캡처하는 동안 이전 영상이 바뀌었습니다.',
   'Video chain connection failed.': '이전 영상 연결에 실패했습니다.',
   '{started}/{total} videos generated, {failed} failed.': '{started}/{total}개 영상 생성, {failed}개 실패.',

@@ -111,7 +111,7 @@ function frameSlotRolesClause(plan: ModelImageRolePlan): string {
  *   시작을 "the given first frame", 참고 칸 그림을 "@Image1 …"로 부른다(그림 번호가 참고 칸 번호와 어긋나지 않게).
  */
 function videoModeTail(input: {
-  mode: Exclude<VideoMode, 'start_end'>
+  mode: VideoMode
   roles: VideoReferenceImageRole[]
   slotPlan: ModelImageRolePlan | null
   labels: string[] | null
@@ -268,7 +268,8 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   //   "이 그림을 다시 그려라"(레퍼런스 권위)인데 영상만 텍스트 권위였던 배선 비대칭의 교정.
   const referenceAuthority = `The reference images are the visual ground truth — match their lighting, color temperature, wardrobe, set dressing and framing exactly; wherever this text description differs from the reference images, follow the references.`
 
-  const modeForTail = videoMode && videoMode !== 'start_end' ? videoMode : null
+  // 방식이 있으면 늘 방식 문장을 붙인다 — 시작+끝(방식 문장 없음)은 오너 2026-11-22 폐기.
+  const modeForTail = videoMode ?? null
   if (referenceImageRoles?.length && generationMethod === 'I2V' && modeForTail) {
     // 방식 문장(2026-11-22): 역할 · 방식 · 진실 세 조각을 뒤에 붙인다. 글 상한이 있는 모델(Kling · Happy Horse 2500자)은
     //   넘치면 앞 글(샷 글)부터 잘라 방식 문장이 잘려 사라지지 않게 한다.

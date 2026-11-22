@@ -15,8 +15,7 @@ const BASE: BuildVideoPromptInput = {
   camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 2 },
 }
 const MODES: Array<[string, Partial<BuildVideoPromptInput>]> = [
-  ['start_end', { referenceImageRoles: ['start', 'end'] }],
-  ['continue', { referenceImageRoles: ['start', 'end'], videoMode: 'continue' }],
+  ['continue', { referenceImageRoles: ['start'], videoMode: 'continue' }],
   ['reference', { referenceImageRoles: ['ref', 'ref'], videoMode: 'reference', referenceLabels: ['character sheet: Mina', 'the location'] }],
   ['start_middle', { referenceImageRoles: ['start', 'direction'], videoMode: 'start_middle', middleSource: 'rough' }],
   ['start_prompt', { referenceImageRoles: ['start'], videoMode: 'start_prompt' }],
@@ -24,7 +23,8 @@ const MODES: Array<[string, Partial<BuildVideoPromptInput>]> = [
 
 describe('같이 정한 것', () => {
   // 왜: 오너 Q4 "영상 지시에도 사용해줘" — 화살표를 고쳐도 영상이 옛 움직임을 따르던 것(D10)을 영상까지 잇는다. 방식은 가리지 않는다.
-  it('고친 연출 장을 읽은 줄이 있으면 그 줄을 다섯 방식 모두의 영상 지시에 싣는다', () => {
+  //   시작+끝은 오너 2026-11-22 폐기로 없어졌다 — 끝 그림과 줄이 다투던 V4 도 같이 없어져 넷 모두에 늘 싣는다.
+  it('고친 연출 장을 읽은 줄은 네 방식 모두의 영상 지시에 싣는다', () => {
     for (const [mode, extra] of MODES) {
       const { fullPrompt, prompt_parts } = buildVideoPrompt({ ...BASE, ...extra, directionLine: LINE })
       expect({ mode, has: fullPrompt.includes(LINE) }).toEqual({ mode, has: true })

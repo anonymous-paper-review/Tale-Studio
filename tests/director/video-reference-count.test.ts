@@ -1,4 +1,4 @@
-// 노드에서 참고 그림을 여러 장 이어도 시작 · 끝 그림을 지키고, 모델이 받는 장 수 안에서 참고 그림만 덜어 보낸다 (방안 고장 1, 2026-11-22)
+// 노드에서 참고 그림을 여러 장 이어도 시작 그림을 지키고, 모델이 받는 장 수 안에서 참고 그림만 덜어 보낸다 — 끝 그림은 보내지 않는다 (방안 고장 1 · 오너 시작+끝 폐기, 2026-11-22)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -93,27 +93,27 @@ beforeEach(() => {
 })
 
 describe('같이 정한 것', () => {
-  // 왜: 노드에서 시작 · 참고 그림 세 장 · 끝을 이어 [영상 만들기]를 누를 때 — 지금은 서버가 앞 네 장만 남기고 역할을 버려
-  //   끝 그림이 빠지고, 역할을 잃은 시작 그림 앞에 DB 시작 그림이 한 장 더 붙었다(방안 고장 1).
-  it('사람이 참고 그림을 세 장 넘게 이어도 끝 그림이 빠지지 않고 시작 그림이 두 번 들어가지 않는다', async () => {
+  // 왜: 노드에서 시작 · 참고 그림 세 장을 이어 [영상 만들기]를 누를 때 — 예전에는 서버가 앞 네 장만 남기고 역할을 버려
+  //   역할을 잃은 시작 그림 앞에 DB 시작 그림이 한 장 더 붙었다(방안 고장 1). 끝 칸 그림은 오너 시작+끝 폐기(2026-11-22)로 보내지 않는다.
+  it('사람이 참고 그림을 세 장 넘게 이어도 시작 그림이 두 번 들어가지 않는다', async () => {
     const prepared = await prepare(wiredFive({ model: 'seedance' }))
 
-    expect(falInput(prepared).image_urls).toEqual([MY_START, ...REF, MY_END])
-    expect(prepared.inputSnapshot.reference_image_roles).toEqual(['start', 'ref', 'ref', 'ref', 'end'])
+    expect(falInput(prepared).image_urls).toEqual([MY_START, ...REF])
+    expect(prepared.inputSnapshot.reference_image_roles).toEqual(['start', 'ref', 'ref', 'ref'])
     expect(falInput(prepared).image_urls).not.toContain(START)
-    expect(String(prepared.inputSnapshot.full_prompt)).toContain('image 5 = END')
+    expect(String(prepared.inputSnapshot.full_prompt)).not.toContain('END')
   })
 })
 
 describe('혼자 정한 것', () => {
   // 왜: Veo 는 참고 그림을 세 장까지만 받는다(fal 표에 상한이 없어 구글 문서 기준) — 넘기면 제출이 거절되거나 모델이 그림을 버린다.
-  //   덜 때 시작 · 끝을 잃으면 영상의 첫 장면 · 마지막 장면이 바뀌므로 참고 그림만 뒤에서부터 덜어 낸다.
-  it('손 배선이 모델이 받는 장 수를 넘으면 참고 그림만 뒤에서부터 덜고 시작 · 끝 그림은 남긴다', async () => {
+  //   덜 때 시작을 잃으면 영상의 첫 장면이 바뀌므로 참고 그림만 뒤에서부터 덜어 낸다(끝 칸 그림은 처음부터 보내지 않는다).
+  it('손 배선이 모델이 받는 장 수를 넘으면 참고 그림만 뒤에서부터 덜고 시작 그림은 남긴다', async () => {
     const prepared = await prepare(wiredFive({ model: 'veo' }))
 
-    expect(falInput(prepared).image_urls).toEqual([MY_START, REF[0], MY_END])
-    expect(prepared.inputSnapshot.reference_image_roles).toEqual(['start', 'ref', 'end'])
-    expect(String(prepared.inputSnapshot.full_prompt)).toContain('image 3 = END')
+    expect(falInput(prepared).image_urls).toEqual([MY_START, REF[0], REF[1]])
+    expect(prepared.inputSnapshot.reference_image_roles).toEqual(['start', 'ref', 'ref'])
+    expect(String(prepared.inputSnapshot.full_prompt)).toContain('image 1 = START')
   })
 
   // 왜: 화면이 "참고 그림 N장은 이 모델이 받지 않아 뺐어요"를 보이려면 서버가 덜어 낸 수를 알려야 한다.
@@ -135,20 +135,21 @@ describe('혼자 정한 것', () => {
     const body = await response.json()
 
     expect(response.status).toBe(200)
-    expect(body.droppedImages).toBe(2)
-    expect(mocks.reserveTake.mock.calls[0][0].inputSnapshot.dropped_reference_images).toBe(2)
+    expect(body.droppedImages).toBe(1)
+    expect(mocks.reserveTake.mock.calls[0][0].inputSnapshot.dropped_reference_images).toBe(1)
   })
 
-  // 왜: 프레임 출처 · 역할을 보내지 않는 옛 화면 · 직접 호출 — 옛 규약은 "첫 그림 = 시작, 마지막 그림 = 끝"이라
-  //   덜 때도 그 둘을 지켜야 같은 뜻으로 만든다.
-  it('역할 없이 그림만 보낸 옛 요청은 첫 그림과 마지막 그림을 남기고 그 사이를 뒤에서부터 덜어 낸다', async () => {
+  // 왜: 프레임 출처 · 역할을 보내지 않는 옛 화면 · 직접 호출 — 옛 규약은 "첫 그림 = 시작, 마지막 그림 = 끝"이다.
+  //   끝은 오너 시작+끝 폐기(2026-11-22)로 보내지 않으니, 첫 그림은 시작 · 사이 그림은 참고로 읽고 마지막 그림만 뺀다.
+  it('역할 없이 그림만 보낸 옛 요청은 첫 그림을 시작, 사이 그림을 참고로 보고, 마지막 그림(옛 약속의 끝)은 보내지 않는다', async () => {
     const prepared = await prepare(videoRequest({
       frameSource: undefined,
-      model: 'veo',
+      model: 'seedance',
       referenceImageUrl: MY_START,
       referenceImageUrls: [MY_START, ...REF, MY_END],
     }))
 
-    expect(falInput(prepared).image_urls).toEqual([MY_START, REF[0], MY_END])
+    expect(falInput(prepared).image_urls).toEqual([MY_START, ...REF])
+    expect(prepared.inputSnapshot.reference_image_roles).toEqual(['start', 'ref', 'ref', 'ref'])
   })
 })
