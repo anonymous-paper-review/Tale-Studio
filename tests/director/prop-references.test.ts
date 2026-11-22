@@ -97,7 +97,7 @@ describe('실사 한 장의 소품 참고', () => {
     expect((await generateStoryboardPOST(storyboardRequest('sh_01_01'))).status).toBe(200)
     const refs = submitted().reference_image_urls ?? []
     expect(refs.slice(1)).toEqual([RING])
-    expect(submitted().prompt).toContain('reference image 2 = 은반지 (left third of the frame)')
+    expect(submitted().prompt).toContain('in order: reference image 2 = 은반지.')
   })
 
   // 왜: 혼자 정한 것 — 소품이 안 보이는 샷에 끼어들지 않게, 그 샷 소품 칸에 나오는 것만. 그림이 아직 없는 소품은 막지 않고 건너뛴다(인물 시트처럼 필수가 아니다).
@@ -152,9 +152,11 @@ describe('소품 참고 규칙', () => {
   })
 
   // 왜: 소품 그림을 사람으로 바꾸거나 연필 그림에 없는 칸에 물건을 더하면 안 된다. 지금 지시문은 인물 시트가 "들고 있는 물건"까지 정하므로, 소품 그림이 있는 물건은 소품 그림이 앞선다고 적는다.
+  //   Writer 소품 칸의 자리(left_third 등)는 적지 않는다 — 연필 그림과 어긋나면 모델이 물건을 옮긴다(2026-11-22 실측: 러프 오른쪽 끝 자판기가 3번 모두 왼쪽 · 가운데로 옮겨짐).
   it('소품 그림은 사람이 아니고, 생김새는 소품 그림이 · 자리는 연필 그림이 정하며, 인물 시트 규칙보다 앞선다고 지시문에 적는다', () => {
     const lines = propReferenceLines(4, [{ propId: 'a', name: '은반지', url: 'https://a', position: 'left_third' }]).join('\n')
-    expect(lines).toContain('reference image 4 = 은반지 (left third of the frame)')
+    expect(lines).toContain('in order: reference image 4 = 은반지.')
+    expect(lines).not.toMatch(/third of the frame/)
     expect(lines).toMatch(/inanimate object/i)
     expect(lines).toMatch(/never (a )?people|never a person/i)
     expect(lines).toMatch(/decides how that object looks/i)

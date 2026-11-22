@@ -3,6 +3,8 @@
 //   참고 그림이 많으면(상한 MAX_REAL_REFERENCE_IMAGES) 소품부터 뺀다 — 인물 시트 · 배경 · 화풍 참고는 그대로.
 //   참고 순서: [러프 시트, 인물 시트들, 배경, 추가 입력 · 앞 화 장면, 소품 그림들, 화풍] — 지금 지시문의 번호(인물 · 배경 · 추가)를 건드리지 않고
 //   화풍은 여전히 "마지막"이다. 소품 역할 문장은 지시문 끝에 붙는다(storyboard-strip 은 바꾸지 않는다).
+//   자리는 연필 러프가 정한다 — Writer 소품 칸의 자리(left_third 등)는 지시문에 적지 않는다. 러프와 어긋나면 모델이 물건을 옮긴다
+//   (2026-11-22 실측: 러프 오른쪽 끝 자판기 + "left third" → 3번 모두 왼쪽 · 가운데로 옮겨 크게 그림).
 //   서버 전용 의존성 금지(화면이 "참고: 소품 N" 을 보일 때 같은 규칙을 쓴다). 약속: tests/director/prop-references.test.ts
 import { placementValues, propPlacementMatches } from '@/lib/artist/props'
 
@@ -16,7 +18,7 @@ export interface ShotPropRef {
   propId: string
   name: string
   url: string
-  /** 그 샷 소품 칸의 자리(position_in_frame) — 없으면 null. */
+  /** 그 샷 소품 칸의 자리(position_in_frame) — 없으면 null. 지시문에는 쓰지 않는다(자리는 러프가 정한다). */
   position: string | null
 }
 
@@ -88,33 +90,13 @@ export function planSheetPropRefs(
   return { refs, columnProps: perColumn.map((column) => column.filter((ref) => kept.has(ref.propId))) }
 }
 
-/** "left_third" → "left third of the frame" — 인물 자리 말과 같은 결. */
-function positionWords(position: string | null): string | null {
-  const token = (position ?? '').trim().toLowerCase()
-  if (!token) return null
-  const words: Record<string, string> = {
-    left_third: 'left third of the frame',
-    center_third: 'center of the frame',
-    right_third: 'right third of the frame',
-    left: 'left of the frame',
-    center: 'center of the frame',
-    right: 'right of the frame',
-  }
-  return words[token] ?? token.replace(/_/g, ' ')
-}
-
 /**
  * 지시문의 소품 역할 줄 — start = 첫 소품 그림의 참고 번호(1부터). columnProps 를 주면(일괄 한 장) 칸마다 그 칸의 소품을 적는다.
  *   지금 지시문(storyboard-strip)은 인물 시트가 "입거나 들고 있는 물건"까지 정하므로, 소품 그림이 있는 물건은 소품 그림이 앞선다고 적는다.
  */
 export function propReferenceLines(start: number, refs: readonly ShotPropRef[], columnProps?: readonly (readonly ShotPropRef[])[]): string[] {
   if (refs.length === 0) return []
-  const listed = refs
-    .map((ref, i) => {
-      const where = columnProps ? null : positionWords(ref.position)
-      return `reference image ${start + i} = ${ref.name}${where ? ` (${where})` : ''}`
-    })
-    .join('; ')
+  const listed = refs.map((ref, i) => `reference image ${start + i} = ${ref.name}`).join('; ')
   return [
     `- PROP references (inanimate objects, never people, faces or mannequins), in order: ${listed}.`,
     '- Each prop reference decides how that object looks — its shape, material, color and markings: reproduce it exactly, even when a character holds or wears it. This overrides the character-sheet rule above for these objects only. The pencil drawing decides only where the object is and how big it is.',
