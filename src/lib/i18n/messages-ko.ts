@@ -2493,6 +2493,13 @@ export const KO: Record<string, string> = {
   "Use it as the art style": "그림체로 써 주세요",
   "Picture {i} of {n}: {name}. How should I use it? If you choose art style or comic page, the picture goes to an analysis model.": "그림 {i}/{n}: {name}. 어떻게 쓸까요? 그림체나 만화 원고를 고르면 그림을 분석 모델로 보내요.",
   "How should I use this picture? ({name}) If you choose art style or comic page, the picture goes to an analysis model.": "이 그림을 어떻게 쓸까요? ({name}) 그림체나 만화 원고를 고르면 그림을 분석 모델로 보내요.",
+  // D6(2026-11-22) — 그림에서 그림체를 가져오지 않는다. 쓰임새 질문 · 안내에서 그림체를 뺐다.
+  "Picture {i} of {n}: {name}. How should I use it? If you choose comic page, the picture goes to an analysis model.": "그림 {i}/{n}: {name}. 어떻게 쓸까요? 만화 원고를 고르면 그림을 분석 모델로 보내요.",
+  "How should I use this picture? ({name}) If you choose comic page, the picture goes to an analysis model.": "이 그림을 어떻게 쓸까요? ({name}) 만화 원고를 고르면 그림을 분석 모델로 보내요.",
+  "Please choose first how to use the picture: comic page, character, background or reference.": "먼저 그림을 어떻게 쓸지 골라 주세요: 만화 원고, 인물, 배경, 참고 자료.",
+  "You uploaded {n} pictures. How should I use them? If you choose the comic, I send the pages to an analysis model to write the script.": "그림 {n}장을 올리셨어요. 어떻게 쓸까요? 만화 원고를 고르면 그림을 분석 모델로 보내 대본을 만들어요.",
+  "I can't take an art style from a picture. Pick one of the four styles (Live Action, 2D Japanese Anime, Watercolor, Stop Motion) in the style window in Artist when you make the images.": "그림에서 그림체를 가져올 수는 없어요. 그림을 만들 때 Artist 스타일 창에서 네 가지(실사 · 2D 일본 애니 · 수채 · 스톱모션) 중 하나를 골라 주세요.",
+  "The comic art style can't be used as is. Pick one of the four styles in the style window in Artist when you make the images.": "만화 그림체는 그대로 쓸 수 없어요. 그림을 만들 때 Artist 스타일 창에서 네 가지 중 하나를 골라 주세요.",
   "Please choose first how to use the picture: comic page, character, background, art style or reference.": "먼저 그림을 어떻게 쓸지 골라 주세요: 만화 원고, 인물, 배경, 그림체, 참고 자료.",
   // 스타일 선택 창의 내 그림체 올리기 카드 (2026-10-10)
   "Upload my art style": "내 그림체 올리기",
@@ -2638,6 +2645,9 @@ export const KO: Record<string, string> = {
   'There is no readable text in {name}. If it is a scanned PDF, upload the pages as images, or upload a text file.': '{name}에서 읽을 수 있는 글이 없어요. 스캔한 PDF라면 쪽을 이미지로 올리거나 글 파일을 올려 주세요.',
   'Upload pictures in the Writer chat after you start. Use the [+] in the chat on the right. You can use them as comic pages, character or background cards, or the art style.':
     '시작한 뒤 Writer 채팅에 그림을 올려 주세요. 오른쪽 채팅의 [+]로 올리면 돼요. 만화 원고 · 인물 · 배경 카드 · 그림체로 쓸 수 있어요.',
+  // D6(2026-11-22) — 그림에서 그림체를 가져오지 않아 안내에서 그림체를 뺐다.
+  'Upload pictures in the Writer chat after you start. Use the [+] in the chat on the right. You can use them as comic pages, character or background cards, or reference.':
+    '시작한 뒤 Writer 채팅에 그림을 올려 주세요. 오른쪽 채팅의 [+]로 올리면 돼요. 만화 원고 · 인물 · 배경 카드 · 참고 자료로 쓸 수 있어요.',
   'Continue without the file': '파일 빼고 진행',
   'Upload another file': '다른 파일 올리기',
   // AI 작업 중 잠금 화면

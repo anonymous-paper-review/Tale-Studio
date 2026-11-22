@@ -40,8 +40,9 @@ afterEach(() => {
 
 describe('그림 역할 관문 — 채팅', () => {
   // 왜: 종전엔 올린 그림이 바로 채팅 모델로 가서 이야기 시드로 각색됐다. 쓰임새를 먼저 정해야 원본이 산다.
-  // 2026-10-10 오너 결정 "채팅으로 올린 그림에도 그림체 선택지 넣어줘" — 앞 문장: "그림을 올리면 그 턴은 모델로 보내지 않고 "이 그림을 어떻게 쓸까요" 선택지(인물·배경·참고 자료)를 먼저 띄운다".
-  it('그림을 올리면 그 턴은 모델로 보내지 않고 "이 그림을 어떻게 쓸까요" 선택지(만화 원고·인물·배경·그림체·참고 자료)를 먼저 띄운다', () => {
+  // 2026-10-10 오너 결정 "채팅으로 올린 그림에도 그림체 선택지 넣어줘" → D6(2026-11-22 "스타일 추출하는 기능도 없애줘")로 그림체 선택지를 다시 뺐다.
+  //   앞 문장: "그림을 올리면 그 턴은 모델로 보내지 않고 "이 그림을 어떻게 쓸까요" 선택지(만화 원고·인물·배경·그림체·참고 자료)를 먼저 띄운다".
+  it('그림을 올리면 그 턴은 모델로 보내지 않고 "이 그림을 어떻게 쓸까요" 선택지(만화 원고·인물·배경·참고 자료)를 먼저 띄운다', () => {
     const fetchSpy = okChat()
     const offered = useGlobalChatStore.getState().offerImageRoles([komatsu], { typed: '', msg: '그림을 올렸어요' })
     expect(offered).toBe(true)
@@ -51,7 +52,7 @@ describe('그림 역할 관문 — 채팅', () => {
     expect(s?.dismissible).toBe(false)
     expect(s?.action?.kind).toBe('choices')
     const labels = s?.action?.kind === 'choices' ? s.action.options.map((o) => o.label) : []
-    expect(labels.map((label) => matchImageUseAnswer(label))).toEqual(['comic', 'character', 'background', 'style', 'reference'])
+    expect(labels.map((label) => matchImageUseAnswer(label))).toEqual(['comic', 'character', 'background', 'reference'])
   })
 
   // 왜: "이 인물로 해줘"처럼 뜻이 분명한데 또 물으면 성가시다. 짧고 분명한 말만 받는다.

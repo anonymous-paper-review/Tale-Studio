@@ -27,17 +27,16 @@ const source = (file: string) => readFileSync(file, 'utf8')
 describe('사용자가 올린 그림체의 기본 이름', () => {
   beforeEach(() => { mocks.updates.length = 0 })
 
-  // 왜: 그림체를 이름 없이 저장하면 서버가 기본 이름 "내 레퍼런스"를 한국어로 박아 저장해, 영어 화면의 그림체 칩에도 한국어가 보였다(오너 2026-11-10).
-  it('영어 화면이면 사용자가 올린 그림체를 이름 없이 저장할 때 기본 이름을 영어로 저장한다', async () => {
+  // 왜: 예전에는 그림체를 이름 없이 저장하면 화면 언어의 기본 이름으로 저장했다(오너 2026-11-10). 그림체 등록 창구는 D6(2026-11-22)로 닫혔다 —
+  //   어느 화면 언어에서도 새 그림체 · 새 기본 이름이 저장되지 않는다. 이미 저장된 이름이 보이는 법은 아래 시험이 지킨다.
+  it('그림체 등록 창구가 닫혀 영어 · 한국어 화면 어느 쪽에서도 올린 그림체를 새로 저장하지 않는다', async () => {
     const save = (uiLocale: string) => POST(new Request('http://test/api/produce/style-anchor', {
       method: 'POST',
       body: JSON.stringify({ projectId: 'proj-1', imageUrl: mediaPublicUrl('ws-1/proj-1/uploads/look/original.png'), medium: '2d_anime', uiLocale }),
     }))
-    expect((await save('en')).status).toBe(200)
-    expect(mocks.updates[0].custom_style_anchor).toMatchObject({ label: 'My reference' })
-    // 정상 경로 고정: 한국어 화면에서는 지금처럼 한국어 기본 이름이다.
-    await save('ko')
-    expect(mocks.updates[1].custom_style_anchor).toMatchObject({ label: '내 레퍼런스' })
+    expect((await save('en')).status).toBe(410)
+    expect((await save('ko')).status).toBe(410)
+    expect(mocks.updates).toHaveLength(0)
   })
 
   // 왜: 이미 "내 레퍼런스"로 저장된 프로젝트가 많다 — 저장값은 두고 보일 때 그 기본 이름만 화면 언어로 바꿔 보인다(리드 2026-11-10 B1).

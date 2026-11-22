@@ -1,4 +1,5 @@
-// Artist 스타일 창에서 올린 그림체의 말풍선과 안내는 Writer 가 아니라 Artist 이름으로 채팅에 남는다 (2026-10-27 디자이너 QA 1차)
+// Artist 스타일 창에서 그림을 올려 그림체로 정하는 길은 없다 — 그래서 그 말풍선 · 안내도 남지 않는다 (2026-10-27 디자이너 QA 1차 → 그림체 올리기는 D6 2026-11-22 로 없앰)
+import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const persist = vi.hoisted(() => ({ save: vi.fn() }))
@@ -8,7 +9,6 @@ vi.mock('@/lib/supabase/client', () => ({
   createCatalogClient: vi.fn(),
 }))
 
-import { STAGE_LABEL } from '@/lib/constants'
 import { useGlobalChatStore as chat } from '@/stores/global-chat-store'
 import { useProducerStore as producer } from '@/stores/producer-store'
 import { useProjectStore as project } from '@/stores/project-store'
@@ -38,23 +38,14 @@ afterEach(() => {
 })
 
 describe('Artist 스타일 창의 내 그림체 올리기(디자이너 QA 1차 관찰 49)', () => {
-  it('Artist 스타일 창에서 올린 그림체 메시지는 Artist 이름으로 채팅에 남는다', async () => {
-    // 왜: Artist에서 그림체를 올렸는데 채팅에는 Writer가 말한 것처럼 보였다(디자이너 QA 1차 관찰 49).
-    await chat.getState().applyUploadedStyle(LOOK, { stage: 'artist' })
-    const messages = chat.getState().messages
-    // 내 말풍선(그림) · 그림체로 정했어요 · 분석이 끝났어요.
-    expect(messages.map((m) => m.role)).toEqual(['user', 'model', 'model'])
-    expect(messages.every((m) => m.stage === 'artist')).toBe(true)
-    expect(messages.map((m) => STAGE_LABEL[m.stage])).not.toContain('Writer')
-    expect(persist.save.mock.calls.length).toBe(3)
-    expect(persist.save.mock.calls.every(([, stage]) => stage === 'artist')).toBe(true)
-    expect(producer.getState().customStyleAnchor?.locked).toBe(true)
-
-    // 다른 곳(예전 경로)은 지금처럼 Writer(producer) 채팅에 남는다.
-    //   Artist 스타일 창의 올리기 카드는 2026-10-27 오너 지시로 내렸다(정비 뒤 다시) — 다시 올릴 때 Artist 로 부르면 이 규칙을 쓴다.
-    chat.getState().reset()
-    producer.getState().reset()
-    await chat.getState().applyUploadedStyle(LOOK)
-    expect(chat.getState().messages.every((m) => m.stage === 'producer')).toBe(true)
+  it('Artist 스타일 창에서는 그림을 올려 그림체로 정할 수 없어, Artist 이름으로든 Writer 이름으로든 그림체를 정했다는 말이 남지 않는다', async () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 스타일 창에 올리기 칸이 없고 그 길도 지웠다.
+    for (const file of ['src/features/artist-room/style-make-dialog.tsx', 'src/features/artist-room/regenerate-style-dialog.tsx']) {
+      expect(readFileSync(file, 'utf8'), file).not.toMatch(/type="file"|applyUploadedStyle/)
+    }
+    expect('applyUploadedStyle' in chat.getState()).toBe(false)
+    expect(chat.getState().messages).toHaveLength(0)
+    expect(persist.save).not.toHaveBeenCalled()
+    expect(producer.getState().customStyleAnchor).toBeNull()
   })
 })
