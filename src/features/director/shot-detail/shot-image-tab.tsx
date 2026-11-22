@@ -33,7 +33,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   data: ShotNodeData
   layout: 'popup' | 'panel'
   /** [다음: 영상 만들기 · N Take](D6) — 새 Take 를 만들고 영상 탭으로 간다. notice = 시작하지 않은 까닭(단추 아래). */
-  makeVideo?: { label: string; disabled: boolean; run: () => void; notice?: string | null }
+  makeVideo?: { label: string; disabled: boolean; run: () => void; notice?: string | null; reason?: string | null }
 }) {
   const t = useT()
   const projectFormat = useProjectFormatStore((s) => s.format)
@@ -114,7 +114,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
         </div>
       ) : null}
       <p className="text-caption text-subtle-foreground">
-        {t('Start and end images are remade together for now.')}
+        {t('Start, middle and end images are remade together for now.')}
         {versions.length > 1 ? ` ${t('Click v1 or v2 to go back to that version.')}` : null}
       </p>
     </div>
@@ -174,7 +174,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
       </div>
       {generationError ? <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-caption text-destructive">{generationError}</p> : null}
       <div className="flex flex-wrap items-center gap-2" data-testid="shot-detail-image-actions">
-        <StoryboardImageButton nodeId={nodeId} data={data} changeNote={change} idleLabel={t(hasImage ? 'Remake start and end images · Takes 0' : 'Make start and end images · Takes 0')} />
+        <StoryboardImageButton nodeId={nodeId} data={data} changeNote={change} idleLabel={t(hasImage ? 'Remake images · Takes 0' : 'Make images · Takes 0')} />
         {hasImage && makeVideo ? (
           <Button type="button" size="sm" variant="outline" disabled={makeVideo.disabled} onClick={makeVideo.run}>{makeVideo.label}</Button>
         ) : null}
@@ -183,6 +183,8 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
         </Button>
       </div>
       {hasImage && makeVideo?.notice ? <p className="text-caption text-destructive">{makeVideo.notice}</p> : null}
+      {/* 꺼진 까닭 한 줄(오너 V3 — 이어받은 모델이 화면비에 안 맞음). 단추를 누르지 못하게 한 까닭이라 흐린 글자. */}
+      {hasImage && makeVideo?.reason ? <p className="text-caption text-subtle-foreground">{makeVideo.reason}</p> : null}
     </div>
   )
 

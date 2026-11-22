@@ -1,9 +1,11 @@
 // Camera [영상 만들기]의 방식(오너 2026-11-22 D2~D5) — 이름 · 설명 · 꺼진 까닭과, 지금 보드에서 방식 규칙(fb-video video-modes)이 볼 사실을 모은다.
 //   이어서의 앞 영상 = 같은 씬 바로 앞 샷(sort_order — 서버와 같은 previousShotInScene)의 Editor 로 가는 Take(★, 없으면 가장 새 완성 — shotDetailTakes).
-//   미들 = START_MIDDLE_SOURCE 쪽 그림(러프 미들 · 실사 가운데 장 — 서버와 같은 함수). 새 Take 요청은 늘 방식 · 사람 말 · 만든 길을 새로 적는다(리드 11/22 ⑤ 주의).
+//   미들 = START_MIDDLE_SOURCE 쪽 그림(오너 V2 — 실사 시트의 가운데 장, 서버와 같은 함수). 실사가 "러프 바뀜"이면 시작+미들은 꺼진다(리드 D1).
+//   방식은 넷(오너 2026-11-22 "시작+끝 폐기", 기본 시작+프롬프트 M1) — 옛 시작+끝 Take 는 이력에 이름으로만 남는다.
+//   새 Take 요청은 늘 방식 · 사람 말 · 만든 길을 새로 적는다(리드 11/22 ⑤ 주의).
 //   약속: tests/camera/video-mode.test.ts
 import { shotDetailFrames, shotDetailTakes, takePhaseOf } from '@/lib/director/shot-detail'
-import { realMiddleFrame, roughMiddleFrame } from '@/lib/director/video-mode-frames'
+import { realMiddleFrame, realMiddleOutdated, roughMiddleFrame } from '@/lib/director/video-mode-frames'
 import {
   DEFAULT_VIDEO_MODE,
   START_MIDDLE_SOURCE,
@@ -34,22 +36,21 @@ export const VIDEO_MODE_LABEL: Record<MadeVideoMode, string> = {
   start_prompt: 'Start + prompt',
 }
 
-/** 고른 방식이 하는 일 한 줄(영어 원문 = i18n 키). */
-export const VIDEO_MODE_HINT: Record<MadeVideoMode, string> = {
-  start_end: 'Moves from the start image to the end image.',
+/** 고른 방식이 하는 일 한 줄(영어 원문 = i18n 키) — 고를 수 있는 넷만(끝 그림은 어느 방식도 쓰지 않는다). */
+export const VIDEO_MODE_HINT: Record<VideoMode, string> = {
   continue: "Starts where the previous shot's video ends.",
   reference: 'Uses the images only as a guide for faces, clothes and places, not as scenes.',
-  start_middle: 'Starts from the start image and follows the direction sketch.',
-  start_prompt: 'Starts from the start image and follows the words. The end image is not used.',
+  start_middle: 'Starts from the start image and follows the arrows in the middle frame.',
+  start_prompt: 'Starts from the start image and follows the words.',
 }
 
 /** 방식을 고를 수 없는 까닭(영어 원문 = i18n 키). */
 export const VIDEO_MODE_BLOCK_TEXT: Record<VideoModeBlock, string> = {
-  storyboard_missing: 'Make the start and end images first.',
+  storyboard_missing: 'Make the start image first.',
   first_shot_in_scene: 'This is the first shot of its scene, so there is no video to continue from.',
   previous_video_missing: 'The previous shot has no finished video yet.',
   previous_video_generating: "The previous shot's video is still being made.",
-  middle_missing: 'This shot has no direction sketch yet. Draw its rough first.',
+  middle_missing: "This shot's images have no middle frame yet. Remake images first.",
   // 리드 D1(2026-11-22) — 서버 거절(409 middle_outdated)과 같은 글. 화면에서 이 까닭으로 끄는 일(cameraModeFacts middleOutdated)은 fb-camera 몫.
   middle_outdated: 'Redraw the live-action storyboard after editing the rough to use Start + middle.',
 }
@@ -93,6 +94,8 @@ export function cameraModeFacts(input: {
       firstShotInScene: previousId === null,
       previousVideo,
       hasMiddle: !!middle,
+      // 리드 D1 — 실사가 참조한 러프가 바뀌었으면(실사 카드의 "러프 바뀜"과 같은 판정) 시작+미들을 끈다. 서버도 409 middle_outdated.
+      middleOutdated: realMiddleOutdated(data?.storyboardImage, writerShot?.roughStoryboard),
     },
     previous: ready
       ? { takeNodeId: ready.id, videoClipId: ready.data.videoClipId!, generationJobId: ready.data.generationJobId!, videoUrl: ready.data.videoUrl!, plannedSec }

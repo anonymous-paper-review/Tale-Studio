@@ -252,6 +252,8 @@ export function useUnsavedArrowsGuard(close: () => void) {
       open: endAsk !== null,
       reading: endAsk?.reading ?? false,
       unreadable: !!endAsk && !endAsk.reading && !endAsk.read,
+      // 남은 줄이 사람이 고친 줄이면 이름표가 "고친 움직임"(리드 2026-11-23).
+      userLine: endAsk?.read?.source === 'user',
       text: endAsk?.text ?? '',
       onTextChange: setEndText,
       onChoose: chooseEnd,
@@ -267,6 +269,7 @@ export function EndRedrawAsk({
   open,
   reading,
   unreadable,
+  userLine = false,
   text,
   onTextChange,
   onChoose,
@@ -274,6 +277,8 @@ export function EndRedrawAsk({
   open: boolean
   reading: boolean
   unreadable: boolean
+  /** 남은 줄이 사람이 고친 줄(source user)이면 true — 이름표가 "고친 움직임". */
+  userLine?: boolean
   text: string
   onTextChange: (text: string) => void
   onChoose: (choice: EndAskChoice) => void
@@ -288,7 +293,7 @@ export function EndRedrawAsk({
         </DialogHeader>
         <div className="flex flex-col gap-1.5">
           <label htmlFor="end-redraw-line" className="text-label font-semibold text-foreground">
-            {t('Motion the AI read')}
+            {userLine ? t('Edited movement') : t('Motion the AI read')}
           </label>
           {reading ? (
             <p className="flex items-center gap-2 rounded-lg bg-card px-3 py-2.5 text-caption text-muted-foreground" data-testid="end-redraw-reading">

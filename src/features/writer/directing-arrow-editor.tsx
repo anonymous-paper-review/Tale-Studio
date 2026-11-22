@@ -590,7 +590,8 @@ export function DirectingArrowEditor({
           끝 장 · 실사는 이 줄로 다시 그려야 맞는다고 알린다(리드 D2 2026-11-23 — 끝 장을 먼저 그려야 실사에 줄이 실린다). */}
       {directionRead ? (
         <div className="flex flex-col gap-1.5 rounded-lg bg-card px-3 py-2.5" data-testid="directing-read-line">
-          <span className="text-caption font-semibold text-subtle-foreground">{t('Motion the AI read')}</span>
+          {/* 사람이 고친 줄이면 "고친 움직임"(리드 2026-11-23) — [그대로]에서도 고친 줄이 남아 누가 쓴 줄인지 보이게. */}
+          <span className="text-caption font-semibold text-subtle-foreground">{directionRead.source === 'user' ? t('Edited movement') : t('Motion the AI read')}</span>
           <p className="break-keep text-caption text-foreground">{askLineText(directionRead, locale)}</p>
           {readUnused ? (
             <p className="break-keep text-caption text-muted-foreground">{t('Videos use this line. To match, redraw the end frame with it, then the live-action images.')}</p>

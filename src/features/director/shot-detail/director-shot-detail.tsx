@@ -14,6 +14,9 @@ import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
+import { useProjectFormatStore } from '@/stores/project-format-store'
+import { videoAspectRatioFromFormat } from '@/lib/project-aspect'
+import { VIDEO_MODEL_ASPECT_TEXT, videoModelFitsAspectRatio } from '@/lib/video-models'
 import { isShotData } from '@/types/director'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { directorNodeLabel } from '@/features/director/node-label'
@@ -51,6 +54,8 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   const remakeShotVideo = useDirectorCanvasStore((s) => s.remakeShotVideo)
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
   const takeBalance = useTakeBalance()
+  // 프로젝트 화면비(오너 V3 — Veo 는 16:9 · 9:16 만). 포맷을 아직 모르면 16:9(서버와 같은 대비값).
+  const aspectRatio = videoAspectRatioFromFormat(useProjectFormatStore((s) => s.format)) ?? '16:9'
   // 이름은 캔버스 · 보드와 같은 것("Shot 4" · "Scene 1") — Writer 의 원래 id(sh_01_04)를 보이지 않는다.
   const boardNames = useBoardNodeNames()
   const node = nodes.find((n) => n.id === shotNodeId)
@@ -63,12 +68,14 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   // [다음: 영상 만들기 · N Take](D6) — 다시 만들기와 같은 설정(가장 최근 Take, 없으면 샷)으로 새 Take 를 만들고 영상 탭으로 간다.
   const settings = takeSettings(data, latestShotTake(nodes, shotNodeId)?.data ?? null)
   const count = takeCostForVideo(settings.model, settings.resolution)
+  // 오너 V3 · 리드 11/23 — 이어받은 모델이 이 화면비로 만들 수 없으면(Veo: 16:9 · 9:16 만) 켜지 않고 같은 까닭을 단추 아래에 보인다.
+  const modelFits = videoModelFitsAspectRatio(settings.model, aspectRatio)
   const makeVideo = {
     // 단추 값이 곧 동의인 자리 — 잔액을 못 읽어도 값을 보인다(영상 탭 단추 · entry D8 과 같은 말, 리드 2026-11-14).
     label: takeValuesShown(takeBalance) ? countText(t, count, 'Next: make the video · 1 Take', 'Next: make the video · {count} Takes', { count }) : t('Next: make the video'),
     // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
     disabled: !shotDetailFrames(data.storyboardImage).start || videoBatchBusy || takes.some((take) => takePhaseOf(take.data) === 'making')
-      || imageGeneration.generating || data.storyboardImage?.status === 'pending' || nextStarting,
+      || imageGeneration.generating || data.storyboardImage?.status === 'pending' || nextStarting || !modelFits,
     // 누를 때 잔액을 다시 읽고, 못 읽으면 시작하지 않고 이미지 탭에 남아 까닭을 보인다.
     run: async () => {
       if (nextStartingRef.current) return
@@ -88,6 +95,7 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
       }
     },
     notice: nextNotice,
+    reason: modelFits ? null : t(VIDEO_MODEL_ASPECT_TEXT),
   }
   const meta = [scene ? directorNodeLabel(scene.data, boardNames) : null, t('{seconds}s', { seconds: data.durationSeconds }), effectivePrompt(data)].filter(Boolean).join(' · ')
 

@@ -11,7 +11,9 @@ import { useT } from '@/lib/i18n'
 import { countText } from '@/lib/i18n/count-text'
 import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
-import { VIDEO_MODELS, effectiveVideoResolution } from '@/lib/video-models'
+import { VIDEO_MODELS, VIDEO_MODEL_ASPECT_TEXT, effectiveVideoResolution, videoModelFitsAspectRatio } from '@/lib/video-models'
+import { videoAspectRatioFromFormat } from '@/lib/project-aspect'
+import { useProjectFormatStore } from '@/stores/project-format-store'
 import { imageChangedForTake, latestShotTake, newTakeRequest, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings } from '@/lib/director/shot-detail'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { useWriterStore } from '@/stores/writer-store'
@@ -39,14 +41,14 @@ export function ImageFixPanel({ shotNodeId, data }: { shotNodeId: string; data: 
         onChange={(event) => setImageChange(event.target.value)}
         rows={2}
         className="min-h-0 text-caption"
-        placeholder={t('Write only what you want to change in the start and end images (e.g. show the umbrella handle)')}
+        placeholder={t('Write only what you want to change in the images (e.g. show the umbrella handle)')}
       />
       <StoryboardImageButton
         nodeId={shotNodeId}
         data={data}
         changeNote={imageChange}
         className={PANEL_BUTTON}
-        idleLabel={hasImage ? t('Remake start and end images · Takes 0') : t('Make start and end images · Takes 0')}
+        idleLabel={hasImage ? t('Remake images · Takes 0') : t('Make images · Takes 0')}
       />
     </div>
   )
@@ -59,6 +61,8 @@ export function VideoMakePanel({ shotNodeId, data }: { shotNodeId: string; data:
   const generateVideoForShot = useDirectorCanvasStore((s) => s.generateVideoForShot)
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   const writerShots = useWriterStore((s) => s.shots)
+  // 프로젝트 화면비(오너 V3 — Veo 는 16:9 · 9:16 만). 포맷을 아직 모르면 16:9(서버와 같은 대비값).
+  const aspectRatio = videoAspectRatioFromFormat(useProjectFormatStore((s) => s.format)) ?? '16:9'
   const takeBalance = useTakeBalance()
   const imageGeneration = useStoryboardImageGeneration(data)
   // 이어받는 Take = 가장 새 Take(다시 만들기와 같은 규칙) — 그 Take 의 바꿀 점을 미리 채우고, 고치거나 지울 수 있다(쌓이지 않는다).
@@ -83,6 +87,7 @@ export function VideoMakePanel({ shotNodeId, data }: { shotNodeId: string; data:
     sending,
     hasTake: !!base,
     imageChanged: !!base && imageChangedForTake(data.storyboardImage, base.data),
+    modelFits: videoModelFitsAspectRatio(setup.model, aspectRatio),
   })
   // 단추 값이 곧 동의인 자리 — 잔액을 못 읽어도 값을 보이고, 숨기는 것은 과금이 꺼졌을 때뿐이다(entry D8 과 같은 말).
   //   방식은 Take 값을 바꾸지 않는다(값 = 모델 · 해상도).
@@ -187,7 +192,12 @@ export function VideoMakePanel({ shotNodeId, data }: { shotNodeId: string; data:
         {label}
       </Button>
       {capturing ? <p className="text-micro text-subtle-foreground">{t("Getting the last frame of the previous shot's video…")}</p> : null}
-      {blockedReason ? <p className="text-micro text-subtle-foreground">{t(blockedReason)}</p> : null}
+      {/* 이어받은 모델이 화면비에 안 맞으면(V3) 어디서 바꾸는지까지 — 이 칸에는 모델 고르기가 없다(⤢ 상세). */}
+      {blockedReason ? (
+        <p className="text-micro text-subtle-foreground">
+          {blockedReason === VIDEO_MODEL_ASPECT_TEXT ? `${t(blockedReason)} ${t('Change the model in Details.')}` : t(blockedReason)}
+        </p>
+      ) : null}
       {notice ? <p className="text-micro text-destructive">{notice}</p> : null}
     </div>
   )

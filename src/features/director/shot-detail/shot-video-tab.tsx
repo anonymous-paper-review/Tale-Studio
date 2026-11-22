@@ -18,8 +18,10 @@ import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
 import {
   FAL_VIDEO_MODEL_ORDER,
   VIDEO_MODELS,
+  VIDEO_MODEL_ASPECT_TEXT,
   clampDuration,
   effectiveVideoResolution,
+  videoModelFitsAspectRatio,
   type VideoModelKey,
   type VideoResolution,
 } from '@/lib/video-models'
@@ -34,7 +36,7 @@ import {
   type ShotDetailTake,
   type TakePhase,
 } from '@/lib/director/shot-detail'
-import { mediaFrameStyle } from '@/lib/project-aspect'
+import { mediaFrameStyle, videoAspectRatioFromFormat } from '@/lib/project-aspect'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
 import { useActiveGenerationJobs } from '@/lib/generation-queue'
@@ -228,9 +230,9 @@ function FixImage({ nodeId, data }: { nodeId: string; data: ShotNodeData }) {
         </div>
         <div className="min-w-[180px] flex-1 space-y-2">
           <Textarea value={change} onChange={(e) => setChange(e.target.value)} rows={2}
-            placeholder={t('Write only what you want to change in the start and end images (e.g. show the umbrella handle)')} />
+            placeholder={t('Write only what you want to change in the images (e.g. show the umbrella handle)')} />
           <StoryboardImageButton nodeId={nodeId} data={data} changeNote={change}
-            idleLabel={t(frames.start ? 'Remake start and end images · Takes 0' : 'Make start and end images · Takes 0')} />
+            idleLabel={t(frames.start ? 'Remake images · Takes 0' : 'Make images · Takes 0')} />
         </div>
       </div>
     </section>
@@ -245,6 +247,8 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
   const openDeleteConfirm = useDirectorCanvasStore((s) => s.openDeleteConfirm)
   const takeBalance = useTakeBalance()
   const imageGeneration = useStoryboardImageGeneration(data)
+  // 프로젝트 화면비(오너 V3 — Veo 는 16:9 · 9:16 만). 포맷을 아직 모르면 16:9(서버와 같은 대비값).
+  const aspectRatio = videoAspectRatioFromFormat(useProjectFormatStore((s) => s.format)) ?? '16:9'
   const base = takeSettings(data, current?.data ?? null)
   const [provider, setProvider] = useState<VideoModelKey>(base.model)
   const [resolution, setResolution] = useState<VideoResolution>(base.resolution)
@@ -265,9 +269,12 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
       ? (showCost ? countText(t, count, 'Make a new Take with the changed image · 1 Take', 'Make a new Take with the changed image · {count} Takes', { count }) : t('Make a new Take with the changed image'))
       : (showCost ? countText(t, count, 'Make a new Take · 1 Take', 'Make a new Take · {count} Takes', { count }) : t('Make a new Take'))
   const videoSeconds = clampDuration(VIDEO_MODELS[provider], data.durationSeconds)
-  // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
+  // 실사 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
   const imageBusy = hasImage && (imageGeneration.generating || data.storyboardImage?.status === 'pending')
-  const disabled = !hasImage || busy || imageBusy || videoBatchBusy || sending
+  // 오너 V3 — 이 화면비로 만들 수 없는 모델(Veo: 16:9 · 9:16 만)은 고를 수 없고, 이어받은 채 고른 모델이 그렇다면 새 Take 도 만들지 않는다.
+  const blockedModels = FAL_VIDEO_MODEL_ORDER.filter((key) => !videoModelFitsAspectRatio(key, aspectRatio))
+  const modelBlocked = !videoModelFitsAspectRatio(provider, aspectRatio)
+  const disabled = !hasImage || busy || imageBusy || videoBatchBusy || sending || modelBlocked
 
   const make = async () => {
     if (disabled) return
@@ -296,7 +303,7 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
     <section className="space-y-3 rounded-[16px] bg-card p-4" data-testid="shot-detail-fix-video">
       <SectionTitle dot="bg-state-video" title={t('Fix the video')} hint={t('When the motion, camera or length are off')} />
       {imageChanged ? (
-        <p className="rounded-[10px] bg-warning/15 px-3 py-2 text-caption font-medium text-warning">{t('The start and end images changed · A new Take will use them')}</p>
+        <p className="rounded-[10px] bg-warning/15 px-3 py-2 text-caption font-medium text-warning">{t('The images changed · A new Take will use the new ones')}</p>
       ) : null}
       {current ? (
         <Textarea value={change} onChange={(e) => setChange(e.target.value)} rows={2}
@@ -307,11 +314,15 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
         <div className="flex flex-wrap gap-2">
           {FAL_VIDEO_MODEL_ORDER.map((key) => (
             <button key={key} type="button" aria-pressed={provider === key} onClick={() => setProvider(key)}
-              className={cn('rounded-[10px] border px-3 py-1.5 text-body transition-colors', provider === key ? 'border-info bg-info/15' : 'border-border hover:bg-accent')}>
+              disabled={!videoModelFitsAspectRatio(key, aspectRatio)}
+              title={videoModelFitsAspectRatio(key, aspectRatio) ? undefined : t(VIDEO_MODEL_ASPECT_TEXT)}
+              className={cn('rounded-[10px] border px-3 py-1.5 text-body transition-colors disabled:cursor-not-allowed disabled:opacity-40', provider === key ? 'border-info bg-info/15' : 'border-border hover:bg-accent')}>
               {VIDEO_MODELS[key].label}
             </button>
           ))}
         </div>
+        {/* 오너 V3 — 꺼진 모델(Veo)의 까닭 한 줄. Cinema 상세 · Director 샷 상세가 같이 쓴다. */}
+        {blockedModels.length > 0 ? <p className="text-caption text-subtle-foreground">{t(VIDEO_MODEL_ASPECT_TEXT)}</p> : null}
       </div>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-1.5">
         <p className="text-caption text-subtle-foreground">{t('Resolution')}</p>
@@ -323,9 +334,9 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
         ) : null}
       </div>
       {!hasImage ? (
-        <p className="text-caption text-subtle-foreground">{t('Make the start and end images first.')}</p>
+        <p className="text-caption text-subtle-foreground">{t('Make the start image first.')}</p>
       ) : imageBusy ? (
-        <p className="text-caption text-subtle-foreground">{t('The start and end images are being remade. Make the Take when they are done.')}</p>
+        <p className="text-caption text-subtle-foreground">{t('The images are being remade. Make the Take when they are done.')}</p>
       ) : busy ? (
         <p className="text-caption text-subtle-foreground">{t('A Take is being made. You can make a new one when it is done.')}</p>
       ) : null}
