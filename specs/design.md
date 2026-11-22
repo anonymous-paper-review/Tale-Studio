@@ -569,6 +569,7 @@ shadcn `Dialog`(`src/components/ui/dialog.tsx`) — **11/5 SYS "모든 팝업에
 `DialogFooter` 단추는 오른쪽 정렬 · 사이 8 · 둥근 알약(11/18 · 14 600) — 취소 `variant="secondary"`(#30302E), 확인 기본(크림). 일부러 다른 셋째 단추(예: 새 프로젝트 창 [← 이전])는 그대로.
 **큰 작업 창**(`frame="work"`: 샷 고치기 1080 · 샷/씬 추가 67rem · Artist 인물 상세 1080 · 산문 재점검)은 시안이 없고 폭도 부르는 쪽이 정해,
 머리 · 여백 · 단추는 예전 모양(왼쪽 머리 · 제목 18 600 · 안쪽 24 · 알약 아님)으로 둔다(리드 2026-11-09). 바탕 · 모서리 · 그림자 · 닫기는 SYS 와 같다.
+샷 고치기 창 왼쪽 큰 그림(시작 · 연출 장, `features/writer/shot-edit-big-frame.tsx`)은 그림 비율 칸이고 눌리지 않는다 — 세로 · 정사각은 연출 편집기 칸과 같은 규칙(`editorFrameStyle`: 높이 ≤ max(12rem, 100dvh − 26rem))으로 폭을 줄여 가운데, 가로는 칸 폭 그대로(리드 2026-11-23 QA ③).
 **확인 팝업**(큰 일을 하기 전에 "~할까요?"를 묻는 창 — 단계 넘기기 · 확정) 맨 위에는 큰 Lumi `<ConfirmLumi stage={지금 단계} />`
 (`src/components/handoff/confirm-lumi.tsx`: 지금 단계 옷 · `idle` · SYS "팝업 제목 위" M 78, 단계 밖 팝업은 `persona="pearl"`). 자리는 `DialogHeader` 안 맨 위 — Header 앞에 둔 창도 틀이 Lumi · 제목 사이를 15 로 맞춘다. 지우기 확인 · 오류 안내에는 넣지 않는다. 지금 쓰는 곳: Producer 시작 확인(`features/entry/entry-form.tsx`) · Writer 로 넘기기 전 확정 창(`handoff/producer-lock-dialog.tsx`) · 산문 확정(`features/prose/prose-confirm-dialog.tsx`) · Artist 그림체 고르기 · 다시 만들기 · 완료(`features/artist-room/style-make-dialog.tsx` · `regenerate-style-dialog.tsx` · `artist-complete-dialog.tsx`) · Storyboard → Director 넘기기(`features/writer/storyboard-director-dialog.tsx`) · Director 로 넘기기 전 준비 창(`handoff/director-readiness-dialog.tsx`) · Director 다시 만들기 · 영상 만들기 확인(`features/director/regenerate-confirm-dialog.tsx`).
 

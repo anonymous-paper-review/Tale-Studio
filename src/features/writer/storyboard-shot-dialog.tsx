@@ -17,12 +17,11 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
-import { ThumbImage } from '@/components/thumb-image'
-import { withCacheBust } from '@/components/rough-frame-cycle'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
 import { EndRedrawAsk, UnsavedArrowsConfirm, applyDirectionTab, directionApplyEnabled, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
+import { ShotEditBigFrame } from '@/features/writer/shot-edit-big-frame'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, readRedrawReply, redrawDirectionOnly, sceneShotLabel, startApplyKind, startChanges, type ApplyKind, type RoughFrame } from '@/lib/writer/shot-edit'
 import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
@@ -30,6 +29,7 @@ import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { invalidateShots } from '@/lib/shots-cache'
 import { flushShotSave, useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
+import { useProjectFormatStore } from '@/stores/project-format-store'
 import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import type { DialogueLine, RoughStoryboardImage, Shot, ShotType } from '@/types'
@@ -61,6 +61,8 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   const loadProject = useWriterStore((s) => s.loadProject)
   const updateShot = useWriterStore((s) => s.updateShot)
   const projectId = useProjectStore((s) => s.projectId)
+  // 큰 그림 칸의 처음 비율(그림을 불러오기 전) — 프로젝트 화면 비율.
+  const projectFormat = useProjectFormatStore((s) => s.format)
   const [tab, setTab] = useState<'start' | 'direction'>('start')
   // 고치는 중인 값 — 팝업을 열 때마다 저장된 샷에서 새로 시작한다(닫으면 버린다 · 채팅이 바꾼 값을 되돌리지 않게, 검토 지적).
   const [draft, setDraft] = useState<{ shotId: string | null; value: Draft | null }>({ shotId: null, value: null })
@@ -260,15 +262,15 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
     }
   }
 
+  // 큰 그림 — 세로 · 정사각 러프도 잘리지 않고 다 보이게, 연출 편집기 칸과 같은 크기 규칙을 쓰는 칸(리드 2026-11-23 QA ③).
   const bigFrame = (url: string | null | undefined, caption: string) => (
-    <div className="relative overflow-hidden rounded-[14px] bg-art-placeholder">
-      {url && panel ? (
-        <ThumbImage src={withCacheBust(url, panel.generatedAt)} alt={caption} className="block h-auto w-full" />
-      ) : (
-        <div className="flex aspect-video items-center justify-center text-caption text-muted-foreground">{t('Not sketched yet')}</div>
-      )}
-      <span className="pointer-events-none absolute bottom-2 right-2 rounded-[6px] bg-black/45 px-1.5 py-px text-micro font-semibold text-foreground">{caption}</span>
-    </div>
+    <ShotEditBigFrame
+      url={url && panel ? url : null}
+      generatedAt={panel?.generatedAt}
+      caption={caption}
+      format={projectFormat}
+      emptyLabel={t('Not sketched yet')}
+    />
   )
 
   const groupCard = (key: 'start' | 'direction', title: string, sub: string) => (
