@@ -16,6 +16,8 @@
 //   Director 넘김 확인 창(머리의 [다음: Director로 →])도 여기서 그린다 — [남은 컷 그리기]가 이 보드의 그리기 상태를 쓴다.
 //   샷을 더하면(보드 [+ 샷 추가] · 채팅) 그 샷 러프를 바로 그린다(2026-11-02 오너 "더할 때마다 자동") — 잠금 없이 그 카드만
 //   그리는 중으로 보인다. 규칙은 lib/writer/added-shot-draws, 연결은 use-added-shot-draws.
+// D1(오너 2026-11-22): 이 화면은 Writer 탭의 콘티 칸이다(주소 · 단계 id writer 그대로). D9: 카드 · 씬 머리를 ⌘/Ctrl+클릭하면 채팅에 "@샷 N" · "@씬 N"이
+//   붙고 날아가는 연출이 나온다(lib/writer/conti-mention) — 그냥 누르면 지금처럼 상세 · 접기.
 
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
@@ -50,6 +52,8 @@ import { useArtistStore } from '@/stores/artist-store'
 import { flushShotSave, onShotAdded, useWriterStore } from '@/stores/writer-store'
 import { useWriterUiStore } from '@/stores/writer-ui-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useChatUiStore } from '@/stores/chat-ui-store'
+import { contiMentionLabels, contiMentionRef, mentionOnModifierClick, stopModifierPointerDown } from '@/lib/writer/conti-mention'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { writerProgressView } from '@/lib/writer/progress-view'
@@ -242,6 +246,8 @@ export function RoughStoryboardView() {
   const [lock, setLock] = useState<BoardLockState>(INITIAL_BOARD_LOCK)
   const [lockKey, setLockKey] = useState<string | null>(null)
   const isClient = useSyncExternalStore(subscribeNothing, () => true, () => false)
+  // D9 ⌘/Ctrl+클릭 멘션 — 입력에 붙은 샷 · 씬(카드 하늘색 테두리).
+  const mentionedRefs = useChatUiStore((s) => s.mentionedRefs)
   // Director 넘김 확인 창 — 머리의 [다음: Director로 →](모든 탭)가 열고, 이 보드가 그린다.
   const directorConfirmOpen = useBoardUiStore((s) => s.directorConfirmOpen)
   const setDirectorConfirmOpen = useBoardUiStore((s) => s.setDirectorConfirmOpen)
@@ -864,7 +870,7 @@ export function RoughStoryboardView() {
   // 첫 진입 브리핑 — 씬 · 샷이 준비됐고 Storyboard 채팅 기록이 없으면 먼저 "이렇게 나눴어요"라고 알린다.
   //   Producer 웰컴과 같은 방식: dismissible:false(넘김 버튼 없음), 유저가 말을 걸면 자동으로 사라짐.
   //   리뉴얼 1차: 씬은 인물 · 배경 디자인 때 먼저 저장되므로, 샷이 생기고 잠금이 풀린 뒤에 알린다.
-  //   카드를 Ctrl/Cmd 로 눌러 붙이는 여러 샷 선택은 없앴으니 그 조작은 안내하지 않는다.
+  //   카드를 ⌘/Ctrl 로 눌러 채팅에 붙이는 멘션(D9 2026-11-22)은 "@" 고르기와 같은 일이라 따로 안내하지 않는다.
   const busyOpen = busy.open
   useEffect(() => {
     if (!projectId || !chatHistoryLoaded || briefedRef.current) return
@@ -1172,6 +1178,8 @@ export function RoughStoryboardView() {
   const statsByScene = sceneStats(sceneManifest, shots)
   // 카드 글 속 인물 이름(멘션 색)과 대사 한 줄의 화자 이름 — Artist 목록의 인물(lib/writer/board-card).
   const characterNames = new Map((sceneManifest?.characters ?? []).map((c) => [c.characterId, c.name]))
+  // ⌘/Ctrl+클릭 멘션 이름 — 채팅 @ 고르기 목록과 같은 이름(보드 전체 번호, 화면 언어).
+  const mentionLabels = contiMentionLabels(sceneManifest, shots, locale)
   const mentionNames = [...characterNames.values()]
 
   return (
@@ -1240,8 +1248,14 @@ export function RoughStoryboardView() {
                   <button
                     type="button"
                     onClick={() => toggleSceneCollapsed(scene.sceneId)}
+                    // ⌘/Ctrl+클릭은 접기 대신 채팅에 "@씬 N"(D9).
+                    onPointerDownCapture={stopModifierPointerDown}
+                    onClickCapture={(e) => mentionOnModifierClick(e, mentionLabels.scenes.get(scene.sceneId))}
                     aria-expanded={!sceneCollapsed}
-                    className="flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left [contain:inline-size] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
+                    className={cn(
+                      'flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left [contain:inline-size] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50',
+                      mentionedRefs.includes(contiMentionRef('scene', scene.sceneId)) && 'mention-flash bg-sky-400/10 ring-2 ring-sky-400/70',
+                    )}
                   >
                     <ChevronDown
                       className={cn('size-3.5 shrink-0 text-subtle-foreground transition-transform', sceneCollapsed && '-rotate-90')}
@@ -1312,15 +1326,21 @@ export function RoughStoryboardView() {
                         key={shot.shotId}
                         role="button"
                         tabIndex={0}
-                        // 카드를 Ctrl/Cmd 로 눌러 채팅에 붙이는 여러 샷 선택은 없앴다(리뉴얼 1차, 프로토타입 S1) — 누르면 언제나 상세.
+                        // 그냥 누르면 상세. ⌘/Ctrl+클릭은 상세 대신 채팅에 "@샷 N"(D9 2026-11-22 — 리뉴얼 1차에 뺐던 여러 샷 고르기가 아니라 멘션 하나씩).
                         onClick={() => openDetail(shot.shotId)}
+                        onPointerDownCapture={stopModifierPointerDown}
+                        onClickCapture={(e) => mentionOnModifierClick(e, mentionLabels.shots.get(shot.shotId))}
                         onKeyDown={(e) => {
                           if (e.key === 'Enter' || e.key === ' ') {
                             e.preventDefault()
                             openDetail(shot.shotId)
                           }
                         }}
-                        className="group relative flex cursor-pointer flex-col gap-2.5 rounded-xl bg-panel p-3 transition-colors duration-100 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50"
+                        className={cn(
+                          'group relative flex cursor-pointer flex-col gap-2.5 rounded-xl bg-panel p-3 transition-colors duration-100 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50',
+                          // 입력에 "@샷 N"이 붙은 카드 — Producer · Artist 카드와 같은 하늘색 테두리.
+                          mentionedRefs.includes(contiMentionRef('shot', shot.shotId)) && 'mention-flash ring-2 ring-sky-400/70 bg-sky-400/10',
+                        )}
                       >
                         {/* 카드 머리(v3 시안 S1) — 전체 번호 이름 그대로 · 길이 · ···(샷 고치기 팝업, 카드 누르기와 같다).
                             제품에 카드 메뉴로 둘 다른 일(지우기 · 다시 그리기)이 화면에 없어 메뉴 대신 팝업을 연다 — 결정 대기. */}

@@ -14,6 +14,7 @@ import { Button } from '@/components/ui/button'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { paragraphClickPicks, paragraphKeyPicks, paragraphLabel, revisingParagraphIndex, selectedTextWithin } from '@/lib/prose/paragraph-pick'
+import { paragraphFlightOnModifierClick } from '@/lib/writer/conti-mention'
 import { TreatmentDiffView } from '@/features/producer/treatment-diff-view'
 import { ProseProposalView } from '@/features/prose/proposal-view'
 import { useProducerStore } from '@/stores/producer-store'
@@ -101,7 +102,10 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
               aria-pressed={attached}
               onClick={(event) => {
                 // 이 문단 안에서 끌어 고른 글만 붙이기를 막는다 — 다른 곳에 고른 글이 남아 있어도 문단은 붙는다.
-                if (paragraphClickPicks(selectedTextWithin(event.currentTarget, window.getSelection()))) toggle()
+                if (!paragraphClickPicks(selectedTextWithin(event.currentTarget, window.getSelection()))) return
+                // ⌘/Ctrl+클릭(D9)도 문단을 붙이고, 붙는 모습을 문단 ↔ 입력칸으로 날아가는 연출로 보인다(lib/writer/conti-mention).
+                paragraphFlightOnModifierClick(event, { index, attached })
+                toggle()
               }}
               onKeyDown={(event) => {
                 if (event.target !== event.currentTarget || !paragraphKeyPicks(event.key)) return
