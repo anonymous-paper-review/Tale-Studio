@@ -1555,9 +1555,13 @@ export function getVideoNodeResolution(
   return isVideoResolution(chosen) ? chosen : DEFAULT_VIDEO_RESOLUTION
 }
 
-/** 이어받는 Take 설정에서 프롬프트만 뺀다 — 새 Take 의 바탕은 늘 지금 샷 프롬프트(리드 검토 c ③). */
+/** 이어받는 Take 설정에서 프롬프트를 뺀다 — 새 Take 의 바탕은 늘 지금 샷 프롬프트(리드 검토 c ③).
+ *  사람 말 · 만든 길(note · via, Camera 이력 요약 — 2026-11-22)도 그 Take 의 기록이라 잇지 않는다(옛 판의 말이 새 판에 붙지 않게, 리드 11/22). */
 function withoutTakePrompt(override: VideoNodeData['override']): VideoOverride {
-  const { prompt: _prompt, ...rest } = override as VideoOverride
+  const rest: VideoOverride = { ...(override as VideoOverride) }
+  delete rest.prompt
+  delete rest.note
+  delete rest.via
   return rest
 }
 

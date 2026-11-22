@@ -9,6 +9,7 @@ import {
   isShotData,
   isVideoData,
   type DirectorNode,
+  type VideoOverride,
 } from '@/types/director'
 import {
   chainFrameMatchesSource,
@@ -165,6 +166,10 @@ export function buildVideoBatchInputs(
     const cameraPreset = override.cameraPreset ?? mother.cameraPreset
     // 모델 · 해상도는 확인창의 Take 계산(video-batch-plan)과 같은 판정으로 정한다 — 배선한 테이크가 있으면 그 테이크 값.
     const settings = videoBatchShotSettings(nodes, shotNodeId)!
+    // 앞 Take 의 사람 말 · 만든 길(note · via, Camera 이력 요약 — 2026-11-22)은 그 Take 의 기록이다 — 일괄의 새 Take 에 싣지 않는다.
+    const settingsOverride: VideoOverride = { ...settings.override }
+    delete settingsOverride.note
+    delete settingsOverride.via
 
     const request: Record<string, unknown> = {
       projectId,
@@ -181,7 +186,7 @@ export function buildVideoBatchInputs(
       resolution: settings.resolution,
       // 새 테이크에 남길 설정 — 배선한 테이크의 설정(모델 · 해상도 등). 없으면 빈 설정(마더 그대로).
       //   일괄은 기본 방식(시작+끝)만 만든다(리드 2026-11-22) — 배선한 테이크에 적힌 방식 · 이어서 출처는 새 테이크 기록에 남기지 않는다.
-      override: takeOverrideForRequest(settings.override, undefined),
+      override: takeOverrideForRequest(settingsOverride, undefined),
       // 제공자는 fal 하나다(2026-10-11 자체 호스팅 경로 제거). store 의 요청 조립과 동일 계약.
       provider: 'fal',
       durationSeconds: mother.durationSeconds,

@@ -8,6 +8,8 @@ import { takeImageVersions, takePhaseOf, takeSettings, type ShotDetailTake, type
 import { VIDEO_MODELS, effectiveVideoResolution } from '@/lib/video-models'
 import type { DialogueLine } from '@/types'
 import type { ShotNodeData, StoryboardImage, StoryboardImageVersion, VideoOverride } from '@/types/director'
+import { DEFAULT_VIDEO_MODE } from '@/lib/director/video-modes'
+import { VIDEO_MODE_LABEL, takeVideoMode } from './video-mode'
 
 /** 요약 한 마디 — key 는 영어 원문 = i18n 키(모델 이름 · 해상도는 번역 없이 그대로 나온다). 화면이 t() 로 옮기고 " · " 로 잇는다. */
 export interface HistoryPhrase {
@@ -86,13 +88,14 @@ function imageSummary(version: StoryboardImageVersion, previous: StoryboardImage
   return said ? [imageFacts(version, previous), said] : [imageFacts(version, previous)]
 }
 
-/** 그 Take 의 사실 — 모델 · 실제 해상도 · 쓴 그림 판(시작 그림 기준). */
+/** 그 Take 의 사실 — 모델 · 실제 해상도 · 쓴 그림 판(시작 그림 기준) · 방식(오너 2026-11-22 D2~D5, 모르면 기본). */
 function takeFacts(shot: Pick<ShotNodeData, 'provider'>, image: StoryboardImage | null | undefined, take: ShotDetailTake) {
   const setup = takeSettings(shot, take.data)
   return {
     model: VIDEO_MODELS[setup.model].label,
     resolution: take.data.videoResolution ?? effectiveVideoResolution(setup.model, setup.resolution),
     imageVersion: takeImageVersions(image, take.data)?.start ?? null,
+    mode: takeVideoMode(take.data) ?? DEFAULT_VIDEO_MODE,
   }
 }
 
@@ -115,21 +118,27 @@ function takeSummary(
   phase: TakePhase,
 ): HistoryPhrase[] {
   const facts = takeFacts(shot, image, take)
-  const note = ((take.data.override ?? {}) as VideoOverride).changeNote?.trim() ?? ''
+  // 그 Take 를 만들 때 적은 사람 말(오너 2026-11-22 결정 4) — note 칸이 있으면 그것만(빈 말이면 없음), 없는 옛 Take 는 바꿀 점(changeNote).
+  const override = (take.data.override ?? {}) as VideoOverride
+  const note = (typeof override.note === 'string' ? override.note : override.changeNote ?? '').trim()
   const out: HistoryPhrase[] = []
   const state = phasePhrase(take, phase)
   if (state) out.push(state)
   if (!previous) {
     out.push({ key: 'First video' }, { key: facts.model }, { key: facts.resolution })
     if (facts.imageVersion !== null) out.push({ key: 'Image v{n}', params: { n: facts.imageVersion } })
+    // 방식은 기본이 아닐 때만 적는다.
+    if (facts.mode !== DEFAULT_VIDEO_MODE) out.push({ key: VIDEO_MODE_LABEL[facts.mode] })
   } else {
     const before = takeFacts(shot, image, previous)
     if (facts.model !== before.model) out.push({ key: facts.model })
     if (facts.resolution !== before.resolution) out.push({ key: facts.resolution })
     if (facts.imageVersion !== null && facts.imageVersion !== before.imageVersion) out.push({ key: 'Image v{n}', params: { n: facts.imageVersion } })
+    // 앞 Take 와 방식이 바뀌었으면 바뀐 방식(기본으로 돌아와도 적는다).
+    if (facts.mode !== before.mode) out.push({ key: VIDEO_MODE_LABEL[facts.mode] })
   }
   if (take.data.videoChainInputId) out.push({ key: 'Continued from the previous video' })
-  if (note) out.push({ key: 'Change: {note}', params: { note } })
+  if (note) out.push(override.via === 'chat' ? { key: 'Asked in chat: {note}', params: { note } } : { key: 'Change: {note}', params: { note } })
   // 앞 Take 와 같은 설정 · 같은 그림으로 다시 만든 것 — 아무것도 안 적으면 빈 칸이 된다.
   if (previous && out.length === (state ? 1 : 0)) out.push({ key: 'Made again' })
   return out
