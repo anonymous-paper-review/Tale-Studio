@@ -118,7 +118,9 @@ function takeSummary(
   phase: TakePhase,
 ): HistoryPhrase[] {
   const facts = takeFacts(shot, image, take)
-  const note = ((take.data.override ?? {}) as VideoOverride).changeNote?.trim() ?? ''
+  // 그 Take 를 만들 때 적은 사람 말(오너 2026-11-22 결정 4) — note 칸이 있으면 그것만(빈 말이면 없음), 없는 옛 Take 는 바꿀 점(changeNote).
+  const override = (take.data.override ?? {}) as VideoOverride
+  const note = (typeof override.note === 'string' ? override.note : override.changeNote ?? '').trim()
   const out: HistoryPhrase[] = []
   const state = phasePhrase(take, phase)
   if (state) out.push(state)
@@ -136,7 +138,7 @@ function takeSummary(
     if (facts.mode !== before.mode) out.push({ key: VIDEO_MODE_LABEL[facts.mode] })
   }
   if (take.data.videoChainInputId) out.push({ key: 'Continued from the previous video' })
-  if (note) out.push({ key: 'Change: {note}', params: { note } })
+  if (note) out.push(override.via === 'chat' ? { key: 'Asked in chat: {note}', params: { note } } : { key: 'Change: {note}', params: { note } })
   // 앞 Take 와 같은 설정 · 같은 그림으로 다시 만든 것 — 아무것도 안 적으면 빈 칸이 된다.
   if (previous && out.length === (state ? 1 : 0)) out.push({ key: 'Made again' })
   return out
