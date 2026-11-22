@@ -10,6 +10,7 @@ import type { DialogueLine } from '@/types'
 import type { ShotNodeData, StoryboardImage, StoryboardImageVersion, VideoOverride } from '@/types/director'
 import { DEFAULT_VIDEO_MODE } from '@/lib/director/video-modes'
 import { dialogueChangedSince, type DialogueLineLike } from '@/lib/director/dialogue-fingerprint'
+import { takeShownModel } from '@/lib/director/take-model-name'
 import { VIDEO_MODE_LABEL, takeVideoMode } from './video-mode'
 
 /** 요약 한 마디 — key 는 영어 원문 = i18n 키(모델 이름 · 해상도는 번역 없이 그대로 나온다). 화면이 t() 로 옮기고 " · " 로 잇는다. */
@@ -91,11 +92,11 @@ function imageSummary(version: StoryboardImageVersion, previous: StoryboardImage
   return said ? [imageFacts(version, previous), said] : [imageFacts(version, previous)]
 }
 
-/** 그 Take 의 사실 — 모델 · 실제 해상도 · 쓴 그림 판(시작 그림 기준) · 방식(오너 2026-11-22 D2~D5, 모르면 기본). */
+/** 그 Take 의 사실 — 모델(그 영상을 실제로 낸 모델 먼저, 리드 결정 ①) · 실제 해상도 · 쓴 그림 판(시작 그림 기준) · 방식(오너 2026-11-22 D2~D5, 모르면 기본). */
 function takeFacts(shot: Pick<ShotNodeData, 'provider'>, image: StoryboardImage | null | undefined, take: ShotDetailTake) {
   const setup = takeSettings(shot, take.data)
   return {
-    model: VIDEO_MODELS[setup.model].label,
+    model: VIDEO_MODELS[takeShownModel(shot, take.data)].label,
     resolution: take.data.videoResolution ?? effectiveVideoResolution(setup.model, setup.resolution),
     imageVersion: takeImageVersions(image, take.data)?.start ?? null,
     mode: takeVideoMode(take.data) ?? DEFAULT_VIDEO_MODE,

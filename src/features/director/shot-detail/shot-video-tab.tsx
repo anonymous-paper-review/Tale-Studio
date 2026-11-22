@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { Loader2, Play, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
+import { takeShownModel } from '@/lib/director/take-model-name'
 import { useT } from '@/lib/i18n'
 import { countText } from '@/lib/i18n/count-text'
 import { cn } from '@/lib/utils'
@@ -118,7 +119,8 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                     <p className="text-caption text-subtle-foreground">{t("Stopped. Takes for videos that had already started aren't refunded. If this one finishes later, it stays in this list.")}</p>
                   ) : phase === 'done' ? (
                     <p className="text-caption text-subtle-foreground">
-                      {[madeWith(take), VIDEO_MODELS[setup.model].label, resolution].filter(Boolean).join(' · ')}
+                      {/* 모델 이름은 그 영상을 실제로 낸 모델 먼저(리드 2026-11-22 결정 ① — 샷 모델이 바뀌어도 옛 Take 이름이 따라 바뀌지 않게). */}
+                      {[madeWith(take), VIDEO_MODELS[takeShownModel(data, take.data)].label, resolution].filter(Boolean).join(' · ')}
                       {take.data.cancelledAt ? <span className="ml-1.5 rounded-full border border-border px-1.5 text-micro">{t('Finished after it was stopped')}</span> : null}
                     </p>
                   ) : phase === 'failed' ? (
