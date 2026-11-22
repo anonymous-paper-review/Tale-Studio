@@ -2,7 +2,7 @@ import { cameraToText } from '@/lib/director/camera-text'
 import { compileMotionContract, type MotionContract } from '@/lib/director/motion-contract'
 import { findCameraBrand, findCameraMovement } from '@/lib/knowledge'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
-import type { VideoModelKey } from '@/lib/video-models'
+import { planModelImageRoles, type ModelImageRolePlan, type VideoModelKey } from '@/lib/video-models'
 import type { CameraConfig, CameraPreset, GenerationMethod } from '@/types'
 
 export type VideoPromptParts = {
@@ -66,6 +66,25 @@ function referenceRolesClause(roles: VideoReferenceImageRole[]): string {
           ? ' The END image is the completed composition.'
           : ''
   return `Reference image order: ${order}.${refs}${temporal}`
+}
+
+/**
+ * 첫 · 마지막 장면 칸이 있는 모델(Kling O3, 2026-11-22)의 역할 문장 — 시작 · 끝은 칸이라 그림 번호가 없고,
+ *   참고 칸 그림은 그 모델의 이름표(@Image1 …)로 부른다. "image 1 = START" 는 참고 칸 번호와 어긋나서 쓰지 않는다.
+ */
+function frameSlotRolesClause(plan: ModelImageRolePlan): string {
+  const frames = plan.firstFrame && plan.lastFrame
+    ? 'The video starts exactly on the given first frame and ends exactly on the given last frame, which is the completed composition.'
+    : plan.firstFrame
+      ? 'The video starts exactly on the given first frame.'
+      : plan.lastFrame
+        ? 'The video ends exactly on the given last frame, which is the completed composition.'
+        : ''
+  const order = plan.imageRoles
+    .map((role, index) => `@Image${index + 1} = ${role === 'start_look' ? 'the first frame again (look and identity only)' : role.toUpperCase()}`)
+    .join(', ')
+  const refs = plan.imageRoles.includes('ref') ? ' REF images are style/character references, not temporal keyframes.' : ''
+  return [frames, order ? `Reference images: ${order}.${refs}` : ''].filter(Boolean).join(' ')
 }
 
 /** 대사 화자(characters 테이블에서 해석). appearance 는 시각 앵커 재료로 일부만 쓰인다. */
@@ -170,7 +189,8 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   const referenceAuthority = `The reference images are the visual ground truth — match their lighting, color temperature, wardrobe, set dressing and framing exactly; wherever this text description differs from the reference images, follow the references.`
 
   if (referenceImageRoles?.length && generationMethod === 'I2V') {
-    const roleInstruction = referenceRolesClause(referenceImageRoles)
+    const slotPlan = planModelImageRoles(modelKey, referenceImageRoles)
+    const roleInstruction = slotPlan ? frameSlotRolesClause(slotPlan) : referenceRolesClause(referenceImageRoles)
     prompt_parts.referenceRoles = roleInstruction
     prompt_parts.referenceAuthority = referenceAuthority
     fullPrompt = `${fullPrompt} ${roleInstruction} ${referenceAuthority}`.slice(0, cap + (contract.text ? 700 : 650))

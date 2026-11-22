@@ -38,6 +38,7 @@ import {
   DEFAULT_VIDEO_RESOLUTION,
   VIDEO_MODELS,
   effectiveVideoResolution,
+  frameSlotRoles,
   isVideoResolution,
   normalizeProvider,
   type VideoModelKey,
@@ -622,8 +623,9 @@ async function prepareVideoRequest(
     const modelKey: VideoModelKey = normalizeProvider(model ?? '')
     const dur = durationSeconds ?? 5
     // 방안 고장 1: 모델이 받는 장 수 안으로 — 시작 · 끝은 남기고 참고 그림만 뒤에서부터 덜어 낸다. 덜어 낸 수는 기록 · 응답에 남긴다.
+    //   첫 · 마지막 장면 칸이 있는 모델(Kling)은 그 칸으로 가는 시작 · 끝을 세지 않는다.
     const modelImages = frames.referenceImageUrls?.length
-      ? clampReferenceImages(frames.referenceImageUrls, frames.referenceImageRoles, VIDEO_MODELS[modelKey].maxImageUrls)
+      ? clampReferenceImages(frames.referenceImageUrls, frames.referenceImageRoles, VIDEO_MODELS[modelKey].maxImageUrls, frameSlotRoles(modelKey))
       : null
     const referenceImageUrlsV2 = modelImages ? modelImages.urls : frames.referenceImageUrls
     const alignedReferenceImageRoles = modelImages ? modelImages.roles : frames.referenceImageRoles
@@ -795,7 +797,7 @@ async function prepareVideoRequest(
       }
     }
     const falSubmitRequest = submitRefUrls
-      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio, resolution)
+      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio, resolution, alignedReferenceImageRoles)
       : buildFalT2VFallbackRequest(fullPrompt, dur, effectiveAspectRatio)
     const falCapture = buildBestEffortFalRequestCapturePatch(falSubmitRequest.input, falSubmitRequest.model)
     const normalizedNewTakeMetadata = {
