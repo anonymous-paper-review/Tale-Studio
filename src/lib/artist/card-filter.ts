@@ -11,6 +11,15 @@ export function artistSectionId(section: ArtistSection): string {
 }
 
 /** 묶음마다 카드 수 — 단추 숫자 · 묶음 머리 숫자(보관 카드 포함). */
+/**
+ * 아직 이 프로젝트의 Artist 자료를 다 읽지 않았는가 — 그 동안은 묶음 머리 · 바로가기 단추 · 머리 줄에 숫자 0 과 "아직 ~이 없어요" 대신
+ *   불러오는 중을 보인다(실제 프로젝트 QA a, 2026-11-23). 카드가 하나라도 있으면(다른 길로 먼저 실렸으면) 숫자를 그대로 보인다.
+ */
+export function artistDataLoading(input: { projectId: string | null; loadedProjectId: string | null; counts: Record<ArtistSection, number> }): boolean {
+  const total = ARTIST_SECTIONS.reduce((sum, section) => sum + (input.counts[section] ?? 0), 0)
+  return total === 0 && (!input.projectId || input.loadedProjectId !== input.projectId)
+}
+
 export function artistSectionCounts(input: { characters: number; worlds: number; props: number }): Record<ArtistSection, number> {
   return { characters: input.characters, world: input.worlds, props: input.props }
 }

@@ -17,6 +17,11 @@ const NO_TEXT_LINE = 'No people, no hands, no faces, no other objects, no text, 
 const DESCRIBED_TEXT_LINE =
   'No people, no hands, no faces, no other objects. Writing that the description says is on the object stays on it, exactly as described; add no other text, no labels, no names, no logo and no watermark.'
 
+/** 문장 끝 — 이미 마침표(. 。 ! ?)로 끝나면 그대로, 아니면 마침표를 붙인다(설명 · 바꿀 점이 마침표로 끝나 ".."가 되던 것, QA 2026-11-23 c). */
+function sentence(text: string): string {
+  return /[.。!?]$/.test(text) ? text : `${text}.`
+}
+
 /** 정책 거절 뒤 안전 재시도 문구 — 인물 시트(turnaround SAFE_TOKENS)와 같은 결. */
 const PROP_SAFE_TOKENS = 'stylized non-graphic depiction, tasteful, safe-for-work'
 
@@ -26,8 +31,8 @@ export function buildPropImagePrompt(input: { name: string; appearance: string; 
   const subject = appearance ? `${name}: ${appearance}` : name
   const instruction = input.instruction?.trim()
   return [
-    `Prop reference picture of ${subject}.`,
-    ...(instruction ? [`Requested change: ${instruction}.`] : []),
+    sentence(`Prop reference picture of ${subject}`),
+    ...(instruction ? [sentence(`Requested change: ${instruction}`)] : []),
     'Show this one object alone, whole and centered, seen straight from the front at eye level, filling about two thirds of the frame,',
     'on a plain neutral background.',
     (input.textRule ?? PROP_TEXT_RULE) === 'described' ? DESCRIBED_TEXT_LINE : NO_TEXT_LINE,
