@@ -284,8 +284,9 @@ export function drawPlanFrame(ctx: CanvasRenderingContext2D, W: number, H: numbe
         const video = src.video(layer.shotId)
         if (video) {
           // 영상 효과 — 모니터와 같은 글(흐림 반지름은 틀 폭 기준). 모니터는 흐린 그림을 줄이므로 흐림도 그 비율만큼 — 캔버스의 흐림은 위의
-          //   옮기기 · 키우기를 따르지 않는다. 캔버스가 못 그리면 효과 없이(시작할 때 알렸다).
-          const filter = src.filterOk ? videoEffectFilter(clip?.effects, W * (motion?.scale ?? 1)) : undefined
+          //   옮기기 · 키우기를 따르지 않는다. 흐림 세기는 그 시각 층의 값(흐림 [시작 → 끝], D14 — 모니터와 같은 목록). 캔버스가 못 그리면
+          //   효과 없이(시작할 때 알렸다).
+          const filter = src.filterOk ? videoEffectFilter(clip?.effects, W * (motion?.scale ?? 1), layer.blur) : undefined
           if (filter) ctx.filter = filter
           drawCover(ctx, video, W, H)
         } else if (layer.shotId === plan.topShotId) {

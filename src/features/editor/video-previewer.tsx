@@ -27,17 +27,13 @@ const FRAME = 1 / SEQUENCE_FPS
 const PREROLL_SEC = 1
 
 /**
- * 클립 모션 · 영상 효과를 영상 그림에 입힌다(2단계 ④ · ⑤) — 위치는 틀 폭 · 높이 비율, 비율은 가운데를 기준으로, 효과는 CSS filter
- *   (흐림 반지름은 틀 폭 기준). 처음 값이면 아무것도 안 붙인다. 세기(불투명도 × 전환)는 재생 고리가 층 상자에 입힌다.
+ * 클립 모션을 영상 그림에 입힌다(2단계 ④) — 위치는 틀 폭 · 높이 비율, 비율은 가운데를 기준으로. 처음 값이면 아무것도 안 붙인다. 세기(불투명도 ×
+ *   전환)는 재생 고리가 층 상자에, 영상 효과(CSS 필터 — 흐림 [시작 → 끝]은 시각마다 바뀐다, D14)는 재생 고리가 영상 그림에 입힌다.
  */
-function layerStyle(clip: Pick<VideoClip, 'motion' | 'effects'> | undefined, frameWidth: number): CSSProperties | undefined {
+function layerStyle(clip: Pick<VideoClip, 'motion'> | undefined): CSSProperties | undefined {
   const motion = clip?.motion
-  const filter = videoEffectFilter(clip?.effects, frameWidth)
-  if (!motion && !filter) return undefined
-  return {
-    ...(motion ? { transform: `translate(${motion.x * 100}%, ${motion.y * 100}%) scale(${motion.scale})` } : {}),
-    ...(filter ? { filter } : {}),
-  }
+  if (!motion) return undefined
+  return { transform: `translate(${motion.x * 100}%, ${motion.y * 100}%) scale(${motion.scale})` }
 }
 
 /** 받아 둔 타이틀 카드 그림 — 층이 새로 생겨도(교차 디졸브 경계에서 고치는 무대 ↔ 그림) 그 장에 바로 그린다. */
@@ -153,6 +149,9 @@ export function VideoPreviewer() {
   // 그릴 것 목록의 층(2단계 ⑦) — 붙여 둘 층만 상태로 두고, 상자 · 영상 요소는 이름으로 찾는다. 위아래 · 세기 · 시각은 재생 고리가 바꾼다.
   const layerBoxes = useRef(new Map<string, HTMLDivElement>())
   const layerVideos = useRef(new Map<string, HTMLVideoElement>())
+  // 영상 효과 filter 글 — 영상 그림마다 마지막으로 쓴 글(바뀔 때만 쓴다)과, 층마다 마지막으로 셈한 글(새로 붙은 영상 그림에 바로 입힌다).
+  const layerFilters = useRef(new WeakMap<HTMLVideoElement, string>())
+  const lastFilters = useRef(new Map<string, string>())
   const mountedKeyRef = useRef('')
   const [mounted, setMounted] = useState<MountedLayer[]>([])
   const activeIdRef = useRef<string | null>(null)
@@ -160,6 +159,11 @@ export function VideoPreviewer() {
   const projectFormat = useProjectFormatStore((s) => s.format)
   const { width: frameW, height: frameH } = exportFrameSize(projectFormat)
   const [pictureRef, frame] = useFrameSize(frameW / frameH)
+  // 흐림 반지름의 기준(모니터 틀 폭) — 재생 고리가 읽는다.
+  const frameWidthRef = useRef(0)
+  useLayoutEffect(() => {
+    frameWidthRef.current = frame.width
+  }, [frame.width])
 
   const [activeShotId, setActiveShotId] = useState<string | null>(null)
   const [actualDuration, setActualDuration] = useState<number | null>(null)
@@ -247,6 +251,17 @@ export function VideoPreviewer() {
         if (layer.kind !== 'video') continue
         const el = layerVideos.current.get(layer.shotId)
         if (el) syncLayerVideo(el, layer, st.videoClips.find((c) => c.shotId === layer.shotId)?.speed ?? 1.0, st.isPlaying, layer.shotId === plan.topShotId)
+      }
+      // 영상 효과 — 그 시각 흐림(층의 blur, D14)까지 모니터 틀 폭 기준 filter 글로. 내보내기와 같은 목록 · 같은 함수다. 재생 중이든 멈춘 채
+      //   옮기든 장마다 셈하고, 글이 바뀔 때만 쓴다.
+      for (const layer of all) {
+        if (layer.kind !== 'video') continue
+        const next = videoEffectFilter(st.videoClips.find((c) => c.shotId === layer.shotId)?.effects, frameWidthRef.current, layer.blur) ?? ''
+        lastFilters.current.set(layer.shotId, next)
+        const el = layerVideos.current.get(layer.shotId)
+        if (!el || layerFilters.current.get(el) === next) continue
+        el.style.filter = next
+        layerFilters.current.set(el, next)
       }
       // 물들이기 막(2026-09-08 · 2단계 ⑤) — 검은 · 흰 막의 투명도만 시간에 따라(영상 픽셀은 손대지 않는다). 자막 위에 덮는다.
       if (dissolveRef.current) dissolveRef.current.style.opacity = String(plan.black)
@@ -348,8 +363,17 @@ export function VideoPreviewer() {
     return (
       <video
         ref={(el) => {
-          if (el) layerVideos.current.set(id, el)
-          else layerVideos.current.delete(id)
+          if (!el) {
+            layerVideos.current.delete(id)
+            return
+          }
+          layerVideos.current.set(id, el)
+          // 새로 붙은 영상 그림에도 그 층의 효과를 바로 — 재생 고리의 다음 장을 기다리면 한 장이 효과 없이 보인다.
+          const filter = lastFilters.current.get(id)
+          if (filter !== undefined && layerFilters.current.get(el) !== filter) {
+            el.style.filter = filter
+            layerFilters.current.set(el, filter)
+          }
         }}
         data-shot-id={id}
         // "전체 보기" 프리패치가 받아둔 blob 이 있으면 그걸로 — 클립 경계 전환이 즉시가 된다(#watch-all).
@@ -358,7 +382,7 @@ export function VideoPreviewer() {
         playsInline
         preload="auto"
         className="absolute inset-0 h-full w-full object-cover"
-        style={layerStyle(clip, frame.width)}
+        style={layerStyle(clip)}
         onLoadedMetadata={(e) => {
           if (id === activeIdRef.current) setActualDuration(e.currentTarget.duration)
         }}
