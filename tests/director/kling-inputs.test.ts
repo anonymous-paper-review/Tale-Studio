@@ -74,13 +74,14 @@ describe('혼자 정한 것', () => {
   })
 })
 
-describe('결정이 필요한 것 (오너 결정 4 — 로컬은 추천대로 켬)', () => {
-  // 왜: 우리는 `audio` 칸을 보냈는데 Kling 의 소리 칸은 `generate_audio`(기본 꺼짐)다 — 모르는 칸은 버려져 Kling 영상은 소리 · 대사 없이 나왔다.
-  //   8/27 약속("음성은 영상 생성기에 맡긴다")대로 켜면 원가가 초당 $0.112 → $0.14 로 는다. 끄기로 정하면 KLING_O3_AUDIO_ON 한 곳만 바꾼다.
-  it('Kling O3 는 소리 켜기를 Kling 의 칸 이름(generate_audio)으로 보내고, fal 이 버리는 칸에 소리가 없다', () => {
+describe('같이 정한 것', () => {
+  // 왜: 오너 2026-11-22 E6 "켠다" — 예전에는 `audio` 칸을 보냈는데 Kling 의 소리 칸은 `generate_audio`(기본 꺼짐)라
+  //   모르는 칸이 버려져 Kling 영상이 소리 · 대사 없이 나왔다. 원가는 초당 $0.112 → $0.14, Take 는 그대로.
+  it('Kling O3 영상은 소리를 켜서 만들고, 소리는 Kling 의 칸 이름(generate_audio)으로 보낸다', () => {
     const request = buildFalReferenceToVideoRequest('kling-o3', 'x', [START, END], 5, '16:9', null, ['start', 'end'])
 
-    expect(request.input.generate_audio).toBe(KLING_O3_AUDIO_ON)
+    expect(KLING_O3_AUDIO_ON).toBe(true)
+    expect(request.input.generate_audio).toBe(true)
     expect(request.input).not.toHaveProperty('audio')
     expect(computeIgnoredFields(request.input, request.model)).not.toContain('audio')
   })

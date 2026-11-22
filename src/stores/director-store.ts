@@ -250,6 +250,8 @@ type HydratedVideoTake = {
   made_frames?: unknown
   /** 지금 영상을 낸 작업의 방식(fb-video 2026-11-22). 모르면 null. */
   made_video_mode?: unknown
+  /** 지금 영상을 낸 작업의 대사 지문(fb-video 2026-11-22 E3). 모르면 null. */
+  made_dialogue_fingerprint?: unknown
   /** 그 Take 의 마지막 작업을 화면에서 멈춘 때(오너 2026-11-14 7번). 없으면 멈추지 않음. */
   cancelled_at?: string | null
 }
@@ -2187,6 +2189,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     madeVideoMode: isVideoMode(row.made_video_mode)
                       ? row.made_video_mode
                       : (row.url && row.url === existingNode.data.videoUrl ? existingNode.data.madeVideoMode ?? null : null),
+                    madeDialogueFingerprint: typeof row.made_dialogue_fingerprint === 'string'
+                      ? row.made_dialogue_fingerprint
+                      : (row.url && row.url === existingNode.data.videoUrl ? existingNode.data.madeDialogueFingerprint ?? null : null),
                     // 화면에서 멈춘 Take(오너 7번) — 서버가 마지막 작업의 멈춤으로 정한다. 방금 멈춰 서버가 아직 모르면 아는 값을 둔다.
                     cancelledAt: typeof row.cancelled_at === 'string'
                       ? row.cancelled_at
@@ -2228,6 +2233,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               data.videoResolution = isVideoResolution(row.video_resolution) ? row.video_resolution : null
               data.madeFrames = parseMadeFrames(row.made_frames)
               data.madeVideoMode = isVideoMode(row.made_video_mode) ? row.made_video_mode : null
+              data.madeDialogueFingerprint = typeof row.made_dialogue_fingerprint === 'string' ? row.made_dialogue_fingerprint : null
               data.cancelledAt = typeof row.cancelled_at === 'string' ? row.cancelled_at : null
               const id = newDirectorId('dn')
               nodes = [...nodes, {
