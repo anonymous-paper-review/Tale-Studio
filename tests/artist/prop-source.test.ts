@@ -71,11 +71,11 @@ describe('소품 출처 바꾸기', () => {
     }
   })
 
-  // 왜: 출처는 한 곳(prop-source.ts)에서 고른다 — 지금은 리드 결정 1(Producer 사물 카드). 출처가 바뀌면 화면 말 중 바뀌는 것은
+  // 왜: 출처는 한 곳(prop-source.ts)에서 고른다 — 오너 E5(2026-11-22 "추천대로" = B)로 [만들기] 때 AI 가 이야기에서 고른다(Producer 사물은 늘 함께). 출처가 바뀌면 화면 말 중 바뀌는 것은
   //   소품 묶음이 비었을 때 한 줄뿐이라 그 줄도 출처를 따른다(출처를 바꾸면서 그 줄을 안 넣으면 여기서 막힌다).
   //   A · B 는 Writer 가 만든 것이라 DB 출처 칸은 writer — 지금 DB 가 받는 값(producer · writer · user)이라 마이그레이션이 없다.
-  it('소품 출처는 한 곳에서 고르고 지금은 Producer 사물 카드이며, 소품이 없을 때 안내도 그 출처의 말이다', () => {
-    expect(ACTIVE_PROP_SOURCE).toBe('producer_cards')
+  it('소품 출처는 한 곳에서 고르고 지금은 [만들기] 때 AI 가 이야기에서 고르는 것이며, 소품이 없을 때 안내도 그 출처의 말이다', () => {
+    expect(ACTIVE_PROP_SOURCE).toBe('story_pick')
     expect(Object.keys(PROP_SOURCE_ORIGIN).sort()).toEqual(['producer_cards', 'repeated_in_shots', 'story_pick'])
     for (const origin of Object.values(PROP_SOURCE_ORIGIN)) expect(['producer', 'writer', 'user']).toContain(origin)
     const line = PROP_EMPTY_LINE[ACTIVE_PROP_SOURCE]

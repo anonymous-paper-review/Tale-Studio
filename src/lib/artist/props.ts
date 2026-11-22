@@ -1,5 +1,5 @@
 // Artist 소품(D7, 오너 2026-11-22 "배경처럼 소품도 shot 이미지 생성 시 참조 · 소품도 한 장 · 중요한 소품만") — 순수 규칙.
-//   소품 = props 행 — 어디서 왔든(출처는 prop-source.ts, 지금은 Producer 사물 카드 · 1단계 리드 결정 1) 같은 규칙으로 읽는다. 출처 칸으로 거르지 않는다.
+//   소품 = props 행 — 어디서 왔든(출처는 prop-source.ts, 지금은 [만들기] 때 AI 가 이야기에서 고른 것 + Producer 사물 · 오너 E5) 같은 규칙으로 읽는다. 출처 칸으로 거르지 않는다.
 //   어느 씬 · 샷에 나오는지: 씬 등장 목록(scenes.characters_present)에 그 id, 샷 소품 칸(static_spec.prop_placement[].prop)에 그 id 나 이름.
 //   서버(실사 참고 그림)와 화면(카드)이 같은 규칙을 쓴다 — 서버 전용 의존성 금지. 약속: tests/artist/prop-cards.test.ts
 import type { PropAsset } from '@/types/asset'
