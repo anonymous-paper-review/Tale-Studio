@@ -217,6 +217,29 @@ const END_FROM_DIRECTION_PROMPT =
 export type RoughFrameKey = 'start' | 'direction' | 'end'
 export const ROUGH_FRAME_KEYS: readonly RoughFrameKey[] = ['start', 'direction', 'end']
 
+/** 한 장 다시 그리기에 보내는 것 — 그림 AI · 문장 · 참고 그림 · 실제로 싣는 사용자 글(내용 검사 대상). */
+export interface FramePlan {
+  model: string
+  prompt: string
+  refs: string[]
+  userText: string | null
+}
+
+// 끝 장을 그리는 방식(D10, 2026-11-22). 오너가 비교 보드(지금 · ① 시작+고친 가운데 · ② 읽은 줄 · ②′ 읽은 줄+Grok)를 보고
+//   고를 때까지 지금 방식이다. 'direction-only' = 고친 가운데 장 한 장 + 정해진 문장(Grok). 바꿀 때는 여기만 바꾼다 —
+//   물음의 [다시 그리기] · [이 장만 다시 만들기](끝) · 옛 regenerate-end 요청이 모두 endFramePlan 을 거친다.
+//   어느 방식이든 샷 설계의 옛 움직임 글(행동 글 · 카메라 무브)은 받지 않는다 — 고친 화살표와 다툰다. 약속: tests/writer/end-frame-plan.test.ts
+export type EndFrameMethod = 'direction-only'
+export const END_FRAME_METHOD: EndFrameMethod = 'direction-only'
+const END_FRAME_PLANS: Record<EndFrameMethod, (frames: NonNullable<RoughJson['frames']>) => FramePlan> = {
+  'direction-only': (frames) => ({ model: GROK_EDIT_MODEL, prompt: END_FROM_DIRECTION_PROMPT, refs: [frames.direction!], userText: null }),
+}
+
+/** 순수: 끝 장 그리기 계획 — END_FRAME_METHOD 가 정한 방식대로. */
+export function endFramePlan(frames: NonNullable<RoughJson['frames']>, method: EndFrameMethod = END_FRAME_METHOD): FramePlan {
+  return END_FRAME_PLANS[method](frames)
+}
+
 // 약속 I(2026-09-04): 3장 중 한 장만 다시 그린다 — 나머지 두 장은 손대지 않는다.
 //   start: DIRECTING 을 참조로 "움직임이 시작되기 전" · end: "움직임이 끝난 뒤" · direction: START 를 참조로 화살표를 그린다.
 //   direction 은 시트처럼 START 와 같은 순간을 그대로 두고 화살표 · 움직임 선 · 짧은 메모만 얹는다(2026-11-14).
@@ -298,13 +321,12 @@ export async function directionMaterialFrom(
   return { action, camera }
 }
 
-/** 한 장 다시 그리기 프롬프트 · 참조 그림 · 실제로 싣는 사용자 글(내용 검사 대상). 시작 · 끝에는 사용자 글이 없다. */
+/** 시작 · 연출 장 다시 그리기 프롬프트 · 참조 그림 · 실제로 싣는 사용자 글(내용 검사 대상). 시작에는 사용자 글이 없다. 끝 장은 endFramePlan. */
 export function promptForFrame(
-  frame: RoughFrameKey,
+  frame: Exclude<RoughFrameKey, 'end'>,
   action: string | null,
   camera: string | null = null,
 ): { prompt: string; refs: (f: NonNullable<RoughJson['frames']>) => string[]; userText: string | null } {
-  if (frame === 'end') return { prompt: END_FROM_DIRECTION_PROMPT, refs: (f) => [f.direction!], userText: null }
   if (frame === 'start') return { prompt: START_FROM_DIRECTION_PROMPT, refs: (f) => [f.direction!], userText: null }
   const userText = action ? movementSentence(action) || null : null
   const marks = [userText, camera].filter(Boolean).join('; ')
@@ -380,16 +402,21 @@ export async function regenerateRoughFrame(
       data?.dynamic_spec ?? null,
     )
   }
-  const { prompt, refs, userText } = promptForFrame(frame, material.action, material.camera)
+  // 끝 장은 END_FRAME_METHOD 가 정한 방식으로(D10) — 시작 · 연출 장은 지금처럼 Grok 한 장.
+  const plan: FramePlan = (() => {
+    if (frame === 'end') return endFramePlan(rb.frames)
+    const { prompt, refs, userText } = promptForFrame(frame, material.action, material.camera)
+    return { model: GROK_EDIT_MODEL, prompt, refs: refs(rb.frames), userText }
+  })()
   // #creem-moderation(2026-10-11): 자리 예약 전에 검사한다 — DIRECTING 재생성에만 실리는 사용자
   //   액션 설명이 검사 대상이고, 프레임 지시문(START/END/DIRECTION 템플릿)은 우리 문구라 보내지 않는다.
   //   검사는 실제로 싣는 글(영어 파생 · 손질한 것)로 한다(2026-11-14 검토 a 1).
-  const moderation = await assertUserTextAllowed([userText], { projectId, kind: 'image_generation' })
+  const moderation = await assertUserTextAllowed([plan.userText], { projectId, kind: 'image_generation' })
   const result = await generateReservedImage(
     {
-      model: GROK_EDIT_MODEL,
-      prompt,
-      reference_image_urls: refs(rb.frames),
+      model: plan.model,
+      prompt: plan.prompt,
+      reference_image_urls: plan.refs,
       moderation,
     },
     { projectId },

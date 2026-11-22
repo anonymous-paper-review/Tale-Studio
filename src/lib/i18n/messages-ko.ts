@@ -683,6 +683,10 @@ export const KO: Record<string, string> = {
   Save: '저장',
   'Redraw the END frame based on the saved DIRECTING frame (1 image generation)': '저장한 DIRECTING 프레임을 기준으로 END 프레임을 다시 그려요 (이미지 생성 1회)',
   'Save, then regenerate END': '저장 후 END 재생성',
+  // 가운데 장 저장 뒤 끝 장 물음(D10 · 2026-11-22)
+  'Redraw the end frame to match these arrows?': '끝 장도 이 화살표대로 다시 그릴까요?',
+  'The start and directing frames stay as they are. Only the end frame is redrawn.': '시작 · 연출 장은 그대로 두고 끝 장만 다시 그려요.',
+  'Could not redraw the end frame. It stays as it was.': '끝 장을 다시 그리지 못했어요. 끝 장은 그대로예요.',
   // ── writer 스테이지: add-item-dialog ──
   'Low angle (looking up)': '로우앵글 (아래에서 위로)',
   'Eye level': '아이레벨 (눈높이)',
