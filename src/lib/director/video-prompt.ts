@@ -2,7 +2,8 @@ import { cameraToText } from '@/lib/director/camera-text'
 import { compileMotionContract, type MotionContract } from '@/lib/director/motion-contract'
 import { findCameraBrand, findCameraMovement } from '@/lib/knowledge'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
-import { planModelImageRoles, type ModelImageRolePlan, type VideoModelKey } from '@/lib/video-models'
+import { VIDEO_MODELS, planModelImageRoles, type ModelImageRolePlan, type VideoModelKey } from '@/lib/video-models'
+import type { StartMiddleSource, VideoMode } from '@/lib/director/video-modes'
 import type { CameraConfig, CameraPreset, GenerationMethod } from '@/types'
 
 export type VideoPromptParts = {
@@ -19,9 +20,11 @@ export type VideoPromptParts = {
   /** #u17-3: 레퍼런스 권위 절 — I2V 에서 텍스트↔레퍼런스 상충 시 레퍼런스가 이긴다. */
   referenceAuthority?: string
   referenceRoles?: string
+  /** 영상 만드는 방식 문장(2026-11-22 D2~D5) — 기본(시작+끝)이면 없다. */
+  videoMode?: string
 }
 
-export type VideoReferenceImageRole = 'start' | 'end' | 'ref'
+export type VideoReferenceImageRole = 'start' | 'end' | 'ref' | 'direction'
 
 export type BuildVideoPromptInput = {
   prompt: string
@@ -46,6 +49,12 @@ export type BuildVideoPromptInput = {
   dialogueSpeakers?: Record<string, DialogueSpeaker> | null
   /** #camera-motivation(2026-09-07): 카메라 동기의 대상 id → 이름. 계약문의 "Purpose" 절이 이름을 쓴다. */
   characterNames?: Record<string, string> | null
+  /** 영상 만드는 방식(오너 2026-11-22 D2~D5) — 없거나 'start_end' 면 지금 글 그대로. */
+  videoMode?: VideoMode | null
+  /** ② 레퍼런스 그림의 이름(그림 순서와 같다) — "image 2 = character sheet: Mina". */
+  referenceLabels?: string[] | null
+  /** ③ 미들 출처 — 러프 스케치와 실사 가운데 장을 다르게 부른다. */
+  middleSource?: StartMiddleSource | null
 }
 
 function referenceRolesClause(roles: VideoReferenceImageRole[]): string {
@@ -85,6 +94,60 @@ function frameSlotRolesClause(plan: ModelImageRolePlan): string {
     .join(', ')
   const refs = plan.imageRoles.includes('ref') ? ' REF images are style/character references, not temporal keyframes.' : ''
   return [frames, order ? `Reference images: ${order}.${refs}` : ''].filter(Boolean).join(' ')
+}
+
+/**
+ * 방식 문장(오너 2026-11-22 D2~D5) — 그림 역할 · 방식 · "무엇이 진실인가" 세 조각. 첫 · 마지막 장면 칸이 있는 모델(Kling)은
+ *   시작을 "the given first frame", 참고 칸 그림을 "@Image1 …"로 부른다(그림 번호가 참고 칸 번호와 어긋나지 않게).
+ */
+function videoModeTail(input: {
+  mode: Exclude<VideoMode, 'start_end'>
+  roles: VideoReferenceImageRole[]
+  slotPlan: ModelImageRolePlan | null
+  labels: string[] | null
+  middleSource: StartMiddleSource | null
+  defaultAuthority: string
+}): { roles: string; mode: string; authority: string } {
+  const { mode, roles, slotPlan, labels, middleSource, defaultAuthority } = input
+  const slotted = slotPlan !== null
+  const first = slotted ? 'the given first frame' : 'image 1'
+  const First = slotted ? 'The given first frame' : 'Image 1'
+  const roleText = slotted ? frameSlotRolesClause(slotPlan) : referenceRolesClause(roles)
+  switch (mode) {
+    case 'continue':
+      return {
+        roles: roleText,
+        mode: `${First} is the last frame of the previous shot's video: begin exactly on it so the cut between the two shots is seamless — same positions, poses, lighting and framing in the first frame.`,
+        authority: defaultAuthority,
+      }
+    case 'start_prompt':
+      return {
+        roles: roleText,
+        mode: `There is no ${slotted ? 'last' : 'end'} frame: after starting exactly on ${first}, let this text decide how the shot moves and how it ends.`,
+        authority: defaultAuthority,
+      }
+    case 'start_middle': {
+      const sketch = slotted ? '@Image1' : 'image 2'
+      const Sketch = slotted ? '@Image1' : 'Image 2'
+      const what = middleSource === 'real'
+        ? 'the START frame overlaid with drawn DIRECTION arrows and labels'
+        : 'a hand-drawn DIRECTION sketch'
+      return {
+        roles: roleText,
+        mode: `${Sketch} is ${what}, not a frame of the video: its arrows, dashed paths and handwritten labels only show the intended camera and subject movement. Perform that movement starting from ${first}. Never draw arrows, lines, labels, text, pencil texture or wooden mannequins from ${sketch} in the video. If this text and the sketch disagree about the movement, follow the sketch.`,
+        authority: `${First} is the visual ground truth — match its lighting, color temperature, wardrobe, set dressing and framing exactly; wherever this text description differs from ${first}, follow ${first}.`,
+      }
+    }
+    case 'reference': {
+      const tag = (index: number) => (slotted ? `@Image${index + 1}` : `image ${index + 1}`)
+      const named = roles.map((_, index) => `${tag(index)} = ${labels?.[index] ?? 'REF'}`).join(', ')
+      return {
+        roles: `Reference images (references only — not frames of this video): ${named}.`,
+        mode: `Keep each person's face, hair and outfit, the location and the props consistent with these references, but compose the shot from this text: no reference image is the first or last frame, and never reproduce a character sheet's white background, multiple poses or layout.`,
+        authority: '',
+      }
+    }
+  }
 }
 
 /** 대사 화자(characters 테이블에서 해석). appearance 는 시각 앵커 재료로 일부만 쓰인다. */
@@ -158,7 +221,7 @@ export function dialogueClause(
 }
 
 export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: string; prompt_parts: VideoPromptParts } {
-  const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, referenceImageRoles, dynamicSpec, dialogueLines, dialogueSpeakers, characterNames } = parts
+  const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, referenceImageRoles, dynamicSpec, dialogueLines, dialogueSpeakers, characterNames, videoMode, referenceLabels, middleSource } = parts
   const contract: MotionContract = compileMotionContract(dynamicSpec, durationSeconds, {
     names: characterNames ? new Map(Object.entries(characterNames)) : null,
   })
@@ -188,7 +251,26 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   //   "이 그림을 다시 그려라"(레퍼런스 권위)인데 영상만 텍스트 권위였던 배선 비대칭의 교정.
   const referenceAuthority = `The reference images are the visual ground truth — match their lighting, color temperature, wardrobe, set dressing and framing exactly; wherever this text description differs from the reference images, follow the references.`
 
-  if (referenceImageRoles?.length && generationMethod === 'I2V') {
+  const modeForTail = videoMode && videoMode !== 'start_end' ? videoMode : null
+  if (referenceImageRoles?.length && generationMethod === 'I2V' && modeForTail) {
+    // 방식 문장(2026-11-22): 역할 · 방식 · 진실 세 조각을 뒤에 붙인다. 글 상한이 있는 모델(Kling · Happy Horse 2500자)은
+    //   넘치면 앞 글(샷 글)부터 잘라 방식 문장이 잘려 사라지지 않게 한다.
+    const tail = videoModeTail({
+      mode: modeForTail,
+      roles: referenceImageRoles,
+      slotPlan: planModelImageRoles(modelKey, referenceImageRoles),
+      labels: referenceLabels ?? null,
+      middleSource: middleSource ?? null,
+      defaultAuthority: referenceAuthority,
+    })
+    prompt_parts.referenceRoles = tail.roles
+    prompt_parts.videoMode = tail.mode
+    if (tail.authority) prompt_parts.referenceAuthority = tail.authority
+    const tailText = [tail.roles, tail.mode, tail.authority].filter(Boolean).join(' ')
+    const max = VIDEO_MODELS[modelKey].promptMaxChars
+    const head = max ? fullPrompt.slice(0, Math.max(0, max - tailText.length - 1)) : fullPrompt
+    fullPrompt = `${head} ${tailText}`
+  } else if (referenceImageRoles?.length && generationMethod === 'I2V') {
     const slotPlan = planModelImageRoles(modelKey, referenceImageRoles)
     const roleInstruction = slotPlan ? frameSlotRolesClause(slotPlan) : referenceRolesClause(referenceImageRoles)
     prompt_parts.referenceRoles = roleInstruction

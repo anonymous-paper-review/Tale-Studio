@@ -10,6 +10,8 @@
 //   - 픽셀을 읽을 수 없는 화면(오래된 브라우저 · 시험용 가짜 캔버스)은 검은 화면 검사를 건너뛴다 — 지금 동작 그대로.
 //   - 잡은 그림은 잡은 시각(밀리초)을 이름에 붙여 올린다(upload-image) — 같은 앞 작업에서 다시 잡아도 덮어쓰기 거절이 나지 않게.
 
+import type { ContinueFrom } from '@/lib/director/video-modes'
+
 export const CONTINUATION_FRAME_LEAD_SEC = 0.15
 export const CONTINUATION_RETRY_STEP_SEC = 0.25
 export const CONTINUATION_RETRIES = 4
@@ -186,13 +188,6 @@ export async function uploadContinuationFrame(input: {
   } catch {
     return null
   }
-}
-
-/** 이어서 요청에 실을 출처(영상 제출의 continueFrom) — 앞 Take · 그 영상을 낸 작업 · 잡은 장면 주소. */
-export interface ContinueFrom {
-  videoClipId: string
-  generationJobId: string
-  frameUrl: string
 }
 
 export type PrepareContinueFromResult =

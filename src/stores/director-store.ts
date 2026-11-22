@@ -130,6 +130,7 @@ import {
   usableFrameImageUrl,
 } from '@/lib/director/video-frame-inputs'
 import { prepareContinueFrom } from '@/lib/director/video-frame-capture'
+import { isVideoMode, takeOverrideForRequest, videoModeForRequest } from '@/lib/director/video-modes'
 
 // ============================================================================
 // Defaults
@@ -240,6 +241,8 @@ type HydratedVideoTake = {
   video_resolution?: string | null
   /** 지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소(디자이너 11/13 D7 · 리드 B). 모르면 null. */
   made_frames?: unknown
+  /** 지금 영상을 낸 작업의 방식(fb-video 2026-11-22). 모르면 null. */
+  made_video_mode?: unknown
   /** 그 Take 의 마지막 작업을 화면에서 멈춘 때(오너 2026-11-14 7번). 없으면 멈추지 않음. */
   cancelled_at?: string | null
 }
@@ -1559,9 +1562,11 @@ export function videoLimitRefusal(): { shotNodeId: string } | null {
 /** 테이크 목록의 made_frames(지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소) — 모양이 다르면 모른다(null). */
 function parseMadeFrames(value: unknown): VideoNodeData['madeFrames'] {
   if (!value || typeof value !== 'object') return null
-  const { start, end } = value as { start?: unknown; end?: unknown }
+  const { start, end, middle } = value as { start?: unknown; end?: unknown; middle?: unknown }
   const text = (v: unknown) => (typeof v === 'string' && v ? v : null)
-  return text(start) || text(end) ? { start: text(start), end: text(end) } : null
+  // 미들(③ 시작+미들, fb-video 2026-11-22)은 있을 때만 싣는다.
+  if (!text(start) && !text(end) && !text(middle)) return null
+  return text(middle) ? { start: text(start), end: text(end), middle: text(middle) } : { start: text(start), end: text(end) }
 }
 
 function videoOwnerKey(data: VideoNodeData): string {
@@ -2154,6 +2159,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     // 지금 영상을 낸 작업이 쓴 그림(리드 B) — 해상도와 같은 규칙: 서버가 모를 때도 같은 영상이면 아는 값을 둔다.
                     madeFrames: parseMadeFrames(row.made_frames)
                       ?? (row.url && row.url === existingNode.data.videoUrl ? existingNode.data.madeFrames ?? null : null),
+                    madeVideoMode: isVideoMode(row.made_video_mode)
+                      ? row.made_video_mode
+                      : (row.url && row.url === existingNode.data.videoUrl ? existingNode.data.madeVideoMode ?? null : null),
                     // 화면에서 멈춘 Take(오너 7번) — 서버가 마지막 작업의 멈춤으로 정한다. 방금 멈춰 서버가 아직 모르면 아는 값을 둔다.
                     cancelledAt: typeof row.cancelled_at === 'string'
                       ? row.cancelled_at
@@ -2194,6 +2202,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               data.adherence = (row.adherence as VideoAdherence | null) ?? null
               data.videoResolution = isVideoResolution(row.video_resolution) ? row.video_resolution : null
               data.madeFrames = parseMadeFrames(row.made_frames)
+              data.madeVideoMode = isVideoMode(row.made_video_mode) ? row.made_video_mode : null
               data.cancelledAt = typeof row.cancelled_at === 'string' ? row.cancelled_at : null
               const id = newDirectorId('dn')
               nodes = [...nodes, {
@@ -4842,6 +4851,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // 샷 Take 의 모델 · 해상도는 [다시 만들기] 단추 값과 같은 함수(takeSettings)로 정한다 — 요청이 따로 세면
         //   한쪽만 바뀌는 날 단추에 적은 Take 값과 실제 요청이 갈라진다(리드 검토 a). 독립 영상은 지금처럼 자기 설정.
         const shotTake = shotNode && isShotData(shotNode.data) ? takeSettings(shotNode.data, videoNode.data) : null
+        // 영상 만드는 방식(fb-video 2026-11-22 D2~D5): Take 에 적힌 방식을 싣는다 — 노드에서 손으로 이은 그림이 있으면 손 배선이 이긴다.
+        //   이어서는 기록된 출처를 그대로 싣는다(앞 샷 영상이 그대로인지는 서버가 본다).
+        const videoMode = shotNode ? videoModeForRequest(videoNode.data.override as VideoOverride, !!chainFrameUrl || hasManualFrameInputs) : undefined
+        const continueFrom = videoMode === 'continue' ? (videoNode.data.override as VideoOverride).continueFrom : undefined
         const requestPayload = {
           projectId,
           ...(shotNode && isShotData(shotNode.data)
@@ -4873,6 +4886,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           frameSource: chainFrameUrl || hasManualFrameInputs ? 'manual' : 'auto',
           ...(referenceImageUrls ? { referenceImageUrls } : {}),
           ...(referenceImageUrls && referenceImageRoles ? { referenceImageRoles } : {}),
+          ...(videoMode ? { videoMode } : {}),
+          ...(continueFrom ? { continueFrom } : {}),
           ...(options?.traceId ? { traceId: options.traceId, actor: 'chat' } : {}),
           ...(shotTake
             ? {
@@ -4880,7 +4895,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 resolution: shotTake.resolution,
                 // 아직 저장 전인 새 테이크는 이 노드의 설정(override)도 보낸다 — 리테이크가 물려받은 해상도 · 모델이
                 //   서버 테이크에도 남아, 다시 읽어 와도 같은 설정으로 보인다(#retake-inherit 의 상속을 DB 까지).
-                ...(videoNode.data.videoClipId ? {} : { override: videoNode.data.override }),
+                ...(videoNode.data.videoClipId ? {} : { override: takeOverrideForRequest(videoNode.data.override, videoMode) }),
               }
             : {}),
         }

@@ -66,6 +66,8 @@ export interface VideoModelSpec {
   frameSlots?: { start: 'start_image_url'; end: 'end_image_url' }
   /** 받는 화면비 — 있으면 이 목록 밖의 값은 보내지 않는다(모델 기본값). 없으면 늘 보낸다(지금 동작). */
   aspectRatios?: readonly string[]
+  /** 글 상한(fal 스키마 11/22: Kling O3 · Happy Horse 2500자). 방식 문장이 붙어 넘치면 앞 글부터 자른다(video-prompt). */
+  promptMaxChars?: number
 }
 
 /**
@@ -101,6 +103,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.14,
     maxImageUrls: 9,
+    promptMaxChars: 2500,
   },
   seedance: {
     key: 'seedance',
@@ -146,6 +149,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     maxImageUrls: 4,
     frameSlots: { start: 'start_image_url', end: 'end_image_url' },
     aspectRatios: ['16:9', '9:16', '1:1'],
+    promptMaxChars: 2500,
   },
   veo: {
     key: 'veo',
