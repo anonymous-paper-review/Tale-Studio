@@ -78,4 +78,15 @@ describe('Artist 채팅의 콘티 넘김', () => {
     expect(nav.handoffToStage).not.toHaveBeenCalled()
     expect(lastModel()).toContain('다시 만드는 그림을 다 그린 뒤에 완료할 수 있어요')
   })
+
+  it('씬 · 샷을 아직 나누는 중이어도 [완료하기]처럼 채팅 넘김이 된다 — 옛 Director 준비 검사로 막지 않는다', async () => {
+    // 왜(리드 2026-11-22 결정): [완료하기]는 씬 · 샷 나누기가 끝나기 전에도 콘티를 연다(나머지는 콘티에서 이어 만들고 그동안 잠금 표시, 10/20).
+    //   채팅에만 남아 있던 옛 Director 준비 검사("씬과 샷을 아직 준비 중")로 막으면 단추는 되는데 채팅은 안 되는 엇갈림이 생긴다.
+    useProjectStore.setState({
+      lifecycleStatus: { ...EMPTY_LIFECYCLE_STATUS, director: { ready: false, blockers: [{ field: 'writer:active', label: '씬과 샷을 아직 준비하고 있어요.' }], warnings: [] } },
+    })
+    await useGlobalChatStore.getState().sendMessage('콘티로 넘겨줘')
+    expect(completeCalls).toHaveLength(1)
+    expect(nav.handoffToStage).toHaveBeenCalledWith('writer')
+  })
 })
