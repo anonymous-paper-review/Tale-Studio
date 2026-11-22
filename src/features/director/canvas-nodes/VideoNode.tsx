@@ -14,7 +14,7 @@ import {
   useDirectorCanvasStore,
 } from '@/stores/director-store'
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
-import { directorNodeLabel, prettyNodeLabel } from '@/features/director/node-label'
+import { directorNodeLabel, prettyNodeLabel, realMentionLabel } from '@/features/director/node-label'
 import { announcingVideoId, nextInLineNote, pendingShotNames, requestedVideoSeconds } from '@/features/director/video-wait'
 import { VideoLengthChip } from '@/features/director/video-length-chip'
 import { STAGE_PERSONA } from '@/lib/lumi'
@@ -276,6 +276,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       id={id}
       theme="video"
       title={parentShotTitle ?? data.label}
+      // ⌘/Ctrl+클릭 멘션(오너 D9) — Director 채팅은 샷 번호로 부르므로 그 샷의 "실사 샷 N". 샷 없는 영상은 멘션하지 않는다.
+      mention={parentShotId && parentShotTitle ? realMentionLabel('shot', parentShotId, parentShotTitle, boardNames.locale) : null}
       selected={detailOpen}
       picked={picked}
       width={240}

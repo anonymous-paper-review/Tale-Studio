@@ -56,12 +56,13 @@ export const useCurrentSceneStore = create<CurrentSceneState>()(
 /**
  * 이 화면이 지금 보는 씬. keys = 씬 열쇠(씬 순서). preferred = 처음 여는 프로젝트에서 먼저 보여 줄 씬(없으면 첫 씬).
  * setSceneKey 는 기억에 쓴다 — 같은 프로젝트를 여는 다른 화면(Director · Camera)도 그 씬으로 연다.
+ * remembered = 이 프로젝트에 기억된 값 그대로(없으면 undefined) — 화면이 보인 씬을 언제 기억에 쓸지 정할 때 본다.
  */
 export function useCurrentScene(
   projectId: string | null | undefined,
   keys: readonly string[],
   preferred?: string | null,
-): { sceneKey: string | null; setSceneKey: (sceneKey: string) => void } {
+): { sceneKey: string | null; setSceneKey: (sceneKey: string) => void; remembered: string | undefined } {
   const remembered = useCurrentSceneStore((s) => (usableProject(projectId) ? s.sceneByProject[projectId] : undefined))
   const setCurrentScene = useCurrentSceneStore((s) => s.setCurrentScene)
   const setSceneKey = useCallback(
@@ -70,5 +71,5 @@ export function useCurrentScene(
     },
     [projectId, setCurrentScene],
   )
-  return { sceneKey: resolveCurrentScene(keys, remembered, preferred), setSceneKey }
+  return { sceneKey: resolveCurrentScene(keys, remembered, preferred), setSceneKey, remembered }
 }

@@ -10,7 +10,12 @@ import { useT } from '@/lib/i18n'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { editActionForKind } from '@/features/director/canvas-interaction'
 import { prettyNodeLabel } from '@/features/director/node-label'
+import { SceneLinkChips } from '@/features/director/scene-links'
 import { useLocaleStore } from '@/stores/locale-store'
+import { useChatUiStore } from '@/stores/chat-ui-store'
+import { useModifierHeld } from '@/hooks/use-modifier-held'
+import { isMentionModifierClick } from '@/lib/card-mention'
+import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 
 
 type Theme = 'scene' | 'shot' | 'video'
@@ -58,6 +63,8 @@ type BaseNodeProps = {
   dimmed?: boolean
   /** 고른 샷(시안 D2 · R "몸통 = 고르기, 흰 테두리") — 상태 색보다 앞선다. */
   picked?: boolean
+  /** ⌘/Ctrl+클릭 때 채팅 입력칸에 넣을 @이름(오너 D9 2026-11-22). 없으면 멘션하지 않는다. */
+  mention?: string | null
 }
 
 function BaseNodeImpl({
@@ -79,8 +86,11 @@ function BaseNodeImpl({
   stateFrame = null,
   dimmed = false,
   picked = false,
+  mention = null,
 }: BaseNodeProps) {
   const t = useT()
+  // ⌘/Ctrl 을 누르고 있으면 멘션되는 카드 위에서 복사 커서(Producer 카드와 같은 신호, 혼자 정한 것 h21).
+  const armed = useModifierHeld()
   // 남은 원래 id(take_v1 · sh_02_07)를 이름으로 바꿀 때도 화면 언어(오너 2026-11-14 답 7).
   const locale = useLocaleStore((s) => s.locale)
   const openPopup = useDirectorCanvasStore((s) => s.openPopup)
@@ -120,9 +130,27 @@ function BaseNodeImpl({
           ? 'border-foreground'
           : stateFrame && !strongStale && !selected ? stateFrame : nodeFrameBorder({ strongStale, selected }),
         dimmed && 'opacity-30',
+        armed && mention && 'cursor-copy',
       )}
       style={width ? { width: `${width}px` } : undefined}
+      // ⌘/Ctrl+클릭 = 채팅 @멘션(오너 D9, #b5 "⌘/Ctrl 클릭은 멘션 전용") — 캡처 단계에서 끊어 샷 고르기 · 캔버스 여러 개 선택 · 끌기가 같이 일어나지 않게 한다.
+      //   비행 방향은 입력칸 글이 진실(#b2) — 토글 전에 본다. Producer readiness-board 와 같은 길.
+      onPointerDownCapture={(event) => {
+        if (!mention || !isMentionModifierClick(event)) return
+        event.preventDefault()
+        event.stopPropagation()
+      }}
+      onClickCapture={(event) => {
+        if (!mention || !isMentionModifierClick(event)) return
+        event.preventDefault()
+        event.stopPropagation()
+        const removing = chatInputHasMention(mention)
+        useChatUiStore.getState().requestMentionToggle(mention)
+        launchMentionFlight({ label: mention, clickX: event.clientX, clickY: event.clientY, toChat: !removing })
+      }}
     >
+      {/* 다른 씬 카드와 이어진 선의 꼬리표(씬별 보기, 혼자 정한 것 h9) — 카드 위쪽에. */}
+      <SceneLinkChips nodeId={id} />
       {/* 생성 중 — 테두리를 도는 색 빛(#e5). 이미지=초록(success), 영상=빨강(primary). */}
       {beam && (
         <span

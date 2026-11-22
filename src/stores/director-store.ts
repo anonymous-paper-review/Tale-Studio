@@ -74,7 +74,10 @@ import {
   type StableWiringRef,
 } from '@/lib/director/wiring-persistence'
 import { runVideoAdherence } from '@/lib/director/video-adherence-client'
-import { markJobsCancelled, refreshGenerationQueue } from '@/lib/generation-queue'
+import { activeShotIds, markJobsCancelled, refreshGenerationQueue, type ActiveJob } from '@/lib/generation-queue'
+import { orderedScenes } from '@/features/director/scene-view'
+import { resolveCurrentScene } from '@/lib/current-scene'
+import { useCurrentSceneStore } from '@/stores/current-scene-store'
 import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
 import { isDemoSession } from '@/lib/demo/context'
 import {
@@ -92,6 +95,7 @@ import { useWriterStore } from '@/stores/writer-store'
 import type { AppLocale } from '@/lib/locale'
 import {
   arrangeDirectorCanvas,
+  arrangeSceneGroup,
   ASSET_TO_SHOT_GAP,
   newShotPosition,
   newTakePosition,
@@ -1190,8 +1194,12 @@ interface DirectorCanvasState {
   arrangePending: boolean
   /** 기다리는 정렬이 "처음 들어갔을 때"의 것이면 true(오너 2026-11-16): 되돌리기 기록에 안 남기고, 화면이 정렬 뒤 첫 화면을 다시 맞춘다. relayoutCanvas · 프로젝트 바꿈이 끈다. */
   arrangeFirstEntry: boolean
-  /** [자동 정렬] 요청. 처음 들어갔을 때의 정렬은 { firstEntry: true }(use-writer-director-sync). 단추는 인자 없이 부른다. */
-  requestArrange: (options?: { firstEntry?: boolean }) => void
+  /** 씬 보기의 [자동 정렬]이 정리할 씬 노드(오너 D8 · 혼자 정한 것 h13). null = 모든 씬(처음 들어갔을 때의 정렬 · 씬이 없는 캔버스). relayoutCanvas · 프로젝트 바꿈이 비운다. */
+  arrangeSceneNodeId: string | null
+  /** [자동 정렬] 요청. 처음 들어갔을 때의 정렬은 { firstEntry: true }(use-writer-director-sync), 씬 보기의 단추는 { sceneNodeId }(그 씬만). */
+  requestArrange: (options?: { firstEntry?: boolean; sceneNodeId?: string | null }) => void
+  /** 처음 여는 프로젝트에서 먼저 보여 줄 씬의 단서(혼자 정한 것 h2) — 만드는 중인 Writer 샷 id. settled = 확인을 마쳤다(그 뒤로 화면이 지금 씬을 기억에 쓴다). 저장하지 않는다. */
+  firstEntrySceneHint: { shotIds: string[]; settled: boolean }
   /** 진입 시 DB → 캔버스 hydrate. canvas_position 적용 + 누락 Video 노드 생성 (DB가 진실) */
   hydrateFromDb: (projectId: string) => Promise<void>
 
@@ -1652,49 +1660,45 @@ const initialNodes: DirectorNode[] = []
 const initialEdges: DirectorEdge[] = []
 
 /**
- * 프로젝트를 이 브라우저에서 **처음 열 때**, 만들고 있는 게 있으면 그 결과가 보이는 화면으로 연다.
+ * 프로젝트를 이 브라우저에서 **처음 열 때**, 만들고 있는 게 있으면 그 결과가 보이는 씬으로 연다.
  *
  * 호출부가 "처음 보는 프로젝트" 가지 안에만 있다(#view-first-entry-only 2026-09-08 오너 판정).
- *   재진입(새로고침 포함)에서는 부르지 않는다 — 배선 작업 중 새로고침하면 하던 화면을 잃었기 때문.
+ *   재진입(새로고침 포함)에서는 부르지 않는다 — 하던 화면을 잃지 않게.
  *   판별은 #first-entry-node 가 쓰는 viewportInitializedProjects 를 그대로 쓴다.
+ *
+ * 오너 D2~D5 · D8(2026-11-22): Director 에 스토리보드 보기가 없어지고 노드 보기가 씬별이 됐다 — 예전에는 스토리보드(실사 · 러프) 보기로 바꿨고,
+ *   이제는 만드는 중인 샷(실사 · 러프 · 영상)의 Writer 샷 id 를 단서로 남긴다. 화면이 그 샷의 씬을 먼저 보인다(지금 보는 씬 기억이 없을 때만,
+ *   features/director/scene-view preferredSceneKey). 확인을 마치면(실패해도) settled — 그 뒤로 화면이 보인 씬을 기억에 쓴다.
  *
  * shot_previz_video 는 목록에 없다(도입 시부터). 의도인지 누락인지 확인되지 않았다.
  */
+const FIRST_ENTRY_SCENE_JOB_KINDS = ['storyboard_real_grid', 'shot_storyboard', 'shot_video', 'shot_rough_storyboard'] as const
+
 async function restoreActiveGenerationView(projectId: string): Promise<void> {
-  if (typeof window === 'undefined' || !projectId || projectId === 'default') return
+  const settle = (shotIds: string[]) => {
+    if (useDirectorCanvasStore.getState().projectId !== projectId) return
+    useDirectorCanvasStore.setState({ firstEntrySceneHint: { shotIds, settled: true } })
+  }
+  if (typeof window === 'undefined' || !projectId || projectId === 'default') return settle([])
   try {
     const response = await fetch(
       `/api/generation/active?projectId=${encodeURIComponent(projectId)}`,
     )
-    if (!response.ok) return
+    if (!response.ok) return settle([])
     const body: unknown = await response.json()
     const rawJobs =
       body && typeof body === 'object' && (body as { data?: unknown }).data
         ? (body as { data: { jobs?: unknown } }).data.jobs
         : null
-    if (!Array.isArray(rawJobs)) return
-    const kinds = new Set(
-      rawJobs
-        .filter(
-          (job): job is { kind: string } =>
-            !!job &&
-            typeof job === 'object' &&
-            typeof (job as { kind?: unknown }).kind === 'string',
-        )
-        .map((job) => job.kind),
+    if (!Array.isArray(rawJobs)) return settle([])
+    const jobs = rawJobs.filter(
+      (job): job is ActiveJob =>
+        !!job && typeof job === 'object' && typeof (job as { kind?: unknown }).kind === 'string',
     )
-    const real =
-      kinds.has('storyboard_real_grid') ||
-      kinds.has('shot_storyboard') ||
-      kinds.has('shot_video')
-    const previz = kinds.has('shot_rough_storyboard')
-    if (!real && !previz) return
-    const current = useDirectorCanvasStore.getState()
-    if (current.projectId !== projectId) return
-    current.setViewMode('storyboard')
-    current.setStoryboardMediaMode(real ? 'real' : 'previz')
+    settle([...activeShotIds(jobs, FIRST_ENTRY_SCENE_JOB_KINDS)])
   } catch {
-    // 진행 상태 조회 실패는 마지막 탭 복원을 방해하지 않는다.
+    // 진행 상태 조회 실패는 씬 열기를 막지 않는다 — 첫 씬으로 연다.
+    settle([])
   }
 }
 
@@ -1743,6 +1747,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       generationErrors: {},
       playingNodeId: null,
       showUnusedAssets: false,
+      firstEntrySceneHint: { shotIds: [], settled: true },
       historyPast: [],
       historyFuture: [],
       _historySuppressed: false,
@@ -1797,6 +1802,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             showUnusedAssets: false,
             arrangePending: false,
             arrangeFirstEntry: false,
+            arrangeSceneNodeId: null,
+            // 처음 보는 프로젝트면 만드는 중인 샷을 확인할 때까지 지금 씬을 기억에 쓰지 않는다(아래 restoreActiveGenerationView).
+            firstEntrySceneHint: { shotIds: [], settled: viewportInitializedProjects[projectId] === true },
             historyPast: [],
             historyFuture: [],
             lastSavedAt: Date.now(),
@@ -1878,18 +1886,25 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       //   in-memory 즉시 적용 + 씬 · 샷 · 영상은 nodeId별 persist로 DB(canvas_position) 반영(재진입 유지). 에셋 자리는 DB 에 없다.
       arrangePending: false,
       arrangeFirstEntry: false,
+      arrangeSceneNodeId: null,
       requestArrange: (options) =>
         set((s) => ({
           arrangePending: true,
           // 사람이 누른 [자동 정렬]이 이미 기다리는 중이면 처음 정렬로 바꾸지 않는다: 단추 정렬은 되돌리기 기록이 남아야 한다(리뷰 s11 낮음 1).
           arrangeFirstEntry: options?.firstEntry === true && !(s.arrangePending && !s.arrangeFirstEntry),
+          // 씬 보기의 단추는 그 씬만(h13). 처음 정렬을 기다리는 중이면 모든 씬 — 막 들어와 누른 단추가 다른 씬을 먼 간격으로 남기지 않게.
+          arrangeSceneNodeId: options?.firstEntry || (s.arrangePending && s.arrangeFirstEntry) ? null : options?.sceneNodeId ?? null,
         })),
 
       relayoutCanvas: () => {
         // 처음 들어갔을 때의 정렬은 동기화 셋업과 같은 시스템 변경이라 되돌리기 기록에 남기지 않는다(오너 2026-11-16). [자동 정렬] 단추는 남긴다.
         if (!get().arrangeFirstEntry) get().commitHistory()
         // 크기 셈(검토 C 3번): 지금 화면에 그린 카드는 DOM 크기, 화면 밖은 예전에 잰 크기와 넉넉한 크기 중 큰 값.
-        const posById = arrangeDirectorCanvas(get().nodes, canvasCardSizing())
+        //   씬 보기의 단추는 그 씬만 정리한다(h13, canvas-layout.arrangeSceneGroup) — 다른 씬은 배치 그대로(넓어지면 통째로 옆으로 밀 뿐).
+        const sceneNodeId = get().arrangeSceneNodeId
+        const posById = sceneNodeId
+          ? arrangeSceneGroup(get().nodes, sceneNodeId, canvasCardSizing())
+          : arrangeDirectorCanvas(get().nodes, canvasCardSizing())
         set((s) => ({
           nodes: s.nodes.map((n) => {
             const p = posById.get(n.id)
@@ -1898,6 +1913,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           lastSavedAt: Date.now(),
           arrangePending: false,
           arrangeFirstEntry: false,
+          arrangeSceneNodeId: null,
         }))
         for (const id of posById.keys()) {
           const node = get().nodes.find((n) => n.id === id)
@@ -5913,6 +5929,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           showUnusedAssets: false,
           arrangePending: false,
           arrangeFirstEntry: false,
+          arrangeSceneNodeId: null,
           historyPast: [],
           historyFuture: [],
           lastSavedAt: Date.now(),
@@ -6029,8 +6046,23 @@ export function nextScenePosition(
  * LLM prompt 컨텍스트용 캔버스 스냅샷 직렬화.
  * 통계 + Scene→Shot→Video 트리 + 선택된 노드의 풀 정보.
  */
+/** 채팅 글의 "지금 보는 씬" 한 줄. 프로젝트를 모르거나 씬이 없으면 null. */
+function currentSceneForContext(
+  state: Pick<DirectorCanvasState, 'nodes'> & { projectId?: string },
+  boardNames?: BoardNodeNames | null,
+): string | null {
+  const projectId = state.projectId
+  if (!projectId || projectId === 'default') return null
+  const scenes = orderedScenes(state.nodes, boardNames)
+  const key = resolveCurrentScene(scenes.map((entry) => entry.key), useCurrentSceneStore.getState().sceneByProject[projectId])
+  const scene = scenes.find((entry) => entry.key === key)
+  if (!scene || !isSceneData(scene.node.data)) return null
+  const name = directorBoardLabel(scene.node.data, boardNames) ?? prettyNodeLabel(scene.node.data.label, boardNames?.locale ?? 'en')
+  return `- The user is looking at [${scene.nodeId}] (board: ${name}) on the canvas. It shows only this scene's cards, so "this scene" means this scene.`
+}
+
 export function serializeDirectorCanvasContext(
-  state: Pick<DirectorCanvasState, 'nodes' | 'edges' | 'selectedNodeId'>,
+  state: Pick<DirectorCanvasState, 'nodes' | 'edges' | 'selectedNodeId'> & { projectId?: string },
   /** 보드 이름표 — 씬 · 샷에 보드 이름("Scene 2 · Shot 8")을 붙인다(오너 2026-11-02 "전체 번호로 통일"). Writer 스토어는 부르는 쪽이 읽는다. */
   boardNames?: BoardNodeNames | null,
   /** 샷마다 이미지(있음 · 그리는 중 · 없음) — 샷 줄에 붙인다(Lumi 가 이미지 없는 샷의 영상을 약속하지 않게, 리드 11/14 B3). 판정은 부르는 쪽(보드와 같은 근거). */
@@ -6062,6 +6094,9 @@ export function serializeDirectorCanvasContext(
     `- 노드 ${nodes.length}개 (Scene ${scenes.length}, Shot ${shots.length}, Video ${videos.length})`,
   )
   lines.push(`- ★ Final 마킹 Video ${finalVideos.length}개`)
+  // 지금 보는 씬(오너 D8 · 리드 11/22 답 e) — 노드 보기는 한 씬만 보인다. 화면과 같은 규칙(기억한 씬 > 첫 씬)으로 정한다.
+  const lookingAt = currentSceneForContext(state, boardNames)
+  if (lookingAt) lines.push(lookingAt)
   lines.push(
     `- 엣지 ${edges.length}개 (parent ${edges.filter((e) => e.data?.category === 'parent').length}, relates-to ${edges.filter((e) => e.data?.category === 'relates-to').length})`,
   )
