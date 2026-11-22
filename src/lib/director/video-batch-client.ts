@@ -11,6 +11,7 @@ import { notifyBatchSummary } from '@/lib/generation-notify'
 import { useLumiNoticeStore } from '@/stores/lumi-notice-store'
 import { notifyQuotaExceeded } from '@/lib/generation-quota-toast'
 import { buildVideoBatchInputs } from '@/lib/director/video-batch-inputs'
+import type { TakeVia } from '@/lib/director/video-modes'
 import type { VideoBatchStartResponse, VideoBatchSummary } from '@/lib/director/video-batch-types'
 import { videoBatchQueueOf } from '@/lib/director/video-batch-queue'
 import { invalidateShots } from '@/lib/shots-cache'
@@ -202,8 +203,9 @@ async function pollVideoBatch(
  */
 export async function runVideoBatch(
   projectId: string,
-  /** shotIds — 이 샷들만(그중 영상을 만들 수 있는 것만). 없으면 남은 샷 전부(오너 2026-11-14 9번 채팅 · 고른 샷). */
-  opts?: { onJob?: GenerationJobObserver; silent?: boolean; limit?: number; shotIds?: readonly string[] },
+  /** shotIds — 이 샷들만(그중 영상을 만들 수 있는 것만). 없으면 남은 샷 전부(오너 2026-11-14 9번 채팅 · 고른 샷).
+   *  takeNote — 새 Take 마다 적을 사람 말 · 만든 길(채팅으로 부탁한 일괄, 2026-11-22). 없으면 적지 않는다. */
+  opts?: { onJob?: GenerationJobObserver; silent?: boolean; limit?: number; shotIds?: readonly string[]; takeNote?: { note: string; via: TakeVia } },
 ): Promise<VideoBatchResult> {
   const store = useDirectorCanvasStore
   const current = store.getState()
@@ -218,7 +220,7 @@ export async function runVideoBatch(
   const shotIds = eligible.slice(0, limit)
   const total = shotIds.length
   // #batch-resume: 첫 await 전에 이번 실행이 낼 목록을 고정한다 — 그 뒤 캔버스가 바뀌어도 흔들리지 않는다.
-  const { items, skipped: buildSkipped } = buildVideoBatchInputs(projectId, current.nodes, shotIds)
+  const { items, skipped: buildSkipped } = buildVideoBatchInputs(projectId, current.nodes, shotIds, opts?.takeNote)
   // 낼 것이 없으면 묶음 표시(진행 · 묶음 id)를 달지 않는다 — 시작하지 않은 것을 시작한 것으로 읽지 않게(재검토 b 낮음 1).
   if (items.length === 0) return { total, started: 0, failed: buildSkipped.length }
 

@@ -1461,8 +1461,12 @@ async function startVideosFor(input: {
   /** 그 부탁에서 사람이 번호로 댄 샷 — 다시 만들기면 영상이 있어도 새 Take(리드 11/14). 알림 카드 · 칩 · 묶음 말은 넘기지 않는다
    *  (그사이 영상이 생긴 샷을 빼는 옛 규칙 그대로). "이미 영상이 있어요" 줄은 부탁을 받은 자리(답 가지 · 번호 대답)가 먼저 말한다. */
   named?: readonly string[]
+  /** 이 영상을 부탁한 사용자 말(Lumi 채팅 턴) — 새 Take 마다 "채팅"과 함께 남아 Camera 이력에 "채팅으로 부탁: …"으로 보인다(리드 2026-11-22 결정 ②).
+   *  말 한 줄을 정할 수 없는 길(빠른 칩 · 되묻기 답 · 알림 카드 단추 · 글 고침 [적용] 뒤)은 넘기지 않는다 — 빈 말과 "채팅"만 남는다. */
+  asked?: string
 }): Promise<void> {
   const locale = contentLocale()
+  const takeNote = { note: (input.asked ?? '').trim(), via: 'chat' as const }
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
   if (!useDirectorCanvasStore.getState().projectId) return
   // 기다리는 글 카드가 건 샷은 옛 글로 만들지 않고 그 카드 [적용]에 묶는다(재검토 b 보통 B) — 채팅 · 칩 · 알림 카드 · 되묻기 "응" 모두 여기를 지난다.
@@ -1548,7 +1552,7 @@ async function startVideosFor(input: {
       // 접수(서버가 2xx 로 받아 jobId 를 줌)되면 그 샷은 시작한 것으로 치고 다음 샷을 보낸다 — 영상이 끝나기를(5초마다 확인)
       //   기다리지 않는다(검토 b (a)~(g) 보통 1). 접수 없이 부른 것이 끝나면 시작하지 못한 것이다 — 실패해도 노드 id 를 돌려주는 길이 있다.
       const outcome = await new Promise<{ accepted: true } | { accepted: false; takeId: string | null }>((resolve) => {
-        useDirectorCanvasStore.getState().remakeShotVideo(id, { onJob: input.onJob, onAccepted: () => resolve({ accepted: true }) })
+        useDirectorCanvasStore.getState().remakeShotVideo(id, { onJob: input.onJob, onAccepted: () => resolve({ accepted: true }), takeNote })
           .then((takeId) => resolve({ accepted: false, takeId }), () => resolve({ accepted: false, takeId: null }))
       })
       if (outcome.accepted) {
@@ -1573,7 +1577,7 @@ async function startVideosFor(input: {
     return
   }
   const runBefore = useDirectorCanvasStore.getState().videoBatchRunId
-  void runVideoBatch(pid, { onJob: input.onJob, shotIds: input.shotIds })
+  void runVideoBatch(pid, { onJob: input.onJob, shotIds: input.shotIds, takeNote })
   // 러너는 시작하면 그 자리에서 새 묶음 표시를 단다 — 그대로면 시작하지 않은 것이다.
   if (useDirectorCanvasStore.getState().videoBatchRunId === runBefore) {
     input.say(t("I couldn't start the videos. Please ask again in a moment."))
@@ -4372,7 +4376,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           }
           const nowVideos = videoIds.filter((id) => !bound.has(id))
           if (nowVideos.length > 0) {
-            await startVideosFor({ shotIds: nowVideos, say: lumiSays, onJob: observeGeneration, isCurrent: isCurrentSession, remake, named: namedVideoIds })
+            await startVideosFor({ shotIds: nowVideos, say: lumiSays, onJob: observeGeneration, isCurrent: isCurrentSession, remake, named: namedVideoIds, asked: trimmed })
           }
           // 앞 턴의 글 카드가 아직 기다리면 그 카드가 건 샷도 그 카드에 묶는다.
           if (waitingCard && confirmIds.some((id) => waitingCard.bound.has(id))) {
