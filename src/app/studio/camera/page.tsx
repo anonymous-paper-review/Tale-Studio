@@ -2,14 +2,12 @@
 
 // Camera(단계 id camera, 오너 2026-11-22 D2~D5) — Director 앞 새 탭. 위에 씬 단추, 아래에 그 씬의 샷이 세로로 서고
 //   샷마다 실사 그림 · 영상 이력이 쌓인다(옛 Director 스토리보드 보기의 일). 데이터는 Director 와 같은 캔버스 상점이다.
-//   조각 1(단계 등록): 화면 틀 · 위 막대 [다음: Director] · Storyboard → Camera 넘김 마무리 · 넘어가면서 이미지 만들기(D0) ·
-//   영상 묶음 되살리기. 샷 줄 · 이력 줄 · 고치기 · 만들기 줄은 features/camera 의 다음 조각.
-//   약속: tests/camera/stage.test.ts · handoff.test.ts · tests/writer/director-handover-images.test.ts
+//   이 화면이 하는 일: Storyboard → Camera 넘김 마무리 · 넘어가면서 이미지 만들기(D0) · 영상 묶음 되살리기 · 동기화 훅.
+//   만들기 줄(work-bar · 위 막대 [다음: Director]) · 샷 줄과 이력 줄(camera-board · shot-row) · ⤢ 상세 창은 features/camera.
+//   약속: tests/camera/* · tests/writer/director-handover-images.test.ts
 import { useEffect } from 'react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { StageHelpBadge } from '@/components/stage-help-badge'
-import { NextStepButton } from '@/components/handoff/next-step-button'
-import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { STAGE_LABEL } from '@/lib/constants'
 import { useT } from '@/lib/i18n'
 import { takeImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
@@ -22,6 +20,7 @@ import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-dire
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
 import { CameraBoard } from '@/features/camera/camera-board'
 import { CameraShotDetailDialog } from '@/features/camera/shot-detail-dialog'
+import { CameraWorkBar } from '@/features/camera/work-bar'
 
 export default function CameraPage() {
   const t = useT()
@@ -68,13 +67,14 @@ export default function CameraPage() {
 
   return (
     <div className="flex flex-1 flex-col overflow-hidden pb-2">
-      <TopBarActions>
-        <NextStepButton />
-      </TopBarActions>
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-canvas-bg" data-testid="camera-page">
-        <div className="flex shrink-0 items-center gap-2 px-4 pb-3 pt-4">
-          <h1 className="shrink-0 text-[15px] font-bold text-foreground">{STAGE_LABEL.camera}</h1>
-          <StageHelpBadge text={t("Make real images and videos shot by shot. Every image and video stays in the shot's history.")} />
+        <div className="flex shrink-0 flex-col gap-3 px-4 pb-3 pt-4">
+          <div className="flex items-center gap-2">
+            <h1 className="shrink-0 text-[15px] font-bold text-foreground">{STAGE_LABEL.camera}</h1>
+            <StageHelpBadge text={t("Make real images and videos shot by shot. Every image and video stays in the shot's history.")} />
+          </div>
+          {/* 위쪽 만들기 줄 — 세는 범위는 지금 모든 씬(씬 범위는 오너 답 뒤, work-scope). [다음: Director]도 이 줄이 위 막대에 단다. */}
+          <CameraWorkBar scope={null} />
         </div>
         <ScrollArea className="min-h-0 flex-1">
           <div className="px-4 pb-6">
