@@ -53,7 +53,7 @@ describe('매체 고르기 창구는 닫혔다', () => {
     mocks.pickAnchorMedium.mockResolvedValue({ medium: '2d_anime' })
   })
 
-  it('매체 고르기 창구는 그림을 모델에 보내지 않고 410 으로 거절한다', async () => {
+  it('매체 고르기 창구는 그림을 모델에 보내지 않고, 이제 없는 기능이라고 거절한다', async () => {
     // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 매체 고르기는 그림에서 그림체를 정하던 길의 첫걸음이었다.
     const res = await POST(post(ok))
     expect(res.status).toBe(410)
