@@ -681,8 +681,19 @@ export const KO: Record<string, string> = {
   Save: '저장',
   // 가운데 장 저장 뒤 끝 장 물음(D10 · 2026-11-22)
   'Redraw the end frame to match these arrows?': '끝 장도 이 화살표대로 다시 그릴까요?',
-  'The start and directing frames stay as they are. Only the end frame is redrawn.': '시작 · 연출 장은 그대로 두고 끝 장만 다시 그려요.',
+  'The start and directing frames stay as they are. Only the end frame is redrawn, which takes over a minute.': '시작 · 연출 장은 그대로 두고 끝 장만 다시 그려요. 1분 넘게 걸려요.',
   'Could not redraw the end frame. It stays as it was.': '끝 장을 다시 그리지 못했어요. 끝 장은 그대로예요.',
+  // 끝 장 ②: 읽은 한 줄(D10 · 2026-11-22 오너 Q1 · Q3 · 리드 Q-a · Q-b)
+  'Motion the AI read': 'AI 가 읽은 움직임',
+  'Reading the arrows…': '화살표를 읽는 중…',
+  'The AI could not read the arrows. Write the motion yourself.': 'AI 가 화살표를 읽지 못했어요. 움직임을 직접 적어 주세요.',
+  'You can edit the line. The end frame is drawn from it.': '줄을 고칠 수 있어요. 끝 장은 이 줄대로 그려요.',
+  'Describe how the shot ends, for example: the figure on the left walks out to the right.': '샷이 어떻게 끝나는지 적어 주세요. 예: 왼쪽 인물이 오른쪽 밖으로 걸어 나간다.',
+  'Redrawing the end frame, which takes over a minute': '끝 장을 다시 그리는 중이에요. 1분 넘게 걸려요.',
+  'The AI could not read the arrows, so the end frame was not redrawn. Write the motion in the directing tab.': 'AI 가 화살표를 읽지 못해 끝 장을 다시 그리지 않았어요. 연출 탭에서 움직임을 직접 적어 주세요.',
+  'Could not translate the motion line. Try again.': '움직임 줄을 영어로 옮기지 못했어요. 다시 시도해 주세요.',
+  'Not used yet. Redraw the end frame to use it for the end frame and video.': '아직 쓰지 않은 줄이에요. 끝 장을 다시 그리면 끝 장 · 영상에 쓰여요.',
+  'Edit and redraw the end frame': '고쳐서 끝 장 다시 그리기',
   // ── writer 스테이지: add-item-dialog ──
   'Low angle (looking up)': '로우앵글 (아래에서 위로)',
   'Eye level': '아이레벨 (눈높이)',

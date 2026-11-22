@@ -17,6 +17,21 @@ import { translate } from '@/lib/i18n'
 import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { stripCameraMoveSentences } from '@/lib/writer/pipeline/stage/view'
 import { stripColor, words } from '@/lib/writer/rough-storyboard'
+import { freshDirectionRead, withEndDrawn, type DirectionRead } from '@/lib/writer/direction-read'
+import { readDirectionMarks } from '@/lib/writer/direction-read-vlm'
+import {
+  completeGenerationJob,
+  confirmGenerationJobReceipt,
+  rejectGenerationJobReservation,
+  reserveGenerationJob,
+  type GenerationJob,
+} from '@/lib/generation-jobs'
+import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
+import { falImageSubmit } from '@/lib/writer/llm/fal'
+import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
+import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
+import { moderatedSubmitInput } from '@/lib/moderation/creem'
+import { recordModerationPass } from '@/lib/api/moderation'
 import type { AppLocale } from '@/lib/locale'
 
 // locale 을 안 넘기는 호출부(rough-directing-edit/route.ts)가 조용히 안 깨지도록 기존 동작(항상
@@ -225,19 +240,51 @@ export interface FramePlan {
   userText: string | null
 }
 
-// 끝 장을 그리는 방식(D10, 2026-11-22). 오너가 비교 보드(지금 · ① 시작+고친 가운데 · ② 읽은 줄 · ②′ 읽은 줄+Grok)를 보고
-//   고를 때까지 지금 방식이다. 'direction-only' = 고친 가운데 장 한 장 + 정해진 문장(Grok). 바꿀 때는 여기만 바꾼다 —
-//   물음의 [다시 그리기] · [이 장만 다시 만들기](끝) · 옛 regenerate-end 요청이 모두 endFramePlan 을 거친다.
+// 끝 장을 그리는 방식(D10, 2026-11-22). 바꿀 때는 여기만 바꾼다 — 물음의 [다시 그리기] · [이 장만 다시 만들기](끝) ·
+//   옛 regenerate-end 요청이 모두 regenerateEndFrame → endFramePlan 을 거친다.
+//   'read-then-draw' = ②(오너 Q1 · Q3 "2번으로 해줘"): 읽는 AI 가 연출 장을 한 줄로 읽고, GPT Image 2 가 시작 장 + 그 줄로 그린다.
+//   'direction-only' = 예전 방식: 고친 연출 장 한 장 + 정해진 문장(Grok). 비교 보드의 "지금 방식" — 고를 수 있게 남겨 둔다.
 //   어느 방식이든 샷 설계의 옛 움직임 글(행동 글 · 카메라 무브)은 받지 않는다 — 고친 화살표와 다툰다. 약속: tests/writer/end-frame-plan.test.ts
-export type EndFrameMethod = 'direction-only'
-export const END_FRAME_METHOD: EndFrameMethod = 'direction-only'
-const END_FRAME_PLANS: Record<EndFrameMethod, (frames: NonNullable<RoughJson['frames']>) => FramePlan> = {
-  'direction-only': (frames) => ({ model: GROK_EDIT_MODEL, prompt: END_FROM_DIRECTION_PROMPT, refs: [frames.direction!], userText: null }),
+export type EndFrameMethod = 'direction-only' | 'read-then-draw'
+export const END_FRAME_METHOD: EndFrameMethod = 'read-then-draw'
+const GPT_EDIT_MODEL = 'openai/gpt-image-2/edit'
+
+/** ② 그리기 문장 — 2026-11-22 비교 시험(다섯 샷)의 문장에서 "START frame" · "storyboard" 낱말만 뺐다
+ *  (한 장 다시 그리기 규칙: 그 낱말이 그림 속 칸 이름 · 표 글씨로 옮겨 적혔다, 11/14 실측 914165c8). 샷 길이를 모르면 길이 말을 뺀다. */
+function endFromLinePrompt(line: string, seconds: number | null): string {
+  const over = typeof seconds === 'number' && seconds > 0 ? ` over ${Math.round(seconds)} seconds` : ''
+  return (
+    'This rough monochrome pencil sketch shows the first moment of one film shot. ' +
+    `Redraw the same shot at the moment this movement has fully completed${over}: ${line.trim()} ` +
+    'Carry the movement its full extent, not a barely-changed copy, and keep everything not mentioned where it is. ' +
+    `Same location, figures, props and pencil style. ${REDRAW_FIGURE_RULE} ${REDRAW_WORDLESS_RULE} Return only the drawing.`
+  )
 }
 
-/** 순수: 끝 장 그리기 계획 — END_FRAME_METHOD 가 정한 방식대로. */
-export function endFramePlan(frames: NonNullable<RoughJson['frames']>, method: EndFrameMethod = END_FRAME_METHOD): FramePlan {
-  return END_FRAME_PLANS[method](frames)
+type EndPlanInput = { line: string; seconds: number | null }
+const END_FRAME_PLANS: Record<EndFrameMethod, (frames: NonNullable<RoughJson['frames']>, input?: EndPlanInput) => FramePlan> = {
+  'direction-only': (frames) => ({ model: GROK_EDIT_MODEL, prompt: END_FROM_DIRECTION_PROMPT, refs: [frames.direction!], userText: null }),
+  'read-then-draw': (frames, input) => {
+    if (!input?.line.trim()) throw new Error('read-then-draw needs the line read from the directing frame')
+    return { model: GPT_EDIT_MODEL, prompt: endFromLinePrompt(input.line, input.seconds), refs: [frames.start!], userText: input.line.trim() }
+  },
+}
+
+/** 순수: 끝 장 그리기 계획 — END_FRAME_METHOD 가 정한 방식대로. ② 는 읽은 줄 · 샷 길이를 받는다(행동 글 · 샷 설계는 받지 않는다). */
+export function endFramePlan(frames: NonNullable<RoughJson['frames']>, method: EndFrameMethod = END_FRAME_METHOD, input?: EndPlanInput): FramePlan {
+  return END_FRAME_PLANS[method](frames, input)
+}
+
+/** 순수: GPT 에 시킬 끝 장 크기 — 다른 두 장 비율, 16 의 배수, 0.66MP 이상(fal gpt-image-2/edit 스키마). 정사각형에 가까우면 1024×1024. */
+export function endFrameImageSize(width: number, height: number): string {
+  const ar = width > 0 && height > 0 ? width / height : 16 / 9
+  if (Math.abs(ar - 1) < 0.05) return '1024x1024'
+  const round16 = (value: number) => Math.max(16, Math.round(value / 16) * 16)
+  for (let long = 1280; long <= 3840; long += 64) {
+    const [w, h] = ar >= 1 ? [long, round16(long / ar)] : [round16(long * ar), long]
+    if (w * h >= 660_000) return `${w}x${h}`
+  }
+  return ar >= 1 ? `3840x${round16(3840 / ar)}` : `${round16(3840 * ar)}x3840`
 }
 
 // 약속 I(2026-09-04): 3장 중 한 장만 다시 그린다 — 나머지 두 장은 손대지 않는다.
@@ -378,7 +425,7 @@ async function otherFramesSize(
 export async function regenerateRoughFrame(
   projectId: string,
   shotId: string,
-  frame: RoughFrameKey,
+  frame: Exclude<RoughFrameKey, 'end'>,
   locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
   opts: DirectingEditOptions = {},
 ): Promise<{ url: string; generatedAt: number; frame: RoughFrameKey }> {
@@ -402,12 +449,9 @@ export async function regenerateRoughFrame(
       data?.dynamic_spec ?? null,
     )
   }
-  // 끝 장은 END_FRAME_METHOD 가 정한 방식으로(D10) — 시작 · 연출 장은 지금처럼 Grok 한 장.
-  const plan: FramePlan = (() => {
-    if (frame === 'end') return endFramePlan(rb.frames)
-    const { prompt, refs, userText } = promptForFrame(frame, material.action, material.camera)
-    return { model: GROK_EDIT_MODEL, prompt, refs: refs(rb.frames), userText }
-  })()
+  // 시작 · 연출 장은 지금처럼 Grok 한 장. 끝 장은 regenerateEndFrame(②, 작업 틀)이 그린다(D10).
+  const { prompt: framePrompt, refs: frameRefs, userText: frameUserText } = promptForFrame(frame, material.action, material.camera)
+  const plan: FramePlan = { model: GROK_EDIT_MODEL, prompt: framePrompt, refs: frameRefs(rb.frames), userText: frameUserText }
   // #creem-moderation(2026-10-11): 자리 예약 전에 검사한다 — DIRECTING 재생성에만 실리는 사용자
   //   액션 설명이 검사 대상이고, 프레임 지시문(START/END/DIRECTION 템플릿)은 우리 문구라 보내지 않는다.
   //   검사는 실제로 싣는 글(영어 파생 · 손질한 것)로 한다(2026-11-14 검토 a 1).
@@ -457,15 +501,218 @@ export async function regenerateRoughFrame(
   return { url: newUrl, generatedAt: now, frame }
 }
 
-/** DIRECTING 프레임을 참조로 END 프레임을 재생성한다 — regenerateRoughFrame(..., 'end') 의 이름 호환. */
+// ── 끝 장 ②: 읽기 · 작업 내기 · 끼우기(D10 · 2026-11-22 오너 Q1 · Q3 · Q4, 리드 Q-a) ──────────────────────────
+//   읽기(7~11초) + 그리기(65~71초)는 요청 하나 60초를 넘는다 — 그리기는 있는 생성 작업 틀(종류 image_generation + 대상 roughEnd)로 낸다.
+//   요청은 작업 번호만 돌려주고, 그림이 오면 완료 처리(fal/finalize.ts → finalizeRoughEndFrameJob)가 끝 장을 바꿔 끼운다.
+//   약속: tests/writer/end-frame-read-draw.test.ts
+
+/** 읽는 AI 가 화살표를 읽지 못했고 사람이 적은 줄도 없다 — 그림 값을 쓰지 않고 알린다(라우트 422 direction_unreadable). */
+export class DirectionUnreadableError extends Error {
+  constructor(locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK) {
+    super(translate(locale, 'The AI could not read the arrows, so the end frame was not redrawn. Write the motion in the directing tab.'))
+    this.name = 'DirectionUnreadableError'
+  }
+}
+
+/** 한국어로 고친 줄을 영어로 옮기지 못했다 — 지시에 한국어를 섞지 않고 다시 시도하게 한다(라우트 422 direction_translate_failed). */
+export class DirectionTranslateError extends Error {
+  constructor(locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK) {
+    super(translate(locale, 'Could not translate the motion line. Try again.'))
+    this.name = 'DirectionTranslateError'
+  }
+}
+
+/** 읽은 줄을 러프 기록에 남긴다 — 그사이 연출 장이 바뀌었으면(옛 연출 장을 읽은 줄) 남기지 않는다. 남겼으면 true. */
+async function storeDirectionRead(projectId: string, shotId: string, read: DirectionRead): Promise<boolean> {
+  const latest = await loadRough(projectId, shotId)
+  if (!latest?.frames?.direction || latest.frames.direction !== read.direction) return false
+  const { error } = await supabaseAdmin
+    .from('shots')
+    .update({ rough_storyboard: { ...latest, directionRead: read } })
+    .eq('project_id', projectId)
+    .eq('shot_id', shotId)
+  if (error) throw error
+  return true
+}
+
+/**
+ * 지금 연출 장을 읽은 줄 — 이미 있으면 다시 읽지 않고, 없으면 읽는 AI(Gemini 3.6 Flash)로 읽어 연출 장 주소와 함께 남긴다.
+ *   저장 직후 물음 창 · 편집기 아래 줄 [고쳐서 끝 장 다시 그리기]가 부른다. 못 읽으면 null(물음 창이 "직접 적어 주세요").
+ *   주소는 우리 보관함 그림만 읽는다 — 러프 기록은 브라우저가 고칠 수 있는 칸이라 남의 주소를 서버가 받아 오지 않게.
+ */
+export async function readDirection(projectId: string, shotId: string): Promise<DirectionRead | null> {
+  const rb = await loadRough(projectId, shotId)
+  if (rb?.status !== 'completed' || !rb.frames?.start || !rb.frames?.direction) return null
+  const fresh = freshDirectionRead(rb)
+  if (fresh) return fresh
+  if (!mediaPathFromUrl(rb.frames.start) || !mediaPathFromUrl(rb.frames.direction)) return null
+  const marks = await readDirectionMarks(rb.frames.start, rb.frames.direction)
+  if (!marks) return null
+  const read: DirectionRead = { en: marks.en, ko: marks.ko, source: 'ai', direction: rb.frames.direction, at: Date.now(), endDrawn: null }
+  return (await storeDirectionRead(projectId, shotId, read)) ? read : null
+}
+
+/** 그 샷의 끝 장 작업이 돌고 있으면 그 작업 번호 — 같은 끝 장을 두 번 내지 않는다. 오래 멈춘(유령) 작업은 세지 않는다. */
+async function runningEndJob(projectId: string, shotId: string): Promise<string | null> {
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select('id, target, created_at')
+    .eq('project_id', projectId)
+    .eq('kind', 'image_generation')
+    .eq('status', 'queued')
+  if (error) throw error
+  const rows = (data ?? []) as Array<{ id: string; target?: { writerShotId?: string; roughEnd?: unknown } | null; created_at?: string | null }>
+  const hit = rows.find(
+    (row) =>
+      !!row.target?.roughEnd &&
+      row.target.writerShotId === shotId &&
+      (!row.created_at || Date.now() - Date.parse(row.created_at) < STALE_QUEUED_MS),
+  )
+  return hit?.id ?? null
+}
+
+/** 사람이 고친 줄 — 화면 말(lang)로 적은 글. 한국어면 영어로 옮겨 싣는다. */
+export interface EditedDirectionLine {
+  text: string
+  lang: 'ko' | 'en'
+}
+
+/**
+ * 끝 장 다시 그리기(②) — 물음의 [다시 그리기] · [이 장만 다시 만들기](끝) · 옛 regenerate-end 요청이 모두 여기로 온다.
+ *   줄: 사람이 고친 줄(다시 읽지 않음, 한국어면 영어로 옮김) → 지금 연출 장을 읽은 줄 → 그래도 없으면 지금 읽는다.
+ *   줄은 내용 검사를 거친 뒤에만 그림을 낸다(10/11 약속). 그 샷의 끝 장 작업이 돌고 있으면 그 작업 번호를 돌려준다.
+ */
 export async function regenerateEndFrame(
   projectId: string,
   shotId: string,
   locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
-  opts: DirectingEditOptions = {},
-): Promise<{ url: string; generatedAt: number }> {
-  const { url, generatedAt } = await regenerateRoughFrame(projectId, shotId, 'end', locale, opts)
-  return { url, generatedAt }
+  opts: DirectingEditOptions & { line?: EditedDirectionLine | null; userId?: string | null } = {},
+): Promise<{ jobId: string; read: DirectionRead | null; replayed: boolean }> {
+  const { data: shot, error: shotError } = await supabaseAdmin
+    .from('shots')
+    .select('rough_storyboard, duration_seconds')
+    .eq('project_id', projectId)
+    .eq('shot_id', shotId)
+    .maybeSingle()
+  if (shotError) throw shotError
+  const rb = ((shot as { rough_storyboard?: unknown } | null)?.rough_storyboard ?? null) as RoughJson | null
+  if (rb?.status !== 'completed' || !rb.frames?.start || !rb.frames?.direction || !rb.frames?.end) {
+    throw new Error(translate(locale, 'You need the 3-frame rough set to redraw a frame'))
+  }
+  const frames = rb.frames
+  // 그리기 전에 본다 — 남의 파일 자리 때문에 그림 값을 쓰지 않는다(리뷰 M5).
+  if (opts.projectFolderOnly) await assertProjectFolder(projectId, storagePathFromPublicUrl(frames.end!, locale), locale)
+
+  const running = await runningEndJob(projectId, shotId)
+  if (running) return { jobId: running, read: freshDirectionRead(rb), replayed: true }
+
+  let read: DirectionRead | null
+  const edited = opts.line?.text?.trim()
+  if (edited) {
+    let en = edited
+    if (opts.line?.lang === 'ko') {
+      const translated = (await deriveEnBatch([{ id: shotId, native: edited }], 'storyboard motion line')).get(shotId)?.trim()
+      if (!translated) throw new DirectionTranslateError(locale)
+      en = translated
+    }
+    read = { en, ko: opts.line?.lang === 'ko' ? edited : null, source: 'user', direction: frames.direction!, at: Date.now(), endDrawn: null }
+    if (!(await storeDirectionRead(projectId, shotId, read))) throw new StaleDirectionError(locale)
+  } else {
+    read = freshDirectionRead(rb) ?? (await readDirection(projectId, shotId))
+  }
+  if (!read) throw new DirectionUnreadableError(locale)
+
+  const seconds = typeof (shot as { duration_seconds?: unknown }).duration_seconds === 'number' ? ((shot as { duration_seconds: number }).duration_seconds) : null
+  const size = await otherFramesSize(frames, 'end')
+  const imageSize = endFrameImageSize(size?.width ?? 16, size?.height ?? 9)
+  const plan = endFramePlan(frames, END_FRAME_METHOD, { line: read.en, seconds })
+
+  // #creem-moderation(2026-10-11): 읽은 줄 · 고친 줄은 사용자 손글씨가 옮겨진 글이다 — 자리 예약 전에 검사한다.
+  const moderation = await assertUserTextAllowed([plan.userText], { projectId, kind: 'image_generation', ...(opts.userId ? { userId: opts.userId } : {}) })
+  const { data: project, error: projectError } = await supabaseAdmin.from('projects').select('workspace_id').eq('id', projectId).maybeSingle()
+  if (projectError) throw projectError
+  const workspaceId = (project as { workspace_id?: string } | null)?.workspace_id ?? undefined
+  const job = await reserveGenerationJob({
+    projectId,
+    model: plan.model,
+    kind: 'image_generation',
+    ...(opts.userId ? { userId: opts.userId } : {}),
+    ...(workspaceId ? { workspaceId } : {}),
+    provider: 'fal',
+    inputSnapshot: { prompt: plan.prompt, image_urls: plan.refs, image_size: imageSize, rough_end: true },
+    target: {
+      ...(workspaceId ? { workspaceId } : {}),
+      writerShotId: shotId,
+      roughEnd: { generatedAt: rb.generatedAt ?? 0, direction: frames.direction!, line: read.en },
+    },
+  })
+  recordModerationPass(moderation, { projectId, kind: 'image_generation', userId: opts.userId ?? null, jobId: job.id })
+  let receipt: Awaited<ReturnType<typeof falImageSubmit>>
+  try {
+    // 외부 접수는 한 번뿐이다 — 예약이 이미 자리를 잡고 있으니 SDK 재시도는 이중 발주다.
+    receipt = await falImageSubmit(
+      moderatedSubmitInput(
+        { model: plan.model, prompt: plan.prompt, reference_image_urls: plan.refs, image_size: imageSize, webhookUrl: resolveWebhookUrl() },
+        moderation,
+      ),
+      { retry: false, falKeyId: job.fal_key_id ?? undefined },
+    )
+  } catch (err) {
+    if (isDefiniteSubmitRejection(err)) {
+      await rejectGenerationJobReservation(job.id, projectId, err instanceof Error ? err.message : String(err)).catch(() => undefined)
+    }
+    throw err
+  }
+  try {
+    await confirmGenerationJobReceipt(job.id, projectId, receipt)
+  } catch (err) {
+    // 이미 접수됐다 — 새 번호로 다시 내지 않는다. 기록 실패는 로그로만.
+    console.error('[directing-edit] end frame receipt could not be saved:', job.id, err instanceof Error ? err.message : String(err))
+  }
+  return { jobId: job.id, read, replayed: false }
+}
+
+/**
+ * 끝 장 작업 끼우기(완료 처리 갈래) — 그림을 다른 두 장 크기로 맞춰 끝 장 자리에 올리고, 끝 장만 바꾼다(약속 I).
+ *   그 줄로 그렸다는 표시(directionRead.endDrawn)를 남겨야 영상 지시가 그 줄을 쓴다(리드 Q-a).
+ *   그사이 러프가 통째로 바뀌었거나 연출 장이 다시 저장됐으면 끼우지 않는다 — 작업은 실패로 남고 화면이 다시 하라고 알린다.
+ */
+export async function finalizeRoughEndFrameJob(job: GenerationJob, falImageUrl: string): Promise<string> {
+  const shotId = job.target.writerShotId
+  const roughEnd = job.target.roughEnd
+  if (!shotId || !roughEnd) throw new Error('rough end job target is missing writerShotId/roughEnd')
+  const unchanged = (rough: RoughJson | null): rough is RoughJson =>
+    !!rough?.frames?.start && !!rough.frames.end && (rough.generatedAt ?? 0) === roughEnd.generatedAt && rough.frames.direction === roughEnd.direction
+  const latest = await loadRough(job.project_id, shotId)
+  if (!unchanged(latest)) throw new Error('The rough changed while the end frame was being drawn, so it was not inserted')
+  const endPath = storagePathFromPublicUrl(latest.frames!.end!)
+  await assertProjectFolder(job.project_id, endPath, UNSPECIFIED_LOCALE_FALLBACK)
+  const res = await fetch(falImageUrl)
+  if (!res.ok) throw new Error(`end frame image fetch failed: HTTP ${res.status}`)
+  const buf = Buffer.from(await res.arrayBuffer())
+  if (buf.length < 10_000) throw new Error(`end frame image is abnormally small (${buf.length}b)`)
+  const size = await otherFramesSize(latest.frames!, 'end')
+  const fitted = size ? await fitFrameToSize(buf, size.width, size.height) : buf
+  const contentType = res.headers.get('content-type') ?? 'image/png'
+  const ext = contentType.includes('png') ? 'png' : contentType.includes('webp') ? 'webp' : 'jpg'
+  const framePath = `${endPath.replace(/\.[a-z]+$/i, '')}.${ext}`
+  const newUrl = await uploadToMedia(framePath, fitted, contentType)
+  // 올리는 사이 바뀌었는지 한 번 더 — 미리보기는 그 뒤에만 바꾼다(한 장 다시 그리기와 같은 순서, 리뷰 L7).
+  const again = await loadRough(job.project_id, shotId)
+  if (!unchanged(again)) throw new Error('The rough changed while the end frame was being drawn, so it was not inserted')
+  await uploadThumbnail(framePath, fitted)
+  const merged = mergeRoughFrame(again, 'end', newUrl, Date.now())
+  const next = merged.directionRead === undefined
+    ? merged
+    : { ...merged, directionRead: withEndDrawn(merged.directionRead, { en: roughEnd.line, direction: roughEnd.direction }, newUrl) }
+  const { error } = await supabaseAdmin
+    .from('shots')
+    .update({ rough_storyboard: next })
+    .eq('project_id', job.project_id)
+    .eq('shot_id', shotId)
+  if (error) throw error
+  await completeGenerationJob(job.id, newUrl)
+  return newUrl
 }
 
 /** 편집기가 평탄화한 direction 프레임(PNG data URL)을 기존 경로에 upsert + 캐시버스트. */
