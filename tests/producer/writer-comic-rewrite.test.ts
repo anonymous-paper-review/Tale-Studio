@@ -132,8 +132,8 @@ describe('확정 전 Writer 화면에서 만화를 고르면', () => {
   it('다시 쓰기를 고르면 만화 원고를 대본으로 옮긴 뒤 그 대본으로 산문 초안을 새로 써서, 화면에 보이는 산문과 확정 · 이어 만들기가 쓰는 산문이 같다', async () => {
     pickComicByWords()
     await send('Rewrite the prose from the comic')
-    expect(choiceLabels()).toContain('Fix the comic art style')
-    await send('Keep the comic art style and fix it')
+    // 그림체 질문(고정 · 각색)은 D6(2026-11-22)로 없어졌다 — 다시 쓰기를 고르면 바로 옮긴다.
+    expect(choiceLabels()).not.toContain('Fix the comic art style')
     await vi.waitFor(() => expect(calls('/api/writer/start')).toHaveLength(1))
     expect(calls('/api/writer/start')[0]).toMatchObject({ projectId: 'proj-1', story: SCRIPT, treatmentDraft: true, restartDraft: true, preserveScript: true })
     expect(order.indexOf('/api/produce/comic-script')).toBeLessThan(order.indexOf('/api/writer/start'))
@@ -163,7 +163,6 @@ describe('확정 전 Writer 화면에서 만화를 고르면', () => {
     writerStart = () => Response.json({ error: 'Already running', code: 'writer_run_active' }, { status: 409 })
     pickComicByWords()
     await send('Rewrite the prose from the comic')
-    await send('Keep the comic art style and fix it')
     await vi.waitFor(() => expect(said(/Couldn't rewrite the prose from the comic/)).toBe(true))
     expect(producer.getState()).toMatchObject({ storyText: OLD_IDEA, preserveScript: null })
     expect(screenProse()).toBe(OLD_PROSE)

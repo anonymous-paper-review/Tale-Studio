@@ -54,7 +54,8 @@ export async function resolveProjectId(db: SupabaseClient, explicit?: string): P
   return projects[0].id as string
 }
 
-export const STAGES = ['entry', 'producer', 'artist', 'writer', 'director', 'editor'] as const
+// 제품 단계 표(src/lib/constants.ts STAGES)와 같은 순서 — Camera(2026-11-22 오너 D2~D5)는 Storyboard 와 Director 사이.
+export const STAGES = ['entry', 'producer', 'artist', 'writer', 'camera', 'director', 'editor'] as const
 
 /**
  * 두 단계 중 더 앞선(진행된) 쪽을 반환한다. 제품 코드 `src/stores/project-store.ts` 의

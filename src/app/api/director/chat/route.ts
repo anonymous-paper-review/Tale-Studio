@@ -50,6 +50,18 @@ IMPORTANT: When suggesting camera or lighting changes, include a JSON block at t
 - If just chatting with no settings suggestions: \`\`\`json\n{}\n\`\`\``
 
 // ──────────────────────────────────────────────────────────────────────
+// Camera 화면에서 온 말(오너 2026-11-22 D2~D5) — 같은 샷 · 같은 동작이지만 사용자는 노드 그래프가 아니라 샷 줄과 판(그림 판 · Take)을 본다.
+//   카드 ⌘/Ctrl+클릭(D9)은 샷 이름 뒤에 판 이름을 붙인다. 지금 그림 바꾸기 · ★ 는 채팅 동작이 없어 카드 단추를 알려 준다.
+//   약속: tests/camera/chat.test.ts
+const CAMERA_SCREEN_NOTE = `
+
+<screen>
+The user is on the Camera screen, not on the node canvas. Camera shows one row per shot: the shot's details on the left and its history on the right, every image version (Image v1, v2, ...) and every video take (Take 1, 2, ...) from oldest to newest.
+Talk about shots, images and takes. Never mention nodes, edges, wiring, the canvas or dragging, and do not emit selectNode.
+The user may point at one card by adding it to a shot name, e.g. "@Real Shot 3 · Image v2", "@Real Shot 3 · Take 4", "@실사 샷 3 · 그림 v2" or "@실사 샷 3 · Take 4". The target is that shot.
+Choosing which image version is current and marking the final take are done with the buttons on the card ([Use this image] and the star). You cannot do those from chat, so tell the user which button to press.
+</screen>`
+
 // Agentic system prompt — Director Canvas (P4 노드 그래프) 사용 시
 // ──────────────────────────────────────────────────────────────────────
 
@@ -569,7 +581,10 @@ export async function POST(req: Request) {
       canvasContext,
       projectId,
       traceId: requestedTraceId,
+      screen: requestedScreen,
     } = await req.json()
+    // 말한 화면 — Camera 면 안내 한 단락을 더하고 기록 단계도 Camera 로 남긴다. 그 밖은 Director(예전 그대로).
+    const screen = requestedScreen === 'camera' ? 'camera' : 'director'
 
     if (!message || typeof message !== 'string') {
       return NextResponse.json(
@@ -608,6 +623,7 @@ export async function POST(req: Request) {
       let llmUsage: ChatLlmUsage | null = null
       const systemPrompt =
         DIRECTOR_CANVAS_SYSTEM +
+        (screen === 'camera' ? CAMERA_SCREEN_NOTE : '') +
         CHAT_OUTPUT_FORMAT_GUIDE +
         CHAT_UPDATES_BATCH_GUIDE +
         responseLanguageDirective(projectLocale)
@@ -633,7 +649,7 @@ export async function POST(req: Request) {
       } = parseAgenticResponse(text, projectLocale ?? parseAppLocale(uiLocale) ?? 'en')
       const trace = buildChatTrace({
         traceId,
-        stage: 'director',
+        stage: screen === 'camera' ? 'camera' : 'director',
         route: 'director/chat',
         system: systemPrompt,
         history: normalizedHistory,

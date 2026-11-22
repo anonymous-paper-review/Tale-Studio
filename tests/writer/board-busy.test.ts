@@ -1,4 +1,4 @@
-// Storyboard 가 씬 · 샷을 나누고 러프를 그리는 동안 화면을 잠그는 표시(단계 · 진행률 · 실패 안내)와 잠금이 풀리는 때를 검사한다
+// 콘티(옛 Storyboard)가 씬 · 샷을 나누고 러프를 그리는 동안 화면을 잠그는 표시(단계 · 진행률 · 실패 안내)와 잠금이 풀리는 때를 검사한다
 import { describe, expect, it } from 'vitest'
 import {
   INITIAL_BOARD_LOCK,
@@ -45,7 +45,7 @@ describe('씬 · 샷을 나누는 동안의 잠금', () => {
     const view = storyboardBusyView({ status: status({ current_stage: 'decoupage' }), facts: splitting, lock: walk(splitting), rough: rough({ total: 0, waiting: 0 }), sceneCount: 3 }, 'ko')
     expect(view.open).toBe(true)
     expect(view.phase).toBe('split')
-    expect(view.title).toBe('Storyboard로 넘어가는 중이에요')
+    expect(view.title).toBe('콘티로 넘어가는 중이에요')
     expect(view.steps).toEqual([
       { label: '산문 읽기', state: 'done' },
       { label: '씬 3개로 나누기', state: 'done' },

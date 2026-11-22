@@ -6,6 +6,7 @@ import { fileHasText, recIsCurrent, type EntryChatProgress, type EntryDraft, typ
 import { seedWithPrefix } from '@/lib/entry/permission-ask'
 import {
   CHAT_QUESTION,
+  KEEP_LENGTH_NOTE,
   MATERIAL_KINDS,
   MIN_IDEA_CHARS,
   PICK_KEYS,
@@ -29,10 +30,12 @@ import { moodRecommendation, ratioRecommendation, type EntrySeries } from './ser
 
 export type Translator = (key: string, params?: Record<string, string | number>) => string
 
-/** 사용자가 말로 답한 뒤의 한 줄 — 읽은 질문들(빈 배열이면 못 알아들었다). 화면에서 번역한다. */
+/** 사용자가 말로 답한 뒤의 한 줄 — 읽은 질문들(빈 배열이면 못 알아들었다). 화면에서 번역한다.
+ *  keptLength = 원작 그대로라 말한 길이를 받지 않았다(D15) — 길이는 원작을 따른다고 덧붙인다. */
 export interface ChatHint {
   said: string
   keys: PickKey[]
+  keptLength?: boolean
 }
 
 /** 빠른 답 · 단계 확인 단추가 남기는 대화 한 쌍 — script = [대본이 있어요], revise = [아니요, 더 고칠래요](11/5 시안 P1 · P2). */
@@ -93,7 +96,7 @@ export function chatSent(draft: EntryDraft): boolean {
 }
 
 export function chatOrderOf(draft: EntryDraft): ChatQuestionKey[] {
-  return chatQuestionOrder(!!draft.file)
+  return chatQuestionOrder(!!draft.file, draft.picks.level)
 }
 
 /** 정했나: 정한 표시가 있고 그 값도 있다(파일 질문의 값은 바꿈 정도). */
@@ -149,9 +152,11 @@ export function fileReadLine(draft: EntryDraft, t: Translator): string {
 }
 
 export function hintText(draft: EntryDraft, hint: ChatHint, t: Translator): string {
-  if (!hint.keys.length) return t(CHAT_HINT_UNKNOWN, { text: hint.said })
+  const kept = hint.keptLength ? t(KEEP_LENGTH_NOTE) : null
+  if (!hint.keys.length) return kept ?? t(CHAT_HINT_UNKNOWN, { text: hint.said })
   const items = hint.keys.map((k) => `${t(QUESTION_NAME[k])} ${answerText(draft, k, t)}`).join(', ')
-  return t(CHAT_HINT_SET, { text: hint.said, items })
+  const set = t(CHAT_HINT_SET, { text: hint.said, items })
+  return kept ? `${set} ${kept}` : set
 }
 
 /** 대화 줄 — 프로토타입 chatStage 와 같은 순서: 인사 · (예시) · (더 적어 달라는 말) / 보낸 글 · 읽었어요 · 지난 문답 · 지금 카드. */
@@ -211,12 +216,18 @@ export interface ChatChip {
   label: string
   value: string | null
   current: boolean
+  /** 다시 고를 수 없는 칸 — 원작 그대로의 길이(원작 길이대로, D15). */
+  locked?: boolean
 }
 
-/** 위쪽 요약 칩 — 정한 값만 보이고, 누르면 그 질문으로 돌아간다. 파일이 있으면 바꿈 정도는 파일 질문이다. */
+/** 위쪽 요약 칩 — 정한 값만 보이고, 누르면 그 질문으로 돌아간다. 파일이 있으면 바꿈 정도는 파일 질문이다.
+ *  원작 그대로면 길이 칸은 "원작 길이대로"로 잠긴다 — 정리표와 같은 값(D15 오너 2026-11-22). */
 export function chatChips(draft: EntryDraft, t: Translator): ChatChip[] {
   const current = currentChatQuestion(draft)
   return PICK_KEYS.map((key) => {
+    if (key === 'runtime' && draft.picks.level === 'keep') {
+      return { key, label: t(QUESTION_NAME[key]), value: t('As long as the original'), current: false, locked: true }
+    }
     const question: ChatQuestionKey = key === 'level' && draft.file ? 'file' : key
     return {
       key,

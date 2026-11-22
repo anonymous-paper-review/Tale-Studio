@@ -24,6 +24,8 @@ function AssetNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       id={id}
       theme="shot"
       title={data.label}
+      // ⌘/Ctrl+클릭 멘션(오너 D9) — 인물 · 배경 이름.
+      mention={data.label}
       selected={selected}
       width={240}
       canDelete={false}

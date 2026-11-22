@@ -17,6 +17,9 @@ import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, resolveChatLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { parseDialogueLanguage, type DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
+import { getActiveRun } from '@/lib/writer/run-store'
+import { isPreservedScriptRun, preservedScriptChatDirective } from '@/lib/writer/preserved-run'
+import type { WriterRunState } from '@/lib/writer/pipeline/steps'
 import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
 import { droppedCharactersNotice, parseFencedUpdates } from '@/lib/agentic-reply-guard'
 import {
@@ -243,12 +246,14 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     let projectLocale: AppLocale | null = null
     let localeSwitched: AppLocale | null = null
     let dialogueLanguage: DialogueLanguage | undefined
+    // 원작 그대로(D15) — [대사 다시 생성] 막기와 같은 판별(실행 입력의 그대로 쓰기 표시 또는 대본에서 옮긴 씬).
+    let preservedRun: WriterRunState | null = null
     if (typeof projectId === 'string' && projectId) {
       if (!(await userOwnsProject(projectId, user.id))) {
         return NextResponse.json({ error: 'forbidden' }, { status: 403 })
       }
       // 로스터(#F-003 R1)·응답 언어(#i18n-s5-batch6-chat)·대사 언어(#dialogue-language-chat) 병렬 조회.
-      const [{ data: roster }, locale, { data: projRow }] = await Promise.all([
+      const [{ data: roster }, locale, { data: projRow }, run] = await Promise.all([
         supabaseAdmin.from('characters').select('character_id').eq('project_id', projectId),
         // 채팅 언어 규칙 v2(#chat-locale-follow v2): 웹페이지 언어 상속 + 다른 언어 3회 연속·명시 요청 시 전환.
         resolveChatLocale({
@@ -258,7 +263,10 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
           uiLocale: parseAppLocale(uiLocale) ?? parseAppLocale(user.user_metadata?.locale),
         }),
         supabaseAdmin.from('projects').select('settings').eq('id', projectId).maybeSingle(),
+        // 실행 상태를 못 읽어도 채팅은 그대로 한다(원작 그대로 지시만 빠진다).
+        getActiveRun(projectId).catch(() => null),
       ])
+      preservedRun = (run?.state as WriterRunState | undefined) ?? null
       allowedCharacterIds = new Set(
         (roster ?? []).map((r) => r.character_id as string).filter(Boolean),
       )
@@ -286,7 +294,8 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       CHAT_OUTPUT_FORMAT_GUIDE +
       CHAT_UPDATES_BATCH_GUIDE +
       responseLanguageDirective(projectLocale) +
-      dialogueLanguageChatDirective(dialogueLanguage)
+      dialogueLanguageChatDirective(dialogueLanguage) +
+      preservedScriptChatDirective(isPreservedScriptRun(preservedRun))
     const userPrompt = `${ctx}${buildChatTaskContext(taskContext)}${message}`
 
     context.start()

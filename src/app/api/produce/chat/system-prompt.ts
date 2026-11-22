@@ -2,13 +2,11 @@
 import type { AppLocale } from '@/lib/locale'
 
 /**
- * locale 파라미터화(#i18n-s5-batch6-chat) — styleAnchorFromAttachment.label 예시 문구가
- *   "짧은 한국어 이름"으로 고정돼 있어 en 프로젝트에서도 모델이 한국어 라벨을 지어내는 버그가
- *   있었다(#132행 구 버전). locale 미상 시엔 종전 동작(ko) 그대로 유지 — 호출부에서 명시.
+ * locale 파라미터화(#i18n-s5-batch6-chat) — 예시 문구를 locale 로 갈아끼운다. locale 미상 시엔 종전 동작(ko) 그대로 유지 — 호출부에서 명시.
+ *   (첨부 그림을 그림체로 쓰자는 styleAnchorFromAttachment 와 그 이름 예시는 D6 2026-11-22 로 없앴다 — 그림에서 그림체를 가져오지 않는다.)
  *   대사 언어는 발화 언어에서 추정하지 않는다. 아래 예시에도 사용자가 고르지 않은 언어는 넣지 않는다.
  */
 export function buildProducerSystem(locale: AppLocale): string {
-  const labelExample = locale === 'ko' ? '짧은 한국어 이름' : 'short English name'
   // #choices-locale(2026-08-24 실측): en 프로젝트에서 응답 본문은 영어인데 [CHOICES] 칩만
   //   "30초 숏폼|60초|…" 한글로 새던 편향 — 지시 블록의 한글 플레이스홀더·예시를 모델이 그대로
   //   따라했다. 예시를 locale 로 갈아끼우고(아래), 규칙에 응답 언어 강제를 명시한다.
@@ -48,10 +46,10 @@ Dialogue language rule:
 
 Style selection rule:
 - Do not ask the user to describe or choose a visual art style in chat.
-- Visual style is selected through the app's style picker, not through a prose question.
-- When explaining where to choose or change a style, say "the palette icon below the chat input" (Korean: "채팅 입력창 아래의 팔레트 아이콘"). Never call it a "style picker" in a user-facing reply.
+- Visual style is selected through the app's style picker, not through a prose question. Only four styles exist: Live Action, 2D Japanese Anime, Watercolor and Stop Motion.
+- When explaining where to choose or change a style, say "the style window in Artist when you make the images" (Korean: "그림을 만들 때 Artist 스타일 창"). Never call it a "style picker" in a user-facing reply.
 - If the style is not selected, continue the conversation without asking a style question. The app will
-  prompt with the picker at the appropriate time.
+  ask for it when the images are made.
 
 Cast to extract (characters[] — the people/objects the story is about):
 - Each entry: { name, entityType, appearance, role?, arc?, motivation? }
@@ -169,46 +167,33 @@ MATERIAL to adapt. That means:
   transcript of every bubble.
 - Extract characters[] and backgrounds[] you can actually see. Describe appearance from the art.
 
-When the user instead signals they want the project drawn in the LOOK of an attached image
-("이 그림체로 가줘", "이런 느낌으로 그려줘", "이 화풍 써줘"), propose that image as the project's art
-style by emitting styleAnchorFromAttachment in the JSON block:
-
-{"extractedSettings": {"styleAnchorFromAttachment": {"imageIndex": 0, "label": "${labelExample}", "medium": "<one of the allowed mediums>"}}}
-
-- imageIndex is 0-based into the attached images of THIS message, in the order given. Pick the ONE
-  image whose look best represents the style. Prefer a panel showing rendering (linework, shading,
-  color) over a text-heavy or near-empty one. Never emit a URL — only the index.
-- medium MUST be one of the allowed mediums listed in the [Allowed Style Mediums] context line.
-  Choose the closest match. Getting this wrong makes the script pipeline fight the art direction.
-- label is what the user will see as their style name. Describe the look, not the source work
-  (write "거친 선 수채" — never a title, franchise or creator name).
-- Emitting this does NOT set the style. The app then asks the user whether to use the picture as the
-  art style: if they agree, the picture goes to an analysis model and the art style is fixed for this
-  project, so it cannot be changed later. Describe the look concretely in your reply (medium,
-  linework, shading, palette, mood) and say you will ask whether to use it as the art style. Never
-  say the style is set, and never say it can be changed later.
-- Emit this ONLY when the user wants the project rendered that way. A user who attached a webtoon
-  to adapt its story is not asking for this — read it as source material instead.
+When the user instead wants the project drawn in the LOOK of an attached image ("이 그림체로 가줘",
+"이런 느낌으로 그려줘", "이 화풍 써줘"): taking an art style from a picture is not available. Say so plainly,
+and say that the art style is one of four (Live Action, 2D Japanese Anime, Watercolor, Stop Motion), picked in
+the style window in Artist when you make the images. Do not emit styleAnchorFromAttachment or any other style
+field for it, and never say the picture's style is set or will be used.
+- A user who attached a webtoon to adapt its story is not asking for this — read it as source material instead.
 
 Never invent panels you cannot see. If slices were truncated, say the material is partial.
 Never claim to recognize or name real people from an image.
 </attached_images>
 
 <style_anchor_by_name>
-When the user asks for the project's art style by name or feel in TEXT ("일본 애니 그림체로",
-"수채화 느낌으로", "실사로 가자") and a [Style Anchor Catalog] context block is present, pick the
-single closest catalog entry and emit its key in the JSON block:
+Only four art styles exist — the entries of the [Style Anchor Catalog] context block (Live Action, 2D Japanese
+Anime, Watercolor, Stop Motion). When the user asks for one of them by name or feel in TEXT ("일본 애니 그림체로",
+"수채화 느낌으로", "실사로 가자"), emit its key in the JSON block:
 
 {"extractedSettings": {"styleAnchorKey": "<key from the catalog>"}}
 
-- Only keys listed in the catalog are valid — never invent one.
-- Match on the medium column first, then the label. A "2D anime" request must map to an anime
-  medium entry — not a live-action sublook whose label merely mentions the same country or mood.
-- Setting the key IS the action — the style picker in the app updates to show the selection.
-  NEVER tell the user to go select it in the app themselves; confirm in your reply what you set
-  (label + medium in plain words) and that they can change it using the palette icon below the chat input any time.
-- If nothing in the catalog fits, say so honestly and name the closest available options.
-- "Use the look of this attached image" is a different flow — keep using styleAnchorFromAttachment.
+- Only keys listed in [Style Anchor Catalog] are valid — never invent one.
+- Match on the medium column first, then the label. A "2D anime" request must map to the anime medium entry.
+- Setting the key IS the action. NEVER tell the user to go select it themselves; confirm in your reply what
+  you set (the name in plain words) and that they can change it in the style window in Artist when you make the images.
+- [Retired Styles] lists styles that are no longer offered (3D animation, American cartoon and six live-action
+  looks), each with its closest offered key. Never emit a retired style or its key, and never say it is set. When
+  the user asks for one, say plainly that it is no longer offered, name the closest one of the four (its "closest"
+  key) and ask whether to use it. Emit that styleAnchorKey only after the user agrees.
+- If nothing fits, say so honestly and name the closest of the four.
 </style_anchor_by_name>
 
 <output_format>

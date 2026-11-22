@@ -128,6 +128,19 @@ export function sortByBoard<N extends { data: NamedNodeData }>(nodes: readonly N
   })
 }
 
+/**
+ * 노드 보기 · 씬 단추를 ⌘/Ctrl+클릭할 때 채팅에 넣는 @이름(오너 D9 2026-11-22) — Director 채팅 고르기 목록(global-chat 의 'real' 항목,
+ *   card-mention sceneShotMentions)과 같은 이름("실사 샷 8" · "Real Shot 8"). label = 화면 이름(directorNodeLabel). id · 이름이 비면 null(멘션하지 않는다).
+ *   카드를 그릴 때 부르므로 번역은 순수 코어(@/lib/i18n/translate)로 — 같은 이름인지는 tests/director/node-mention.test.ts 가 맞춰 본다.
+ */
+export function realMentionLabel(kind: 'scene' | 'shot', id: string, label: string, locale: AppLocale): string | null {
+  const name = label.trim()
+  if (!id.trim() || !name) return null
+  const kindPattern = kind === 'scene' ? /^(?:scene|씬)\s+/i : /^(?:shot|샷)\s+/i // i18n-ok: 두 말의 종류 낱말을 뗀다(card-mention 과 같은 규칙)
+  const bare = name.replace(kindPattern, '').trim() || name
+  return `${translate(locale, 'Real')} ${kind === 'scene' ? sceneName(locale, bare) : shotName(locale, bare)}`
+}
+
 /** Director 채팅 @멘션 대상 — 씬 · 샷 노드를 보드와 같은 이름으로. */
 export function directorMentionTargets(
   nodes: ReadonlyArray<{ id: string; data: DirectorNodeData }>,

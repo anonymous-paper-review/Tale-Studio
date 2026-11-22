@@ -617,14 +617,17 @@ export const useEntryStore = create<EntryStoreState>((set, get) => {
       if (!said || locked()) return
       const draft = get().draft
       const parsed = parseChatAnswer(said, { keepAllowed: hasOriginalText(draft.idea, draft.file) })
+      // 원작 그대로면 말한 길이는 받지 않는다 — 길이는 원작을 따른다(D15 오너 2026-11-22). 같은 말에서 바꿈 정도를 바꾸면(다듬기 · 키우기) 그 길이를 받는다.
+      const keptLength = !!parsed.runtime && (parsed.level ?? draft.picks.level) === 'keep'
+      if (keptLength) delete parsed.runtime
       const keys = (Object.keys(parsed) as PickKey[]).filter((k) => parsed[k])
       if (!keys.length) {
-        set({ chat: { ...get().chat, hint: { said, keys: [] }, nudge: null } })
+        set({ chat: { ...get().chat, hint: { said, keys: [], ...(keptLength ? { keptLength } : {}) }, nudge: null } })
         return
       }
       const patch = parsedPatch(draft, parsed, { asPre: false })
       const order: PickKey[] = ['mood', 'runtime', 'level', 'ratio']
-      set({ draft: applyChatPatch(draft, patch), chat: { ...get().chat, hint: { said, keys: order.filter((k) => keys.includes(k)) }, nudge: null } })
+      set({ draft: applyChatPatch(draft, patch), chat: { ...get().chat, hint: { said, keys: order.filter((k) => keys.includes(k)), ...(keptLength ? { keptLength } : {}) }, nudge: null } })
       await sendPatch(patch)
     },
 

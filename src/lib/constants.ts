@@ -1,5 +1,10 @@
 import type { StageConfig, StageId } from '@/types'
 
+// Camera 탭 이름(오너 2026-11-22 D2~D5 — 가칭, 오너가 바꿀 수 있다. id 'camera' 는 그대로). 레일 이름 · 문장 속 이름은 여기 한 곳에서만 정하고,
+//   이름이 들어가는 문구는 모두 STAGE_LABEL · STAGE_AGENT_NAME 을 {stage} · {agent} 로 받는다(리드 11/22 "문구 키 한 곳에").
+const CAMERA_LABEL = 'Camera'
+const CAMERA_AGENT = 'Cinematographer'
+
 export const STAGES = [
   // 리뉴얼 1차(2026-10-19): 화면 이름 Producer → Writer → Artist → Storyboard → Director → Editor.
   //   id 는 옛 이름 그대로다(types/project.ts StageId 주석): entry=Producer, producer=Writer, writer=Storyboard.
@@ -30,11 +35,23 @@ export const STAGES = [
     nextStage: 'writer',
   },
   {
-    // 화면 이름 Storyboard(가칭) — 씬 · 샷 · 러프 스토리보드. 예전 Writer 화면 그대로 Artist 뒤로 옮겼다.
+    // 콘티(옛 화면 이름 Storyboard) — 씬 · 샷 · 러프 콘티. 예전 Writer 화면 그대로 Artist 뒤로 옮겼다.
+    //   2026-11-22(오너 D1): Writer 탭 안의 콘티 칸이다 — 레일은 Writer 칸 하나로 보인다(lib/stage-rail RAIL_ITEMS). 이름표 · 담당도 Writer.
+    //   2026-11-22(오너 D2~D5): 다음 단계는 Director 앞에 선 새 탭 Camera 다.
     id: 'writer',
-    name: 'The Storyboard Room',
-    agent: 'Storyboard',
+    name: "The Writers' Room",
+    agent: 'Writer',
     path: '/studio/writer',
+    handoffLabel: `Next: ${CAMERA_LABEL}`,
+    nextStage: 'camera',
+  },
+  {
+    // 화면 이름 Camera(가칭, 오너 2026-11-22 D2~D5) — 씬마다 샷의 실사 그림 · 영상 이력. 옛 Director 스토리보드 보기의 일을 받았다.
+    //   Director 로는 조건 없이 넘긴다(리드 11/22 f).
+    id: 'camera',
+    name: `The ${CAMERA_LABEL} Room`,
+    agent: CAMERA_AGENT,
+    path: '/studio/camera',
     handoffLabel: 'Next: Director',
     nextStage: 'director',
   },
@@ -64,12 +81,13 @@ export const DEFAULT_SHOT_DURATION = 8
 
 // ── GlobalChat: stage 이름 + 색 (design.md §2.9). 단일 source — 컴포넌트는 import만 ──
 
-// 화면에 보이는 단계 이름 — id 와 다르다(리뉴얼 1차): producer 는 Writer, writer 는 Storyboard 로 보인다.
+// 화면에 보이는 단계 이름 — id 와 다르다(리뉴얼 1차): producer 는 Writer. writer(콘티)도 Writer 다 — Writer 탭 안의 칸(D1 2026-11-22).
 export const STAGE_LABEL: Record<StageId, string> = {
   entry: 'Producer',
   producer: 'Writer',
-  writer: 'Storyboard',
+  writer: 'Writer',
   artist: 'Artist',
+  camera: CAMERA_LABEL,
   director: 'Director',
   editor: 'Editor',
 }
@@ -82,19 +100,22 @@ export const STAGE_LABEL: Record<StageId, string> = {
 export const STAGE_AGENT_NAME: Record<StageId, string> = {
   entry: 'Producer',
   producer: 'Writer',
-  writer: 'Storyboard',
+  writer: 'Writer',
   artist: 'Concept Artist',
+  camera: CAMERA_AGENT,
   director: 'Director',
   editor: 'Editor',
 }
 
 /** stage 색 badge 클래스 — design.md §2.9 토큰. JIT-safe literal (face와 동일 색). */
-//   색은 화면 이름을 따른다: Producer(entry)=보라, Writer(producer)=파랑, Storyboard(writer)=청록.
+//   색은 화면 이름을 따른다: Producer(entry) · Writer(producer) · 콘티(writer — Writer 탭 안의 칸이라 Writer 색, D1 2026-11-22 · 리드 결정 2).
+//   Camera 는 옛 Storyboard 색(딥 블루)을 받는다(리드 2026-11-22 — 콘티가 Writer 칸 안으로 들어가며 비는 자리, design.md §2.9).
 export const STAGE_BADGE_CLASS: Record<StageId, string> = {
   entry: 'bg-stage-producer/15 text-stage-producer border-stage-producer/30',
   producer: 'bg-stage-writer/15 text-stage-writer border-stage-writer/30',
-  writer: 'bg-stage-storyboard/15 text-stage-storyboard border-stage-storyboard/30',
+  writer: 'bg-stage-writer/15 text-stage-writer border-stage-writer/30',
   artist: 'bg-stage-artist/15 text-stage-artist border-stage-artist/30',
+  camera: 'bg-stage-storyboard/15 text-stage-storyboard border-stage-storyboard/30',
   director: 'bg-stage-director/15 text-stage-director border-stage-director/30',
   editor: 'bg-stage-editor/15 text-stage-editor border-stage-editor/30',
 }
@@ -103,8 +124,9 @@ export const STAGE_BADGE_CLASS: Record<StageId, string> = {
 export const STAGE_FACE_COLOR: Record<StageId, string> = {
   entry: 'var(--stage-producer)',
   producer: 'var(--stage-writer)',
-  writer: 'var(--stage-storyboard)',
+  writer: 'var(--stage-writer)',
   artist: 'var(--stage-artist)',
+  camera: 'var(--stage-storyboard)',
   director: 'var(--stage-director)',
   editor: 'var(--stage-editor)',
 }
@@ -117,6 +139,8 @@ export const STAGE_CHAT_TITLE: Record<StageId, string> = {
   artist: 'Art with Lumi',
   writer: 'Directing with Lumi',
   // Director · Editor 는 11/13 시안 D5 대로 단계 이름을 적는다(오너 11/14 "추천대로") — 다른 단계는 v3 그대로.
+  //   Camera 도 같은 꼴(시안 없음, 오너 2026-11-22 D2~D5). 이름은 STAGE_LABEL 에서 — 채팅 머리가 {stage} 로 넘긴다.
+  camera: 'Lumi · {stage}',
   director: 'Lumi · Director',
   editor: 'Lumi · Editor',
 }
@@ -128,6 +152,8 @@ export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   writer: 'E.g. make shot 8 darker',
   // 새 인물 · 배경은 채팅으로 만들지 않는다(디자이너 QA 1차 #04) — 있는 인물을 고치는 예시를 든다.
   artist: "E.g. make the main character's hair shorter",
+  // Camera(오너 2026-11-22 D2~D5) — 판을 쌓는 탭이라 다시 만드는 예시를 든다.
+  camera: "E.g. make shot 3's video again, a bit slower",
   // 11/13 시안 D5 — 말로 샷 하나를 고치는 예시(오너 11/14 "추천대로").
   director: "E.g. make shot 1's lighting neon blue",
   // Editor 채팅은 조언만 한다(오너 2026-11-14 10번) — 작업물을 바꾸지 않으니 "어떻게 하나"를 묻는 예시를 든다.
@@ -170,6 +196,8 @@ export const STAGE_THINKING_PHRASES: Record<StageId, readonly string[]> = {
     'Matching up look consistency',
     'Organizing the generation plan',
   ],
+  // Camera(오너 2026-11-22 D2~D5) — 샷마다 쌓인 판을 보고 고친다.
+  camera: ['Looking over the shot history', 'Gauging lighting and mood', 'Checking shot continuity'],
   director: [
     'Retracing the storyboard order',
     'Mapping out camera movement',
@@ -203,6 +231,12 @@ export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
     'Fill in the empty character views',
     'Regenerate the background image',
   ],
+  // Camera(오너 2026-11-22 D2~D5)는 Director 와 같은 채팅 엔진이라 같은 요청을 쓴다.
+  camera: [
+    "Change this shot's camera to a low angle",
+    'Make the lighting more dramatic',
+    'Write the shot description more specifically',
+  ],
   director: [
     "Change this shot's camera to a low angle",
     'Make the lighting more dramatic',
@@ -218,10 +252,12 @@ export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
 
 // writer 채팅: 러프 스토리보드 검토 단계에서 씬/샷 CRUD (api/writer/chat + global-chat-store 'writer' case).
 //   editor 채팅은 조언만 한다(api/editor/chat — 오너 2026-11-14 10번, 작업물을 바꾸는 길이 없다).
+// camera(오너 2026-11-22 D2~D5): Director 와 같은 채팅 엔진(api/director/chat)을 쓰고 말은 채팅방 Camera 구간에 남는다(lib/director-chat-stage).
 export const CHAT_SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([
   'producer',
   'writer',
   'artist',
+  'camera',
   'director',
   'editor',
 ])

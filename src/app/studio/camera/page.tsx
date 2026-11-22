@@ -1,0 +1,105 @@
+'use client'
+
+// Camera(단계 id camera, 오너 2026-11-22 D2~D5) — Director 앞 새 탭. 위에 씬 단추, 아래에 그 씬의 샷이 세로로 서고
+//   샷마다 실사 그림 · 영상 이력이 쌓인다(옛 Director 스토리보드 보기의 일). 데이터는 Director 와 같은 캔버스 상점이다.
+//   이 화면이 하는 일: Storyboard → Camera 넘김 마무리 · 넘어가면서 이미지 만들기(D0) · 영상 묶음 되살리기 · 동기화 훅.
+//   만들기 줄(work-bar · 위 막대 [다음: Director]) · 샷 줄과 이력 줄(camera-board · shot-row) · ⤢ 상세 창은 features/camera.
+//   약속: tests/camera/* · tests/writer/director-handover-images.test.ts
+import { useEffect } from 'react'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { SceneButtons } from '@/components/scene-buttons'
+import { StageHelpBadge } from '@/components/stage-help-badge'
+import { STAGE_LABEL } from '@/lib/constants'
+import { useT } from '@/lib/i18n'
+import { takeImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
+import { runRealBatch } from '@/lib/director/real-batch-client'
+import { restoreVideoBatch } from '@/lib/director/video-batch-client'
+import { useDirectorCanvasStore } from '@/stores/director-store'
+import { useGlobalChatStore } from '@/stores/global-chat-store'
+import { useProjectStore } from '@/stores/project-store'
+import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
+import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
+import { switchDirectorScene } from '@/features/director/hooks/use-scene-view'
+import { CameraBoard } from '@/features/camera/camera-board'
+import { useCameraScene } from '@/features/camera/use-camera-scene'
+import { CameraShotDetailDialog } from '@/features/camera/shot-detail-dialog'
+import { CameraWorkBar } from '@/features/camera/work-bar'
+
+export default function CameraPage() {
+  const t = useT()
+  // Storyboard 에서 부탁한 넘김은 실제 Camera 화면이 붙은 뒤에만 끝났다고 알린다(라우터 요청이 아니라 이 화면의 mount 가 확인한다).
+  const handoffProjectId = useProjectStore((s) => s.projectId)
+  useEffect(() => {
+    if (handoffProjectId) useGlobalChatStore.getState().confirmDirectorHandoff(handoffProjectId, '/studio/camera')
+  }, [handoffProjectId])
+
+  // ⤢ 상세는 이 화면의 창에서만 연다 — 다른 화면에서 열어 둔 상세가 들어오자마자 뜨지 않게, 떠날 때도 닫는다.
+  useEffect(() => {
+    useDirectorCanvasStore.getState().closeShotDetail()
+    return () => useDirectorCanvasStore.getState().closeShotDetail()
+  }, [])
+
+  const projectId = useDirectorCanvasStore((s) => s.projectId)
+  // 프로젝트 init(resetChildStores)이 끝난 뒤에만 시작한다 — 그 전에 시작한 일은 reset 에 지워진다.
+  const stageReady = useProjectStore((s) => s.currentStage === 'camera' && !s.initLoading)
+
+  // Writer 씬 · 샷 → 캔버스 노드(Director 와 같은 동기화) · 생성이 끝나면 바로 다시 읽기.
+  useWriterDirectorSync()
+  useQueueRehydrate(projectId && projectId !== 'default' ? projectId : null)
+
+  // 영상 묶음 되살리기 — 탭을 닫았다 와도 서버 묶음의 차례 · 진행이 이어진다(Director 화면과 같은 길).
+  useEffect(() => {
+    if (!stageReady || !projectId || projectId === 'default') return
+    const restore = () => {
+      if (document.hidden) return
+      void restoreVideoBatch(projectId).catch((error) => {
+        console.error('[camera] video batch restore failed:', error)
+      })
+    }
+    restore()
+    document.addEventListener('visibilitychange', restore)
+    return () => document.removeEventListener('visibilitychange', restore)
+  }, [projectId, stageReady])
+
+  // 씬 단추 · 지금 보는 씬(오너 D2~D5 · D8) — Director 노드 보기와 같은 기억을 쓴다. 씬을 바꾸면 Director 도 그 씬으로 열린다.
+  const { items: sceneItems, sceneKey, scene, place, projectId: sceneProjectId } = useCameraScene()
+
+  // D0(디자이너 1110 확정 · 2026-11-14): Storyboard 넘기기 창에서 "넘어가면서 이미지 만들기"를 고르고 넘어온 경우에만 실사 일괄을 한 번 시작한다.
+  //   들어오기만 해서는 만들지 않는다(8/27 #c5).
+  useEffect(() => {
+    if (!stageReady || !projectId || projectId === 'default') return
+    if (takeImagesOnDirectorEntry(projectId)) void runRealBatch(projectId)
+  }, [projectId, stageReady])
+
+  return (
+    <div className="flex flex-1 flex-col overflow-hidden pb-2">
+      <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-canvas-bg" data-testid="camera-page">
+        <div className="@container flex shrink-0 flex-col gap-3 px-4 pb-3 pt-4">
+          <div className="flex min-w-0 items-center gap-3">
+            {/* 씬 단추(오너 D2~D5 · D8) — 누르면 그 씬의 샷만 아래에 선다. ⌘/Ctrl+클릭은 @멘션(D9), Alt+←/→ 는 앞 · 뒤 씬. */}
+            <SceneButtons
+              items={sceneItems}
+              value={sceneKey}
+              onChange={(key) => { if (sceneProjectId) switchDirectorScene(sceneProjectId, key) }}
+              cycleWithAltArrows
+              className="max-w-[min(640px,60cqw)]"
+            />
+            <div className="flex min-w-0 items-center gap-2">
+              <h1 className="shrink-0 text-[15px] font-bold text-foreground">{STAGE_LABEL.camera}</h1>
+              <StageHelpBadge text={t("Make real images and videos shot by shot. Every image and video stays in the shot's history.")} />
+            </div>
+          </div>
+          {/* 위쪽 만들기 줄 — 세는 범위는 지금 모든 씬(씬 범위는 오너 답 뒤, work-scope). [다음: Director]도 이 줄이 위 막대에 단다. */}
+          <CameraWorkBar scope={null} />
+        </div>
+        {/* 씬을 바꾸면 샷 줄 목록이 맨 위에서 시작한다(앞 씬에서 내려간 자리를 새 씬에 남기지 않는다). */}
+        <ScrollArea key={sceneKey ?? 'none'} className="min-h-0 flex-1">
+          <div className="px-4 pb-6">
+            <CameraBoard scene={scene} place={place} />
+          </div>
+        </ScrollArea>
+      </div>
+      <CameraShotDetailDialog />
+    </div>
+  )
+}

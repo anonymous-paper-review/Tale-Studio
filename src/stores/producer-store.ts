@@ -8,6 +8,7 @@ import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { depthLevelFromRuntime } from '@/lib/depth'
 import { customStyleLabel } from '@/lib/custom-style-label'
+import { isOfferedStyle } from '@/lib/style-offer'
 import { isDemoSession } from '@/lib/demo/context'
 import { assignCastSlugs, assignLocationSlugs } from '@/lib/cast-slug'
 import { claimAction, releaseAction } from '@/lib/action-guard'
@@ -237,8 +238,9 @@ interface ProducerState {
   /** 스타일 앵커 선택 — 낙관적 반영 + projects.style_anchor_key 저장. */
   setStyleAnchor: (key: string | null) => Promise<boolean>
   /** D12: 채팅이 이름/느낌으로 고른 카탈로그 앵커 키 적용 — 카탈로그 검증 후 setStyleAnchor.
-   *  모델이 발명한 키는 unknown_key로 되돌려 호출부가 정직하게 말하게 한다. */
-  applyStyleAnchorKeyFromChat: (key: string) => Promise<'applied' | 'unknown_key' | 'failed' | 'locked'>
+   *  모델이 발명한 키는 unknown_key로 되돌려 호출부가 정직하게 말하게 한다.
+   *  네 가지 밖의(없어진) 스타일은 정하지 않고 retired 로 되돌린다 — 호출부가 가장 가까운 것을 권한다(D6 오너 2026-11-22). */
+  applyStyleAnchorKeyFromChat: (key: string) => Promise<'applied' | 'unknown_key' | 'failed' | 'locked' | 'retired'>
   /** 올린 내 그림체를 지운다 — 고정된 그림체여도 지울 수 있고, 지우면 다른 스타일을 고를 수 있다(2026-10-27 QA #03 · 오너). */
   removeCustomStyleAnchor: () => Promise<boolean>
   /** 채팅이 해석한 화풍 의도를 반영 — 저장은 서버(api/produce/style-anchor)가 검증 후 한다. */
@@ -951,6 +953,7 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
     if (get().styleAnchors.length === 0) await get().loadStyleAnchors()
     const anchor = get().styleAnchors.find((a) => a.key === key)
     if (!anchor) return 'unknown_key'
+    if (!isOfferedStyle(anchor.key)) return 'retired'
     return await get().setStyleAnchor(anchor.key) ? 'applied' : 'failed'
   },
 

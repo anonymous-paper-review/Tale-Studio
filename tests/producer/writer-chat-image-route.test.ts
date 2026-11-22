@@ -1,4 +1,4 @@
-// Writer 화면 채팅(넘기기 전 산문 초안)에 올린 그림의 쓰임새 답과 그림이 실린 말은 산문 고침으로 빠지지 않고 고른 대로 쓰이며, 그림 없는 말만 산문 고침이 되는지 검사한다
+// Writer 화면 채팅(넘기기 전 산문 초안)에 올린 그림의 쓰임새 답과 그림이 실린 말은 산문 고침으로 빠지지 않고 고른 대로 쓰이며(그림체는 D6 로 없어져 까닭만 말한다), 그림 없는 말만 산문 고침이 되는지 검사한다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
@@ -62,23 +62,23 @@ describe('Writer 화면 채팅의 그림 쓰임새', () => {
     expect(calls('/api/writer/scene-gate')).toEqual([])
   })
 
-  // 왜: 점검 C08 — "Art style"을 골라도 산문 수정안으로 빠져 그림체가 등록 · 고정되지 않았다(그림 + 짧은 말 "Use this as the art style"만 됐다).
-  it('Writer 화면 채팅에 올린 그림을 그림체로 고르면 산문을 고치지 않고 그 그림으로 그림체를 정해 고정한다', async () => {
+  // 왜: 점검 C08 — 그림 질문의 답이 산문 수정안으로 빠지면 안 된다. 그림체는 D6(2026-11-22)로 그림에서 가져오지 않는다 — 까닭을 말하고 다시 묻는다.
+  it('Writer 화면 채팅에 올린 그림을 그림체라고 답해도 산문을 고치지 않고 그림체도 정하지 않으며, 까닭과 함께 쓰임새를 다시 묻는다', async () => {
     chat.getState().offerImageRoles([LOOK], { typed: '', msg: 'Uploaded a picture' })
     await send('Use it as the art style')
-    await vi.waitFor(() => expect(calls('/api/produce/style-anchor')).toHaveLength(1))
-    expect(calls('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: LOOK.thumbUrl, lock: true })
-    await vi.waitFor(() => expect(producer.getState().customStyleAnchor?.locked).toBe(true))
+    expect(lastModel()).toBe("I can't take an art style from a picture. Pick one of the four styles (Live Action, 2D Japanese Anime, Watercolor, Stop Motion) in the style window in Artist when you make the images.")
+    expect(chat.getState().suggestion?.id).toBe(`image-role:${LOOK.id}`)
+    expect(calls('/api/produce/style-anchor')).toEqual([])
+    expect(producer.getState().customStyleAnchor).toBeNull()
     expect(calls('/api/writer/scene-gate')).toEqual([])
   })
 
-  // 왜: 점검 C06 — 만화라고 말로 같이 보내면 쓰임새 질문은 건너뛰지만, 이어진 그림체 질문에 답하면 산문 수정안으로 빠져 원고를 읽지 않았다.
-  //   2026-11-10 오너 답(검토 a 심각 1): 확정 전 Writer 화면에서는 그림체보다 먼저 산문을 만화로 다시 쓸지 묻는다 — [다시 쓰기]를 고른 뒤 그림체를 고른다.
-  it('Writer 화면 채팅에 만화라고 말하며 원고를 올리고 다시 쓰기와 그림체를 고르면 산문 고침 요청으로 빠지지 않고 원고를 읽어 대본으로 옮긴다', async () => {
+  // 왜: 점검 C06 — 만화라고 말로 같이 보내면 쓰임새 질문은 건너뛰지만, 이어진 질문에 답하면 산문 수정안으로 빠져 원고를 읽지 않았다.
+  //   2026-11-10 오너 답(검토 a 심각 1): 확정 전 Writer 화면에서는 먼저 산문을 만화로 다시 쓸지 묻는다. 그 뒤 그림체 질문은 D6(2026-11-22)로 없어졌다.
+  it('Writer 화면 채팅에 만화라고 말하며 원고를 올리고 다시 쓰기를 고르면 그림체 질문 없이, 산문 고침 요청으로 빠지지 않고 원고를 읽어 대본으로 옮긴다', async () => {
     chat.getState().offerImageRoles([PAGE], { typed: 'Turn my comic into video as drawn', msg: 'Turn my comic into video as drawn' })
     await send('Rewrite the prose from the comic')
-    expect(chat.getState().comicStyleGate).not.toBeNull()
-    await send('Keep the comic art style and fix it')
+    expect(chat.getState().comicStyleGate).toBeNull()
     await vi.waitFor(() => expect(calls('/api/produce/comic-script')).toHaveLength(1))
     expect(calls('/api/produce/comic-script')[0].pages.map((page: { name: string }) => page.name)).toEqual(['comic_1.webp'])
     await vi.waitFor(() => expect(producer.getState().storyText).toBe(SCRIPT))

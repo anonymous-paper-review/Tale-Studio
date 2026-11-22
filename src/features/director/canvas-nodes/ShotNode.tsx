@@ -18,7 +18,7 @@ import { useRoughStoryboard } from '@/features/director/hooks/use-rough-storyboa
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { isShotData, type DirectorNode } from '@/types/director'
 import { IMAGE_MODELS, normalizeImageModelKey } from '@/lib/image-models'
-import { directorNodeLabel } from '@/features/director/node-label'
+import { directorNodeLabel, realMentionLabel } from '@/features/director/node-label'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
@@ -142,6 +142,8 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         id={id}
         theme="shot"
         title={nodeTitle}
+        // ⌘/Ctrl+클릭 멘션(오너 D9) — Director 채팅 고르기 목록과 같은 "실사 샷 N".
+        mention={realMentionLabel('shot', id, nodeTitle, boardNames.locale)}
         selected={detailOpen}
         picked={picked}
         width={280}

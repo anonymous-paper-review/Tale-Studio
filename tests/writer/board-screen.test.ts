@@ -1,4 +1,4 @@
-// Storyboard 화면 머리(이름 · 숫자 · Director 버튼)와, 씬 · 샷을 나누는 동안 보드를 덮는 방식 · 카드 누르기를 검사한다
+// 콘티(옛 Storyboard) 화면 머리(이름 · 숫자 · 다음 단계 버튼)와, 씬 · 샷을 나누는 동안 보드를 덮는 방식 · 카드 누르기를 검사한다
 import { createElement } from 'react'
 import { readFileSync } from 'node:fs'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -53,11 +53,13 @@ beforeEach(() => {
   data.status = null
 })
 
-describe('Storyboard 화면 머리', () => {
-  // 왜: 화면 이름은 리뉴얼 순서의 단계 이름 Storyboard 다(예전 이름 Writers' Room 은 지금 산문 단계와 헷갈린다). 러닝타임은 지표로 제목 옆에만 작게.
-  it('Storyboard 화면을 열면 머리에 "Storyboard"와 씬 · 샷 · 초가 보이고 "Writers\' Room"은 보이지 않는다', () => {
+describe('콘티 화면 머리', () => {
+  // 왜: D1(오너 2026-11-22) — 옛 Storyboard 화면은 Writer 탭의 콘티 칸이다. 화면 이름은 위 막대 [씬 스토리 | 콘티]가 보여 주고(리드 결정 1),
+  //   머리의 큰 제목은 읽기 프로그램에만 남긴다. 러닝타임은 지표로 머리에 작게. 예전 이름 Writers' Room 은 보이지 않는다.
+  it('콘티 화면 머리에는 씬 · 샷 · 초가 보이고, 화면 이름 "콘티"는 위 막대 칸이 보여 주어 머리에는 읽기 프로그램용으로만 남는다', () => {
     const html = renderToStaticMarkup(createElement(WriterHeader))
-    expect(html).toContain('>Storyboard<')
+    expect(html).toContain('<span class="sr-only">콘티</span>')
+    expect(html).not.toContain('>Storyboard<')
     expect(html).toContain('씬 2 · 샷 3 · 10초')
     expect(html).not.toContain('Writers')
   })
@@ -69,10 +71,11 @@ describe('Storyboard 화면 머리', () => {
     expect(html).not.toContain('role="progressbar"')
   })
 
-  // 왜: Storyboard 의 다음 단계는 Director 다 — 일반 다음 단계 버튼은 이 단계에서 아무것도 보여 주지 않았다.
-  it('머리 오른쪽에는 [다음: Director로] 버튼이 있다', () => {
+  // 왜: 콘티(옛 Storyboard)의 다음 단계는 Director 앞에 선 새 탭 Camera 다(오너 2026-11-22 D2~D5) — 단추 글은 단계 표의 다음 단계 이름을 따른다.
+  it('머리 오른쪽에는 [다음: Camera로] 버튼이 있다', () => {
     const html = renderToStaticMarkup(createElement(WriterHeader))
-    expect(html).toContain('다음: Director로')
+    expect(html).toContain('다음: Camera로')
+    expect(html).not.toContain('다음: Director로')
     expect(html).toContain('data-testid="storyboard-next-director"')
   })
 })
@@ -90,16 +93,14 @@ describe('씬 · 샷을 나누는 동안의 화면', () => {
 describe('보드 카드 누르기', () => {
   const view = readFileSync('src/features/writer/rough-storyboard-view.tsx', 'utf8')
 
-  // 왜: 카드를 Ctrl/Cmd 로 눌러 채팅에 붙이는 여러 샷 선택은 없앴다(프로토타입 S1) — 그냥 누르면 샷 상세가 열리는 동작만 남긴다.
-  it('보드 카드와 씬 이름을 Ctrl/Cmd로 눌러도 채팅에 붙이지 않는다', () => {
-    expect(view).not.toContain('mentionLabelForModifierClick')
-    expect(view).not.toContain('requestMentionToggle')
-    expect(view).not.toContain('onClickCapture')
+  // 왜: D9(오너 2026-11-22) — ⌘/Ctrl+클릭 멘션이 모든 탭에서 되어야 한다. 리뉴얼 1차(프로토타입 S1)에 뺐던 카드 · 씬 이름 멘션을 되살린다(여러 샷 고르기가 아니라 채팅 @멘션 하나씩).
+  it('보드 카드와 씬 이름을 ⌘/Ctrl로 누르면 상세 · 접기 대신 채팅에 @멘션이 붙는다', () => {
+    expect(view).toMatch(/onClickCapture=\{\(e\) => mentionOnModifierClick\(e, mentionLabels\.shots\.get\(shot\.shotId\)\)\}/)
+    expect(view).toMatch(/onClickCapture=\{\(e\) => mentionOnModifierClick\(e, mentionLabels\.scenes\.get\(scene\.sceneId\)\)\}/)
   })
 
-  // 왜: 숨은 조작키 없이 누르면 언제나 같은 일이 일어나야 한다 — Ctrl 을 누른 채 눌러도 샷 상세가 열린다.
-  it('보드 카드를 누르면 조작키와 상관없이 샷 상세를 연다', () => {
+  // 왜: 정상 경로 고정 — ⌘/Ctrl 없이 누르면 지금처럼 샷 상세가 열린다.
+  it('보드 카드를 ⌘/Ctrl 없이 누르면 샷 상세를 연다', () => {
     expect(view).toContain('onClick={() => openDetail(shot.shotId)}')
-    expect(view).not.toMatch(/event\.ctrlKey \|\| event\.metaKey/)
   })
 })

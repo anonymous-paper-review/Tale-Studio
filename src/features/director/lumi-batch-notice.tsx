@@ -28,6 +28,8 @@ export function LumiBatchNotice() {
   const t = useT()
   const locale = useLocale()
   const notice = useLumiNoticeStore((s) => s.notice)
+  // 카드를 띄운 화면(Director · Camera, 리드 2026-11-22) — 그 화면에서만 보인다.
+  const shownOn = useLumiNoticeStore((s) => s.stage ?? 'director')
   const collapsed = useChatUiStore((s) => s.collapsed)
   const projectId = useProjectStore((s) => s.projectId)
   const stage = useProjectStore((s) => s.currentStage)
@@ -38,7 +40,7 @@ export function LumiBatchNotice() {
   const takes = useTakeBalance()
   const busy = useGlobalChatStore((s) => s.loading)
 
-  if (!notice || !collapsed || stage !== 'director' || notice.projectId !== projectId) return null
+  if (!notice || !collapsed || stage !== shownOn || notice.projectId !== projectId) return null
   const names = boardNodeNames(sceneManifest, writerShots ?? [], locale)
   const view = lumiBatchNoticeView({
     notice,
@@ -46,6 +48,7 @@ export function LumiBatchNotice() {
     labelOf: (id) => shotLabelOf(nodes.find((node) => node.id === id), names),
     takesReturned: takes.mode !== 'off' && takes.balance !== null,
     locale,
+    screen: stage === 'camera' ? 'camera' : 'director',
   })
   const run = (action: LumiNoticeAction) => {
     useLumiNoticeStore.getState().dismiss()
@@ -63,7 +66,7 @@ export function LumiBatchNotice() {
       )}
     >
       <div className="flex items-center gap-2.5 pr-6">
-        <LumiAvatar persona={STAGE_PERSONA.director} size={28} />
+        <LumiAvatar persona={STAGE_PERSONA[stage]} size={28} />
         <p className="text-label font-bold text-foreground">{view.title}</p>
       </div>
       {view.body && <p className="text-caption text-muted-foreground">{view.body}</p>}

@@ -9,6 +9,8 @@
 //   (새 화면만)로 폴백한다. 방향 판정은 순수 함수로 분리해 테스트한다.
 
 import { STAGES } from '@/lib/constants'
+import { railIndexOfStage } from '@/lib/stage-rail'
+import type { StageId } from '@/types'
 
 /** 탭 전환 직후 채팅 임시 요소(제안·승인 카드·팁)를 숨기는 시간. 이후 계단식 등장. */
 export const EPHEMERAL_SETTLE_MS = 1000
@@ -17,8 +19,16 @@ export const CASCADE_STEP_MS = 150
 
 export type SlideDirection = 'forward' | 'back' | 'none'
 
+/** 주소의 단계(id). 단계 주소가 아니면 null. */
+export function stageIdFromPathname(pathname: string): StageId | null {
+  return (STAGES.find((s) => pathname.startsWith(s.path))?.id as StageId | undefined) ?? null
+}
+
+/** 주소가 레일에서 몇 번째 칸인가(위 → 아래) — 세로 움직임 방향의 기준. 씬 스토리 · 콘티는 같은 Writer 칸이다(D1 2026-11-22).
+ *  단계 주소가 아니면 -1. */
 export function stageIndexFromPathname(pathname: string): number {
-  return STAGES.findIndex((s) => pathname.startsWith(s.path))
+  const stage = stageIdFromPathname(pathname)
+  return stage ? railIndexOfStage(stage) : -1
 }
 
 export function slideDirectionBetween(prev: number | null, next: number): SlideDirection {
@@ -32,9 +42,11 @@ export function slideDirectionBetween(prev: number | null, next: number): SlideD
  *  resolveCommit: VT 의 DOM 갱신 대기 약속 — 새 라우트의 template 마운트가 해소한다. */
 export const stageNavMemory: {
   lastIndex: number | null
+  /** 직전 단계(id) — Writer 칸 안 두 칸(씬 스토리 · 콘티) 사이의 옆 움직임을 가른다(lib/writer/parts writerPartSlide). */
+  lastStage: StageId | null
   viaViewTransition: boolean
   resolveCommit: (() => void) | null
-} = { lastIndex: null, viaViewTransition: false, resolveCommit: null }
+} = { lastIndex: null, lastStage: null, viaViewTransition: false, resolveCommit: null }
 
 // ── View Transition 오케스트레이션 (#tab-slide-v2) ──────────────────────────────
 

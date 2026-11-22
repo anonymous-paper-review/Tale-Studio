@@ -6,6 +6,7 @@ import type {
   GenerationMethod,
 } from '@/types/shot'
 import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
+import type { ContinueFrom, TakeVia, VideoMode } from '@/lib/director/video-modes'
 
 // ============================================================================
 // Director Canvas Types
@@ -103,6 +104,10 @@ export type StoryboardImageVersion = {
   roughGeneratedAt?: number | null
   /** 화면에서 멈춘 작업이 뒤늦게 끝난 그림 — 기록에만 있고 저절로 지금 그림이 되지 않는다(오너 7번). */
   cancelled?: true
+  /** 이 판을 부탁한 사람 말(오너 2026-11-22 결정 4) — [이미지 고치기]의 바꿀 점 · 채팅에 부탁한 말. 없으면 칸이 없다. lib/director/image-note */
+  note?: string
+  /** 그 말을 한 곳 — 'button' = 바꿀 점 칸, 'chat' = 채팅(Lumi). note 와 같이만 있다. */
+  via?: 'button' | 'chat'
 }
 
 // ─── Scene Node ────────────────────────────────────────────────────────────
@@ -178,6 +183,14 @@ export type VideoOverride = Partial<{
   /** 샷 상세 영상 고치기의 바꿀 점(디자이너 11/13 D7 · 리드 검토 c ③) — 이 Take 를 만들 때 지금 샷 프롬프트 끝에 한 번 붙인다.
    *  기록으로 남아 다음 Take 의 칸에 미리 채워질 뿐 쌓이지 않는다. 빈 글 = 바꿀 점 없음. */
   changeNote: string
+  /** 영상 만드는 방식(오너 2026-11-22 D2~D5) — 없으면 기본(시작+끝). 영상 요청에 실리고 [다시 만들기]가 이어받는다. */
+  videoMode: VideoMode
+  /** ① 이어서의 출처 — 앞 샷 Take · 그 영상을 낸 작업 · 잡은 장면. 다시 만들어도 같은 장면에서 잇는다(앞 샷 영상이 그대로인지는 서버가 본다). */
+  continueFrom: ContinueFrom
+  /** Camera 이력 요약(fb-camera) — 사람이 쓴 말. */
+  note: string
+  /** Camera 이력 요약(fb-camera) — 만든 길(단추 · 채팅 · 일괄). */
+  via: TakeVia
 }>
 
 /** 부모 Shot 없이 독립 생성한 Video가 직접 소유하는 완전한 생성 설정. */
@@ -230,7 +243,9 @@ type VideoNodeCommonData = {
   videoResolution?: VideoResolution | null
   /** 지금 영상을 낸 작업이 실제로 쓴 시작 · 끝 그림 주소(작업 기록 기준, 디자이너 11/13 D7 · 리드 B). 모르면 null/없음.
    *  화면이 샷의 이미지 버전과 맞춰 "시작 v1 + 끝 v1"을 낸다. */
-  madeFrames?: { start: string | null; end: string | null } | null
+  madeFrames?: { start: string | null; end: string | null; middle?: string | null } | null
+  /** 지금 영상을 낸 작업의 방식(2026-11-22) — 작업 기록 기준. 모르면 null/없음, 적히지 않은 작업은 기본(start_end). */
+  madeVideoMode?: VideoMode | null
   /** 화면에서 멈춘 때(오너 2026-11-14 7번) — 그 Take 의 마지막 작업을 멈췄다. 뒤늦게 끝나도 기록에만 있다. */
   cancelledAt?: string | null
   [key: string]: unknown

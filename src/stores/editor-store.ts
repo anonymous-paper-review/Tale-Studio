@@ -28,7 +28,7 @@ import { compactSnapshot, sharePeaks } from '@/lib/editor/peaks'
 import { autoMoveNotice } from '@/lib/editor/auto-move'
 import { nearestEditPoint } from '@/lib/editor/timeline-segments'
 import { TRANSITION_DEFAULT_SEC, cleanTransition, crossSourceSec, dipOpacityAt, dissolveOpacityAt, edgeFadeAt, edgeTransition, joinedNeighbor, transitionWindows, type TransitionEdge, type TransitionWindow } from '@/lib/editor/transition'
-import { VIDEO_EFFECT_DEFAULT, patchEffects, type VideoEffectKind, type VideoEffectPatch } from '@/lib/editor/video-effects'
+import { VIDEO_EFFECT_DEFAULT, blurAt, blurMode, hasVideoEffects, patchEffects, type VideoEffectKind, type VideoEffectPatch } from '@/lib/editor/video-effects'
 import { TITLE_CLIP_SECONDS, TITLE_SIZE_DEFAULT, cleanTitleText } from '@/lib/editor/title-clip'
 import { withCancelledTakes } from '@/lib/director/take-cancellations'
 
@@ -619,6 +619,11 @@ export interface FrameLayer {
   /** 영상만 — 그 시각 원본 시각(초)과, 원본이 모자라 첫 장 · 끝 장에 멈췄는지(교차 디졸브 짝 · 미리 불러 둔 층). */
   sourceSec?: number
   held?: boolean
+  /**
+   * 영상만, 흐림을 넣은 클립만 — 그 시각 흐림 세기(0 ~ 1, D14). [시작 → 끝]은 클립이 시작할 때 시작 값에서 끝날 때 끝 값까지 곧은 줄이고,
+   *   클립 밖(교차 디졸브 짝)은 시작 · 끝 값에 멈춘다. 모니터 · 내보내기가 이 값을 그대로 그린다(videoEffectFilter).
+   */
+  blur?: number
 }
 
 /** 시각 t 의 그릴 것 목록 — 모니터와 내보내기가 같은 목록으로 같은 그림을 그린다(2단계 ⑦, R7). */
@@ -642,7 +647,10 @@ function frameLayerKind(shotId: string): FrameLayerKind {
   return isTitleClipShotId(shotId) ? 'title' : isTitleCardShotId(shotId) ? 'card' : 'video'
 }
 
-/** 클립 하나를 시각 t 의 층으로 — 세기는 불투명도 × 빈 끝 교차 디졸브, 영상은 원본 시각(모자라면 첫 장 · 끝 장). */
+/**
+ * 클립 하나를 시각 t 의 층으로 — 세기는 불투명도 × 빈 끝 교차 디졸브, 영상은 원본 시각(모자라면 첫 장 · 끝 장)과 흐림을 넣었으면 그 시각
+ *   흐림 세기(클립 자리 안의 진행으로, D14).
+ */
 function frameLayerOf(input: FrameInput, windows: readonly TransitionWindow[], item: TrackLayoutItem, t: number): FrameLayer {
   const clip = input.videoClips.find((c) => c.shotId === item.shotId)
   const kind = frameLayerKind(item.shotId)
@@ -650,7 +658,13 @@ function frameLayerOf(input: FrameInput, windows: readonly TransitionWindow[], i
   if (kind !== 'video') return { shotId: item.shotId, kind, trackId: item.trackId, alpha }
   const shot = input.shots.find((s) => s.shotId === item.shotId)
   const source = crossSourceSec(item, clip ?? {}, clip?.actualDurationSec ?? shot?.durationSeconds ?? 0, t)
-  return { shotId: item.shotId, kind, trackId: item.trackId, alpha, sourceSec: round3(source.sec), held: source.held }
+  const blur = blurAt(clip?.effects, clipProgress(item, t))
+  return { shotId: item.shotId, kind, trackId: item.trackId, alpha, sourceSec: round3(source.sec), held: source.held, ...(blur !== undefined ? { blur: round3(blur) } : {}) }
+}
+
+/** 클립 자리 안의 진행 — 0 = 클립이 시작할 때, 1 = 끝날 때(밖이면 0 아래 · 1 위, 흐림이 멈춘다). 흐림 [시작 → 끝]과 자르기가 같이 쓴다. */
+function clipProgress(item: { startSec: number; durationSec: number }, t: number): number {
+  return item.durationSec > 0 ? (t - item.startSec) / item.durationSec : 0
 }
 
 /**
@@ -938,13 +952,16 @@ function splitVideoChanges(state: EditorState, shotId: string, atGlobalSec: numb
     clip ?? { shotId, url: null, status: 'pending', thumbnailUrl: null }
 
   // 나눈 자리에는 전환이 없다 — 시작 전환은 앞 조각, 끝 전환은 뒷조각에 남는다. 모션 · 불투명도 · 효과는 둘 다 이어받는다(2단계 ④ · ⑤).
+  //   흐림 [시작 → 끝]은 자른 자리의 값으로 나눈다 — 앞 조각은 시작 → 자른 자리, 뒷조각은 자른 자리 → 끝이라 화면이 그대로다(D14).
+  const cut = blurMode(baseClip.effects) === 'ramp' ? blurAt(baseClip.effects, clipProgress(item, atGlobalSec)) : undefined
+  const at = cut === undefined ? undefined : round3(cut)
   const { transitionIn: _in, ...backClip } = baseClip
   const videoClips = state.videoClips.map((c) => {
     if (c.shotId !== shotId) return c
     const { transitionOut: _out, ...front } = c
-    return { ...front, trimStart, trimEnd: srcSplit }
+    return { ...front, trimStart, trimEnd: srcSplit, ...(at !== undefined && front.effects ? { effects: { ...front.effects, blurEnd: at } } : {}) }
   })
-  videoClips.push({ ...backClip, shotId: newId, trimStart: srcSplit, trimEnd })
+  videoClips.push({ ...backClip, shotId: newId, trimStart: srcSplit, trimEnd, ...(at !== undefined && backClip.effects ? { effects: { ...backClip.effects, blur: at } } : {}) })
 
   const order = [...(state.clipOrder[shot.sceneId] ?? [])]
   const idx = order.indexOf(shotId)
@@ -3069,7 +3086,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       if (!clip || isDrawnClipShotId(shotId) || clipLocked(state, shotId)) return state
       const selected = { selectedClipShotId: shotId, selectedShotIds: [shotId], selectedAudioId: null, selectedAudioIds: [], previewSourceShotId: null }
       if (clip.effects?.[kind] !== undefined) return selected
-      const effects = { ...clip.effects, [kind]: structuredClone(VIDEO_EFFECT_DEFAULT[kind]) }
+      // 흐림은 늘 [일정하게]로 들어간다 — 예전 Editor 가 흐림만 빼 남긴 끝 값 칸은 버린다(D14).
+      const { blurEnd: _orphan, ...kept } = clip.effects ?? {}
+      const effects = { ...(kind === 'blur' ? kept : clip.effects), [kind]: structuredClone(VIDEO_EFFECT_DEFAULT[kind]) }
       return {
         ...selected,
         videoClips: state.videoClips.map((c) => (c.shotId === shotId ? { ...c, effects } : c)),
@@ -3101,8 +3120,11 @@ export const useEditorStore = create<EditorState>((set, get) => ({
         changed = true
         const effects = { ...c.effects }
         delete effects[kind]
+        // 흐림의 끝 값은 흐림의 칸이다 — 흐림과 같이 뺀다(D14).
+        if (kind === 'blur') delete effects.blurEnd
         const { effects: _old, ...rest } = c
-        return Object.keys(effects).length > 0 ? { ...rest, effects } : rest
+        // 남은 효과가 없으면 칸을 지운다 — 예전 Editor 가 남긴 끝 값 칸만 남아도 효과 없는 클립이다.
+        return hasVideoEffects({ effects }) ? { ...rest, effects } : rest
       })
       return changed ? { videoClips, past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT), future: [] } : state
     }),

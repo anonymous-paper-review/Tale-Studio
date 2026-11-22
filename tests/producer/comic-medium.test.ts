@@ -1,4 +1,4 @@
-// 만화 그림체의 매체(애니 · 카툰 · 실사 등)는 첫 쪽 그림을 보고 모델이 허용 목록에서 하나 고르고, 목록 밖이면 쓰지 않는다 (2026-10-09)
+// 만화 그림체의 매체 고르기 규칙(허용 목록 · 하나만)은 남아 있지만, 매체 고르기 창구는 D6(2026-11-22)로 닫혀 그림을 모델에 보내지 않는다 (2026-10-09)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -44,7 +44,7 @@ describe('만화 그림체의 매체 고르기', () => {
   })
 })
 
-describe('매체 고르기 창구', () => {
+describe('매체 고르기 창구는 닫혔다', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     mocks.getUser.mockResolvedValue({ id: 'user-1' })
@@ -53,38 +53,28 @@ describe('매체 고르기 창구', () => {
     mocks.pickAnchorMedium.mockResolvedValue({ medium: '2d_anime' })
   })
 
-  it('첫 쪽 그림과 허용 목록으로 매체를 골라 돌려준다', async () => {
-    // 정상 경로 고정 — 만화 원고로 그대로 영상화를 고르면 그림체를 정하기 전에 이 창구가 매체를 정한다.
+  it('매체 고르기 창구는 그림을 모델에 보내지 않고 410 으로 거절한다', async () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 매체 고르기는 그림에서 그림체를 정하던 길의 첫걸음이었다.
     const res = await POST(post(ok))
-    expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ medium: '2d_anime' })
-    expect(mocks.pickAnchorMedium).toHaveBeenCalledWith(MEDIA, ALLOWED)
-  })
-
-  it('매체를 고르지 못하면 실패로 돌려주고 실사로 채우지 않는다', async () => {
-    // 왜: 모델이 답을 못 하거나 목록 밖을 말할 때 조용히 실사로 두면 만화가 실사 연출로 넘어간다.
-    mocks.pickAnchorMedium.mockResolvedValue({ medium: null })
-    const res = await POST(post(ok))
-    expect(res.status).toBe(502)
-    expect(await res.json()).toEqual({ error: 'medium_pick_failed' })
-  })
-
-  it('허용 목록을 읽지 못하면 고르지 않는다', async () => {
-    // 왜: 목록 없이 고르면 모델이 매체를 지어낸다 — 그림체 등록 창구도 목록 밖 값은 받지 않는다.
-    mocks.listStyleAnchorMediums.mockResolvedValue([])
-    const res = await POST(post(ok))
-    expect(res.status).toBe(503)
+    expect(res.status).toBe(410)
+    expect(await res.json()).toEqual({ error: 'style_extraction_retired' })
     expect(mocks.pickAnchorMedium).not.toHaveBeenCalled()
   })
 
-  it('분석 동의 표시가 없거나, 로그인 · 내 프로젝트 · 내가 올린 그림이 아니면 그림을 모델에 보내지 않는다', async () => {
-    // 왜: 매체 고르기도 그림을 분석 모델에 보내는 일이다 — 만화 원고 질문에서 받은 동의 안에서만 한다.
-    expect((await POST(post({ ...ok, consent: undefined }))).status).toBe(400)
-    expect((await POST(post({ ...ok, imageUrl: 'https://elsewhere.example/p1.webp' }))).status).toBe(400)
+  it('매체 고르기 창구는 허용 목록도 읽지 않는다', async () => {
+    // 왜: 닫힌 창구는 아무 일도 하지 않는다 — DB · 모델 어느 쪽도 부르지 않는다(D6).
+    await POST(post(ok))
+    expect(mocks.listStyleAnchorMediums).not.toHaveBeenCalled()
+  })
+
+  it('로그인 · 동의 · 내 프로젝트 여부와 상관없이 매체 고르기 창구는 그림을 모델에 보내지 않는다', async () => {
+    // 왜: 예전에는 동의 · 주인 확인을 지나면 그림을 모델에 보냈다 — 이제는 어떤 요청도 보내지 않는다(D6).
+    expect((await POST(post({ ...ok, consent: undefined }))).status).toBe(410)
+    expect((await POST(post({ ...ok, imageUrl: 'https://elsewhere.example/p1.webp' }))).status).toBe(410)
     mocks.userOwnsProject.mockResolvedValue(false)
-    expect((await POST(post(ok))).status).toBe(403)
+    expect((await POST(post(ok))).status).toBe(410)
     mocks.getUser.mockResolvedValue(null)
-    expect((await POST(post(ok))).status).toBe(401)
+    expect((await POST(post(ok))).status).toBe(410)
     expect(mocks.pickAnchorMedium).not.toHaveBeenCalled()
   })
 })

@@ -1,4 +1,4 @@
-// 그림체를 고정하면 분석 대기 표시를 남기고, 분석이 끝나면(실패해도) 미뤄 둔 Artist 그림을 그리게 한다 (오너 2026-10-10)
+// 그림체 등록 · 분석 창구가 닫혀(D6 2026-11-22) 분석 대기 표시를 새로 남기지 않고, 예전 대기 표시는 5분이 지나면 Artist 그림을 막지 않는다 (오너 2026-10-10)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -45,6 +45,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 import { POST as analyzeStyle } from '@/app/api/produce/style-facets/route'
 import { POST as saveStyle } from '@/app/api/produce/style-anchor/route'
 import { liteFacetsFromCompile } from '@/lib/style-facets/lite'
+import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { mediaPublicUrl } from '@/lib/storage/media-url'
 
 const MEDIA = mediaPublicUrl('ws-1/proj-1/uploads/look/original.webp')
@@ -67,38 +68,28 @@ beforeEach(() => {
 })
 
 describe('그림체 분석과 Artist 그림', () => {
-  it('그림을 그림체로 고정하면 분석 대기 표시를 함께 남긴다', async () => {
-    // 왜: 고정한 그림체는 곧 분석기가 돈다 — Writer 가 그 사이에 Artist 그림을 시작하면 이 표시를 보고 미룬다.
+  it('그림체 등록 창구가 닫혀 분석 대기 표시를 새로 남기지 않는다', async () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 그림을 그림체로 고정하는 일이 없으니 기다릴 분석도 없다.
     mocks.project = { custom_style_anchor: null }
     const res = await saveStyle(post('http://test/api/produce/style-anchor', { projectId: 'proj-1', imageUrl: MEDIA, label: '내 그림체', medium: '2d_anime', lock: true }))
-    expect(res.status).toBe(200)
-    expect(mocks.updates[0].custom_style_anchor).toMatchObject({ url: MEDIA, locked: true, analysis_pending_at: expect.any(String) })
+    expect(res.status).toBe(410)
+    expect(mocks.updates).toHaveLength(0)
   })
 
-  it('그림체 분석이 끝나면 분석 대기 표시를 지우고 미뤄 둔 Artist 그림을 그림체 설명과 함께 그린다', async () => {
-    // 왜: 10/10 오너 "분석이 진행 중에는 artist 생성이 안 되게 막아두고 끝나면 진행". 그리는 것은 분석 결과를 저장한 다음이다.
+  it('닫힌 그림체 분석 창구는 그림체 설명을 저장하지 않고 미뤄 둔 Artist 그림 그리기도 부르지 않는다', async () => {
+    // 왜: 분석 창구가 닫혀 분석 결과가 없다(D6). 예전 대기 표시가 남은 작품은 표시가 5분을 넘기면 Artist 가 스스로 그린다(아래 시험).
     mocks.extractLiteFacets.mockResolvedValueOnce({ facets: FACETS, attempts: [] })
     const res = await analyzeStyle(post('http://test/api/produce/style-facets', { projectId: 'proj-1', consent: 'style-picker-v1' }))
-    expect(await res.json()).toMatchObject({ ok: true, facets: true })
-    expect(mocks.events).toEqual(['save', 'artist'])
-    expect(mocks.updates[0].custom_style_anchor).toMatchObject({ url: MEDIA, facets: { probe_anchors: FACETS!.probe_anchors } })
-    expect(mocks.updates[0].custom_style_anchor).not.toHaveProperty('analysis_pending_at')
-    expect(mocks.triggerAssetDrafts).toHaveBeenCalledWith('proj-1', { afterStyleAnalysis: true })
-  })
-
-  it('그림체 분석이 실패해도 미뤄 둔 Artist 그림은 그린다(그림만 참고)', async () => {
-    // 왜: 분석이 실패하면 그림체는 그림만으로 이어진다(종전 규칙) — 그림을 끝없이 미루면 안 된다.
-    mocks.extractLiteFacets.mockResolvedValueOnce({ facets: null, attempts: [] })
-    await analyzeStyle(post('http://test/api/produce/style-facets', { projectId: 'proj-1', consent: 'style-picker-v1' }))
-    expect(mocks.events).toEqual(['artist'])
-    expect(mocks.triggerAssetDrafts).toHaveBeenCalledWith('proj-1', { afterStyleAnalysis: true })
-  })
-
-  it('분석하는 동안 그림체가 바뀌었으면 미뤄 둔 그림을 그리지 않는다', async () => {
-    // 왜: 새 그림체에는 새 분석이 돈다 — 그 분석이 끝날 때 그린다.
-    mocks.extractLiteFacets.mockResolvedValueOnce({ facets: FACETS, attempts: [] })
-    mocks.reread = { url: mediaPublicUrl('ws-1/proj-1/uploads/other/original.png'), analysis_pending_at: new Date().toISOString() }
-    await analyzeStyle(post('http://test/api/produce/style-facets', { projectId: 'proj-1', consent: 'style-picker-v1' }))
+    expect(res.status).toBe(410)
+    expect(mocks.events).toEqual([])
+    expect(mocks.extractLiteFacets).not.toHaveBeenCalled()
     expect(mocks.triggerAssetDrafts).not.toHaveBeenCalled()
+  })
+
+  it('예전 분석 대기 표시가 남은 작품도 그 표시가 5분을 넘으면 Artist 그림을 막지 않는다', () => {
+    // 왜: 배포 때 분석을 기다리던 작품은 끝을 알려 줄 분석 창구가 없다 — 오래된 표시는 멈춘 분석으로 보고 막지 않는다(종전 규칙 그대로, 정상 경로 고정).
+    const now = Date.parse('2026-11-22T12:00:00.000Z')
+    expect(styleAnalysisPending({ url: MEDIA, analysis_pending_at: '2026-11-22T11:50:00.000Z' }, now)).toBe(false)
+    expect(styleAnalysisPending({ url: MEDIA, analysis_pending_at: '2026-11-22T11:58:00.000Z' }, now)).toBe(true)
   })
 })

@@ -1,21 +1,25 @@
-// Director 보기 토글은 "스토리보드 | 노드" 순서이고, 화면이 토글 순서 방향으로 미끄러져 들어온다 (시안 D1 406:3717, 리드 11/14 화면 확인 1)
+// Director 에는 보기 토글이 없고 그 자리에 씬 단추가 있으며, 씬을 바꾸면 그 씬 첫 샷이 첫 화면 자리로 짧게 옮겨 온다 (오너 D2~D5 · D8 2026-11-22 — 예전: 시안 D1 406:3717 "스토리보드 | 노드" 토글, 리드 11/14 화면 확인 1)
 import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 
 const page = readFileSync(join(process.cwd(), 'src/app/studio/director/page.tsx'), 'utf8')
 
-describe('보기 토글', () => {
-  it('보기 토글은 스토리보드가 왼쪽, 노드가 오른쪽이다', () => {
-    // 왜: 시안 D1 은 결과(스토리보드)를 먼저 둔다 — 지금은 노드가 왼쪽이라 시안과 거꾸로였다.
-    const storyboard = page.indexOf('<TabsTrigger value="storyboard"')
-    const node = page.indexOf('<TabsTrigger value="node"')
-    expect(storyboard).toBeGreaterThan(-1)
-    expect(node).toBeGreaterThan(storyboard)
+describe('보기 토글 자리', () => {
+  it('Director 에는 보기 토글이 없고 그 자리(툴바 맨 왼쪽)에 씬 단추가 있다', () => {
+    // 왜: 오너 D2~D5 "director의 storyboard 뷰를 없애고" · D8 "앞에서 없앤 Storyboard / Node 버튼 위치에 넣어줘". 러프 · 실사 격자는 새 Camera 탭이 맡는다.
+    expect(page).not.toContain('<TabsTrigger value="storyboard"')
+    expect(page).not.toContain('<TabsTrigger value="node"')
+    expect(page).not.toContain('<StoryboardGridView')
+    const scenes = page.indexOf('<SceneButtons')
+    expect(scenes).toBeGreaterThan(-1)
+    expect(scenes).toBeLessThan(page.indexOf("{t('The Set')}"))
   })
 
-  it('노드로 바꾸면 오른쪽에서, 스토리보드로 바꾸면 왼쪽에서 화면이 미끄러져 들어온다', () => {
-    // 왜: 바뀐 토글 순서와 같은 방향이어야 어느 쪽으로 갔는지 눈으로 따라간다(#e2 2026-08-03 전환 연출).
-    expect(page).toMatch(/setViewSlide\(viewMode === 'node' \? 'forward' : 'back'\)/)
+  it('씬을 바꾸면 그 씬 첫 샷이 첫 화면 자리로 짧게 옮겨 온다', () => {
+    // 왜: 씬마다 카드가 캔버스의 다른 자리에 있다 — 화면을 그대로 두면 새 씬 카드가 화면 밖이다(혼자 정한 것 h5). 옛 보기 전환 미끄러짐은 보기와 함께 없앴다.
+    expect(page).not.toContain('setViewSlide(')
+    expect(page).toMatch(/const target = focus \? cardViewport\(focus, paneSize\) : firstEntryViewport\(st\.nodes, paneSize, sceneNodeId\)/)
+    expect(page).toMatch(/if \(target\) void applyViewport\(target, \{ duration: 300 \}\)/)
   })
 })

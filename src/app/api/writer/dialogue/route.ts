@@ -5,6 +5,8 @@
 // 대사탭의 "대사 생성/재생성" 버튼이 호출한다.
 //
 // 얇은 라우트(architecture §2): 인증·zod 검증·소유 확인·위임. 생성 본체는 stages/dialogue.ts 공용.
+// D15(오너 2026-11-22): 원본 그대로(대본 보존) 프로젝트는 원작 대사를 지킨다 — 화면 단추가 없어도 바로 보낸 요청을 여기서 막는다
+//   (산문 고치기 막기와 같은 판별, lib/writer/preserved-run). 대사 줄을 손으로 고치는 길(샷 저장)은 막지 않는다.
 // 씬 순차(메모리 캐리)라 한 호출에서 전 씬을 돌고(3~8씬 ≈ 1~2분), 완료 후 일괄 UPDATE.
 import { NextResponse } from 'next/server'
 import { shotDialogueLines } from '@/lib/writer/pipeline/util/dialogue_lines'
@@ -18,6 +20,7 @@ import { resolveModels } from '@/lib/writer/pipeline'
 import { PipelineLogger } from '@/lib/writer/logger'
 import { writerShotIdToMain } from '@/lib/writer/adapters'
 import type { WriterRunState } from '@/lib/writer/pipeline/steps'
+import { isPreservedScriptRun } from '@/lib/writer/preserved-run'
 import type { DialogueLine } from '@/types'
 
 export const maxDuration = 300 // 씬 순차 LLM 호출 — generate/images 와 동일 한도
@@ -59,6 +62,15 @@ export async function POST(req: Request) {
           error: { code: 'no_run_state', message: "Can't generate dialogue — no completed writer run found." },
         },
         { status: 422 },
+      )
+
+    if (isPreservedScriptRun(state))
+      return NextResponse.json(
+        {
+          ok: false,
+          error: { code: 'preserved_script', message: 'This project keeps the script as written, so dialogue is not rewritten. You can still edit lines by hand.' },
+        },
+        { status: 409 },
       )
 
     // 등장인물 목록(모습이 있는 인물) — 1~2분 걸리는 유료 대사 생성 전에 읽는다. 뒤에서 실패하면 생성 결과를 버리게 된다.

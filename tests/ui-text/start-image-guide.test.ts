@@ -28,4 +28,16 @@ describe('시작 화면의 그림 안내', () => {
       expect(KO[key]).toContain(`${OWNER_SENTENCE}. 오른쪽 채팅의 [+]로 올리면 돼요.`)
     }
   })
+
+  // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6 2026-11-22) — 안내가 올린 그림을 그림체로 쓸 수 있다고 하면 없는 길을 가리킨다.
+  //   그림체는 그림을 만들 때 Artist 스타일 창에서 네 가지 중 고른다.
+  it('시작 화면의 그림 안내는 올린 그림을 그림체로 쓸 수 있다고 하지 않는다', () => {
+    const screen = readFileSync('src/features/entry/entry-workspace.tsx', 'utf8')
+    const keys = [...screen.matchAll(/t\((['"])((?:(?!\1).)*Writer chat after you start(?:(?!\1).)*)\1\)/g)].map((m) => m[2])
+    expect(keys).toHaveLength(2)
+    for (const key of keys) {
+      expect(key).not.toMatch(/art style/)
+      expect(KO[key]).not.toMatch(/그림체/)
+    }
+  })
 })

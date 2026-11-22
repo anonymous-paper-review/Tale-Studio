@@ -144,7 +144,7 @@ describe('영어 화면의 채팅 화면 문구', () => {
       expect(cannedFor(stage, 'en')).not.toBe('')
       expect(cannedFor(stage, 'en')).not.toMatch(HANGUL)
     }
-    expect(cannedFor('writer', 'ko')).toBe('공유 미리보기 모드예요. 실제로는 여기서 씬 구조와 러프 스토리보드를 검토·수정해요.')
+    expect(cannedFor('writer', 'ko')).toBe('공유 미리보기 모드예요. 실제로는 여기서 씬 구조와 러프 콘티를 검토·수정해요.')
     expect(source('src/stores/global-chat-store.ts')).toContain('cannedFor(stage, contentLocale())')
   })
 })

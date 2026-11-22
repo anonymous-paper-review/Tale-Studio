@@ -41,6 +41,7 @@ import { storageKeySegment } from '@/lib/storage/key-segment'
 import { updateStoryboardImage } from '@/lib/director/storyboard-image-store'
 import { isJobCancelled } from '@/lib/director/job-cancellations'
 import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { versionNoteFields } from '@/lib/director/image-note'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
 // Natural IDs stay in the database; new storage objects use the shared versioned,
@@ -1078,6 +1079,8 @@ async function finalizeStoryboardStripJob(
     // 약속 I4: 참조한 러프의 시각 — 러프가 바뀌면 "러프 바뀜"(자동 재생성은 하지 않는다, 오너 I5).
     roughGeneratedAt: job.target.roughGeneratedAt ?? null,
     ...(stopped ? { cancelled: true as const } : {}),
+    // 이 판을 부탁한 사람 말(오너 2026-11-22 결정 4) — 멈춘 판에도 남는다.
+    ...versionNoteFields(job.target.imageNote),
   }, { select: !stopped }))
 
   await completeGenerationJob(job.id, startUrl)
@@ -1113,6 +1116,7 @@ export async function finalizeShotStoryboardJob(
     source: 'generated',
     roughGeneratedAt: job.target.roughGeneratedAt ?? null,
     ...(stopped ? { cancelled: true as const } : {}),
+    ...versionNoteFields(job.target.imageNote),
   }, { select: !stopped }))
 
   await completeGenerationJob(job.id, publicUrl)

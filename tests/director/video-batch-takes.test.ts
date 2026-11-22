@@ -209,7 +209,7 @@ describe('약속 E — 영상 일괄 생성은 Take를 미리 센다', () => {
     const store = read('src/stores/global-chat-store.ts')
     expect(store).not.toMatch(/kind: 'directorGenerateVideoBatch'/)
     expect(store).toContain('describeVideoBatchPlan(plan, t)[0]')
-    expect(store).toContain('void runVideoBatch(pid, { onJob: input.onJob, shotIds: input.shotIds })')
+    expect(store).toContain('void runVideoBatch(pid, { onJob: input.onJob, shotIds: input.shotIds, takeNote })')
     expect(store).toContain('Started making videos for {shots} · {takes} Takes.')
     // 채팅 막이(startChatVideos)를 건너뛰고 스토어까지 온 generateVideos 는 돌지 않는다.
     expect(read('src/stores/director-store.ts')).toMatch(/case 'generateVideos': \{[\s\S]*?result\.skipped\.push/)
@@ -243,9 +243,10 @@ describe('약속 E — 영상 일괄 생성은 Take를 미리 센다', () => {
     expect(mockStore.state.generateVideoForShot).not.toHaveBeenCalled()
     await new Promise((r) => setTimeout(r, 5))
     expect(notifyMock.notifyBatchSummary).toHaveBeenCalledTimes(1)
-    expect(notifyMock.notifyBatchSummary.mock.calls[0]).toEqual(['director', '✓ 1 videos done, 2 failed'])
+    // 끝 줄은 실사 · 영상의 집 Camera 로 낸다(2026-11-22 오너 D2~D5 — 예전엔 'director').
+    expect(notifyMock.notifyBatchSummary.mock.calls[0]).toEqual(['camera', '✓ 1 videos done, 2 failed'])
     // 일괄 모드에서는 건별 완료 알림을 내지 않아 줄이 하나다.
-    expect(read('src/stores/director-store.ts')).toMatch(/if \(options\?\.batch !== true\) notifyGenerationComplete\('director'/)
+    expect(read('src/stores/director-store.ts')).toMatch(/if \(options\?\.batch !== true\) notifyGenerationComplete\('camera'/)
     expect(read('src/lib/i18n/messages-ko.ts')).toMatch(/'\{done\} videos done, \{failed\} failed': '영상 \{done\}개 완료, \{failed\}개 실패'/)
   })
 })

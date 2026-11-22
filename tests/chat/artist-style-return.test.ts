@@ -106,13 +106,13 @@ describe('"이전 스타일로 돌아갈까요?" 카드', () => {
     expect(suggestion?.action).toEqual({ kind: 'artistVersions', options: [], regenerate: true })
   })
 
-  it('Storyboard를 연 뒤에는 채팅도 스타일을 바꿀 수 없다고 알리고 단추를 보이지 않는다', async () => {
+  it('콘티를 연 뒤에는 채팅도 스타일을 바꿀 수 없다고 알리고 단추를 보이지 않는다', async () => {
     // 왜: 오너 결정(2) — [완료하기] 뒤에는 불러오기 · 재생성이 없다. 채팅도 같은 까닭을 말한다.
     useProjectStore.setState({ reachedStage: 'writer' })
     const fetchMock = serverHas([view(1, 'real'), view(2, 'anime', true)], true)
     await useGlobalChatStore.getState().sendMessage('전 버전으로', undefined, { stageOverride: 'artist' })
     expect(modelCalled(fetchMock)).toBe(false)
     expect(useGlobalChatStore.getState().suggestion?.action?.kind).not.toBe('artistVersions')
-    expect(useGlobalChatStore.getState().messages.at(-1)).toMatchObject({ role: 'model', content: 'Storyboard를 연 뒤에는 스타일을 바꿀 수 없어요.' })
+    expect(useGlobalChatStore.getState().messages.at(-1)).toMatchObject({ role: 'model', content: '콘티를 연 뒤에는 스타일을 바꿀 수 없어요.' })
   })
 })
