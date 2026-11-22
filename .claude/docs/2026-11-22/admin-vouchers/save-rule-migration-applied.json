@@ -1,0 +1,27 @@
+{
+  "migrationVersion": "20261122041500",
+  "migrationName": "admin_voucher_save_moves_takes",
+  "sha256": "c5c924fa305e009c2271b11021779141c693d2006cc7ee8f6e5fd18fde040ffb",
+  "ownerDecision": "2026-11-22 B안 — 종료일만 바꾸면 남은 Take 수는 그대로 두고 기한만 옮긴다. 한 달 치는 티어를 바꾸거나 끝난 고객을 다시 열 때만 준다. 구독 중인 고객의 Take가 회수만 되던 문제도 함께 고친다.",
+  "development": {
+    "project": "pbiumddivadgbzxuymak",
+    "appliedAt": "2026-11-22T04:13:07.375Z",
+    "appliedWith": "node scripts/apply-dev-migration.mjs",
+    "historyRecorded": true,
+    "verifiedWith": "node scripts/test-admin-voucher-dev-db.mjs — 되돌리는 트랜잭션 14건 통과. --baseline(적용 전 함수)에서는 새 규칙 10건이 실패하는 것을 먼저 확인"
+  },
+  "production": {
+    "project": "qnjnrihfpqkdhjuzvepy",
+    "appliedAt": "2026-11-22T04:14:49.526Z",
+    "appliedBefore": "main 배포 전 — 함수 인자가 같아 지금 배포된 코드도 새 함수로 그대로 돈다.",
+    "appliedWith": "Supabase Management API database/query 로 파일 그대로 실행 + supabase_migrations.schema_migrations 이력 행 (20261118090000 과 같은 방식)",
+    "historyRecorded": true,
+    "beforeCounts": { "vouchers": 92, "redemptions": 3, "adminLedgerRows": 0, "ledgerRows": 168 },
+    "afterCounts": { "vouchers": 92, "redemptions": 3, "adminLedgerRows": 0, "ledgerRows": 168 },
+    "functionExecute": {
+      "admin_update_voucher_redemption": { "anon": false, "authenticated": false, "service_role": true },
+      "admin_end_voucher_redemption": { "anon": false, "authenticated": false, "service_role": true }
+    }
+  },
+  "productionChanged": true
+}

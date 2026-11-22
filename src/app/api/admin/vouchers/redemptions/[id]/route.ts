@@ -29,8 +29,8 @@ export async function PATCH(request: Request, context: { params: Promise<{ id: s
     p_revoke: false,
   })
   if (error) return NextResponse.json({ error: 'redemption_update_failed' }, { status: 500 })
+  // 지난 종료일로 저장하면 DB가 [해지]와 같이 끝낸다(status: ended). 관리자가 고른 결과라 성공으로 돌려준다.
   if ((data as { status?: string } | null)?.status === 'not_found') return NextResponse.json({ error: 'redemption_not_found' }, { status: 404 })
-  if ((data as { status?: string } | null)?.status === 'ended') return NextResponse.json({ error: 'redemption_ended' }, { status: 409 })
   return NextResponse.json({ ok: true })
 }
 
