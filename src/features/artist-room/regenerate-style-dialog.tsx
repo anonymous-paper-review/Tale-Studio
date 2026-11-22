@@ -5,6 +5,8 @@
 //   내 그림체를 쓰는 동안 다른 스타일은 고를 수 없다 — ✕로 내리면 고를 수 있고, 내 그림체는 지금 버전 기록에 남는다(혼자 정한 것).
 //   고른 스타일로 만든 이전 버전이 있으면 다시 만들지 않고 불러오는 길을 보인다. [다시 만들기] → artist-version-store.regenerate.
 //   요약의 "인물 N · 배경 M"은 서버와 같은 규칙(buildRegenPlan)으로 센다 — 올린 그림(그대로 쓰기) 칸은 그대로 두고 그 장수를 보인다(2026-10-31 오너 결정 C).
+//   다른 스타일은 네 가지만 고른다(D6 오너 2026-11-22). 지금 스타일이 없어진 것이면 "지금 · 새로 고를 수 없음" 칸으로 남아
+//   같은 스타일로 다시 만들 수 있다(리드 2026-11-22 안 1 바탕 — 이미 그 스타일로 그린 작품은 그대로 그린다).
 import { useState } from 'react'
 import { Loader2, Lock, RotateCcw, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
@@ -15,6 +17,7 @@ import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { useLocale, useT } from '@/lib/i18n'
 import { fixKoreanParticles } from '@/lib/korean-particles'
 import { styleAnchorName } from '@/lib/style-anchor-name'
+import { isOfferedStyle } from '@/lib/style-offer'
 import { buildRegenPlan, previousVersionWithStyle, regenCounts, regenKeptUploads, regenStyleNote, versionStyleLabel, type RegenPlanInput } from '@/lib/artist/style-versions'
 import { StyleGrid } from '@/features/artist-room/style-make-dialog'
 import { useArtistStore } from '@/stores/artist-store'
@@ -62,6 +65,8 @@ export function RegenerateStyleDialog() {
   }
 
   const keptCustom = custom && !dropCustom ? custom : null
+  // 지금 스타일이 없어진 것(D6) — 그 칸 하나만 남긴다. 다른 칸은 네 가지뿐이다.
+  const keptRetired = !custom && savedKey && !isOfferedStyle(savedKey) ? anchors.find((anchor) => anchor.key === savedKey) ?? null : null
   const chosenKey = keptCustom ? savedKey : picked
   const currentLabel = versionStyleLabel({ styleKey: savedKey, customStyle: custom }, anchors, locale)
   const chosenAnchor = anchors.find((anchor) => anchor.key === chosenKey)
@@ -108,6 +113,7 @@ export function RegenerateStyleDialog() {
           ) : null}
           <StyleGrid
             anchors={anchors}
+            kept={keptRetired}
             picked={chosenKey}
             onPick={setPicked}
             custom={keptCustom}
