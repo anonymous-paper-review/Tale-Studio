@@ -12,7 +12,7 @@ import { NextStepButton } from '@/components/handoff/next-step-button'
 import { CharacterPanel } from '@/features/artist/character-panel'
 import { WorldPanel } from '@/features/artist/world-panel'
 import { PropPanel } from '@/features/artist/prop-panel'
-import { ArtistSectionHeading, SECTION_LABEL } from '@/features/artist/section-heading'
+import { ArtistSectionHeading, SECTION_LABEL, sectionName } from '@/features/artist/section-heading'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -52,7 +52,7 @@ import { VersionHistoryDialog } from '@/features/artist-room/version-history-dia
 import { completeVersionBlock, useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
 import { regenOverlayDescription, regenStepLines, versionStyleLabel } from '@/lib/artist/style-versions'
 import { propsAutoDrawOpen } from '@/lib/artist/props'
-import { ARTIST_SECTIONS, activeArtistSection, artistSectionCounts, artistSectionId, jumpToArtistSection, keyScrollsArtistBoard, shownArtistSection, type ArtistSection } from '@/lib/artist/card-filter'
+import { ARTIST_SECTIONS, activeArtistSection, artistDataLoading, artistSectionCounts, artistSectionId, jumpToArtistSection, keyScrollsArtistBoard, shownArtistSection, type ArtistSection } from '@/lib/artist/card-filter'
 
 /** 움직임 줄이기 설정 — 켜져 있으면 바로가기가 미끄러지지 않는다(D13). */
 const prefersReducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
@@ -77,6 +77,7 @@ export default function VisualPage() {
 
   const projectId = useProjectStore((s) => s.projectId)
   const propAssets = useArtistStore((s) => s.propAssets)
+  const loadedProjectId = useArtistStore((s) => s.loadedProjectId)
   // D13(오너 2026-11-22 "한 페이지에 다 담아주고 버튼을 누르면 그 섹션으로 바로 이동") — 걸러 보기 칸(v3 A5) 대신 묶음 바로가기.
   //   마지막에 간 묶음은 스토어가 기억한다(약속 D15) — 떠났다 돌아오면 그 묶음으로 간다. 묶음은 늘 그려져 있어 카드에서 고른 것이 남는다.
   const remembered = useArtistStore((s) => s.uiTab)
@@ -633,12 +634,18 @@ export default function VisualPage() {
       {t(storyboardPrep === 'splitting' ? 'Getting Storyboard ready · splitting scenes and shots' : storyboardPrep === 'drawing' ? 'Getting Storyboard ready · drawing the roughs' : 'Storyboard is ready')}
     </span>
   ) : null
+  // 자료를 다 읽기 전(실제 프로젝트 QA a, 2026-11-23) — 머리 줄 · 바로가기 단추 · 묶음 머리에 숫자 0 과 "아직 ~이 없어요" 대신 불러오는 중을 보인다.
+  const sectionLoading = artistDataLoading({
+    projectId,
+    loadedProjectId,
+    counts: artistSectionCounts({ characters: characterAssets.length, worlds: worldAssets.length, props: propAssets.length }),
+  })
   const headerRow = (
     <PageHeader
       title={t('Characters · backgrounds · props')}
       meta={
         <span data-testid="artist-header-counts">
-          {t('Characters {persons} · backgrounds {places} · props {props}', { persons: headerPersons, places: headerPlaces, props: propAssets.length })}
+          {sectionLoading ? t('Loading…') : t('Characters {persons} · backgrounds {places} · props {props}', { persons: headerPersons, places: headerPlaces, props: propAssets.length })}
           {headerKept > 0 ? ` · ${t('Kept {count}', { count: headerKept })}` : null}
         </span>
       }
@@ -707,7 +714,7 @@ export default function VisualPage() {
               <nav aria-label={t('Jump to a section')} className="flex flex-wrap gap-1.5" data-testid="artist-sections-nav">
                 {ARTIST_SECTIONS.map((section) => (
                   <ChoiceChip key={section} selected={active === section} onClick={() => jumpTo(section)} data-testid={`artist-jump-${section}`}>
-                    {t(SECTION_LABEL[section], { count: sectionCounts[section] })}
+                    {sectionLoading ? sectionName(t, section) : t(SECTION_LABEL[section], { count: sectionCounts[section] })}
                   </ChoiceChip>
                 ))}
               </nav>
@@ -754,7 +761,7 @@ export default function VisualPage() {
               className="flex flex-col gap-3.5"
               style={{ scrollMarginTop: barHeight + 12 }}
             >
-              <ArtistSectionHeading section={section} count={sectionCounts[section]} />
+              <ArtistSectionHeading section={section} count={sectionCounts[section]} loading={sectionLoading} />
               {section === 'characters' ? (
                 <CharacterPanel columns={boardColumns} onZoomStep={stepZoom} />
               ) : section === 'world' ? (

@@ -116,6 +116,17 @@ describe('소품 그림 지시문', () => {
     expect(off.submit.prompt).toContain(FACET_NO_TEXT)
   })
 
+  // 왜: 실제 프로젝트 QA(2026-11-23 c)에서 설명이 마침표로 끝나 지시문에 "…수동개방'.. Show this…"처럼 마침표가 두 번 붙었다.
+  //   바꿀 점(Requested change) 줄도 같은 틀이라 함께 막는다(혼자 정한 것 · 쉬움).
+  it('소품 설명이나 바꿀 점이 마침표(. 。 ! ?)로 끝나도 소품 그림 지시문에 마침표가 두 번 붙지 않는다', () => {
+    for (const end of ['.', '。', '!', '?']) {
+      const text = buildPropImagePrompt({ name: '문', appearance: `A grey door${end}`, instruction: `Make it older${end}` })
+      expect(text).toContain(`Prop reference picture of 문: A grey door${end} Requested change: Make it older${end} Show this one object`)
+      expect(text).not.toMatch(/[.。!?]\./)
+    }
+    expect(buildPropImagePrompt({ name: '문', appearance: 'A grey door', instruction: 'Make it older' })).toContain('A grey door. Requested change: Make it older. Show')
+  })
+
   // 왜: 작품 그림체와 같은 그림이어야 샷 이미지에서 겉돌지 않는다. 소품에는 사람이 없어 인물 조각(Figure rules · Priority)은 효과가 없다(사물 시트 규칙과 같다).
   it('그림체 기준 그림이 있으면 소품 그림에 붙이되 인물 조각은 싣지 않는다', () => {
     const plan = planPropImageSubmit({ ...prop, anchor, styleWithoutReference: false })

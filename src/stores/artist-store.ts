@@ -700,6 +700,9 @@ interface ArtistState {
    *  다시 progress 게이트에 걸리지 않는다. page-local useState/타이머가 remount 로 리셋돼
    *  생성 도중 탭 전환 시 프로그레스 바가 재등장하던 버그 방지. reset()(프로젝트 전환)에만 비워진다. */
   enteredProjects: Record<string, boolean>
+  /** Artist 자료(인물 · 배경 · 소품 · 씬)를 DB 에서 다 읽은 프로젝트 — 자료가 하나도 없어도 읽기가 끝나면 적는다, 읽기에 실패하면 적지 않는다.
+   *  화면은 이 값이 지금 프로젝트가 아니고 카드도 없으면 숫자 0 · "아직 ~이 없어요" 대신 불러오는 중을 보인다(실제 프로젝트 QA a, 2026-11-23). */
+  loadedProjectId: string | null
 
   loadData: () => void
   /** 새 캐릭터 카드를 추가 (낙관적 로컬 + projectId 있으면 DB persist). 새 characterId 반환. */
@@ -893,9 +896,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   imageProvider: 'fal' as ImageProvider,
   error: null,
   enteredProjects: {},
+  loadedProjectId: null,
 
   loadData: async () => {
     const projectId = useProjectStore.getState().projectId
+    // DB 읽기가 끝났는가(자료가 없어도) — 끝나면 loadedProjectId 를 적는다. 읽기 실패 · 다른 프로젝트로 옮긴 뒤의 답은 적지 않는다.
+    let dbRead = false
 
     // Try loading from DB first
     if (projectId) {
@@ -964,6 +970,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .eq('project_id', projectId),
         ])
         if (useProjectStore.getState().projectId !== projectId) return
+        dbRead = true
         const locCandidatesByLocation = groupLocationCandidates(dbLocCandidates ?? [])
         const locAppearancesByLocation = groupLocationAppearances(dbLocAppearances ?? [], dbLocCandidates ?? [])
 
@@ -1115,6 +1122,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             | (LookTokens & { color_meaning?: Record<string, string> })
             | null
           set({
+            loadedProjectId: projectId,
             sceneManifest: manifest,
             characterAssets,
             worldAssets,
@@ -1183,6 +1191,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
 
     // No data available — keep empty state (don't show fake mock data)
+    // 자료가 하나도 없는 프로젝트도 DB 읽기가 끝났으면 다 읽은 것이다 — 그때만 "아직 ~이 없어요"가 보인다.
+    if (projectId && dbRead && useProjectStore.getState().projectId === projectId && get().loadedProjectId !== projectId) set({ loadedProjectId: projectId })
   },
 
   // 새 캐릭터 카드 추가. 채팅(createCharacter)은 2026-10-27(디자이너 QA 1차 #04)부터 이 길을 쓰지 않는다.
@@ -2751,6 +2761,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       imageProvider: 'fal' as ImageProvider,
       error: null,
       enteredProjects: {},
+      loadedProjectId: null,
     }),
 }))
 
