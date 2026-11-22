@@ -310,10 +310,7 @@ export default function AccountPage() {
                 <li key={`${item.kind}-${item.refId ?? i}-${item.at}`} className="flex items-center justify-between py-2.5">
                   <span className="flex flex-col">
                     <span>{t(ACTIVITY_LABEL[item.kind])}</span>
-                    <span className="text-xs text-gray-500">
-                      {fmt(item.at)}
-                      {item.reason ? ` · ${item.reason}` : ''}
-                    </span>
+                    <span className="text-xs text-gray-500">{fmt(item.at)}</span>
                   </span>
                   <span className={cn('tabular-nums', item.delta > 0 ? 'text-success' : 'text-gray-300')}>
                     {item.delta > 0 ? `+${item.delta}` : item.delta}

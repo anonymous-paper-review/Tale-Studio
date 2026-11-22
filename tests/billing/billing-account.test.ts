@@ -129,15 +129,18 @@ describe('최근 내역', () => {
     expect(new Set(items.map((i) => i.refId)).size).toBe(2)
   })
 
-  it('관리자 화면에서 생긴 줄에는 영어 내부 메모가 붙지 않는다', () => {
+  // 오너 2026-11-22: 사유 칸에 개발용 메모가 보여서 메모를 빼고 날짜만 보인다(A안).
+  it('최근 내역의 어떤 줄에도 내부 메모가 붙지 않는다', () => {
     const rows: LedgerRow[] = [
-      row({ id: 'r', kind: 'refund_revoke', delta: -30, grant_id: 'g', ref_kind: 'voucher_admin_revoke', ref_id: `g:${SAVE}`, reason: 'voucher entitlement adjusted by admin', created_at: T1 }),
-      row({ id: 'a', kind: 'grant_plan', delta: 104, ref_kind: 'voucher_admin_plan', ref_id: `${REDEMPTION}:${SAVE}`, reason: 'admin set takes to 400', created_at: T1 }),
-      row({ id: 'm', kind: 'manual_adjust', delta: -6, ref_kind: 'admin_take_set', ref_id: 'c0ffee00-0000-4000-8000-000000000004', reason: 'admin set takes to 260', created_at: '2026-11-22T09:00:00.000Z' }),
+      row({ id: 'p', kind: 'grant_plan', delta: 16, ref_kind: 'paddle_transaction', ref_id: 'txn_1', reason: 'paddle plan s1 (subscription_recurring)' }),
+      row({ id: 'v', kind: 'grant_plan', delta: 30, ref_kind: 'voucher_redemption', ref_id: REDEMPTION, reason: 'voucher -> s2' }),
+      row({ id: 'h', kind: 'hold', delta: -1, grant_id: 'p', ref_kind: 'generation_job', ref_id: 'job-1', reason: 'take_hold' }),
+      row({ id: 'b', kind: 'grant_bonus', delta: 500, reason: '오너 요청(2026-10-31): Take 500 추가 지급' }),
+      row({ id: 'r', kind: 'refund_revoke', delta: -30, grant_id: 'v', ref_kind: 'voucher_admin_revoke', ref_id: `v:${SAVE}`, reason: 'voucher entitlement adjusted by admin', created_at: T1 }),
     ]
     const items = groupRecentActivity(rows)
-    expect(items).toHaveLength(3)
-    expect(items.map((i) => i.reason)).toEqual([null, null, null])
+    expect(items).toHaveLength(5)
+    expect(items.filter((i) => 'reason' in i)).toEqual([])
   })
 })
 

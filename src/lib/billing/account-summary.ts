@@ -121,7 +121,6 @@ export interface ActivityItem {
   delta: number
   refKind: string | null
   refId: string | null
-  reason: string | null
   at: string
 }
 
@@ -137,7 +136,8 @@ function adminSaveId(refId: string): string {
  * 최근 내역 — 한 영상(ref)에 여러 lot 으로 쪼개진 hold 행을 한 줄로 합친다. 최신순.
  * 그룹 키 = kind + ref. ref 가 없는 행(적립·수동 조정)은 행마다 한 줄.
  * 관리자 화면에서 생긴 행은 원래 종류와 상관없이 조정(manual_adjust)으로 보이고, 저장 한 번에서 같은 방향(+/−)끼리
- * 한 줄로 합친다. 고객에게 영어 내부 메모를 보이지 않도록 사유는 비운다. (오너 2026-11-22: 환불 대신 조정)
+ * 한 줄로 합친다. (오너 2026-11-22: 환불 대신 조정)
+ * ledger 의 reason 은 개발용 메모라 내역에 싣지 않는다 — 각 줄은 날짜 · 종류 · 개수만 보인다. (오너 2026-11-22 A안)
  */
 export function groupRecentActivity(rows: readonly LedgerRow[], limit = 20): ActivityItem[] {
   const groups = new Map<string, ActivityItem>()
@@ -158,7 +158,6 @@ export function groupRecentActivity(rows: readonly LedgerRow[], limit = 20): Act
         delta: row.delta,
         refKind: row.ref_kind,
         refId: row.ref_id,
-        reason: byAdminPage ? null : row.reason,
         at: row.created_at,
       })
     }
