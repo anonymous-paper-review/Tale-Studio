@@ -12,6 +12,7 @@ import { mediaFrameStyle } from '@/lib/project-aspect'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import { useLocaleStore } from '@/stores/locale-store'
 import type { ActiveJob } from '@/lib/generation-queue'
 import { shotStopTarget } from '@/lib/director/stop-work'
 import { StopMakingButton } from '@/features/director/stop-making-button'
@@ -20,6 +21,7 @@ import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { GeneratedImage } from '@/components/generating-frame'
 import { Lumi } from '@/components/lumi/lumi'
 import { historyActions, type HistoryEntry, type HistoryPhrase } from './shot-history'
+import { cameraMentionLabel, mentionOnModifierClick, stopModifierPointerDown } from './mention'
 
 const PILL = 'inline-flex h-6 items-center rounded-full px-2.5 text-micro font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50'
 
@@ -45,6 +47,14 @@ export function HistoryCard({ entry, shotNodeId, shotName, writerShotId, activeJ
   const videoStop = writerShotId && entry.kind === 'take' && entry.phase === 'making' ? shotStopTarget(activeJobs, writerShotId, 'video') : null
   const stop = imageStop ?? videoStop
   const kind = imageStop ? 'image' : 'video'
+  // ⌘/Ctrl+클릭 = 이 판을 채팅에 @멘션(D9) — "실사 샷 3 · 그림 v2" · "실사 샷 3 · Take 4". 아직 없는 판(만드는 자리)은 샷 이름.
+  const locale = useLocaleStore((s) => s.locale)
+  const mentionLabel = cameraMentionLabel(
+    entry.kind === 'image' ? { kind: 'image', label: shotName, n: entry.n }
+      : entry.kind === 'take' ? { kind: 'take', label: shotName, n: entry.takeNumber }
+        : { kind: 'shot', label: shotName },
+    locale,
+  )
   // [먼저 하기] — 영상 묶음에서 맨 앞이 아닌 차례(시안 D4, 리드 S4-2 7).
   const linePosition = entry.kind === 'video-pending' ? entry.position : -1
 
@@ -87,6 +97,8 @@ export function HistoryCard({ entry, shotNodeId, shotName, writerShotId, activeJ
       className={cn('flex w-[184px] shrink-0 flex-col gap-2 rounded-[14px] border-[1.5px] bg-card p-2 transition-opacity duration-100', border)}
       data-history-kind={entry.kind}
       data-used={entry.used ? 'true' : 'false'}
+      onPointerDownCapture={stopModifierPointerDown}
+      onClickCapture={(event) => mentionOnModifierClick(event, mentionLabel)}
     >
       <div className={cn('relative overflow-hidden rounded-[10px] bg-art-placeholder', !frame && 'aspect-video')} style={frame ?? undefined}>
         <Thumb entry={entry} alt={`${shotName} · ${title}`} />

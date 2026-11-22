@@ -2,7 +2,8 @@ import type { StageId } from '@/types'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 
-export type PendingProposalStage = Extract<StageId, 'producer' | 'writer' | 'artist' | 'director'>
+// camera(오너 2026-11-22 D2~D5): Camera 채팅이 낸 글 고침 [적용] 카드는 Camera 화면에서 답한다.
+export type PendingProposalStage = Extract<StageId, 'producer' | 'writer' | 'artist' | 'camera' | 'director'>
 
 export type PendingProposalKind =
   | 'producerSourcePatch'

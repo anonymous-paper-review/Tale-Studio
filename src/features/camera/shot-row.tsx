@@ -11,6 +11,7 @@ import { shotDetailTakes } from '@/lib/director/shot-detail'
 import { detailTabForShot, imageRemakeFailed, shotStateTone, type DirectorShotState } from '@/lib/director/shot-state'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useWriterStore } from '@/stores/writer-store'
+import { useLocaleStore } from '@/stores/locale-store'
 import { isShotData, type DirectorNode } from '@/types/director'
 import { useActiveGenerationJobs } from '@/lib/generation-queue'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
@@ -18,6 +19,7 @@ import { ShotPipelineRow } from '@/features/director/shot-status'
 import { HistoryCard } from './history-card'
 import { ImageFixPanel, VideoMakePanel } from './fix-panel'
 import { dialogueRowLines, shotHistory, type ImageWork } from './shot-history'
+import { cameraMentionLabel, mentionOnModifierClick, stopModifierPointerDown } from './mention'
 
 const FIX_BUTTON = 'inline-flex h-7 items-center gap-1.5 rounded-full px-3 text-micro font-semibold transition-colors'
 
@@ -54,6 +56,9 @@ export function CameraShotRow({ node, label, state }: { node: DirectorNode; labe
   const description = writerShot?.actionDescription?.trim() || null
   const seconds = typeof data?.durationSeconds === 'number' && data.durationSeconds > 0 ? Math.round(data.durationSeconds) : null
   const tone = shotStateTone(state)
+  // ⌘/Ctrl+클릭 = 이 샷을 채팅에 @멘션(D9) — 이름은 채팅 고르기 목록과 같은 "실사 샷 N".
+  const locale = useLocaleStore((s) => s.locale)
+  const mentionLabel = cameraMentionLabel({ kind: 'shot', label }, locale)
 
   // 처음 열 때와 판이 늘 때 맨 오른쪽(새 판)이 보이게 — 사람이 옆으로 넘겨 둔 자리는 판 수가 그대로면 건드리지 않는다.
   const stripRef = useRef<HTMLOListElement>(null)
@@ -69,7 +74,12 @@ export function CameraShotRow({ node, label, state }: { node: DirectorNode; labe
       data-shot-state={state}
       data-testid="camera-shot-row"
     >
-      <div className="flex w-60 shrink-0 flex-col gap-2">
+      {/* 왼쪽 칸만 샷 멘션을 받는다 — 판 카드는 자기 이름(· 그림 vN · Take N)으로 멘션한다(캡처는 바깥이 먼저라 줄 전체에 걸면 카드를 덮는다). */}
+      <div
+        className="flex w-60 shrink-0 flex-col gap-2"
+        onPointerDownCapture={stopModifierPointerDown}
+        onClickCapture={(event) => mentionOnModifierClick(event, mentionLabel)}
+      >
         <div className="flex items-start gap-2">
           <h3 className="min-w-0 flex-1 truncate text-label font-semibold text-foreground">
             {label}

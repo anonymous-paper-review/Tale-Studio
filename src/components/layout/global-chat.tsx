@@ -31,6 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { LumiAvatar } from '@/components/lumi/lumi'
 import { CollapseIcon, ExpandIcon } from '@/components/icons/v3-icons'
 import { STAGE_PERSONA, chatLumiState } from '@/lib/lumi'
+import { directorChatStage, isDirectorChatStage } from '@/lib/director-chat-stage'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -108,7 +109,8 @@ import { useT } from '@/lib/i18n'
 import { pickContentLocale } from '@/lib/locale'
 import { totalInputTokens, type ChatTrace } from '@/lib/chat-trace'
 import type { StageId } from '@/types'
-import { boardNodeNames, directorMentionTargets } from '@/features/director/node-label'
+import { boardNodeNames, directorMentionTargets, directorNodeLabel } from '@/features/director/node-label'
+import { cameraCardMentionLabels } from '@/features/camera/mention'
 
 /** 입력창에 얹혀 있는 첨부 하나. 전송되면 비워진다(이번 턴 한정). */
 interface Attachment {
@@ -583,6 +585,11 @@ export function GlobalChat() {
         ...scriptLineMentions(buildScriptLines(writerManifest, writerShots), locale),
       ].map((m) => ({ id: m.ref, label: m.label, hint: m.hint }))
     }
+    // Camera(오너 2026-11-22 D2~D5)는 실사만 다룬다 — 실사 씬 · 샷. 카드 ⌘/Ctrl+클릭(D9)이 넣는 이름과 같다.
+    if (currentStage === 'camera') {
+      const targets = directorMentionTargets(directorNodes, directorNames)
+      return sceneShotMentions(targets, 'real', locale).map((m) => ({ id: m.ref, label: m.label, hint: m.hint }))
+    }
     if (currentStage === 'director') {
       const targets = directorMentionTargets(directorNodes, directorNames)
       return [...sceneShotMentions(targets, 'previz', locale), ...sceneShotMentions(targets, 'real', locale)].map(
@@ -720,7 +727,12 @@ export function GlobalChat() {
   }, [])
 
   // 넣고 빼기가 더 긴 라벨(예: "이름 미정 인물 2")의 앞부분을 지우지 않게 지금 목록의 라벨을 함께 넘긴다(리드 검토 4).
-  const mentionLabels = useMemo(() => mentionItems.map((m) => m.label), [mentionItems])
+  //   Camera 는 판 카드 이름("실사 샷 3 · 그림 v2" · "· Take 4", D9)도 — 고르기 목록에는 없지만 샷 이름으로 시작한다.
+  const cameraCardLabels = useMemo(
+    () => (currentStage === 'camera' ? cameraCardMentionLabels(directorNodes, (node) => directorNodeLabel(node.data, directorNames), locale) : []),
+    [currentStage, directorNodes, directorNames, locale],
+  )
+  const mentionLabels = useMemo(() => [...mentionItems.map((m) => m.label), ...cameraCardLabels], [mentionItems, cameraCardLabels])
 
   // 입력창의 @멘션 ↔ 카드 하이라이트 동기화 (입력에서 지우면 자동 해제)
   useEffect(() => {
@@ -1472,7 +1484,7 @@ export function GlobalChat() {
         </div>
 
         {/* 지금 할 일 줄(11/13 시안 D5) — Director 만, 머리 바로 아래에 붙어 말이 쌓여도 밀려 올라가지 않는다. */}
-        {currentStage === 'director' && <LumiNowLine />}
+        {isDirectorChatStage(currentStage) && <LumiNowLine />}
 
         {/* Messages */}
         {/* 투명 덮개(AI 가 같은 단계에서 일하는 동안)가 받은 휠 · 끌기를 넘길 칸 — 실제로 스크롤하는 viewport 에 단다(검토 A2 N1).
@@ -1942,14 +1954,14 @@ export function GlobalChat() {
           <ChatProgressPin stage={currentStage} />
           {/* Director 빠른 칩(11/13 시안 D5 "Suggestions", 오너 2026-11-14 "추천대로") — 입력칸 바로 위에 늘 보이고, 누르면 그 말을 바로 보낸다.
               칩 말은 AI 를 거치지 않고 지금 보드 상태로 바로 한다(global-chat-store runDirectorQuickChip). 시안 값: 28 알약 · 바탕색 · 테두리 · 사이 6. */}
-          {currentStage === 'director' && (
+          {isDirectorChatStage(currentStage) && (
             <div className="mb-3 flex flex-col items-start gap-1.5" data-testid="director-quick-chips">
               {DIRECTOR_QUICK_CHIPS.map((chip) => (
                 <button
                   key={chip}
                   type="button"
                   disabled={sendDisabled}
-                  onClick={() => void sendMessage(t(chip), undefined, { stageOverride: 'director' })}
+                  onClick={() => void sendMessage(t(chip), undefined, { stageOverride: directorChatStage(currentStage) })}
                   className="inline-flex min-h-7 items-center rounded-full border border-border bg-background px-3 py-1 text-left text-caption font-medium text-foreground transition-colors duration-100 ease-out hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
                 >
                   {t(chip)}

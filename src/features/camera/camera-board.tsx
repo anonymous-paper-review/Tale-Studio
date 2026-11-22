@@ -5,6 +5,7 @@
 //   한 번에 한 씬만 보인다 — 그 전에는 씬을 모두 차례로 보인다.
 import { useMemo } from 'react'
 import { useT } from '@/lib/i18n'
+import { useLocaleStore } from '@/stores/locale-store'
 import { STAGE_LABEL } from '@/lib/constants'
 import { getChildShots, useDirectorCanvasStore } from '@/stores/director-store'
 import { isSceneData, isShotData } from '@/types/director'
@@ -12,12 +13,14 @@ import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-name
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
 import { directorNodeLabel, sortByBoard } from '@/features/director/node-label'
 import { CameraShotRow } from './shot-row'
+import { cameraMentionLabel, mentionOnModifierClick, stopModifierPointerDown } from './mention'
 
 export function CameraBoard() {
   const t = useT()
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const names = useBoardNodeNames()
   const states = useDirectorShotStates()
+  const locale = useLocaleStore((s) => s.locale)
   const scenes = useMemo(
     () =>
       sortByBoard(nodes.filter((node) => isSceneData(node.data)), names).map((scene) => ({
@@ -43,7 +46,14 @@ export function CameraBoard() {
     <div className="flex flex-col gap-7 [contain:inline-size]" data-testid="camera-board">
       {scenes.map((scene) => (
         <section key={scene.id} className="flex flex-col gap-3">
-          <h2 className="text-[15px] font-semibold text-foreground">{scene.label}</h2>
+          {/* ⌘/Ctrl+클릭 = 이 씬을 채팅에 @멘션(D9) — "실사 씬 N". */}
+          <h2
+            className="self-start text-[15px] font-semibold text-foreground"
+            onPointerDownCapture={stopModifierPointerDown}
+            onClickCapture={(event) => mentionOnModifierClick(event, cameraMentionLabel({ kind: 'scene', label: scene.label }, locale))}
+          >
+            {scene.label}
+          </h2>
           {scene.shots.map((shot) => (
             <CameraShotRow key={shot.id} node={shot} label={directorNodeLabel(shot.data, names)} state={states.get(shot.id) ?? 'image_needed'} />
           ))}
