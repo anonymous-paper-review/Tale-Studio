@@ -29,7 +29,8 @@ import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-che
 import { StopMakingButton } from '@/features/director/stop-making-button'
 import { isStoppableJob } from '@/lib/director/stop-work'
 import { useActiveGenerationJobs } from '@/lib/generation-queue'
-import { normalizeProvider } from '@/lib/video-models'
+import { normalizeProvider, VIDEO_MODEL_ASPECT_TEXT } from '@/lib/video-models'
+import { modelBlockedByAspect, shownVideoError } from '@/features/director/video-aspect'
 import { useShotState } from '@/features/director/hooks/use-shot-states'
 import { dimmedByStatusFilter, takeCountsAsVideo, takeIsRunning, videoTakeFrame, videoTakeTail } from '@/lib/director/shot-state'
 import { StateTailLine } from '@/features/director/shot-status'
@@ -170,6 +171,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const generating = takeIsRunning(data)
   const completed = (data.lastAttemptStatus ?? data.status) === 'completed' && takeCountsAsVideo(data)
   const requestedSeconds = effectiveProvider && effectiveSeconds !== null ? requestedVideoSeconds(effectiveProvider, effectiveSeconds) : null
+  // 정사각 프로젝트에서 Veo 로 만든 Take 는 다시 만들 수 없다(오너 2026-11-22 V3, 서버가 Take 전에 거절 — 리드 q1) — [영상 리테이크]를 끄고 까닭을 보인다(혼자 정한 것 5b).
+  //   모델을 바꾸려면 상세를 연다.
+  const retakeModelBlocked = modelBlockedByAspect(effectiveProvider, projectFormat)
   // 1080p 표시는 지금 영상에 대한 말이다 — 그 영상을 낸 작업 기록 기준(2026-10-31 리뷰). 설정은 왼쪽 패널이 보여준다.
   const madeAt1080p = !!data.videoUrl && data.videoResolution === '1080p'
   // 해상도는 마더 Shot 을 바꾼 값이 아니다(마더에는 해상도가 없다) — 노란 "바꾼 설정" 표시 대신 아래 1080p 표시로 보인다.
@@ -233,7 +237,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
           <Button
             size="sm"
             className="h-7 gap-1 rounded-full px-3 text-xs"
-            disabled={ownerGenerating || generating || retakeReading}
+            disabled={ownerGenerating || generating || retakeReading || retakeModelBlocked}
+            title={retakeModelBlocked ? t(VIDEO_MODEL_ASPECT_TEXT) : undefined}
             onClick={async (e) => {
               e.stopPropagation()
               if (retakeReadingRef.current) return
@@ -309,6 +314,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       {/* Manual frame wiring inputs(#handle-visibility) — 항상 보이는 라벨 홈들.
           hover-only 8px 점은 "구멍이 안 보인다"는 오너 피드백의 원인이었다. */}
       {/* v3 D1: 한국어 라벨 · 20px 간격(제목 줄 아래부터). */}
+      {/* 끝(END) 구멍은 없다(오너 2026-11-22 밤 "Start, End 프레임 생성 방식은 일단 폐기") — 영상은 끝 그림을 쓰지 않는다. 참조 구멍이 그 자리로 올라온다. */}
       <LabeledTargetHandle
         id="video-chain"
         label={t('Previous video')}
@@ -322,15 +328,9 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         title={t('START frame input')}
       />
       <LabeledTargetHandle
-        id="frame-end"
-        label={t('End')}
-        top={86}
-        title={t('END frame input')}
-      />
-      <LabeledTargetHandle
         id="frame-ref"
         label={t('Reference')}
-        top={106}
+        top={86}
         title={t('REF frame input')}
       />
       {/* 영상 재생 / 썸네일 / 상태 — single-play: playingNodeId===id 일 때만 <video> 마운트.
@@ -343,7 +343,7 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       >
         {data.status === 'failed' && !data.videoUrl ? (
           <span className="px-2 text-center text-[10px] text-destructive">
-            {data.lastAttemptError ?? data.errorMessage ?? t('Failed')}
+            {shownVideoError(data.lastAttemptError ?? data.errorMessage ?? t('Failed'), t)}
           </span>
         ) : isPlaying && data.videoUrl ? (
           <>
@@ -468,7 +468,10 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         <p className="mt-1 text-[10px] text-destructive" inert={generating}>{t(TAKES_UNKNOWN_TEXT)}</p>
       )}
       {data.lastAttemptError && (
-        <p className="mt-1 text-[10px] text-destructive" inert={generating}>{data.lastAttemptError}</p>
+        <p className="mt-1 text-[10px] text-destructive" inert={generating}>{shownVideoError(data.lastAttemptError, t)}</p>
+      )}
+      {retakeModelBlocked && (
+        <p className="mt-1 text-[10px] leading-snug text-muted-foreground" inert={generating}>{t(VIDEO_MODEL_ASPECT_TEXT)}</p>
       )}
       {/* 만드는 동안 노드를 덮는 기다리는 카드(11/5 시안 DG · SYS "노드 위 기다림", 리드 2026-11-09). 동시에 만드는 영상마다 하나씩
           (만드는 순서는 그대로). 남은 시간은 쓰지 않고, 막대 · 다음 차례는 묶음일 때만. 노드 테두리까지 덮고, 입력 구멍은 위에 남는다. */}

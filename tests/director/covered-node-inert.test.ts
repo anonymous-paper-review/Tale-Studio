@@ -105,7 +105,8 @@ describe('혼자 정한 것', () => {
     const seen = renderVideo()
 
     const ports = seen.filter(named('LabeledTargetHandle'))
-    expect(ports).toHaveLength(4)
+    // 2026-11-23 오너 결정(11/22 밤 "시작+끝 방식 폐기")으로 끝(END) 구멍을 뺐다 — 이전 영상 · 시작 · 참조 셋(예전 4).
+    expect(ports).toHaveLength(3)
     expect(ports.some((item) => item.inert)).toBe(false)
     expect(seen.find(named('NodeWaitCard'))?.inert).toBe(false)
     const baseHandles = renderBase(true).filter((item) => item.node.type === Handle)

@@ -52,6 +52,14 @@ export function notifyBatchSummary(stage: StageId, content: string): void {
 }
 
 /**
+ * 채팅이 보낸 바꿈을 화면이 받지 않았을 때 까닭 한 줄(리드 2026-11-23 q2 — 정사각 프로젝트에서 영상 모델을 Veo 로 바꾸려 할 때).
+ *   content 는 ⚠ 를 붙인 완성 문장 — 보고 있는 stage 여도 남긴다(방금 한 부탁의 즉답).
+ */
+export function notifyRefusedChange(stage: StageId, content: string): void {
+  useGlobalChatStore.getState().notifyIssue(stage, content)
+}
+
+/**
  * give-up 게이트로 자동 생성이 멈췄을 때.
  *   이걸 안 알리면 화면상 아무 일도 안 일어난 것과 구분되지 않는다 — 그리고 원인이 고쳐져도
  *   자동으로는 복구되지 않으므로 "사람이 눌러야 한다"를 반드시 전달해야 한다.

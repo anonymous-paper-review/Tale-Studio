@@ -93,21 +93,17 @@ export function nodeContextMenuItems(
 /**
  * onConnect 라우팅: Shot의 T 입력(targetHandle==='prompt')으로 들어오는 연결은
  * Prompt 노드 와이어링(wirePromptToShot)으로, Shot 이미지 입력은 image 와이어링으로,
- * Video 프레임 입력은 frame 와이어링으로, 이전 Video 입력은 video-chain으로,
+ * Video 시작 · 참조 입력은 frame 와이어링으로, 이전 Video 입력은 video-chain으로,
  * 그 외는 기존 관계(RelationModal)로.
+ * 옛 끝(END) 칸은 없앴다(오너 2026-11-22 밤 "Start, End 프레임 생성 방식은 일단 폐기") — 그 칸으로 들어오는 연결은 아무 일도 하지 않는다('ignore').
  */
 export function connectRouteForTargetHandle(
   targetHandle: string | null | undefined,
-): 'prompt-wire' | 'image-wire' | 'frame-wire' | 'video-chain' | 'relation' {
+): 'prompt-wire' | 'image-wire' | 'frame-wire' | 'video-chain' | 'relation' | 'ignore' {
   if (targetHandle === 'prompt') return 'prompt-wire'
   if (targetHandle === 'image-reference') return 'image-wire'
-  if (
-    targetHandle === 'frame-start' ||
-    targetHandle === 'frame-end' ||
-    targetHandle === 'frame-ref'
-  ) {
-    return 'frame-wire'
-  }
+  if (targetHandle === 'frame-start' || targetHandle === 'frame-ref') return 'frame-wire'
+  if (targetHandle === 'frame-end') return 'ignore'
   if (targetHandle === 'video-chain') return 'video-chain'
   return 'relation'
 }
