@@ -7,7 +7,7 @@
 //   위층 = 원본 DIRECTING 프레임을 올린 캔버스
 // 지우개(destination-out)로 위층을 긁으면 밑층이 드러난다 = 기존 화살표 삭제.
 // 펜으로 위층에 새 화살표를 그리고, 저장 시 두 층을 평탄화해 direction 프레임에 upsert.
-import { useEffect, useImperativeHandle, useRef, useState } from 'react'
+import { useEffect, useImperativeHandle, useRef, useState, type CSSProperties } from 'react'
 import { Eraser, Layers, Loader2, Pen, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
@@ -76,6 +76,32 @@ export function toolWithPlate(tool: Tool, hasPlate: boolean): Tool {
  *  그림 시각만 바뀌므로 그리던 화살표를 그대로 둔다(재검토 c 3 — 예전엔 그림 시각으로 다시 깔아 저장 전 자국이 사라졌다). 순수 함수 — 테스트 대상. */
 export function reloadsTopLayer(loaded: string | null, direction: string | null | undefined): boolean {
   return !!direction && direction !== loaded
+}
+
+/** 세로 · 정사각 그림 칸의 높이 상한 — 화면 높이에서 창 머리 · 도구 줄 · 저장 줄 · 창 아래 단추 몫(26rem)을 뺀다.
+ *  1440×900 · 1280×720 · 400 폭에서 잰 값(리드 2026-11-23 QA 본 것 b). 아주 낮은 화면에서도 그릴 수 있게 12rem 아래로는 줄이지 않는다. */
+const EDITOR_FRAME_MAX_HEIGHT = 'max(12rem, 100dvh - 26rem)'
+
+/** 편집기 그림 칸 — 원본 프레임 비율로 고정해 좌표가 어긋나지 않게 한다. 세로 · 정사각 그림은 높이가 화면 안에 들어오게 폭을 줄인다
+ *  (세로 9:16 이 칸 폭을 다 써 984px 높이가 되어 저장 줄이 그림 아래를 덮었다). 가로 그림은 지금처럼 칸 폭을 다 쓴다. 순수 함수 — 테스트 대상. */
+export function editorFrameStyle(dims: { w: number; h: number } | null): CSSProperties {
+  if (!dims) return { aspectRatio: '16 / 9' }
+  const aspectRatio = `${dims.w} / ${dims.h}`
+  if (dims.h < dims.w) return { aspectRatio }
+  return { aspectRatio, width: `min(100%, calc(${EDITOR_FRAME_MAX_HEIGHT} * ${dims.w} / ${dims.h}))` }
+}
+
+/** 화면 좌표 → 위층 캔버스(원래 그림 해상도) 좌표 — 그림 칸이 줄어 보여도 비율로 옮기므로, 저장하면(위층 크기 그대로 합침)
+ *  원래 그림의 같은 자리에 남는다(리드 2026-11-23). 순수 함수 — 테스트 대상. */
+export function displayToCanvasPoint(
+  client: { x: number; y: number },
+  rect: { left: number; top: number; width: number; height: number },
+  canvas: { width: number; height: number },
+): { x: number; y: number } {
+  return {
+    x: ((client.x - rect.left) / rect.width) * canvas.width,
+    y: ((client.y - rect.top) / rect.height) * canvas.height,
+  }
 }
 
 /** 분리 답 읽기 — 409(stale_direction)면 화면이 서버보다 낡았다: 알리고 지금 그림을 다시 읽는다(위층도 맞춘다). 테스트 대상. */
@@ -214,11 +240,7 @@ export function DirectingArrowEditor({
 
   const toCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement>): Pt => {
     const canvas = e.currentTarget
-    const rect = canvas.getBoundingClientRect()
-    return {
-      x: ((e.clientX - rect.left) / rect.width) * canvas.width,
-      y: ((e.clientY - rect.top) / rect.height) * canvas.height,
-    }
+    return displayToCanvasPoint({ x: e.clientX, y: e.clientY }, canvas.getBoundingClientRect(), canvas)
   }
 
   const drawSegment = (ctx: CanvasRenderingContext2D, from: Pt, to: Pt) => {
@@ -511,10 +533,11 @@ export function DirectingArrowEditor({
       </div>
 
       {/* 캔버스 — 밑층(클린 플레이트 img) 위에 위층 캔버스. 두 층 모두 컨테이너를 가득 채우고,
-          컨테이너 비율을 원본 프레임 비율로 고정해 좌표가 어긋나지 않게 한다. */}
+          컨테이너 비율을 원본 프레임 비율로 고정해 좌표가 어긋나지 않게 한다. 세로 · 정사각 그림은 화면 높이 안에 들어오게
+          폭을 줄여 가운데 둔다 — 저장 줄이 그림을 덮지 않게(editorFrameStyle, 리드 2026-11-23). */}
       <div
-        className="relative w-full overflow-hidden rounded-lg border bg-muted"
-        style={{ aspectRatio: dims ? `${dims.w} / ${dims.h}` : '16 / 9' }}
+        className="relative mx-auto w-full overflow-hidden rounded-lg border bg-muted"
+        style={editorFrameStyle(dims)}
       >
         {effectiveClean ? (
           // eslint-disable-next-line @next/next/no-img-element
