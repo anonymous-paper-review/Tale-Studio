@@ -54,6 +54,8 @@ import { useWriterUiStore } from '@/stores/writer-ui-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { contiMentionLabels, contiMentionRef, mentionOnModifierClick, stopModifierPointerDown } from '@/lib/writer/conti-mention'
+import { useModifierHeld } from '@/hooks/use-modifier-held'
+import { MentionHint } from '@/features/writer/mention-hint'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { writerProgressView } from '@/lib/writer/progress-view'
@@ -246,8 +248,9 @@ export function RoughStoryboardView() {
   const [lock, setLock] = useState<BoardLockState>(INITIAL_BOARD_LOCK)
   const [lockKey, setLockKey] = useState<string | null>(null)
   const isClient = useSyncExternalStore(subscribeNothing, () => true, () => false)
-  // D9 ⌘/Ctrl+클릭 멘션 — 입력에 붙은 샷 · 씬(카드 하늘색 테두리).
+  // D9 ⌘/Ctrl+클릭 멘션 — 입력에 붙은 샷 · 씬(카드 하늘색 테두리)과 ⌘/Ctrl 를 누르고 있는지(Producer 카드와 같은 알약 · 붙이기 커서).
   const mentionedRefs = useChatUiStore((s) => s.mentionedRefs)
+  const mentionArmed = useModifierHeld()
   // Director 넘김 확인 창 — 머리의 [다음: Director로 →](모든 탭)가 열고, 이 보드가 그린다.
   const directorConfirmOpen = useBoardUiStore((s) => s.directorConfirmOpen)
   const setDirectorConfirmOpen = useBoardUiStore((s) => s.setDirectorConfirmOpen)
@@ -1255,6 +1258,7 @@ export function RoughStoryboardView() {
                     aria-expanded={!sceneCollapsed}
                     className={cn(
                       'flex min-w-0 flex-1 items-center gap-2.5 rounded-md text-left [contain:inline-size] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50',
+                      mentionArmed && 'cursor-copy',
                       mentionedRefs.includes(contiMentionRef('scene', scene.sceneId)) && 'mention-flash bg-sky-400/10 ring-2 ring-sky-400/70',
                     )}
                   >
@@ -1339,10 +1343,12 @@ export function RoughStoryboardView() {
                         }}
                         className={cn(
                           'group relative flex cursor-pointer flex-col gap-2.5 rounded-xl bg-panel p-3 transition-colors duration-100 hover-red-beam focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring/50',
+                          mentionArmed && 'cursor-copy ring-1 ring-sky-400/40',
                           // 입력에 "@샷 N"이 붙은 카드 — Producer · Artist 카드와 같은 하늘색 테두리.
                           mentionedRefs.includes(contiMentionRef('shot', shot.shotId)) && 'mention-flash ring-2 ring-sky-400/70 bg-sky-400/10',
                         )}
                       >
+                        <MentionHint armed={mentionArmed} mentioned={mentionedRefs.includes(contiMentionRef('shot', shot.shotId))} />
                         {/* 카드 머리(v3 시안 S1) — 전체 번호 이름 그대로 · 길이 · ···(샷 고치기 팝업, 카드 누르기와 같다).
                             제품에 카드 메뉴로 둘 다른 일(지우기 · 다시 그리기)이 화면에 없어 메뉴 대신 팝업을 연다 — 결정 대기. */}
                         <div className="flex items-center gap-1.5">
