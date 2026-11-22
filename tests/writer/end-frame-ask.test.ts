@@ -198,6 +198,21 @@ describe('연출 탭의 읽은 한 줄', () => {
     }
     expect(messagesKo['Edit and redraw the end frame']).toBe('고쳐서 끝 장 다시 그리기')
   })
+
+  // 왜(리드 2026-11-23 · fb-end 제안 승인): [그대로]에서도 고친 줄이 남아(리드 (A)) 사람이 고친 줄이 늘어난다 — 사람이 쓴 줄 위에
+  //   "AI 가 읽은 움직임"이 붙어 있으면 누가 쓴 줄인지 헷갈린다. AI 가 읽은 그대로인 줄은 지금 이름표 그대로다.
+  it('사람이 고친 줄이면 편집기 아래 · 물음 창 이름표가 "고친 움직임"이고, AI 가 읽은 그대로면 "AI 가 읽은 움직임"이다', () => {
+    const user = render({ ...LINE, source: 'user', direction: 'https://media.test/r/direction.png' })
+    expect(user).toContain('Edited movement')
+    expect(user).not.toContain('Motion the AI read')
+    const ai = render({ ...LINE, direction: 'https://media.test/r/direction.png' })
+    expect(ai).toContain('Motion the AI read')
+    expect(ai).not.toContain('Edited movement')
+    const confirm = read('src/features/writer/unsaved-arrows-confirm.tsx')
+    expect(confirm).toMatch(/\{userLine \? t\('Edited movement'\) : t\('Motion the AI read'\)\}/)
+    expect(confirm).toMatch(/userLine: endAsk\?\.read\?\.source === 'user'/)
+    expect(messagesKo['Edited movement']).toBe('고친 움직임')
+  })
 })
 
 describe('물음 창 [그대로]와 고친 줄', () => {
