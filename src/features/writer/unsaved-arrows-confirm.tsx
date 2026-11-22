@@ -7,12 +7,16 @@
 //   입구 A 에서 [시작] 탭으로 바꿀 때도 같은 물음을 거친다(편집기가 사라지며 그린 것이 없어진다, 리드 2026-11-14).
 //   연출 장을 다시 만들 때도 묻는다 — 그때는 저장해도 바뀌니 [계속 그리기] · [버리고 다시 만들기] 둘(검토 a 54016e65).
 //   페이지를 떠나거나 새로 고칠 때는 브라우저 기본 물음(beforeunload)을 띄운다 — 저장하면 푼다.
-//   약속: tests/writer/directing-editor-unsaved.test.ts
+//   화살표를 저장하면 끝 장도 이 화살표대로 다시 그릴지 묻는다(D10 · 2026-11-22 리드 Q2) — 두 입구가 같은 물음(EndRedrawAsk)을 쓴다.
+//   약속: tests/writer/directing-editor-unsaved.test.ts · tests/writer/end-frame-ask.test.ts
 import { useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { useT } from '@/lib/i18n'
+import { redrawEndFrame, resolveEndAsk, type EndAskChoice, type EndRedrawDeps } from '@/lib/writer/end-frame-ask'
+import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 import type { DirectingArrowEditorHandle } from '@/features/writer/directing-arrow-editor'
 
 export type UnsavedChoice = 'save' | 'discard' | 'keep'
@@ -75,8 +79,43 @@ export async function applyDirectionTab(
 
 export type UnsavedPurpose = 'close' | 'switch' | 'redraw'
 
-/** 두 입구가 같이 쓰는 지킴 — 편집기 ref · 저장하지 않은 화살표 여부 · 닫기 · 탭 바꾸기 요청 · 물음 창 props. */
+/** 끝 장 물음의 대상 — 어느 프로젝트의 어느 샷인지, 다시 그린 뒤 무엇을 다시 읽을지. */
+export interface EndAskTarget {
+  projectId: string
+  shotId: string
+  onRedrawn: () => void | Promise<void>
+}
+
+/** 끝 장 다시 그리기의 실제 부품 — 요청 · 알림 · 다시 읽기. [이 장만 다시 만들기](끝)와 같은 요청을 보낸다. */
+function endRedrawDeps(target: EndAskTarget, t: ReturnType<typeof useT>): EndRedrawDeps {
+  const frame = t('End frame')
+  return {
+    post: async (body) => {
+      const res = await fetch('/api/writer/rough-directing-edit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const j = await res.json().catch(() => null)
+      return { ok: res.ok, error: res.ok ? null : (j?.error ?? `HTTP ${res.status}`) }
+    },
+    reload: () => reloadAfterRoughFrameEdit(target.projectId, target.onRedrawn),
+    notify: {
+      info: (message) => toast.info(message),
+      success: (message) => toast.success(message),
+      error: (message, retry, detail) => toast.error(message, { description: detail ?? undefined, action: { label: t('Try again'), onClick: retry } }),
+    },
+    messages: {
+      drawing: t('Redrawing the {frame}, about 30 seconds', { frame }),
+      done: t('Redrew the {frame}. The other two are unchanged.', { frame }),
+      failed: t('Could not redraw the end frame. It stays as it was.'),
+    },
+  }
+}
+
+/** 두 입구가 같이 쓰는 지킴 — 편집기 ref · 저장하지 않은 화살표 여부 · 닫기 · 탭 바꾸기 요청 · 물음 창 props · 끝 장 물음. */
 export function useUnsavedArrowsGuard(close: () => void) {
+  const t = useT()
   const editorRef = useRef<DirectingArrowEditorHandle>(null)
   const [dirty, setDirty] = useState(false)
   // 물음 창이 열려 있으면 무엇을 하려다 물었는지(닫기 · 탭 바꾸기)와 고른 뒤 이어서 할 일.
@@ -107,6 +146,16 @@ export function useUnsavedArrowsGuard(close: () => void) {
       setPending(null)
     }
   }
+  // 끝 장 물음 — 화살표를 저장한 뒤 열고, 고르면 저장을 끝낸다(창 [적용] · [저장하고 닫기]는 고른 뒤 닫힌다). 그리기는 기다리지 않는다.
+  const [endAsk, setEndAsk] = useState<{ target: EndAskTarget; done: () => void } | null>(null)
+  const askEnd = (target: EndAskTarget) => new Promise<void>((done) => setEndAsk({ target, done }))
+  const chooseEnd = (choice: EndAskChoice) => {
+    const current = endAsk
+    setEndAsk(null)
+    if (!current) return
+    resolveEndAsk(choice, () => void redrawEndFrame(current.target.projectId, current.target.shotId, endRedrawDeps(current.target, t)))
+    current.done()
+  }
   return {
     editorRef,
     dirty,
@@ -116,7 +165,32 @@ export function useUnsavedArrowsGuard(close: () => void) {
     requestSwitch,
     requestRedraw,
     confirm: { open: pending !== null, purpose: pending?.purpose ?? 'close', saving, onChoose: choose },
+    askEnd,
+    endAsk: { open: endAsk !== null, onChoose: chooseEnd },
   }
+}
+
+/** "끝 장도 이 화살표대로 다시 그릴까요?" — [그대로] · [다시 그리기]. Esc · ✕ · 바깥 누르기는 [그대로](그림 값이 들지 않는 쪽). */
+export function EndRedrawAsk({ open, onChoose }: { open: boolean; onChoose: (choice: EndAskChoice) => void }) {
+  const t = useT()
+  return (
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onChoose('keep') }}>
+      <DialogContent data-testid="end-redraw-ask">
+        <DialogHeader>
+          <DialogTitle>{t('Redraw the end frame to match these arrows?')}</DialogTitle>
+          <DialogDescription>{t('The start and directing frames stay as they are. Only the end frame is redrawn.')}</DialogDescription>
+        </DialogHeader>
+        <DialogFooter>
+          <Button variant="secondary" onClick={() => onChoose('keep')} data-testid="end-redraw-keep">
+            {t('Keep as is')}
+          </Button>
+          <Button onClick={() => onChoose('redraw')} data-testid="end-redraw-redraw">
+            {t('Redraw')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 /** "저장하지 않은 화살표가 있어요" — [계속 그리기] · [버리고 닫기] · [저장하고 닫기](탭을 바꿀 때는 "…바꾸기"). Esc · ✕ 는 계속 그리기(그린 것을 지킨다). */
