@@ -1442,7 +1442,8 @@ function PaletteBar() {
           </button>
 
           {/* 상태 고르기(시안 D1 "전체 4 ▾") — 고르면 그 상태 샷만 보인다. */}
-          <ShotStatusFilterMenu counts={statusCounts} value={statusFilter} onChange={setStatusFilter} />
+          {/* 다 읽기 전 · 못 불러옴이면 수를 적지 않는다(리드 11/23 판 읽기 뒷마무리 — 고르기 줄과 같다). */}
+          <ShotStatusFilterMenu counts={statusCounts} value={statusFilter} onChange={setStatusFilter} countShown={!boardOff} />
 
           {/* 채팅이 닫혀 있으면 여는 곳(v3 D1 Lumi 알약) — Director 는 채팅을 닫은 채 시작한다. */}
           <LumiChatPill />

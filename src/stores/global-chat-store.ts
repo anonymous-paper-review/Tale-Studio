@@ -1416,6 +1416,28 @@ async function heldWorkLines(held: HeldDirectorWork, locale: AppLocale, names: R
   return lines
 }
 
+/**
+ * 판 읽기 막이(리드 2026-11-23) — 이 프로젝트의 판 읽기 기록이 있고 다 읽지 않았을 때만 true. 기록이 없으면(판을 읽는 화면이 없을 때 — Editor 등) 막지 않는다.
+ *   빠른 칩 · 채팅 답의 그림(답 처리) · 영상(startVideosFor) · 글 카드 [적용](승인 앞 · runHeldDirectorWork)이 같은 판정을 쓴다.
+ *   약속: tests/director/board-load-chat.test.ts · tests/director/board-load-chat-replies.test.ts
+ */
+function chatBoardNotReady(projectId: string | null | undefined): boolean {
+  const load = useBoardLoadStore.getState()
+  return !!projectId && load.projectId === projectId && load.status !== 'ready'
+}
+const BOARD_NOT_LOADED_REPLY = "The shots haven't finished loading yet. Please ask again once they're loaded."
+/** 막았다는 한 줄 — 바로 앞 줄이 같은 말이면 다시 남기지 않는다(한 답에서 그림 · 영상이 함께 막힐 때 · 카드를 거듭 누를 때). */
+function sayBoardNotLoaded(say: (content: string) => void): void {
+  const line = translate(contentLocale(), BOARD_NOT_LOADED_REPLY)
+  const last = useGlobalChatStore.getState().messages.at(-1)
+  if (last?.role === 'model' && last.content === line) return
+  say(line)
+}
+/** 글 카드에 묶인 그림 · 영상이 있는가 — 막이는 만들기만 막는다(글만의 카드는 지금처럼). */
+function heldHasWork(held: HeldDirectorWork | undefined): boolean {
+  return !!held && (held.allBlankImages || held.images.length > 0 || held.videos.length > 0 || (held.remakes ?? []).length > 0)
+}
+
 /** 글 카드 [적용] 뒤 — 묶어 둔 그림 · 영상을 바뀐 글로 만든다(그림은 버튼과 같은 길로 Take 없이, 영상은 Take 셈 뒤). */
 async function runHeldDirectorWork(held: HeldDirectorWork, ctx: {
   projectId: string
@@ -1424,6 +1446,11 @@ async function runHeldDirectorWork(held: HeldDirectorWork, ctx: {
   onJob: GenerationJobObserver
   isCurrent: () => boolean
 }): Promise<void> {
+  // 판 읽기 막이(리드 11/23) — 막히는 카드는 승인 앞에서 먼저 멈춘다(카드가 그대로 남게). 여기는 그 사이 판 상태가 바뀐 때의 마지막 막이.
+  if (chatBoardNotReady(ctx.projectId)) {
+    sayBoardNotLoaded(ctx.say)
+    return
+  }
   const locale = contentLocale()
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
   const canvas = useDirectorCanvasStore.getState()
@@ -1468,6 +1495,11 @@ async function startVideosFor(input: {
    *  말 한 줄을 정할 수 없는 길(빠른 칩 · 되묻기 답 · 알림 카드 단추 · 글 고침 [적용] 뒤)은 넘기지 않는다 — 빈 말과 "채팅"만 남는다. */
   asked?: string
 }): Promise<void> {
+  // 판 읽기 막이(리드 11/23) — AI 답 · 되묻기의 "응" · 글 카드 [적용] 뒤 · 알림 카드 단추의 영상이 모두 여기를 지난다.
+  if (chatBoardNotReady(useDirectorCanvasStore.getState().projectId)) {
+    sayBoardNotLoaded(input.say)
+    return
+  }
   const locale = contentLocale()
   const takeNote = { note: (input.asked ?? '').trim(), via: 'chat' as const }
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
@@ -1604,9 +1636,8 @@ async function runDirectorQuickChip(input: {
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
   // 이 프로젝트 판을 다 읽기 전 · 못 불러옴이면 아무것도 만들지 않는다 — 위쪽 만들기 단추를 끈 것과 같은 까닭(리드 11/23 판 읽기 뒷마무리).
   //   판 읽기 기록이 없으면(판을 읽는 화면이 없을 때) 막지 않는다. 약속: tests/director/board-load-chat.test.ts
-  const boardLoad = useBoardLoadStore.getState()
-  if (boardLoad.projectId === input.projectId && boardLoad.status !== 'ready') {
-    input.say(t("The shots haven't finished loading yet. Please ask again once they're loaded."))
+  if (chatBoardNotReady(input.projectId)) {
+    sayBoardNotLoaded(input.say)
     return
   }
   const canvas = useDirectorCanvasStore.getState()
@@ -4290,7 +4321,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           // 앞 턴의 글 카드가 아직 기다리면 그 카드가 건 샷의 그림도 그 카드에 묶는다(재검토 b 보통 B — 영상은 startVideosFor 가 묶는다).
           const waitingCard = waitingTextCard(projectId)
           const toWaitingCard: HeldDirectorWork = { images: [], allBlankImages: false, videos: [] }
-          const immediate = split.immediate.filter((update) => {
+          const immediateAll = split.immediate.filter((update) => {
             if (update.type !== 'generateImage') return true
             if (update.id) {
               if (bound.has(update.id)) held.images.push(update.id)
@@ -4305,6 +4336,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           })
             // 채팅으로 다시 그린 그림 판에는 사용자가 쓴 부탁이 남는다(오너 2026-11-22 결정 4) — 모델이 낸 값은 서버 검사가 이미 버렸다.
             .map((update) => (update.type === 'generateImage' && update.id ? { ...update, askedInChat: trimmed } : update))
+          // 판 읽기 막이(리드 11/23) — 이 프로젝트 판을 다 읽기 전 · 못 불러옴이면 답의 그림 만들기는 넘기지 않는다(칩 막이와 같은 판정). 설정 · 연결 같은 다른 바꿈은 그대로.
+          const imageBlocked = chatBoardNotReady(projectId) && immediateAll.some((update) => update.type === 'generateImage')
+          const immediate = imageBlocked ? immediateAll.filter((update) => update.type !== 'generateImage') : immediateAll
+          if (imageBlocked) sayBoardNotLoaded(lumiSays)
           const result = useDirectorCanvasStore.getState().applyUpdates(immediate, { traceId, onJob: observeGeneration })
           const resolvedIds = result.resolvedIds ?? {}
           const resolve = (id: string) => (Object.hasOwn(resolvedIds, id) ? resolvedIds[id] : id)
@@ -5198,6 +5233,12 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const isCurrentSession = () => session === chatSession && projectId === useProjectStore.getState().projectId
     if (proposal.projectId && proposal.projectId !== projectId) return false
     const items = proposal.items ?? [proposal]
+    // 판 읽기 막이(리드 11/23) — 그림 · 영상이 묶인 글 카드는 판을 다 읽기 전 · 못 불러옴이면 [적용]하지 않는다. 카드를 내리기 전에 멈춰 카드가 그대로 남고,
+    //   글도 바꾸지 않는다(글만 바꾸고 남기면 다시 누를 때 옛 글 검사에 걸린다). 다 읽은 뒤 다시 누르면 지금처럼 된다.
+    if (projectId && chatBoardNotReady(projectId) && items.some((item) => item.kind === 'directorTextEdit' && heldHasWork(item.payload.then as HeldDirectorWork | undefined))) {
+      sayBoardNotLoaded(producerSpeaker(projectId, proposal.stage))
+      return false
+    }
     const remaining = [...items]
     const saveRemaining = () => {
       if (get().cancelledProposalIds.includes(proposal.id) || (projectId && loadConversationState(projectId).cancelledProposalIds?.includes(proposal.id))) return
