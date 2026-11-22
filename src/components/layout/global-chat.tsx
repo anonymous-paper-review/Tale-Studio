@@ -1704,7 +1704,7 @@ export function GlobalChat() {
                       STAGE_BADGE_CLASS[pendingProposal.stage],
                     )}
                   >
-                    Suggestion
+                    {t('Suggestion')}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold"><MarkdownText text={scrubProse(pendingProposal.target)} /></p>
