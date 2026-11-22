@@ -252,10 +252,12 @@ export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
 
 // writer 채팅: 러프 스토리보드 검토 단계에서 씬/샷 CRUD (api/writer/chat + global-chat-store 'writer' case).
 //   editor 채팅은 조언만 한다(api/editor/chat — 오너 2026-11-14 10번, 작업물을 바꾸는 길이 없다).
+// camera(오너 2026-11-22 D2~D5): Director 와 같은 채팅 엔진(api/director/chat)을 쓰고 말은 채팅방 Camera 구간에 남는다(lib/director-chat-stage).
 export const CHAT_SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([
   'producer',
   'writer',
   'artist',
+  'camera',
   'director',
   'editor',
 ])

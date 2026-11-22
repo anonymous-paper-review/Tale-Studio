@@ -3790,6 +3790,24 @@ export const KO: Record<string, string> = {
   'Make the shots in {stage} first.': '{stage}에서 먼저 샷을 만들어 주세요.',
   "Make real images and videos shot by shot. Every image and video stays in the shot's history.":
     '샷마다 실사 이미지와 영상을 만들어요. 만든 이미지와 영상은 모두 그 샷의 이력에 남아요.',
+  // Camera 이력 요약(판마다 무엇이 바뀌었나 — 지금 저장된 사실만)
+  'First image': '처음 그림',
+  'Drawn again': '다시 그림',
+  'Redrawn after the rough changed': '러프가 바뀐 뒤 다시 그림',
+  'First video': '처음 영상',
+  'Image v{n}': '그림 v{n}',
+  'Continued from the previous video': '앞 영상에서 이어서',
+  'Change: {note}': '바꿀 점: {note}',
+  'Made again': '다시 만듦',
+  'Failed: {reason}': '실패: {reason}',
+  'Remake failed: {reason}': '다시 만들기 실패: {reason}',
+  'New image': '새 그림',
+  'Current image': '지금 그림',
+  'Use this image': '이 그림 쓰기',
+  'Could not change the current image. Please try again.': '지금 그림을 바꾸지 못했어요. 다시 눌러 주세요.',
+  'No image or video yet.': '아직 그림 · 영상이 없어요.',
+  '{shot} history': '{shot} 이력',
+  'New Take': '새 Take',
   'This is a shared preview. In the real project, you make real images and videos shot by shot here and keep every version.':
     '공유 미리보기 모드예요. 실제로는 샷마다 실사 이미지와 영상을 만들고 모든 판을 남겨요.',
 

@@ -97,6 +97,7 @@ import { editorChatContext } from '@/lib/editor/chat-context'
 import { useEditorStore } from '@/stores/editor-store'
 import { handoffMarker } from '@/lib/chat-blocks'
 import { shotMediaStage } from '@/lib/generation-batches'
+import { directorChatStage, isDirectorChatStage, type DirectorChatStage } from '@/lib/director-chat-stage'
 import {
   buildChatTrace,
   createChatTraceId,
@@ -1907,25 +1908,26 @@ async function runDirectorQuickChip(input: {
 }
 
 /**
- * Director 에서 AI 를 거치지 않고 바로 하는 한 턴(빠른 칩 · 알림 카드 단추) — 누른 말을 채팅에 남기고, 하는 동안 입력을 잠그고,
- *   Lumi 답을 남긴다(같은 세션 · 같은 프로젝트일 때만).
+ * Director · Camera 에서 AI 를 거치지 않고 바로 하는 한 턴(빠른 칩 · 알림 카드 단추) — 누른 말을 채팅에 남기고, 하는 동안 입력을 잠그고,
+ *   Lumi 답을 남긴다(같은 세션 · 같은 프로젝트일 때만). 말은 그 말을 한 화면의 구간에 남는다(Camera, 오너 2026-11-22 D2~D5).
  */
 async function runDirectorTurn(
   projectId: string,
+  stage: DirectorChatStage,
   userText: string,
   isCurrent: () => boolean,
   work: (say: (content: string) => void) => Promise<void>,
 ): Promise<void> {
   useGlobalChatStore.setState((state) => ({
-    messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'user' as const, content: userText }],
+    messages: [...state.messages, { id: makeId(), stage, role: 'user' as const, content: userText }],
     loading: true,
     error: null,
   }))
-  saveChatMessage(projectId, 'director', 'user', userText)
+  saveChatMessage(projectId, stage, 'user', userText)
   const say = (content: string) => {
     if (!isCurrent()) return
-    useGlobalChatStore.setState((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'model' as const, content }] }))
-    saveChatMessage(projectId, 'director', 'model', content)
+    useGlobalChatStore.setState((state) => ({ messages: [...state.messages, { id: makeId(), stage, role: 'model' as const, content }] }))
+    saveChatMessage(projectId, stage, 'model', content)
   }
   try {
     await work(say)
@@ -3165,7 +3167,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const videoAsk = get().directorVideoAsk
     if (videoAsk && !opts?.silentUser) {
       set({ directorVideoAsk: null })
-      if (stage === 'director' && projectId && videoAsk.projectId === projectId) {
+      if (isDirectorChatStage(stage) && projectId && videoAsk.projectId === projectId) {
+        // 되물은 화면(Director · Camera — 같은 샷 · 같은 엔진)에서 답하면 그 화면 구간에 남는다(오너 2026-11-22 D2~D5).
+        const chatStage = directorChatStage(stage)
         // 번호를 물었는데 "2?"처럼 물음표로 · "3이나 4"처럼 고르는 말로 답했다 — 바로 만들지 않고 그 샷 목록으로 되묻는다(물음표 규칙 — 재검토 b 낮음 2, 검토 a 통합 낮음).
         const askedBack = 'numbers' in videoAsk ? askedBackShotNumbers(trimmed) : null
         if (askedBack) {
@@ -3184,19 +3188,19 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const shotIds = withImagesOnly(answered.filter((id) => open.has(id)), contentLocale(), (line) => lines.push(line))
           const sayLines = (contents: readonly string[]) => {
             for (const content of contents) {
-              set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'director' as const, role: 'model' as const, content }] }))
-              saveChatMessage(projectId, 'director', 'model', content)
+              set((state) => ({ messages: [...state.messages, { id: makeId(), stage: chatStage, role: 'model' as const, content }] }))
+              saveChatMessage(projectId, chatStage, 'model', content)
             }
           }
           if (shotIds.length === 0) {
-            if (lines.length === 0) get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'There are no such shots right now.'))
+            if (lines.length === 0) get().appendLocalExchange(chatStage, trimmed, translate(contentLocale(), 'There are no such shots right now.'))
             else {
-              get().appendLocalUser('director', trimmed)
+              get().appendLocalUser(chatStage, trimmed)
               sayLines(lines)
             }
             return
           }
-          get().appendLocalUser('director', trimmed)
+          get().appendLocalUser(chatStage, trimmed)
           set({ directorVideoAsk: { projectId, shotIds, ...(videoAsk.remake ? { remake: true, named: shotIds } : {}) } })
           const line = await confirmVideosLine(shotIds, contentLocale(), videoAsk.remake)
           if (!isCurrentSession()) return
@@ -3206,7 +3210,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         // 번호를 물었다 — "3번" · "3번이랑 4번" · 맨 숫자도 샷 번호다(재검토 b 낮음 3). 그 번호의 샷만 바로 만든다(분명한 꼴 (1)).
         const numbers = 'numbers' in videoAsk ? answeredShotNumbers(trimmed) : null
         if (numbers) {
-          await runDirectorTurn(projectId, trimmed, isCurrentSession, async (say) => {
+          await runDirectorTurn(projectId, chatStage, trimmed, isCurrentSession, async (say) => {
             const nodes = useDirectorCanvasStore.getState().nodes
             const shots = directorShotRefs(nodes, directorBoardNames(contentLocale()))
             const answered = shots.filter((shot) => shot.shotNo !== null && numbers.has(shot.shotNo)).map((shot) => shot.nodeId)
@@ -3222,24 +3226,24 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         if ('shotIds' in videoAsk && asksBackYes(trimmed)) {
           set({ directorVideoAsk: videoAsk })
-          get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'Shall I start? Please answer yes or no.'))
+          get().appendLocalExchange(chatStage, trimmed, translate(contentLocale(), 'Shall I start? Please answer yes or no.'))
           return
         }
         if ('shotIds' in videoAsk && saysYes(trimmed)) {
-          await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => startVideosFor({ shotIds: videoAsk.shotIds, say, isCurrent: isCurrentSession, remake: videoAsk.remake, named: videoAsk.named }))
+          await runDirectorTurn(projectId, chatStage, trimmed, isCurrentSession, (say) => startVideosFor({ shotIds: videoAsk.shotIds, say, isCurrent: isCurrentSession, remake: videoAsk.remake, named: videoAsk.named }))
           return
         }
         if ('shotIds' in videoAsk && isCancellationUtterance(trimmed)) {
-          get().appendLocalExchange('director', trimmed, translate(contentLocale(), 'I did not make any videos.'))
+          get().appendLocalExchange(chatStage, trimmed, translate(contentLocale(), 'I did not make any videos.'))
           return
         }
       }
     }
 
-    // Director 빠른 칩(11/13 시안 D5, 오너 2026-11-14) — 칩 말은 AI 를 거치지 않고 지금 보드 상태로 바로 한다. 보낸 말 · Lumi 답은 채팅에 남는다.
-    const quickChip = stage === 'director' && !opts?.silentUser ? directorQuickChipOf(trimmed) : null
+    // Director · Camera 빠른 칩(11/13 시안 D5, 오너 2026-11-14 · 2026-11-22 D2~D5) — 칩 말은 AI 를 거치지 않고 지금 보드 상태로 바로 한다. 보낸 말 · Lumi 답은 그 화면 구간에 남는다.
+    const quickChip = isDirectorChatStage(stage) && !opts?.silentUser ? directorQuickChipOf(trimmed) : null
     if (quickChip && projectId) {
-      await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => runDirectorQuickChip({ chip: quickChip, projectId, say, isCurrent: isCurrentSession }))
+      await runDirectorTurn(projectId, directorChatStage(stage), trimmed, isCurrentSession, (say) => runDirectorQuickChip({ chip: quickChip, projectId, say, isCurrent: isCurrentSession }))
       return
     }
 
@@ -3846,8 +3850,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         break
       }
+      case 'camera':
       case 'director': {
-        // Director Canvas agentic 모드 — 항상 canvasContext 전달.
+        // Director Canvas agentic 모드 — 항상 canvasContext 전달. Camera(오너 2026-11-22 D2~D5)도 같은 샷 · 같은 엔진이고, screen 으로 화면을 알린다
+        //   (서버가 노드 · 캔버스 말 대신 샷 줄 · 판으로 말하게 한다).
         // (unify-director-store-db Step 1: 옛 director-store legacy 분기 제거, canvas가 단일 진실)
         const canvasState = useDirectorCanvasStore.getState()
         // 씬 · 샷마다 보드 이름("씬 2 · 샷 8" · "Scene 2 · Shot 8")을 붙인다 — 사용자는 보드 번호로 부르고(@실사 샷 8 · @Previz Shot 8), 모델도 그 이름으로 답한다(오너 2026-11-02 "전체 번호로 통일").
@@ -3865,6 +3871,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           canvasContext,
           // 서버가 projects.locale 을 조회해 응답 언어를 강제할 수 있게 전달(#i18n-s5-batch6-chat).
           projectId,
+          screen: stage,
         }
         break
       }
@@ -4580,7 +4587,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             get().pendingProposal?.traceId === traceId ? 'awaiting_approval' : null,
         })
       }
-      if (stage === 'director') {
+      if (isDirectorChatStage(stage)) {
         // 오너 2026-11-14 9번 "루미에게 부탁하면 바로 실행해줘" — 확인 카드 없이 바로 한다. 그림은 Take 를 쓰지 않아 곧장 만들고,
         //   영상은 사용자가 말한 샷만(막이) · Take 가 모자라면 하나도 시작하지 않는다. 글(샷 이름 · 프롬프트, 씬 설명 등)은
         //   "끝난 결과가 글이면 전후 비교 후 변화 채택" — 전 · 후를 보이고 [적용]을 눌러야 바뀐다. 설정 · 연결 · 새 노드는 지금처럼 바로.
@@ -4699,7 +4706,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             textCardOffered = get().offerPendingProposal(
               createPendingProposal({
                 traceId,
-                stage: 'director',
+                stage: directorChatStage(stage),
                 kind: 'directorTextEdit',
                 target: translate(locale, 'Text changes'),
                 action: translate(locale, 'Apply the text Lumi suggested'),
@@ -5142,7 +5149,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (!projectId || shotIds.length === 0 || get().loading) return
     const session = chatSession
     const isCurrent = () => session === chatSession && projectId === useProjectStore.getState().projectId
-    await runDirectorTurn(projectId, userText, isCurrent, (say) => startVideosFor({ shotIds, say, isCurrent, remake: opts?.remake === true }))
+    await runDirectorTurn(projectId, directorChatStage(useProjectStore.getState().currentStage), userText, isCurrent, (say) => startVideosFor({ shotIds, say, isCurrent, remake: opts?.remake === true }))
   },
 
   // 프로액티브 제안 띄우기 — 한 번에 하나만(이미 떠 있으면 무시), 이미 dismiss/승인한 id 도 무시.
