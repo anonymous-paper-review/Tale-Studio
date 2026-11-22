@@ -31,4 +31,13 @@ describe('V3 — Veo 화면비', () => {
     expect(panel).toMatch(/modelFits: videoModelFitsAspectRatio\(setup\.model, aspectRatio\)/)
     expect(panel).toContain("t('Change the model in Details.')")
   })
+
+  it('샷 상세 이미지 탭의 [다음: 영상 만들기 · N Take]도 이어받은 모델이 Veo 이고 16:9 · 9:16 이 아니면 꺼지고 같은 까닭이 단추 아래에 보인다', () => {
+    // 왜: 리드 11/23 — 이 단추도 이어받은 설정으로 새 Take 를 만든다. 누르면 서버가 409 model_aspect_unsupported 로 막으니 화면이 먼저 막는다.
+    const detail = readFileSync('src/features/director/shot-detail/director-shot-detail.tsx', 'utf8')
+    expect(detail).toMatch(/const modelFits = videoModelFitsAspectRatio\(settings\.model, aspectRatio\)/)
+    expect(detail).toMatch(/\|\| nextStarting \|\| !modelFits/)
+    expect(detail).toMatch(/reason: modelFits \? null : t\(VIDEO_MODEL_ASPECT_TEXT\)/)
+    expect(readFileSync('src/features/director/shot-detail/shot-image-tab.tsx', 'utf8')).toMatch(/makeVideo\?\.reason \? <p className="text-caption text-subtle-foreground">\{makeVideo\.reason\}<\/p> : null/)
+  })
 })
