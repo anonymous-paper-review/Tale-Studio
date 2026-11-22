@@ -212,6 +212,8 @@ export function buildRealGridPrompt(
     /** #viz-gap 실험 arm: 컬럼(=샷) 순서대로의 시네 라인. 연필이 못 옮기는 조명/초점/DoF/렌즈/색만.
      *  생략(기본)이면 현행 프롬프트 그대로 — 라이브 라우트 무변경. renderRepaintCineLine 산출물. */
     cineLines?: (string | null | undefined)[]
+    /** D10 ②(2026-11-22 오너 R1): 칸(=샷) 순서대로의 "끝 장을 그린 읽은 줄"(freshDirectionLine) — 줄 있는 칸만 싣는다. */
+    directionLines?: (string | null | undefined)[]
     /** #real-grid-identity(2026-08-12, 실측 a5cb2cae sh_04_18): 레퍼런스 순서와 칸별 배정.
      *  옛 프롬프트의 "corresponding character(s)"는 대응 관계가 어디에도 정의돼 있지 않아
      *  모델이 자유 추측했고, 소수 인물이 다수 인물에 흡수되는 바꿔치기가 실측됐다.
@@ -311,9 +313,23 @@ export function buildRealGridPrompt(
         ]
       : []),
     ...renderGridCineBlock(cineLines),
+    ...renderGridMovementBlock(opts.directionLines),
     ...(hasStyleRef && opts.styleAvoid?.trim() ? [`- ${opts.styleAvoid.trim()}`] : []),
     REAL_NO_TEXT_LINE,
   ].join('\n')
+}
+
+/** 칸별 움직임 블록(D10 ② · 2026-11-22 오너 R1) — 사람이 고친 화살표를 읽고 그 줄로 끝 장을 다시 그린 칸만.
+ *  시트 길에는 샷 글이 없어 옛 움직임 글과 다투지 않는다 — 그 칸의 3행(END)과 같은 움직임이라고만 적는다. */
+function renderGridMovementBlock(directionLines?: (string | null | undefined)[]): string[] {
+  const entries = (directionLines ?? [])
+    .map((line, i) => ({ i, line: (line ?? '').trim() }))
+    .filter((e) => e.line.length > 0)
+  if (!entries.length) return []
+  return [
+    `- Per-column movement (the director's latest movement for these columns; it matches that column's row 3 END panel):`,
+    ...entries.map((e) => `    · Column ${e.i + 1}: ${e.line}`),
+  ]
 }
 
 /** 컬럼별 시네 라인 블록(#viz-gap) — 연필 시트가 못 보여주는 빛/초점/렌즈/색만 실현하라고 지시.
@@ -441,6 +457,8 @@ export function buildRealStripPrompt(
     hasStyleRef: boolean
     /** #viz-gap 실험 arm: 이 샷의 시네 라인(비운반 채널만). 생략 시 현행 프롬프트 그대로. */
     cineLine?: string | null
+    /** D10 ②(2026-11-22 오너 R1): 이 샷의 "끝 장을 그린 읽은 줄"(freshDirectionLine). 없으면 지금 지시 그대로. */
+    directionLine?: string | null
     /** #F-006: 씬 시간대(scenes.time_of_day). 샷 산문의 시간대 단어는 확률적(실측 4/7 샷에만
      *  존재)이라 씬 진실로 고정한다. 그리드 쪽 주석 참조 — 앵커 절과의 권위 관계 동일. */
     sceneLighting?: string | null
@@ -525,6 +543,12 @@ export function buildRealStripPrompt(
         ]
       : []),
     `- Shot description: ${shotPrompt}`,
+    // D10 ②(오너 R1): 사람이 고친 화살표를 읽은 줄 — 샷 글은 지우지 않고(움직임 밖 정보), 다를 때 이 줄과 참고 끝 칸을 따르게 한다.
+    ...(opts.directionLine && opts.directionLine.trim()
+      ? [
+          `- Movement (the director edited it after the shot description was written; where the two disagree, follow this movement and reference panel 3): ${opts.directionLine.trim()}`,
+        ]
+      : []),
     ...(cineLine && cineLine.trim()
       ? [
           `- Cinematography — realize these lighting, focus, lens and color intents the pencil cannot show; apply them WITHOUT changing framing, composition or poses: ${cineLine.trim()}`,

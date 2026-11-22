@@ -32,6 +32,7 @@ import {
   type CharacterRefLabel,
 } from '@/lib/director/storyboard-strip'
 import { realCineLine } from '@/lib/director/real-cine-line'
+import { freshDirectionLine } from '@/lib/writer/direction-read'
 import { applyDirectorRefs, directorRefsExcludeWorld, loadPropsForReferences, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking, readOffFrame } from '@/lib/director/shot-references'
 import { planSheetPropRefs, propRefRoom, propReferenceLines } from '@/lib/director/shot-prop-refs'
 import { loadSeriesFirstShotContinuity, seriesContinuityPromptLine } from '@/lib/series/continuity'
@@ -77,6 +78,8 @@ interface EligibleShot {
   roughGeneratedAt: number | null
   /** D5(2026-11-22): 러프 가운데 장 글씨 칸이 나르던 빛 · 색 · 렌즈 · 초점 — 샷 설계에서 만든 글(없으면 null). */
   cineLine: string | null
+  /** D10 ②(2026-11-22 오너 R1): 그 샷의 "끝 장을 그린 읽은 줄"(없으면 null) — 칸별 움직임으로 싣는다. */
+  directionLine: string | null
   /** 소품 참고(D7 2단계): 칸마다 소품 칸(static_spec.prop_placement)을 읽는다. */
   staticSpec: unknown
 }
@@ -239,6 +242,7 @@ export async function POST(req: NextRequest) {
         frames: { start: f.start, direction: f.direction, end: f.end },
         blocking: readCharacterBlocking(s.static_spec),
         cineLine: realCineLine(s.static_spec),
+        directionLine: freshDirectionLine(s.rough_storyboard),
         staticSpec: s.static_spec,
       })
     }
@@ -443,6 +447,7 @@ export async function POST(req: NextRequest) {
         styleAnchors: userStyleFacets?.probeAnchors ?? null,
         styleAvoid: userStyleFacets?.negative ?? null,
         cineLines: group.map((s) => s.cineLine),
+        directionLines: group.map((s) => s.directionLine),
       }) + (seriesFrameUrl ? `\n- ${seriesContinuityPromptLine(seriesFrameColumn + 1)}` : '') + (propLines.length ? `\n${propLines.join('\n')}` : '')
       const referenceImageUrls = [
         refUrl,
@@ -462,6 +467,8 @@ export async function POST(req: NextRequest) {
       try {
         moderation = await assertUserTextAllowed(
           [
+            // D10 ②(오너 R1): 칸별 읽은 줄 — 사용자 손글씨가 옮겨진 글이라 검사한다.
+            ...group.map((s) => s.directionLine),
             ...columnCharacters.flatMap((column) => column.flatMap((c) => [c.name, c.pose, c.position])),
             ...propRefs.map((ref) => ref.name),
             sceneLighting,
