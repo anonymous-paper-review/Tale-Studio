@@ -74,7 +74,7 @@ export function WriterNextCard({ step, onChatFocus }: { step: 'ask' | 'more'; on
       <Button size="sm" variant="outline" onClick={() => { dismissCurrent(); useGlobalChatStore.getState().requestProseRewrite(t('Ask for a rewrite')) }}>
         <Sparkles className="size-4" />{t('Ask for a rewrite')}
       </Button>
-      <Button size="sm" variant="outline" onClick={() => { dismissCurrent(); useWriterRoomStore.getState().requestManual() }}>
+      <Button size="sm" variant="outline" onClick={() => { dismissCurrent(); useGlobalChatStore.getState().requestProseManualEdit(t('Edit it myself')) }}>
         <Pencil className="size-4" />{t('Edit it myself')}
       </Button>
       <Button

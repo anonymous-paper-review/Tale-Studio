@@ -215,6 +215,8 @@ interface GlobalChatState {
   offerStartComicStyle: (projectId: string) => Promise<boolean>
   /** Writer 산문 다시 쓰기 단추([다시 써 달라고 하기]) — 원작 그대로 쓰는 작품이면 조건 창 대신 누른 말과 까닭을 남기고, 아니면 조건 창을 연다(D15 오너 2026-11-22). */
   requestProseRewrite: (said: string) => void
+  /** Writer 직접 고치기 단추([직접 고칠래요]) — 원작 그대로 쓰는 작품이면 직접 고치기 대신 누른 말과 같은 까닭을 남기고, 아니면 직접 고치기를 연다(D15). */
+  requestProseManualEdit: (said: string) => void
   /** 트리트먼트에 미리 보이는 안(v1 · v2 · v3). 채팅 카드와 트리트먼트가 같은 값을 읽는다. */
   sceneStoryVariantPreview: { projectId: string; proposalId: string; variantId: string } | null
   previewSceneStoryVariant: (proposalId: string, variantId: string) => void
@@ -2647,6 +2649,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       return
     }
     useWriterRoomStore.getState().openRewrite()
+  },
+
+  requestProseManualEdit: (said) => {
+    // 원작 그대로 쓰는 작품은 산문 도구가 꺼져 직접 고치기가 열리지 않는다 — [다시 써 달라고 하기]와 같은 까닭 · 넘어가는 길을 남긴다(D15, 리드 2026-11-22).
+    if (proseKeepsOriginal()) {
+      get().appendLocalExchange('producer', said, translate(contentLocale(), PRESERVED_PROSE_NOTE))
+      return
+    }
+    useWriterRoomStore.getState().requestManual()
   },
 
   resolveSceneStoryUndo: async (action, undoId) => {
