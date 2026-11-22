@@ -4,7 +4,9 @@
 //   작품 스타일은 하나 — 고른 스타일 · 만드는 것(인물 시트 N · 배경 M) · 예상 크레딧을 보여 주고 [만들기]로 전체를 만든다.
 //   [만들기] = 확정 산문 초안을 이어 가며 인물 · 배경 디자인 뒤에 멈추게 한다(artistGate). 그림은 Take 가 들지 않는다(take-cost: Take 는 영상 전용).
 //   "내 그림체 올리기" 카드는 2026-10-27 오너 지시로 내렸다("추후 정비해서 다시 올릴거야") — 이미 올린 그림체가 있는 프로젝트는
-//   그 그림체 카드와 지우기(✕)만 보인다. 올리기 · 분석 서버 경로와 Writer 채팅의 그림체 첨부는 그대로다.
+//   그 그림체 카드와 지우기(✕)만 보인다.
+//   고를 수 있는 스타일은 네 가지뿐이다(D6 오너 2026-11-22, lib/style-offer). 이 작품 · 앞 화가 이미 쓰는 없어진 스타일은 그 칸 하나만 남고,
+//   그림이 아직 없는 작품이 예전에 정해 둔 없어진 스타일이면 가장 가까운 것을 골라 두고 까닭을 한 줄 보인다.
 import { useEffect, useState } from 'react'
 import { Check, ImageIcon, Loader2, Lock, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -13,8 +15,9 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { ThumbImage } from '@/components/thumb-image'
 import { useLocale, useT } from '@/lib/i18n'
-import { directionParticle } from '@/lib/korean-particles'
+import { directionParticle, fixKoreanParticles } from '@/lib/korean-particles'
 import { styleAnchorName } from '@/lib/style-anchor-name'
+import { isOfferedStyle, nearestOfferedStyle, offeredStyles } from '@/lib/style-offer'
 import { cn } from '@/lib/utils'
 import { breakdownRows, rowsToDraw } from '@/lib/artist/breakdown'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
@@ -35,7 +38,7 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   const cast = useProducerStore((s) => s.cast)
   const backgrounds = useProducerStore((s) => s.backgrounds)
   const styleSetting = useGlobalChatStore((s) => !!projectId && s.styleSettingFor === projectId)
-  const [picked, setPicked] = useState<string | null>(savedKey)
+  const [pickedKey, setPicked] = useState<string | null>(savedKey)
   const [making, setMaking] = useState(false)
   const [removing, setRemoving] = useState(false)
   // [만들기]로 디자인 실행을 거는 동안 왼쪽 사이드바도 막는다 — 창이 마우스는 막아도 Alt 단축키는 막지 못했다(2026-10-27).
@@ -46,6 +49,15 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   const { view: series } = useSeriesInfo(projectId)
   const prevStyleId = series?.styleId ?? null
   const prevIsCustom = !!custom && !!prevStyleId && prevStyleId === savedKey
+  // 없어진 스타일(D6): 시리즈 다음 화가 이어받은 앞 화 스타일이면 그 칸 하나만 남긴다(리드 2026-11-22 안 1 바탕 — 같은 작품).
+  //   그 밖에 예전에 정해 둔 없어진 스타일이면 가장 가까운 네 가지 중 하나를 골라 둔다(오너 "가장 가까운 4종 중 하나를 제안해줘").
+  const savedAnchor = anchors.find((anchor) => anchor.key === savedKey) ?? null
+  const savedRetired = !custom && !!savedKey && !isOfferedStyle(savedKey)
+  const keptRetired = savedRetired && savedAnchor && prevStyleId === savedKey ? savedAnchor : null
+  const nearestKey = savedRetired && !keptRetired ? nearestOfferedStyle({ key: savedKey, medium: savedAnchor?.medium ?? null }) : null
+  const nearestAnchor = nearestKey ? offeredStyles(anchors).find((anchor) => anchor.key === nearestKey) ?? null : null
+  // 예전에 정해 둔 없어진 스타일은 가장 가까운 것을 골라 둔 것으로 보인다 — 다른 칸을 누르면 그 칸이다.
+  const picked = pickedKey && pickedKey === savedKey && nearestAnchor ? nearestAnchor.key : pickedKey
   // 레퍼런스로 올린 그림은 그대로 쓴다(2026-10-27 오너) — 그리는 수(시리즈면 앞 화 그림 수까지)에서 빼고 아래 칸에 따로 센다.
   const { draw: rows, asIs } = rowsToDraw(breakdownRows(cast, backgrounds))
   const persons = rows.filter((row) => row.kind === 'person').length
@@ -64,7 +76,7 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   useEffect(() => {
     if (open && anchors.length === 0) void useProducerStore.getState().loadStyleAnchors()
   }, [open, anchors.length])
-  // 열 때마다 저장된 스타일에서 시작한다(렌더 중 맞춤 — set-state-in-effect 회피).
+  // 열 때마다 저장된 스타일(없어진 것이면 가장 가까운 것)에서 시작한다(렌더 중 맞춤 — set-state-in-effect 회피).
   const [openedWith, setOpenedWith] = useState<boolean>(open)
   if (open !== openedWith) {
     setOpenedWith(open)
@@ -131,6 +143,11 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
                 </span>
               </p>
             ) : null}
+            {savedAnchor && nearestAnchor ? (
+              <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-testid="artist-style-nearest">
+                {nearestNote(t, styleAnchorName(savedAnchor, locale), styleAnchorName(nearestAnchor, locale))}
+              </p>
+            ) : null}
             {prevStyleId ? (
               <p className="rounded-lg border border-border bg-muted/40 px-3 py-2 text-sm text-muted-foreground" data-testid="artist-style-series">
                 {t('If the style stays the same, the carried-over pictures are used as they are. If you change it, the carried-over characters and backgrounds in this episode are redrawn in this style.')}
@@ -138,6 +155,7 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
             ) : null}
             <StyleGrid
               anchors={anchors}
+              kept={keptRetired}
               picked={picked}
               onPick={setPicked}
               custom={custom}
@@ -174,6 +192,11 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
   )
 }
 
+/** 예전에 정해 둔 스타일이 없어졌을 때 처음 그리기 창의 한 줄(D6) — 한국어는 두 이름 받침에 맞춰 조사를 붙인다. */
+function nearestNote(t: (text: string, params?: Record<string, string | number>) => string, style: string, nearest: string): string {
+  return fixKoreanParticles(t('{style} is no longer offered, so I picked the closest style, {nearest}.', { style, nearest }), [style, nearest])
+}
+
 /** 만들기 단추 글(11/5 시안 AS "실사로 그리기") — 한국어는 스타일 이름 받침에 맞춰 '으로 · 로'를 붙인다("3D 애니메이션으로 그리기").
  *  스타일을 아직 고르지 않았으면 이름 없이 [그리기]. 약속: tests/artist/style-make-button.test.ts */
 export function makeButtonText(t: (text: string, params?: Record<string, string | number>) => string, style: string | null): string {
@@ -188,9 +211,12 @@ const TILE_ART = 'relative flex aspect-[41/28] items-center justify-center overf
  * 스타일 격자 — 처음 만드는 창(A2)과 재생성 창(A6, regenerate-style-dialog)이 같이 쓴다.
  *   이미 올린 내 그림체가 있으면 그 카드(보기 · ✕)가 맨 앞이고, 그 그림체를 쓰는 동안 다른 스타일은 고를 수 없다(✕로 내려야 고른다).
  *   currentKey = 재생성 창의 지금 작품 스타일("지금" 표시, 직접 올린 그림체면 'custom').
+ *   고를 칸은 네 가지뿐이다(D6 오너 2026-11-22) — anchors 에 전체 목록이 와도 여기서 거른다. kept = 이 작품 · 앞 화가 이미 쓰는
+ *   없어진 스타일 — 그 칸 하나만 맨 앞에 "새로 고를 수 없음"으로 남는다(리드 2026-11-22 안 1 바탕).
  */
-export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSetting, removing, busy, onRemoveCustom, prevStyleId, prevIsCustom, currentKey = null }: {
+export function StyleGrid({ anchors, kept = null, picked, onPick, custom, locked, styleSetting, removing, busy, onRemoveCustom, prevStyleId, prevIsCustom, currentKey = null }: {
   anchors: readonly StyleAnchor[]
+  kept?: StyleAnchor | null
   picked: string | null
   onPick: (key: string) => void
   custom: { url: string; label: string } | null
@@ -206,6 +232,8 @@ export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSettin
   const t = useT()
   const locale = useLocale()
   const pickable = !(locked || custom)
+  const offered = offeredStyles(anchors)
+  const tiles = kept && !offered.some((anchor) => anchor.key === kept.key) ? [kept, ...offered] : offered
   return (
     <div className="grid grid-cols-3 gap-x-3 gap-y-3.5 sm:grid-cols-4" role="radiogroup" aria-label={t('Style')}>
       {/* 이미 올린 내 그림체(올리기 카드는 2026-10-27 내림) — 보기 · 지우기만. 쓰는 동안은 늘 고른 칸이다. */}
@@ -237,9 +265,10 @@ export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSettin
           </span>
         </div>
       ) : null}
-      {anchors.map((anchor) => {
+      {tiles.map((anchor) => {
         const on = !custom && picked === anchor.key
         const name = styleAnchorName(anchor, locale)
+        const retired = anchor === kept
         return (
           <button
             key={anchor.key}
@@ -249,7 +278,7 @@ export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSettin
             disabled={locked || !!custom}
             onClick={() => onPick(anchor.key)}
             className="group flex min-w-0 flex-col gap-2 text-left focus-visible:outline-none disabled:cursor-not-allowed disabled:opacity-50"
-            data-testid="artist-style-option"
+            data-testid={retired ? 'artist-style-retired' : 'artist-style-option'}
           >
             <span className={cn(TILE_ART, on ? 'outline-stage' : 'outline-transparent group-focus-visible:outline-ring', !on && pickable && 'group-hover:outline-border-strong')}>
               {anchor.previewUrl ? <ThumbImage src={anchor.previewUrl} alt={name} className="size-full object-cover" /> : <ImageIcon className="size-5 text-muted-foreground opacity-40" aria-hidden />}
@@ -267,6 +296,8 @@ export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSettin
               {prevStyleId === anchor.key ? (
                 <span className="truncate text-[10px] text-subtle-foreground">{t('Previous episode style')}</span>
               ) : null}
+              {/* 없어진 스타일 칸(D6) — 이 작품은 계속 쓸 수 있지만 새로 고를 수는 없다. */}
+              {retired ? <span className="truncate text-[10px] text-subtle-foreground">{t('No longer offered')}</span> : null}
             </span>
           </button>
         )

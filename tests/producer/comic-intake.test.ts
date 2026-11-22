@@ -1,4 +1,4 @@
-// 만화 원고 여러 장을 올리면 한 번에 쓰임새를 묻고, "만화 원고로 그대로 영상화"를 고르면 대본 · 그림체까지 이어진다 (2026-10-09 오너)
+// 만화 원고 여러 장을 올리면 한 번에 쓰임새를 묻고, "만화 원고로 그대로 영상화"를 고르면 그림체는 묻지 않고 대본만 옮긴다 (2026-10-09 오너 · 그림체는 D6 2026-11-22)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/client', () => ({
@@ -42,8 +42,6 @@ function mockApi(routes: Routes) {
 const calls = (spy: { mock: { calls: ReadonlyArray<ReadonlyArray<unknown>> } }, url: string) =>
   spy.mock.calls.filter((c) => c[0] === url).map((c) => JSON.parse(String((c[1] as RequestInit | undefined)?.body ?? '{}')))
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), { status })
-// 만화를 고르면 그림체를 묻는다(2026-10-09 오너 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘") — 답을 보낸다.
-const answerStyle = (mode: 'lock' | 'adapt') => useGlobalChatStore.getState().sendMessage(mode === 'lock' ? '만화 그림체 그대로 고정해 줘' : '실사 같은 다른 스타일로 각색해 줘')
 const comicRoutes = (over: Partial<Routes> = {}): Routes => ({
   '/api/produce/comic-script': () => json({ script: SCRIPT, stats: { scenes: 1, dialogue_lines: 2, action_blocks: 2, characters: 2 } }),
   '/api/produce/anchor-medium': () => json({ medium: '2d_anime' }),
@@ -138,7 +136,6 @@ describe('만화 원고로 그대로 영상화', () => {
     const spy = mockApi(comicRoutes())
     useGlobalChatStore.getState().offerImageRoles([p10, p2, p1], { typed: '', msg: '그림을 올렸어요' })
     await useGlobalChatStore.getState().sendMessage('만화 원고를 그대로 영상화해 줘')
-    await answerStyle('lock')
     await vi.waitFor(() => expect(calls(spy, '/api/produce/comic-script')).toHaveLength(1))
     const body = calls(spy, '/api/produce/comic-script')[0]
     expect(body.projectId).toBe('proj-1')
@@ -150,7 +147,6 @@ describe('만화 원고로 그대로 영상화', () => {
     // 왜: 각색하지 않고 Writer 에 넘기려면 대본 그대로 쓰기(#script-preserve)를 켜야 한다. 외모는 글보다 그림이 정확하다.
     const spy = mockApi(comicRoutes())
     useGlobalChatStore.getState().offerImageRoles([p1, p2], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
-    await answerStyle('lock')
     await vi.waitFor(() => expect(useProducerStore.getState().preserveScript).toBe(true))
     expect(useProducerStore.getState().storyText).toBe(SCRIPT)
     await vi.waitFor(() => expect(calls(spy, '/api/produce/chat')).toHaveLength(1))
@@ -159,38 +155,31 @@ describe('만화 원고로 그대로 영상화', () => {
     expect(String(fill.message)).toMatch(/그대로|exactly as written/)
   })
 
-  // 2026-10-09 오너 결정 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘" — 앞 문장: "만화 원고로 그대로 영상화를 고르면 첫 쪽을 이 프로젝트 그림체로 정하고 그림체를 분석한다".
-  it('만화 그림체 고정을 고르면 첫 쪽을 이 프로젝트 그림체로 고정하고 그림체를 분석한다', async () => {
-    // 왜: 만화 그림체를 그대로 쓰기로 했으면 그 그림체로 고정한다 — 분석기(facet)로 그림체 설명을 만들어 생성에 싣는다(오너 10/9).
+  // 2026-10-09 오너 결정 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘" → D6(2026-11-22) "스타일 추출하는 기능도 없애줘"로 바뀌었다.
+  it('만화 원고를 그대로 영상화해도 첫 쪽을 그림체로 정하지 않고 그림체 분석 모델도 부르지 않는다', async () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 그림체는 그림을 만들 때 Artist 에서 네 가지 중 고른다.
     const spy = mockApi(comicRoutes())
     useGlobalChatStore.getState().offerImageRoles([p2, p1], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
-    await answerStyle('lock')
-    await vi.waitFor(() => expect(calls(spy, '/api/produce/style-facets')).toHaveLength(1))
-    expect(calls(spy, '/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: p1.thumbUrl, lock: true })
-    expect(calls(spy, '/api/produce/style-facets')[0]).toMatchObject({ projectId: 'proj-1', consent: 'comic-choice-v1' })
-    expect(useProducerStore.getState().styleAnchorKey).toBe('custom_abc')
-    expect(useProducerStore.getState().customStyleAnchor?.locked).toBe(true)
-  })
-
-  it('그림체를 정하기 전에 첫 쪽 그림으로 매체를 고르고, 그 매체로 그림체를 정한다', async () => {
-    // 왜: 그림체 등록은 매체(애니 · 카툰 · 실사 등)가 있어야 받는다. 10/9 로컬 시험에서 매체 없이 보내 그림체가 안 정해졌다.
-    const spy = mockApi(comicRoutes())
-    useGlobalChatStore.getState().offerImageRoles([p2, p1], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
-    await answerStyle('lock')
-    await vi.waitFor(() => expect(calls(spy, '/api/produce/style-anchor')).toHaveLength(1))
-    expect(calls(spy, '/api/produce/anchor-medium')[0]).toEqual({ projectId: 'proj-1', imageUrl: p1.thumbUrl, consent: 'comic-choice-v1' })
-    expect(calls(spy, '/api/produce/style-anchor')[0].medium).toBe('2d_anime')
-    await vi.waitFor(() => expect(useProducerStore.getState().styleAnchorKey).toBe('custom_abc'))
-  })
-
-  it('매체를 고르지 못하면 그림체를 정하지 않고 채팅에 알린다', async () => {
-    // 왜: 매체 없이 정하면 실사로 흘러간다 — 정하지 않고 알리면 사용자가 스타일을 직접 고를 수 있다.
-    const spy = mockApi(comicRoutes({ '/api/produce/anchor-medium': () => json({ error: 'medium_pick_failed' }, 502) }))
-    useGlobalChatStore.getState().offerImageRoles([p1, p2], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
-    await answerStyle('lock')
-    await vi.waitFor(() => expect(useGlobalChatStore.getState().messages.some((m) => /그림체로 정하지 못했어요/.test(m.content))).toBe(true))
+    await vi.waitFor(() => expect(calls(spy, '/api/produce/chat')).toHaveLength(1))
     expect(calls(spy, '/api/produce/style-anchor')).toHaveLength(0)
     expect(calls(spy, '/api/produce/style-facets')).toHaveLength(0)
+    expect(useProducerStore.getState().styleAnchorKey).toBeFalsy()
+    expect(useProducerStore.getState().customStyleAnchor).toBeNull()
+  })
+
+  it('만화 원고를 그대로 영상화해도 첫 쪽 그림의 매체를 고르러 분석 모델에 보내지 않는다', async () => {
+    // 왜: 매체 고르기는 그림에서 그림체를 정하던 길의 첫걸음이었다 — 그 길이 없어졌다(D6). 만화 쪽은 대본을 읽을 때만 분석 모델에 간다.
+    const spy = mockApi(comicRoutes())
+    useGlobalChatStore.getState().offerImageRoles([p2, p1], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
+    await vi.waitFor(() => expect(calls(spy, '/api/produce/comic-script')).toHaveLength(1))
+    expect(calls(spy, '/api/produce/anchor-medium')).toHaveLength(0)
+  })
+
+  it('만화 원고를 옮긴 뒤 만화 그림체는 그대로 쓸 수 없고 그림을 만들 때 Artist 에서 네 가지 중 고른다고 채팅에 알린다', async () => {
+    // 왜(혼자 정한 것): 늘 묻던 그림체 질문이 말없이 사라지면 만화 그림체로 그려지는 줄 안다 — 고르는 곳을 한 줄로 알린다(D6).
+    mockApi(comicRoutes())
+    useGlobalChatStore.getState().offerImageRoles([p1, p2], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
+    await vi.waitFor(() => expect(useGlobalChatStore.getState().messages.some((m) => m.content === '만화 그림체는 그대로 쓸 수 없어요. 그림을 만들 때 Artist 스타일 창에서 네 가지 중 하나를 골라 주세요.')).toBe(true))
     expect(useProducerStore.getState().styleAnchorKey).toBeFalsy()
   })
 
@@ -198,7 +187,6 @@ describe('만화 원고로 그대로 영상화', () => {
     const spy = mockApi(comicRoutes())
     useGlobalChatStore.getState().offerImageRoles([p1], { typed: '', msg: '그림을 올렸어요' })
     await useGlobalChatStore.getState().sendMessage('스토리')
-    await answerStyle('lock')
     await vi.waitFor(() => expect(calls(spy, '/api/produce/comic-script')).toHaveLength(1))
     expect(useGlobalChatStore.getState().imageRoleGate).toBeNull()
   })
@@ -208,54 +196,50 @@ describe('만화 원고로 그대로 영상화', () => {
     mockApi(comicRoutes({ '/api/produce/comic-script': () => json({ error: 'comic_script_failed' }, 502) }))
     useProducerStore.setState({ storyText: '이전 이야기' })
     useGlobalChatStore.getState().offerImageRoles([p1, p2], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
-    await answerStyle('lock')
     await vi.waitFor(() => expect(useGlobalChatStore.getState().messages.some((m) => /대본으로 옮기지 못했어요/.test(m.content))).toBe(true))
     expect(useProducerStore.getState().storyText).toBe('이전 이야기')
     expect(useProducerStore.getState().preserveScript).not.toBe(true)
   })
 
-  it('그림체 분석이 실패해도 만화 그림은 그림체로 남고 채팅에 알린다', async () => {
-    // 왜: 분석은 덤이다 — 실패해도 앵커 그림만으로 생성은 이어진다(인계 lite 계약).
-    mockApi(comicRoutes({ '/api/produce/style-facets': () => json({ ok: false, facets: false }, 200) }))
+  it('만화를 읽는 동안의 안내는 대본으로 옮긴다는 말뿐이고 그림체 분석은 말하지 않는다', async () => {
+    // 왜: 그림체 분석이 없어졌다(D6) — "그림체도 분석할게요 · 1~2분"이라고 하면 하지 않는 일을 기다리게 된다.
+    mockApi(comicRoutes())
     useGlobalChatStore.getState().offerImageRoles([p1, p2], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
-    await answerStyle('lock')
-    await vi.waitFor(() => expect(useGlobalChatStore.getState().messages.some((m) => /그림체 분석/.test(m.content) && /그림만/.test(m.content))).toBe(true))
-    expect(useProducerStore.getState().styleAnchorKey).toBe('custom_abc')
+    await vi.waitFor(() => expect(useProducerStore.getState().preserveScript).toBe(true))
+    const said = useGlobalChatStore.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
+    expect(said).toContain('만화 2쪽을 읽고 있어요. 대본으로 옮길게요. 1분쯤 걸려요.')
+    expect(said.some((line) => /그림체.*분석|분석.*그림체/.test(line))).toBe(false)
   })
 })
 
-describe('만화 그림체 묻기', () => {
-  it('만화 원고로 영상화하면 대본을 옮기기 전에 그림체를 만화 그림체로 고정할지 실사 등 다른 스타일로 각색할지 묻는다', async () => {
-    // 왜: 만화를 그대로 옮길지, 실사처럼 다른 그림으로 각색할지는 사용자가 정한다(10/9 오너).
+describe('만화 그림체는 묻지 않는다', () => {
+  it('만화 원고로 영상화하면 그림체를 묻지 않고 바로 대본을 옮긴다', async () => {
+    // 왜: 만화 그림체로 고정하는 길이 없어졌다(D6) — 고정 · 각색을 물을 것이 없다.
     const spy = mockApi(comicRoutes())
     useGlobalChatStore.getState().offerImageRoles([p1, p2], { typed: '', msg: '그림을 올렸어요' })
     await useGlobalChatStore.getState().sendMessage('만화 원고를 그대로 영상화해 줘')
-    const s = useGlobalChatStore.getState().suggestion
-    expect(s?.dismissible).toBe(false)
-    expect(s?.action?.kind === 'choices' ? s.action.options.map((o) => o.label) : []).toEqual(['만화 그림체로 고정', '실사 등 다른 스타일로 각색'])
-    expect(s?.content).toMatch(/고정하면 나중에 바꿀 수 없어요/)
-    expect(calls(spy, '/api/produce/comic-script')).toHaveLength(0)
+    await vi.waitFor(() => expect(calls(spy, '/api/produce/comic-script')).toHaveLength(1))
+    expect(useGlobalChatStore.getState().suggestion?.id ?? '').not.toMatch(/^comic-style:/)
   })
 
-  it('실사 등 다른 스타일로 각색을 고르면 만화 그림을 그림체로 쓰지 않고 스타일 고르기 창을 띄운다', async () => {
-    // 왜: 각색은 만화 그림체를 쓰지 않는다 — 만들 스타일(실사 등)을 사용자가 고른다.
+  it('만화 원고로 영상화해도 스타일 고르기 창 요청을 띄우지 않는다', async () => {
+    // 왜: 스타일은 그림을 만들 때 Artist 스타일 창에서 고른다(D6) — 지금 화면에는 받을 창이 없는 요청이었다.
     const spy = mockApi(comicRoutes())
     useGlobalChatStore.getState().offerImageRoles([p1, p2], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
-    await answerStyle('adapt')
     await vi.waitFor(() => expect(useProducerStore.getState().preserveScript).toBe(true))
     expect(calls(spy, '/api/produce/anchor-medium')).toHaveLength(0)
     expect(calls(spy, '/api/produce/style-anchor')).toHaveLength(0)
-    expect(useChatUiStore.getState().stylePickerRequest?.projectId).toBe('proj-1')
+    expect(useChatUiStore.getState().stylePickerRequest).toBeNull()
   })
 
-  it('그림체 질문에 다른 말로 답하면 대본을 옮기지 않고 다시 묻는다', async () => {
-    // 왜: 답이 아닌 말로 넘어가면 그림체를 정하지 않은 채 만들게 된다.
+  it('만화 원고를 고른 뒤에 한 말은 그림체 질문의 답으로 붙잡지 않고 평소대로 채팅이 받는다', async () => {
+    // 왜: 그림체 질문이 없으니 붙잡을 이유가 없다 — 다음 말은 평소 채팅으로 간다.
     const spy = mockApi(comicRoutes())
     useGlobalChatStore.getState().offerImageRoles([p1, p2], { typed: '내 만화를 영상화해 줘', msg: '내 만화를 영상화해 줘' })
+    await vi.waitFor(() => expect(calls(spy, '/api/produce/chat')).toHaveLength(1))
     await useGlobalChatStore.getState().sendMessage('잘 모르겠어')
-    expect(calls(spy, '/api/produce/comic-script')).toHaveLength(0)
-    const s = useGlobalChatStore.getState().suggestion
-    expect(s?.action?.kind === 'choices' ? s.action.options.map((o) => o.label) : []).toEqual(['만화 그림체로 고정', '실사 등 다른 스타일로 각색'])
+    await vi.waitFor(() => expect(calls(spy, '/api/produce/chat').some((b) => b.message === '잘 모르겠어')).toBe(true))
+    expect(calls(spy, '/api/produce/comic-script')).toHaveLength(1)
   })
 
   it('이미 그림체가 고정된 프로젝트에서는 그림체를 묻지 않고 대본만 옮긴다', async () => {

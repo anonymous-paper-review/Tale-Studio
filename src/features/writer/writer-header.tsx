@@ -5,6 +5,8 @@
 //   러닝타임은 목표가 아니라 지표 — 제목 옆에 "씬 3 · 샷 8 · 20초"만 작게 보이고 샷을 고치거나 더하면 같이 바뀐다.
 //   v3(2026-11-03 오너 "v3로 적용", 시안 S1): 화면 머리(PageHeader — 큰 제목 · 메타 · 크림 단추) 아래 도구 줄 하나 —
 //   알약 탭 · 탭 옆 도구(러프 보드의 [+ 씬 추가] · [+ 샷 추가]) · 오른쪽 액션(확대 · 축소 등). [마스터 시트]는 두지 않는다(오너 결정 3).
+//   D1(오너 2026-11-22): 이 화면은 Writer 탭의 콘티 칸이다 — 화면 이름은 위 막대 [씬 스토리 | 콘티]가 보여 주고(리드 결정 1, 시안 없음),
+//   머리의 큰 제목은 읽기 프로그램에만 남긴다(숫자 · 단추만 보인다).
 
 import type { ReactNode } from 'react'
 import { ArrowRight } from 'lucide-react'
@@ -12,14 +14,17 @@ import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/page-header'
 import { StageHelpBadge } from '@/components/stage-help-badge'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
+import { STAGES, STAGE_LABEL } from '@/lib/constants'
 import { WriterTabs } from '@/features/writer/writer-tabs'
 import { WriterEnginePicker } from '@/features/writer/writer-engine-picker'
-import { STAGE_LABEL } from '@/lib/constants'
 import { useLocale, useT } from '@/lib/i18n'
 import { boardStats, boardStatsLabel } from '@/lib/writer/board-summary'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
+
+// 콘티의 다음 단계(단계 표) — 2026-11-22 오너 D2~D5 부터 Camera. 단추 글은 그 이름을 따른다(이름이 바뀌면 같이 바뀐다).
+const CONTI_NEXT_STAGE = STAGES.find((stage) => stage.id === 'writer')?.nextStage ?? 'camera'
 
 interface WriterHeaderProps {
   description?: string
@@ -51,7 +56,7 @@ export function WriterHeader({ description, tools, actions, hideNextStep = false
       <PageHeader
         title={
           <span className="inline-flex items-center gap-1.5">
-            {STAGE_LABEL.writer}
+            <span className="sr-only">{t('Storyboard')}</span>
             {description ? <StageHelpBadge text={description} /> : null}
           </span>
         }
@@ -70,7 +75,7 @@ export function WriterHeader({ description, tools, actions, hideNextStep = false
               onClick={() => openDirectorConfirm(true)}
               data-testid="storyboard-next-director"
             >
-              {t('Next: Director')}
+              {t('Next: {stage}', { stage: STAGE_LABEL[CONTI_NEXT_STAGE] })}
               <ArrowRight className="size-4" />
             </Button>
           ) : undefined

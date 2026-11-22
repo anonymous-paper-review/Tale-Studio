@@ -173,14 +173,18 @@ export function applyStyleAnchor(
   anchor: ResolvedStyleAnchor | null,
   base: AnchorableSubmit,
   mode: 'single' | 'multiref',
-  opts?: { pinAspectRatio?: string; people?: boolean },
+  opts?: { pinAspectRatio?: string; people?: boolean; describedText?: boolean },
 ): AnchorableSubmit
-/** opts.people — 인물이 있는 장면(인물 시트 · 인물이 든 컷)이면 facet 의 Figure rules · Priority 를 싣는다. */
+/**
+ * opts.people — 인물이 있는 장면(인물 시트 · 인물이 든 컷)이면 facet 의 Figure rules · Priority 를 싣는다.
+ * opts.describedText — 본문이 "설명에 적힌 글씨만 남기고 덧붙인 글씨는 막는다"를 갖고 있으면(소품 글씨 스위치, 2026-11-22)
+ *   전면 글자 금지 줄을 싣지 않는다 — 인물 시트가 칸 이름 때문에 빼는 것과 같은 까닭. 주지 않으면 지금 그대로다.
+ */
 export function applyStyleAnchor(
   anchor: ResolvedStyleAnchor | null,
   base: AnchorableSubmit,
   mode: StyleAnchorMode,
-  opts?: { pinAspectRatio?: string; people?: boolean },
+  opts?: { pinAspectRatio?: string; people?: boolean; describedText?: boolean },
 ): AnchorableSubmit {
   if (anchor == null) return base
 
@@ -216,7 +220,7 @@ export function applyStyleAnchor(
         ...(facets.negative ? [facets.negative] : []),
         // 인물 시트는 양식(2번째 참조)의 칸 이름을 지켜야 한다 — 본문이 이미 "never add any extra text"를 갖고 있어
         //   전면 글자 금지 줄은 싣지 않는다. 비율은 요청 값(aspect_ratio)으로 정해 문장으로 넣지 않는다.
-        ...(mode === 'turnaround' ? [] : [FACET_NO_TEXT]),
+        ...(mode === 'turnaround' || opts?.describedText ? [] : [FACET_NO_TEXT]),
       ].join('\n')
     : `${headClause}${modeClause}${styleClauseLine}\n${body}`
 

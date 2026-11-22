@@ -1,4 +1,4 @@
-// 새 프로젝트에서 올린 그림과 채팅으로 나중에 올린 그림은 같은 기능으로 처리하고, "스타일로 반영해줘"는 그림체로 읽는다 (2026-10-10 오너)
+// 새 프로젝트에서 올린 그림과 채팅으로 나중에 올린 그림은 같은 기능으로 처리하고, "스타일로 반영해줘"라고 해도 그림에서 그림체를 정하지 않는다 (2026-10-10 오너 · 그림체 추출은 D6 2026-11-22 로 없앰)
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -22,6 +22,7 @@ const img = (name: string) => ({ id: name, name, thumbUrl: `${MEDIA}/${name}/ori
 const LOOK = img('look.png'), FACE = img('face.png'), PLACE = img('place.png'), NOTE = img('note.png'), P1 = img('comic_1.webp'), P2 = img('comic_2.webp')
 const SCRIPT = 'S#1. 방 - 낮\n남자: 왔어.\n여자: 응.\n남자: 가자.'
 const ko = (text: string) => translate('ko', text)
+const NO_STYLE_FROM_PICTURE = "I can't take an art style from a picture. Pick one of the four styles (Live Action, 2D Japanese Anime, Watercolor, Stop Motion) in the style window in Artist when you make the images."
 const plan = (over: Partial<PendingCreation>): PendingCreation => ({
   locale: 'ko', original: null, comicPages: [], comicStyle: null, styleImage: null, cards: [], references: [], note: null, startTreatment: false, ...over,
 })
@@ -79,14 +80,15 @@ afterEach(() => {
 })
 
 describe('그림과 함께 쓴 "스타일"', () => {
-  it('채팅에 그림 한 장을 붙이고 "스타일로 반영해줘"라고 하면 묻지 않고 그림체로 받아 고정하고 그림체 분석기로 분석한다', async () => {
-    // 왜: 10/10 운영 806e2cc2 — "스타일"을 참고 자료로 읽어 채팅 모델이 그림체를 정하는 예전 길로 가는 바람에 고정도 분석도 되지 않았다.
+  it('채팅에 그림 한 장을 붙이고 "스타일로 반영해줘"라고 해도 그림체로 정하지 않고, 그림에서 가져올 수 없다는 까닭과 함께 쓰임새를 묻는다', async () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 그림체는 그림을 만들 때 Artist 에서 네 가지 중 고른다.
     chat.getState().offerImageRoles([LOOK], { typed: '스타일로 반영해줘', msg: '스타일로 반영해줘' })
-    expect(chat.getState().imageRoleGate).toBeNull()
-    await vi.waitFor(() => expect(calls('/api/produce/style-facets')).toHaveLength(1))
-    expect(calls('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: LOOK.thumbUrl, lock: true })
-    expect(producer.getState().customStyleAnchor?.locked).toBe(true)
-    expect(calls('/api/produce/chat')).toHaveLength(0)
+    expect(chat.getState().imageRoleGate).not.toBeNull()
+    expect(chat.getState().suggestion?.id).toBe(`image-role:${LOOK.id}`)
+    expect(chat.getState().messages.some((m) => m.role === 'model' && m.content === ko(NO_STYLE_FROM_PICTURE))).toBe(true)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(work()).toEqual([])
+    expect(producer.getState().customStyleAnchor).toBeNull()
   })
 
   it('"스타일 참고만 해줘"처럼 참고가 함께 있으면 그림체로 정하지 않고 참고 자료로 보낸다', async () => {
@@ -114,26 +116,28 @@ describe('그림과 함께 쓴 "스타일"', () => {
     expect(calls('/api/produce/style-anchor')).toHaveLength(0)
   })
 
-  it('채팅에서 말로 그림체를 고르면 그림마다 질문의 안내를 본 것이 아니라 말로 고른 것으로 남긴다', async () => {
-    // 왜: 분석 모델로 보낸다는 안내는 질문에 실려 있다. 질문 없이 말로 골랐으면 그 사실대로 남겨야 기록이 맞다.
+  it('채팅에서 말로 그림체를 골라도 그림을 분석 모델(매체 고르기 · 그림체 분석)로 보내지 않는다', async () => {
+    // 왜: 그림에서 그림체를 뽑는 일이 없어졌다(D6) — 그림은 사용자가 고른 쓰임새(만화 원고 · 카드 · 참고 자료)로만 모델에 간다.
     chat.getState().offerImageRoles([LOOK], { typed: '이 그림체로 해줘', msg: '이 그림체로 해줘' })
-    await vi.waitFor(() => expect(calls('/api/produce/style-facets')).toHaveLength(1))
-    expect(calls('/api/produce/anchor-medium')[0]).toMatchObject({ consent: 'chat-style-request-v1' })
-    expect(calls('/api/produce/style-facets')[0]).toMatchObject({ consent: 'chat-style-request-v1' })
+    await answer(ko('Use it as the art style'))
+    await new Promise((r) => setTimeout(r, 20))
+    expect(calls('/api/produce/anchor-medium')).toHaveLength(0)
+    expect(calls('/api/produce/style-facets')).toHaveLength(0)
+    expect(calls('/api/produce/style-anchor')).toHaveLength(0)
   })
 })
 
 describe('새 프로젝트와 채팅은 같은 기능', () => {
-  it('새 프로젝트와 채팅에서 그림체로 고른 그림은 같은 일을 한다: 매체를 고르고 고정한 뒤 분석한다', async () => {
-    // 왜: 10/10 오너 "프로젝트 생성 시 입력하는 플로우랑 채팅으로 나중에 입력하는 플로우 모두 똑같은 기능으로 관리해줘".
+  it('새 프로젝트와 채팅에서 그림체로 고른 그림은 같은 일을 한다: 그림체로 정하지 않고 분석 모델로도 보내지 않는다', async () => {
+    // 왜: 10/10 오너 "두 플로우를 똑같은 기능으로" — 그림체 추출이 없어진 뒤에도(D6) 두 길이 같아야 한다.
     await chat.getState().runCreationPlan(plan({ styleImage: LOOK }))
     const fromNew = { work: work(), cards: cards() }
     fresh()
     chat.getState().offerImageRoles([LOOK], { typed: '', msg: '그림을 올렸어요' })
     await answer(ko('Use it as the art style'))
-    await vi.waitFor(() => expect(calls('/api/produce/style-facets')).toHaveLength(1))
+    await new Promise((r) => setTimeout(r, 20))
     expect({ work: work(), cards: cards() }).toEqual(fromNew)
-    expect(fromNew.cards.style).toEqual({ url: LOOK.thumbUrl, locked: true })
+    expect(fromNew).toEqual({ work: [], cards: { cast: [], backgrounds: [], style: null } })
   })
 
   it('새 프로젝트와 채팅에서 인물 · 배경으로 고른 그림은 같은 카드를 만들고 같은 그림으로 채운다', async () => {
@@ -162,23 +166,22 @@ describe('새 프로젝트와 채팅은 같은 기능', () => {
     expect(fromNew).toEqual([`채팅 ${NOTE.sliceUrls.join('+')}`])
   })
 
-  it('새 프로젝트와 채팅에서 만화 원고로 고르고 그림체 고정을 고르면 같은 일을 한다: 대본으로 옮기고 첫 쪽 그림체로 고정 · 분석한다', async () => {
-    // 왜: 만화를 새 프로젝트에서 올리든 채팅으로 올리든 대본과 그림체가 같게 나와야 한다.
+  it('새 프로젝트와 채팅에서 만화 원고로 고르면 같은 일을 한다: 대본으로 옮기고 그림체는 정하지 않는다', async () => {
+    // 왜: 만화를 새 프로젝트에서 올리든 채팅으로 올리든 대본이 같게 나와야 한다. 만화 그림체는 가져오지 않는다(D6).
     await chat.getState().runCreationPlan(plan({ original: 'comic', comicPages: [P1, P2], comicStyle: 'lock' }))
-    await vi.waitFor(() => expect(calls('/api/produce/style-facets')).toHaveLength(1))
+    await vi.waitFor(() => expect(calls('/api/produce/chat')).toHaveLength(1))
     const fromNew = { work: work(), cards: cards() }
     fresh()
     chat.getState().offerImageRoles([P1, P2], { typed: '', msg: '그림을 올렸어요' })
     await answer(ko('Turn my comic pages into video exactly as drawn'))
-    await answer(ko('Keep the comic art style and fix it'))
-    await vi.waitFor(() => expect(calls('/api/produce/style-facets')).toHaveLength(1))
     await vi.waitFor(() => expect(calls('/api/produce/chat')).toHaveLength(1))
     expect({ work: work(), cards: cards() }).toEqual(fromNew)
-    expect(fromNew.cards.style).toEqual({ url: P1.thumbUrl, locked: true })
+    expect(fromNew.cards.style).toBeNull()
+    expect(fromNew.work.some((line) => line.startsWith('대본 옮기기'))).toBe(true)
   })
 
-  it('새 프로젝트 · 채팅 · 스타일 선택 창은 그림 쓰임새를 한 곳에서 처리한다', () => {
-    // 왜: 같은 일을 하는 길이 여럿이면 한쪽만 고쳐져 어긋난다(이번 "스타일" 사고). 그림체 · 만화 · 카드를 정하는 일은 한 곳에서만 부른다.
+  it('새 프로젝트 · 채팅은 그림 쓰임새를 한 곳에서 처리하고, 그림에서 그림체를 정하는 길은 없다', () => {
+    // 왜: 같은 일을 하는 길이 여럿이면 한쪽만 고쳐져 어긋난다(이번 "스타일" 사고). 그림체 추출은 없앴다(D6) — 그 창구를 부르는 곳이 남으면 안 된다.
     const source = readFileSync('src/stores/global-chat-store.ts', 'utf8')
     const callers = (callee: string) => {
       const names: string[] = []
@@ -192,7 +195,7 @@ describe('새 프로젝트와 채팅은 같은 기능', () => {
       return [...new Set(names)].sort()
     }
     expect(callers('runMaterialPlan')).toEqual(expect.arrayContaining(['runChatImagePlan', 'runCreationPlan']))
-    expect(callers('runStyleFromImage')).toEqual(['runComicAdaptation', 'runMaterialPlan'])
+    expect(source).not.toMatch(/runStyleFromImage|\/api\/produce\/(?:style-anchor|style-facets|anchor-medium)/)
     expect(callers('runImageRolePlan')).toEqual(['runMaterialPlan'])
     expect(callers('runComicAdaptation')).toEqual(['retryComicScript', 'runMaterialPlan'])
   })

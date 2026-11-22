@@ -86,6 +86,7 @@ describe('화면에서 멈추기', () => {
   it('멈춘 Take 가 뒤늦게 끝나도 채팅에 Take 목록에만 남았다고 한 줄 알리고 완료 알림은 하지 않는다', () => {
     // 왜: 리드 d — 영상도 이미지와 같은 규칙. 완료 알림("영상이 완성됐어요")이 뜨면 Editor 로 가는 영상이 바뀐 줄 안다.
     const store = readFileSync('src/stores/director-store.ts', 'utf8')
-    expect(store).toMatch(/status === 'completed' && stoppedJobIds\.has\(jobId\)\) \{[\s\S]{0,600}notifyStoppedResultKept\('director'[\s\S]{0,400}return true/)
+    //   알림의 단계는 실사 · 영상의 집 Camera 다(2026-11-22 오너 D2~D5 — 예전엔 'director').
+    expect(store).toMatch(/status === 'completed' && stoppedJobIds\.has\(jobId\)\) \{[\s\S]{0,600}notifyStoppedResultKept\('camera'[\s\S]{0,400}return true/)
   })
 })

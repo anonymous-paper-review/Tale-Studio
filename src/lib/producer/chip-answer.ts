@@ -5,19 +5,18 @@
 //   스토어는 이 결과만 믿는다(image-role.ts 와 같은 짜임).
 import { translate } from '@/lib/i18n'
 import type { AppLocale } from '@/lib/locale'
-import { comicRewriteQuestion, comicStyleQuestion, imageBatchQuestion, type ComicRewrite, type ComicStyle, type ImageBatchChoice } from '@/lib/producer/comic-intake'
+import { comicRewriteQuestion, imageBatchQuestion, type ComicRewrite, type ImageBatchChoice } from '@/lib/producer/comic-intake'
 import type { ImageUseAnswer } from '@/lib/producer/image-role'
 
 type Chip = { label: string; utterance: string }
 const VOICES: readonly AppLocale[] = ['en', 'ko']
 
-/** 그림마다 묻는 쓰임새 칩 — 새 프로젝트 화면과 같은 다섯 가지(2026-10-10 오너 "채팅으로 올린 그림에도 그림체 선택지 넣어줘"). */
+/** 그림마다 묻는 쓰임새 칩 — 만화 원고 · 인물 · 배경 · 참고 자료만. 그림체 칩은 D6(2026-11-22 "스타일 추출하는 기능도 없애줘")로 뺐다. */
 export function imageRoleOptions(voice: AppLocale): Chip[] {
   return [
     { label: translate(voice, 'Comic pages'), utterance: translate(voice, 'Use it as a comic page') },
     { label: translate(voice, 'Character card'), utterance: translate(voice, 'Use it as a character') },
     { label: translate(voice, 'Background card'), utterance: translate(voice, 'Use it as a background') },
-    { label: translate(voice, 'Art style'), utterance: translate(voice, 'Use it as the art style') },
     { label: translate(voice, 'Reference only'), utterance: translate(voice, 'Use it as reference only') },
   ]
 }
@@ -27,14 +26,6 @@ export function characterPickOptions(voice: AppLocale, cards: ReadonlyArray<{ na
   return [
     ...cards.map((card) => ({ label: card.name, utterance: translate(voice, 'This is {name}', { name: card.name }) })),
     { label: translate(voice, 'New character'), utterance: translate(voice, 'Make a new character card') },
-  ]
-}
-
-/** 채팅 모델이 첨부 그림을 그림체로 쓰자고 할 때 묻는 칩(2026-10-10 오너 "묻고 정한다"). */
-export function styleAttachmentOptions(voice: AppLocale): Chip[] {
-  return [
-    { label: translate(voice, 'Use as the art style'), utterance: translate(voice, 'Use it as the art style') },
-    { label: translate(voice, 'Keep as reference'), utterance: translate(voice, 'Use it as reference only') },
   ]
 }
 
@@ -77,26 +68,22 @@ const BATCH_WORDS: Record<ImageBatchChoice, readonly string[]> = {
   each: ['each', 'each picture', 'one by one', '그림마다', '하나씩', '따로', '각각'], // i18n-ok: 답 낱말 목록 자체
   reference: ['reference', 'all reference', '참고', '참고 자료', '모두 참고', '모두 참고 자료'], // i18n-ok: 답 낱말 목록 자체
 }
-const COMIC_STYLE_WORDS: Record<ComicStyle | 'stop', readonly string[]> = {
-  lock: ['lock', 'fix', 'keep', 'fixed', '고정', '만화 그림체', '그대로'], // i18n-ok: 답 낱말 목록 자체
-  adapt: ['adapt', 'live action', 'another style', '각색', '실사', '다른 스타일', '다른 그림체'], // i18n-ok: 답 낱말 목록 자체
-  stop: ['stop', 'cancel', 'never mind', '그만', '그만두기', '취소'], // i18n-ok: 답 낱말 목록 자체
-}
 const REWRITE_WORDS: Record<ComicRewrite, readonly string[]> = {
   rewrite: ['rewrite', 'yes', 'ok', '다시 쓰기', '다시 써', '예', '네', '응'], // i18n-ok: 답 낱말 목록 자체
-  reference: ['reference', 'reference only', 'no', '참고', '참고 자료', '아니', '아니요', '아뇨'], // i18n-ok: 답 낱말 목록 자체
-}
-const STYLE_ATTACHMENT_WORDS: Record<'style' | 'reference', readonly string[]> = {
-  style: ['style', 'art style', 'yes', 'ok', '그림체', '예', '네', '응'], // i18n-ok: 답 낱말 목록 자체
   reference: ['reference', 'reference only', 'no', '참고', '참고 자료', '아니', '아니요', '아뇨'], // i18n-ok: 답 낱말 목록 자체
 }
 const RETRY_WORDS = ['again', 'retry', 'try again', '다시', '다시 옮기기'] // i18n-ok: 답 낱말 목록 자체
 const NEW_CHARACTER_WORDS = ['new', 'new character', 'new card', 'new person', '새 인물', '새 카드', '새로', '새로 만들기'] // i18n-ok: 답 낱말 목록 자체
 
-/** 그림마다 묻는 쓰임새 질문의 답. */
+/** 그림마다 묻는 쓰임새 질문의 답. 그림체는 칩이 없지만(D6) 예전 칩 말 · 낱말로 답하면 'style' 로 알아듣는다 — 부르는 쪽이 그림에서
+ *  가져올 수 없다는 까닭을 말하고 다시 묻는다. */
 export function matchWriterImageUse(text: string): ImageUseAnswer | null {
-  const keys: ImageUseAnswer[] = ['comic', 'character', 'background', 'style', 'reference']
-  return pick(text, keys.map((key, i) => ({ key, phrases: [...chipPhrases(imageRoleOptions, i), ...USE_WORDS[key]] })))
+  const keys: ImageUseAnswer[] = ['comic', 'character', 'background', 'reference']
+  const oldStyleChip = VOICES.flatMap((voice) => [translate(voice, 'Art style'), translate(voice, 'Use it as the art style')])
+  return pick(text, [
+    ...keys.map((key, i) => ({ key, phrases: [...chipPhrases(imageRoleOptions, i), ...USE_WORDS[key]] })),
+    { key: 'style' as const, phrases: [...oldStyleChip, ...USE_WORDS.style] },
+  ])
 }
 
 /** 여러 장을 한 번에 묻는 질문의 답. */
@@ -105,22 +92,10 @@ export function matchWriterBatch(text: string): ImageBatchChoice | null {
   return pick(text, keys.map((key, i) => ({ key, phrases: [...chipPhrases((voice) => imageBatchQuestion(voice, 2).options, i), ...BATCH_WORDS[key]] })))
 }
 
-/** 만화 그림체 질문의 답 — 고정 · 각색 · 그만두기. */
-export function matchWriterComicStyle(text: string): ComicStyle | 'stop' | null {
-  const keys: Array<ComicStyle | 'stop'> = ['lock', 'adapt', 'stop']
-  return pick(text, keys.map((key, i) => ({ key, phrases: [...chipPhrases((voice) => comicStyleQuestion(voice, { stop: true }).options, i), ...COMIC_STYLE_WORDS[key]] })))
-}
-
 /** 만화로 산문 다시 쓰기 질문의 답 — 다시 쓰기 · 참고로만. */
 export function matchWriterComicRewrite(text: string): ComicRewrite | null {
   const keys: ComicRewrite[] = ['rewrite', 'reference']
   return pick(text, keys.map((key, i) => ({ key, phrases: [...chipPhrases((voice) => comicRewriteQuestion(voice).options, i), ...REWRITE_WORDS[key]] })))
-}
-
-/** 첨부 그림을 그림체로 쓸지 묻는 질문의 답. */
-export function matchWriterStyleAttachment(text: string): 'style' | 'reference' | null {
-  const keys: Array<'style' | 'reference'> = ['style', 'reference']
-  return pick(text, keys.map((key, i) => ({ key, phrases: [...chipPhrases(styleAttachmentOptions, i), ...STYLE_ATTACHMENT_WORDS[key]] })))
 }
 
 /** "어느 인물의 그림인가요?"의 답 — 고른 카드(localId) · 'new' · null. 칩 말 · 인물 이름 · "새 인물" 같은 짧은 답만 받는다(문장은 받지 않는다). */
@@ -146,13 +121,15 @@ const IMAGE_QUESTIONS: ReadonlyArray<readonly [string, (text: string, labels: re
   ['image-role:', matchWriterImageUse],
   ['image-character:', (text, labels) => matchCharacterPick(text, labels.map((name) => ({ localId: name, name })))],
   ['image-batch:', matchWriterBatch],
-  ['comic-style:', matchWriterComicStyle],
   ['comic-rewrite:', matchWriterComicRewrite],
   ['comic-retry:', matchComicRetry],
-  ['style-attachment:', matchWriterStyleAttachment],
+  // D6(2026-11-22)로 없어진 질문(만화 그림체 · 그림체로 쓸지) — 그 전 기록의 칩만 새로 고침 뒤 돌아올 수 있다. 돌아온 칩 이름으로 답하면
+  //   산문 고침으로 새지 않게 다른 그림 질문처럼 "다시 올려 주세요"로 받는다. 새로 묻지는 않는다.
+  ['comic-style:', () => null],
+  ['style-attachment:', () => null],
 ]
 
-/** 그림 질문(쓰임새 · 어느 인물 · 여러 장 · 만화 그림체 · 다시 쓰기 · 다시 옮기기 · 그림체로 쓸지)의 칩 기록 id 인가. */
+/** 그림 질문(쓰임새 · 어느 인물 · 여러 장 · 다시 쓰기 · 다시 옮기기, 그리고 D6 전 기록의 만화 그림체 · 그림체로 쓸지)의 칩 기록 id 인가. */
 export function isImageQuestionId(id: string): boolean {
   return IMAGE_QUESTIONS.some(([prefix]) => id.startsWith(prefix))
 }

@@ -10,14 +10,23 @@ import { hasNonRequestContext, withoutMediaGenerationProhibition } from '@/lib/h
 import { parseProducerDraft, useProducerStore } from './producer-store'
 import { useProjectStore, type WriterStatusAssets } from './project-store'
 import type { StageId } from '@/types'
+import { STAGE_LABEL } from '@/lib/constants'
 
-const stages = ['producer', 'writer', 'artist', 'director', 'editor']
+// 채팅 작업 흐름이 쓰는 단계 순서 — 산문 실행 기준의 옛 순서라 writer 가 artist 앞이다. Camera(오너 2026-11-22 D2~D5)는 Director 앞.
+const stages = ['producer', 'writer', 'artist', 'camera', 'director', 'editor']
+
+/** 저장된 단계 값이 floor 단계 이상인가 — 모르는 단계 값이면 아니다. 약속: tests/camera/stage.test.ts */
+export function workflowStageReached(stage: string | null | undefined, floor: string): boolean {
+  const at = stages.indexOf(stage ?? '')
+  return at >= 0 && at >= stages.indexOf(floor)
+}
 
 /** 현황 스냅샷의 화면 이름 표 — 순서 · 도구 대상 이름 ↔ 사용자가 보는 화면 이름. */
 const SCREEN_NAMES = {
-  order: 'Producer (start) > Writer (prose) > Artist > Storyboard (scenes and shots) > Director > Editor',
-  producer: 'Writer screen (prose)',
-  writer: 'Storyboard screen (scenes and shots)',
+  // D1(오너 2026-11-22): Writer 화면 = 씬 스토리(producer) + 콘티(writer, 영어 Storyboard) 두 칸.
+  order: `Producer (start) > Writer: Scene story (prose) > Artist > Writer: Storyboard (scenes and shots) > ${STAGE_LABEL.camera} (real images and videos per shot) > Director > Editor`,
+  producer: 'Writer screen, Scene story part (prose)',
+  writer: 'Writer screen, Storyboard part (scenes and shots)',
   artist: 'Artist screen',
 }
 
@@ -42,7 +51,8 @@ export function workflowPermission(message: string, action: string, target?: str
   if (action === 'refresh') return /(새로|갱신|다시.*(?:불러|조회|확인)|refresh|reload)/i.test(message) // i18n-ok: 사용자 요청 의도 인식.
   if (action === 'resume') return /(재개해|이어서.*(?:실행해|생성해|진행해)|실행.*재시도해|^(?:please\s+)?resume\b|^(?:please\s+)?retry.*(?:run|generation))/i.test(message.replace(/"[^"]*"|“[^”]*”|`[^`]*`/g, '')) // i18n-ok: 사용자 요청 의도 인식.
   // 화면 이름(리뉴얼 1차 · 오너 2026-11-14): 도구 대상 producer 는 Writer 산문 화면, writer 는 Storyboard 화면이다 — 옛 낱말(producer · writer · 작가)은 그대로 두고 화면 이름을 더한다.
-  const targetWords: Record<string, RegExp> = { producer: /(producer|프로듀서|writer|라이터|작가|prose|산문)/i, writer: /(writer|라이터|작가|storyboard|스토리보드)/i, artist: /(artist|아티스트)/i } // i18n-ok: 단계 이름 인식.
+  //   D1(오너 2026-11-22): writer 는 Writer 탭의 콘티 — 콘티 · conti 도 writer 대상이다.
+  const targetWords: Record<string, RegExp> = { producer: /(producer|프로듀서|writer|라이터|작가|prose|산문)/i, writer: /(writer|라이터|작가|storyboard|스토리보드|conti|콘티)/i, artist: /(artist|아티스트)/i } // i18n-ok: 단계 이름 인식.
   return !!target && !!targetWords[target]?.test(message) && /(열어|열기|가자|가줘|이동|넘겨|넘기|보여|호출|불러|핸드오프|open|go|move|hand.?over|take me|invite)/i.test(message) // i18n-ok: 사용자 요청 의도 인식.
 }
 
@@ -83,8 +93,8 @@ export function createStudioWorkflow(options: {
     // 새 프로젝트의 트리트먼트 초안(2026-10-02 시안 v04)은 아직 넘기지 않은 실행이다 — 넘긴 Writer 로 치지 않는다.
     const handedOff = status.started === true && status.draft !== true
     const allowed = ['producer']
-    if (handedOff || stages.indexOf(reached) >= stages.indexOf('writer')) allowed.push('writer')
-    if (stages.indexOf(reached) >= stages.indexOf('artist') && status.assets.images_ready) allowed.push('artist')
+    if (handedOff || workflowStageReached(reached, 'writer')) allowed.push('writer')
+    if (workflowStageReached(reached, 'artist') && status.assets.images_ready) allowed.push('artist')
     last = {
       projectId: options.projectId, currentStage: useProjectStore.getState().currentStage, reachedStage: reached, allowedStages: allowed,
       // 키 이름은 시험이 못 박아 그대로 둔다 — blockers · softWarnings 는 지금 화면 흐름에 막힌 점이 없어 비어 있다(옛 관문 항목은 note 가 막힌 점이 아니라고 적는다).
@@ -93,7 +103,7 @@ export function createStudioWorkflow(options: {
         savedDraft: saved ? { settings: saved.settings, storyReady: saved.storyReady, savedAt: saved.savedAt } : null,
         committed: { settings: project.data.settings, storyPresent: !!project.data.story_text }, styleAnchorKey: project.data.style_anchor_key },
       // 키 이름은 시험이 못 박아 그대로 둔다 — writer 는 Storyboard 화면의 씬 · 샷 실행이고 산문 Writer 화면이 아니다(screens 표가 화면 이름을 말한다).
-      writer: { started: handedOff, treatmentDraft: status.draft === true, status: status.current_status, stage: status.current_stage, error: status.error, completed: status.pipeline_completed, progress: status.progress_percent, savedScenes: scenes.count, savedShots: shots.count, note: 'This writer entry is the Storyboard screen scene and shot run, not the prose Writer screen. No execution record does not imply missing script. Saved scene and shot counts are independent of the execution history.' },
+      writer: { started: handedOff, treatmentDraft: status.draft === true, status: status.current_status, stage: status.current_stage, error: status.error, completed: status.pipeline_completed, progress: status.progress_percent, savedScenes: scenes.count, savedShots: shots.count, note: 'This writer entry is the Writer Storyboard scene and shot run, not the Writer Scene story (prose). No execution record does not imply missing script. Saved scene and shot counts are independent of the execution history.' },
       // 서버가 준 숫자 키(chars_ready · chars_total …)는 그대로 두고, 그린 그림 수와 그림 카드 수를 목록 수와 따로 이름 붙여 더한다.
       artist: {
         ...status.assets,
@@ -115,7 +125,7 @@ export function createStudioWorkflow(options: {
     if (stages.includes(state.reachedStage)) useProjectStore.getState().unlockThrough(state.reachedStage as StageId)
     if (state.writer.started) useProjectStore.getState().unlockThrough('writer')
     // Writer 가 시작됐거나 DB 단계가 producer 를 넘었으면 Producer 는 잠긴다(2026-10-01).
-    if (state.writer.started || stages.indexOf(state.reachedStage) > stages.indexOf('producer')) useProjectStore.getState().lockProducer()
+    if (state.writer.started || workflowStageReached(state.reachedStage, 'writer')) useProjectStore.getState().lockProducer()
   }
   return createProjectWorkflow({
     read, refresh, isCurrent: () => options.isCurrent() && !options.signal.aborted,
@@ -129,7 +139,7 @@ export function createStudioWorkflow(options: {
         if (saved.error) return { status: 'failed', message: `Writer exists, but its stage could not be saved: ${saved.error.message}` }
         const current = saved.data ?? (await createClient().from('projects').select('current_stage').eq('id', options.projectId).maybeSingle()).data
         check()
-        if (!current || stages.indexOf(current.current_stage) < stages.indexOf('writer')) return { status: 'unverified', message: 'Writer exists, but its saved stage could not be confirmed. Query again before opening.' }
+        if (!current || !workflowStageReached(current.current_stage, 'writer')) return { status: 'unverified', message: 'Writer exists, but its saved stage could not be confirmed. Query again before opening.' }
         last = { ...last, reachedStage: current.current_stage }
       }
       if (last) await refresh(last)

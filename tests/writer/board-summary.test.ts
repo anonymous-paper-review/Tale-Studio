@@ -1,4 +1,4 @@
-// Storyboard 보드 제목 옆 숫자 · 샷 이름 · Director 넘김 창 내용 · 첫 안내 문구를 검사한다
+// Storyboard 보드 제목 옆 숫자 · 샷 이름 · Cinema 넘김 창 내용 · 첫 안내 문구를 검사한다 (2026-11-22 오너 D2~D5 — Storyboard 다음은 Cinema)
 import { describe, expect, it } from 'vitest'
 import {
   boardShotLabels,
@@ -73,11 +73,12 @@ describe('보드의 샷 이름', () => {
   })
 })
 
-describe('Director 넘김 확인 창', () => {
+describe('Cinema 넘김 확인 창', () => {
   // 왜: 넘기기 전에 무엇이 얼마나 넘어가는지 보여 준다(프로토타입 S7 → 디자이너 1110 확정 D0, 2026-11-14). 러프가 다 있으면 빠지는 샷 안내는 필요 없다. 정상 경로 고정.
   it('러프가 다 있으면 넘김 창은 넘어가는 것 · 다음 · 그다음만 보여 주고 빠지는 샷 안내는 없다', () => {
     const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', extra)
-    expect(view.title).toBe('Director로 넘어갈까요?')
+    // 넘어가는 곳은 Camera 다(2026-11-22 오너 D2~D5 — 예전엔 Director).
+    expect(view.title).toBe('Cinema로 넘어갈까요?')
     expect(view.rows).toEqual([
       { label: '넘어가는 것', value: '샷 3 · 10초 · 인물 2 · 배경 1 · 러프 3장' },
       { label: '다음', value: '러프 → 실사 이미지 3장 · 약\u00a02분 · Takes 안 써요' },

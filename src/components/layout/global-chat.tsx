@@ -31,6 +31,7 @@ import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover
 import { LumiAvatar } from '@/components/lumi/lumi'
 import { CollapseIcon, ExpandIcon } from '@/components/icons/v3-icons'
 import { STAGE_PERSONA, chatLumiState } from '@/lib/lumi'
+import { directorChatStage, isDirectorChatStage } from '@/lib/director-chat-stage'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useProducerStore } from '@/stores/producer-store'
@@ -62,6 +63,8 @@ import {
   toggleMentionToken,
   foundationMentions,
 } from '@/lib/card-mention'
+import { artistMentionItems } from '@/lib/artist/mention-items'
+import { breakdownRows } from '@/lib/artist/breakdown'
 import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
@@ -108,7 +111,8 @@ import { useT } from '@/lib/i18n'
 import { pickContentLocale } from '@/lib/locale'
 import { totalInputTokens, type ChatTrace } from '@/lib/chat-trace'
 import type { StageId } from '@/types'
-import { boardNodeNames, directorMentionTargets } from '@/features/director/node-label'
+import { boardNodeNames, directorMentionTargets, directorNodeLabel } from '@/features/director/node-label'
+import { cameraCardMentionLabels } from '@/features/camera/mention'
 
 /** 입력창에 얹혀 있는 첨부 하나. 전송되면 비워진다(이번 턴 한정). */
 interface Attachment {
@@ -550,12 +554,14 @@ export function GlobalChat() {
   const producerBackgrounds = useProducerStore((s) => s.backgrounds)
   const artistCharacters = useArtistStore((s) => s.characterAssets)
   const artistWorlds = useArtistStore((s) => s.worldAssets)
+  const artistProps = useArtistStore((s) => s.propAssets)
   const writerManifest = useWriterStore((s) => s.sceneManifest)
   const writerShots = useWriterStore((s) => s.shots)
   // t() 는 매 렌더 새 함수 참조라 memo deps에 그대로 넣으면 메모이제이션이 무력화된다 —
   //   번역 결과(문자열, 값 비교 가능)만 미리 뽑아 deps에 넣는다.
   const characterHint = t('Character')
   const locationHint = t('Location')
+  const propHint = t('Prop')
   const directorNodes = useDirectorCanvasStore((s) => s.nodes)
   // Director 씬 · 샷 멘션 이름은 보드와 같은 전체 번호("러프 샷 8" · "Previz Shot 8", 오너 2026-11-02 "전체 번호로 통일") — 말은 카드와 같은 화면 언어(2026-11-14 답 7).
   const directorNames = useMemo(() => boardNodeNames(writerManifest, writerShots, locale), [writerManifest, writerShots, locale])
@@ -568,20 +574,22 @@ export function GlobalChat() {
       ]
     }
     if (currentStage === 'artist') {
-      return [
-        ...artistCharacters
-          .filter((c) => c.name?.trim())
-          .map((c) => ({ id: c.characterId, label: c.name, hint: characterHint })),
-        ...artistWorlds
-          .filter((w) => w.name?.trim())
-          .map((w) => ({ id: w.locationId, label: w.name, hint: locationHint })),
-      ]
+      // D9(2026-11-22): 인물 · 배경 · 소품 카드 이름. 카드가 아직 없는 첫 화면(글 목록)은 글 목록 줄 이름.
+      return artistMentionItems(
+        { characters: artistCharacters, worlds: artistWorlds, props: artistProps, breakdown: breakdownRows(producerCast, producerBackgrounds) },
+        { character: characterHint, location: locationHint, prop: propHint },
+      )
     }
     if (currentStage === 'writer') {
       return [
         ...writerSceneShotMentions(writerManifest, writerShots, locale),
         ...scriptLineMentions(buildScriptLines(writerManifest, writerShots), locale),
       ].map((m) => ({ id: m.ref, label: m.label, hint: m.hint }))
+    }
+    // Camera(오너 2026-11-22 D2~D5)는 실사만 다룬다 — 실사 씬 · 샷. 카드 ⌘/Ctrl+클릭(D9)이 넣는 이름과 같다.
+    if (currentStage === 'camera') {
+      const targets = directorMentionTargets(directorNodes, directorNames)
+      return sceneShotMentions(targets, 'real', locale).map((m) => ({ id: m.ref, label: m.label, hint: m.hint }))
     }
     if (currentStage === 'director') {
       const targets = directorMentionTargets(directorNodes, directorNames)
@@ -596,6 +604,8 @@ export function GlobalChat() {
     producerBackgrounds,
     artistCharacters,
     artistWorlds,
+    artistProps,
+    propHint,
     writerManifest,
     writerShots,
     characterHint,
@@ -617,10 +627,11 @@ export function GlobalChat() {
     for (const c of producerCast) put(c.localId, c.name)
     for (const c of artistCharacters) put(c.characterId, c.name)
     for (const w of artistWorlds) put(w.locationId, w.name)
+    for (const p of artistProps) put(p.propId, p.name)
     for (const c of writerManifest?.characters ?? []) put(c.characterId, c.name)
     for (const l of writerManifest?.locations ?? []) put(l.locationId, l.name)
     return map
-  }, [producerCast, artistCharacters, artistWorlds, writerManifest])
+  }, [producerCast, artistCharacters, artistWorlds, artistProps, writerManifest])
   // 샷 id 는 지금 보드의 전체 번호로(오너 2026-11-02 "전체 번호로 통일") — id 숫자는 샷을 더하거나 지우면 보드와 어긋난다.
   const shotLabelById = useMemo(() => boardShotLabels(writerManifest, writerShots, chatLocale), [writerManifest, writerShots, chatLocale])
   const scrubProse = (text: string) => scrubInternalIdsInProse(text, chatLocale, scrubNameById, shotLabelById)
@@ -720,7 +731,12 @@ export function GlobalChat() {
   }, [])
 
   // 넣고 빼기가 더 긴 라벨(예: "이름 미정 인물 2")의 앞부분을 지우지 않게 지금 목록의 라벨을 함께 넘긴다(리드 검토 4).
-  const mentionLabels = useMemo(() => mentionItems.map((m) => m.label), [mentionItems])
+  //   Camera 는 판 카드 이름("실사 샷 3 · 그림 v2" · "· Take 4", D9)도 — 고르기 목록에는 없지만 샷 이름으로 시작한다.
+  const cameraCardLabels = useMemo(
+    () => (currentStage === 'camera' ? cameraCardMentionLabels(directorNodes, (node) => directorNodeLabel(node.data, directorNames), locale) : []),
+    [currentStage, directorNodes, directorNames, locale],
+  )
+  const mentionLabels = useMemo(() => [...mentionItems.map((m) => m.label), ...cameraCardLabels], [mentionItems, cameraCardLabels])
 
   // 입력창의 @멘션 ↔ 카드 하이라이트 동기화 (입력에서 지우면 자동 해제)
   useEffect(() => {
@@ -1456,7 +1472,7 @@ export function GlobalChat() {
             (#chat-continuity) — 구간 구분선이 단계를 가른다. 답을 기다리는 동안 Lumi 는 생각하는 모습. */}
         <div className="flex shrink-0 items-center gap-2 pb-3 pl-5 pr-3.5 pt-4">
           <LumiAvatar persona={STAGE_PERSONA[currentStage]} state={chatLumiState({ loading, error: !!error })} size={28} />
-          <h2 className="min-w-0 flex-1 truncate text-label font-semibold text-foreground">{t(STAGE_CHAT_TITLE[currentStage])}</h2>
+          <h2 className="min-w-0 flex-1 truncate text-label font-semibold text-foreground">{t(STAGE_CHAT_TITLE[currentStage], { stage: STAGE_LABEL[currentStage] })}</h2>
           {/* 다음 단계 호출 칩(#owner-handoff-reentry 2026-08-31)은 2026-10-01 오너 지시("채팅 위의 버튼은 없애줘")로
               각 단계 화면 오른쪽 위 NextStepButton 으로 옮겼다 — 같은 문장을 채팅에 입력해 넘긴다. */}
           <Button
@@ -1472,7 +1488,7 @@ export function GlobalChat() {
         </div>
 
         {/* 지금 할 일 줄(11/13 시안 D5) — Director 만, 머리 바로 아래에 붙어 말이 쌓여도 밀려 올라가지 않는다. */}
-        {currentStage === 'director' && <LumiNowLine />}
+        {isDirectorChatStage(currentStage) && <LumiNowLine />}
 
         {/* Messages */}
         {/* 투명 덮개(AI 가 같은 단계에서 일하는 동안)가 받은 휠 · 끌기를 넘길 칸 — 실제로 스크롤하는 viewport 에 단다(검토 A2 N1).
@@ -1688,7 +1704,7 @@ export function GlobalChat() {
                       STAGE_BADGE_CLASS[pendingProposal.stage],
                     )}
                   >
-                    Suggestion
+                    {t('Suggestion')}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold"><MarkdownText text={scrubProse(pendingProposal.target)} /></p>
@@ -1942,14 +1958,14 @@ export function GlobalChat() {
           <ChatProgressPin stage={currentStage} />
           {/* Director 빠른 칩(11/13 시안 D5 "Suggestions", 오너 2026-11-14 "추천대로") — 입력칸 바로 위에 늘 보이고, 누르면 그 말을 바로 보낸다.
               칩 말은 AI 를 거치지 않고 지금 보드 상태로 바로 한다(global-chat-store runDirectorQuickChip). 시안 값: 28 알약 · 바탕색 · 테두리 · 사이 6. */}
-          {currentStage === 'director' && (
+          {isDirectorChatStage(currentStage) && (
             <div className="mb-3 flex flex-col items-start gap-1.5" data-testid="director-quick-chips">
               {DIRECTOR_QUICK_CHIPS.map((chip) => (
                 <button
                   key={chip}
                   type="button"
                   disabled={sendDisabled}
-                  onClick={() => void sendMessage(t(chip), undefined, { stageOverride: 'director' })}
+                  onClick={() => void sendMessage(t(chip), undefined, { stageOverride: directorChatStage(currentStage) })}
                   className="inline-flex min-h-7 items-center rounded-full border border-border bg-background px-3 py-1 text-left text-caption font-medium text-foreground transition-colors duration-100 ease-out hover:bg-accent disabled:pointer-events-none disabled:opacity-50"
                 >
                   {t(chip)}
@@ -2221,8 +2237,8 @@ export function GlobalChat() {
           <LumiChatPill stage="editor" className="order-last" />
         </TopBarActions>
       )}
-      {/* D8 Lumi 알림 카드(11/13 시안) — 채팅을 접어 둔 Director 에서 일괄이 끝나면 오른쪽 아래. 열려 있으면 채팅 줄로만 알린다. */}
-      {collapsed && currentStage === 'director' && <LumiBatchNotice />}
+      {/* D8 Lumi 알림 카드(11/13 시안) — 채팅을 접어 둔 Director · Camera 에서 일괄이 끝나면 오른쪽 아래. 열려 있으면 채팅 줄로만 알린다. */}
+      {collapsed && isDirectorChatStage(currentStage) && <LumiBatchNotice />}
       {collapsed && currentStage !== 'director' && currentStage !== 'editor' && (
         <aside
           className="z-sidebar fixed flex w-11 flex-col items-center gap-3 rounded-l-xl bg-chat-bg pt-4"

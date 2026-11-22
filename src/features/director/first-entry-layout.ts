@@ -106,14 +106,26 @@ export const FIRST_ENTRY_ZOOM = 0.75
 /**
  * 처음 들어갔을 때 보여 주는 화면: 가장 왼쪽 샷을 가운데(가로)에 두고 위에서 3분의 1 쯤에 둔다(0.75 배).
  * 씬 카드는 캔버스에서 숨겨져 기준이 될 수 없다(2026-08-31). 샷이 없으면 null.
+ * sceneNodeId 를 주면 그 씬의 샷만 본다 — 씬별 보기(오너 D8 2026-11-22)는 씬을 바꿀 때마다 그 씬 첫 샷을 이 자리로 맞춘다(혼자 정한 것 h5).
  */
-export function firstEntryViewport(nodes: readonly DirectorNode[], pane: { width: number; height: number }): Viewport | null {
-  const shots = nodes.filter((node) => node.data.kind === 'shot')
+export function firstEntryViewport(
+  nodes: readonly DirectorNode[],
+  pane: { width: number; height: number },
+  sceneNodeId?: string | null,
+): Viewport | null {
+  const shots = nodes.filter(
+    (node) => node.data.kind === 'shot' && (!sceneNodeId || (isShotData(node.data) && node.data.parentSceneNodeId === sceneNodeId)),
+  )
   if (shots.length === 0) return null
   const first = shots.reduce((a, b) => (a.position.x <= b.position.x ? a : b))
+  return cardViewport(first, pane)
+}
+
+/** 카드 하나를 첫 화면과 같은 자리(가로 가운데 · 위에서 3분의 1 · 0.75 배)에 두는 화면 — 다른 씬 꼬리표를 누르면 그 카드에 맞춘다. */
+export function cardViewport(card: Pick<DirectorNode, 'position'>, pane: { width: number; height: number }): Viewport {
   return {
-    x: pane.width / 2 - (first.position.x + 130) * FIRST_ENTRY_ZOOM,
-    y: pane.height / 3 - (first.position.y + 60) * FIRST_ENTRY_ZOOM,
+    x: pane.width / 2 - (card.position.x + 130) * FIRST_ENTRY_ZOOM,
+    y: pane.height / 3 - (card.position.y + 60) * FIRST_ENTRY_ZOOM,
     zoom: FIRST_ENTRY_ZOOM,
   }
 }

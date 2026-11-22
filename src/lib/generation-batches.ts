@@ -12,6 +12,7 @@ export type GenerationLane = 'artist' | 'writer-rough' | 'director-storyboard' |
 export const LANE_OF_KIND: Record<GenerationJobKind, GenerationLane | null> = {
   character_view: 'artist',
   world_shot: 'artist',
+  prop_image: 'artist',
   shot_rough_storyboard: 'writer-rough',
   shot_storyboard: 'director-storyboard',
   image_generation: null,
@@ -20,12 +21,27 @@ export const LANE_OF_KIND: Record<GenerationJobKind, GenerationLane | null> = {
   shot_previz_video: 'director-previz',
 }
 
+// 실사 그림 · 영상(레인 이름은 옛 director-*)은 Camera 의 일이다(2026-11-22 오너 D2~D5 — 실사 · 영상 만들기가 Camera 로).
 export const LANE_STAGE: Record<GenerationLane, StageId> = {
   artist: 'artist',
   'writer-rough': 'writer',
-  'director-storyboard': 'director',
-  'director-video': 'director',
-  'director-previz': 'director',
+  'director-storyboard': 'camera',
+  'director-video': 'camera',
+  'director-previz': 'camera',
+}
+
+/** 실사 그림 · 영상이 사는 단계 — Camera 에서 만들고 Director 노드 보기도 같은 샷을 본다(오너 2026-11-22 D2~D5). */
+const SHOT_MEDIA_STAGES: readonly StageId[] = ['camera', 'director']
+
+/** 실사 그림 · 영상 알림을 붙일 단계 — 지금 Director 를 보고 있으면 Director, 그 밖(Camera · 다른 화면 · 모름)은 Camera.
+ *  알림이 지금 보는 화면의 채팅 구간에 남고, 보고 있는 화면이면 "다른 단계에서 끝났어요"가 뜨지 않게. 약속: tests/camera/notice-home.test.ts */
+export function shotMediaStage(currentStage: StageId | null | undefined): StageId {
+  return currentStage === 'director' ? 'director' : 'camera'
+}
+
+/** 함께 "본 것"으로 치는 단계 — Camera 와 Director 는 같은 샷을 보니 하나를 보면 둘 다 본 것이다. 그 밖은 그 단계 하나. */
+export function stagesSeenTogether(stage: StageId): StageId[] {
+  return SHOT_MEDIA_STAGES.includes(stage) ? [...SHOT_MEDIA_STAGES] : [stage]
 }
 
 /** 일괄 제출은 몇 초 안에 끝나므로 2분이면 한 배치를 넉넉히 덮고, 한참 전의 단건 생성은 섞이지 않는다. */
@@ -192,8 +208,10 @@ export function deriveStageBadges(
   currentStage: StageId | null,
 ): Partial<Record<StageId, number>> {
   const out: Partial<Record<StageId, number>> = {}
+  // 지금 보는 단계와 함께 보는 단계(Camera · Director)는 0 이다.
+  const watching = currentStage ? stagesSeenTogether(currentStage) : []
   for (const c of completions) {
-    if (c.stage === currentStage) continue
+    if (watching.includes(c.stage)) continue
     const seen = lastSeen[c.stage]
     if (seen == null || c.at <= seen) continue
     out[c.stage] = (out[c.stage] ?? 0) + c.units

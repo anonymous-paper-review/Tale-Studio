@@ -4,7 +4,7 @@
 //
 // Alt+QWERT(스테이지 간)와 짝을 이루는 스테이지 **안** 이동이다:
 //   writer  러프 스토리보드 ↔ 대사
-//   artist  인물 ↔ 배경
+//   artist  인물 · 배경 · 소품 묶음(D13 2026-11-22 — 한 페이지 바로가기)
 //   director Node ↔ Storyboard(Previz) ↔ Storyboard(Real)
 //
 // 판정 규칙은 stage-shortcuts 와 동일 철학:

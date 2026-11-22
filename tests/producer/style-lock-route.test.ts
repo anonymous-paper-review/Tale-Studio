@@ -1,4 +1,4 @@
-// 고정된 그림체는 그림체 등록 창구에서도 다른 그림으로 바꿀 수 없고, 채팅 모델에는 그림체가 정해져 있다고 알린다 (2026-10-09 오너)
+// 그림체 등록 창구는 이제 그림을 받지 않고(410), 그림체가 고정된 작품의 채팅 모델에는 그림체가 정해져 있다고 알린다 (2026-10-09 오너 · 등록은 D6 2026-11-22 로 없앰)
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -41,21 +41,20 @@ beforeEach(() => {
   mocks.updates.length = 0
 })
 
-describe('그림체 등록 창구의 고정', () => {
-  it('그림을 그림체로 고를 때 고정 표시를 함께 저장한다', async () => {
-    // 정상 경로 고정 — 고정은 프로젝트 그림체 기록에 남아 새로고침 · 다른 기기에서도 그대로다.
+describe('그림체 등록 창구는 닫혔다', () => {
+  it('그림체 등록 창구는 그림을 그림체로 저장하지 않고 410 으로 거절한다', async () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 옛 탭 · 직접 요청도 그림체를 새로 정하지 못하게 창구에서 막는다.
     const res = await POST(post({ projectId: 'proj-1', imageUrl: MEDIA, label: '내 그림체', medium: '2d_anime', lock: true }))
-    expect(res.status).toBe(200)
-    expect(await res.json()).toMatchObject({ imageUrl: MEDIA, locked: true })
-    expect(mocks.updates[0].custom_style_anchor).toMatchObject({ url: MEDIA, medium: '2d_anime', locked: true })
+    expect(res.status).toBe(410)
+    expect(await res.json()).toEqual({ error: 'style_extraction_retired' })
+    expect(mocks.updates).toHaveLength(0)
   })
 
-  it('고정된 그림체는 다른 그림으로 바꾸려 해도 거절한다', async () => {
-    // 왜: 화면 단추를 막아도 채팅 첨부 · 만화 흐름은 이 창구로 그림체를 바꾼다 — 창구에서도 막는다.
+  it('이미 그림체를 올린 작품도 그림체 등록 창구로 다른 그림을 보내면 410 으로 거절하고 그림체를 바꾸지 않는다', async () => {
+    // 왜: 이미 올린 그림체는 그대로 쓰고(리드 2026-11-22 안 1 바탕), 다른 그림으로 바꾸는 길도 없다(D6).
     mocks.current = { url: MEDIA, label: '내 그림체', medium: '2d_anime', locked: true }
     const res = await POST(post({ projectId: 'proj-1', imageUrl: MEDIA, label: '다른 그림체', medium: 'live_action' }))
-    expect(res.status).toBe(409)
-    expect(await res.json()).toEqual({ error: 'style_locked' })
+    expect(res.status).toBe(410)
     expect(mocks.updates).toHaveLength(0)
   })
 })

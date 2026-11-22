@@ -16,6 +16,7 @@
 //   stage-labels.ts 의 writer 파이프라인 문구와 같은 어투로 통일("Director가 …하고 있습니다").
 
 import { STAGE_AGENT_NAME } from '@/lib/constants'
+// 실사 그림 · 영상(이름은 옛 director-*)은 Camera 의 일이다 — Cinematographer 가 만든다(2026-11-22 오너 D2~D5).
 import type { GenerationJobKind } from '@/lib/generation-jobs'
 import type { GenerationBatch, GenerationLane } from '@/lib/generation-batches'
 import type { DirectorNode } from '@/types/director'
@@ -313,12 +314,12 @@ export function directorShotImageWork(
     return {
       key: 'director-storyboard',
       label: translate(locale, '{agent} is generating shooting-ready images', {
-        agent: STAGE_AGENT_NAME.director,
+        agent: STAGE_AGENT_NAME.camera,
       }),
       done,
       total: shots.length,
       failed: failed || undefined,
-      stage: 'director',
+      stage: 'camera',
     }
   }
   const itemId = (entry: (typeof shots)[number]) => entry.data.writerShotId ?? entry.id
@@ -348,12 +349,12 @@ export function directorShotImageWork(
   return {
     key: 'director-storyboard',
     label: translate(locale, '{agent} is generating shooting-ready images', {
-      agent: STAGE_AGENT_NAME.director,
+      agent: STAGE_AGENT_NAME.camera,
     }),
     done,
     total: batch.members.size,
     failed: failed || undefined,
-    stage: 'director',
+    stage: 'camera',
   }
 }
 
@@ -391,12 +392,12 @@ export function directorVideoWork(
     return {
       key: 'director-video',
       label: translate(locale, '{agent} is generating video', {
-        agent: STAGE_AGENT_NAME.director,
+        agent: STAGE_AGENT_NAME.camera,
       }),
       done,
       total: videos.length > 0 ? videos.length : activeCount,
       failed: failed || undefined,
-      stage: 'director',
+      stage: 'camera',
     }
   }
   const batch = currentBatch('director-video', active, activeCount)
@@ -415,11 +416,11 @@ export function directorVideoWork(
   ).length
   return {
     key: 'director-video',
-    label: translate(locale, '{agent} is generating video', { agent: STAGE_AGENT_NAME.director }),
+    label: translate(locale, '{agent} is generating video', { agent: STAGE_AGENT_NAME.camera }),
     done,
     total: batch.members.size,
     failed: failed || undefined,
-    stage: 'director',
+    stage: 'camera',
   }
 }
 
@@ -436,6 +437,11 @@ const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; st
     agent: STAGE_AGENT_NAME.artist,
     stage: 'artist',
   },
+  prop_image: {
+    labelKey: '{agent} is generating prop images',
+    agent: STAGE_AGENT_NAME.artist,
+    stage: 'artist',
+  },
   shot_rough_storyboard: {
     labelKey: '{agent} is drawing the rough storyboard',
     agent: STAGE_AGENT_NAME.writer,
@@ -443,24 +449,24 @@ const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; st
   },
   shot_storyboard: {
     labelKey: '{agent} is generating shooting-ready images',
-    agent: STAGE_AGENT_NAME.director,
-    stage: 'director',
+    agent: STAGE_AGENT_NAME.camera,
+    stage: 'camera',
   },
   image_generation: null,
   storyboard_real_grid: {
     labelKey: '{agent} is batch-generating shooting-ready images',
-    agent: STAGE_AGENT_NAME.director,
-    stage: 'director',
+    agent: STAGE_AGENT_NAME.camera,
+    stage: 'camera',
   },
   shot_video: {
     labelKey: '{agent} is generating video',
-    agent: STAGE_AGENT_NAME.director,
-    stage: 'director',
+    agent: STAGE_AGENT_NAME.camera,
+    stage: 'camera',
   },
   shot_previz_video: {
     labelKey: '{agent} is making the previz video',
-    agent: STAGE_AGENT_NAME.director,
-    stage: 'director',
+    agent: STAGE_AGENT_NAME.camera,
+    stage: 'camera',
   },
 }
 
@@ -489,9 +495,9 @@ export function queueWorks(
 const LANE_WORK: Record<GenerationLane, { labelKey: string; agent: string }> = {
   artist: { labelKey: '{agent} is generating images', agent: STAGE_AGENT_NAME.artist },
   'writer-rough': { labelKey: '{agent} is drawing the rough storyboard', agent: STAGE_AGENT_NAME.writer },
-  'director-storyboard': { labelKey: '{agent} is generating shooting-ready images', agent: STAGE_AGENT_NAME.director },
-  'director-video': { labelKey: '{agent} is generating videos', agent: STAGE_AGENT_NAME.director },
-  'director-previz': { labelKey: '{agent} is generating previz videos', agent: STAGE_AGENT_NAME.director },
+  'director-storyboard': { labelKey: '{agent} is generating shooting-ready images', agent: STAGE_AGENT_NAME.camera },
+  'director-video': { labelKey: '{agent} is generating videos', agent: STAGE_AGENT_NAME.camera },
+  'director-previz': { labelKey: '{agent} is generating previz videos', agent: STAGE_AGENT_NAME.camera },
 }
 
 /**

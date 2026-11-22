@@ -8,7 +8,7 @@
 // 지우개(destination-out)로 위층을 긁으면 밑층이 드러난다 = 기존 화살표 삭제.
 // 펜으로 위층에 새 화살표를 그리고, 저장 시 두 층을 평탄화해 direction 프레임에 upsert.
 import { useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Eraser, Layers, Loader2, Pen, RotateCcw, Save, Trash2, Undo2, Wand2 } from 'lucide-react'
+import { Eraser, Layers, Loader2, Pen, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -17,6 +17,7 @@ import { cn } from '@/lib/utils'
 import type { RoughStoryboardImage } from '@/types'
 import { translate, useT } from '@/lib/i18n'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
+import { endAskAfterSave } from '@/lib/writer/end-frame-ask'
 import { warnBeforeLeaving } from '@/features/writer/unsaved-arrows-confirm'
 import { useLocaleStore } from '@/stores/locale-store'
 
@@ -103,6 +104,7 @@ export function DirectingArrowEditor({
   panel,
   onSaved,
   onDirtyChange,
+  onArrowsSaved,
   ref,
 }: {
   projectId: string
@@ -111,6 +113,8 @@ export function DirectingArrowEditor({
   onSaved: () => void
   /** 저장하지 않은 화살표(되돌리기 칸)가 생기거나 없어질 때 — 창이 [적용]을 켜고 닫기 전에 묻는다. */
   onDirtyChange?: (dirty: boolean) => void
+  /** 그린 화살표를 저장한 뒤 — 창이 끝 장도 다시 그릴지 묻는다(D10). 고를 때까지 저장이 끝나지 않는다([적용] · [저장하고 닫기]는 고른 뒤 닫힌다). */
+  onArrowsSaved?: () => Promise<void> | void
   ref?: React.Ref<DirectingArrowEditorHandle>
 }) {
   const t = useT()
@@ -311,7 +315,7 @@ export function DirectingArrowEditor({
       // 낡은 화면 위에 새 그림의 밑층을 섞지 않는다 — 409 면 알리고 화면을 다시 읽어 위층도 지금 그림으로 맞춘다.
       const separatedPlate = await readSeparateResponse(res, {
         notify: () => toast.info(t('The directing frame changed in the meantime, so we loaded it again. Separate the layer again.')),
-        // 감싼 까닭: 출시 시험 rough-frame-edit-refresh 가 두 저장 길의 다시 읽기 줄을 글자 그대로 세어 2개여야 한다 — 이 길은 그 셈 밖에 둔다.
+        // 감싼 까닭: 출시 시험 rough-frame-edit-refresh 가 저장 길의 다시 읽기 줄을 글자 그대로 세어 1개여야 한다 — 이 길은 그 셈 밖에 둔다.
         reload: () => reloadAfterRoughFrameEdit(projectId, () => onSaved()),
       })
       if (!separatedPlate) return
@@ -330,14 +334,15 @@ export function DirectingArrowEditor({
   }
 
   /**
-   * 저장 (+ 선택적으로 END 재생성).
-   * regenerateEnd: 화살표를 고쳤으면 "그 화살표가 끝난 뒤의 그림"인 END 도 따라가야 한다 —
-   *   안 그러면 편집이 DIRECTING 한 장에만 남고 3프레임 세트가 서로 다른 이야기를 한다.
-   *   과금이 걸리므로 기본 [저장]과 갈라 놓고, 누른 사람만 i2i 를 태운다.
+   * 저장 — 편집기 [저장] · 창 [적용] · 물음 창 [저장하고 닫기] 셋 다 여기로 온다.
+   * 화살표를 고쳤으면 "그 화살표가 끝난 뒤의 그림"인 끝 장도 따라가야 한다 — 안 그러면 세 장이 서로 다른 이야기를 한다.
+   *   저절로 다시 그리지 않고(약속 I) 저장한 뒤 창이 묻는다(D10 · 2026-11-22 리드 Q2). 예전 [저장 후 END 재생성] 단추는 이 물음으로 합쳤다.
    */
-  const handleSave = async (regenerateEnd = false): Promise<boolean> => {
+  const handleSave = async (): Promise<boolean> => {
     const top = topCanvasRef.current
     if (!top || !ready) return false
+    // 저장 전에 그린 것(되돌리기 칸)이 있었을 때만 끝 장을 묻는다 — 그린 것 없는 [저장]은 끝 장과 상관없다.
+    const hadStrokes = undoStackRef.current.length > 0
     setSaving(true)
     try {
       // 평탄화: 밑층(클린 플레이트) → 위층 순서로 합성. 분리 전이면 위층 단독(원본+펜, 전면 불투명).
@@ -366,22 +371,11 @@ export function DirectingArrowEditor({
       // 저장했으면 저장하지 않은 화살표는 없다 — 다시 불러오기(새 주소)를 기다리지 않고 바로 비운다(닫을 때 묻지 않게).
       undoStackRef.current = []
       setUndoCount(0)
-      if (!regenerateEnd) {
-        toast.success(t('Saved the DIRECTING frame'))
-        await reloadAfterRoughFrameEdit(projectId, onSaved)
-        return true
-      }
-      // 저장이 끝난 뒤(= 서버가 새 DIRECTING 을 갖고 있는 상태) END 를 그 그림 기준으로 다시 그린다.
-      toast.info(t('Redrawing the END frame, about 30 seconds'))
-      const endRes = await fetch('/api/writer/rough-directing-edit', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'regenerate-end', projectId, shotId }),
-      })
-      const endJson = await endRes.json().catch(() => null)
-      if (!endRes.ok) throw new Error(endJson?.error ?? `HTTP ${endRes.status}`)
-      toast.success(t('Saved DIRECTING and regenerated the END frame'))
+      toast.success(t('Saved the DIRECTING frame'))
       await reloadAfterRoughFrameEdit(projectId, onSaved)
+      // 저장은 끝났다 — 물음이 열려 있는 동안 편집기 단추가 돌지 않게 먼저 푼다.
+      setSaving(false)
+      if (endAskAfterSave(hadStrokes) === 'ask') await onArrowsSaved?.()
       return true
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('Save failed'))
@@ -571,6 +565,7 @@ export function DirectingArrowEditor({
               )
             : t('The pen works right away. To erase existing arrows, separate the layers first.')}
         </p>
+        {/* 끝 장 다시 그리기는 저장한 뒤 창이 묻는다(D10) — 따로 있던 [저장 후 END 재생성] 단추를 합쳤다. */}
         <Button
           size="sm"
           variant="outline"
@@ -579,21 +574,6 @@ export function DirectingArrowEditor({
         >
           {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
           {t('Save')}
-        </Button>
-        {/* 화살표를 고쳤으면 END 도 그 화살표를 따라가야 한다(#end-from-direction). 이미지 생성이
-            한 번 걸리므로 기본 저장과 갈라 두고, 누른 사람만 과금을 태운다. */}
-        <Button
-          size="sm"
-          disabled={busy || !ready}
-          onClick={() => void handleSave(true)}
-          title={t('Redraw the END frame based on the saved DIRECTING frame (1 image generation)')}
-        >
-          {saving ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Wand2 className="size-3.5" />
-          )}
-          {t('Save, then regenerate END')}
         </Button>
       </div>
     </div>

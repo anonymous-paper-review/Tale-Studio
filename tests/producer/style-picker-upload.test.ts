@@ -1,4 +1,4 @@
-// 내 그림체 그림을 올리면 채팅의 "그림체"와 같은 규칙으로 고정 · 분석한다 (2026-10-10 오너) — Artist 스타일 창의 올리기 카드는 2026-10-27 내렸다(정비 뒤 다시)
+// 내 그림체 그림을 올려 그림체로 정하는 길은 없다 — Artist 스타일 창의 올리기 카드는 2026-10-27 내렸고, 올린 그림을 그림체로 쓰는 기능은 D6(2026-11-22)로 없앴다
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -54,21 +54,19 @@ describe('스타일 선택 창의 내 그림체 올리기', () => {
     expect(translate('ko', 'Remove my art style')).toBeTruthy()
   })
 
-  it('올린 그림은 매체를 고르고 그림체로 고정한 뒤 그림체 분석기로 분석하고, 내 말풍선에 그 그림을 남긴다', async () => {
-    // 왜: 채팅에서 그림을 그림체로 고른 것과 같은 일이다(10/9 오너 결정 A · 고정). 어떤 그림을 골랐는지 채팅 기록에 남아야 한다.
-    await chat.getState().applyUploadedStyle(LOOK)
-    expect(calls('/api/produce/anchor-medium')[0]).toMatchObject({ imageUrl: LOOK.thumbUrl, consent: 'style-picker-v1' })
-    expect(calls('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: LOOK.thumbUrl, lock: true })
-    expect(calls('/api/produce/style-facets')[0]).toMatchObject({ consent: 'style-picker-v1' })
-    expect(producer.getState().customStyleAnchor?.locked).toBe(true)
-    expect(chat.getState().messages.some((m) => m.role === 'user' && m.content.includes(LOOK.thumbUrl))).toBe(true)
+  it('스타일 창에서 그림을 올려 그림체로 정하는 길은 채팅 저장소에도 없다', () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 올리기 카드를 다시 붙여도 부를 곳이 없게 그 길을 지웠다.
+    expect('applyUploadedStyle' in chat.getState()).toBe(false)
+    expect(calls('/api/produce/style-anchor')).toHaveLength(0)
   })
 
-  it('그림체가 고정된 프로젝트에서는 올려도 그림체를 바꾸지 않고 알린다', async () => {
-    // 정상 경로 고정 — 고정된 그림체는 어디서도 바꿀 수 없다(10/9 오너).
+  it('그림체를 이미 올린 작품의 그림체는 채팅에 그림을 올려 그림체라고 답해도 바뀌지 않는다', async () => {
+    // 정상 경로 고정 — 이미 올린 그림체는 그대로 쓰고(리드 2026-11-22 안 1 바탕), 새 그림에서 그림체를 정하는 길은 없다(D6).
     producer.setState({ styleAnchorKey: 'custom_fixed', customStyleAnchor: { url: `${MEDIA}/fixed/original.webp`, label: '내 그림체', medium: '2d_anime', locked: true } })
-    await chat.getState().applyUploadedStyle(LOOK)
+    chat.getState().offerImageRoles([LOOK], { typed: '', msg: '그림을 올렸어요' })
+    await chat.getState().sendMessage('그림체로 써 주세요')
     expect(calls('/api/produce/style-anchor')).toHaveLength(0)
-    expect(chat.getState().messages.some((m) => m.role === 'model' && /그대로 둘게요/.test(m.content))).toBe(true)
+    expect(producer.getState().customStyleAnchor?.url).toBe(`${MEDIA}/fixed/original.webp`)
+    expect(producer.getState().styleAnchorKey).toBe('custom_fixed')
   })
 })

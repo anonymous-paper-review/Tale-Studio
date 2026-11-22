@@ -4,7 +4,8 @@ import { describe, expect, it } from 'vitest'
 import { railStageState } from '@/lib/stage-rail'
 import type { StageId } from '@/types'
 
-const ORDER: StageId[] = ['entry', 'producer', 'artist', 'writer', 'director', 'editor']
+// 레일 칸 순서(D1 오너 2026-11-22) — Writer 칸(id producer)이 씬 스토리 · 콘티(id writer)를 함께 맡는다.
+const ORDER: StageId[] = ['entry', 'producer', 'artist', 'camera', 'director', 'editor']
 const states = (active: StageId, reached: StageId) => ORDER.map((stage) => railStageState(stage, { active, reached }))
 
 describe('왼쪽 레일 단계 칸', () => {
@@ -13,14 +14,18 @@ describe('왼쪽 레일 단계 칸', () => {
     expect(railStageState('artist', { active: 'artist', reached: 'artist' })).toBe('current')
   })
 
-  it('지금까지 연 가장 먼 단계보다 앞의 단계에는 끝낸 단계 체크를 단다', () => {
-    // 왜: v3 시안 A5 — Artist 에 있으면 Producer · Writer 에 체크가 붙는다. 넘어간 단계는 잠금이 아니라 "완료"다(리뉴얼 1차).
-    expect(states('artist', 'artist')).toEqual(['done', 'done', 'current', 'upcoming', 'upcoming', 'upcoming'])
+  it('지금까지 연 가장 먼 단계보다 앞의 단계에는 끝낸 단계 체크를 달고, Writer 칸은 콘티까지 지나야(Cinema 가 열려야) 체크가 붙는다', () => {
+    // 왜: 넘어간 단계는 잠금이 아니라 "완료"다(리뉴얼 1차). D1(2026-11-22) — Writer 칸은 Artist 를 마치면 콘티로 다시 돌아오는 칸이라,
+    //   처음 Artist 에 있을 때는 아직 하는 칸(체크 없음)이다(혼자 정한 것 b — v3 시안 A5 는 합치기 전 그림).
+    expect(states('artist', 'artist')).toEqual(['done', 'open', 'current', 'upcoming', 'upcoming', 'upcoming'])
+    expect(states('camera', 'camera')).toEqual(['done', 'done', 'done', 'current', 'upcoming', 'upcoming'])
   })
 
   it('앞 단계로 돌아가 보고 있어도 이미 넘어간 단계의 체크는 그대로 남는다', () => {
-    // 왜: Storyboard 까지 갔다가 Writer 를 다시 열어도 끝낸 일은 끝낸 일이다 — 보는 화면에 따라 체크가 사라지면 진행이 되돌아간 것처럼 보인다.
-    expect(states('producer', 'writer')).toEqual(['done', 'current', 'done', 'open', 'upcoming', 'upcoming'])
+    // 왜: Camera 까지 갔다가 Artist 를 다시 열어도 끝낸 일은 끝낸 일이다 — 보는 화면에 따라 체크가 사라지면 진행이 되돌아간 것처럼 보인다.
+    expect(states('artist', 'camera')).toEqual(['done', 'done', 'current', 'open', 'upcoming', 'upcoming'])
+    // 콘티까지 연 뒤 씬 스토리를 다시 보면 Writer 칸이 지금 칸, 지나온 Artist 는 끝낸 칸이다.
+    expect(states('producer', 'writer')).toEqual(['done', 'current', 'done', 'upcoming', 'upcoming', 'upcoming'])
   })
 
   it('지금까지 연 가장 먼 단계는 열려 있어도 체크를 달지 않는다', () => {

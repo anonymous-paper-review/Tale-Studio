@@ -41,6 +41,7 @@ import { storageKeySegment } from '@/lib/storage/key-segment'
 import { updateStoryboardImage } from '@/lib/director/storyboard-image-store'
 import { isJobCancelled } from '@/lib/director/job-cancellations'
 import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { versionNoteFields } from '@/lib/director/image-note'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 
 // Natural IDs stay in the database; new storage objects use the shared versioned,
@@ -920,6 +921,34 @@ export async function finalizeWorldShotJob(
   return publicUrl
 }
 
+/**
+ * 소품 그림 영속화(D7 2026-11-22) → props.image_url · source_hash 갱신. 그릴 때마다 새 파일(작업 번호가 이름) — 인물 · 배경과 같다.
+ *   지문(source_hash)은 제출 때 스냅샷에 남긴 "생김새 + 그림체" — 카드가 "설명 바뀜" · "그림체 바뀜"을 가린다(lib/artist/prop-image).
+ *   지난 그림 기록(후보 표)은 없다 — 작업 기록(generation_jobs.result_url)에 주소가 남는다.
+ */
+export async function finalizePropImageJob(
+  job: GenerationJob,
+  falImageUrl: string,
+  falPayload?: unknown,
+): Promise<string> {
+  const { workspaceId, propId } = job.target
+  if (!workspaceId || !propId) {
+    throw new Error('prop_image job target missing workspaceId/propId')
+  }
+  await recordFalResponseSnapshot(job, falPayload)
+  const path = generationFilePath(`${workspaceId}/${job.project_id}/props/${storageKeySegment(propId)}_image`, job.id)
+  const publicUrl = await uploadImageFromUrl(falImageUrl, path)
+  const snapshot = job.input_snapshot as { source_hash?: string | null } | null | undefined
+  const { error } = await supabaseAdmin
+    .from('props')
+    .update({ image_url: publicUrl, source_hash: snapshot?.source_hash ?? null })
+    .eq('project_id', job.project_id)
+    .eq('prop_id', propId)
+  if (error) throw error
+  await completeGenerationJob(job.id, publicUrl)
+  return publicUrl
+}
+
 // ── 리페인트 레퍼런스 시트 정리 (#ref-sheet-ttl, 2026-08-19 오너 결정 B안) ──
 //   합성 레퍼런스 시트(real_grid_ref_*/_storyboard_ref_strip)는 fal 이 가져간 뒤 역할이 끝나는
 //   일회용인데 삭제 로직이 없어 무한 누적됐다(실측 267장 — storage 쿼터 초과 기여).
@@ -1050,6 +1079,8 @@ async function finalizeStoryboardStripJob(
     // 약속 I4: 참조한 러프의 시각 — 러프가 바뀌면 "러프 바뀜"(자동 재생성은 하지 않는다, 오너 I5).
     roughGeneratedAt: job.target.roughGeneratedAt ?? null,
     ...(stopped ? { cancelled: true as const } : {}),
+    // 이 판을 부탁한 사람 말(오너 2026-11-22 결정 4) — 멈춘 판에도 남는다.
+    ...versionNoteFields(job.target.imageNote),
   }, { select: !stopped }))
 
   await completeGenerationJob(job.id, startUrl)
@@ -1085,6 +1116,7 @@ export async function finalizeShotStoryboardJob(
     source: 'generated',
     roughGeneratedAt: job.target.roughGeneratedAt ?? null,
     ...(stopped ? { cancelled: true as const } : {}),
+    ...versionNoteFields(job.target.imageNote),
   }, { select: !stopped }))
 
   await completeGenerationJob(job.id, publicUrl)
@@ -1413,6 +1445,9 @@ export async function finalizeGenerationJob(job: GenerationJob, result: Finalize
     case 'world_shot':
       if (result.media !== 'image') throw new Error('world_shot requires an image result')
       return finalizeWorldShotJob(job, result.url, result.payload)
+    case 'prop_image':
+      if (result.media !== 'image') throw new Error('prop_image requires an image result')
+      return finalizePropImageJob(job, result.url, result.payload)
     case 'shot_storyboard':
       if (result.media !== 'image') throw new Error('shot_storyboard requires an image result')
       return finalizeShotStoryboardJob(job, result.url, result.payload)

@@ -29,13 +29,16 @@ import { appendCheckConstraints, parseCheckConstraints } from '@/lib/writer/chec
 import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
 import { moderationRejectionResponse, recordModerationPass } from '@/lib/api/moderation'
 import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
+import { realCineLine } from '@/lib/director/real-cine-line'
 import {
+  loadPropsForReferences,
   loadShotReferencePlans,
   missingSheetsMessage,
   stripUrlQuery,
   MISSING_CHARACTER_SHEETS,
   type ShotRowForReferences,
 } from '@/lib/director/shot-references'
+import { planShotPropRefs, propRefRoom, propReferenceLines, type ShotPropRef } from '@/lib/director/shot-prop-refs'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { aspectRatioFromFormat, parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
@@ -44,6 +47,7 @@ import { isChatTraceId } from '@/lib/chat-trace'
 import { isImageModelKey, normalizeImageModelKey, resolveImageEndpoint, resolveSheetImageModel } from '@/lib/image-models'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 import { existingStoryboardJobId } from '@/lib/director/storyboard-active-job'
+import { readImageNote } from '@/lib/director/image-note'
 import { loadSeriesFirstShotContinuity, seriesContinuityPromptLine } from '@/lib/series/continuity'
 
 export const runtime = 'nodejs'
@@ -53,7 +57,7 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId, imageModel, characterRefCount: bodyCharCount, worldRefCount: bodyWorldCount } =
+    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId, imageModel, characterRefCount: bodyCharCount, worldRefCount: bodyWorldCount, note, via } =
       (await req.json()) as {
         projectId?: string
         writerShotId?: string
@@ -64,6 +68,9 @@ export async function POST(req: Request) {
         imageModel?: string
         characterRefCount?: number
         worldRefCount?: number
+        /** 사람 말(바꿀 점 · 채팅 부탁) — 검사는 readImageNote. */
+        note?: unknown
+        via?: unknown
       }
     // #image-model-select: 화이트리스트 밖 모델명은 400 — 임의 fal 경로 주입 방지.
     //   실제 엔드포인트는 reference 유무가 정해지는 submit 시점에 고른다(#registry-merge).
@@ -71,6 +78,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Unknown imageModel' }, { status: 400 })
     }
     const requestedModelKey = imageModel !== undefined ? normalizeImageModelKey(imageModel) : null
+    // 사람 말(바꿀 점 · 채팅 부탁, 오너 2026-11-22 결정 4) — 잘못 왔으면 남기지 않고 그림은 그대로 만든다. 완료가 그림 판에 옮긴다.
+    const imageNote = readImageNote(note, via)
 
     if (!projectId || !writerShotId || !prompt) {
       return NextResponse.json(
@@ -174,6 +183,11 @@ export async function POST(req: Request) {
     const characterRefLabels = serverPlan
       ? serverPlan.characterRefs.map((r) => ({ name: r.name, position: r.position, pose: r.pose }))
       : undefined
+    // 소품 참고(D7 2단계, 2026-11-22) — 그 샷 소품 칸에 나오는 소품의 그림(한 샷 2장까지). 소품 그림을 못 읽으면 소품 없이 그린다(지금과 같다).
+    const shotPropPlan: ShotPropRef[] = shot
+      ? planShotPropRefs((shot as { static_spec?: unknown }).static_spec, await loadPropsForReferences(projectId).catch(() => []))
+      : []
+    let propRefs: ShotPropRef[] = []
 
     // #u17-2(2026-08-31 오너 지시): 수동 샷(shots.prompt=NULL)의 한국어 액션 원문 유출 방어 —
     //   영상 라우트(#w-c)와 동일하게 서버 최종 방어로 EN 파생. 이미 영어면 LLM 없이 통과,
@@ -198,6 +212,8 @@ export async function POST(req: Request) {
       roughFrames?.start && roughFrames.direction && roughFrames.end
         ? { start: roughFrames.start, direction: roughFrames.direction, end: roughFrames.end }
         : null
+    // D5(2026-11-22): 러프 가운데 장 글씨를 옮기지 않으니, 그 글씨가 나르던 빛 · 색 · 렌즈 · 초점을 샷 설계에서 글로 싣는다(스트립 길만).
+    const cineLine = stripFrames ? realCineLine((shot as { static_spec?: unknown } | null)?.static_spec) : null
     // #ref-gate(2026-09-02 오너 결정): writer 샷인데 러프 3프레임이 없으면 단일 이미지로 조용히 강등하지
     //   않고 409 code 로 막는다 — 클라가 러프 완성을 기다렸다가 자동 재개한다. shots 행이 없는 캔버스 전용
     //   샷만 종전 단일 경로.
@@ -275,8 +291,14 @@ export async function POST(req: Request) {
       if (upErr) throw upErr
       stripRefUrl = `${mediaPublicUrl(refPath)}?v=${Date.now()}`
 
-      // 레퍼런스 계약(buildRealStripPrompt 와 합치): [스트립, ...캐릭터/월드, 앵커?].
+      // 레퍼런스 계약(buildRealStripPrompt 와 합치): [스트립, ...캐릭터/월드, 소품?, 앵커?].
       //   applyStyleAnchor 는 앵커를 1번에 놓아 스트립 프롬프트와 충돌 → 스트립 모드는 수동 조립.
+      //   소품(D7 2단계)은 인물 · 배경 · 추가 입력 뒤, 화풍 앞 — 지금 번호는 그대로이고 화풍은 여전히 마지막이다. 상한을 넘으면 소품부터 뺀다.
+      const styleRefCount = anchor ? (anchor.usePreviewRef && anchor.previewUrl ? 2 : 1) : 0
+      propRefs = shotPropPlan
+        .filter((ref) => !assembledRefs.some((url) => stripUrlQuery(url) === stripUrlQuery(ref.url)))
+        .slice(0, propRefRoom(1 + assembledRefs.length + styleRefCount))
+      const propLines = propReferenceLines(2 + assembledRefs.length, propRefs)
       finalOpts = {
         prompt: buildRealStripPrompt(guardedPrompt, {
           // #ref-gate: 서버가 붙인 인물·배경·추가 입력의 경계. 레거시 샷(characters 미정의)만 클라 경계.
@@ -291,7 +313,8 @@ export async function POST(req: Request) {
           anchorKeepsGrade: anchor?.anchorKind === 'sublook',
           styleRefCount: anchor?.usePreviewRef && anchor.previewUrl ? 2 : 1,
           frameAxis: composed.geometry.frameAxis,
-        }),
+          cineLine,
+        }) + (propLines.length ? `\n${propLines.join('\n')}` : ''),
         // #real-strip-guard(2026-08-06)→#fal-canvas→#sheet-formats(2026-08-17): 캔버스는 합성이
         //   고른 지오메트리를 따른다 — 레퍼런스·캔버스·프롬프트 축·크롭이 한 시트 계약으로 정합.
         //   (ed5bd4a 전까지 image_size 는 타입에 없어 버려지고 'auto'가 전송되고 있었다 —
@@ -300,6 +323,7 @@ export async function POST(req: Request) {
         reference_image_urls: [
           stripRefUrl,
           ...assembledRefs,
+          ...propRefs.map((ref) => ref.url),
           ...(anchor ? [anchor.imageUrl] : []),
           ...(anchor?.usePreviewRef && anchor.previewUrl ? [anchor.previewUrl] : []),
         ],
@@ -361,6 +385,8 @@ export async function POST(req: Request) {
           ...parseCheckConstraints((shot as { check_notes?: unknown } | null)?.check_notes),
           continuityPrevText,
           ...(characterRefLabels ?? []).flatMap((r) => [r.name, r.pose]),
+          cineLine,
+          ...propRefs.map((ref) => ref.name),
         ],
         { projectId, kind: 'shot_storyboard', userId: access.userId },
       )
@@ -386,6 +412,7 @@ export async function POST(req: Request) {
           writerShotId,
           ...(stripFrames ? { gridVariant: 'strip1' as const } : {}),
           ...(typeof roughGeneratedAt === 'number' ? { roughGeneratedAt } : {}),
+          ...(imageNote ? { imageNote } : {}),
         },
       })
     } catch (err) {

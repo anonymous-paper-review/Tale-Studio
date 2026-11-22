@@ -360,7 +360,7 @@ function NoTextDialog({ tab }: { tab: EntryTab }) {
           </DialogDescription>
         </DialogHeader>
         {/* 낱말 단위로만 줄을 바꾼다 — "배 / 경 카드"처럼 끊겼다(검토 a 낮음 1). */}
-        {image ? <p className="break-keep text-xs text-muted-foreground">{t('Upload pictures in the Writer chat after you start. Use the [+] in the chat on the right. You can use them as comic pages, character or background cards, or the art style.')}</p> : null}
+        {image ? <p className="break-keep text-xs text-muted-foreground">{t('Upload pictures in the Writer chat after you start. Use the [+] in the chat on the right. You can use them as comic pages, character or background cards, or reference.')}</p> : null}
         <DialogFooter>
           <Button variant="secondary" onClick={() => void continueWithoutFile(tab)}>
             {t('Continue without the file')}

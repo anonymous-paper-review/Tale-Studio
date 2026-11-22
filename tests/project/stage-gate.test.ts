@@ -7,8 +7,11 @@ import { reachedStageFromFacts, canEnterStage, proseLockedFromFacts, type StageF
 const fresh: StageFacts = { storedStage: 'producer', treatmentStarted: false, runContinued: false, hasShots: false }
 
 describe('리뉴얼 단계 열림', () => {
-  it('단계는 Producer, Writer, Artist, Storyboard, Director, Editor 순서로 보인다', () => {
-    expect(STAGES.map((s) => STAGE_LABEL[s.id])).toEqual(['Producer', 'Writer', 'Artist', 'Storyboard', 'Director', 'Editor'])
+  it('단계는 Producer, Writer 씬 스토리, Artist, Writer 콘티, Cinema, Director, Editor 순서로 열린다', () => {
+    // 왜: 오너 2026-11-22 D2~D5 — Director 앞에 새 탭 Camera 가 선다. D1 — 옛 Storyboard(id writer)는 Writer 탭의 콘티라 이름표도 Writer 다
+    //   (Artist 를 마치면 Writer 로 돌아오는 고리). 레일 칸 순서는 tests/project/writer-rail.test.ts.
+    expect(STAGES.map((s) => s.id)).toEqual(['entry', 'producer', 'artist', 'writer', 'camera', 'director', 'editor'])
+    expect(STAGES.map((s) => STAGE_LABEL[s.id])).toEqual(['Producer', 'Writer', 'Artist', 'Writer', 'Cinema', 'Director', 'Editor'])
   })
 
   it('새 프로젝트는 Producer만 열려 있다', () => {

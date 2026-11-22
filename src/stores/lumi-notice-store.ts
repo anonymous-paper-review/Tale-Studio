@@ -3,8 +3,10 @@
 //   카드는 저절로 닫히지 않는다 — ✕ · 단추로 닫고, 채팅을 열거나 Director 를 떠나거나 다른 프로젝트로 가면 사라진다(다시 접어도 돌아오지 않는다).
 //   글 · 단추는 lib/director/lumi-batch-notice, 카드는 features/director/lumi-batch-notice. 약속: tests/director/lumi-batch-notice.test.ts
 import { create } from 'zustand'
+import { isDirectorChatStage } from '@/lib/director-chat-stage'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useProjectStore } from '@/stores/project-store'
+import type { StageId } from '@/types/project'
 
 export interface LumiBatchNotice {
   projectId: string
@@ -16,19 +18,22 @@ export interface LumiBatchNotice {
 
 interface LumiNoticeState {
   notice: LumiBatchNotice | null
-  /** 일괄이 끝났을 때(러너가 부른다) — 지금 그 프로젝트의 Director 에서 채팅을 접어 둔 때만 카드를 띄운다. */
+  /** 카드를 띄운 화면 — Director 또는 Camera(리드 2026-11-22, 실사 · 영상 알림의 집). 그 화면을 떠나면 카드가 사라진다. */
+  stage: StageId | null
+  /** 일괄이 끝났을 때(러너가 부른다) — 지금 그 프로젝트의 Director · Camera 에서 채팅을 접어 둔 때만 카드를 띄운다. */
   batchEnded: (notice: LumiBatchNotice) => void
   dismiss: () => void
 }
 
 export const useLumiNoticeStore = create<LumiNoticeState>()((set) => ({
   notice: null,
+  stage: null,
   batchEnded: (notice) => {
     const project = useProjectStore.getState()
-    if (project.currentStage !== 'director' || project.projectId !== notice.projectId) return
+    if (!isDirectorChatStage(project.currentStage) || project.projectId !== notice.projectId) return
     if (!useChatUiStore.getState().collapsed) return
     if (notice.done + notice.failed === 0) return
-    set({ notice })
+    set({ notice, stage: project.currentStage })
   },
   dismiss: () => set({ notice: null }),
 }))
@@ -38,5 +43,6 @@ useChatUiStore.subscribe((state) => {
 })
 useProjectStore.subscribe((state) => {
   const notice = useLumiNoticeStore.getState().notice
-  if (notice && (state.currentStage !== 'director' || state.projectId !== notice.projectId)) useLumiNoticeStore.setState({ notice: null })
+  const shownOn = useLumiNoticeStore.getState().stage ?? 'director'
+  if (notice && (state.currentStage !== shownOn || state.projectId !== notice.projectId)) useLumiNoticeStore.setState({ notice: null })
 })

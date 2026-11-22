@@ -1,6 +1,7 @@
 // Storyboard 보드의 숫자 · 샷 이름 · Director 넘김 창 내용 (리뉴얼 1차 2026-10-19, 프로토타입 S1 · S7).
 //   보드 카드 · 화면 머리 · 넘김 창이 같은 셈을 쓰도록 한 곳에 둔다 — 러닝타임은 목표가 아니라 샷 길이의 합(지표)이다.
 import { sceneShotName } from '@/lib/board-names'
+import { STAGE_LABEL } from '@/lib/constants'
 import { countText } from '@/lib/i18n/count-text'
 import { translate } from '@/lib/i18n/translate'
 import type { AppLocale } from '@/lib/locale'
@@ -172,7 +173,8 @@ export function directorConfirmView(summary: DirectorHandoffSummary, locale: App
             : translate(locale, 'Rough → {count} real images · about {minutes} min', { count: images, minutes: realImageBatchMinutes(images) })
           : translate(locale, 'The real images are already made')
   return {
-    title: translate(locale, 'Move on to Director?'),
+    // 넘어가는 곳은 Camera(2026-11-22 오너 D2~D5 — 예전엔 Director). 이름은 단계 표에서.
+    title: translate(locale, 'Move on to {stage}?', { stage: STAGE_LABEL.camera }),
     description: images && images > 0 ? translate(locale, 'We start by turning the {count} roughs into real images.', { count: images }) : null,
     rows: [
       {

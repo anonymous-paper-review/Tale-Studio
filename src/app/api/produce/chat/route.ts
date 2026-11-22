@@ -20,12 +20,13 @@ import {
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { translate } from '@/lib/i18n/translate'
 import { sanitizeAttachmentUrls } from '@/lib/upload/attachment'
-import { listStyleAnchorCatalog, listStyleAnchorMediums } from '@/lib/style-anchor'
+import { listStyleAnchorCatalog } from '@/lib/style-anchor'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { buildReferenceDigest, getProjectReferenceId } from '@/lib/reference-import'
 import { buildChatTrace, createChatTraceId, type ChatLlmUsage } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
 import { styleCatalogLine } from '@/lib/style-anchor-name'
+import { offeredStyles, retiredStylesContext } from '@/lib/style-offer'
 
 
 
@@ -145,12 +146,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       if (preserved) contextParts.push(preserved)
     }
     if (attachments.urls.length > 0) {
-      // 모델이 고를 medium 후보 — 저장 라우트가 검증에 쓰는 목록과 같은 출처여야 한다.
-      //   이미지가 붙은 턴에서만 조회한다(평소 채팅에 DB 왕복을 더하지 않는다). 고정된 그림체면 고를 일이 없다.
-      const mediums = styleLocked === true ? [] : await listStyleAnchorMediums()
-      if (mediums.length > 0) {
-        contextParts.push(`[Allowed Style Mediums]\n${mediums.join(', ')}`)
-      }
+      // 예전에는 첨부 그림을 그림체로 쓰자고 할 때 고를 매체 목록도 실었다 — 그림에서 그림체를 정하는 길이 D6(오너 2026-11-22)로 없어져 싣지 않는다.
       // 슬라이스는 위→아래 순서로 붙는다. 이 순서를 모르면 모델이 컷 순서를 뒤섞는다.
       contextParts.push(
         `[Attached Images]\n${attachments.urls.length} image(s) are attached to this message, in reading order (top to bottom for sliced vertical strips such as webtoon episodes). Read any speech bubbles, captions and on-image text as part of the content.${
@@ -235,10 +231,11 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     //   고정된 그림체면 목록을 주지 않는다 — 보면 바꾸자고 권한다.
     const anchorCatalog = styleLocked !== true ? await listStyleAnchorCatalog() : []
     if (anchorCatalog.length > 0) {
-      contextParts.push(
-        // 키 · 한국어 이름 · 영어 이름 · 매체 — 영어로 답할 때 한국어 이름을 쓰지 않게(10/21).
-        `[Style Anchor Catalog]\n${anchorCatalog.map((a) => styleCatalogLine(a)).join('\n')}`,
-      )
+      // 키 · 한국어 이름 · 영어 이름 · 매체 — 영어로 답할 때 한국어 이름을 쓰지 않게(10/21).
+      //   고를 수 있는 것은 네 가지뿐이다(D6 오너 2026-11-22) — 없어진 스타일은 가장 가까운 짝 표로만 준다(정하지 않고 권한다).
+      contextParts.push(`[Style Anchor Catalog]\n${offeredStyles(anchorCatalog).map((a) => styleCatalogLine(a)).join('\n')}`)
+      const retired = retiredStylesContext(anchorCatalog)
+      if (retired) contextParts.push(retired)
     }
 
     // 핸드오프 가부의 단일 판정자 = 코드 게이트. LLM 이 자기 기준으로 "준비 완료"를 선언하지 않도록

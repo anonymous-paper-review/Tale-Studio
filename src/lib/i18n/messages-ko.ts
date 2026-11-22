@@ -481,7 +481,7 @@ export const KO: Record<string, string> = {
 
   // ── writer 스테이지: writer-tabs ──
   'V2 units': 'V2 유닛',
-  'Rough storyboard': '러프 스토리보드',
+  'Rough storyboard': '러프 콘티',
   Treatment: '트리트먼트',
   Dialogue: '대사',
   // ── writer 스테이지: writer-engine-picker ──
@@ -662,8 +662,6 @@ export const KO: Record<string, string> = {
   'Discard and remake': '버리고 다시 만들기',
   'Could not create a canvas context': '캔버스 컨텍스트 생성 실패',
   'Saved the DIRECTING frame': 'DIRECTING 프레임을 저장했어요',
-  'Redrawing the END frame, about 30 seconds': 'END 프레임을 다시 그리는 중이에요. 30초쯤 걸려요',
-  'Saved DIRECTING and regenerated the END frame': 'DIRECTING 저장 + END 프레임 재생성 완료',
   'Save failed': '저장 실패',
   'You need a 3-frame rough set to edit. Generate a panel first.': '3프레임 러프 세트가 있어야 편집할 수 있어요. 패널을 먼저 생성해주세요.',
   'Re-separate layer': '레이어 다시 분리',
@@ -681,8 +679,10 @@ export const KO: Record<string, string> = {
   'Scrape the top layer with the eraser to reveal the arrow-free layer underneath. Draw new arrows with the pen.': '지우개로 위층을 긁으면 화살표 없는 밑층이 드러나요. 펜으로 새 화살표를 그려요.',
   'The pen works right away. To erase existing arrows, separate the layers first.': '펜은 바로 쓸 수 있어요. 기존 화살표를 지우려면 먼저 레이어 분리를 눌러주세요.',
   Save: '저장',
-  'Redraw the END frame based on the saved DIRECTING frame (1 image generation)': '저장한 DIRECTING 프레임을 기준으로 END 프레임을 다시 그려요 (이미지 생성 1회)',
-  'Save, then regenerate END': '저장 후 END 재생성',
+  // 가운데 장 저장 뒤 끝 장 물음(D10 · 2026-11-22)
+  'Redraw the end frame to match these arrows?': '끝 장도 이 화살표대로 다시 그릴까요?',
+  'The start and directing frames stay as they are. Only the end frame is redrawn.': '시작 · 연출 장은 그대로 두고 끝 장만 다시 그려요.',
+  'Could not redraw the end frame. It stays as it was.': '끝 장을 다시 그리지 못했어요. 끝 장은 그대로예요.',
   // ── writer 스테이지: add-item-dialog ──
   'Low angle (looking up)': '로우앵글 (아래에서 위로)',
   'Eye level': '아이레벨 (눈높이)',
@@ -726,23 +726,22 @@ export const KO: Record<string, string> = {
   'A location has been selected.': '추가할 위치가 선택됐어요.',
   'Choose where to add it on the left.': '왼쪽에서 추가할 위치를 골라주세요.',
   // ── writer 스테이지: rough-storyboard-view ──
-  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nLet me know which scene or shot you\'d like to revise or add.\nPress "@" to pick a scene or shot (Ctrl+click a card does the same).': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
-  'The rough storyboard is all ready. Ready to move to Artist and work out character and background concepts?': '러프 스토리보드가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nLet me know which scene or shot you\'d like to revise or add.\nPress "@" to pick a scene or shot (Ctrl+click a card does the same).': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
   '{count} panels stopped auto-generating after repeated failures. Use "Retry" on the card to regenerate them.': '패널 {count}개는 반복 실패로 자동 생성을 멈췄어요. 카드의 "다시 시도"로 재생성할 수 있어요.',
   'Generation failed': '생성 실패',
-  'Rough storyboard generation request failed': '러프 스토리보드 생성 요청 실패',
-  'Rough storyboard: click a card to review, edit, or regenerate; click a scene name to collapse it': '러프 스토리보드: 카드를 클릭하면 확인·수정·재생성, 씬 이름을 클릭하면 접을 수 있어요',
+  'Rough storyboard generation request failed': '러프 콘티 생성 요청 실패',
+  'Rough storyboard: click a card to review, edit, or regenerate; click a scene name to collapse it': '러프 콘티: 카드를 클릭하면 확인·수정·재생성, 씬 이름을 클릭하면 접을 수 있어요',
   'Zoom out (more columns)': '축소 (열 늘리기)',
   'Rough board zoom': '러프보드 축척',
   'Storyboard zoom': '스토리보드 축척',
   'Zoom in (fewer columns)': '확대 (열 줄이기)',
   'Back to the default size': '기본 크기로',
   'Storyboard board': '스토리보드 보드',
-  'Rough storyboard board': '러프 스토리보드 보드',
-  'Generating rough storyboard': '러프 스토리보드 생성 중',
+  'Rough storyboard board': '러프 콘티 보드',
+  'Generating rough storyboard': '러프 콘티 생성 중',
   '{count} panels generating': '패널 {count}개 생성 중',
   'Board total: {count} shots': '보드 전체 {count}샷',
-  'Rough storyboard progress': '러프 스토리보드 진행 현황',
+  'Rough storyboard progress': '러프 콘티 진행 현황',
   'Confirming the previous rough request. It will not be submitted again.': '앞선 러프 요청의 접수 여부를 확인 중이에요. 같은 요청을 다시 보내지 않아요.',
   'Unseen completions: {count}': '아직 확인하지 않은 완료 {count}개',
   'Back to Projects': '프로젝트 목록으로',
@@ -895,7 +894,8 @@ export const KO: Record<string, string> = {
   // ── director-store ──
   'Go live': '실사화',
   'New video take': '새 영상 테이크',
-  Storyboard: '스토리보드',
+  // Writer 탭의 콘티 칸 이름(D1 오너 2026-11-22 "storyboard란 명칭은 콘티로") — 영어 화면은 Storyboard 그대로.
+  Storyboard: '콘티',
   'Storyboard image': '스토리보드 이미지',
   'Timed out (90s)': '시간 초과 (90s)',
   'Video is taking longer than expected. It may still finish in the background.': '영상 만들기가 예상보다 오래 걸립니다. 뒤에서 계속 진행 중일 수 있습니다.',
@@ -947,7 +947,7 @@ export const KO: Record<string, string> = {
   'This is a shared preview, so chat is turned off. In the real Producer stage, you shape the story, characters and tone together here.':
     '지금은 공유 미리보기라 실제 대화는 비활성이에요. 실제 프로듀서 단계에선 여기서 스토리·캐릭터·톤을 함께 정리해요.',
   'This is a shared preview. In the real project, you review and edit the scene structure and rough storyboard here.':
-    '공유 미리보기 모드예요. 실제로는 여기서 씬 구조와 러프 스토리보드를 검토·수정해요.',
+    '공유 미리보기 모드예요. 실제로는 여기서 씬 구조와 러프 콘티를 검토·수정해요.',
   'This is a shared preview. In the real project, you create and refine character and world cards here.':
     '공유 미리보기 모드예요. 실제로는 캐릭터·월드 카드를 생성하고 다듬어요.',
   'This is a shared preview. In the real project, you direct shots, camera and video on the canvas here.':
@@ -1169,9 +1169,9 @@ export const KO: Record<string, string> = {
   'Google Gemini 2.5 · previous generation': 'Google Gemini 2.5 · 이전 세대',
   // #ref-gate: 생성 선행조건(인물 시트·러프·실사 스토리보드) 대기·자동 재개 안내
   'character sheets for {names}': '{names}의 인물 시트', // copy-ok: fragment
-  'the rough storyboard of {shot}': '{shot}의 러프 스토리보드', // copy-ok: fragment
+  'the rough storyboard of {shot}': '{shot}의 러프 콘티', // copy-ok: fragment
   'the live-action storyboard of {shot}': '{shot}의 실사 스토리보드', // copy-ok: fragment
-  'rough storyboards for {count} shots': '{count}개 샷의 러프 스토리보드', // copy-ok: fragment
+  'rough storyboards for {count} shots': '{count}개 샷의 러프 콘티', // copy-ok: fragment
   'Waiting for {what}. Generation resumes automatically when it is ready.':
     '{what}을(를) 기다리는 중입니다. 준비되면 자동으로 이어서 생성합니다.',
   '{what} ready. Resuming generation.': '{what} 준비됨. 생성을 이어갑니다.',
@@ -1456,9 +1456,12 @@ export const KO: Record<string, string> = {
     '좋아요, Writer로 넘어갈게요! 재료를 넘기고 씬·샷 설계를 시작해요.',
   'On it, re-running the Writer with your current source. This can take a while.':
     '좋아요, 지금 원천 그대로 Writer를 다시 실행할게요! 시간이 좀 걸릴 수 있어요.',
-  // D12 — 채팅이 이름/느낌으로 스타일 앵커를 직접 반영 (2026-08-31 오너)
-  "Couldn't find that art style in the catalog. Tell me the feel again or choose one using the palette icon below the chat input.":
-    '그 그림체는 목록에서 못 찾았어요. 느낌을 다시 말해 주거나 채팅 입력창 아래의 팔레트 아이콘을 눌러 골라 주세요.',
+  // D12 — 채팅이 이름/느낌으로 스타일 앵커를 직접 반영 (2026-08-31 오너). 고르는 곳은 Artist 스타일 창(리드 2026-11-22 결정 3 — 팔레트 아이콘은 없다).
+  "Couldn't find that art style. Tell me the feel again, or pick one of the four styles in the style window in Artist when you make the images.":
+    '그 그림체는 찾지 못했어요. 느낌을 다시 말해 주거나, 그림을 만들 때 Artist 스타일 창에서 네 가지 중 하나를 골라 주세요.',
+  // D6(오너 2026-11-22) — 없어진 스타일은 정하지 않고 네 가지 중 가장 가까운 것을 권한다. 조사는 이름에 맞춰 고친다(fixKoreanParticles).
+  '{style} is no longer offered. Of the four styles, {nearest} is the closest. You can pick it in the style window in Artist when you make the images.':
+    '{style}은 이제 고를 수 없어요. 네 가지 중에서는 {nearest}가 가장 가까워요. 그림을 만들 때 Artist 스타일 창에서 고를 수 있어요.',
   "The previous Writer run didn't finish (no scenes/shots)": '이전 Writer 실행이 완료되지 않았어요 (씬/샷 없음)',
   'Check the story and settings, then re-run to generate scenes/shots and fill in Director/Editor.': '스토리·설정을 확인하고 다시 실행하면 씬·샷이 생성돼 Director/Editor 가 채워집니다.',
   'Suggest re-running Writer': 'Writer 다시 실행 제안',
@@ -1525,6 +1528,10 @@ export const KO: Record<string, string> = {
   'The videos for {shots} failed, and your Takes were returned. You can make them again. Leave them out and they join Editor once their videos are ready.': '{shots} 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.',
   'The video for {shots} failed. You can make it again. Leave it out and it joins Editor once its video is ready.': '{shots} 영상은 만들다 실패했어요. 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.',
   'The videos for {shots} failed. You can make them again. Leave them out and they join Editor once their videos are ready.': '{shots} 영상은 만들다 실패했어요. 다시 만들 수 있고, 빼고 넘겨도 나중에 영상이 생기면 Editor에 저절로 들어와요.',
+  'The video for {shots} failed, and your Takes were returned. You can make it again.': '{shots} 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들 수 있어요.',
+  'The videos for {shots} failed, and your Takes were returned. You can make them again.': '{shots} 영상은 만들다 실패했어요(Takes는 돌려드렸어요). 다시 만들 수 있어요.',
+  'The video for {shots} failed. You can make it again.': '{shots} 영상은 만들다 실패했어요. 다시 만들 수 있어요.',
+  'The videos for {shots} failed. You can make them again.': '{shots} 영상은 만들다 실패했어요. 다시 만들 수 있어요.',
   'Leave out and go to Editor': '빼고 Editor로',
   'Make {shots} again': '{shots} 다시 만들기',
   // 검토 b 고침(2026-11-14) — 영상 막이 · 글 카드에 묶인 생성 · Take 확인 · 승인 단계
@@ -1604,13 +1611,14 @@ export const KO: Record<string, string> = {
   'Please try again. If it keeps happening, try tweaking the description a bit.': '다시 시도해 주세요. 반복되면 묘사를 조금 바꿔 보세요.',
   "{label} auto-generation stopped. Repeated failures triggered a cost-protection pause on automatic retries. Click generate again on the card (manual requests aren't limited).": '{label} 자동 생성을 멈췄어요. 연속으로 실패해서 비용 보호를 위해 자동 재시도를 중단했어요. 카드에서 다시 생성을 눌러 주세요 (수동 요청은 이 제한을 받지 않아요).',
   // ── misc: pipeline-progress.ts ──
-  '{agent} is drawing the rough storyboard': '{agent}가 러프 스토리보드를 그리고 있습니다',
+  '{agent} is drawing the rough storyboard': '{agent}가 러프 콘티를 그리고 있습니다',
   '{agent} is generating character and background images': '{agent}가 캐릭터·배경 이미지를 생성하고 있습니다',
   '{agent} is generating images': '{agent}가 이미지를 생성하고 있습니다',
   '{agent} is generating shooting-ready images': '{agent}가 촬영용 이미지를 생성하고 있습니다',
   '{agent} is generating video': '{agent}가 영상을 생성하고 있습니다',
   '{agent} is generating character images': '{agent}가 캐릭터 이미지를 생성하고 있습니다',
   '{agent} is generating background images': '{agent}가 배경 이미지를 생성하고 있습니다',
+  '{agent} is generating prop images': '{agent}가 소품 이미지를 생성하고 있습니다',
   '{agent} is batch-generating shooting-ready images': '{agent}가 촬영용 이미지를 일괄 생성하고 있습니다',
   '{agent} is making the previz video': '{agent}가 프리비즈 영상을 만들고 있습니다',
   // ── misc: stage-labels.ts ──
@@ -1777,6 +1785,9 @@ export const KO: Record<string, string> = {
   'Save screen as JPEG': '화면 JPEG로 저장',
   'Save master sheet as image': '마스터 시트 이미지로 저장',
   'Remove my art style': '내 그림체 지우기',
+  // D6(오너 2026-11-22) — 고를 수 있는 스타일은 네 가지. 없어진 스타일은 이 작품이 쓰는 칸 하나만 남고, 정해 둔 것이 없어졌으면 가장 가까운 것을 골라 둔다.
+  'No longer offered': '새로 고를 수 없음',
+  '{style} is no longer offered, so I picked the closest style, {nearest}.': '{style}은 이제 고를 수 없어서 가장 가까운 {nearest}를 골라 뒀어요.',
   'Remove my art style? You can pick another style after removing it.': '내 그림체를 지울까요? 지우면 다른 스타일을 고를 수 있어요.',
   'Could not remove my art style. Please try again.': '내 그림체를 지우지 못했어요. 다시 시도해 주세요.',
   'Could not remove my art style: {message}': '내 그림체를 지우지 못했어요: {message}',
@@ -1951,6 +1962,32 @@ export const KO: Record<string, string> = {
 
   // ── Director: real 빈 카드 안내(#real-empty-guidance) ──
   'Generate a Real image.': 'Real 이미지를 생성해주세요.',
+
+  // ── 씬 단추(오너 D8 2026-11-22) — Director 노드 보기 · Camera 공용 ──
+  Scenes: '씬',
+  '1 shot': '샷 1개',
+  'No shots in this scene yet.': '이 씬에는 아직 샷이 없어요.',
+  // 씬만 세는 위쪽 만들기 줄의 확인 창 제목(오너 2026-11-22 E2)
+  'Make 1 video in {scene}?': '{scene}의 영상 1개를 만들까요?',
+  'Make {count} videos in {scene}?': '{scene}의 영상 {count}개를 만들까요?',
+  'Make the images in {scene}, then their videos?': '{scene}의 이미지를 만들고 이어서 영상도 만들까요?',
+  'How to make the video': '영상 만드는 방식',
+  'Start + end': '시작+끝',
+  'Continuation': '이어서',
+  'Start + middle': '시작+미들',
+  'Start + prompt': '시작+프롬프트',
+  'Moves from the start image to the end image.': '시작 그림에서 끝 그림까지 움직여요.',
+  "Starts where the previous shot's video ends.": '앞 샷 영상이 끝난 장면에서 바로 시작해요.',
+  'Uses the images only as a guide for faces, clothes and places, not as scenes.': '그림은 얼굴 · 옷 · 장소를 따르는 참고로만 쓰고, 장면으로 쓰지 않아요.',
+  'Starts from the start image and follows the direction sketch.': '시작 그림에서 시작해 연출 스케치(화살표)대로 움직여요.',
+  'Starts from the start image and follows the words. The end image is not used.': '시작 그림에서 시작해 글대로 움직여요. 끝 그림은 쓰지 않아요.',
+  'This is the first shot of its scene, so there is no video to continue from.': '씬의 첫 샷이라 이어 붙일 앞 영상이 없어요.',
+  'The previous shot has no finished video yet.': '앞 샷에 아직 완성된 영상이 없어요.',
+  "The previous shot's video is still being made.": '앞 샷 영상을 아직 만드는 중이에요.',
+  'This shot has no direction sketch yet. Draw its rough first.': '이 샷에는 아직 연출 스케치가 없어요. 러프를 먼저 그려 주세요.',
+  "Getting the last frame of the previous shot's video…": '앞 샷 영상의 마지막 장면을 잡는 중이에요…',
+  'Linked to a card in another scene. Click to go there.': '다른 씬 카드와 이어져 있어요. 누르면 그 씬으로 가요',
+  'This scene has no shots yet.': '이 씬에는 아직 샷이 없어요',
 
   // ── Editor: 빈 화면 3분리(#pps-empty-states) — 로딩/실패/정상 빈 구분 ──
   'Could not load your clips.': '클립을 불러오지 못했어요.',
@@ -2489,6 +2526,13 @@ export const KO: Record<string, string> = {
   "Use it as the art style": "그림체로 써 주세요",
   "Picture {i} of {n}: {name}. How should I use it? If you choose art style or comic page, the picture goes to an analysis model.": "그림 {i}/{n}: {name}. 어떻게 쓸까요? 그림체나 만화 원고를 고르면 그림을 분석 모델로 보내요.",
   "How should I use this picture? ({name}) If you choose art style or comic page, the picture goes to an analysis model.": "이 그림을 어떻게 쓸까요? ({name}) 그림체나 만화 원고를 고르면 그림을 분석 모델로 보내요.",
+  // D6(2026-11-22) — 그림에서 그림체를 가져오지 않는다. 쓰임새 질문 · 안내에서 그림체를 뺐다.
+  "Picture {i} of {n}: {name}. How should I use it? If you choose comic page, the picture goes to an analysis model.": "그림 {i}/{n}: {name}. 어떻게 쓸까요? 만화 원고를 고르면 그림을 분석 모델로 보내요.",
+  "How should I use this picture? ({name}) If you choose comic page, the picture goes to an analysis model.": "이 그림을 어떻게 쓸까요? ({name}) 만화 원고를 고르면 그림을 분석 모델로 보내요.",
+  "Please choose first how to use the picture: comic page, character, background or reference.": "먼저 그림을 어떻게 쓸지 골라 주세요: 만화 원고, 인물, 배경, 참고 자료.",
+  "You uploaded {n} pictures. How should I use them? If you choose the comic, I send the pages to an analysis model to write the script.": "그림 {n}장을 올리셨어요. 어떻게 쓸까요? 만화 원고를 고르면 그림을 분석 모델로 보내 대본을 만들어요.",
+  "I can't take an art style from a picture. Pick one of the four styles (Live Action, 2D Japanese Anime, Watercolor, Stop Motion) in the style window in Artist when you make the images.": "그림에서 그림체를 가져올 수는 없어요. 그림을 만들 때 Artist 스타일 창에서 네 가지(실사 · 2D 일본 애니 · 수채 · 스톱모션) 중 하나를 골라 주세요.",
+  "The comic art style can't be used as is. Pick one of the four styles in the style window in Artist when you make the images.": "만화 그림체는 그대로 쓸 수 없어요. 그림을 만들 때 Artist 스타일 창에서 네 가지 중 하나를 골라 주세요.",
   "Please choose first how to use the picture: comic page, character, background, art style or reference.": "먼저 그림을 어떻게 쓸지 골라 주세요: 만화 원고, 인물, 배경, 그림체, 참고 자료.",
   // 스타일 선택 창의 내 그림체 올리기 카드 (2026-10-10)
   "Upload my art style": "내 그림체 올리기",
@@ -2508,8 +2552,8 @@ export const KO: Record<string, string> = {
   'Breakdown': '브레이크다운',
   'Complete': '완료하기',
   'Next: Director': '다음: Director로',
-  'Hand over to Storyboard': 'Storyboard로 넘기기',
-  'Please hand over to Storyboard': 'Storyboard로 넘겨주세요',
+  'Hand over to Storyboard': '콘티로 넘기기',
+  'Please hand over to Storyboard': '콘티로 넘겨주세요',
   'E.g. rewrite it, or make the ending funnier': '예: 다시 써줘 / 결말을 더 웃기게',
   'Rewrite it': '다시 써줘',
   'Make it shorter': '더 짧게',
@@ -2634,6 +2678,9 @@ export const KO: Record<string, string> = {
   'There is no readable text in {name}. If it is a scanned PDF, upload the pages as images, or upload a text file.': '{name}에서 읽을 수 있는 글이 없어요. 스캔한 PDF라면 쪽을 이미지로 올리거나 글 파일을 올려 주세요.',
   'Upload pictures in the Writer chat after you start. Use the [+] in the chat on the right. You can use them as comic pages, character or background cards, or the art style.':
     '시작한 뒤 Writer 채팅에 그림을 올려 주세요. 오른쪽 채팅의 [+]로 올리면 돼요. 만화 원고 · 인물 · 배경 카드 · 그림체로 쓸 수 있어요.',
+  // D6(2026-11-22) — 그림에서 그림체를 가져오지 않아 안내에서 그림체를 뺐다.
+  'Upload pictures in the Writer chat after you start. Use the [+] in the chat on the right. You can use them as comic pages, character or background cards, or reference.':
+    '시작한 뒤 Writer 채팅에 그림을 올려 주세요. 오른쪽 채팅의 [+]로 올리면 돼요. 만화 원고 · 인물 · 배경 카드 · 참고 자료로 쓸 수 있어요.',
   'Continue without the file': '파일 빼고 진행',
   'Upload another file': '다른 파일 올리기',
   // AI 작업 중 잠금 화면
@@ -2726,10 +2773,13 @@ export const KO: Record<string, string> = {
   'Not yet': '아직',
   'Chat input': '채팅 입력',
   'Pick one, or just say it. E.g. make it 1 minute': '골라도 되고, 말로 해도 돼요. 예: 1분짜리로',
+  'Pick one, or just say it. E.g. make it a comedy': '골라도 되고, 말로 해도 돼요. 예: 코미디로',
   '"{text}": set {items}.': '"{text}": {items}(으)로 정했어요.',
   '"{text}": I did not quite get that. Please choose with the buttons.': '"{text}": 잘 못 알아들었어요. 버튼으로 골라 주세요.',
   'I will start like this.': '이렇게 시작할게요.',
   'When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make the length 1 minute".': '누르면 화면 비율이 잠겨요. 고치고 싶으면 위쪽 항목을 누르거나 "길이는 1분으로"처럼 말해 주세요.',
+  // D15(오너 2026-11-22): 원작 그대로면 길이는 원작을 따른다 — 정리 카드의 말로 고치기 예시는 장르로.
+  'When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make it a comedy".': '누르면 화면 비율이 잠겨요. 고치고 싶으면 위쪽 항목을 누르거나 "장르는 코미디로"처럼 말해 주세요.',
   // 예시
   'Office comedy': '직장 코미디',
   'The hallway vending machine breaks and cans pour out, but Minho is the only one who does not get a single can': '회사 복도 자판기가 고장 나서 캔이 우르르 쏟아지는데, 주인공 민호만 하나도 못 먹는 이야기',
@@ -2846,8 +2896,26 @@ export const KO: Record<string, string> = {
   'All {count}': '모두 {count}',
   'Characters {count}': '인물 {count}',
   'Backgrounds {count}': '배경 {count}',
+  // D13 · D7(2026-11-22): Artist 한 페이지 묶음(인물 · 배경 · 소품)과 바로가기 단추.
+  'Props {count}': '소품 {count}',
+  Prop: '소품',
+  'Appears in: scenes {scenes} · shots {shots}': '씬 {scenes} · 샷 {shots}에 나와요',
+  'Not in any shot yet': '아직 샷에 나오지 않아요',
+  'Prop image': '소품 이미지',
+  'Regenerate the prop image': '소품 이미지 다시 그리기',
+  'Style changed': '그림체 바뀜',
+  'What to change (optional)': '바꿀 점(선택)',
+  '{name} · Prop': '{name} · 소품',
+  'Prop: click to view or redraw': '소품: 눌러서 보거나 다시 그려요',
+  'Characters · backgrounds · props': '인물 · 배경 · 소품',
+  'Characters {persons} · backgrounds {places} · props {props}': '인물 {persons} · 배경 {places} · 소품 {props}',
+  'Jump to a section': '묶음으로 바로 가기',
+  'No characters yet. Characters come from the confirmed prose.': '아직 인물이 없어요. 인물은 확정한 산문에서 나와요.',
+  'No backgrounds yet. Backgrounds come from the confirmed prose.': '아직 배경이 없어요. 배경은 확정한 산문에서 나와요.',
+  'No props yet. Objects you set in Producer become props.': '아직 소품이 없어요. Producer 에서 사물로 정한 것이 소품이 돼요.',
+  'No props. Props are the important objects picked from the story when you press Make, plus objects you set in Producer.': '소품이 없어요. [만들기] 때 이야기에서 고른 중요한 물건과 Producer 에서 사물로 정한 것이 소품이 돼요.',
   'Looks {count}': '모습 {count}',
-  'Complete · to Storyboard': '완료하기 · Storyboard로',
+  'Complete · to Storyboard': '완료하기 · 콘티로',
   'Filter cards': '카드 걸러 보기',
   'I wrote the prose in {count} scenes. If you do not like it, say "Rewrite it" or change the conditions and rewrite it.': '씬 {count}개로 산문을 썼어요. 마음에 안 들면 "다시 써줘"라고 하거나 조건을 바꿔 다시 쓰게 해 주세요.',
   'The prose changed while you were editing. Copy your changes, close this window, and open the latest prose.': '편집하는 동안 산문이 바뀌었어요. 고친 내용을 복사해 두고 창을 닫은 뒤 최신 산문을 열어 주세요.',
@@ -2935,7 +3003,7 @@ export const KO: Record<string, string> = {
   'Add a look': '모습 추가하기',
   'Delete this look': '이 모습 지우기',
   'Used in shots': '쓰인 샷',
-  'It shows once Storyboard splits the shots': 'Storyboard에서 샷을 나누면 보여요',
+  'It shows once Storyboard splits the shots': '콘티에서 샷을 나누면 보여요',
   'Not used in any shot yet': '아직 어느 샷에도 안 쓰였어요',
   'Changed description · {label}. Remake it to apply it to the image.': '바뀐 설명 · {label}. 다시 만들어야 그림에 반영돼요.',
   'It is made from the description below. The style ({style}) stays the same.': '아래 설명대로 만들어요. 스타일({style})은 그대로예요.',
@@ -2978,15 +3046,15 @@ export const KO: Record<string, string> = {
   'There is nothing to draw yet. Write the story of this shot first.': '아직 그릴 내용이 없어요. 이 샷의 스토리를 먼저 써 주세요.',
   'Designing the characters and backgrounds stopped. Continue with Resume at the top first.': '인물 · 배경 디자인이 멈췄어요. 먼저 위의 [이어서 재시도]로 이어 가 주세요.',
   'Redrew the directing frame. The other two are unchanged.': '연출 그림을 다시 그렸어요. 나머지 두 장은 그대로예요.',
-  'Storyboard opens. Scenes, shots and roughs that are still being made continue there.': 'Storyboard 가 열려요. 아직 만드는 씬 · 샷 · 러프는 거기서 이어서 만들어요.',
-  'Getting Storyboard ready · splitting scenes and shots': 'Storyboard 준비 중 · 씬과 샷 나누는 중',
-  'Getting Storyboard ready · drawing the roughs': 'Storyboard 준비 중 · 러프 그리는 중',
-  'Storyboard is ready': 'Storyboard 준비됨',
+  'Storyboard opens. Scenes, shots and roughs that are still being made continue there.': '콘티가 열려요. 아직 만드는 씬 · 샷 · 러프는 거기서 이어서 만들어요.',
+  'Getting Storyboard ready · splitting scenes and shots': '콘티 준비 중 · 씬과 샷 나누는 중',
+  'Getting Storyboard ready · drawing the roughs': '콘티 준비 중 · 러프 그리는 중',
+  'Storyboard is ready': '콘티 준비됨',
   'Artist · breakdown': 'Artist · 브레이크다운',
   'Character sheets {persons} · backgrounds {places}': '인물 시트 {persons} · 배경 {places}',
   'Characters {persons} · backgrounds {places}': '인물 {persons} · 배경 {places}',
-  'Check what moves on to Storyboard.': 'Storyboard로 넘어가는 것을 확인해 주세요.',
-  'Complete and move on to Storyboard?': '완료하고 Storyboard로 넘길까요?',
+  'Check what moves on to Storyboard.': '콘티로 넘어가는 것을 확인해 주세요.',
+  'Complete and move on to Storyboard?': '완료하고 콘티로 넘길까요?',
   'Confirmed prose · characters {persons} · backgrounds {places}': '확정 산문 · 인물 {persons} · 배경 {places}',
   'Could not complete. Please try again.': '완료하지 못했어요. 다시 시도해 주세요.',
   'Could not save the style. Please try again.': '스타일을 저장하지 못했어요. 다시 시도해 주세요.',
@@ -3014,9 +3082,9 @@ export const KO: Record<string, string> = {
   'Estimated credits': '예상 크레딧',
   'Filter': '나눠 보기',
   'From the confirmed prose: {persons} characters · {places} backgrounds': '확정 산문에서 뽑은 인물 {persons} · 배경 {places}',
-  'Go to Storyboard': 'Storyboard로 가기',
+  'Go to Storyboard': '콘티로 가기',
   'Images do not use Takes.': '그림은 Take가 들지 않아요.',
-  'Looks that change by scene (clothes, age) can be added after the images are made, from the card details or in Storyboard.': '씬마다 다른 모습(옷 · 나이)은 그림을 만든 뒤 카드 상세나 Storyboard에서 더할 수 있어요.',
+  'Looks that change by scene (clothes, age) can be added after the images are made, from the card details or in Storyboard.': '씬마다 다른 모습(옷 · 나이)은 그림을 만든 뒤 카드 상세나 콘티에서 더할 수 있어요.',
   'Draw it in {style}': '{style}{ro} 그리기',
   'Make the images for the characters and backgrounds that have none first.': '그림 없는 인물 · 배경을 먼저 만들어 주세요.',
   'Draw': '그리기',
@@ -3039,7 +3107,7 @@ export const KO: Record<string, string> = {
   'Yes, complete it': '예, 완료하기',
   'Make the images for these first: {names}': '먼저 이 그림을 만들어 주세요: {names}',
   'The images are still being designed. Try again once they are ready.': '아직 인물 · 배경을 디자인하는 중이에요. 다 되면 다시 눌러 주세요.',
-  'You can still fix looks and images in Storyboard, or come back to Artist.': '모습 · 그림은 Storyboard에서도, 다시 Artist로 와서도 고칠 수 있어요.',
+  'You can still fix looks and images in Storyboard, or come back to Artist.': '모습 · 그림은 콘티에서도, 다시 Artist로 와서도 고칠 수 있어요.',
   // ── Artist 브레이크다운 레퍼런스(2026-10-27 오너) ── 줄마다 그림 한 장 · 올린 그림은 그대로 그 카드의 그림
   'Reference': '레퍼런스',
   'Upload a reference image': '레퍼런스 이미지 올리기',
@@ -3081,8 +3149,8 @@ export const KO: Record<string, string> = {
   'Rack focus': '랙 포커스',
   'Running time: the sum of the shot lengths': '러닝타임: 샷 길이의 합',
   'Scenes and shots are made when you press Complete in Artist.': 'Artist에서 [완료하기]를 누르면 씬 · 샷을 나눠요.',
-  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
-  'Moving to Storyboard': 'Storyboard로 넘어가는 중이에요',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  'Moving to Storyboard': '콘티로 넘어가는 중이에요',
   'Splitting into scenes and shots, then drawing the roughs. This can take a few minutes. The screen and chat stay locked until it is done.': '씬 · 샷을 나누고 러프를 그려요. 몇 분 걸릴 수 있어요. 끝날 때까지 화면과 채팅은 잠겨요.',
   'Reading the prose': '산문 읽기',
   'Splitting into scenes': '씬 나누기',
@@ -3251,7 +3319,7 @@ export const KO: Record<string, string> = {
   'Load · history {count}': '불러오기 · 기록 {count}',
   'Regenerate everything': '재생성하기',
   'Regenerating keeps the earlier version here': '재생성하면 이전 버전이 여기 남아요',
-  'The style cannot be changed after Storyboard opens.': 'Storyboard를 연 뒤에는 스타일을 바꿀 수 없어요.',
+  'The style cannot be changed after Storyboard opens.': '콘티를 연 뒤에는 스타일을 바꿀 수 없어요.',
   'Drawing the images. You can change the style once they are done.': '그림을 그리는 중이에요. 다 그린 뒤에 스타일을 바꿀 수 있어요.',
   'Which style should we remake it in?': '어떤 스타일로 다시 만들까요?',
   'You can remake it in the same style or pick another one. The current version (v{n} · {style}) stays in the history, so you can load it any time.':
@@ -3419,8 +3487,9 @@ export const KO: Record<string, string> = {
   'Complete previous step first': '이전 단계를 먼저 끝내세요',
   'This is the storyboard. See every shot image per scene at a glance.\n\n· Click cards to pick shots, and the buttons at the top work on the picked shots\n· "Make images" turns the rough shots into real images, then "Make videos"\n· Press ⤢ Details on a card to open its details':
     '여기는 스토리보드예요. 씬마다 샷 그림을 한눈에 봐요.\n\n· 카드를 누르면 샷이 골라지고, 위 단추는 고른 샷에만 일해요\n· "이미지 만들기"로 러프를 실사 이미지로 바꾸고, 그다음 "영상 만들기"\n· 카드의 ⤢ 상세를 누르면 상세가 열려요',
-  'This is The Set, where scenes → shots → videos connect as nodes.\n\n· Click a node to pick its shot, and press ⤢ Details to open its details\n· "Make images" at the top turns the rough shots into real images at once\n· When images are ready, "Make videos" makes the videos':
-    '여기는 The Set, 촬영장이에요. 씬 → 샷 → 영상이 노드로 이어져 있어요.\n\n· 노드를 누르면 그 샷이 골라지고, ⤢ 상세를 누르면 상세가 열려요\n· 위 "이미지 만들기"로 러프를 한 번에 실사 이미지로 바꿔요\n· 이미지가 되면 "영상 만들기"로 영상을 만들어요',
+  // 씬 단추 한 줄을 더했다(씬별 보기, 오너 D8 2026-11-22).
+  'This is The Set, where scenes → shots → videos connect as nodes.\n\n· Pick a scene with the scene buttons at the top to see only its cards\n· Click a node to pick its shot, and press ⤢ Details to open its details\n· "Make images" at the top turns the rough shots into real images at once\n· When images are ready, "Make videos" makes the videos':
+    '여기는 The Set, 촬영장이에요. 씬 → 샷 → 영상이 노드로 이어져 있어요.\n\n· 위 씬 단추로 씬을 고르면 그 씬 카드만 보여요\n· 노드를 누르면 그 샷이 골라지고, ⤢ 상세를 누르면 상세가 열려요\n· 위 "이미지 만들기"로 러프를 한 번에 실사 이미지로 바꿔요\n· 이미지가 되면 "영상 만들기"로 영상을 만들어요',
   // Director → Editor 넘기기 창(D8, 2026-11-14 디자이너 1110 확정 · 오너 답 8번)
   // 길이는 샷 계획 길이의 합 — Editor 가 클립마다 실제 영상 길이로 줄일 수 있어 어림으로(리드 2026-11-14).
   //   "약"과 숫자 사이는 줄이 안 바뀌는 빈칸(\u00a0) — 좁은 화면에서 "약" / "33초"로 갈리지 않게.
@@ -3479,7 +3548,7 @@ export const KO: Record<string, string> = {
   "Video clips with the mouse: drag a clip to move it in time or onto another video track (gaps between clips are allowed), drag a clip's left or right edge to trim it, and click a gap between clips for {ripple}, which closes it. Delete takes the selected clips off and leaves a gap; Shift+Delete takes them off and closes the gap. Ctrl+K splits at the playhead.": '마우스로 영상 클립: 끌어서 시간 · 다른 영상 줄로 옮기기(클립 사이 빈 곳이 있어도 됨), 왼쪽 · 오른쪽 가장자리를 끌어 길이 바꾸기, 클립 사이 빈 곳을 누르면 {ripple}(빈 곳을 메움). Delete 는 고른 클립을 빼고 빈 곳을 남기고, Shift+Delete 는 빼고 빈 곳을 메움. Ctrl+K 는 플레이헤드 자리에서 나눔.',
   'Right-click a clip on a video track: {speed} (video clips, 0.25× to 4×), {start} and {end} ({cross}, {dipBlack} or {dipWhite}, {lengths} long, or {none}), {split} (at the playhead, or in the middle if the playhead is not on that clip), {hide} (takes the clip off the timeline and leaves a gap) and {ripple} (takes it off and closes the gap). With several clips selected, {speed}, {start}, {end}, {hide} and {ripple} apply to all of them (a transition length changes only the clips that have that transition), and {split} splits only the clip you right-clicked.': '영상 줄의 클립을 오른쪽 클릭: {speed}(영상 클립, 0.25×부터 4×까지), {start} · {end}({cross} · {dipBlack} · {dipWhite}, 길이 {lengths}, 또는 {none}), {split}(플레이헤드 자리에서, 플레이헤드가 그 클립 위에 없으면 가운데에서), {hide}(클립을 타임라인에서 빼고 빈 곳을 남김), {ripple}(빼고 빈 곳을 메움). 여러 클립을 고르면 {speed} · {start} · {end} · {hide} · {ripple} 모두 고른 클립 전부에 적용됨(전환 길이는 그 전환이 있는 클립만 바뀜). {split}만 오른쪽 클릭한 클립 하나를 나눔.',
   'The {effects} tab next to {project}: drag a video transition ({cross}, {dipBlack}, {dipWhite}) onto the front half of a clip to put it at the start or the back half to put it at the end, drag {fade} onto the front or back half of an audio clip for a fade in or fade out, and drag a video effect ({bw}, {blur}, {bc}) onto a video clip.': '{project} 옆 {effects} 탭: 비디오 전환({cross} · {dipBlack} · {dipWhite})을 클립 앞쪽 절반에 끌어 놓으면 시작에, 뒤쪽 절반에 놓으면 끝에 들어감. {fade}를 소리 조각 앞쪽 · 뒤쪽 절반에 놓으면 페이드 인 · 아웃. 비디오 효과({bw} · {blur} · {bc})는 영상 클립에 끌어 놓음.',
-  "Select a clip and open {controls}: {motion} ({posX}, {posY}, {scale}) and {opacity}, one value for the whole clip; the clip's video effects ({bw} on or off, {blurName} 0 to 100%, {brightness} and {contrast} from -100% to +100%, {remove} takes one off); the start and end transitions and their length; {speed}; and for an audio clip its {volume} and fades. Double-click a value's % to reset it.": '클립을 고르고 {controls}: {motion}({posX} · {posY} · {scale})과 {opacity}(클립 전체에 값 하나), 그 클립의 비디오 효과({bw} 켬 · 끔, {blurName} 0~100%, {brightness} · {contrast} −100%~+100%, {remove}로 하나씩 뺌), 시작 · 끝 전환과 그 길이, {speed}, 소리 조각이면 {volume}과 페이드. 값의 %를 두 번 누르면 처음 값으로.',
+  "Select a clip and open {controls}: {motion} ({posX}, {posY}, {scale}) and {opacity}, one value for the whole clip; the clip's video effects ({bw} on or off; {gaussian} as {constant}, one {blurName} value from 0 to 100%, or {startEnd}, where the blur changes in a straight line from its {start} % at the start of the clip to its {end} % at the end; {brightness} and {contrast} from -100% to +100%; {remove} takes one off); the start and end transitions and their length; {speed}; and for an audio clip its {volume} and fades. Double-click a value's % to reset it.": '클립을 고르고 {controls}: {motion}({posX} · {posY} · {scale})과 {opacity}(클립 전체에 값 하나), 그 클립의 비디오 효과({bw} 켬 · 끔, {gaussian}은 {constant}(값 하나, {blurName} 0~100%) 또는 {startEnd}(클립 처음의 {start} %에서 끝의 {end} %까지 곧게 바뀜), {brightness} · {contrast} −100%~+100%, {remove}로 하나씩 뺌), 시작 · 끝 전환과 그 길이, {speed}, 소리 조각이면 {volume}과 페이드. 값의 %를 두 번 누르면 처음 값으로.',
   "Titles (added with {type}): white bold text over the video. In {controls}: {text}, {size} (10 to 100) and {position} ({upper}, {center}, {lower} or {band}), plus motion, opacity and transitions. Drag a title's edges to change its length.": '제목({type}로 만듦): 영상 위 흰 굵은 글자. {controls}에서 {text}, {size}(10~100), {position}({upper} · {center} · {lower} · {band}), 그리고 모션 · 불투명도 · 전환. 제목 가장자리를 끌어 길이 바꾸기.',
   "Title cards: {newItem} → {titleCard} inserts a black title card at the clip boundary nearest the playhead. Double-click the text on the monitor to edit it, drag the text or the image to move it, and click the card's length on the timeline to type a new length. Right-click the card on the monitor: {put} or {replace} ({upload}, or pick an image from {characters}, {backgrounds} or {rough}), {remove}, {textFront} or {imageFront}, {reset}. A title card is always white text on black.": '타이틀 카드: {newItem} → {titleCard}는 플레이헤드에서 가장 가까운 클립 경계에 검은 타이틀 카드를 넣음. 모니터에서 글자를 두 번 눌러 고치고, 글자 · 이미지를 끌어 옮기고, 타임라인에서 카드 길이를 눌러 새 길이를 입력. 모니터의 카드를 오른쪽 클릭: {put} · {replace}({upload}, 또는 {characters} · {backgrounds} · {rough}에서 이미지 고르기), {remove}, {textFront} · {imageFront}, {reset}. 타이틀 카드는 늘 검정 위 흰 글자.',
   "Playhead: drag on the ruler, click the monitor's progress bar, ← or → moves one frame, Shift+← or → five frames, Ctrl/⌘+← or → jumps to the previous or next edit point. Monitor buttons: {start}, {prev}, a frame back, {play}, a frame forward, {next}, {end}.": '플레이헤드: 눈금자에서 끌기, 모니터 진행 막대 누르기, ← · →는 한 장, Shift+← · →는 다섯 장, Ctrl/⌘+← · →는 앞 · 다음 편집점. 모니터 단추: {start}, {prev}, 한 장 뒤, {play}, 한 장 앞, {next}, {end}.',
@@ -3489,7 +3558,7 @@ export const KO: Record<string, string> = {
   '{undo} and {redo} at the top right undo and redo edits (Ctrl+Z, Ctrl+Y). {shortcuts} lists every key.': '오른쪽 위 {undo} · {redo}로 편집을 되돌리고 다시 함(Ctrl+Z · Ctrl+Y). {shortcuts}에 모든 키가 있음.',
   'Transitions other than {cross}, {dipBlack}, {dipWhite} and the {fade} audio fade: no wipes, slides, zooms or other transition types.': '전환: {cross} · {dipBlack} · {dipWhite}와 소리 {fade} 밖의 전환. 와이프 · 슬라이드 · 줌 같은 다른 전환은 없음.',
   "Deleting: a delete item in a clip's right-click menu on the video track. After {split}, take off the piece you don't want with {hide} (leaves a gap), {ripple} (closes it) or the Delete key.": '지우기: 영상 클립 오른쪽 클릭 메뉴의 지우기 항목. {split} 뒤 필요 없는 조각은 {hide}(빈 곳을 남김), {ripple}(빈 곳을 메움) 또는 Delete 키로 뺌.',
-  'Picture changes: colour grading beyond {bc}, crop, rotate, reverse, freeze frame, and keyframes (motion, opacity and effects keep one value for the whole clip).': '그림 바꾸기: {bc} 밖의 색 보정 · 크롭 · 회전 · 거꾸로 재생 · 정지 화면 · 키프레임(모션 · 불투명도 · 효과는 클립 전체에 값 하나).',
+  'Picture changes: colour grading beyond {bc}, crop, rotate, reverse, freeze frame, and keyframes (motion, opacity and effects keep one value for the whole clip, except that {gaussian} can be {startEnd}, which changes only in a straight line from the start of the clip to its end).': '그림 바꾸기: {bc} 밖의 색 보정 · 크롭 · 회전 · 거꾸로 재생 · 정지 화면 · 키프레임(모션 · 불투명도 · 효과는 클립 전체에 값 하나. {gaussian}의 {startEnd}만 클립 처음에서 끝까지 곧게 바뀜).',
   'Text styling: title font or colour, subtitle font, size, colour or timing, and title card font, colour or image size.': '글자 꾸미기: 제목의 글꼴 · 색, 자막의 글꼴 · 크기 · 색 · 나오는 시간, 타이틀 카드의 글꼴 · 색 · 이미지 크기.',
   'Timeline: overlapping clips on the same track, copy and paste, and more than one sequence.': '타임라인: 같은 줄에서 클립 겹치기, 복사 · 붙여넣기, 시퀀스 여러 개.',
   'Clip volume: a separate volume for a video clip. Change the audio clip under it instead.': '클립 음량: 영상 클립만의 음량. 대신 그 아래 소리 조각을 바꿈.',
@@ -3625,6 +3694,11 @@ export const KO: Record<string, string> = {
   'Off': '끔',
   'Blur': '흐림',
   'Contrast': '대비',
+  // 흐림 [일정하게] · [시작 → 끝](D14, 2026-11-22) — 한국어는 오너 말 그대로. 손잡이 이름은 화면 읽기용.
+  'Constant': '일정하게',
+  'Start → End': '시작 → 끝',
+  'Blur start': '흐림 시작',
+  'Blur end': '흐림 끝',
   'Start transition': '시작 전환',
   'End transition': '끝 전환',
 
@@ -3656,9 +3730,9 @@ export const KO: Record<string, string> = {
   'I have concepts ready for the characters and backgrounds: {count} character · {worldCount} backgrounds.\nLet me know which character or background you\'d like to revise.\nPress "@" to pick a character or background (Ctrl+click a card does the same).': '인물과 배경의 컨셉을 준비했어요: 캐릭터 {count}명 · 배경 {worldCount}곳.\n고치고 싶은 인물이나 배경을 알려주세요.\n"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
   'I have concepts ready for the characters and backgrounds: {count} characters · {worldCount} background.\nLet me know which character or background you\'d like to revise.\nPress "@" to pick a character or background (Ctrl+click a card does the same).': '인물과 배경의 컨셉을 준비했어요: 캐릭터 {count}명 · 배경 {worldCount}곳.\n고치고 싶은 인물이나 배경을 알려주세요.\n"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
   'I have concepts ready for the characters and backgrounds: {count} character · {worldCount} background.\nLet me know which character or background you\'d like to revise.\nPress "@" to pick a character or background (Ctrl+click a card does the same).': '인물과 배경의 컨셉을 준비했어요: 캐릭터 {count}명 · 배경 {worldCount}곳.\n고치고 싶은 인물이나 배경을 알려주세요.\n"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
-  'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
-  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
-  'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
   // ── 2026-11-14 오너: 항목 · 씬이 1개일 때의 단수 문장(한국어는 같은 꼴) ──
   'There is {count} thing worth filling in:\n{summary}': '채워두면 좋을 항목이 {count}건 있어요:\n{summary}',
   'Splitting into {count} scene': '씬 {count}개로 나누기',
@@ -3733,4 +3807,52 @@ export const KO: Record<string, string> = {
   Revoked: '해지',
   'In use': '이용 중',
   'End access': '해지',
+  // ── Camera 탭(오너 2026-11-22 D2~D5) — 이름(Camera)은 단계 표에서 {stage} 로 받는다 ──
+  "E.g. make shot 3's video again, a bit slower": '예: 샷 3 영상을 조금 더 천천히 다시 만들어 줘',
+  'Looking over the shot history': '샷 이력을 살피는 중',
+  'Yes, start shooting': '좋아요, 촬영하기로',
+  'Please hand over to {stage}': '{stage}로 넘겨주세요',
+  'Move on to {stage}?': '{stage}로 넘어갈까요?',
+  'The saved scenes and shots are ready. Opening {stage}.': '저장된 씬과 샷, 이동 조건을 확인했어요. {stage} 화면을 여는 중이에요.',
+  'Could not open {stage}. Your work is saved. Select {stage} on the left or ask me to try again.':
+    '{stage} 화면을 열지 못했어요. 작업은 저장되어 있어요. 왼쪽 {stage}를 선택하거나 다시 넘겨 달라고 말씀해 주세요.',
+  '{stage} is ready. I checked {scenes} saved scenes and {shots} saved shots. Ask me to hand over when you are ready.':
+    '{stage}로 이동할 수 있어요. 저장된 씬 {scenes}개와 샷 {shots}개를 확인했어요. 넘겨 달라고 하시면 이동할게요.',
+  'I will check again and open {stage} when it is ready. Say cancel to stop waiting.':
+    '준비 상태를 다시 확인하고 완료되면 {stage}를 열게요. 기다리지 않으려면 취소라고 말씀해 주세요.',
+  'Real image': '실사 이미지',
+  'Make the shots in {stage} first.': '{stage}에서 먼저 샷을 만들어 주세요.',
+  "Make real images and videos shot by shot. Every image and video stays in the shot's history.":
+    '샷마다 실사 이미지와 영상을 만들어요. 만든 이미지와 영상은 모두 그 샷의 이력에 남아요.',
+  // Camera 이력 요약(판마다 무엇이 바뀌었나 — 지금 저장된 사실만)
+  'First image': '처음 그림',
+  'Drawn again': '다시 그림',
+  'Redrawn after the rough changed': '러프가 바뀐 뒤 다시 그림',
+  'First video': '처음 영상',
+  'Image v{n}': '그림 v{n}',
+  'Continued from the previous video': '앞 영상에서 이어서',
+  'Change: {note}': '바꿀 점: {note}',
+  'Asked in chat: {note}': '채팅으로 부탁: {note}',
+  'Made again': '다시 만듦',
+  'Failed: {reason}': '실패: {reason}',
+  'Remake failed: {reason}': '다시 만들기 실패: {reason}',
+  'New image': '새 그림',
+  'Current image': '지금 그림',
+  'Use this image': '이 그림 쓰기',
+  'Could not change the current image. Please try again.': '지금 그림을 바꾸지 못했어요. 다시 눌러 주세요.',
+  'No image or video yet.': '아직 그림 · 영상이 없어요.',
+  '{shot} history': '{shot} 이력',
+  'New Take': '새 Take',
+  'This is a shared preview. In the real project, you make real images and videos shot by shot here and keep every version.':
+    '공유 미리보기 모드예요. 실제로는 샷마다 실사 이미지와 영상을 만들고 모든 판을 남겨요.',
+
+  // ── Writer 콘티(D1 오너 2026-11-22, fb1120 fb-conti) — 위 막대 [씬 스토리 | 콘티] ──
+  'Opens when you press Complete in Artist': 'Artist에서 완료하기를 누르면 열려요',
+  // 콘티 머리 [다음: {stage}로] — 다음 단계 이름은 단계 표에서(2026-11-22 오너 D2~D5 부터 Camera)
+  'Next: {stage}': '다음: {stage}로',
+  // D15 — 원작 그대로 프로젝트의 콘티 대사 탭(대사를 AI 로 새로 쓰지 않음, 문구는 fb-style 제안 · 리드 2026-11-22)
+  'This work keeps the original dialogue, so AI does not write new lines. Click a line to edit it yourself.':
+    '원작 대사를 그대로 쓰는 작품이라 AI가 대사를 새로 쓰지 않아요. 줄을 눌러 직접 고칠 수 있어요.',
+  'There is no dialogue in the original yet. Add a line with the pencil button on each shot.':
+    '원작에 아직 대사가 없어요. 샷마다 연필 단추로 대사를 더할 수 있어요.',
 }

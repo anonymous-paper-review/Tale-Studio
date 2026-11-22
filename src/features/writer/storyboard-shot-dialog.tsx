@@ -21,7 +21,7 @@ import { ThumbImage } from '@/components/thumb-image'
 import { withCacheBust } from '@/components/rough-frame-cycle'
 import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
-import { UnsavedArrowsConfirm, applyDirectionTab, directionApplyEnabled, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
+import { EndRedrawAsk, UnsavedArrowsConfirm, applyDirectionTab, directionApplyEnabled, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, readRedrawReply, redrawDirectionOnly, sceneShotLabel, startApplyKind, startChanges, type ApplyKind, type RoughFrame } from '@/lib/writer/shot-edit'
@@ -312,6 +312,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
                   onSaved={() => void loadProject()}
                   ref={guard.editorRef}
                   onDirtyChange={guard.setDirty}
+                  onArrowsSaved={() => guard.askEnd({ projectId, shotId: shot.shotId, onRedrawn: () => loadProject() })}
                 />
               ) : (
                 bigFrame(tab === 'start' ? frames?.start : frames?.direction, t(tab === 'start' ? 'Start' : 'Directing'))
@@ -421,6 +422,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
       </Dialog>
       <AiBusyOverlay open={!!busy} layer="dialog" title={busy?.title ?? ''} steps={busy?.steps} />
       <UnsavedArrowsConfirm {...guard.confirm} />
+      <EndRedrawAsk {...guard.endAsk} />
     </>
   )
 }

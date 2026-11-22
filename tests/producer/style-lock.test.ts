@@ -1,4 +1,4 @@
-// 새 프로젝트에서 올린 그림을 "그림체"로 고르면(그림체 추출) 그 그림체로 고정돼 Producer 에서 스타일을 바꿀 수 없다 (2026-10-09 오너)
+// 이미 그림체를 올린(그림체 추출로 정한) 작품은 그 그림체로 고정돼 바꿀 수 없고, 그림에서 그림체를 새로 정하는 길은 없다 (2026-10-09 오너 · 그림체 추출은 D6 2026-11-22 로 없앰)
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -65,30 +65,30 @@ afterEach(() => {
   useLocaleStore.setState({ locale: 'en' })
 })
 
-describe('그림체 추출로 정한 그림체는 고정된다', () => {
-  it('새 프로젝트에서 그림을 그림체로 고르면 그 그림체는 고정으로 저장된다', async () => {
-    // 왜: 사용자가 고른 그림의 그림체를 바탕으로 작업을 쌓는다 — 다른 스타일로 바뀌면 그 위에 쌓은 것이 어긋난다(10/9 오너).
+describe('그림에서 그림체를 새로 정하지 않는다', () => {
+  it('새 프로젝트에서 그림을 그림체로 골라도 그림체로 저장하지 않는다', async () => {
+    // 왜: 오너 "웹툰이나 이미지 입력받았을 때 스타일 추출하는 기능도 없애줘"(D6) — 그림체는 그림을 만들 때 Artist 에서 네 가지 중 고른다.
     stub()
     await chat.getState().runCreationPlan(plan({ styleImage: LOOK }))
-    expect(calls('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: LOOK.thumbUrl, lock: true })
-    expect(producer.getState().customStyleAnchor?.locked).toBe(true)
+    expect(calls('/api/produce/style-anchor')).toHaveLength(0)
+    expect(producer.getState().customStyleAnchor).toBeNull()
   })
 
-  it('그림체 분석이 실패해도 그림체 고정은 그대로다', async () => {
-    // 왜: 고른 것은 그림이고 분석은 덤이다 — 분석이 실패해도 그림체는 그 그림이다.
-    stub({ '/api/produce/style-facets': () => Response.json({ ok: false, facets: false }) })
+  it('새 프로젝트에서 그림을 그림체로 골라도 그림체 분석 모델을 부르지 않는다', async () => {
+    // 왜: 그림체 분석은 그림에서 그림체를 뽑던 길의 일부였다(D6로 없앰) — 그림을 분석 모델로 보내지 않는다.
+    stub()
     await chat.getState().runCreationPlan(plan({ styleImage: LOOK }))
-    expect(producer.getState().customStyleAnchor?.locked).toBe(true)
+    expect(calls('/api/produce/anchor-medium')).toHaveLength(0)
+    expect(calls('/api/produce/style-facets')).toHaveLength(0)
   })
 
-  // 2026-10-09 오너 결정 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘" — 앞 문장: "만화 원고의 첫 쪽으로 저절로 정해진 그림체는 고정하지 않는다".
-  //   이제 저절로 정해지는 그림체가 없다: 고정을 고르면 고정, 각색을 고르면 만화 그림을 그림체로 쓰지 않는다.
-  it('만화 원고에서 그림체 고정을 고르면 첫 쪽 그림체로 고정된다', async () => {
+  // 2026-10-09 오너 결정 "그림체로 고정할지 실사와 같은 각색을 할지 물어봐줘" → D6(2026-11-22)로 만화 그림체를 쓰는 길이 없어졌다.
+  it('만화 원고에서 그림체 고정을 골라도 첫 쪽을 그림체로 정하지 않고 대본만 옮긴다', async () => {
     stub()
     await chat.getState().runCreationPlan(plan({ original: 'comic', comicPages: [PAGE], comicStyle: 'lock' }))
-    await vi.waitFor(() => expect(calls('/api/produce/style-facets')).toHaveLength(1))
-    expect(calls('/api/produce/style-anchor')[0]).toMatchObject({ imageUrl: PAGE.thumbUrl, lock: true })
-    expect(producer.getState().customStyleAnchor?.locked).toBe(true)
+    expect(calls('/api/produce/comic-script')).toHaveLength(1)
+    expect(calls('/api/produce/style-anchor')).toHaveLength(0)
+    expect(producer.getState().customStyleAnchor).toBeNull()
   })
 })
 

@@ -1,3 +1,9 @@
+import { STAGE_LABEL } from '@/lib/constants'
+import { translate } from '@/lib/i18n/translate'
+
+// 콘티의 한국어 이름(D1 오너 2026-11-22 "storyboard란 명칭은 콘티로") — 사전에서 읽는다(지시문 원문은 영어로 둔다).
+const CONTI_KO = translate('ko', 'Storyboard')
+
 /** Shared request handling; domain facts and authorization remain in their existing owners. */
 export const CHAT_AGENT_GUIDE = `
 <request-handling>
@@ -10,10 +16,11 @@ If recent history does not contain an earlier agreement and saved project data d
 </request-handling>
 
 <screens>
-The user sees these screens in this order: Producer (the start screen), Writer (the prose), Artist, Storyboard (scenes and shots), Director, Editor.
-After Artist the next screen is Storyboard, never Director. Director comes after Storyboard and Editor comes last.
-Tool and code names are older than the screen names: the tool target "producer" is the Writer screen (the prose) and the tool target "writer" is the Storyboard screen (scenes and shots). Always talk to the user with the screen names.
-When the user confirms the prose on the Writer screen, the prose is locked and Artist opens. Scenes and shots are made after that and are edited on the Storyboard screen.
+The user sees these screens in this order: Producer (the start screen), Writer > Scene story (the prose), Artist, Writer > Storyboard (scenes and shots), ${STAGE_LABEL.camera} (real images and videos for each shot), Director, Editor.
+The Writer screen has two parts, Scene story and Storyboard, and the left rail shows them as one Writer tab. In Korean the Writer Storyboard is called "${CONTI_KO}".
+After Artist the next screen is the Writer Storyboard, never ${STAGE_LABEL.camera} or Director. ${STAGE_LABEL.camera} comes after the Writer Storyboard, Director comes after ${STAGE_LABEL.camera}, and Editor comes last.
+Tool and code names are older than the screen names: the tool target "producer" is the Writer Scene story (the prose) and the tool target "writer" is the Writer Storyboard (scenes and shots). Always talk to the user with the screen names.
+When the user confirms the prose in the Writer Scene story, the prose is locked and Artist opens. Scenes and shots are made after that and are edited in the Writer Storyboard.
 </screens>`
 
 /** This only routes a message; execution permission remains in the tools and domain gates. */
@@ -29,7 +36,7 @@ export function writerInputRoute(message: string, state: { running: boolean; sce
   return state.running ? 'blocked' : 'chat'
 }
 
-const labels: Record<string, string> = { producer: 'Producer', writer: 'Writer', artist: 'Artist', director: 'Director', editor: 'Editor' }
+const labels: Record<string, string> = { producer: 'Producer', writer: 'Writer', artist: 'Artist', camera: STAGE_LABEL.camera, director: 'Director', editor: 'Editor' }
 export function normalizeChatHistory(value: unknown): Array<{ role: 'user' | 'model'; content: string }> {
   if (!Array.isArray(value)) return []
   return value.flatMap(message => {

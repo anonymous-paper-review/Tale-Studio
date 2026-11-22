@@ -14,6 +14,9 @@ import { Button } from '@/components/ui/button'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { paragraphClickPicks, paragraphKeyPicks, paragraphLabel, revisingParagraphIndex, selectedTextWithin } from '@/lib/prose/paragraph-pick'
+import { paragraphFlightOnModifierClick } from '@/lib/writer/conti-mention'
+import { useModifierHeld } from '@/hooks/use-modifier-held'
+import { MentionHint } from '@/features/writer/mention-hint'
 import { TreatmentDiffView } from '@/features/producer/treatment-diff-view'
 import { ProseProposalView } from '@/features/prose/proposal-view'
 import { useProducerStore } from '@/stores/producer-store'
@@ -27,6 +30,8 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
   const [starting, setStarting] = useState(false)
   const pick = useWriterRoomStore((s) => s.paragraph)
   const revising = useWriterRoomStore((s) => s.revising)
+  // ⌘/Ctrl 를 누르고 있으면 붙일 수 있는 문단에 "⌘/Ctrl+클릭 멘션" 알약 · 붙이기 커서(D9 — Producer · 콘티 카드와 같은 표시).
+  const mentionArmed = useModifierHeld()
   // [산문 쓰기]를 누른 뒤 Writer 가 쓰기 시작했다고 알릴 때까지도 왼쪽 사이드바를 막는다(2026-10-27) — 그 사이 다른 단계로 옮겨 갈 수 있었다.
   useAiBusyHold(starting)
   const { view, diffRows, phase, draftLive } = prose
@@ -101,7 +106,10 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
               aria-pressed={attached}
               onClick={(event) => {
                 // 이 문단 안에서 끌어 고른 글만 붙이기를 막는다 — 다른 곳에 고른 글이 남아 있어도 문단은 붙는다.
-                if (paragraphClickPicks(selectedTextWithin(event.currentTarget, window.getSelection()))) toggle()
+                if (!paragraphClickPicks(selectedTextWithin(event.currentTarget, window.getSelection()))) return
+                // ⌘/Ctrl+클릭(D9)도 문단을 붙이고, 붙는 모습을 문단 ↔ 입력칸으로 날아가는 연출로 보인다(lib/writer/conti-mention).
+                paragraphFlightOnModifierClick(event, { index, attached })
+                toggle()
               }}
               onKeyDown={(event) => {
                 if (event.target !== event.currentTarget || !paragraphKeyPicks(event.key)) return
@@ -109,14 +117,17 @@ export function ProseDocument({ prose }: { prose: ProseState }) {
                 toggle()
               }}
               className={cn(
-                'flex w-full gap-4 rounded-[14px] py-4 pl-4 pr-6 text-left transition-colors duration-100 ease-out',
+                'relative flex w-full gap-4 rounded-[14px] py-4 pl-4 pr-6 text-left transition-colors duration-100 ease-out',
                 'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                 attached ? 'bg-stage/12 ring-[1.5px] ring-inset ring-stage' : 'hover:bg-accent/60',
+                mentionArmed && 'cursor-copy',
               )}
               data-testid={`prose-paragraph-${index + 1}`}
             >
               {label}
               <span className="block min-w-0 select-text text-prose text-foreground">{paragraph}</span>
+              {/* 알약은 문단 왼쪽 위에 겹쳐 뜬다(absolute) — 문단 번호 · 글보다 뒤에 둔다. */}
+              <MentionHint armed={mentionArmed} mentioned={attached} />
             </div>
           )
         })}

@@ -58,6 +58,7 @@ import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { parseDirectorRefs } from '@/lib/director/director-refs'
 import { latestShotTake, promptWithChange, takeSettings } from '@/lib/director/shot-detail'
 import { currentStoryboardVersion, keptStoryboardImage, selectStoryboardVersion, storyboardImageVersions, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
+import { imageNoteFor } from '@/lib/director/image-note'
 import {
   isEmptyStableFrameInputs,
   parseStableFrameInputs,
@@ -74,7 +75,10 @@ import {
   type StableWiringRef,
 } from '@/lib/director/wiring-persistence'
 import { runVideoAdherence } from '@/lib/director/video-adherence-client'
-import { markJobsCancelled, refreshGenerationQueue } from '@/lib/generation-queue'
+import { activeShotIds, markJobsCancelled, refreshGenerationQueue, type ActiveJob } from '@/lib/generation-queue'
+import { orderedScenes } from '@/features/director/scene-view'
+import { resolveCurrentScene } from '@/lib/current-scene'
+import { useCurrentSceneStore } from '@/stores/current-scene-store'
 import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
 import { isDemoSession } from '@/lib/demo/context'
 import {
@@ -92,6 +96,7 @@ import { useWriterStore } from '@/stores/writer-store'
 import type { AppLocale } from '@/lib/locale'
 import {
   arrangeDirectorCanvas,
+  arrangeSceneGroup,
   ASSET_TO_SHOT_GAP,
   newShotPosition,
   newTakePosition,
@@ -130,7 +135,7 @@ import {
   usableFrameImageUrl,
 } from '@/lib/director/video-frame-inputs'
 import { prepareContinueFrom } from '@/lib/director/video-frame-capture'
-import { isVideoMode, takeOverrideForRequest, videoModeForRequest } from '@/lib/director/video-modes'
+import { isVideoMode, takeOverrideForRequest, videoModeForRequest, type TakeVia } from '@/lib/director/video-modes'
 
 // ============================================================================
 // Defaults
@@ -170,6 +175,8 @@ export type DirectorGenerationRequestOptions = {
   inheritFromVideoNodeId?: string
   /** 샷 상세의 "바꾸고 싶은 점"(디자이너 11/13 D6) — 이번 이미지 다시 만들기에만 프롬프트 끝에 붙인다. 샷 프롬프트는 그대로. */
   changeNote?: string
+  /** 채팅(Lumi)에 이 그림을 부탁한 말 — 프롬프트에는 붙이지 않고 다 그린 그림 판에 남긴다(오너 2026-11-22 결정 4, lib/director/image-note). */
+  askedInChat?: string
   /** 샷 상세의 영상 고치기(디자이너 11/13 D7) — 바꾼 모델 · 해상도 · 바꿀 점을 새 Take 설정에만 얹는다(이어받은 설정 위에). */
   videoOverride?: VideoOverride
 }
@@ -1192,8 +1199,12 @@ interface DirectorCanvasState {
   arrangePending: boolean
   /** 기다리는 정렬이 "처음 들어갔을 때"의 것이면 true(오너 2026-11-16): 되돌리기 기록에 안 남기고, 화면이 정렬 뒤 첫 화면을 다시 맞춘다. relayoutCanvas · 프로젝트 바꿈이 끈다. */
   arrangeFirstEntry: boolean
-  /** [자동 정렬] 요청. 처음 들어갔을 때의 정렬은 { firstEntry: true }(use-writer-director-sync). 단추는 인자 없이 부른다. */
-  requestArrange: (options?: { firstEntry?: boolean }) => void
+  /** 씬 보기의 [자동 정렬]이 정리할 씬 노드(오너 D8 · 혼자 정한 것 h13). null = 모든 씬(처음 들어갔을 때의 정렬 · 씬이 없는 캔버스). relayoutCanvas · 프로젝트 바꿈이 비운다. */
+  arrangeSceneNodeId: string | null
+  /** [자동 정렬] 요청. 처음 들어갔을 때의 정렬은 { firstEntry: true }(use-writer-director-sync), 씬 보기의 단추는 { sceneNodeId }(그 씬만). */
+  requestArrange: (options?: { firstEntry?: boolean; sceneNodeId?: string | null }) => void
+  /** 처음 여는 프로젝트에서 먼저 보여 줄 씬의 단서(혼자 정한 것 h2) — 만드는 중인 Writer 샷 id. settled = 확인을 마쳤다(그 뒤로 화면이 지금 씬을 기억에 쓴다). 저장하지 않는다. */
+  firstEntrySceneHint: { shotIds: string[]; settled: boolean }
   /** 진입 시 DB → 캔버스 hydrate. canvas_position 적용 + 누락 Video 노드 생성 (DB가 진실) */
   hydrateFromDb: (projectId: string) => Promise<void>
 
@@ -1289,7 +1300,8 @@ interface DirectorCanvasState {
    *  opts.onAccepted — 접수 알림: 서버가 2xx 로 받아 jobId 를 준 때 한 번. 2xx 가 아니면(몸에 jobId · queued 가 실려 와도 — 4xx · 503 결과 모름)
    *  · 500 · 연결 끊김 · 실패 알림은 아니다(리드 결정 — 결과를 모르는 것은 부른 쪽이 새 Take 가 만드는 중으로 남았는지로 따로 말한다).
    *  Lumi 는 이것으로 다음 샷을 보낸다(board 검토 b · entry D8 이 같이 쓴다). opts.onJob — 진행 알림 그대로. 둘 다 없으면 지금 그대로. */
-  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void }) => Promise<string | null>
+  /*  opts.takeNote — 새 Take 에 적을 사람 말 · 만든 길(채팅으로 부탁한 다시 만들기, Camera 이력 요약 2026-11-22). 없으면 적지 않는다(앞 Take 의 말도 잇지 않는다). */
+  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void; takeNote?: { note: string; via: TakeVia } }) => Promise<string | null>
   generateVideoForShot: (
     shotNodeId: string,
     options?: DirectorGenerationRequestOptions,
@@ -1418,7 +1430,8 @@ export type DirectorCanvasUpdate =
   | { type: 'generateVideo'; id: string }
   // #c5 (2026-08-27): 진입 자동 실사 생성을 끄면서 채팅 경로를 열었다. id 를 주면 그 샷만,
   //   생략하면 미생성 전체를 일괄로 — 버튼과 같은 경로(generateStoryboardImage / runRealBatch)를 탄다.
-  | { type: 'generateImage'; id?: string }
+  //   askedInChat = 채팅에서 이 그림을 부탁한 사용자 말(오너 2026-11-22 결정 4) — 서버 검사가 모델 값은 버리고 채팅 상점이 붙인다. 다 그린 판에 남는다.
+  | { type: 'generateImage'; id?: string; askedInChat?: string }
   // 영상 일괄 — shotIds 가 있으면 그 샷만, 없으면 남은 샷 전부. 채팅은 확인 카드 없이 바로 시작한다(오너 2026-11-14 9번 —
   //   global-chat-store 의 startChatVideos 가 막이 · Take 셈 뒤 runVideoBatch 를 부른다. 이 스토어의 applyUpdates 는 돌리지 않는다).
   | { type: 'generateVideos'; shotIds?: string[] }
@@ -1545,9 +1558,13 @@ export function getVideoNodeResolution(
   return isVideoResolution(chosen) ? chosen : DEFAULT_VIDEO_RESOLUTION
 }
 
-/** 이어받는 Take 설정에서 프롬프트만 뺀다 — 새 Take 의 바탕은 늘 지금 샷 프롬프트(리드 검토 c ③). */
+/** 이어받는 Take 설정에서 프롬프트를 뺀다 — 새 Take 의 바탕은 늘 지금 샷 프롬프트(리드 검토 c ③).
+ *  사람 말 · 만든 길(note · via, Camera 이력 요약 — 2026-11-22)도 그 Take 의 기록이라 잇지 않는다(옛 판의 말이 새 판에 붙지 않게, 리드 11/22). */
 function withoutTakePrompt(override: VideoNodeData['override']): VideoOverride {
-  const { prompt: _prompt, ...rest } = override as VideoOverride
+  const rest: VideoOverride = { ...(override as VideoOverride) }
+  delete rest.prompt
+  delete rest.note
+  delete rest.via
   return rest
 }
 
@@ -1654,49 +1671,45 @@ const initialNodes: DirectorNode[] = []
 const initialEdges: DirectorEdge[] = []
 
 /**
- * 프로젝트를 이 브라우저에서 **처음 열 때**, 만들고 있는 게 있으면 그 결과가 보이는 화면으로 연다.
+ * 프로젝트를 이 브라우저에서 **처음 열 때**, 만들고 있는 게 있으면 그 결과가 보이는 씬으로 연다.
  *
  * 호출부가 "처음 보는 프로젝트" 가지 안에만 있다(#view-first-entry-only 2026-09-08 오너 판정).
- *   재진입(새로고침 포함)에서는 부르지 않는다 — 배선 작업 중 새로고침하면 하던 화면을 잃었기 때문.
+ *   재진입(새로고침 포함)에서는 부르지 않는다 — 하던 화면을 잃지 않게.
  *   판별은 #first-entry-node 가 쓰는 viewportInitializedProjects 를 그대로 쓴다.
+ *
+ * 오너 D2~D5 · D8(2026-11-22): Director 에 스토리보드 보기가 없어지고 노드 보기가 씬별이 됐다 — 예전에는 스토리보드(실사 · 러프) 보기로 바꿨고,
+ *   이제는 만드는 중인 샷(실사 · 러프 · 영상)의 Writer 샷 id 를 단서로 남긴다. 화면이 그 샷의 씬을 먼저 보인다(지금 보는 씬 기억이 없을 때만,
+ *   features/director/scene-view preferredSceneKey). 확인을 마치면(실패해도) settled — 그 뒤로 화면이 보인 씬을 기억에 쓴다.
  *
  * shot_previz_video 는 목록에 없다(도입 시부터). 의도인지 누락인지 확인되지 않았다.
  */
+const FIRST_ENTRY_SCENE_JOB_KINDS = ['storyboard_real_grid', 'shot_storyboard', 'shot_video', 'shot_rough_storyboard'] as const
+
 async function restoreActiveGenerationView(projectId: string): Promise<void> {
-  if (typeof window === 'undefined' || !projectId || projectId === 'default') return
+  const settle = (shotIds: string[]) => {
+    if (useDirectorCanvasStore.getState().projectId !== projectId) return
+    useDirectorCanvasStore.setState({ firstEntrySceneHint: { shotIds, settled: true } })
+  }
+  if (typeof window === 'undefined' || !projectId || projectId === 'default') return settle([])
   try {
     const response = await fetch(
       `/api/generation/active?projectId=${encodeURIComponent(projectId)}`,
     )
-    if (!response.ok) return
+    if (!response.ok) return settle([])
     const body: unknown = await response.json()
     const rawJobs =
       body && typeof body === 'object' && (body as { data?: unknown }).data
         ? (body as { data: { jobs?: unknown } }).data.jobs
         : null
-    if (!Array.isArray(rawJobs)) return
-    const kinds = new Set(
-      rawJobs
-        .filter(
-          (job): job is { kind: string } =>
-            !!job &&
-            typeof job === 'object' &&
-            typeof (job as { kind?: unknown }).kind === 'string',
-        )
-        .map((job) => job.kind),
+    if (!Array.isArray(rawJobs)) return settle([])
+    const jobs = rawJobs.filter(
+      (job): job is ActiveJob =>
+        !!job && typeof job === 'object' && typeof (job as { kind?: unknown }).kind === 'string',
     )
-    const real =
-      kinds.has('storyboard_real_grid') ||
-      kinds.has('shot_storyboard') ||
-      kinds.has('shot_video')
-    const previz = kinds.has('shot_rough_storyboard')
-    if (!real && !previz) return
-    const current = useDirectorCanvasStore.getState()
-    if (current.projectId !== projectId) return
-    current.setViewMode('storyboard')
-    current.setStoryboardMediaMode(real ? 'real' : 'previz')
+    settle([...activeShotIds(jobs, FIRST_ENTRY_SCENE_JOB_KINDS)])
   } catch {
-    // 진행 상태 조회 실패는 마지막 탭 복원을 방해하지 않는다.
+    // 진행 상태 조회 실패는 씬 열기를 막지 않는다 — 첫 씬으로 연다.
+    settle([])
   }
 }
 
@@ -1745,6 +1758,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       generationErrors: {},
       playingNodeId: null,
       showUnusedAssets: false,
+      firstEntrySceneHint: { shotIds: [], settled: true },
       historyPast: [],
       historyFuture: [],
       _historySuppressed: false,
@@ -1799,6 +1813,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             showUnusedAssets: false,
             arrangePending: false,
             arrangeFirstEntry: false,
+            arrangeSceneNodeId: null,
+            // 처음 보는 프로젝트면 만드는 중인 샷을 확인할 때까지 지금 씬을 기억에 쓰지 않는다(아래 restoreActiveGenerationView).
+            firstEntrySceneHint: { shotIds: [], settled: viewportInitializedProjects[projectId] === true },
             historyPast: [],
             historyFuture: [],
             lastSavedAt: Date.now(),
@@ -1880,18 +1897,25 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       //   in-memory 즉시 적용 + 씬 · 샷 · 영상은 nodeId별 persist로 DB(canvas_position) 반영(재진입 유지). 에셋 자리는 DB 에 없다.
       arrangePending: false,
       arrangeFirstEntry: false,
+      arrangeSceneNodeId: null,
       requestArrange: (options) =>
         set((s) => ({
           arrangePending: true,
           // 사람이 누른 [자동 정렬]이 이미 기다리는 중이면 처음 정렬로 바꾸지 않는다: 단추 정렬은 되돌리기 기록이 남아야 한다(리뷰 s11 낮음 1).
           arrangeFirstEntry: options?.firstEntry === true && !(s.arrangePending && !s.arrangeFirstEntry),
+          // 씬 보기의 단추는 그 씬만(h13). 처음 정렬을 기다리는 중이면 모든 씬 — 막 들어와 누른 단추가 다른 씬을 먼 간격으로 남기지 않게.
+          arrangeSceneNodeId: options?.firstEntry || (s.arrangePending && s.arrangeFirstEntry) ? null : options?.sceneNodeId ?? null,
         })),
 
       relayoutCanvas: () => {
         // 처음 들어갔을 때의 정렬은 동기화 셋업과 같은 시스템 변경이라 되돌리기 기록에 남기지 않는다(오너 2026-11-16). [자동 정렬] 단추는 남긴다.
         if (!get().arrangeFirstEntry) get().commitHistory()
         // 크기 셈(검토 C 3번): 지금 화면에 그린 카드는 DOM 크기, 화면 밖은 예전에 잰 크기와 넉넉한 크기 중 큰 값.
-        const posById = arrangeDirectorCanvas(get().nodes, canvasCardSizing())
+        //   씬 보기의 단추는 그 씬만 정리한다(h13, canvas-layout.arrangeSceneGroup) — 다른 씬은 배치 그대로(넓어지면 통째로 옆으로 밀 뿐).
+        const sceneNodeId = get().arrangeSceneNodeId
+        const posById = sceneNodeId
+          ? arrangeSceneGroup(get().nodes, sceneNodeId, canvasCardSizing())
+          : arrangeDirectorCanvas(get().nodes, canvasCardSizing())
         set((s) => ({
           nodes: s.nodes.map((n) => {
             const p = posById.get(n.id)
@@ -1900,6 +1924,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           lastSavedAt: Date.now(),
           arrangePending: false,
           arrangeFirstEntry: false,
+          arrangeSceneNodeId: null,
         }))
         for (const id of posById.keys()) {
           const node = get().nodes.find((n) => n.id === id)
@@ -4160,6 +4185,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // 만드는 중 · 실패 · 기다림 표시에도 지금 그림의 프레임 · 버전은 그대로(디자이너 11/13 D6 — 버전 줄 · 끝 그림이 사라지지 않게).
         const kept = keptStoryboardImage(data.storyboardImage)
         const prompt = promptWithChange(effectivePrompt(data) || data.label, options?.changeNote ?? '')
+        const said = imageNoteFor(options)
 
         const storyboardAlreadyGenerating = api.nodes.some(
           (candidate) =>
@@ -4222,6 +4248,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 // #image-model-select: 샷이 고른 fal 이미지 모델 (미지정 = 서버 기본)
                 ...(data.imageModel ? { imageModel: data.imageModel } : {}),
                 ...(options?.traceId ? { traceId: options.traceId } : {}),
+                // 사람 말(바꿀 점 · 채팅 부탁) — 다 그린 그림 판에 남는다(오너 2026-11-22 결정 4).
+                ...(said ? { note: said.note, via: said.via } : {}),
               }),
             })
             if (get().projectId !== projectId) return { jobId: null, status: 'skipped' }
@@ -4237,7 +4265,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               // #ref-gate(오너 결정 1번): 선행 산출물(인물 시트·러프)이 없으면 안내 후 대기 → 나타나면 자동 재개.
               //   대기 중엔 노드를 generating(스피너)으로 두고, 사람이 다시 누르지 않아도 이어진다. 20분 상한.
               if (isPrerequisiteMissing(res.status, body)) {
-                notifyPrerequisiteWaiting('director', body)
+                notifyPrerequisiteWaiting('camera', body)
                 releaseAction(`director:storyboard:${shotNodeId}`)
                 const outcome = await waitForPrerequisite(projectId, body, {
                   isCancelled: () => get().projectId !== projectId,
@@ -4251,7 +4279,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   })
                   return get().generateStoryboardImage(shotNodeId, { ...options, resumeDepth: depth + 1 })
                 }
-                if (outcome === 'timeout') notifyPrerequisiteTimeout('director', body)
+                if (outcome === 'timeout') notifyPrerequisiteTimeout('camera', body)
                 get().updateNodeData<'shot'>(shotNodeId, {
                   storyboardImage: {
                     ...kept,
@@ -4300,7 +4328,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               // 채팅에 남는 줄이라 문장 · 이름 모두 채팅 언어(리드 검토 3 — H1).
               const locale = contentLocale()
               const name = stoppedShotName(shot, locale)
-              notifyStoppedResultKept('director', version
+              notifyStoppedResultKept('camera', version
                 ? translate(locale, 'The image you stopped for {shot} finished later and was kept as version v{n}. The current image did not change.', { shot: name, n: version.n })
                 : translate(locale, 'The image you stopped for {shot} finished later and was kept in the versions. The current image did not change.', { shot: name }))
               return { jobId, status: 'cancelled', resultUrl: url }
@@ -4330,7 +4358,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // 스트립 모드(#real-strip)의 frames{start,direction,end}는 잡 result_url(=start)에
             //   실리지 않는다 — DB 진실 재수화로 회수(로컬이 방금 쓴 완료값 그대로면 DB 값 채택).
             await get().hydrateFromDb(projectId).catch(() => {})
-            notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Storyboard')) // 다른 stage에 있을 때만 알림
+            notifyGenerationComplete('camera', translate(useLocaleStore.getState().locale, 'Real image')) // 다른 stage에 있을 때만 알림
             return { jobId, status: 'completed', resultUrl: url, httpStatus: res.status }
           } catch (err) {
             if (get().projectId !== projectId) return { jobId: activeJobId, status: 'skipped' }
@@ -4353,7 +4381,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // 실패한 시도가 1초 창을 붙잡고 있으면 즉시 재시도가 막힌다 — 창을 바로 연다.
             releaseAction(`director:storyboard:${shotNodeId}`)
             // 카드의 작은 빨간 글씨는 스크롤하면 사라진다 — 사유를 채팅에도 남긴다(#double-fire).
-            notifyGenerationFailure('director', translate(useLocaleStore.getState().locale, 'Storyboard image'), message)
+            notifyGenerationFailure('camera', translate(useLocaleStore.getState().locale, 'Real image'), message)
             return { jobId: activeJobId, status: 'failed', error: message }
           }
         }
@@ -4569,8 +4597,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               }
             }
           : undefined
-        const options = latest || onJob
-          ? { ...(latest ? { inheritFromVideoNodeId: latest.id } : {}), ...(onJob ? { onJob } : {}) }
+        const options = latest || onJob || opts?.takeNote
+          ? {
+              ...(latest ? { inheritFromVideoNodeId: latest.id } : {}),
+              ...(onJob ? { onJob } : {}),
+              ...(opts?.takeNote ? { videoOverride: { note: opts.takeNote.note, via: opts.takeNote.via } } : {}),
+            }
           : undefined
         return get().generateVideoForShot(shotNodeId, options)
       },
@@ -4995,7 +5027,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             // #ref-gate(오너 결정 1번): 실사 스토리보드가 아직 없으면 대기 → 나타나면 같은 샷의 영상 생성을 자동 재개.
             //   false 를 돌려주면 호출부가 방금 만든 미저장 take 노드를 롤백하므로, 재개는 새 take 로 다시 시작한다.
             if (isPrerequisiteMissing(res.status, body)) {
-              notifyPrerequisiteWaiting('director', body)
+              notifyPrerequisiteWaiting('camera', body)
               if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
               const depth = options?.resumeDepth ?? 0
               const resumeShotNodeId = shotNode && isShotData(shotNode.data) ? shotNode.id : null
@@ -5013,7 +5045,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   if (outcome === 'ready') {
                     notifyPrerequisiteResumed(resumeBody)
                     void get().generateVideoForShot(resumeShotNodeId, { ...options, resumeDepth: depth + 1 })
-                  } else if (outcome === 'timeout') notifyPrerequisiteTimeout('director', resumeBody)
+                  } else if (outcome === 'timeout') notifyPrerequisiteTimeout('camera', resumeBody)
                 })
               }
               return false
@@ -5110,14 +5142,14 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 const shot = doneNode && isVideoData(doneNode.data) ? get().nodes.find((n) => n.id === (doneNode.data as VideoNodeData).parentShotNodeId) : undefined
                 // 채팅에 남는 줄이라 문장 · 이름 모두 채팅 언어(리드 검토 3 — H1).
                 const locale = contentLocale()
-                notifyStoppedResultKept('director', translate(locale, 'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.', {
+                notifyStoppedResultKept('camera', translate(locale, 'The Take you stopped for {shot} finished later. It stays in the Take list and does not go to Editor unless you choose it.', {
                   shot: stoppedShotName(shot, locale),
                 }))
                 return true
               }
               if (status === 'completed') {
                 // 약속 E4(2026-09-04): 일괄은 러너가 "N개 완료, M개 실패" 한 줄로 남긴다 — 건별 알림은 단건만.
-                if (options?.batch !== true) notifyGenerationComplete('director', translate(useLocaleStore.getState().locale, 'Video'))
+                if (options?.batch !== true) notifyGenerationComplete('camera', translate(useLocaleStore.getState().locale, 'Video'))
                 // #adherence P2: 모션 계약 준수 검사(fire-and-forget) — 브라우저가 첫/끝 프레임을
                 //   캡처해 서버 판정 후 배지 반영. 실패는 조용히 무시(생성 결과에 영향 없음).
                 const doneNode = get().nodes.find((n) => n.id === videoNodeId)
@@ -5638,8 +5670,9 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   })
                   break
                 }
-                const imageGeneration = options
-                  ? get().generateStoryboardImage(imgId, options)
+                const said = u.askedInChat ? { ...options, askedInChat: u.askedInChat } : options
+                const imageGeneration = said
+                  ? get().generateStoryboardImage(imgId, said)
                   : get().generateStoryboardImage(imgId)
                 void imageGeneration
                 result.applied += 1
@@ -5919,6 +5952,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           showUnusedAssets: false,
           arrangePending: false,
           arrangeFirstEntry: false,
+          arrangeSceneNodeId: null,
           historyPast: [],
           historyFuture: [],
           lastSavedAt: Date.now(),
@@ -6035,8 +6069,23 @@ export function nextScenePosition(
  * LLM prompt 컨텍스트용 캔버스 스냅샷 직렬화.
  * 통계 + Scene→Shot→Video 트리 + 선택된 노드의 풀 정보.
  */
+/** 채팅 글의 "지금 보는 씬" 한 줄. 프로젝트를 모르거나 씬이 없으면 null. */
+function currentSceneForContext(
+  state: Pick<DirectorCanvasState, 'nodes'> & { projectId?: string },
+  boardNames?: BoardNodeNames | null,
+): string | null {
+  const projectId = state.projectId
+  if (!projectId || projectId === 'default') return null
+  const scenes = orderedScenes(state.nodes, boardNames)
+  const key = resolveCurrentScene(scenes.map((entry) => entry.key), useCurrentSceneStore.getState().sceneByProject[projectId])
+  const scene = scenes.find((entry) => entry.key === key)
+  if (!scene || !isSceneData(scene.node.data)) return null
+  const name = directorBoardLabel(scene.node.data, boardNames) ?? prettyNodeLabel(scene.node.data.label, boardNames?.locale ?? 'en')
+  return `- The user is looking at [${scene.nodeId}] (board: ${name}) on the canvas. It shows only this scene's cards, so "this scene" means this scene.`
+}
+
 export function serializeDirectorCanvasContext(
-  state: Pick<DirectorCanvasState, 'nodes' | 'edges' | 'selectedNodeId'>,
+  state: Pick<DirectorCanvasState, 'nodes' | 'edges' | 'selectedNodeId'> & { projectId?: string },
   /** 보드 이름표 — 씬 · 샷에 보드 이름("Scene 2 · Shot 8")을 붙인다(오너 2026-11-02 "전체 번호로 통일"). Writer 스토어는 부르는 쪽이 읽는다. */
   boardNames?: BoardNodeNames | null,
   /** 샷마다 이미지(있음 · 그리는 중 · 없음) — 샷 줄에 붙인다(Lumi 가 이미지 없는 샷의 영상을 약속하지 않게, 리드 11/14 B3). 판정은 부르는 쪽(보드와 같은 근거). */
@@ -6068,6 +6117,9 @@ export function serializeDirectorCanvasContext(
     `- 노드 ${nodes.length}개 (Scene ${scenes.length}, Shot ${shots.length}, Video ${videos.length})`,
   )
   lines.push(`- ★ Final 마킹 Video ${finalVideos.length}개`)
+  // 지금 보는 씬(오너 D8 · 리드 11/22 답 e) — 노드 보기는 한 씬만 보인다. 화면과 같은 규칙(기억한 씬 > 첫 씬)으로 정한다.
+  const lookingAt = currentSceneForContext(state, boardNames)
+  if (lookingAt) lines.push(lookingAt)
   lines.push(
     `- 엣지 ${edges.length}개 (parent ${edges.filter((e) => e.data?.category === 'parent').length}, relates-to ${edges.filter((e) => e.data?.category === 'relates-to').length})`,
   )

@@ -2,7 +2,8 @@ import type { StageId } from '@/types'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 
-export type PendingProposalStage = Extract<StageId, 'producer' | 'writer' | 'artist' | 'director'>
+// camera(오너 2026-11-22 D2~D5): Camera 채팅이 낸 글 고침 [적용] 카드는 Camera 화면에서 답한다.
+export type PendingProposalStage = Extract<StageId, 'producer' | 'writer' | 'artist' | 'camera' | 'director'>
 
 export type PendingProposalKind =
   | 'producerSourcePatch'
@@ -12,6 +13,8 @@ export type PendingProposalKind =
   | 'artistRegenerateCharacterAllViews'
   | 'artistRegenerateCharacterViews'
   | 'artistRegenerateWorldAsset'
+  // D7(2026-11-22): 소품 그림 한 장 다시 그리기 — 인물 · 배경 다시 그리기와 같은 승인 카드.
+  | 'artistRegenerateProp'
   // C3 F6: cc 가 감지한 "기존 캐릭터 canonical 외형(원천) 변경"은 자동경로 금지 — 이 제안으로만 표면화,
   //   승인 후 서버 검증 라우트(/api/artist/appearance)가 characters.appearance 를 커밋한다.
   | 'artistSourceAppearancePatch'

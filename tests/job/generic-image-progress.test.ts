@@ -39,10 +39,11 @@ describe('image_generation 진행 집계', () => {
       row({ id: 'video', kind: 'shot_video', status: 'queued' }),
     ]
 
+    // 실사 그림 · 영상 배치는 Camera 의 일이다(오너 2026-11-22 D2~D5 — 실사 · 영상 만들기가 Camera 로 옮김).
     expect(summarizeGenerationBatches(rows, NOW + 3_000)).toEqual([
       {
         lane: 'director-storyboard',
-        stage: 'director',
+        stage: 'camera',
         active: 1,
         total: 1,
         done: 0,
@@ -50,7 +51,7 @@ describe('image_generation 진행 집계', () => {
       },
       {
         lane: 'director-video',
-        stage: 'director',
+        stage: 'camera',
         active: 1,
         total: 1,
         done: 0,
@@ -84,7 +85,7 @@ describe('image_generation 진행 집계', () => {
     ])
     expect(works.find((work) => work.key === 'queue-shot_video')).toMatchObject({
       total: 7,
-      stage: 'director',
+      stage: 'camera',
     })
     expect(works.find((work) => work.key === 'queue-shot_rough_storyboard')).toMatchObject({
       total: 3,
