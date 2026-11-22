@@ -29,8 +29,11 @@ export function lumiBatchNoticeView(input: {
   /** 실패한 영상의 Take 를 돌려드렸다 — Take 를 쓰는 계정(과금 켜짐 · 무제한 아님)일 때만 참. */
   takesReturned: boolean
   locale: AppLocale
+  /** 카드를 띄운 화면 — Camera(리드 2026-11-22)는 다음 단계가 Director 라 Editor 말 대신 [다음: Director]. 없으면 Director. */
+  screen?: 'camera' | 'director'
 }): LumiNoticeView {
   const { notice, states, labelOf, takesReturned, locale } = input
+  const camera = input.screen === 'camera'
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
   const having = (state: DirectorShotState) => [...states].filter(([, s]) => s === state).map(([id]) => id)
   const done = notice.done > 0
@@ -52,6 +55,7 @@ export function lumiBatchNoticeView(input: {
   const canHandOff = having('video_done').length > 0
   const failed = having('video_failed')
   if (failed.length === 0) {
+    if (camera) return { title, body: null, done, actions: canHandOff ? [{ kind: 'handoff', label: t('Next: Director') }] : [] }
     return {
       title,
       body: canHandOff ? t('Join them into one video in Editor.') : null,
@@ -61,6 +65,24 @@ export function lumiBatchNoticeView(input: {
   }
   const shots = shotListLabel(locale, failed.map(labelOf))
   const one = failed.length === 1
+  // Camera: 촬영 화면에서는 실패한 것을 다시 만드는 일이 먼저다 — Director 로는 실패와 상관없이 넘어간다(조건 없이 넘김).
+  if (camera) {
+    return {
+      title,
+      body: takesReturned
+        ? one
+          ? t('The video for {shots} failed, and your Takes were returned. You can make it again.', { shots })
+          : t('The videos for {shots} failed, and your Takes were returned. You can make them again.', { shots })
+        : one
+          ? t('The video for {shots} failed. You can make it again.', { shots })
+          : t('The videos for {shots} failed. You can make them again.', { shots }),
+      done,
+      actions: [
+        { kind: 'videos', label: t('Make {shots} again', { shots }), shotIds: failed, remake: true },
+        ...(canHandOff ? [{ kind: 'handoff' as const, label: t('Next: Director') }] : []),
+      ],
+    }
+  }
   const body = takesReturned
     ? one
       ? t('The video for {shots} failed, and your Takes were returned. You can make it again. Leave it out and it joins Editor once its video is ready.', { shots })
