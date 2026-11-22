@@ -1,4 +1,4 @@
-// 씬 단추 줄(Director · Camera 공용)이 씬 이름을 순서대로 보이고, 누르면 그 씬을 고르고, ⌘/Ctrl+클릭이면 씬은 그대로 두고 @이름을 채팅에 넣는지 검사한다 (오너 D8 · D9 2026-11-22)
+// 씬 단추 줄(Director · Cinema 공용)이 씬 이름을 순서대로 보이고, 누르면 그 씬을 고르고, ⌘/Ctrl+클릭이면 씬은 그대로 두고 @이름을 채팅에 넣는지 검사한다 (오너 D8 · D9 2026-11-22)
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'

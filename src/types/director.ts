@@ -246,6 +246,11 @@ type VideoNodeCommonData = {
   madeFrames?: { start: string | null; end: string | null; middle?: string | null } | null
   /** 지금 영상을 낸 작업의 방식(2026-11-22) — 작업 기록 기준. 모르면 null/없음, 적히지 않은 작업은 기본(start_end). */
   madeVideoMode?: VideoMode | null
+  /** 지금 영상을 낸 작업의 대사 지문(오너 2026-11-22 E3) — dialogueChangedSince(이 노드 데이터, 지금 대사)로 바뀜을 본다. 모르면 null/없음. */
+  madeDialogueFingerprint?: string | null
+  /** 지금 영상을 낸 작업의 모델(리드 2026-11-22) — 판의 모델 이름은 이것을 먼저 쓴다. 다시 만들 때 · 다음 Take 의 모델은
+   *  이것을 따르지 않는다(takeSettings 는 Take 에 고른 값 · 샷 설정). 모르면 null/없음. */
+  madeModel?: VideoModelKey | null
   /** 화면에서 멈춘 때(오너 2026-11-14 7번) — 그 Take 의 마지막 작업을 멈췄다. 뒤늦게 끝나도 기록에만 있다. */
   cancelledAt?: string | null
   [key: string]: unknown

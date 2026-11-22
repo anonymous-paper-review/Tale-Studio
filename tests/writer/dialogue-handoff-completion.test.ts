@@ -1,4 +1,4 @@
-// 전체 대사 수정은 실제 저장이 끝난 뒤 남은 씬을 이어 처리하고, 모두 끝나야 다음 단계로 넘긴다. (2026-11-22 오너 D2~D5 — 다음 단계가 Director 에서 Camera 로)
+// 전체 대사 수정은 실제 저장이 끝난 뒤 남은 씬을 이어 처리하고, 모두 끝나야 다음 단계로 넘긴다. (2026-11-22 오너 D2~D5 — 다음 단계가 Director 에서 Cinema 로)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Scene, Shot } from '@/types'
 
@@ -64,7 +64,7 @@ beforeEach(() => {
 afterEach(() => { vi.clearAllTimers(); useGlobalChatStore.getState().reset(); useWriterStore.getState().reset(); vi.useRealTimers(); vi.unstubAllGlobals() })
 
 describe('대사 전체 수정 완료에 따른 이어가기', () => {
-  it('전체 한국어로 맞추고 넘겨 달라고 하면 일부 씬 저장 뒤 남은 씬을 자동 처리하고 모두 저장된 뒤 Camera로 넘긴다', async () => {
+  it('전체 한국어로 맞추고 넘겨 달라고 하면 일부 씬 저장 뒤 남은 씬을 자동 처리하고 모두 저장된 뒤 Cinema로 넘긴다', async () => {
     respond([[update(1), update(2), update(3)], [update(4)], [update(5)]])
     await useGlobalChatStore.getState().sendMessage('전체 한국어로 맞추고 넘겨줘')
     expect(writes.map(write => write.id)).toEqual(['shot_1','shot_2','shot_3','shot_4','shot_5'])
@@ -157,7 +157,7 @@ it('남은 한 씬도 여러 번 나뉘어 돌아오면 저장한 샷을 빼고 
 })
 
 
-it('모든 대사를 저장했어도 Camera 준비 조건이 부족하면 완료 내역을 남기고 이동을 보류한다', async () => {
+it('모든 대사를 저장했어도 Cinema 준비 조건이 부족하면 완료 내역을 남기고 이동을 보류한다', async () => {
   useProjectStore.setState({ lifecycleStatus: { ...structuredClone(EMPTY_LIFECYCLE_STATUS), director: { ready: false, blockers: [{ field: 'missing-image', label: '인물 이미지가 필요해요.' }], warnings: [] } } })
   respond([[update(1),update(2),update(3),update(4),update(5)]])
   await useGlobalChatStore.getState().sendMessage('전체 한국어로 맞추고 넘겨줘')
@@ -204,7 +204,7 @@ it('47샷의 대사를 처리해도 같은 요청의 진행 안내는 한 줄만
   expect(handoff).toHaveBeenCalledOnce()
 })
 
-it('Camera 이동 질문 뒤 대사 통일과 이동을 요청하면 저장 후 서버의 현재 조건을 확인한다', async () => {
+it('Cinema 이동 질문 뒤 대사 통일과 이동을 요청하면 저장 후 서버의 현재 조건을 확인한다', async () => {
   useGlobalChatStore.setState({ messages: [{ id: 'question', stage: 'writer', role: 'user', content: '카메라로 넘길수잇어?' }] })
   respond([[update(1), update(2), update(3), update(4), update(5)]])
   await useGlobalChatStore.getState().sendMessage('전체 한국어로 맞추고 넘겨줘')

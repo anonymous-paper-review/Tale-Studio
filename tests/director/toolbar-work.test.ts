@@ -52,7 +52,9 @@ describe('단추가 세는 일', () => {
     expect(videoWorkBlock(new Map(), new Set(), false, true)).toBe('none_in_status')
     expect(workBlockLine('none_in_status', 'none_in_status', ko)).toBe('이 상태의 샷이 없어요')
     const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
-    expect(page).toContain('const workStates = workScopeStates(shotStates, statusFilter)')
+    // 2026-11-22 오너 E2(b1): 씬을 고르면 "보이는 샷"은 그 씬(과 씬 밖 카드)의 샷이다 — 셈 바탕이 프로젝트 전체(shotStates)에서 sceneShotStates 로 바뀌었다.
+    //   (예전 기대 글: 'const workStates = workScopeStates(shotStates, statusFilter)')
+    expect(page).toContain('const workStates = workScopeStates(sceneShotStates, statusFilter)')
     expect(page).toContain('imageButtonMode(workStates, picked)')
     expect(page).toContain('videoWorkShotIds(workStates, picked)')
   })

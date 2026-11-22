@@ -1,7 +1,8 @@
-// Camera 위쪽 만들기 줄 — [이미지 만들기 · N] · [영상 만들기 · N] · 진행 · [모두 멈추기] · 영상까지 이어서가 Director 툴바와 같은 규칙 · 같은 러너로 되고, 세는 범위를 한 곳에서 정하는지 검사한다 (오너 2026-11-22 D2~D5 · 리드 답 a · 약속 E)
+// Cinema 위쪽 만들기 줄 — [이미지 만들기 · N] · [영상 만들기 · N] · 진행 · [모두 멈추기] · 영상까지 이어서가 Director 툴바와 같은 규칙 · 같은 러너로 되고, 세는 범위를 한 곳에서 정하는지 검사한다 (오너 2026-11-22 D2~D5 · 리드 답 a · 약속 E)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import { scopeShotStates } from '@/features/camera/work-scope'
+import { translate } from '@/lib/i18n/translate'
 import type { DirectorShotState } from '@/lib/director/shot-state'
 
 const states = new Map<string, DirectorShotState>([['s1', 'image_needed'], ['s2', 'image_done'], ['s3', 'video_done'], ['s4', 'image_failed']])
@@ -57,5 +58,28 @@ describe('Director 툴바와 같은 규칙', () => {
     expect(source).toMatch(/chainStep\(chainWaitingShotIds, shotStates, realBatchBusy, resumeWaitingNodeIds, videoBatchBusy\)/)
     expect(source).toMatch(/setChainVideoAfterImage\(false\)/)
     expect(source).toContain("t('Make images + videos')")
+  })
+})
+
+describe('씬만 세기(오너 E2)', () => {
+  it('영상 일괄 확인 창 제목에 지금 씬 이름이 붙는다 — "씬 2의 영상 5개를 만들까요?"', () => {
+    // 왜: 오너 2026-11-22 E2 — 위쪽 단추는 지금 씬만 만든다. 확인 창이 어느 씬인지 말해야 다른 씬이 빠진 것을 안다.
+    expect(translate('ko', 'Make {count} videos in {scene}?', { count: 5, scene: '씬 2' })).toBe('씬 2의 영상 5개를 만들까요?')
+    expect(translate('ko', 'Make 1 video in {scene}?', { scene: '씬 2' })).toBe('씬 2의 영상 1개를 만들까요?')
+    expect(bar()).toMatch(/title=\{sceneName \? countText\(t, videoPlan\.total, 'Make 1 video in \{scene\}\?', 'Make \{count\} videos in \{scene\}\?', \{ count: videoPlan\.total, scene: sceneName \}\)/)
+  })
+
+  it('영상까지 이어서 확인 창 제목에도 지금 씬 이름이 붙는다', () => {
+    // 왜: 이미지와 그 영상까지 한 번에 만드는 창 — Take 를 쓰므로 범위(씬)를 보이고 묻는다.
+    expect(translate('ko', 'Make the images in {scene}, then their videos?', { scene: '씬 2' })).toBe('씬 2의 이미지를 만들고 이어서 영상도 만들까요?')
+    expect(bar()).toContain("t('Make the images in {scene}, then their videos?', { scene: sceneName })")
+  })
+
+  it('[모두 멈추기]는 씬과 상관없이 만들고 있는 이미지 · 영상을 모두 멈춘다', () => {
+    // 왜: 오너 E2 — 멈추기는 범위를 좁히지 않는다(다른 씬에서 돌던 것도 멈춰야 "모두"다).
+    const source = bar()
+    const stopAll = source.slice(source.indexOf('const stopAll = async () => {'), source.indexOf('// 이어 보내기 지켜보기'))
+    expect(stopAll).toContain('stoppableJobs(await freshActiveJobs(run.projectId))')
+    expect(stopAll).not.toMatch(/scope|workStates|imageWork|videoWork/)
   })
 })

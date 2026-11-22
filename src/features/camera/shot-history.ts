@@ -9,6 +9,7 @@ import { VIDEO_MODELS, effectiveVideoResolution } from '@/lib/video-models'
 import type { DialogueLine } from '@/types'
 import type { ShotNodeData, StoryboardImage, StoryboardImageVersion, VideoOverride } from '@/types/director'
 import { DEFAULT_VIDEO_MODE } from '@/lib/director/video-modes'
+import { dialogueChangedSince, type DialogueLineLike } from '@/lib/director/dialogue-fingerprint'
 import { VIDEO_MODE_LABEL, takeVideoMode } from './video-mode'
 
 /** 요약 한 마디 — key 는 영어 원문 = i18n 키(모델 이름 · 해상도는 번역 없이 그대로 나온다). 화면이 t() 로 옮기고 " · " 로 잇는다. */
@@ -38,6 +39,8 @@ export type HistoryEntry =
       final: 'manual' | 'auto' | null
       used: boolean
       summary: HistoryPhrase[]
+      /** 이 Take 를 만든 뒤 그 샷 대사가 바뀌었다(오너 2026-11-22 E3 — fb-video dialogueChangedSince 가 true 일 때만). 모르면 false. */
+      dialogueChanged: boolean
     }
   | {
       /** 그리는 중 · 일괄 차례를 기다림 · 다시 그리기 실패 자리 — 판이 아니라 줄 끝의 알림 자리다(지금 그림은 그대로). */
@@ -154,6 +157,8 @@ export function shotHistory(input: {
   takes: readonly ShotDetailTake[]
   final: { id: string; auto: boolean } | null
   shot: Pick<ShotNodeData, 'provider'>
+  /** 그 샷의 지금 대사(shots.dialogue_lines 그대로) — 대사 바뀜 판정(E3). undefined = 화면이 모른다(Writer 샷 없는 손으로 더한 샷) — 묻지 않는다. */
+  dialogueLines?: readonly DialogueLineLike[] | null
   imageWork?: ImageWork | null
   /** 영상 묶음에서 이 샷의 차례(0 = 다음 차례). 기다리지 않으면 없음. */
   videoLine?: number | null
@@ -185,6 +190,8 @@ export function shotHistory(input: {
       final,
       used: final !== null,
       summary: takeSummary(input.shot, input.image, take, i > 0 ? takes[i - 1]! : null, phase),
+      // 판정은 fb-video 의 dialogueChangedSince 하나 — 지문 칸을 직접 읽지 않는다. 'unknown'(옛 Take · 다시 만드는 중 · 재시도 실패)은 표시 없음.
+      dialogueChanged: input.dialogueLines !== undefined && dialogueChangedSince(take.data, input.dialogueLines) === true,
     }
   })
 
@@ -236,4 +243,9 @@ export function dialogueRowLines(lines: readonly Pick<DialogueLine, 'characterId
   return lines
     .filter((line) => typeof line.text === 'string' && line.text.trim())
     .map((line) => ({ speaker: line.characterId ? nameById.get(line.characterId) ?? line.characterId : 'V.O.', text: line.text.trim() }))
+}
+
+/** ★ 최종 Take(사람이 고른 것, 없으면 가장 새 완성 — 자동)의 대사가 바뀌었다 — 샷 줄에도 한 줄을 보인다(오너 E3). */
+export function finalTakeDialogueChanged(entries: readonly HistoryEntry[]): boolean {
+  return entries.some((entry) => entry.kind === 'take' && entry.final !== null && entry.dialogueChanged)
 }

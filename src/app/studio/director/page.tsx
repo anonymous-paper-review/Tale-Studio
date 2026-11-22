@@ -77,6 +77,7 @@ import {
   promptNodePlace,
   sceneAfterHistoryStep,
   sceneCanvas,
+  sceneDialogTitle,
   shotStatesIn,
   viewportShowsAnyCard,
 } from '@/features/director/scene-view'
@@ -1084,6 +1085,8 @@ function PaletteBar() {
   const t = useT()
   // 씬 단추(오너 D8 2026-11-22) — 옛 [스토리보드 | 노드] 자리. Alt+←/→ 는 앞 · 뒤 씬(옛 보기 순환 자리, h19).
   const { items: sceneItems, sceneKey, sceneNodeId, view, projectId: sceneProjectId } = useDirectorSceneView()
+  // 확인 창 제목 앞에 붙는 지금 씬 이름(오너 E2 2026-11-22 "확인 창 제목에 씬 이름").
+  const sceneLabel = sceneItems.find((item) => item.key === sceneKey)?.label ?? null
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   // #real-grid: 일괄 생성은 4샷 시트 러너(runRealBatch)로 통합 — 진행 플래그는 스토어 공유.
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
@@ -1107,7 +1110,8 @@ function PaletteBar() {
   // 샷 상태 · 남은 일(시안 R 416:4941 · D1, 오너 2026-11-14) — 단추 숫자 · 가장 밝은 단추 · 예상 칸이 같은 판정을 쓴다.
   const shotStates = useDirectorShotStates()
   // 씬별 보기(오너 D8): 상태 고르기 숫자 · [전체 고르기] · 고름은 지금 씬(과 씬 밖 카드)의 샷만 센다(h12).
-  //   [이미지 · 영상 만들기 N] 이 그 씬만 셀지는 오너 결정(b1, Take) 전이라 지금처럼 프로젝트 전체(아래 workStates).
+  //   [이미지 · 영상 만들기 N] · "영상까지 이어서" · 확인 창 Take 도 그 씬만(오너 E2 = b1 추천, 2026-11-22 — [전체] 단추 없음, 아래 workStates).
+  //   [모두 멈추기] · 진행 줄 · [다음: Editor로] 크림은 프로젝트 전체(shotStates) 그대로. 여러 씬을 한 번에는 채팅 빠른 칩(모든 씬).
   const sceneShotStates = shotStatesIn(shotStates, view.shotIds)
   const statusCounts = countStatusFilters(sceneShotStates.values())
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
@@ -1118,8 +1122,8 @@ function PaletteBar() {
   const clearPickedShots = useDirectorCanvasStore((s) => s.clearPickedShots)
   const visibleShotIds = [...sceneShotStates.entries()].filter(([, state]) => matchesStatusFilter(state, statusFilter)).map(([id]) => id)
   const picked = effectivePickedIds(pickedShotIds, visibleShotIds)
-  // 상태를 골랐으면 단추 · 예상도 보이는 샷만 센다(리드 11/14 답 1).
-  const workStates = workScopeStates(shotStates, statusFilter)
+  // 상태를 골랐으면 단추 · 예상도 보이는 샷만 센다(리드 11/14 답 1) — 씬을 고르면 보이는 샷은 그 씬(과 씬 밖 카드)의 샷이다(오너 E2).
+  const workStates = workScopeStates(sceneShotStates, statusFilter)
   // [이미지 만들기 · N]: 이미지 없는 샷. 고른 샷이 모두 이미지가 있으면 [이미지 다시 만들기 · N](8/27 오너 "전체 재생성" 길).
   const imageMode = imageButtonMode(workStates, picked)
   const imageWork = imageMode.mode === 'make' ? imageMode.shotIds : []
@@ -1545,7 +1549,7 @@ function PaletteBar() {
       <RegenerateConfirmDialog
         open={confirmChain}
         onOpenChange={setConfirmChain}
-        title={t('Make images, then their videos?')}
+        title={sceneDialogTitle(sceneLabel, t('Make images, then their videos?'))}
         description={countText(t, imageWork.length, 'Makes 1 image, and its video starts by itself when the image is done.', 'Makes {count} images, and each video starts by itself when its image is done.', { count: imageWork.length })}
         impact={[
           // 영어는 1개면 단수(영어 재점검 S2).
@@ -1574,7 +1578,7 @@ function PaletteBar() {
       <RegenerateConfirmDialog
         open={confirmRemake}
         onOpenChange={setConfirmRemake}
-        title={countText(t, imageMode.shotIds.length, 'Make 1 image again?', 'Make {count} images again?', { count: imageMode.shotIds.length })}
+        title={sceneDialogTitle(sceneLabel, countText(t, imageMode.shotIds.length, 'Make 1 image again?', 'Make {count} images again?', { count: imageMode.shotIds.length }))}
         description={countText(t, imageMode.shotIds.length, 'Remakes the image for the 1 picked shot. No Takes are used.', 'Remakes the image for the {count} picked shots. No Takes are used.', { count: imageMode.shotIds.length })}
         // 다시 만들어도 지금 이미지는 버전으로 남는다(오너 답 5번).
         impact={[countText(t, imageMode.shotIds.length, 'The new image becomes the current one. The current image stays in the versions.', 'The new images become the current ones. The current images stay in the versions.')]}
@@ -1584,7 +1588,7 @@ function PaletteBar() {
       <RegenerateConfirmDialog
         open={confirmVideoBatch}
         onOpenChange={setConfirmVideoBatch}
-        title={t('Generate videos for eligible shots?')}
+        title={sceneDialogTitle(sceneLabel, t('Generate videos for eligible shots?'))}
         // 영어는 1개면 단수(영어 재점검 S2) — 한국어는 그대로.
         description={countText(t, videoPlan.total, 'Generate a video for 1 eligible shot.', 'Generate videos for {count} eligible shots.', { count: videoPlan.total })}
         impact={[

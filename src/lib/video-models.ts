@@ -71,8 +71,8 @@ export interface VideoModelSpec {
 }
 
 /**
- * Kling O3 소리 켜기(오너 결정 4 대기, 2026-11-22) — 켜면 원가가 초당 $0.112 → $0.14(Take 는 그대로 5).
- *   8/27 약속("음성은 영상 생성기에 맡긴다")대로 로컬은 켬. 오너가 "끔"이라 하면 이 값 하나만 false 로 바꾼다.
+ * Kling O3 소리 켜기 — 오너 2026-11-22 E6 확정: 켠다(8/27 약속 "음성은 영상 생성기에 맡긴다"대로).
+ *   원가는 초당 $0.112 → $0.14, Take 는 그대로 5. 다시 끄기로 정하면 이 값 하나만 false 로 바꾼다.
  */
 export const KLING_O3_AUDIO_ON = true
 
@@ -206,6 +206,20 @@ export function normalizeProvider(p: string): VideoModelKey {
   if (p === 'kling') return 'kling-o3' // legacy alias
   if (p in VIDEO_MODELS) return p as VideoModelKey
   return DEFAULT_VIDEO_MODEL
+}
+
+/** 고를 수 있는 영상 모델 이름인가 — 모르는 이름을 기본 모델로 바꾸지 않고 아니라고 답한다('constructor' 같은 이름도 아니다). */
+export function isVideoModelKey(value: unknown): value is VideoModelKey {
+  return typeof value === 'string' && Object.hasOwn(VIDEO_MODELS, value)
+}
+
+/**
+ * 작업 기록의 모델 칸(그 작업이 실제로 부른 fal 주소 — 다른 모델로 넘어가면 넘어간 주소) → 고를 수 있는 모델 이름(리드 2026-11-22).
+ * 목록에 없는 주소(대체 MiniMax · 예전 주소)면 null — 기본 모델로 짐작하지 않는다.
+ */
+export function videoModelKeyOfEndpoint(endpoint: unknown): VideoModelKey | null {
+  if (typeof endpoint !== 'string' || !endpoint) return null
+  return Object.values(VIDEO_MODELS).find((spec) => spec.endpoint === endpoint)?.key ?? null
 }
 
 const FRAME_SLOT_ROLES: ReadonlySet<'start' | 'end'> = new Set(['start', 'end'] as const)

@@ -1,4 +1,4 @@
-// 씬 단추를 쓰는 화면(Director · Camera)이 들어올 때 어느 씬을 열고, 지금 보는 씬을 프로젝트마다 이 브라우저에만 기억하는지 검사한다 (오너 D8 2026-11-22)
+// 씬 단추를 쓰는 화면(Director · Cinema)이 들어올 때 어느 씬을 열고, 지금 보는 씬을 프로젝트마다 이 브라우저에만 기억하는지 검사한다 (오너 D8 2026-11-22)
 import { beforeEach, describe, expect, it } from 'vitest'
 
 import { resolveCurrentScene } from '@/lib/current-scene'
@@ -50,7 +50,7 @@ describe('지금 보는 씬 기억', () => {
     expect(useCurrentSceneStore.getState().sceneByProject).toEqual({ p1: 'sc_02', p2: 'sc_03' })
   })
 
-  it('지금 보는 씬은 화면 이름 없이 프로젝트 하나에 한 값이라, Director 와 Camera 가 같은 값을 읽고 쓴다', () => {
+  it('지금 보는 씬은 화면 이름 없이 프로젝트 하나에 한 값이라, Director 와 Cinema 가 같은 값을 읽고 쓴다', () => {
     // 왜: Camera 에서 씬 3 을 보다 Director 로 가면 씬 3 이 열린다(리드 11/22 답 b — 두 화면이 같은 기억을 쓴다).
     useCurrentSceneStore.getState().setCurrentScene('p1', 'sc_03')
     useCurrentSceneStore.getState().setCurrentScene('p1', 'sc_01')
