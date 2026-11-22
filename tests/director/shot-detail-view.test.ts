@@ -304,7 +304,7 @@ describe('Director 샷 상세 화면', () => {
     expect(out).toContain('src="https://media.test/start.png"')
     expect(out).toContain('src="https://media.test/end.png"')
     expect(out.match(/role="checkbox" aria-checked="true" aria-disabled="true"/g)?.length).toBe(2)
-    expect(out).toContain('Start and end images are remade together for now.')
+    expect(out).toContain('Start, middle and end images are remade together for now.')
   })
 
   it('이미지 탭의 설정은 한 화면에 바꾸고 싶은 점 · 프롬프트 · 이미지 모델 · 비율 · 해상도 · 개수 · 참고 이미지 · 등장인물 · 장소를 보이고 고치기 · 설정 탭이 없다', () => {

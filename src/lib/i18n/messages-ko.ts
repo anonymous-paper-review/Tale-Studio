@@ -12,7 +12,7 @@ export const KO: Record<string, string> = {
   'Video · none': '영상 · 없음',
   'Start image': '시작 이미지',
   'End image': '끝 이미지',
-  'Start and end images are remade together for now.': '지금은 시작 · 끝 이미지를 함께 다시 만들어요.',
+  'Start, middle and end images are remade together for now.': '지금은 시작 · 가운데 · 끝 이미지를 함께 다시 만들어요.',
   'What to change': '바꾸고 싶은 점',
   'Leave it empty to remake with the settings below': '비워 두면 아래 설정 그대로 다시 만들어요',
   'Write only what you want to change in the picture. The rest stays as it is (e.g. show the umbrella handle, keep the face).':

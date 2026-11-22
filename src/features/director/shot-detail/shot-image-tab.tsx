@@ -114,7 +114,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
         </div>
       ) : null}
       <p className="text-caption text-subtle-foreground">
-        {t('Start and end images are remade together for now.')}
+        {t('Start, middle and end images are remade together for now.')}
         {versions.length > 1 ? ` ${t('Click v1 or v2 to go back to that version.')}` : null}
       </p>
     </div>
