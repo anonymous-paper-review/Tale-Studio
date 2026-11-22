@@ -25,6 +25,11 @@ export function startConfirmNote(level: LevelKey | null): string {
   return level === 'keep' ? KEEP_LENGTH_NOTE : 'You can change the genre and mood and the length again in Writer.'
 }
 
+/** 2안 말로 답하는 입력칸의 예시 — 원작 그대로면 길이가 아니라 장르다(D15, 혼자 정한 것: 그대로는 말한 길이를 받지 않는다). */
+export function chatReplyExample(level: LevelKey | null): string {
+  return level === 'keep' ? 'Pick one, or just say it. E.g. make it a comedy' : 'Pick one, or just say it. E.g. make it 1 minute'
+}
+
 /** 2안 정리 카드 아래 안내 — 말로 고치는 예시가 원작 그대로면 길이가 아니라 장르다(D15, 혼자 정한 것). */
 export function chatConfirmNote(level: LevelKey | null): string {
   return level === 'keep'

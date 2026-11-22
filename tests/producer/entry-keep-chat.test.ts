@@ -14,7 +14,7 @@ import { EntryChat } from '@/features/entry/entry-chat'
 import { useEntryStore } from '@/features/entry/entry-store'
 import { chatChips, chatTranscript, currentChatQuestion, hintText, EMPTY_CHAT_UI } from '@/features/entry/chat-flow'
 import { chatQuestionOrder } from '@/features/entry/options'
-import { chatConfirmNote, startConfirmNote, summaryRows } from '@/features/entry/summary'
+import { chatConfirmNote, chatReplyExample, startConfirmNote, summaryRows } from '@/features/entry/summary'
 import { emptyEntryDraft, materialBasis, type EntryDraft, type EntryFileMeta } from '@/lib/entry/draft'
 import { translate } from '@/lib/i18n/translate'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -135,6 +135,15 @@ describe('원작 그대로와 시작 화면 채팅의 길이', () => {
     expect(ko(chatConfirmNote('keep'))).toContain('"장르는 코미디로"')
     // 그대로가 아니면 지금 안내 그대로다.
     expect(chatConfirmNote('grow')).toBe('When you press it, the screen ratio is locked. To change something, click an item above or say it, like "make the length 1 minute".')
+  })
+
+  it('그대로면 말로 답하는 입력칸의 예시도 길이 대신 장르를 든다', () => {
+    // 왜: 정리 카드 아래 입력칸이 "예: 1분짜리로"라고 길이를 말하라고 권했다(화면 확인에서 찾음) — 그대로는 그 말을 받지 않는다.
+    setEntry(keepIdeaDraft())
+    const out = html()
+    expect(out).toContain(`placeholder="${ko(chatReplyExample('keep'))}"`)
+    expect(out).not.toContain(ko('Pick one, or just say it. E.g. make it 1 minute'))
+    expect(chatReplyExample('polish')).toBe('Pick one, or just say it. E.g. make it 1 minute')
   })
 
   it('그대로면 확인 창은 길이를 Writer에서 다시 바꿀 수 있다고 하지 않고 원작 길이를 따른다고 보인다', () => {

@@ -47,7 +47,7 @@ import {
 import { useEntryStore } from './entry-store'
 import { AgentBubble, FileChip, RecommendedBadge, UploadingChip, UserBubble, WhyLine } from './entry-parts'
 import { moodRecommendation, ratioRecommendation } from './series'
-import { chatConfirmNote, summaryRows } from './summary'
+import { chatConfirmNote, chatReplyExample, summaryRows } from './summary'
 
 export function EntryChat() {
   const t = useT()
@@ -483,10 +483,11 @@ function FirstComposer() {
   )
 }
 
-/** 질문에 말로 답하는 입력칸 — "1분짜리로"처럼 말해도 된다. */
+/** 질문에 말로 답하는 입력칸 — "1분짜리로"처럼 말해도 된다(원작 그대로면 예시는 장르, D15). */
 function ReplyInput() {
   const t = useT()
   const reply = useEntryStore((s) => s.chatReply)
+  const level = useEntryStore((s) => s.draft.picks.level)
   const writing = useEntryStore((s) => s.writing)
   const focusAsks = useEntryStore((s) => s.chat.focus ?? 0)
   const fieldRef = useRef<HTMLInputElement>(null)
@@ -517,7 +518,7 @@ function ReplyInput() {
             submit()
           }
         }}
-        placeholder={t('Pick one, or just say it. E.g. make it 1 minute')}
+        placeholder={t(chatReplyExample(level))}
         disabled={disabled}
         className="h-9 border-0 bg-transparent px-0 text-chat shadow-none focus-visible:ring-0 dark:bg-transparent"
       />

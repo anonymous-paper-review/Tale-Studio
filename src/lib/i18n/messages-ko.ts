@@ -2724,6 +2724,7 @@ export const KO: Record<string, string> = {
   'Not yet': '아직',
   'Chat input': '채팅 입력',
   'Pick one, or just say it. E.g. make it 1 minute': '골라도 되고, 말로 해도 돼요. 예: 1분짜리로',
+  'Pick one, or just say it. E.g. make it a comedy': '골라도 되고, 말로 해도 돼요. 예: 코미디로',
   '"{text}": set {items}.': '"{text}": {items}(으)로 정했어요.',
   '"{text}": I did not quite get that. Please choose with the buttons.': '"{text}": 잘 못 알아들었어요. 버튼으로 골라 주세요.',
   'I will start like this.': '이렇게 시작할게요.',
