@@ -136,7 +136,7 @@ import {
   usableFrameImageUrl,
 } from '@/lib/director/video-frame-inputs'
 import { prepareContinueFrom } from '@/lib/director/video-frame-capture'
-import { isVideoMode, takeOverrideForRequest, videoModeForRequest, type TakeVia } from '@/lib/director/video-modes'
+import { isMadeVideoMode, takeOverrideForRequest, videoModeForRequest, type TakeVia } from '@/lib/director/video-modes'
 
 // ============================================================================
 // Defaults
@@ -2189,7 +2189,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     // 지금 영상을 낸 작업이 쓴 그림(리드 B) — 해상도와 같은 규칙: 서버가 모를 때도 같은 영상이면 아는 값을 둔다.
                     madeFrames: parseMadeFrames(row.made_frames)
                       ?? (row.url && row.url === existingNode.data.videoUrl ? existingNode.data.madeFrames ?? null : null),
-                    madeVideoMode: isVideoMode(row.made_video_mode)
+                    madeVideoMode: isMadeVideoMode(row.made_video_mode)
                       ? row.made_video_mode
                       : (row.url && row.url === existingNode.data.videoUrl ? existingNode.data.madeVideoMode ?? null : null),
                     madeDialogueFingerprint: typeof row.made_dialogue_fingerprint === 'string'
@@ -2238,7 +2238,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               data.adherence = (row.adherence as VideoAdherence | null) ?? null
               data.videoResolution = isVideoResolution(row.video_resolution) ? row.video_resolution : null
               data.madeFrames = parseMadeFrames(row.made_frames)
-              data.madeVideoMode = isVideoMode(row.made_video_mode) ? row.made_video_mode : null
+              data.madeVideoMode = isMadeVideoMode(row.made_video_mode) ? row.made_video_mode : null
               data.madeDialogueFingerprint = typeof row.made_dialogue_fingerprint === 'string' ? row.made_dialogue_fingerprint : null
               data.madeModel = isVideoModelKey(row.made_model) ? row.made_model : null
               data.cancelledAt = typeof row.cancelled_at === 'string' ? row.cancelled_at : null
@@ -4811,23 +4811,18 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const idempotencyKey = crypto.randomUUID()
         const preserveSuccess = !!videoNode.data.videoUrl
         const frameInputs = normalizeFrameInputs(videoNode.data.frameInputs)
-        const hasManualFrameInputs =
-          !!frameInputs.start || !!frameInputs.end || frameInputs.refs.length > 0
+        // 끝 그림은 영상에 보내지 않는다(오너 2026-11-22 "Start, End 프레임 생성 방식 폐기") — 끝 칸만 이은 Take 는 손 배선으로 치지 않는다.
+        const hasManualFrameInputs = !!frameInputs.start || frameInputs.refs.length > 0
         const storyboard =
           shotNode && isShotData(shotNode.data)
             ? shotNode.data.storyboardImage
             : null
-        // V2 refs(#real-strip): 실사 3프레임이 있으면 [START, END] 2장 — 시작·끝 구도 고정.
+        // 실사 3프레임이 있으면 시작 한 장(서버가 방식대로 다시 고른다 — 실사 끝은 보내지 않는다, 2026-11-22).
         const sbFrames = storyboard?.status === 'completed' ? storyboard.frames : undefined
         const automaticStart =
           shotNode && isShotData(shotNode.data)
             ? resolveShotFrameImageUrl(shotNode.data, 'start')
             : null
-        const automaticEnd = sbFrames
-          ? shotNode && isShotData(shotNode.data)
-            ? resolveShotFrameImageUrl(shotNode.data, 'end')
-            : null
-          : null
         const automaticReferenceImageUrl =
           shotNode && isShotData(shotNode.data)
             ? (storyboard?.status === 'completed'
@@ -4851,12 +4846,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               resolveFrameInputImageUrl(get().nodes, sourceNodeId, 'ref'),
             )
             .filter((url): url is string => !!url)
-          const end =
-            (frameInputs.end
-              ? resolveFrameInputImageUrl(get().nodes, frameInputs.end, 'end')
-              : null) ?? automaticEnd
           const urls: string[] = []
-          const roles: Array<'start' | 'end' | 'ref'> = []
+          const roles: Array<'start' | 'ref'> = []
           if (start) {
             urls.push(start)
             roles.push('start')
@@ -4864,10 +4855,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           for (const url of refs) {
             urls.push(url)
             roles.push('ref')
-          }
-          if (end) {
-            urls.push(end)
-            roles.push('end')
           }
           if (urls.length > 0) {
             referenceImageUrls = urls

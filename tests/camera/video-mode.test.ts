@@ -1,4 +1,4 @@
-// Cinema [영상 만들기]의 방식 다섯 — 고를 수 없는 방식은 까닭과 함께 꺼지고, 이어서는 앞 샷의 Editor 로 가는 영상 끝 장면으로, 새 Take 마다 사람 말 · 만든 길을 새로 적는지 검사한다 (오너 2026-11-22 D2~D5 · fb-video 계약 fd0e8e56 · 리드 11/22 ⑤)
+// Cinema [영상 만들기]의 방식 넷 — 고를 수 없는 방식은 까닭과 함께 꺼지고, 이어서는 앞 샷의 Editor 로 가는 영상 끝 장면으로, 새 Take 마다 사람 말 · 만든 길을 새로 적는지 검사한다 (오너 2026-11-22 D2~D5 · fb-video 계약 fd0e8e56 · 리드 11/22 ⑤)
 import { readFileSync } from 'node:fs'
 import { describe, expect, it } from 'vitest'
 import {
@@ -37,18 +37,18 @@ const writerShots = [
 ] as unknown as Parameters<typeof cameraModeFacts>[0]['writerShots']
 const panel = () => readFileSync('src/features/camera/fix-panel.tsx', 'utf8')
 
-describe('방식 다섯', () => {
-  it('[영상 만들기] 칸에는 방식 다섯(기본 시작+끝 · 이어서 · 레퍼런스 · 시작+미들 · 시작+프롬프트)이 있고, 처음 고른 방식은 가장 새 Take 의 방식, 처음 영상이면 기본이다', () => {
-    // 왜: 오너 D2~D5 — 기본(시작+끝)과 넷. 방식은 [다시 만들기]처럼 앞 Take 를 이어받는다(fb-video 혼자 정한 것 3).
-    expect(CAMERA_VIDEO_MODES).toEqual(['start_end', 'continue', 'reference', 'start_middle', 'start_prompt'])
-    expect(CAMERA_VIDEO_MODES.map((mode) => translate('ko', VIDEO_MODE_LABEL[mode]))).toEqual(['시작+끝', '이어서', '레퍼런스', '시작+미들', '시작+프롬프트'])
-    expect(defaultVideoMode(null)).toBe('start_end')
-    expect(defaultVideoMode({ override: {} })).toBe('start_end')
+describe('방식 넷', () => {
+  it('[영상 만들기] 칸에는 방식 넷(이어서 · 레퍼런스 · 시작+미들 · 시작+프롬프트)이 있고, 처음 고른 방식은 가장 새 Take 의 방식, 처음 영상이면 기본(시작+프롬프트)이다', () => {
+    // 왜: 오너 D2~D5 의 넷 — 시작+끝은 오너 2026-11-22 폐기, 기본은 시작+프롬프트(리드 제안 · 오너 확인 중). 방식은 [다시 만들기]처럼 앞 Take 를 이어받는다(fb-video 혼자 정한 것 3).
+    expect(CAMERA_VIDEO_MODES).toEqual(['continue', 'reference', 'start_middle', 'start_prompt'])
+    expect(CAMERA_VIDEO_MODES.map((mode) => translate('ko', VIDEO_MODE_LABEL[mode]))).toEqual(['이어서', '레퍼런스', '시작+미들', '시작+프롬프트'])
+    expect(defaultVideoMode(null)).toBe('start_prompt')
+    expect(defaultVideoMode({ override: {} })).toBe('start_prompt')
     expect(defaultVideoMode({ override: { videoMode: 'reference' } })).toBe('reference')
-    expect(defaultVideoMode({ override: { videoMode: 'nope' } as never })).toBe('start_end')
+    expect(defaultVideoMode({ override: { videoMode: 'nope' } as never })).toBe('start_prompt')
   })
 
-  it('씬의 첫 샷 · 앞 샷 영상이 없거나 만드는 중 · 미들 스케치가 없으면 그 방식은 꺼지고 까닭이 보인다', () => {
+  it('씬의 첫 샷 · 앞 샷 영상이 없거나 만드는 중 · 실사 시트에 가운데 장이 없으면 그 방식은 꺼지고 까닭이 보인다', () => {
     // 왜: 서버가 막을 요청(409)을 보내기 전에 화면이 막고, 왜 못 고르는지 한 줄로 알린다(Take 를 쓰지 않는다).
     const first = cameraModeFacts({ shotNodeId: 'n1', nodes: [shot('n1', 'w1')], writerShots })
     expect(videoModeAvailability('continue', first.facts)).toEqual({ enabled: false, reason: 'first_shot_in_scene' })
@@ -56,7 +56,10 @@ describe('방식 다섯', () => {
     expect(videoModeAvailability('continue', noPrevVideo.facts)).toEqual({ enabled: false, reason: 'previous_video_missing' })
     const making = cameraModeFacts({ shotNodeId: 'n2', nodes: [shot('n1', 'w1'), shot('n2', 'w2'), take('t1', 'n1', 1, { status: 'generating', lastAttemptStatus: 'generating', videoUrl: null })], writerShots })
     expect(videoModeAvailability('continue', making.facts)).toEqual({ enabled: false, reason: 'previous_video_generating' })
-    const noMiddle = cameraModeFacts({ shotNodeId: 'n3', nodes: [shot('n3', 'w3')], writerShots })
+    // 미들은 실사 시트의 가운데 장이다(오너 V2) — 가운데 장이 없는 실사.
+    const noDirection = shot('n3', 'w3') as unknown as { id: string; data: Record<string, unknown> }
+    noDirection.data = { ...noDirection.data, storyboardImage: { url: 'https://x/n3.png', status: 'completed', errorMessage: null, generatedAt: 1, frames: { start: 'https://x/n3.png', end: 'https://x/n3.png-end' } } }
+    const noMiddle = cameraModeFacts({ shotNodeId: 'n3', nodes: [noDirection as unknown as DirectorNode], writerShots })
     expect(videoModeAvailability('start_middle', noMiddle.facts)).toEqual({ enabled: false, reason: 'middle_missing' })
     const noImage = cameraModeFacts({ shotNodeId: 'n1', nodes: [shot('n1', 'w1', false)], writerShots })
     expect(videoModeAvailability('reference', noImage.facts)).toEqual({ enabled: false, reason: 'storyboard_missing' })
@@ -94,7 +97,7 @@ describe('새 Take 의 기록', () => {
       inheritFromVideoNodeId: 'old',
       videoOverride: { changeNote: '', videoMode: 'reference', note: '', via: 'button' },
     })
-    expect(made('', 'start_end', null)).toEqual({ videoOverride: { videoMode: 'start_end', note: '', via: 'button' } })
+    expect(made('', 'start_prompt', null)).toEqual({ videoOverride: { videoMode: 'start_prompt', note: '', via: 'button' } })
     expect(panel()).toMatch(/fresh: freshTakeFields\(\{ mode, change, continueFrom \}\)/)
     expect(panel()).toMatch(/const change = base \? note : ''/)
   })

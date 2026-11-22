@@ -3,7 +3,7 @@ import { classifyJobError } from '@/lib/generation-jobs'
 import { cancelledJobsById } from '@/lib/director/job-cancellations'
 import { releaseTakesForJob } from '@/lib/billing/take-hold'
 import type { Json, Tables } from '@/types/database'
-import { DEFAULT_VIDEO_MODE, isVideoMode, type VideoMode } from '@/lib/director/video-modes'
+import { RETIRED_START_END, isMadeVideoMode, type MadeVideoMode } from '@/lib/director/video-modes'
 import { isDialogueFingerprint } from '@/lib/director/dialogue-fingerprint'
 import { videoModelKeyOfEndpoint, type VideoModelKey } from '@/lib/video-models'
 export {
@@ -160,8 +160,8 @@ export type LiveDirectorVideoTake = DirectorVideoTake & {
   video_resolution: '1080p' | null
   /** 지금 영상을 낸 작업이 쓴 시작 · 끝(· 미들) 그림 주소(리드 B). 모르면 null. */
   made_frames: { start: string | null; end: string | null; middle?: string | null } | null
-  /** 지금 영상을 낸 작업의 방식(2026-11-22 D2~D5) — 적히지 않은 작업은 기본(start_end), 모르면 null. */
-  made_video_mode: VideoMode | null
+  /** 지금 영상을 낸 작업의 방식(2026-11-22 D2~D5) — 방식이 적히지 않은 옛 작업은 폐기한 시작+끝(start_end), 손 배선 작업 · 모르면 null. */
+  made_video_mode: MadeVideoMode | null
   /** 지금 영상을 낸 작업이 남긴 대사 지문(오너 2026-11-22 E3) — 다시 만드는 중 · 실패한 시도 · 지문 없는 옛 작업이면 null. */
   made_dialogue_fingerprint: string | null
   /** 지금 영상을 낸 작업의 모델(리드 2026-11-22 · fb-camera 발견) — 판의 모델 이름 근거. 다시 만드는 중 · 실패한 시도 ·
@@ -182,11 +182,12 @@ type LastAttemptJob = {
   reference_image_urls?: unknown
   reference_image_roles?: unknown
   video_mode?: unknown
+  frame_source?: unknown
   dialogue_fingerprint?: unknown
 }
 
 const LIVE_TAKE_WITH_LAST_JOB =
-  '*, last_attempt_job:generation_jobs!video_clips_last_attempt_job_fkey(id, status, model, result_url, resolution:input_snapshot->>resolution, reference_image_url:input_snapshot->>reference_image_url, reference_image_urls:input_snapshot->reference_image_urls, reference_image_roles:input_snapshot->reference_image_roles, video_mode:input_snapshot->>video_mode, dialogue_fingerprint:input_snapshot->>dialogue_fingerprint)'
+  '*, last_attempt_job:generation_jobs!video_clips_last_attempt_job_fkey(id, status, model, result_url, resolution:input_snapshot->>resolution, reference_image_url:input_snapshot->>reference_image_url, reference_image_urls:input_snapshot->reference_image_urls, reference_image_roles:input_snapshot->reference_image_roles, video_mode:input_snapshot->>video_mode, frame_source:input_snapshot->>frame_source, dialogue_fingerprint:input_snapshot->>dialogue_fingerprint)'
 
 /** 지금 영상 파일을 그 작업이 냈는가 — 다시 만드는 중 · 다시 만들기 실패면 지금 영상은 예전 작업 것이다. */
 function madeByJob(take: Pick<DirectorVideoTake, 'url' | 'storage_path'>, job: LastAttemptJob | null | undefined): job is LastAttemptJob {
@@ -217,13 +218,19 @@ export function madeFrames(
   return middle ? { start, end, middle } : { start, end }
 }
 
-/** 지금 영상을 낸 작업의 방식(2026-11-22 D2~D5) — 다시 만드는 중 · 실패한 시도면 모른다(null). 방식이 적히지 않은 작업은 기본. */
+/**
+ * 지금 영상을 낸 작업의 방식(2026-11-22 D2~D5) — 다시 만드는 중 · 실패한 시도면 모른다(null).
+ *   시작+끝 폐기(오너 2026-11-22 밤) 뒤로는 기본 방식도 적는다 — 방식이 적히지 않은 작업은 그 전(기본 = 시작+끝)에 만든 옛 작업이다.
+ *   방식 없는 손 배선 · 직접 보낸 그림 작업(frame_source 표시)은 방식을 모른다(null) — 끝 그림을 보낸 적 없는 Take 를 시작+끝으로 읽지 않는다.
+ */
 export function madeVideoMode(
   take: Pick<DirectorVideoTake, 'url' | 'storage_path'>,
   job: LastAttemptJob | null | undefined,
-): VideoMode | null {
+): MadeVideoMode | null {
   if (!madeByJob(take, job)) return null
-  return isVideoMode(job.video_mode) ? job.video_mode : DEFAULT_VIDEO_MODE
+  if (isMadeVideoMode(job.video_mode)) return job.video_mode
+  if (typeof job.frame_source === 'string' && job.frame_source) return null
+  return RETIRED_START_END
 }
 
 /** 지금 영상을 낸 작업이 남긴 대사 지문(오너 2026-11-22 E3) — 화면이 dialogueChangedSince 로 지금 대사와 견준다. 모르면 null. */

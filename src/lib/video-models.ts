@@ -163,6 +163,8 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.2,
     maxImageUrls: 3,
+    // 오너 V3(2026-11-22): Veo 3.1 은 가로 · 세로 영상만 만든다 — 정사각 요청을 fal 이 받았다가 422 로 실패하고 자동 대체가 MiniMax 로 넘어갔다.
+    aspectRatios: ['16:9', '9:16'],
   },
 }
 
@@ -207,6 +209,19 @@ export function normalizeProvider(p: string): VideoModelKey {
   if (p in VIDEO_MODELS) return p as VideoModelKey
   return DEFAULT_VIDEO_MODEL
 }
+
+/**
+ * 이 화면비 프로젝트에서 이 모델을 고를 수 있나(오너 V3 2026-11-22 — Veo 는 16:9 · 9:16 만). 고르기 화면(Camera · Director 노드 · 독립 영상)과
+ *   서버(영상 요청 · 일괄 · 채팅 · 다시 만들기)가 같이 부른다. 화면비 목록이 없는 모델은 어느 화면비든 된다.
+ *   aspectRatio = 프로젝트 화면비(videoAspectRatioFromFormat(parseProjectFormat(settings.format)) ?? '16:9').
+ */
+export function videoModelFitsAspectRatio(modelKey: VideoModelKey, aspectRatio: string): boolean {
+  const ratios = VIDEO_MODELS[modelKey].aspectRatios
+  return !ratios || ratios.includes(aspectRatio)
+}
+
+/** 고를 수 없을 때 보이는 까닭 한 줄(영어 원문 = i18n 키) — 서버 거절(409 model_aspect_unsupported)의 error 도 같은 글. 지금 걸리는 모델은 Veo 뿐이다. */
+export const VIDEO_MODEL_ASPECT_TEXT = 'Veo 3.1 makes only 16:9 or 9:16 videos. Choose another model for this project.'
 
 /** 고를 수 있는 영상 모델 이름인가 — 모르는 이름을 기본 모델로 바꾸지 않고 아니라고 답한다('constructor' 같은 이름도 아니다). */
 export function isVideoModelKey(value: unknown): value is VideoModelKey {

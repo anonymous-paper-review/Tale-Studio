@@ -40,6 +40,8 @@ import {
   frameSlotRoles,
   isVideoResolution,
   normalizeProvider,
+  videoModelFitsAspectRatio,
+  VIDEO_MODEL_ASPECT_TEXT,
   type VideoModelKey,
 } from '@/lib/video-models'
 import {
@@ -64,16 +66,18 @@ import {
 } from '@/lib/director/video-reference-frames'
 import {
   DEFAULT_VIDEO_MODE,
+  RETIRED_START_END,
+  isMadeVideoMode,
   isTakeVia,
   isVideoMode,
   parseContinueFrom,
   type ContinueFrom,
   type VideoMode,
 } from '@/lib/director/video-modes'
-import { resolveModeFrames, type LabeledImage, type ModeFramesResult } from '@/lib/director/video-mode-frames'
+import { isRoughImageUrl, resolveModeFrames, type LabeledImage, type ModeFramesResult } from '@/lib/director/video-mode-frames'
 import { checkContinueSource } from '@/lib/director/video-continue-source'
 import { dialogueFingerprint } from '@/lib/director/dialogue-fingerprint'
-import { freshDirectionLine } from '@/lib/writer/direction-read'
+import { freshDirectionRead } from '@/lib/writer/direction-read'
 import {
   MISSING_CHARACTER_SHEETS,
   directorRefsExcludeWorld,
@@ -404,7 +408,9 @@ async function loadShotPropReferenceImages(): Promise<LabeledImage[]> {
 
 const MODE_FRAME_ERRORS: Record<Exclude<ModeFramesResult, { ok: true }>['code'], { status: 400 | 409; error: string }> = {
   missing_storyboard: { status: 409, error: 'The live-action storyboard is missing for this shot. Generate it before the video.' },
-  missing_middle_frame: { status: 409, error: 'The middle (direction) frame for this shot is missing. Draw the rough storyboard first.' },
+  missing_middle_frame: { status: 409, error: "This shot's live-action storyboard has no middle (direction) panel. Generate the live-action storyboard again first." },
+  // 리드 D1(2026-11-22): 실사를 그린 뒤 러프가 바뀌었으면 실사 가운데 장(고치기 전 움직임)과 읽은 줄(고친 뒤 움직임)이 다르다.
+  middle_outdated: { status: 409, error: 'Redraw the live-action storyboard after editing the rough to use Start + middle.' },
   missing_reference_images: { status: 409, error: 'This shot has no images to use as references.' },
   missing_continue_frame: { status: 400, error: 'Invalid request: continueFrom is required for continue' },
 }
@@ -612,10 +618,19 @@ async function prepareVideoRequest(
     }
     // 영상 만드는 방식(오너 2026-11-22 D2~D5): 모르는 이름은 어떤 그림을 보낼지 정한 적이 없다 — Take 를 잡기 전에 거절한다.
     //   독립 영상(샷 없음)은 방식이 없다(설정 전체를 그 영상이 갖는다) — 보내도 쓰지 않는다.
-    if (body.videoMode != null && !isVideoMode(body.videoMode)) {
-      return NextResponse.json({ error: 'Invalid request: videoMode must be start_end, continue, reference, start_middle or start_prompt' }, { status: 400 })
+    //   폐기한 'start_end'(옛 Take 다시 만들기 · 옛 화면이 보냄)는 거절하지 않고 기본 방식으로 만든다(오너 2026-11-22 "다시 만들면 기본 방식").
+    if (body.videoMode != null && !isMadeVideoMode(body.videoMode)) {
+      return NextResponse.json({ error: 'Invalid request: videoMode must be continue, reference, start_middle or start_prompt' }, { status: 400 })
     }
-    const videoMode: VideoMode | null = !standalone && isVideoMode(body.videoMode) ? body.videoMode : null
+    // 서버가 그림을 고르는 요청('auto' — 지금 화면 · 일괄)은 방식이 없으면 기본 방식(시작+프롬프트)으로 만든다(오너 2026-11-22 시작+끝 폐기).
+    //   손 배선('manual')은 방식이 없다(손 배선이 이긴다). 그림을 직접 보낸 옛 요청(frameSource 없음)은 보낸 그림에서 끝만 뺀다.
+    const videoMode: VideoMode | null = standalone
+      ? null
+      : isVideoMode(body.videoMode)
+        ? body.videoMode
+        : body.frameSource !== 'manual' && (body.videoMode === RETIRED_START_END || body.frameSource === 'auto')
+          ? DEFAULT_VIDEO_MODE
+          : null
     const continueFrom = videoMode === 'continue' ? parseContinueFrom(body.continueFrom) : null
     if (videoMode === 'continue' && !continueFrom) {
       return NextResponse.json({ error: 'Invalid request: continueFrom is required for continue' }, { status: 400 })
@@ -683,6 +698,16 @@ async function prepareVideoRequest(
     const chosenFrames = modeSelection
       ? { generationMethod: 'I2V' as const, referenceImageUrl: modeSelection.urls[0] ?? null, referenceImageUrls: modeSelection.urls, referenceImageRoles: modeSelection.roles }
       : frames
+    // 오너 2026-11-22 "영상 생성에는 무조건 실사 그림만": 러프(목각 인형) 그림이 섞이면 Take 를 잡기 전에 멈춘다 — 몰래 빼고 만들지 않는다.
+    //   지금 화면은 러프를 보내지 않는다(③ 미들도 실사) — 걸리면 고장이다.
+    const shotRough = standalone ? null : (shot as { rough_storyboard?: unknown } | null)?.rough_storyboard
+    const imagesToSend = [...(chosenFrames.referenceImageUrls ?? []), ...(chosenFrames.referenceImageUrl ? [chosenFrames.referenceImageUrl] : [])]
+    if (imagesToSend.some((url) => isRoughImageUrl(url, shotRough))) {
+      return NextResponse.json(
+        { error: 'Rough (wooden mannequin) images cannot be used to make a video.', code: 'rough_image_not_allowed', shotId: writerShotId },
+        { status: 400 },
+      )
+    }
     const generationMethod: GenerationMethod = chosenFrames.generationMethod
     const referenceImageUrl = chosenFrames.referenceImageUrl ?? undefined
     let standaloneConfig: StandaloneVideoConfig | null = null
@@ -718,6 +743,14 @@ async function prepareVideoRequest(
     }
     if (!writerShotId || prompt === undefined) {
       return NextResponse.json({ error: 'Video generation input is incomplete' }, { status: 400 })
+    }
+    // 오너 V3(2026-11-22): 이 프로젝트 화면비를 못 만드는 모델(Veo = 16:9 · 9:16 만)은 Take · 예산 · 동시성을 보기 전에 멈춘다 —
+    //   fal 이 받았다가 실패하면 자동 대체가 다른 모델로 몰래 만들었다. 새 Take · 다시 만들기 · 채팅 · 일괄이 모두 이 준비를 지난다.
+    if (!videoModelFitsAspectRatio(normalizeProvider(model ?? ''), effectiveAspectRatio)) {
+      return NextResponse.json(
+        { error: VIDEO_MODEL_ASPECT_TEXT, code: 'model_aspect_unsupported', shotId: writerShotId, aspectRatio: effectiveAspectRatio },
+        { status: 409 },
+      )
     }
     const characterAppearanceKeys = standalone
       ? {}
@@ -827,10 +860,12 @@ async function prepareVideoRequest(
     })()
     const promptIsStoredComposition =
       !standalone && typeof shot?.prompt === 'string' && shot.prompt.trim() === prompt.trim()
-    // 오너 Q4(2026-11-22): 사람이 고친 연출 장을 AI 가 읽은 줄(그 줄로 끝 장까지 다시 그렸을 때만 — fb-end freshDirectionLine).
+    // 오너 Q4(2026-11-22): 사람이 고친 연출 장을 AI 가 읽은 줄 — 지금 연출 장을 읽은 줄이면 싣는다(fb-end freshDirectionRead).
+    //   리드 D2(2026-11-22): 끝 그림이 영상에서 빠져 "끝 장을 그 줄로 그렸을 때만"(리드 Q-a)의 까닭이 영상에는 없다 — 끝 장을 [그대로] 둬도 싣는다.
+    //   (실사 R1 은 지금처럼 끝 장을 그린 줄만 쓴다 — 실사 시트에는 끝 칸이 있다.)
     //   있으면 영상의 움직임은 그 줄이 정한다 — 작가의 옛 움직임 글(motion_prompt)은 붙이지 않고, 옛 움직임 계약은 buildVideoPrompt 가 뺀다.
     //   없거나 낡았으면 null — 지시 · 검사 · 기록이 이 기능 전과 같다.
-    const directionLine = standalone ? null : freshDirectionLine((shot as { rough_storyboard?: unknown } | null)?.rough_storyboard)
+    const directionLine = standalone ? null : freshDirectionRead((shot as { rough_storyboard?: unknown } | null)?.rough_storyboard)?.en ?? null
     const promptForVideo =
       writerMotionPrompt && promptIsStoredComposition && !promptEn.includes(writerMotionPrompt) && !directionLine
         ? `${writerMotionPrompt} ${promptEn}`
@@ -969,7 +1004,9 @@ async function prepareVideoRequest(
       // 덜어 낸 그림이 있을 때만 적는다 — 덜지 않은 요청은 이 기능 전 작업과 같은 기록 모양(재생 비교 보호).
       ...(droppedReferenceImages > 0 ? { dropped_reference_images: droppedReferenceImages } : {}),
       // 방식(2026-11-22): 기본이 아닐 때만 적는다 — 기본은 이 기능 전 작업과 같은 기록 모양(재생 비교 보호, resolution 과 같은 규칙).
-      ...(videoMode && videoMode !== DEFAULT_VIDEO_MODE ? { video_mode: videoMode } : {}),
+      // 방식은 기본까지 늘 적는다(2026-11-22) — 기본이 시작+프롬프트로 바뀌어 "안 적음"은 폐기 전 옛 작업(시작+끝)만 뜻한다.
+      //   방식 없는 손 배선 · 직접 보낸 그림 작업은 그 표시를 남긴다 — 이력이 그 작업을 옛 시작+끝으로 읽지 않게(madeVideoMode).
+      ...(videoMode ? { video_mode: videoMode } : standalone ? {} : { frame_source: body.frameSource === 'manual' ? 'manual' : 'client' }),
       ...(videoMode === 'continue' && continueFrom
         ? { continue_from: { video_clip_id: continueFrom.videoClipId, generation_job_id: continueFrom.generationJobId, frame_url: continueFrom.frameUrl } }
         : {}),

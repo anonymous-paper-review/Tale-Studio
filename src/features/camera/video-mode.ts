@@ -8,9 +8,11 @@ import {
   DEFAULT_VIDEO_MODE,
   START_MIDDLE_SOURCE,
   VIDEO_MODES,
+  isMadeVideoMode,
   isVideoMode,
   previousShotInScene,
   type ContinueFrom,
+  type MadeVideoMode,
   type VideoMode,
   type VideoModeBlock,
   type VideoModeFacts,
@@ -22,7 +24,8 @@ import type { Shot } from '@/types/shot'
 export const CAMERA_VIDEO_MODES: readonly VideoMode[] = VIDEO_MODES
 
 /** 방식 이름(영어 원문 = i18n 키). */
-export const VIDEO_MODE_LABEL: Record<VideoMode, string> = {
+// 이력에는 폐기한 시작+끝(옛 Take)도 이름이 있어야 한다 — 고를 수 있는 넷 + start_end(fb-video 2026-11-22, 타입만).
+export const VIDEO_MODE_LABEL: Record<MadeVideoMode, string> = {
   start_end: 'Start + end',
   // 'Continue' 는 이미 다른 뜻('계속하기')의 키라 쓰지 않는다.
   continue: 'Continuation',
@@ -32,7 +35,7 @@ export const VIDEO_MODE_LABEL: Record<VideoMode, string> = {
 }
 
 /** 고른 방식이 하는 일 한 줄(영어 원문 = i18n 키). */
-export const VIDEO_MODE_HINT: Record<VideoMode, string> = {
+export const VIDEO_MODE_HINT: Record<MadeVideoMode, string> = {
   start_end: 'Moves from the start image to the end image.',
   continue: "Starts where the previous shot's video ends.",
   reference: 'Uses the images only as a guide for faces, clothes and places, not as scenes.',
@@ -47,6 +50,8 @@ export const VIDEO_MODE_BLOCK_TEXT: Record<VideoModeBlock, string> = {
   previous_video_missing: 'The previous shot has no finished video yet.',
   previous_video_generating: "The previous shot's video is still being made.",
   middle_missing: 'This shot has no direction sketch yet. Draw its rough first.',
+  // 리드 D1(2026-11-22) — 서버 거절(409 middle_outdated)과 같은 글. 화면에서 이 까닭으로 끄는 일(cameraModeFacts middleOutdated)은 fb-camera 몫.
+  middle_outdated: 'Redraw the live-action storyboard after editing the rough to use Start + middle.',
 }
 
 /** 이어서의 출처 — 앞 샷의 Editor 로 가는 Take. plannedSec = 앞 샷 길이(장면을 잡는 자리, fb-video video-frame-capture). */
@@ -101,9 +106,9 @@ export function defaultVideoMode(base: Pick<VideoNodeData, 'override'> | null): 
   return isVideoMode(mode) ? mode : DEFAULT_VIDEO_MODE
 }
 
-/** 그 Take 를 만든 방식 — 다 된 Take 는 그 영상을 낸 작업 기록, 아직이면 고른 방식. 모르면 null. */
-export function takeVideoMode(take: Pick<VideoNodeData, 'madeVideoMode' | 'override'>): VideoMode | null {
-  if (isVideoMode(take.madeVideoMode)) return take.madeVideoMode
+/** 그 Take 를 만든 방식 — 다 된 Take 는 그 영상을 낸 작업 기록(옛 시작+끝 포함 — fb-video 2026-11-22), 아직이면 고른 방식. 모르면 null. */
+export function takeVideoMode(take: Pick<VideoNodeData, 'madeVideoMode' | 'override'>): MadeVideoMode | null {
+  if (isMadeVideoMode(take.madeVideoMode)) return take.madeVideoMode
   const chosen = (take.override as VideoOverride | undefined)?.videoMode
   return isVideoMode(chosen) ? chosen : null
 }
