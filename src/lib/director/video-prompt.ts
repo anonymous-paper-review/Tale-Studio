@@ -258,10 +258,11 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   //   계약 경로 캡 +450.
   // 읽은 줄은 맨 앞이고 그 길이만큼 상한을 늘린다 — 줄이 장면 글 자리를 빼앗지 않게(줄이 없으면 지금 상한 그대로).
   const cap = (contract.text ? (dialogue ? 1650 : 1400) : dialogue ? 750 : 500) + (movementText ? movementText.length + 2 : 0)
-  let fullPrompt = [movementText, contract.text, dialogue, prompt, movementFragment, gearFragment, cameraText]
-    .filter(Boolean)
-    .join('. ')
-    .slice(0, cap)
+  // 읽은 줄이 문장 부호(. 。 ! ?)로 끝나면 뒤 조각을 띄어쓰기 하나로 잇는다 — '. '로 이으면 "…subtly.. Full shot"처럼
+  //   마침표가 겹친다(영상 QA 2026-11-23). 줄이 없으면 지금과 한 글자도 다르지 않다.
+  const rest = [contract.text, dialogue, prompt, movementFragment, gearFragment, cameraText].filter(Boolean).join('. ')
+  const lead = movementText && rest ? `${movementText}${/[.。!?！？]$/u.test(movementText) ? ' ' : '. '}` : movementText
+  let fullPrompt = `${lead}${rest}`.slice(0, cap)
 
   // #u17-3(2026-08-31 오너 확정, 실측 sh_02_04): 장면 묘사문(shots.prompt)은 writer 가 상상한
   //   프레임 묘사라 실제 생성된 레퍼런스와 조명·배경·질감이 어긋날 수 있다 — 이미지 경로는
