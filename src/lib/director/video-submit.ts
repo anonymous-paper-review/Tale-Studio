@@ -72,6 +72,8 @@ import {
 } from '@/lib/director/video-modes'
 import { resolveModeFrames, type LabeledImage, type ModeFramesResult } from '@/lib/director/video-mode-frames'
 import { checkContinueSource } from '@/lib/director/video-continue-source'
+import { dialogueFingerprint } from '@/lib/director/dialogue-fingerprint'
+import { freshDirectionLine } from '@/lib/writer/direction-read'
 import {
   MISSING_CHARACTER_SHEETS,
   directorRefsExcludeWorld,
@@ -825,11 +827,18 @@ async function prepareVideoRequest(
     })()
     const promptIsStoredComposition =
       !standalone && typeof shot?.prompt === 'string' && shot.prompt.trim() === prompt.trim()
+    // 오너 Q4(2026-11-22): 사람이 고친 연출 장을 AI 가 읽은 줄(그 줄로 끝 장까지 다시 그렸을 때만 — fb-end freshDirectionLine).
+    //   있으면 영상의 움직임은 그 줄이 정한다 — 작가의 옛 움직임 글(motion_prompt)은 붙이지 않고, 옛 움직임 계약은 buildVideoPrompt 가 뺀다.
+    //   없거나 낡았으면 null — 지시 · 검사 · 기록이 이 기능 전과 같다.
+    const directionLine = standalone ? null : freshDirectionLine((shot as { rough_storyboard?: unknown } | null)?.rough_storyboard)
     const promptForVideo =
-      writerMotionPrompt && promptIsStoredComposition && !promptEn.includes(writerMotionPrompt)
+      writerMotionPrompt && promptIsStoredComposition && !promptEn.includes(writerMotionPrompt) && !directionLine
         ? `${writerMotionPrompt} ${promptEn}`
         : promptEn
     const dialogueLines = !standalone && Array.isArray(shot!.dialogue_lines) ? (shot!.dialogue_lines as DialogueLine[]) : null
+    // 대사 지문(오너 2026-11-22 E3): 만들 때의 대사(화자 · 글)를 남겨 "이 Take 를 만든 뒤 대사가 바뀌었나"를 알린다.
+    //   영상 준비 한 곳이라 한 Take · 일괄 · 이어서 · 다시 만들기가 같은 자리에서 남긴다. 독립 영상(샷 없음)은 대사가 없다.
+    const dialogueFingerprintValue = standalone ? null : dialogueFingerprint(dialogueLines)
     let dialogueSpeakers: Record<string, DialogueSpeaker> | null = null
     const speakerIds = [...new Set(
       (dialogueLines ?? [])
@@ -901,13 +910,15 @@ async function prepareVideoRequest(
       videoMode,
       referenceLabels,
       middleSource: modeSelection?.middleSource ?? null,
+      directionLine, // 오너 Q4
     })
     // #creem-moderation(2026-10-11): 최종 프롬프트가 확정된 직후·자리 예약(submitPreparedVideo) 전에
     //   사용자 글만 검사한다 — 샷 산문(모션 프롬프트 포함)과 대사. 모션 계약·카메라 기재·negative_prompt
     //   같은 우리 고정 문구는 보내지 않는다. 이 경로는 지금 요청이 아니라 나중 요청(묶음 이어가기)이
     //   저장된 스냅샷을 그대로 다시 내므로, 영수증을 input_snapshot 에 남긴다(해시 포함) — 이 경로는
     //   작업 행 자체가 영수증을 들고 있어 별도 관측 이벤트를 더 쓰지 않는다(이미지·previz 는 반대).
-    const moderationParts = [promptForVideo, ...(dialogueLines ?? []).map((line) => line?.text)]
+    // 읽은 줄에는 사람이 연출 장에 쓴 손글씨 · 사람이 고친 글이 옮겨진다(오너 Q4) — 사용자 글처럼 같이 검사한다.
+    const moderationParts = [promptForVideo, ...(dialogueLines ?? []).map((line) => line?.text), ...(directionLine ? [directionLine] : [])]
     // 재생(exactReplay)은 이미 통과한 예약을 다시 내는 것이다 — 저장된 영수증의 해시가 지금 글의
     //   해시와 같을 때만 그 영수증을 다시 쓴다. 다르면 새로 검사한다(예전 영수증이 다른 글을 통과시키지 못하게).
     let moderation = exactReplay
@@ -963,6 +974,9 @@ async function prepareVideoRequest(
         ? { continue_from: { video_clip_id: continueFrom.videoClipId, generation_job_id: continueFrom.generationJobId, frame_url: continueFrom.frameUrl } }
         : {}),
       ...(referenceLabels ? { reference_labels: referenceLabels } : {}),
+      ...(dialogueFingerprintValue ? { dialogue_fingerprint: dialogueFingerprintValue } : {}),
+      // 실은 읽은 줄(오너 Q4) — 실었을 때만 적는다(없는 요청은 이 기능 전 기록 모양 그대로, 재생 비교 보호).
+      ...(directionLine ? { direction_read: promptParts.directionRead ?? directionLine } : {}),
       movement_preset: movementPreset ?? null,
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),

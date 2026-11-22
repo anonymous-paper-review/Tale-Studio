@@ -3844,6 +3844,8 @@ export const KO: Record<string, string> = {
   'Continued from the previous video': '앞 영상에서 이어서',
   'Change: {note}': '바꿀 점: {note}',
   'Asked in chat: {note}': '채팅으로 부탁: {note}',
+  // 대사 바뀜 표시(오너 2026-11-22 E3 — 오너 페이지 문장에서 대시만 뺌)
+  'The dialogue changed. Make a new Take to match.': '대사가 바뀌었어요. 다시 만들면 맞아요.',
   'Made again': '다시 만듦',
   'Failed: {reason}': '실패: {reason}',
   'Remake failed: {reason}': '다시 만들기 실패: {reason}',

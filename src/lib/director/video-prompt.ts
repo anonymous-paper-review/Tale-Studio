@@ -22,6 +22,8 @@ export type VideoPromptParts = {
   referenceRoles?: string
   /** 영상 만드는 방식 문장(2026-11-22 D2~D5) — 기본(시작+끝)이면 없다. */
   videoMode?: string
+  /** 고친 연출 장을 읽은 줄(오너 2026-11-22 Q4) — 있으면 움직임은 이 줄이 정한다. */
+  directionRead?: string
 }
 
 export type VideoReferenceImageRole = 'start' | 'end' | 'ref' | 'direction'
@@ -55,7 +57,15 @@ export type BuildVideoPromptInput = {
   referenceLabels?: string[] | null
   /** ③ 미들 출처 — 러프 스케치와 실사 가운데 장을 다르게 부른다. */
   middleSource?: StartMiddleSource | null
+  /**
+   * 고친 연출 장을 AI 가 읽은 한 줄의 영어판(오너 2026-11-22 Q4 — fb-end freshDirectionLine). 있으면 영상의 움직임은 이 줄이 정한다:
+   *   맨 앞에 싣고 옛 움직임 계약(dynamicSpec)은 싣지 않는다. 없거나(null) 빈 글이면 지금 지시 그대로(정상 경로 고정).
+   */
+  directionLine?: string | null
 }
+
+/** 읽은 줄을 싣는 길이 상한 — 사람이 고친 줄이 지나치게 길면 다른 지시를 밀어낸다. */
+export const DIRECTION_LINE_MAX_CHARS = 400
 
 function referenceRolesClause(roles: VideoReferenceImageRole[]): string {
   const order = roles
@@ -222,7 +232,12 @@ export function dialogueClause(
 
 export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: string; prompt_parts: VideoPromptParts } {
   const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, referenceImageRoles, dynamicSpec, dialogueLines, dialogueSpeakers, characterNames, videoMode, referenceLabels, middleSource } = parts
-  const contract: MotionContract = compileMotionContract(dynamicSpec, durationSeconds, {
+  // 오너 Q4(2026-11-22): 고친 연출 장을 읽은 줄이 있으면 움직임은 그 줄이 정한다 — 옛 움직임 계약은 싣지 않는다(끝 그림과 같은 원칙).
+  const directionLine = typeof parts.directionLine === 'string' && parts.directionLine.trim()
+    ? parts.directionLine.trim().slice(0, DIRECTION_LINE_MAX_CHARS)
+    : null
+  const movementText = directionLine ? `Movement (from the edited direction sketch): ${directionLine}` : ''
+  const contract: MotionContract = compileMotionContract(directionLine ? null : dynamicSpec, durationSeconds, {
     names: characterNames ? new Map(Object.entries(characterNames)) : null,
   })
   const dialogue = dialogueClause(dialogueLines, dialogueSpeakers)
@@ -230,6 +245,7 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   const movementFragment = generationMethod === 'T2V' && movementPreset ? findCameraMovement(movementPreset)?.prompt_fragment ?? '' : ''
   const gearFragment = cameraPreset ? `shot on ${findCameraBrand(cameraPreset.brand)?.full_name ?? cameraPreset.brand}, ${cameraPreset.focalLength}mm, f/${cameraPreset.aperture}, white balance ${cameraPreset.whiteBalance}K` : ''
   const prompt_parts: VideoPromptParts = { prompt, movement: movementFragment, gear: gearFragment, camera: cameraText }
+  if (directionLine) prompt_parts.directionRead = directionLine
   if (contract.text) prompt_parts.motionContract = contract.text
   if (dialogue) prompt_parts.dialogue = dialogue
   // 계약문이 맨 앞(모델이 앞 토큰을 강하게 가중) — 그 뒤 장면 묘사·수동 카메라·기어.
@@ -240,8 +256,9 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   // #coverage-first(2026-09-02 리뷰 M3): 순차 계약(then·순서 문장·gaze)이 계약문을 ~1000자까지 키워
   //   옛 캡(950)에서 ban 절과 장면 묘사문(prompt — 리빌 대상을 나르는 유일한 채널)이 통째로 잘렸다.
   //   계약 경로 캡 +450.
-  const cap = contract.text ? (dialogue ? 1650 : 1400) : dialogue ? 750 : 500
-  let fullPrompt = [contract.text, dialogue, prompt, movementFragment, gearFragment, cameraText]
+  // 읽은 줄은 맨 앞이고 그 길이만큼 상한을 늘린다 — 줄이 장면 글 자리를 빼앗지 않게(줄이 없으면 지금 상한 그대로).
+  const cap = (contract.text ? (dialogue ? 1650 : 1400) : dialogue ? 750 : 500) + (movementText ? movementText.length + 2 : 0)
+  let fullPrompt = [movementText, contract.text, dialogue, prompt, movementFragment, gearFragment, cameraText]
     .filter(Boolean)
     .join('. ')
     .slice(0, cap)
