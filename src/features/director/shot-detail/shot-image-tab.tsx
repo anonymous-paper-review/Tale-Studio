@@ -33,7 +33,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   data: ShotNodeData
   layout: 'popup' | 'panel'
   /** [다음: 영상 만들기 · N Take](D6) — 새 Take 를 만들고 영상 탭으로 간다. notice = 시작하지 않은 까닭(단추 아래). */
-  makeVideo?: { label: string; disabled: boolean; run: () => void; notice?: string | null }
+  makeVideo?: { label: string; disabled: boolean; run: () => void; notice?: string | null; reason?: string | null }
 }) {
   const t = useT()
   const projectFormat = useProjectFormatStore((s) => s.format)
@@ -183,6 +183,8 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
         </Button>
       </div>
       {hasImage && makeVideo?.notice ? <p className="text-caption text-destructive">{makeVideo.notice}</p> : null}
+      {/* 꺼진 까닭 한 줄(오너 V3 — 이어받은 모델이 화면비에 안 맞음). 단추를 누르지 못하게 한 까닭이라 흐린 글자. */}
+      {hasImage && makeVideo?.reason ? <p className="text-caption text-subtle-foreground">{makeVideo.reason}</p> : null}
     </div>
   )
 

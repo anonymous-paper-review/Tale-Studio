@@ -332,7 +332,7 @@ describe('Director 샷 상세 화면', () => {
     expect(tab).toMatch(/<StoryboardImageButton nodeId=\{nodeId\} data=\{data\}/)
   })
 
-  it('이미지 탭의 다시 만들기 단추는 "시작·끝 이미지 다시 만들기 · Takes 0" 하나이고 바꾸고 싶은 점을 이번 생성에 실어 보낸다', () => {
+  it('이미지 탭의 다시 만들기 단추는 "이미지 다시 만들기 · Takes 0" 하나이고 바꾸고 싶은 점을 이번 생성에 실어 보낸다', () => {
     // 왜: D6 · 오너 답 5번 — 시작 · 끝 함께 다시 만든다. 바꾸고 싶은 점은 이번 생성에만 붙는다(혼자 정한 것).
     expect(render('popup')).toContain('Remake images · Takes 0')
     const button = readFileSync('src/features/director/storyboard-image-button.tsx', 'utf8')
