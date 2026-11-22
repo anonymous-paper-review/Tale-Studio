@@ -107,12 +107,12 @@ export const STAGE_AGENT_NAME: Record<StageId, string> = {
 }
 
 /** stage 색 badge 클래스 — design.md §2.9 토큰. JIT-safe literal (face와 동일 색). */
-//   색은 화면 이름을 따른다: Producer(entry)=보라, Writer(producer)=파랑, Storyboard(writer)=청록.
+//   색은 화면 이름을 따른다: Producer(entry) · Writer(producer) · 콘티(writer — Writer 탭 안의 칸이라 Writer 색, D1 2026-11-22 · 리드 결정 2).
 //   Camera 는 옛 Storyboard 색(딥 블루)을 받는다(리드 2026-11-22 — 콘티가 Writer 칸 안으로 들어가며 비는 자리, design.md §2.9).
 export const STAGE_BADGE_CLASS: Record<StageId, string> = {
   entry: 'bg-stage-producer/15 text-stage-producer border-stage-producer/30',
   producer: 'bg-stage-writer/15 text-stage-writer border-stage-writer/30',
-  writer: 'bg-stage-storyboard/15 text-stage-storyboard border-stage-storyboard/30',
+  writer: 'bg-stage-writer/15 text-stage-writer border-stage-writer/30',
   artist: 'bg-stage-artist/15 text-stage-artist border-stage-artist/30',
   camera: 'bg-stage-storyboard/15 text-stage-storyboard border-stage-storyboard/30',
   director: 'bg-stage-director/15 text-stage-director border-stage-director/30',
@@ -123,7 +123,7 @@ export const STAGE_BADGE_CLASS: Record<StageId, string> = {
 export const STAGE_FACE_COLOR: Record<StageId, string> = {
   entry: 'var(--stage-producer)',
   producer: 'var(--stage-writer)',
-  writer: 'var(--stage-storyboard)',
+  writer: 'var(--stage-writer)',
   artist: 'var(--stage-artist)',
   camera: 'var(--stage-storyboard)',
   director: 'var(--stage-director)',

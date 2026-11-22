@@ -31,21 +31,23 @@ export function lumiBox(size: LumiSize | number, variant: LumiVariant = 'full'):
   return { width, height: variant === 'full' ? Math.round(width * LUMI_BOX_RATIO) : width }
 }
 
-/** 단계 id → 화면 이름과 같은 Lumi 옷. id 는 옛 이름이다(entry=Producer, producer=Writer, writer=Storyboard).
+/** 단계 id → 화면 이름과 같은 Lumi 옷. id 는 옛 이름이다(entry=Producer, producer=Writer, writer=Storyboard → 콘티).
+ *  D1(오너 2026-11-22) · 리드 결정 2: 콘티(id writer)는 Writer 탭 안의 칸이라 Writer 옷 · 색이다.
  *  Camera(오너 2026-11-22 D2~D5)는 옛 Storyboard 옷 · 색을 받는다(리드 11/22 — 콘티가 Writer 칸 안으로 들어가며 비는 자리, 시안 없음). */
 export const STAGE_PERSONA: Record<StageId, LumiStagePersona> = {
   entry: 'producer',
   producer: 'writer',
   artist: 'artist',
-  writer: 'storyboard',
+  writer: 'writer',
   camera: 'storyboard',
   director: 'director',
   editor: 'editor',
 }
 
-/** 단계 옷이면 그 단계 색 이름(data-stage 값) — 화이트 펄 · 완성은 단계 색이 없다. */
+/** 단계 옷이면 그 단계 색 이름(data-stage 값) — 화이트 펄 · 완성은 단계 색이 없다.
+ *  옷 이름이 곧 색 이름이다(globals.css [data-stage]) — 지금 어느 단계 id 가 그 옷을 쓰는지와 상관없다(콘티가 Writer 옷이 된 뒤에도 Storyboard 옷 · 색은 남는다). */
 export function lumiStageTheme(persona: LumiPersona): LumiStagePersona | undefined {
-  return (Object.values(STAGE_PERSONA) as string[]).includes(persona) ? (persona as LumiStagePersona) : undefined
+  return persona === 'pearl' || persona === 'complete' ? undefined : persona
 }
 
 /** 움직이는 Lumi 파일(약 3.1MB, React · three.js 포함) — public/ 에 둔다. 큰 Lumi 가 처음 나올 때만 불러온다. */

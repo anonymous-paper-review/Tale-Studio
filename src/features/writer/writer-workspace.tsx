@@ -12,6 +12,8 @@ import { cn } from '@/lib/utils'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterUiStore } from '@/stores/writer-ui-store'
+import { useProducerStore } from '@/stores/producer-store'
+import { scriptKeptAsWritten } from '@/lib/writer/preserved-run'
 import { writerTabOrder } from '@/lib/writer/tab-order'
 
 // 생성 화면 디버그 진입(#gen-debug 2026-07-21): ?debug=generation + admin 계정일 때만
@@ -55,6 +57,8 @@ export function WriterWorkspace() {
   const projectId = useProjectStore((state) => state.projectId)
   const { status } = useWriterStatus(projectId)
   const debugGeneration = useGenerationDebug()
+  // 원본 그대로(대본 보존) — 대사 탭이 [대사 생성 · 다시 생성]을 숨긴다(D15 오너 2026-11-22).
+  const preserved = useProducerStore((s) => scriptKeptAsWritten({ preserveScript: s.preserveScript, storyText: s.storyText }))
 
   // V2 프로젝트 진입 동선 (#v2-tab 2026-08-17): 이전엔 engine=v2 면 프리뷰가 워크스페이스를
   //   전면 강점유해 헤더 탭이 보이지만 눌러도 반응이 없었고, 러프 보드가 영영 닫혔다.
@@ -131,7 +135,7 @@ export function WriterWorkspace() {
           visibleTab === 'dialogue' ? cn('flex min-h-0 flex-1 flex-col', slideClass) : 'hidden',
         )}
       >
-        <DialogueView />
+        <DialogueView preserved={preserved} />
       </div>
     </div>
   )

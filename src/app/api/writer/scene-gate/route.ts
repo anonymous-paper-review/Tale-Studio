@@ -11,6 +11,7 @@ import { requireProjectAccess } from '@/lib/api/guard'
 import { getActiveRun } from '@/lib/writer/run-store'
 import { triggerWriterStep } from '@/lib/writer/pipeline/steps'
 import type { WriterRunState } from '@/lib/writer/pipeline/steps'
+import { isPreservedScriptRun } from '@/lib/writer/preserved-run'
 import { mergeSceneStoryProposal, sceneStoryProposalExpired } from '@/lib/producer/scene-story-proposal'
 import { newRewriteProposal, variantProposal } from '@/lib/producer/scene-story-rewrite'
 import { rewriteBasis, rewriteLevelForSeed } from '@/lib/writer/prose-conditions'
@@ -74,7 +75,7 @@ export async function POST(req: NextRequest) {
       const state = { ...(run.state as WriterRunState) }
       const updatedAt = new Date(Math.max(Date.now(), new Date(run.updated_at).getTime() + 1)).toISOString()
       const storyVersion = state._sceneStoryVersion ?? run.updated_at
-      const preserved = state.input.preserveScript === true || state.scenes?.scenes.some((scene) => scene.provenance?.source === 'script')
+      const preserved = isPreservedScriptRun(state)
       if (preserved && (action === 'save' || action === 'revise' || action === 'apply' || action === 'rewrite')) {
         return NextResponse.json({ error: 'Preserved script scenes cannot be changed', code: 'preserved_script' }, { status: 409 })
       }

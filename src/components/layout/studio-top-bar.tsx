@@ -5,11 +5,13 @@
 //   오른쪽 자리에 단추를 놓고 싶은 화면(예: Director 의 [다음: Editor로])은 <TopBarActions> 로 넣는다.
 //   AI 가 일하는 잠금 화면이 떠 있어도 제목 칸은 막히지 않는다(data-ai-lock-keep, lib/ai-busy-lock) — 예전 레일 홈 카드처럼 이름을 바꾼다.
 //   단계 칩 · 오른쪽 자리는 그동안 막히고, 오른쪽 자리는 흐려져 막혀 있음을 알린다.
+//   Writer 두 화면(씬 스토리 · 콘티)은 칩 바로 오른쪽에 [씬 스토리 | 콘티]를 둔다(D1 2026-11-22, features/writer/writer-part-switch).
 import { useSyncExternalStore, type ReactNode } from 'react'
 import { createPortal } from 'react-dom'
 import { toast } from 'sonner'
 import { StageChip } from '@/components/controls/stage-chip'
 import { ProjectTitleField } from '@/features/entry/project-title-field'
+import { WriterPartSwitch } from '@/features/writer/writer-part-switch'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/stores/project-store'
@@ -52,6 +54,7 @@ export function StudioTopBar({
       data-testid="studio-top-bar"
     >
       <StageChip stage={stage} />
+      <WriterPartSwitch stage={stage} />
       <div data-ai-lock-keep className="contents">
         {title ?? <CurrentProjectTitle />}
       </div>

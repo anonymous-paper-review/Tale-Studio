@@ -79,11 +79,13 @@ export function nextStepAction(stage: StageId, opts: { producerLocked: boolean }
 
 /** 대상 스테이지를 가리키는 말 — 한/영 모두. */
 //   화면 이름을 따른다(리뉴얼 1차): "Writer"·"작가"는 id producer, "Storyboard"·"스토리보드"는 id writer.
+//   D1(오너 2026-11-22): id writer 는 Writer 탭의 콘티다 — "콘티" · "conti" 도 writer 를 가리키고, Artist 다음은 Writer 의 콘티라
+//   writer 를 목적지로 볼 때(Artist 에서 넘길 때)는 "Writer" · "작가"도 콘티로 읽는다. 옛 이름 "스토리보드"도 그대로 알아듣는다.
 //   Camera(오너 2026-11-22 D2~D5)의 영어 낱말은 탭 이름(STAGE_LABEL)에서 가져온다 — 이름이 바뀌면 따라간다.
 const STAGE_WORDS: Record<StageId, readonly string[]> = {
   entry: ['producer', '프로듀서'],
   producer: ['writer', '작가', '라이터'],
-  writer: ['storyboard', '스토리보드'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
+  writer: ['storyboard', '스토리보드', 'conti', '콘티', 'writer', '작가'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
   artist: ['artist', '아티스트', '컨셉아티스트'],
   camera: [STAGE_LABEL.camera.toLowerCase(), '카메라'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
   director: ['director', '디렉터', '디렉타', '감독'],

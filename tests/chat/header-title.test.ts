@@ -69,7 +69,8 @@ const CASES: Array<[string, StageId, string, string, string]> = [
   ['/studio/start', 'entry', 'Lumi와 기획 이야기', 'Planning with Lumi', 'producer'],
   ['/studio/producer', 'producer', 'Lumi와 산문 이야기', 'Prose with Lumi', 'writer'],
   ['/studio/artist', 'artist', 'Lumi와 그림 이야기', 'Art with Lumi', 'artist'],
-  ['/studio/writer', 'writer', 'Lumi와 연출 이야기', 'Directing with Lumi', 'storyboard'],
+  // 콘티(id writer)는 Writer 탭 안의 칸 — Writer 옷(D1 2026-11-22 · 리드 결정 2). 제목은 그대로.
+  ['/studio/writer', 'writer', 'Lumi와 연출 이야기', 'Directing with Lumi', 'writer'],
   ['/studio/director', 'director', 'Lumi · Director', 'Lumi · Director', 'director'],
   ['/studio/editor', 'editor', 'Lumi · Editor', 'Lumi · Editor', 'editor'],
 ]

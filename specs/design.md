@@ -231,7 +231,7 @@ v3 시안에는 테두리가 거의 없다(면 색 차이로 나눈다). 테두�
 | 토큰 | 화면 | 뜻 |
 |---|---|---|
 | `--stage-producer` | Producer (id entry) | 오렌지 골드 · 기획 |
-| `--stage-writer` | Writer (id producer) | 로즈 레드 · 글 |
+| `--stage-writer` | Writer (id producer) · 그 안의 콘티 칸(id writer, D1 2026-11-22 · 리드 결정 2) | 로즈 레드 · 글 · 콘티 |
 | `--stage-artist` | Artist | 일렉트릭 바이올렛 · 그림 |
 | `--stage-storyboard` | Storyboard (id writer) · Camera (id camera) | 딥 블루 · 콘티 → 촬영 |
 | `--stage-director` | Director | 애저 · 연출 |
@@ -543,6 +543,7 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 - **레일** `src/components/layout/sidebar.tsx`: 맨 위 Tale 로고(30×26, 누르면 프로젝트 목록) · 단계 칸(v3 채움 아이콘 · 라벨 · 끝낸 단계 체크 · 지금 단계 밝은 바탕과 단계 색 아이콘) · 아래 Take · 공유 · 내보내기 · Help · 프로필. 칸 모습 판정은 `src/lib/stage-rail.ts` `railStageState`(약속 tests/project/rail-done-mark.test.ts).
   11/5 색: 지금 단계 아이콘 = 그 단계 색(`text-stage`) · 이름 #F5F4EE, 다른 단계 아이콘 #C2C0B6(`text-muted-foreground`) · 이름은 끝냄 #C2C0B6 · 안 연 #8E8B82, 끝낸 단계 체크 크림 #F5F4EE. 아래 단추는 아이콘 · 글 사이 4(`FooterIconItem`).
 - **위 막대** `src/components/layout/studio-top-bar.tsx` `StudioTopBar`: 단계 칩(`StageChip`) · 프로젝트 제목 + 연필(`ProjectTitleField`, 이름 바꾸기) · 오른쪽 자리. 스튜디오 레이아웃이 모든 단계 화면 위에 놓고(위에 붙는 sticky), Producer 시작 화면은 탭이 든 자기 막대를 같은 컴포넌트로 그린다. 화면이 오른쪽 자리에 단추를 놓을 때는 `<TopBarActions>`(포털).
+  Writer 두 화면(씬 스토리 · 콘티, D1 2026-11-22)은 칩 바로 오른쪽에 [씬 스토리 | 콘티] 묶음 탭(`Tabs` default, 높이 32, `features/writer/writer-part-switch.tsx`)을 둔다 — **시안 없음**(부품 · 토큰으로 맞춤). 화면 이름은 이 칸이 보여 주고 두 화면 머리(`PageHeader`)의 큰 제목은 읽기 프로그램에만 남긴다. 아직 안 열린 콘티 칸은 꺼지고 까닭을 `title` 로 보인다.
 - **대시보드 머리** `src/components/dashboard/dashboard-header.tsx` `DashboardHeader`: 스튜디오 밖(/projects · /projects/new · /playground · /queue · /account) 공용 — `TaleLockup` · 탭 묶음 · 오른쪽 자리(새 프로젝트 등).
   11/5 R2~R6: 막대 바탕은 페이지 바탕을 따르고(이 화면들은 `bg-lobby`) 아래 선이 없다. 높이 78(위아래 20) · 로고 묶음 26 · 로고와 탭 사이 89.
   탭은 알약 하나(`bg-side` · 안쪽 4 · 사이 2, 칸 13px · 위아래 7 · 양옆 14, 고른 칸 `bg-tab-selected` 600 · 나머지 500 흐린 글자).

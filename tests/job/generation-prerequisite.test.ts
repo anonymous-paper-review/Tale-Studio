@@ -83,7 +83,7 @@ describe('prerequisiteLabel / notify', () => {
     const chat = mocks.notifyIssue.mock.calls.map((call) => String(call[1]))
     expect(chat).toEqual([
       '⚠ 수인 수장의 인물 시트을(를) 기다리는 중입니다. 준비되면 자동으로 이어서 생성합니다.',
-      '⚠ sh_01_24의 러프 스토리보드을(를) 20분 동안 기다렸지만 오지 않아 대기를 멈췄습니다. 먼저 만든 뒤 다시 눌러 주세요.',
+      '⚠ sh_01_24의 러프 콘티을(를) 20분 동안 기다렸지만 오지 않아 대기를 멈췄습니다. 먼저 만든 뒤 다시 눌러 주세요.',
     ])
     for (const line of chat) expect(line).not.toMatch(/생성 생성|시작하지 못했/)
   })
@@ -95,7 +95,7 @@ describe('prerequisiteLabel / notify', () => {
       shots: [{ shotId: 'sh_01_23', sceneId: 'sc_01' }, { shotId: 'sh_01_24', sceneId: 'sc_01' }] as never,
     })
     mocks.locale = 'ko'
-    expect(prerequisiteLabel(ROUGH)).toBe('샷 2의 러프 스토리보드')
+    expect(prerequisiteLabel(ROUGH)).toBe('샷 2의 러프 콘티')
     mocks.locale = 'en'
     expect(prerequisiteLabel(ROUGH)).toBe('the rough storyboard of Shot 2')
     // 보드에 없는 샷은 번호를 지어내지 않고 지금 그대로.
