@@ -14,12 +14,12 @@
 
 import { useEffect, useState } from 'react'
 import { usePathname } from 'next/navigation'
-import { STAGES } from '@/lib/constants'
 import { cn } from '@/lib/utils'
 import { writerPartSlide } from '@/lib/writer/parts'
 import {
   resolveStageCommit,
   slideDirectionBetween,
+  stageIdFromPathname,
   stageIndexFromPathname,
   stageNavMemory,
 } from '@/lib/stage-transition'
@@ -27,17 +27,19 @@ import {
 export default function StudioTemplate({ children }: { children: React.ReactNode }) {
   const pathname = usePathname()
   const idx = stageIndexFromPathname(pathname)
+  const stage = stageIdFromPathname(pathname)
   // 방향은 마운트 시 1회 고정. 싱글턴 읽기만 하고 갱신은 아래 effect 에서 — StrictMode 의
   //   이중 initializer 호출이 부작용 없이 같은 값을 계산한다.
   const [slide] = useState(() => {
     if (stageNavMemory.viaViewTransition) return { sideways: 'none', direction: 'none' } as const
-    const sideways = writerPartSlide(STAGES[stageNavMemory.lastIndex ?? -1]?.id, STAGES[idx]?.id)
+    const sideways = writerPartSlide(stageNavMemory.lastStage, stage)
     return { sideways, direction: sideways === 'none' ? slideDirectionBetween(stageNavMemory.lastIndex, idx) : 'none' } as const
   })
   useEffect(() => {
     if (idx !== -1) stageNavMemory.lastIndex = idx
+    if (stage) stageNavMemory.lastStage = stage
     resolveStageCommit()
-  }, [idx])
+  }, [idx, stage])
 
   return (
     <div
