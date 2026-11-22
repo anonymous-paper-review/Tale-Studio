@@ -1285,6 +1285,157 @@ export type Database = {
           },
         ]
       }
+      mt_events: {
+        Row: {
+          id: number
+          kind: string
+          project_id: string
+          t: string
+          text: string
+        }
+        Insert: {
+          id?: number
+          kind?: string
+          project_id: string
+          t?: string
+          text: string
+        }
+        Update: {
+          id?: number
+          kind?: string
+          project_id?: string
+          t?: string
+          text?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mt_events_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "mt_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mt_jobs: {
+        Row: {
+          args: Json
+          created_at: string
+          error: string | null
+          finished_at: string | null
+          id: number
+          kind: string
+          project_id: string
+          started_at: string | null
+          state: string
+          worker: string | null
+        }
+        Insert: {
+          args?: Json
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: number
+          kind: string
+          project_id: string
+          started_at?: string | null
+          state?: string
+          worker?: string | null
+        }
+        Update: {
+          args?: Json
+          created_at?: string
+          error?: string | null
+          finished_at?: string | null
+          id?: number
+          kind?: string
+          project_id?: string
+          started_at?: string | null
+          state?: string
+          worker?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "mt_jobs_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "mt_projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      mt_projects: {
+        Row: {
+          billing: Json | null
+          brief: Json
+          created_at: string
+          email: string | null
+          error: string | null
+          id: string
+          job: string | null
+          log: string | null
+          meta: Json
+          mode: string
+          phase: string | null
+          revisions: Json
+          snap: Json | null
+          status: string
+          token: string
+          updated_at: string
+        }
+        Insert: {
+          billing?: Json | null
+          brief?: Json
+          created_at?: string
+          email?: string | null
+          error?: string | null
+          id: string
+          job?: string | null
+          log?: string | null
+          meta?: Json
+          mode?: string
+          phase?: string | null
+          revisions?: Json
+          snap?: Json | null
+          status?: string
+          token: string
+          updated_at?: string
+        }
+        Update: {
+          billing?: Json | null
+          brief?: Json
+          created_at?: string
+          email?: string | null
+          error?: string | null
+          id?: string
+          job?: string | null
+          log?: string | null
+          meta?: Json
+          mode?: string
+          phase?: string | null
+          revisions?: Json
+          snap?: Json | null
+          status?: string
+          token?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
+      mt_workers: {
+        Row: {
+          name: string
+          seen: string
+        }
+        Insert: {
+          name: string
+          seen?: string
+        }
+        Update: {
+          name?: string
+          seen?: string
+        }
+        Relationships: []
+      }
       playground_items: {
         Row: {
           author_name: string
@@ -2073,6 +2224,7 @@ export type Database = {
         Row: {
           code: string
           id: string
+          plan: string
           plan_ended_at: string | null
           plan_ends_at: string | null
           redeemed_at: string
@@ -2082,6 +2234,7 @@ export type Database = {
         Insert: {
           code: string
           id?: string
+          plan: string
           plan_ended_at?: string | null
           plan_ends_at?: string | null
           redeemed_at?: string
@@ -2091,6 +2244,7 @@ export type Database = {
         Update: {
           code?: string
           id?: string
+          plan?: string
           plan_ended_at?: string | null
           plan_ends_at?: string | null
           redeemed_at?: string
@@ -2116,22 +2270,31 @@ export type Database = {
       }
       vouchers: {
         Row: {
+          active: boolean
           code: string
           created_at: string
+          deleted_at: string | null
+          duration_days: number
           max_uses: number
           note: string | null
           plan: string
         }
         Insert: {
+          active?: boolean
           code: string
           created_at?: string
+          deleted_at?: string | null
+          duration_days?: number
           max_uses?: number
           note?: string | null
           plan: string
         }
         Update: {
+          active?: boolean
           code?: string
           created_at?: string
+          deleted_at?: string | null
+          duration_days?: number
           max_uses?: number
           note?: string | null
           plan?: string
@@ -2278,6 +2441,19 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      admin_end_voucher_redemption: {
+        Args: { p_redemption: string }
+        Returns: Json
+      }
+      admin_update_voucher_redemption: {
+        Args: {
+          p_ends_at: string
+          p_plan: string
+          p_redemption: string
+          p_revoke?: boolean
+        }
+        Returns: Json
+      }
       attach_director_video_provider_request: {
         Args: {
           p_job_id: string

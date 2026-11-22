@@ -9,6 +9,17 @@ import { getPlanEntitlements } from '@/lib/plan-limits'
 /** 코드로 받은 Take 와 코드 요금제가 살아 있는 날 수. 결제가 없어 매달 다시 채워지지 않으므로 한 달치를 한 번 주고, 같은 날 요금제도 끝난다. */
 export const VOUCHER_TAKES_VALID_DAYS = 30
 
+export interface VoucherUseCapacity {
+  active: boolean
+  deletedAt: string | null
+  used: number
+  maxUses: number
+}
+
+export function voucherCanBeUsed(input: VoucherUseCapacity): boolean {
+  return input.active && input.deletedAt === null && input.used < input.maxUses
+}
+
 /** 정리한 코드 모양(대문자 · 숫자). 만드는 코드는 TALE + 8자이고, DB 제약도 같은 범위다. */
 export const VOUCHER_CODE_PATTERN = /^[A-Z0-9]{8,32}$/
 
@@ -20,10 +31,13 @@ export function normalizeVoucherCode(input: unknown): string {
 }
 
 /** 코드를 쓴 순간 넣을 Take 와 만료 시각 — 그 요금제의 한 달 포함량을 30일 동안. 이 시각이 코드 요금제가 끝나는 시각도 된다. */
-export function voucherTakeGrant(plan: string, now: Date): { takes: number; expiresAt: string } {
+export function voucherTakeGrant(plan: string, now: Date, durationDays = VOUCHER_TAKES_VALID_DAYS): { takes: number; expiresAt: string } {
+  if (!Number.isInteger(durationDays) || durationDays < 1 || durationDays > 3650) {
+    throw new Error('voucher duration must be 1..3650 days')
+  }
   return {
     takes: getPlanEntitlements(plan).includedTakesPerMonth,
-    expiresAt: new Date(now.getTime() + VOUCHER_TAKES_VALID_DAYS * 86_400_000).toISOString(),
+    expiresAt: new Date(now.getTime() + durationDays * 86_400_000).toISOString(),
   }
 }
 

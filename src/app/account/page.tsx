@@ -222,6 +222,15 @@ export default function AccountPage() {
 
         {/* 받은 코드로 요금제 시작(2026-10-27 오너 바우처) — 무료 요금제 계정에만. */}
         {data && showVoucherCard({ plan, unlimited: data.unlimited }) && <VoucherCard />}
+        {/* 바우처 관리 화면(/admin) 입구 — 관리자 계정에만(2026-11-18). */}
+        {data?.isAdmin && (
+          <Card title={t('Voucher management')}>
+            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <p className="text-sm text-gray-300">{t('Manage voucher codes and customer access.')}</p>
+              <Link href="/admin" className={linkButtonClass}>{t('Open admin')}</Link>
+            </div>
+          </Card>
+        )}
 
         <Card title={t('Takes')}>
           <div className="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">

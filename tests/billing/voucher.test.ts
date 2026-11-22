@@ -1,4 +1,4 @@
-// 구글로 로그인한 사용자가 받은 코드를 넣으면 그 요금제와 한 달 Take 가 들어오고, 코드마다 정한 계정 수까지만 쓰며 한 계정은 같은 코드를 한 번만 쓰고, 코드 요금제는 쓴 때로부터 30일 뒤 무료로 돌아간다 (2026-10-27 · 10-29 · 11-12 오너 바우처)
+// 구글로 로그인한 사용자가 받은 코드를 넣으면 그 요금제와 한 달 Take 가 들어오고, 코드마다 정한 계정 수까지만 쓰며 한 계정은 같은 코드를 한 번만 쓰고, 코드 요금제는 쓴 때로부터 30일 뒤 무료로 돌아간다. 관리자가 중지 · 삭제한 코드는 새로 쓸 수 없다 (2026-10-27 · 10-29 · 11-12 오너 바우처, 11-18 관리자 화면)
 //   오너 결정(10-27): 아이디 · 비밀번호를 나눠 주던 테스트 계정을 코드로 바꾼다. s2 · p10 코드를 45개씩 만들고, 코드 하나는 한 명만 쓴다.
 //   오너 결정(10-29): s2 · p10 코드를 하나씩 만들어 여러 구글 계정이 같은 코드를 쓴다. 이미 만든 한 명용 코드는 그대로 한 명만 쓴다.
 //   오너 결정(11-12): 코드를 등록한 날로부터 한 달이 지나면 무료 기능으로 돌아간다. 이미 등록한 계정도 등록한 날 기준이다.
@@ -32,11 +32,11 @@ import { formatVoucherCode, generateVoucherCode, parseVoucherArgs } from '../../
 const USER = { id: 'user-1', email: 'tester@gmail.com', user_metadata: {} }
 const WORKSPACE = { id: 'ws-1', plan: 'free', owner_id: 'user-1' }
 
-function voucherRow(row: { plan: string } | null) {
+function voucherRow(row: { plan: string; duration_days?: number; active?: boolean; deleted_at?: string | null } | null) {
   const query = {
     select: vi.fn(),
     eq: vi.fn(),
-    maybeSingle: vi.fn().mockResolvedValue({ data: row, error: null }),
+    maybeSingle: vi.fn().mockResolvedValue({ data: row ? { duration_days: 30, active: true, deleted_at: null, ...row } : null, error: null }),
   }
   query.select.mockReturnValue(query)
   query.eq.mockReturnValue(query)
@@ -140,6 +140,15 @@ describe('코드 넣기 (POST /api/billing/voucher)', () => {
     expect(mocks.from).not.toHaveBeenCalled()
   })
 
+  it('관리자가 중지하거나 삭제한 코드는 새로 등록할 수 없다', async () => {
+    // 왜: 이미 배포된 코드도 관리자가 중지·삭제하면 이후 고객 등록을 막아야 한다.
+    voucherRow({ plan: 's2', active: false })
+    const res = await redeem('TALE-7K3P-9QXM')
+    expect(res.status).toBe(404)
+    expect(await res.json()).toEqual({ error: 'invalid' })
+    expect(mocks.rpc).not.toHaveBeenCalled()
+  })
+
   it('쓸 수 있는 계정 수를 다 채운 코드를 넣으면 "이미 사용된 코드예요"로 거절한다', async () => {
     // 왜: 한 명용 코드를 받은 사람이 다른 사람에게 넘기거나, 공용 코드가 정한 수보다 많이 퍼졌을 때다. 남은 자리는 DB 함수가 잠금을 걸고 센다.
     voucherRow({ plan: 'p10' })
@@ -171,8 +180,8 @@ describe('코드 넣기 (POST /api/billing/voucher)', () => {
     expect(res.status).toBe(200)
     expect(await res.json()).toMatchObject({ ok: true, plan: 'p10', takes: 150 })
     expect(lookup.eq).toHaveBeenCalledWith('code', 'TALE7K3P9QXM')
-    // 쓴 기록은 voucher_redemptions 로 옮겼다(10-29). 코드 표에서는 요금제만 읽는다.
-    expect(lookup.select).toHaveBeenCalledWith('plan')
+    // 쓴 기록은 voucher_redemptions 로 옮겼다(10-29). 코드 표에서는 요금제와 관리자 설정(기간 · 중지 · 삭제)만 읽는다(11-18).
+    expect(lookup.select).toHaveBeenCalledWith('plan, duration_days, active, deleted_at')
     expect(mocks.rpc).toHaveBeenCalledWith('redeem_voucher', {
       p_code: 'TALE7K3P9QXM',
       p_workspace: 'ws-1',

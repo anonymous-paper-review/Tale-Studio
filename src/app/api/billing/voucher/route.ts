@@ -35,15 +35,15 @@ export async function POST(req: Request) {
 
     const { data: voucher, error: lookupError } = await supabaseAdmin
       .from('vouchers')
-      .select('plan')
+      .select('plan, duration_days, active, deleted_at')
       .eq('code', code)
       .maybeSingle()
     if (lookupError) throw lookupError
-    if (!voucher) return fail('invalid')
+    if (!voucher || !voucher.active || voucher.deleted_at) return fail('invalid')
 
     const plan = String(voucher.plan)
     const workspace = await ensureWorkspace(user)
-    const grant = voucherTakeGrant(plan, new Date())
+    const grant = voucherTakeGrant(plan, new Date(), voucher.duration_days)
     const { data, error } = await supabaseAdmin.rpc('redeem_voucher', {
       p_code: code,
       p_workspace: workspace.id,
