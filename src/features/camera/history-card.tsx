@@ -16,6 +16,7 @@ import { useLocaleStore } from '@/stores/locale-store'
 import type { ActiveJob } from '@/lib/generation-queue'
 import { shotStopTarget } from '@/lib/director/stop-work'
 import { StopMakingButton } from '@/features/director/stop-making-button'
+import { RoughChangedTag } from '@/features/director/shot-status'
 import { MoveFirstButton } from '@/features/director/move-first-button'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { GeneratedImage } from '@/components/generating-frame'
@@ -25,7 +26,7 @@ import { cameraMentionLabel, mentionOnModifierClick, stopModifierPointerDown } f
 
 const PILL = 'inline-flex h-6 items-center rounded-full px-2.5 text-micro font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50'
 
-export function HistoryCard({ entry, shotNodeId, shotName, writerShotId, activeJobs }: {
+export function HistoryCard({ entry, shotNodeId, shotName, writerShotId, activeJobs, roughChanged = false }: {
   entry: HistoryEntry
   shotNodeId: string
   shotName: string
@@ -33,6 +34,8 @@ export function HistoryCard({ entry, shotNodeId, shotName, writerShotId, activeJ
   writerShotId: string | null
   /** 지금 도는 작업 — [멈추기]가 이 샷이 만드는 그림 · 영상을 고른다(스토리보드 카드와 같은 길, 오너 7번). */
   activeJobs: readonly ActiveJob[]
+  /** 실사를 그린 뒤 러프가 바뀌었다(Director 노드와 같은 판정) — 지금 이미지 판에만 건넨다(fb-end QA 4 · 리드 2026-11-23). */
+  roughChanged?: boolean
 }) {
   const t = useT()
   const format = useProjectFormatStore((s) => s.format)
@@ -102,6 +105,8 @@ export function HistoryCard({ entry, shotNodeId, shotName, writerShotId, activeJ
     >
       <div className={cn('relative overflow-hidden rounded-[10px] bg-art-placeholder', !frame && 'aspect-video')} style={frame ?? undefined}>
         <Thumb entry={entry} alt={`${shotName} · ${title}`} />
+        {/* "러프 바뀜" — Director 노드와 같은 이름표 · 같은 자리(그림 오른쪽 위). 자동으로 다시 만들지 않는다(오너 I5). */}
+        {roughChanged ? <RoughChangedTag className="pointer-events-none absolute right-1.5 top-1.5 max-w-[calc(100%-12px)]" /> : null}
       </div>
       <div className="flex min-w-0 flex-wrap items-center gap-1.5">
         <span className="font-num text-caption font-semibold text-foreground">{title}</span>

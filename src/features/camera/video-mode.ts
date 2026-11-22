@@ -51,8 +51,18 @@ export const VIDEO_MODE_BLOCK_TEXT: Record<VideoModeBlock, string> = {
   previous_video_missing: 'The previous shot has no finished video yet.',
   previous_video_generating: "The previous shot's video is still being made.",
   middle_missing: "This shot's images have no middle frame yet. Remake images first.",
-  // 리드 D1(2026-11-22) — 서버 거절(409 middle_outdated)과 같은 글. 화면에서 이 까닭으로 끄는 일(cameraModeFacts middleOutdated)은 fb-camera 몫.
-  middle_outdated: 'Redraw the live-action storyboard after editing the rough to use Start + middle.',
+  // 리드 D1(2026-11-22) — 화면에서 이 까닭으로 끄는 일(cameraModeFacts middleOutdated)은 fb-camera 몫. 말은 Cinema 의 다른 곳처럼 "images"
+  //   (리드 G 2026-11-23 — 서버 거절 409 middle_outdated 의 영어 "live-action storyboard"는 fb-video 몫이라 그대로).
+  middle_outdated: 'Remake the images after editing the rough to use Start + middle.',
+}
+
+/** 이어서가 꺼진 까닭 중 앞 샷의 ★ Take 에 만든 기록(작업 기록)이 없을 때 — 영상은 있는데 마지막 장면을 잡을 수 없다(리드 A 2026-11-23).
+ *  버튼 이름이 "Continuation"이라 영어도 그 말을 쓴다('Continue'는 이미 다른 뜻 '계속하기'의 키). */
+export const CONTINUE_NO_RECORD_TEXT = "The previous shot's video has no generation record, so its last frame can't be carried over. Remake that video to use Continuation."
+
+/** 방식이 꺼진 까닭 글(영어 원문 = i18n 키) — "앞 샷 영상 없음"은 ★ Take 가 정말 없을 때만, 기록 없는 ★ Take 면 그 까닭. */
+export function videoModeBlockText(reason: VideoModeBlock, context: { previousNoRecord?: boolean } = {}): string {
+  return reason === 'previous_video_missing' && context.previousNoRecord ? CONTINUE_NO_RECORD_TEXT : VIDEO_MODE_BLOCK_TEXT[reason]
 }
 
 /** 이어서의 출처 — 앞 샷의 Editor 로 가는 Take. plannedSec = 앞 샷 길이(장면을 잡는 자리, fb-video video-frame-capture). */
@@ -71,7 +81,7 @@ export function cameraModeFacts(input: {
   shotNodeId: string
   nodes: readonly DirectorNode[]
   writerShots: readonly WriterShotFacts[]
-}): { facts: VideoModeFacts; previous: ContinueSource | null } {
+}): { facts: VideoModeFacts; previous: ContinueSource | null; previousNoRecord: boolean } {
   const node = input.nodes.find((n) => n.id === input.shotNodeId)
   const data = node && isShotData(node.data) ? node.data : null
   const writerShotId = data?.writerShotId ?? null
@@ -83,6 +93,8 @@ export function cameraModeFacts(input: {
   const { takes, final } = previousNode ? shotDetailTakes(input.nodes, previousNode.id) : { takes: [], final: null }
   const chosen = final ? takes.find((take) => take.id === final.id) ?? null : null
   const ready = chosen && chosen.data.videoUrl && chosen.data.videoClipId && chosen.data.generationJobId ? chosen : null
+  // ★ Take 영상은 있는데 만든 작업 기록이 없다(복사한 프로젝트 · 기록 전 옛 Take) — 이어서는 꺼지고 까닭을 따로 말한다(리드 A 2026-11-23).
+  const previousNoRecord = !!chosen && !!chosen.data.videoUrl && !!chosen.data.videoClipId && !chosen.data.generationJobId
   const previousVideo: VideoModeFacts['previousVideo'] = ready
     ? 'ready'
     : takes.some((take) => takePhaseOf(take.data) === 'making') ? 'generating' : 'none'
@@ -100,6 +112,7 @@ export function cameraModeFacts(input: {
     previous: ready
       ? { takeNodeId: ready.id, videoClipId: ready.data.videoClipId!, generationJobId: ready.data.generationJobId!, videoUrl: ready.data.videoUrl!, plannedSec }
       : null,
+    previousNoRecord,
   }
 }
 

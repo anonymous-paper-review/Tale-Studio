@@ -44,7 +44,8 @@ export function CameraBoard({ scene, place }: { scene: CameraSceneView | null; p
 
   return (
     // contain:inline-size — ScrollArea 안쪽 표(display:table)가 이력 줄 폭만큼 넓어져 줄이 판 밖으로 넘치지 않게(ScrollArea 최소 폭 함정, 11/3 QA 1번).
-    <section className="flex flex-col gap-3 [contain:inline-size]" data-testid="camera-board" data-scene-key={scene.key}>
+    // @container — 판 폭으로 샷 줄 모양을 고른다(좁으면 이력 판이 샷 줄 아래로, 리드 2026-11-23 QA C).
+    <section className="@container flex flex-col gap-3 [contain:inline-size]" data-testid="camera-board" data-scene-key={scene.key}>
       <div className="flex min-w-0 items-baseline gap-2">
         {/* ⌘/Ctrl+클릭 = 이 씬을 채팅에 @멘션(D9) — "실사 씬 N". */}
         <h2

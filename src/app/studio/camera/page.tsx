@@ -18,6 +18,8 @@ import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
+import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
+import { useNarrowScreen } from '@/hooks/use-narrow-screen'
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
 import { switchDirectorScene } from '@/features/director/hooks/use-scene-view'
 import { CameraBoard } from '@/features/camera/camera-board'
@@ -38,6 +40,11 @@ export default function CameraPage() {
     useDirectorCanvasStore.getState().closeShotDetail()
     return () => useDirectorCanvasStore.getState().closeShotDetail()
   }, [])
+
+  // 좁은 화면(1100px 보다 좁음 — 앱의 좁은 화면 기준, Director · Editor 에서 연 채팅이 판 위에 덮이는 기준과 같다)에서는
+  //   채팅과 판이 나란히 서지 못해 채팅을 닫은 채 시작한다. 사람은 접힌 레일로 열 수 있고, 떠나면 들어오기 전 모습으로 돌아간다(리드 2026-11-23 QA C).
+  const narrowScreen = useNarrowScreen()
+  useHoldChatClosed('camera', narrowScreen)
 
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   // 프로젝트 init(resetChildStores)이 끝난 뒤에만 시작한다 — 그 전에 시작한 일은 reset 에 지워진다.

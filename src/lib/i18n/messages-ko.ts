@@ -1992,7 +1992,7 @@ export const KO: Record<string, string> = {
   'The images changed · A new Take will use the new ones': '이미지가 바뀌었어요 · 새 Take를 만들면 새 이미지를 써요',
   'Make the start image first.': '시작 이미지를 먼저 만들어요.',
   'The images are being remade. Make the Take when they are done.': '이미지를 다시 만드는 중이에요. 다 되면 Take 를 만들어요.',
-  "This shot's images have no middle frame yet. Remake images first.": '이 샷의 실사 이미지에 가운데 장이 아직 없어요. 이미지를 다시 만들어 주세요.',
+  "This shot's images have no middle frame yet. Remake images first.": '이 샷의 이미지에 가운데 장이 아직 없어요. 이미지를 다시 만들어 주세요.',
   'Starts from the start image and follows the arrows in the middle frame.': '시작 그림에서 시작해 실사 가운데 장의 화살표대로 움직여요.',
   'Starts from the start image and follows the words.': '시작 그림에서 시작해 글대로 움직여요.',
   // 오너 V3 — Cinema [영상 만들기]가 이어받은 Veo 로 꺼졌을 때 어디서 바꾸는지(⤢ 상세)
@@ -2015,6 +2015,12 @@ export const KO: Record<string, string> = {
   'Uses the images only as a guide for faces, clothes and places, not as scenes.': '그림은 얼굴 · 옷 · 장소를 따르는 참고로만 쓰고, 장면으로 쓰지 않아요.',
   'This is the first shot of its scene, so there is no video to continue from.': '씬의 첫 샷이라 이어 붙일 앞 영상이 없어요.',
   'The previous shot has no finished video yet.': '앞 샷에 아직 완성된 영상이 없어요.',
+  // 리드 A(2026-11-23) — ★ Take 영상은 있는데 만든 작업 기록이 없을 때(복사한 프로젝트 · 기록 전 옛 Take).
+  "The previous shot's video has no generation record, so its last frame can't be carried over. Remake that video to use Continuation.": '앞 샷 영상에 만든 기록이 없어 마지막 장면을 이어 받을 수 없어요. 앞 샷 영상을 다시 만들면 쓸 수 있어요.',
+  // 리드 G(2026-11-23) — ③ 까닭도 Cinema 의 다른 곳처럼 "이미지".
+  'Remake the images after editing the rough to use Start + middle.': '러프를 고친 뒤 이미지를 다시 만들어야 시작+미들을 쓸 수 있어요.',
+  // fb-director QA B(2026-11-23) — 끝 그림을 쓰지 않은 Take 의 그림 이름. 이력 판의 'Image v{n}'(그림 v{n})과 다른 열쇠.
+  'Image v{version}': '이미지 v{version}',
   "The previous shot's video is still being made.": '앞 샷 영상을 아직 만드는 중이에요.',
   "Getting the last frame of the previous shot's video…": '앞 샷 영상의 마지막 장면을 잡는 중이에요…',
   'Linked to a card in another scene. Click to go there.': '다른 씬 카드와 이어져 있어요. 누르면 그 씬으로 가요',

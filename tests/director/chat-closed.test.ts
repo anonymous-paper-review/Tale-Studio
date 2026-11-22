@@ -179,14 +179,16 @@ describe('혼자 정한 것', () => {
   })
 
   // 왜: 채팅을 처음에 닫아 두는 것은 D1(Director) 과 예전부터 그랬던 Editor(요청 6b) 뿐이다. 다른 단계는 지금처럼 사용자가 고른 대로 열려 있다.
-  it('Director · Editor 밖의 단계 화면은 채팅을 닫아 두지 않는다', () => {
+  //   Cinema 는 채팅과 판이 나란히 서지 못하는 좁은 화면(1100px 보다 좁음 — 앱의 좁은 화면 기준)에서만 닫아 둔다(리드 11/23 QA C).
+  it('Director · Editor 는 채팅을 닫아 두고, Cinema 는 화면 폭이 1100px 보다 좁을 때만 닫아 두며, 그 밖의 단계 화면은 닫아 두지 않는다', () => {
     const studio = path.join(process.cwd(), 'src/app/studio')
     const holding = readdirSync(studio, { withFileTypes: true })
       .filter((entry) => entry.isDirectory() && existsSync(path.join(studio, entry.name, 'page.tsx')))
       .filter((entry) => /useHoldChatClosed\(/.test(read(`src/app/studio/${entry.name}/page.tsx`)))
       .map((entry) => entry.name)
       .sort()
-    expect(holding).toEqual(['director', 'editor'])
+    expect(holding).toEqual(['camera', 'director', 'editor'])
+    expect(read('src/app/studio/camera/page.tsx')).toContain("useHoldChatClosed('camera', narrowScreen)")
   })
 
   // 왜: D1 시안은 접힌 채팅 레일 없이 캔버스가 오른쪽 끝까지 가고, 닫힌 채팅을 여는 곳은 툴바 끝 Lumi 알약 하나다(리드 확인 2026-11-03).
