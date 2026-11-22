@@ -27,7 +27,7 @@ const references = {
 
 describe('같이 정한 것', () => {
   // 왜: 오너 2026-11-22 "기존에 있던 Start, End 프레임 생성 방식은 일단 폐기" — 남는 방식은 오너 D2~D5 의 넷이다.
-  //   기본(아무것도 안 고름)은 시작+프롬프트다(리드 제안, 오너 확인 중 — 이 상수 하나로 바꿔 끼운다).
+  //   기본(아무것도 안 고름)은 시작+프롬프트다(오너 확정 2026-11-22 M1).
   it('영상 만드는 방식은 넷이다 — 이어서 · 레퍼런스 · 시작+미들 · 시작+프롬프트, 시작+끝은 고를 수 없다', () => {
     expect(VIDEO_MODES).toEqual(['continue', 'reference', 'start_middle', 'start_prompt'])
     expect(isVideoMode('start_end')).toBe(false)

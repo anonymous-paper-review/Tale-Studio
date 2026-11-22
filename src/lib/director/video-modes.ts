@@ -9,7 +9,7 @@
 
 export const VIDEO_MODES = ['continue', 'reference', 'start_middle', 'start_prompt'] as const
 export type VideoMode = (typeof VIDEO_MODES)[number]
-/** 기본 방식(리드 제안 · 오너 확인 중, 2026-11-22) — 이 상수 하나로 바꿔 끼운다. */
+/** 기본 방식 — 오너 확정(2026-11-22 M1 "추천대로"): 시작+프롬프트. */
 export const DEFAULT_VIDEO_MODE: VideoMode = 'start_prompt'
 /** 폐기한 시작+끝 — 고를 수 없다. 옛 Take 이력과 옛 요청(다시 만들기가 물려 보냄)에서 읽기만 한다. */
 export const RETIRED_START_END = 'start_end' as const

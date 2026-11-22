@@ -39,7 +39,7 @@ const panel = () => readFileSync('src/features/camera/fix-panel.tsx', 'utf8')
 
 describe('방식 넷', () => {
   it('[영상 만들기] 칸에는 방식 넷(이어서 · 레퍼런스 · 시작+미들 · 시작+프롬프트)이 있고, 처음 고른 방식은 가장 새 Take 의 방식, 처음 영상이면 기본(시작+프롬프트)이다', () => {
-    // 왜: 오너 D2~D5 의 넷 — 시작+끝은 오너 2026-11-22 폐기, 기본은 시작+프롬프트(리드 제안 · 오너 확인 중). 방식은 [다시 만들기]처럼 앞 Take 를 이어받는다(fb-video 혼자 정한 것 3).
+    // 왜: 오너 D2~D5 의 넷 — 시작+끝은 오너 2026-11-22 폐기, 기본은 시작+프롬프트(오너 확정 M1). 방식은 [다시 만들기]처럼 앞 Take 를 이어받는다(fb-video 혼자 정한 것 3).
     expect(CAMERA_VIDEO_MODES).toEqual(['continue', 'reference', 'start_middle', 'start_prompt'])
     expect(CAMERA_VIDEO_MODES.map((mode) => translate('ko', VIDEO_MODE_LABEL[mode]))).toEqual(['이어서', '레퍼런스', '시작+미들', '시작+프롬프트'])
     expect(defaultVideoMode(null)).toBe('start_prompt')
