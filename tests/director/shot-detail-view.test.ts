@@ -155,7 +155,7 @@ describe('Director 샷 상세 화면', () => {
     done(1, { madeFrames: { start: 'https://media.test/a-s.png?v=1', end: 'https://media.test/a-e.png' } })
     const out = render('panel', 'video')
     expect(out).toContain('Start v1 + End v1 · Seedance 2.0 · 720p')
-    expect(out).toContain('The start and end images changed · A new Take will use them')
+    expect(out).toContain('The images changed · A new Take will use the new ones')
     setLocale('ko')
     expect(render('panel', 'video')).toContain('시작 v1 + 끝 v1 · Seedance 2.0 · 720p')
   })
@@ -255,11 +255,11 @@ describe('Director 샷 상세 화면', () => {
     // 상점이 다시 만들기를 시작할 때와 같은 모양 — 지금 그림의 프레임 · 버전은 그대로, 상태만 만드는 중.
     director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: { ...IMAGE, ...keptStoryboardImage(IMAGE), status: 'generating' } })
     const video = render('panel', 'video')
-    expect(video).toContain('The start and end images are being remade. Make the Take when they are done.')
+    expect(video).toContain('The images are being remade. Make the Take when they are done.')
     expect(buttonTag(video, 'Make a new Take · 5 Takes')).toContain('disabled=""')
     expect(buttonTag(render('popup'), 'Next: make the video · 5 Takes')).toContain('disabled=""')
     setLocale('ko')
-    expect(render('panel', 'video')).toContain('시작 · 끝 이미지를 다시 만드는 중이에요. 다 되면 Take 를 만들어요.')
+    expect(render('panel', 'video')).toContain('이미지를 다시 만드는 중이에요. 다 되면 Take 를 만들어요.')
   })
 
   it('가장 새 Take 가 실패했으면 상세는 그 Take 를 먼저 보이고, 다시 만들기는 그 Take 의 모델 · 해상도를 이어받는다', () => {
@@ -334,7 +334,7 @@ describe('Director 샷 상세 화면', () => {
 
   it('이미지 탭의 다시 만들기 단추는 "시작·끝 이미지 다시 만들기 · Takes 0" 하나이고 바꾸고 싶은 점을 이번 생성에 실어 보낸다', () => {
     // 왜: D6 · 오너 답 5번 — 시작 · 끝 함께 다시 만든다. 바꾸고 싶은 점은 이번 생성에만 붙는다(혼자 정한 것).
-    expect(render('popup')).toContain('Remake start and end images · Takes 0')
+    expect(render('popup')).toContain('Remake images · Takes 0')
     const button = readFileSync('src/features/director/storyboard-image-button.tsx', 'utf8')
     expect(button).toMatch(/changeNote\.trim\(\) \? generateStoryboardImage\(nodeId, \{ changeNote \}\) : generateStoryboardImage\(nodeId\)/)
   })
@@ -370,7 +370,7 @@ describe('Director 샷 상세 화면', () => {
       expect(out, label).toContain(label)
     }
     expect(out.match(/role="checkbox" aria-checked="true" aria-disabled="true"/g)?.length).toBe(2)
-    expect(out).toContain('Remake start and end images · Takes 0')
+    expect(out).toContain('Remake images · Takes 0')
     expect(out).toContain('Make a new Take · 5 Takes')
     expect(out).toContain('Delete this Take')
     setLocale('ko')
@@ -383,11 +383,11 @@ describe('Director 샷 상세 화면', () => {
     director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: { ...IMAGE, generatedAt: Date.parse('2026-11-14T02:00:00.000Z') } })
     done(1, { lastAttemptAt: '2026-11-14T01:00:00.000Z' })
     const out = render('panel', 'video')
-    expect(out).toContain('The start and end images changed · A new Take will use them')
+    expect(out).toContain('The images changed · A new Take will use the new ones')
     expect(out).toContain('Make a new Take with the changed image · 5 Takes')
     setLocale('ko')
     const ko = render('panel', 'video')
-    expect(ko).toContain('시작 · 끝 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요')
+    expect(ko).toContain('이미지가 바뀌었어요 · 새 Take를 만들면 새 이미지를 써요')
     expect(ko).toContain('바뀐 이미지로 새 Take 만들기 · 5 Take')
   })
 
@@ -404,7 +404,7 @@ describe('Director 샷 상세 화면', () => {
     // 왜: R "영상 만들기는 이미지가 먼저 있어야 해요" — 눌러도 실패하는 단추를 켜 두지 않는다.
     director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: null })
     const out = render('popup', 'video')
-    expect(out).toContain('Make the start and end images first.')
+    expect(out).toContain('Make the start image first.')
     expect(buttonTag(out, 'Make the video · 5 Takes')).toContain('disabled=""')
   })
 
