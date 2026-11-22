@@ -180,8 +180,10 @@ describe('꺼진 단추와 그 까닭', () => {
     expect(page).toContain('workBlockLine(imageBlock, videoBlock, t)')
     expect(page).toMatch(/const blockLine = [^\n]*workBlockLine\(imageBlock, videoBlock, t\)/)
     expect(page).toMatch(/<p id="director-work-block"[^>]*>\s*\{blockLine\}/)
-    expect(page).toContain('disabled={imageBlock !== null}')
-    expect(page).toContain('disabled={videoBlock !== null}')
+    // 2026-11-23 리드 결정(판 읽기 — 샷 정보를 다 읽기 전 · 못 불러옴이면 만들기 단추를 끈다, tests/director/board-load)으로 몸만 바꿈.
+    //   예전: 'disabled={imageBlock !== null}' · 'disabled={videoBlock !== null}'.
+    expect(page).toContain('disabled={imageBlock !== null || boardOff}')
+    expect(page).toContain('disabled={videoBlock !== null || boardOff}')
     expect(page).not.toContain("title={imageMode.shotIds.length === 0 ? t('Every shot here already has an image.')")
     expect(page).toContain('imageCount: imageBlock === null ? imageWork.length : 0')
     expect(page).toContain('videoCount: videoBlock === null ? videoWork.length : 0')
