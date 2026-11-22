@@ -1952,6 +1952,9 @@ export const KO: Record<string, string> = {
 
   // ── 씬 단추(오너 D8 2026-11-22) — Director 노드 보기 · Camera 공용 ──
   Scenes: '씬',
+  '1 shot': '샷 1개',
+  'Linked to a card in another scene. Click to go there.': '다른 씬 카드와 이어져 있어요. 누르면 그 씬으로 가요',
+  'This scene has no shots yet.': '이 씬에는 아직 샷이 없어요',
 
   // ── Editor: 빈 화면 3분리(#pps-empty-states) — 로딩/실패/정상 빈 구분 ──
   'Could not load your clips.': '클립을 불러오지 못했어요.',
@@ -3420,8 +3423,9 @@ export const KO: Record<string, string> = {
   'Complete previous step first': '이전 단계를 먼저 끝내세요',
   'This is the storyboard. See every shot image per scene at a glance.\n\n· Click cards to pick shots, and the buttons at the top work on the picked shots\n· "Make images" turns the rough shots into real images, then "Make videos"\n· Press ⤢ Details on a card to open its details':
     '여기는 스토리보드예요. 씬마다 샷 그림을 한눈에 봐요.\n\n· 카드를 누르면 샷이 골라지고, 위 단추는 고른 샷에만 일해요\n· "이미지 만들기"로 러프를 실사 이미지로 바꾸고, 그다음 "영상 만들기"\n· 카드의 ⤢ 상세를 누르면 상세가 열려요',
-  'This is The Set, where scenes → shots → videos connect as nodes.\n\n· Click a node to pick its shot, and press ⤢ Details to open its details\n· "Make images" at the top turns the rough shots into real images at once\n· When images are ready, "Make videos" makes the videos':
-    '여기는 The Set, 촬영장이에요. 씬 → 샷 → 영상이 노드로 이어져 있어요.\n\n· 노드를 누르면 그 샷이 골라지고, ⤢ 상세를 누르면 상세가 열려요\n· 위 "이미지 만들기"로 러프를 한 번에 실사 이미지로 바꿔요\n· 이미지가 되면 "영상 만들기"로 영상을 만들어요',
+  // 씬 단추 한 줄을 더했다(씬별 보기, 오너 D8 2026-11-22).
+  'This is The Set, where scenes → shots → videos connect as nodes.\n\n· Pick a scene with the scene buttons at the top to see only its cards\n· Click a node to pick its shot, and press ⤢ Details to open its details\n· "Make images" at the top turns the rough shots into real images at once\n· When images are ready, "Make videos" makes the videos':
+    '여기는 The Set, 촬영장이에요. 씬 → 샷 → 영상이 노드로 이어져 있어요.\n\n· 위 씬 단추로 씬을 고르면 그 씬 카드만 보여요\n· 노드를 누르면 그 샷이 골라지고, ⤢ 상세를 누르면 상세가 열려요\n· 위 "이미지 만들기"로 러프를 한 번에 실사 이미지로 바꿔요\n· 이미지가 되면 "영상 만들기"로 영상을 만들어요',
   // Director → Editor 넘기기 창(D8, 2026-11-14 디자이너 1110 확정 · 오너 답 8번)
   // 길이는 샷 계획 길이의 합 — Editor 가 클립마다 실제 영상 길이로 줄일 수 있어 어림으로(리드 2026-11-14).
   //   "약"과 숫자 사이는 줄이 안 바뀌는 빈칸(\u00a0) — 좁은 화면에서 "약" / "33초"로 갈리지 않게.

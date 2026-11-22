@@ -158,6 +158,86 @@ export function arrangeDirectorCanvas(nodes: readonly DirectorNode[], sizing: Ca
 }
 
 /**
+ * 씬 보기의 [자동 정렬](오너 D8 · 혼자 정한 것 h13, 2026-11-22): 그 씬의 샷 · 영상만 arrangeDirectorCanvas 와 같은 간격으로 놓는다.
+ *   묶음 왼쪽은 지금 자리(가장 왼쪽 샷), 위는 ORIGIN.y. 씬 밖 카드(프롬프트 · 씬 없는 샷 · 샷 없는 영상)는 옮기지 않고 피한다(검토 C 2번과 같다).
+ *   다른 씬 카드는 배치를 그대로 둔다. 다만 묶음이 넓어져 오른쪽 끝이 늘면, 원래 묶음 오른쪽에 있던 다른 씬 카드를 늘어난 만큼 통째로 오른쪽으로 민다
+ *   (겹치면 새 카드 자리 셈이 엉킨다). 에셋 카드는 씬 보기에서 그릴 때만 놓으니 다루지 않는다. 샷이 없는 씬이면 빈 표.
+ */
+export function arrangeSceneGroup(nodes: readonly DirectorNode[], sceneId: string, sizing: CardSizing = {}): Map<string, XYPosition> {
+  const placed = new Map<string, XYPosition>()
+  const sizeOf = (node: DirectorNode) => cardSize(node, sizing)
+  const scene = nodes.find((node) => node.id === sceneId && isSceneData(node.data))
+  if (!scene) return placed
+  const shots = nodes.filter((node) => isShotData(node.data) && node.data.parentSceneNodeId === sceneId).sort(byPlace)
+  if (shots.length === 0) return placed
+  const videosOf = (shotId: string) =>
+    nodes.filter((node) => isVideoData(node.data) && node.data.parentShotNodeId === shotId).sort(byPlace)
+  const group = [...shots, ...shots.flatMap((shot) => videosOf(shot.id))]
+  const rightOf = (list: readonly DirectorNode[], at: (node: DirectorNode) => XYPosition) =>
+    Math.max(...list.map((node) => at(node).x + sizeOf(node).width))
+  const oldRight = rightOf(group, (node) => node.position)
+
+  // 1) 묶음 안: 샷 줄을 위에서 아래로, 테이크는 샷 오른쪽 열에(arrangeDirectorCanvas 2번과 같다).
+  const groupX = Math.min(...shots.map((shot) => shot.position.x))
+  const shotColumnWidth = Math.max(UNMEASURED_NODE_SIZE.shot.width, ...shots.map((shot) => sizeOf(shot).width))
+  const videoX = groupX + shotColumnWidth + NODE_COLUMN_GAP
+  let rowY = ORIGIN.y
+  placed.set(scene.id, { x: groupX - SHOT_OFFSET_X, y: ORIGIN.y })
+  for (const shot of shots) {
+    placed.set(shot.id, { x: groupX, y: rowY })
+    let takeY = rowY
+    for (const video of videosOf(shot.id)) {
+      placed.set(video.id, { x: videoX, y: takeY })
+      takeY += sizeOf(video).height + NODE_ROW_GAP
+    }
+    const takesBottom = takeY > rowY ? takeY - NODE_ROW_GAP : rowY
+    rowY = Math.max(rowY + sizeOf(shot).height, takesBottom) + NODE_ROW_GAP
+  }
+
+  // 2) 씬 밖 카드를 피한다 — 정렬한 카드(+ 입력 구멍 라벨 · 줄 간격)와 겹치면 묶음을 그 카드 오른쪽 열 간격 뒤로 민다.
+  const inSomeScene = (node: DirectorNode) => {
+    if (isShotData(node.data)) return !!node.data.parentSceneNodeId
+    if (isVideoData(node.data)) {
+      const parentId = node.data.parentShotNodeId
+      const parent = parentId ? nodes.find((other) => other.id === parentId) : undefined
+      return !!parent && isShotData(parent.data) && !!parent.data.parentSceneNodeId
+    }
+    return false
+  }
+  const obstacles = nodes
+    .filter((node) => CARD_KINDS.has(node.data.kind) && !isAssetData(node.data) && !placed.has(node.id) && !inSomeScene(node))
+    .map((node) => boxAt(node.position, sizeOf(node)))
+  for (let round = 0; round <= obstacles.length; round++) {
+    const boxes = group.map((node) => boxAt(placed.get(node.id)!, sizeOf(node)))
+    const hit = obstacles.filter((obstacle) =>
+      boxes.some((card) => intersects(obstacle, { x: card.x - PORT_LABEL_SPACE, y: card.y - NODE_ROW_GAP, w: card.w + PORT_LABEL_SPACE * 2, h: card.h + NODE_ROW_GAP * 2 })),
+    )
+    if (hit.length === 0) break
+    const left = Math.min(...boxes.map((card) => card.x))
+    const dx = Math.max(...hit.map((obstacle) => obstacle.x + obstacle.w + NODE_COLUMN_GAP - left))
+    if (dx <= 0) break
+    for (const [id, at] of placed) placed.set(id, { x: at.x + dx, y: at.y })
+  }
+
+  // 3) 묶음이 넓어졌으면 원래 오른쪽 끝 너머의 다른 씬 샷 · 영상을 늘어난 만큼 민다. 민 샷의 씬(숨은 묶음 기준점)도 같이 민다.
+  const pushed = rightOf(group, (node) => placed.get(node.id)!) - oldRight
+  if (pushed > 0) {
+    const shifted = new Set<string>()
+    for (const node of nodes) {
+      if (placed.has(node.id) || !inSomeScene(node) || node.position.x < oldRight) continue
+      placed.set(node.id, { x: node.position.x + pushed, y: node.position.y })
+      shifted.add(node.id)
+    }
+    for (const node of nodes) {
+      if (!isSceneData(node.data) || placed.has(node.id)) continue
+      const moves = nodes.some((other) => shifted.has(other.id) && isShotData(other.data) && other.data.parentSceneNodeId === node.id)
+      if (moves) placed.set(node.id, { x: node.position.x + pushed, y: node.position.y })
+    }
+  }
+  return placed
+}
+
+/**
  * start 에서 시작해, 같은 세로줄(가로로 겹치는)의 다른 카드와 줄 간격(56)보다 가까우면 그 카드 밑으로 내린다.
  * 새 카드 크기는 모르니 넉넉한 크기로 센다.
  */

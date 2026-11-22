@@ -59,21 +59,30 @@ import { refetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balan
 import { takeValuesShown } from '@/lib/billing/take-cost'
 import { TAKES_UNKNOWN_TEXT, takesReadable } from '@/features/director/takes-check'
 import { RegenerateConfirmDialog } from '@/features/director/regenerate-confirm-dialog'
-import { useAltArrowCycle } from '@/lib/use-alt-arrow-cycle'
-import { AltArrowHint } from '@/components/alt-arrow-hint'
 import { StageHelpBadge } from '@/components/stage-help-badge'
+import { SceneButtons } from '@/components/scene-buttons'
 import { NextStepButton } from '@/components/handoff/next-step-button'
 import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
 import { PickAllBar, ShotStatusFilterMenu } from '@/features/director/shot-status'
-import { StoryboardZoomPill } from '@/features/director/storyboard-zoom-pill'
 import { useDirectorShotStates } from '@/features/director/hooks/use-shot-states'
 import { countStatusFilters, dimmedByStatusFilter, directorHasFinishedVideo, matchesStatusFilter } from '@/lib/director/shot-state'
-import { HIDDEN_ON_CANVAS, directorCanvasMeta, storyboardCanvasMeta } from '@/features/director/canvas-meta'
+import { HIDDEN_ON_CANVAS, directorCanvasMeta } from '@/features/director/canvas-meta'
 import { separateAssetCards } from '@/features/director/asset-column'
 import { arrangeOnceCardsRendered, renderedCardSizes } from '@/features/director/canvas-layout'
-import { firstEntryViewport, markFirstEntrySettled } from '@/features/director/first-entry-layout'
+import { cardViewport, firstEntryViewport, markFirstEntrySettled } from '@/features/director/first-entry-layout'
+import {
+  cardSceneOf,
+  linkCardName,
+  promptNodePlace,
+  sceneAfterHistoryStep,
+  sceneCanvas,
+  shotStatesIn,
+  viewportShowsAnyCard,
+} from '@/features/director/scene-view'
+import { switchDirectorScene, useDirectorSceneView } from '@/features/director/hooks/use-scene-view'
+import { SceneLinksProvider, type SceneLinkChip } from '@/features/director/scene-links'
 
 import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
@@ -81,7 +90,6 @@ import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 // Editor 핸드오프를 권하는 최소 진행률(#d10 2026-08-27). 1개만 만들어도 권하던 것을 막는다.
 //   전부(1.0)를 요구하지 않는 이유: 마지막 한두 샷을 남겨두고 편집을 시작하는 흐름도 정상이다.
 const EDITOR_NUDGE_MIN_RATIO = 0.8
-import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { cn } from '@/lib/utils'
 
 import { isVideoData } from '@/types/director'
@@ -97,9 +105,8 @@ import { useAssetStorageStore } from '@/stores/asset-storage-store'
 import {
   isShotData,
   SNAP_GRID,
+  type DirectorNode,
 } from '@/types/director'
-import { StoryboardGridView } from '@/features/director/canvas-views/StoryboardGridView'
-import { useStoryboardZoom } from '@/components/generating-frame'
 import { countText } from '@/lib/i18n/count-text'
 import { confirmFirstEntryArrange, useWriterDirectorSync } from '@/features/director/hooks/use-writer-director-sync'
 import { useQueueRehydrate } from '@/features/director/hooks/use-queue-rehydrate'
@@ -266,7 +273,8 @@ function MiniMapPanel() {
           <MiniMap
             className="!static !m-0 !h-full !w-full !bg-transparent"
             bgColor="transparent"
-            nodeColor={(node) => (node.selected ? 'var(--stage)' : 'var(--minimap-node)')}
+            // 처음 정렬 때 크기를 재려고 보이지 않게 그린 다른 씬 카드(씬별 보기, h14)는 미니맵에도 그리지 않는다.
+            nodeColor={(node) => (node.style?.visibility === 'hidden' ? 'transparent' : node.selected ? 'var(--stage)' : 'var(--minimap-node)')}
             nodeBorderRadius={3}
             maskColor="var(--minimap-mask)"
             maskStrokeColor="var(--minimap-viewport)"
@@ -330,10 +338,11 @@ function CanvasZoomPill({ onPersonMove }: { onPersonMove?: () => void }) {
 
 // 상태를 골랐는데 그 상태 샷이 하나도 없으면 캔버스 위에 한 줄(시안 없음, 리드 검토 c ④c) — 노드형은 다른 상태를 흐리게만 둬서
 //   모두 흐린 캔버스만 보이면 고장으로 보인다.
-function NodeStatusEmptyNote() {
+function NodeStatusEmptyNote({ shotIds }: { shotIds: readonly string[] }) {
   const t = useT()
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
-  const shotStates = useDirectorShotStates()
+  // 씬별 보기(오너 D8): 지금 씬(과 씬 밖 카드)의 샷만 본다(혼자 정한 것 h12).
+  const shotStates = shotStatesIn(useDirectorShotStates(), shotIds)
   if (statusFilter === 'all' || shotStates.size === 0) return null
   if ([...shotStates.values()].some((state) => matchesStatusFilter(state, statusFilter))) return null
   return (
@@ -343,6 +352,32 @@ function NodeStatusEmptyNote() {
       </span>
     </div>
   )
+}
+
+// 고른 씬에 샷이 없으면 캔버스 가운데 한 줄(씬별 보기, 혼자 정한 것 h18 · 시안 없음) — 빈 판만 보이면 고장으로 보인다.
+function SceneEmptyNote() {
+  const t = useT()
+  return (
+    <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
+      <span className="rounded-full bg-background px-3.5 py-1.5 text-label text-muted-foreground shadow-node">
+        {t('This scene has no shots yet.')}
+      </span>
+    </div>
+  )
+}
+
+/** 처음 정렬(모든 씬)을 기다리는 동안 다른 씬 카드를 보이지 않게 그려 크기를 잰다(혼자 정한 것 h14) — 누를 수도 끌 수도 없다. */
+function measureOnly(node: DirectorNode): DirectorNode {
+  return {
+    ...node,
+    // xyflow 는 node.style 을 자기 값(visibility · pointerEvents) 뒤에 펼친다 — 여기 값이 이긴다.
+    style: { ...node.style, visibility: 'hidden', pointerEvents: 'none' },
+    domAttributes: { ...node.domAttributes, 'aria-hidden': true },
+    draggable: false,
+    selectable: false,
+    connectable: false,
+    focusable: false,
+  }
 }
 
 const edgeTypes = {
@@ -361,6 +396,21 @@ const edgeTypes = {
 
 function CanvasInner() {
   const t = useT()
+  // 씬별 보기(오너 D8 2026-11-22): 캔버스에는 고른 씬의 카드만 그린다(거르기는 화면에서만 — 스토어 · DB 는 프로젝트 통째, scene-view.ts).
+  const { scenes, sceneNodeId, view } = useDirectorSceneView()
+  const sceneNodeIdRef = useRef(sceneNodeId)
+  sceneNodeIdRef.current = sceneNodeId
+  const scenesRef = useRef(scenes)
+  scenesRef.current = scenes
+  // 다른 씬으로 가서 가운데에 둘 카드(꼬리표 · 상세 열기). 씬을 바꾼 뒤 화면 맞추기가 쓴다.
+  const focusCardRef = useRef<string | null>(null)
+  const goToScene = useCallback((targetSceneNodeId: string, focusCardId: string | null = null) => {
+    const entry = scenesRef.current.find((scene) => scene.nodeId === targetSceneNodeId)
+    const projectId = useDirectorCanvasStore.getState().projectId
+    if (!entry || !projectId) return
+    focusCardRef.current = focusCardId
+    switchDirectorScene(projectId, entry.key)
+  }, [])
   // 몸통 = 고르기 — 상태 고르기로 흐려진 노드는 고르지 않는다(아래 onNodeClick).
   const shotStates = useDirectorShotStates()
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
@@ -429,12 +479,21 @@ function CanvasInner() {
       }
       if (!(e.ctrlKey || e.metaKey)) return
       const k = e.key.toLowerCase()
+      // 되돌리기 · 다시 하기로 다른 씬 카드가 바뀌면 그 씬으로 간다 — 보이지 않는 곳이 바뀌면 고장으로 보인다(씬별 보기, 혼자 정한 것 h15).
+      const stepHistory = (step: () => void) => {
+        const before = useDirectorCanvasStore.getState()
+        const snapshot = { nodes: before.nodes, edges: before.edges }
+        step()
+        const after = useDirectorCanvasStore.getState()
+        const target = sceneAfterHistoryStep(snapshot, { nodes: after.nodes, edges: after.edges }, sceneNodeIdRef.current)
+        if (target) goToScene(target)
+      }
       if (k === 'z' && !e.shiftKey) {
         e.preventDefault()
-        undo()
+        stepHistory(undo)
       } else if (k === 'y' || (k === 'z' && e.shiftKey)) {
         e.preventDefault()
-        redo()
+        stepHistory(redo)
       } else if (k === 'c') {
         // Cmd/Ctrl+C = 선택 노드의 대표 이미지 복사(#node-copy-image).
         //   페이지 텍스트를 드래그해 복사하는 중이면 브라우저 기본 동작이 우선.
@@ -453,7 +512,7 @@ function CanvasInner() {
     }
     window.addEventListener('keydown', onKey)
     return () => window.removeEventListener('keydown', onKey)
-  }, [undo, redo, t])
+  }, [undo, redo, t, goToScene])
 
   // 누락 감지 넛지 (chat-proactive-copilot Phase 4): 캔버스가 안정되면(2s) 채워두면 좋을
   //   항목(샷의 캐릭터·배경 참조 누락 / 스토리보드 미생성)을 1회 informational 제안. 생성 트리거 X.
@@ -553,7 +612,7 @@ function CanvasInner() {
     const target = firstEntryViewport(useDirectorCanvasStore.getState().nodes, {
       width: pane?.clientWidth ?? 1200,
       height: pane?.clientHeight ?? 800,
-    })
+    }, sceneNodeIdRef.current)
     if (!target) return
     firstEntryReframedRef.current = true
     await applyViewport(target, { duration: 250 })
@@ -570,7 +629,12 @@ function CanvasInner() {
     if (!arrangePending) return
     let cancelled = false
     const stop = arrangeOnceCardsRendered({
-      cardIds: () => useDirectorCanvasStore.getState().nodes.filter((n) => !HIDDEN_ON_CANVAS.has(n.data.kind)).map((n) => n.id),
+      // 씬 보기의 단추 정렬(h13)은 그 씬 카드만 재면 된다. 모든 씬 정렬(처음 정렬)은 다른 씬 카드도 보이지 않게 그려 잰다(아래 measureOnly, h14).
+      cardIds: () => {
+        const st = useDirectorCanvasStore.getState()
+        if (!st.arrangeSceneNodeId) return st.nodes.filter((n) => !HIDDEN_ON_CANVAS.has(n.data.kind)).map((n) => n.id)
+        return sceneCanvas(st.nodes, st.edges, st.arrangeSceneNodeId, { showUnusedAssets: st.showUnusedAssets }).nodes.map((n) => n.id)
+      },
       renderedIds: renderedCardSizes,
       arrange: () => {
         const store = useDirectorCanvasStore.getState()
@@ -607,7 +671,7 @@ function CanvasInner() {
   }, [arrangePending, reframeFirstShot])
 
   // Node 뷰 재진입 시 마지막 뷰포트 복원 (#e 2026-07-14).
-  //   CanvasInner는 Node↔Storyboard 토글·스테이지 이동마다 remount된다. 예전엔 매 mount마다
+  //   CanvasInner는 스테이지 이동마다 remount된다(Director 스토리보드 보기는 오너 D2~D5 로 없앴다). 예전엔 매 mount마다
   //   fitView가 돌아 위치가 초기화됐다. 이제 최초 진입(viewportInitialized=false)만 fitView하고,
   //   이후엔 store에 유지된 viewport(onMove로 갱신, 싱글턴+persist)를 복원한다.
   //   fitView 타이밍은 useNodesInitialized로 노드 측정 완료를 기다린다.
@@ -619,7 +683,19 @@ function CanvasInner() {
     if (didInitViewportRef.current || !nodesInitialized) return
     didInitViewportRef.current = true
     const st = useDirectorCanvasStore.getState()
+    const paneEl = document.querySelector('.react-flow')
+    const paneSize = { width: paneEl?.clientWidth ?? 1200, height: paneEl?.clientHeight ?? 800 }
     if (st.viewportInitialized) {
+      // 씬별 보기: 저장한 화면에 이 씬 카드가 하나도 없으면(다른 화면 · Camera 에서 씬을 바꾸고 왔다) 그 씬 첫 샷으로 맞춘다.
+      const sceneCards = sceneCanvas(st.nodes, st.edges, sceneNodeIdRef.current, { showUnusedAssets: st.showUnusedAssets }).nodes
+      const sceneStart = sceneNodeIdRef.current && !viewportShowsAnyCard(st.viewport, paneSize, sceneCards)
+        ? firstEntryViewport(st.nodes, paneSize, sceneNodeIdRef.current)
+        : null
+      if (sceneStart) {
+        void applyViewport(sceneStart)
+        useDirectorCanvasStore.setState({ viewport: sceneStart })
+        return
+      }
       void applyViewport(st.viewport)
       return
     }
@@ -631,7 +707,7 @@ function CanvasInner() {
       const target = firstEntryViewport(useDirectorCanvasStore.getState().nodes, {
         width: pane?.clientWidth ?? 1200,
         height: pane?.clientHeight ?? 800,
-      })
+      }, sceneNodeIdRef.current)
       if (!target) {
         useDirectorCanvasStore.setState({
           viewport: getViewport(),
@@ -648,6 +724,34 @@ function CanvasInner() {
       })
     })()
   }, [nodesInitialized, applyViewport, getViewport, fitView])
+
+  // 씬을 바꾸면 그 씬 첫 샷을 첫 화면 자리로 짧게 옮긴다(혼자 정한 것 h5). 꼬리표 · 상세로 왔으면 그 카드를 가운데에.
+  //   씬을 바꾸는 것은 새 씬의 첫 화면이라 "사람이 화면을 옮겼다"를 푼다 — 뒤이은 처음 정렬이 새 씬 기준으로 화면을 맞출 수 있게.
+  const lastSceneRef = useRef(sceneNodeId)
+  useEffect(() => {
+    if (lastSceneRef.current === sceneNodeId) return
+    lastSceneRef.current = sceneNodeId
+    if (!didInitViewportRef.current || !sceneNodeId) return
+    const st = useDirectorCanvasStore.getState()
+    const pane = document.querySelector('.react-flow')
+    const paneSize = { width: pane?.clientWidth ?? 1200, height: pane?.clientHeight ?? 800 }
+    const focus = focusCardRef.current ? st.nodes.find((n) => n.id === focusCardRef.current) : undefined
+    focusCardRef.current = null
+    const target = focus ? cardViewport(focus, paneSize) : firstEntryViewport(st.nodes, paneSize, sceneNodeId)
+    viewportMovedByPersonRef.current = false
+    if (target) void applyViewport(target, { duration: 300 })
+  }, [sceneNodeId, applyViewport])
+
+  // [바꾸기] · ⤢ 로 다른 씬 샷의 상세를 열면 그 씬으로 가서 그 카드를 가운데에 둔다(혼자 정한 것 h16) — 상세 옆 캔버스에 그 카드가 보이게.
+  //   상세를 여는 길은 모두 사람의 누름이다(채팅이 만들거나 고친 것은 보는 씬을 바꾸지 않는다, #c4).
+  const detailNodeId = useDirectorCanvasStore((s) => s.detailNodeId)
+  useEffect(() => {
+    if (!detailNodeId) return
+    const st = useDirectorCanvasStore.getState()
+    const byId = new Map(st.nodes.map((n) => [n.id, n]))
+    const owner = cardSceneOf(byId.get(detailNodeId), byId)
+    if (owner && owner !== sceneNodeIdRef.current) goToScene(owner, detailNodeId)
+  }, [detailNodeId, goToScene])
 
   // 우클릭 메뉴(#context-menu 2026-08-31) — 좌클릭=선택 · 더블클릭=편집과 구분되는 세 번째 축.
   const [contextMenu, setContextMenu] = useState<CanvasMenuState | null>(null)
@@ -804,18 +908,34 @@ function CanvasInner() {
   )
 
   // #scene-hide: 씬 노드와 씬 관련 엣지는 캔버스에 안 그린다 (데이터는 유지 —
-  //   Writer 동기화·스토리보드 뷰·챗 명령이 계속 쓴다). 구 persist의 파생 카드 쟔재도 함께 거른다.
-  const hiddenNodeIds = new Set(
-    nodes.filter((n) => HIDDEN_ON_CANVAS.has(n.data.kind)).map((n) => n.id),
-  )
+  //   Writer 동기화·챗 명령이 계속 쓴다). 구 persist의 파생 카드 쟔재도 함께 거른다.
+  // 씬별 보기(오너 D8): 고른 씬의 카드 · 그 씬이 쓰는 인물 · 배경 · 씬 밖 카드만 그린다(view, scene-view.sceneCanvas).
+  //   처음 정렬(모든 씬)을 기다리는 동안은 다른 씬 카드도 보이지 않게 그려 크기를 잰다(h14).
+  const arrangeSceneNodeId = useDirectorCanvasStore((s) => s.arrangeSceneNodeId)
+  const measuringAll = arrangePending && !arrangeSceneNodeId && sceneNodeId !== null
   // 오너 QA 2026-11-03 3번: 인물 · 배경 카드가 위아래로 겹치면 그릴 때만 아래로 내린다(저장된 자리는 그대로).
-  const visibleNodes = useMemo(
-    () => separateAssetCards(nodes.filter((n) => !HIDDEN_ON_CANVAS.has(n.data.kind))),
-    [nodes],
-  )
-  const visibleEdges = edges.filter(
-    (e) => !hiddenNodeIds.has(e.source) && !hiddenNodeIds.has(e.target),
-  )
+  const visibleNodes = useMemo(() => {
+    const shown = separateAssetCards(view.nodes)
+    if (!measuringAll) return shown
+    const shownIds = new Set(shown.map((n) => n.id))
+    return [...shown, ...nodes.filter((n) => !HIDDEN_ON_CANVAS.has(n.data.kind) && !shownIds.has(n.id)).map(measureOnly)]
+  }, [view.nodes, measuringAll, nodes])
+  const visibleEdges = view.edges
+  // 다른 씬 카드와 이어진 선의 꼬리표(h9) — 누르면 그 씬으로 가서 그 카드를 가운데에.
+  const boardNames = useBoardNodeNames()
+  const linkChips = useMemo(() => {
+    const byId = new Map(nodes.map((n) => [n.id, n]))
+    const chips = new Map<string, SceneLinkChip[]>()
+    for (const link of view.links) {
+      const list = chips.get(link.nodeId) ?? []
+      const key = `${link.side}:${link.otherNodeId}`
+      if (list.some((chip) => chip.key === key)) continue
+      list.push({ key, side: link.side, text: linkCardName(byId.get(link.otherNodeId), byId, boardNames), go: () => goToScene(link.otherSceneId, link.otherNodeId) })
+      chips.set(link.nodeId, list)
+    }
+    return chips
+  }, [view.links, nodes, boardNames, goToScene])
+  const sceneHasShots = !sceneNodeId || view.nodes.some((n) => isShotData(n.data) && n.data.parentSceneNodeId === sceneNodeId)
 
   return (
     // B-D1 fix: wrapper div에 onDoubleClick 등록해 ReactFlow 내부 처리와 독립적으로 캐처
@@ -823,6 +943,7 @@ function CanvasInner() {
       className="relative h-full w-full"
       onDoubleClick={onPaneDoubleClick}
     >
+      <SceneLinksProvider chips={linkChips}>
       <ReactFlow
         nodes={visibleNodes}
         edges={visibleEdges}
@@ -923,6 +1044,7 @@ function CanvasInner() {
         <CanvasZoomPill onPersonMove={() => { viewportMovedByPersonRef.current = true }} />
         <MiniMapPanel />
       </ReactFlow>
+      </SceneLinksProvider>
 
       {nodes.length === 0 && (
         <div className="pointer-events-none absolute inset-0 flex items-center justify-center">
@@ -935,7 +1057,9 @@ function CanvasInner() {
         </div>
       )}
 
-      <NodeStatusEmptyNote />
+      {nodes.length > 0 && !sceneHasShots && <SceneEmptyNote />}
+
+      <NodeStatusEmptyNote shotIds={view.shotIds} />
 
       <CanvasContextMenu
         state={contextMenu}
@@ -957,27 +1081,10 @@ function CanvasInner() {
 const TOOLBAR_PILL =
   'flex h-[34px] shrink-0 items-center gap-1.5 rounded-full bg-background px-3.5 text-[13px] font-medium text-foreground shadow-node transition-colors duration-100 hover:bg-card'
 
-// Alt+←/→ 순환 뷰 시퀀스(#keyboard-only 2026-08-11) — Node → Storyboard(Previz) → Storyboard(Real).
-const DIRECTOR_VIEW_CYCLE = ['node', 'previz', 'real'] as const
-type DirectorViewStep = (typeof DIRECTOR_VIEW_CYCLE)[number]
-
 function PaletteBar() {
   const t = useT()
-  const viewMode = useDirectorCanvasStore((s) => s.viewMode)
-  const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
-  const storyboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
-  const setStoryboardMediaMode = useDirectorCanvasStore((s) => s.setStoryboardMediaMode)
-  // 두 상태(viewMode, mediaMode)를 하나의 걸음으로 합쳐 순환한다.
-  const viewStep: DirectorViewStep =
-    viewMode === 'node' ? 'node' : storyboardMediaMode === 'real' ? 'real' : 'previz'
-  useAltArrowCycle(DIRECTOR_VIEW_CYCLE, viewStep, (next) => {
-    if (next === 'node') {
-      setViewMode('node')
-      return
-    }
-    setViewMode('storyboard')
-    setStoryboardMediaMode(next)
-  })
+  // 씬 단추(오너 D8 2026-11-22) — 옛 [스토리보드 | 노드] 자리. Alt+←/→ 는 앞 · 뒤 씬(옛 보기 순환 자리, h19).
+  const { items: sceneItems, sceneKey, sceneNodeId, view, projectId: sceneProjectId } = useDirectorSceneView()
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   // #real-grid: 일괄 생성은 4샷 시트 러너(runRealBatch)로 통합 — 진행 플래그는 스토어 공유.
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
@@ -995,18 +1102,22 @@ function PaletteBar() {
   const showUnusedAssets = useDirectorCanvasStore((s) => s.showUnusedAssets)
   const toggleUnusedAssets = useDirectorCanvasStore((s) => s.toggleUnusedAssets)
   const addPromptNode = useDirectorCanvasStore((s) => s.addPromptNode)
-  const promptCount = nodes.filter((n) => n.data.kind === 'prompt').length
+  // 새 프롬프트 노드는 지금 화면 왼쪽 위에(씬 보기 — 판 맨 왼쪽은 뒤 씬에서 화면 밖이다, h17). 이 보기의 프롬프트 수만큼 조금씩 아래에.
+  const promptCount = view.nodes.filter((n) => n.data.kind === 'prompt').length
 
   // 샷 상태 · 남은 일(시안 R 416:4941 · D1, 오너 2026-11-14) — 단추 숫자 · 가장 밝은 단추 · 예상 칸이 같은 판정을 쓴다.
   const shotStates = useDirectorShotStates()
-  const statusCounts = countStatusFilters(shotStates.values())
+  // 씬별 보기(오너 D8): 상태 고르기 숫자 · [전체 고르기] · 고름은 지금 씬(과 씬 밖 카드)의 샷만 센다(h12).
+  //   [이미지 · 영상 만들기 N] 이 그 씬만 셀지는 오너 결정(b1, Take) 전이라 지금처럼 프로젝트 전체(아래 workStates).
+  const sceneShotStates = shotStatesIn(shotStates, view.shotIds)
+  const statusCounts = countStatusFilters(sceneShotStates.values())
   const statusFilter = useDirectorCanvasStore((s) => s.statusFilter)
   const setStatusFilter = useDirectorCanvasStore((s) => s.setStatusFilter)
   // 고른 샷(시안 D2 406:4588) — 상태 고르기로 보이는 샷 안의 고름만 센다. 고른 샷이 있으면 단추 · 예상이 그 샷 기준.
   const pickedShotIds = useDirectorCanvasStore((s) => s.pickedShotIds)
   const setPickedShots = useDirectorCanvasStore((s) => s.setPickedShots)
   const clearPickedShots = useDirectorCanvasStore((s) => s.clearPickedShots)
-  const visibleShotIds = [...shotStates.entries()].filter(([, state]) => matchesStatusFilter(state, statusFilter)).map(([id]) => id)
+  const visibleShotIds = [...sceneShotStates.entries()].filter(([, state]) => matchesStatusFilter(state, statusFilter)).map(([id]) => id)
   const picked = effectivePickedIds(pickedShotIds, visibleShotIds)
   // 상태를 골랐으면 단추 · 예상도 보이는 샷만 센다(리드 11/14 답 1).
   const workStates = workScopeStates(shotStates, statusFilter)
@@ -1068,8 +1179,8 @@ function PaletteBar() {
   const [confirmVideoBatch, setConfirmVideoBatch] = useState(false)
   const [confirmRemake, setConfirmRemake] = useState(false)
   const [confirmChain, setConfirmChain] = useState(false)
-  // D1 "The Set" 노드 9 · 샷 4"(노드형) · "씬 2 · 샷 4 · 12초"(스토리보드형).
-  const canvasMeta = viewMode === 'storyboard' ? storyboardCanvasMeta(nodes, t) : directorCanvasMeta(nodes, t)
+  // D1 "The Set 노드 9 · 샷 4" — 지금 씬 캔버스에 보이는 카드만(h12).
+  const canvasMeta = directorCanvasMeta(view.nodes, t)
 
   // Writer 샷은 4샷 한 장 일괄로, Director 에서 손으로 더한 샷(Writer 샷 없음)은 한 장씩.
   const writerShotIdOf = (id: string): string | null => {
@@ -1228,37 +1339,14 @@ function PaletteBar() {
       </TopBarActions>
       <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
         <div className="flex min-w-0 items-center gap-3">
-          {/* Node / Storyboard 토글 */}
-          <AltArrowHint>
-            <Tabs value={viewMode} onValueChange={(v) => setViewMode(v as 'node' | 'storyboard')}>
-              <TabsList className="h-9 rounded-full bg-background p-1 shadow-node">
-                <TabsTrigger value="storyboard" className="rounded-full px-3.5 text-[13px]">{t('Storyboard')}</TabsTrigger>
-                <TabsTrigger value="node" className="rounded-full px-3.5 text-[13px]">{t('Node')}</TabsTrigger>
-              </TabsList>
-            </Tabs>
-          </AltArrowHint>
-
-          {/* 러프 | 실사 미디어 토글(#previz-video) — Storyboard 뷰 전용, 상단바 상주(2026-07-22). */}
-          {viewMode === 'storyboard' && (
-            <div className="flex h-9 items-center gap-0.5 rounded-full bg-background p-1 shadow-node">
-              {(['previz', 'real'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setStoryboardMediaMode(m)}
-                  aria-pressed={storyboardMediaMode === m}
-                  className={cn(
-                    'h-full rounded-full px-3 text-[13px] transition-colors',
-                    storyboardMediaMode === m
-                      ? 'bg-accent font-semibold text-foreground'
-                      : 'font-medium text-subtle-foreground hover:text-foreground',
-                  )}
-                >
-                  {m === 'previz' ? t('Rough') : t('Real')}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* 씬 단추(오너 D8) — 옛 [스토리보드 | 노드] 자리. 누르면 그 씬 카드만 그린다. ⌘/Ctrl+클릭은 @멘션(D9), Alt+←/→ 는 앞 · 뒤 씬. */}
+          <SceneButtons
+            items={sceneItems}
+            value={sceneKey}
+            onChange={(key) => switchDirectorScene(sceneProjectId, key)}
+            cycleWithAltArrows
+            className="max-w-[min(560px,42cqw)]"
+          />
 
           {/* 제목(#e1 2026-07-14 스테이지 헤더 → v3 툴바 안) — 설명문은 "?" 뱃지 호버(2026-08-06). */}
           <div className="flex min-w-0 items-center gap-2">
@@ -1285,46 +1373,42 @@ function PaletteBar() {
         </div>
 
         <div className="ml-auto flex shrink-0 items-center gap-2">
-          {/* 캔버스 전용 액션 3종 — Node 탭에서만 표시(#e2 2026-07-13) */}
-          {viewMode === 'node' && (
-            <>
-              {/* 안 쓴 에셋(시안 D1 노드형) — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만). 켜짐은 눌린 모양. */}
-              <button
-                type="button"
-                onClick={() => toggleUnusedAssets()}
-                aria-pressed={showUnusedAssets}
-                title={t('Show registered assets that this scene does not reference in the left asset column too')}
-                className={cn(TOOLBAR_PILL, showUnusedAssets && 'bg-stage/18 ring-[1.5px] ring-inset ring-stage hover:bg-stage/25')}
-              >
-                <Boxes className="size-3.5" />
-                <span>{t('Unused assets')}</span>
-              </button>
+          {/* 캔버스 전용 액션 3종(#e2 2026-07-13) — Director 는 노드 보기 하나라 늘 보인다(오너 D2~D5). */}
+          {/* 안 쓴 에셋(시안 D1 노드형) — 씬마다 그 씬이 참조 안 하는 등록 에셋도 좌측 컬럼에 표시(표시만). 켜짐은 눌린 모양. */}
+          <button
+            type="button"
+            onClick={() => toggleUnusedAssets()}
+            aria-pressed={showUnusedAssets}
+            title={t('Show registered assets that this scene does not reference in the left asset column too')}
+            className={cn(TOOLBAR_PILL, showUnusedAssets && 'bg-stage/18 ring-[1.5px] ring-inset ring-stage hover:bg-stage/25')}
+          >
+            <Boxes className="size-3.5" />
+            <span>{t('Unused assets')}</span>
+          </button>
 
-              {/* 노드 자동 정렬 — asset·scene·shot·video를 다이어그램 레이아웃으로 재배치 (DB 반영) */}
-              <button
-                type="button"
-                onClick={() => requestArrange()}
-                title={t('Arrange assets, scenes, shots, and videos in a left-to-right layout with spacing (saved to DB)')}
-                className={TOOLBAR_PILL}
-              >
-                <LayoutGrid className="size-3.5" />
-                <span>{t('Auto-arrange')}</span>
-              </button>
+          {/* 노드 자동 정렬 — 씬 보기에서는 지금 씬의 샷 · 영상만 다이어그램 레이아웃으로 재배치(h13, DB 반영) */}
+          <button
+            type="button"
+            onClick={() => requestArrange({ sceneNodeId })}
+            title={t('Arrange assets, scenes, shots, and videos in a left-to-right layout with spacing (saved to DB)')}
+            className={TOOLBAR_PILL}
+          >
+            <LayoutGrid className="size-3.5" />
+            <span>{t('Auto-arrange')}</span>
+          </button>
 
-              {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
-              <button
-                type="button"
-                onClick={() =>
-                  addPromptNode({ x: 80, y: 120 + promptCount * 180 })
-                }
-                title={t('Adds a standalone prompt node. Connect its right handle to a Shot\'s T input to sync the Shot prompt.')}
-                className={TOOLBAR_PILL}
-              >
-                <Plus className="size-3.5" />
-                <span>{t('Prompt node')}</span>
-              </button>
-            </>
-          )}
+          {/* 프롬프트 노드 추가 — Higgsfield식 분리 프롬프트(우측 핸들을 Shot T 입력에 연결) */}
+          <button
+            type="button"
+            onClick={() =>
+              addPromptNode(promptNodePlace(useDirectorCanvasStore.getState().viewport, promptCount))
+            }
+            title={t('Adds a standalone prompt node. Connect its right handle to a Shot\'s T input to sync the Shot prompt.')}
+            className={TOOLBAR_PILL}
+          >
+            <Plus className="size-3.5" />
+            <span>{t('Prompt node')}</span>
+          </button>
 
           {/* 상태 고르기(시안 D1 "전체 4 ▾") — 고르면 그 상태 샷만 보인다. */}
           <ShotStatusFilterMenu counts={statusCounts} value={statusFilter} onChange={setStatusFilter} />
@@ -1565,26 +1649,16 @@ export default function DirectorCanvasPage() {
     if (handoffProjectId) useGlobalChatStore.getState().confirmDirectorHandoff(handoffProjectId, '/studio/director')
   }, [handoffProjectId])
   const t = useT()
+  // 오너 D2~D5(2026-11-22): Director 에는 노드 보기만 있다 — 스토리보드(러프 · 실사) 보기는 새 Camera 탭이 맡는다.
+  //   이 브라우저에 옛 스토리보드 보기가 기억돼 있어도 노드 보기로 연다(옛 값이면 왼쪽 상세 패널이 안 열린다, h22). 보기 값은 Camera 가 격자를 다시 쓸 때를 위해 스토어에 남긴다.
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
-  // 스토리보드 축척 — PaletteBar(컨트롤)와 StoryboardGridView(그리드·단축키)가 공유(#e-zoom-merge)
-  const [storyboardZoom, setStoryboardZoom] = useStoryboardZoom('director:storyboard:zoomLevel')
+  const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
+  useEffect(() => {
+    if (viewMode !== 'node') setViewMode('node')
+  }, [viewMode, setViewMode])
   const guideProjectId = useDirectorCanvasStore((s) => s.projectId)
   // 첫 사용법 안내도 채팅 기록을 다 읽은 뒤에만(위 채워 두면 좋은 것 안내와 같은 까닭, 2026-11-14 오너).
   const guideChatLoaded = useGlobalChatStore((s) => !!guideProjectId && s.messagesLoadedProjectId === guideProjectId)
-  // Node↔Storyboard 전환 슬라이드(#e2 2026-08-03) — 두 뷰는 조건 렌더(원래 remount)라
-  //   mount 애니메이션이 곧 전환 연출. 방향은 토글 순서(시안 D1: Storyboard 왼쪽·Node 오른쪽, 리드 11/14).
-  const [prevViewMode, setPrevViewMode] = useState(viewMode)
-  const [viewSlide, setViewSlide] = useState<'forward' | 'back' | 'none'>('none')
-  if (viewMode !== prevViewMode) {
-    setViewSlide(viewMode === 'node' ? 'forward' : 'back')
-    setPrevViewMode(viewMode)
-  }
-  const viewSlideClass =
-    viewSlide === 'forward'
-      ? 'animate-in fade-in-25 slide-in-from-right-6 duration-500 ease-out motion-reduce:animate-none'
-      : viewSlide === 'back'
-        ? 'animate-in fade-in-25 slide-in-from-left-6 duration-500 ease-out motion-reduce:animate-none'
-        : undefined
   const offerSuggestion = useGlobalChatStore((s) => s.offerSuggestion)
   // 프로젝트 init(resetChildStores)이 끝나기 전에 올린 제안은 reset()에 지워진다 —
   //   스테이지 동기 + init 완료 후에만 발화.
@@ -1595,7 +1669,7 @@ export default function DirectorCanvasPage() {
   // Writer Scene/Shot → Director 노드 자동 셋업 (프롬프트 + 에셋 바인딩, 스펙 §8)
   useWriterDirectorSync()
 
-  // 큐 축소 → 재수화(#live-refresh) — Node/Storyboard 어느 뷰든 생성 완료가 즉시 보인다.
+  // 큐 축소 → 재수화(#live-refresh) — 생성 완료가 즉시 보인다.
   useQueueRehydrate(guideProjectId && guideProjectId !== 'default' ? guideProjectId : null)
 
   useEffect(() => {
@@ -1639,12 +1713,13 @@ export default function DirectorCanvasPage() {
   //     1) 상단 'Generate storyboard' 버튼 — 전체 일괄
   //     2) 카드/노드의 개별 생성 버튼 — 샷 하나
   //     3) 채팅 지시 — 위 둘과 같은 경로로 들어온다
-  // 첫 진입 사용법 안내(#e3) — Node/Storyboard 탭 각각 프로젝트당 1회(localStorage 가드).
-  //   제안 슬롯은 선점형: 갭 넛지가 점유 중이면 내리고 안내를 올리고, 그 외 제안이면 양보.
+  // 첫 진입 사용법 안내(#e3) — 노드 보기 안내, 프로젝트당 1회(localStorage 가드). 스토리보드 보기 안내는 보기와 함께 없앴다(오너 D2~D5).
+  //   옛 스토리보드 보기 값을 노드로 맞춘 뒤에 띄운다(위 h22). 제안 슬롯은 선점형: 갭 넛지가 점유 중이면 내리고 안내를 올리고, 그 외 제안이면 양보.
   useEffect(() => {
     if (!guideProjectId || guideProjectId === 'default' || !stageReady) return
     if (!guideChatLoaded) return
-    const key = viewMode === 'storyboard' ? 'storyboardGuide' : 'nodeGuide'
+    if (viewMode !== 'node') return
+    const key = 'nodeGuide'
     const guardKey = `director:${key}:${guideProjectId}`
     try {
       if (localStorage.getItem(guardKey)) return
@@ -1664,20 +1739,14 @@ export default function DirectorCanvasPage() {
       stage: 'director',
       dismissible: false,
       action: null,
-      content:
-        viewMode === 'storyboard'
-          ? t(
-              'This is the storyboard. See every shot image per scene at a glance.\n\n' +
-                '· Click cards to pick shots, and the buttons at the top work on the picked shots\n' +
-                '· "Make images" turns the rough shots into real images, then "Make videos"\n' +
-                '· Press ⤢ Details on a card to open its details',
-            )
-          : t(
-              'This is The Set, where scenes → shots → videos connect as nodes.\n\n' +
-                '· Click a node to pick its shot, and press ⤢ Details to open its details\n' +
-                '· "Make images" at the top turns the rough shots into real images at once\n' +
-                '· When images are ready, "Make videos" makes the videos',
-            ),
+      // 씬 단추 한 줄(h23) — 씬별 보기를 알린다.
+      content: t(
+        'This is The Set, where scenes → shots → videos connect as nodes.\n\n' +
+          '· Pick a scene with the scene buttons at the top to see only its cards\n' +
+          '· Click a node to pick its shot, and press ⤢ Details to open its details\n' +
+          '· "Make images" at the top turns the rough shots into real images at once\n' +
+          '· When images are ready, "Make videos" makes the videos',
+      ),
     })
   }, [guideProjectId, viewMode, stageReady, guideChatLoaded, offerSuggestion, t])
 
@@ -1686,40 +1755,17 @@ export default function DirectorCanvasPage() {
     //   제목 "The Set" · 도움말은 판 안 툴바 왼쪽으로, [다음: Editor로]는 위 막대 오른쪽으로 옮겼다.
     <div className="flex flex-1 flex-col overflow-hidden pb-2">
       <div className="relative flex min-h-0 flex-1 flex-col overflow-hidden rounded-xl bg-canvas-bg">
-        {/* Center: top Palette bar(#e1 — 하단→상단 이동) + Canvas (Node/Storyboard) */}
+        {/* Center: top Palette bar(#e1 — 하단→상단 이동) + 노드 캔버스(씬별 보기, 오너 D8) */}
         <PaletteBar />
 
-        {/* min-h-0: flex-1이 내용 높이만큼 커져 PaletteBar(토글)를
-            밀어내고 StoryboardGridView의 overflow-auto가 안 걸리던 문제 수정.
-            이걸로 storyboard 그리드 스크롤 + Node/Storyboard 토글 항상 노출. */}
+        {/* min-h-0: flex-1이 내용 높이만큼 커져 PaletteBar(씬 단추)를 밀어내지 않게. */}
         <div className="relative min-h-0 flex-1">
-          {/* key=viewMode: 전환 시 래퍼 remount 로 슬라이드 재생(#e2) — 뷰 자체도 원래 조건
-              렌더로 remount 되던 구조라 추가 비용 없음. */}
-          <div key={viewMode} className={cn('flex h-full min-h-0 flex-col', viewSlideClass)}>
-            {viewMode === 'storyboard' ? (
-              <>
-                <div className="min-h-0 flex-1">
-                  <StoryboardGridView
-                    zoomLevel={storyboardZoom}
-                    onZoomLevelChange={setStoryboardZoom}
-                  />
-                </div>
-                {/* 축척은 시안 D1 처럼 판 왼쪽 아래 "− 100% + ⤢" 알약(노드형 축척과 같은 생김새). 카드가 스크롤돼 들어가지 않는
-                    아래 띠에 둬 어느 카드도 덮지 않는다(리드 11/14). Ctrl+wheel 단축은 보드가 그대로 처리한다. */}
-                <div className="flex shrink-0 items-center px-4 pb-4 pt-2">
-                  <StoryboardZoomPill zoomLevel={storyboardZoom} onZoomLevelChange={setStoryboardZoom} />
-                </div>
-              </>
-            ) : (
-              <ReactFlowProvider>
-                <CanvasInner />
-              </ReactFlowProvider>
-            )}
+          <div className="flex h-full min-h-0 flex-col">
+            <ReactFlowProvider>
+              <CanvasInner />
+            </ReactFlowProvider>
           </div>
         </div>
-
-        {/* Storyboard 뷰에서도 더블클릭 편집 팝업이 동작하도록 viewMode 무관 마운트 */}
-        {viewMode === 'storyboard' && <DirectorNodePopup />}
 
         {/* 결정 #12 완료: D-3 NodePopup이 카메라/조명/렌즈 편집을 흡수.
             우측 Inspector aside 제거됨 (D-3 마일스톤, 2026-05-25) */}
