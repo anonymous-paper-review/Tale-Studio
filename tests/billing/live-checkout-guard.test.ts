@@ -117,6 +117,23 @@ it('운영 결제가 닫혀 있어도 요금과 옵션은 볼 수 있다', async
   for (const price of ['$15', '$199', '$29']) expect(markup).toContain(price)
 })
 
+// 왜: 2026-11-22 오너 "구매 버튼은 눌러도 Take 충전처럼 아직 안 된다고 뜨게". 눌리지 않는 버튼은 고장으로 보인다.
+it('운영 결제를 열기 전에도 요금표의 구매 버튼은 누를 수 있고, 누르면 결제창 대신 Take 충전과 같은 준비 중 안내를 띄운다', async () => {
+  const { purchaseButton, PAYMENTS_NOT_OPEN_COPY } = await import('@/lib/billing/pricing-selection')
+  for (const purchasable of [true, false]) {
+    expect(purchaseButton({ checkoutEnabled: false, purchasable, busy: false })).toEqual({ disabled: false, action: 'notice', notice: PAYMENTS_NOT_OPEN_COPY })
+  }
+  expect(PAYMENTS_NOT_OPEN_COPY).toBe('Payments are being prepared')
+})
+
+// 왜: 정상 경로 고정. 운영 결제를 연 뒤에는 가격 ID가 있는 상품만 결제창으로 이어진다.
+it('운영 결제를 연 뒤에는 가격 ID가 있는 상품의 구매 버튼만 결제창을 연다', async () => {
+  const { purchaseButton } = await import('@/lib/billing/pricing-selection')
+  expect(purchaseButton({ checkoutEnabled: true, purchasable: true, busy: false })).toEqual({ disabled: false, action: 'checkout', notice: null })
+  expect(purchaseButton({ checkoutEnabled: true, purchasable: false, busy: false })).toEqual({ disabled: true, action: 'checkout', notice: null })
+  expect(purchaseButton({ checkoutEnabled: true, purchasable: true, busy: true })).toEqual({ disabled: true, action: 'checkout', notice: null })
+})
+
 // 왜: 가격 ID가 채워진 것과 운영 결제를 연 것은 서로 다른 상태다. 운영 점검이 이를 혼동하면 안 된다.
 it('운영 결제가 닫혀 있으면 상품 설정과 구매 가능 상태를 따로 보여준다', async () => {
   const { GET } = await import('@/app/api/billing/catalog-status/route')

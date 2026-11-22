@@ -2,13 +2,14 @@
 
 import { Suspense, useRef, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
+import { toast } from 'sonner'
 import { ArrowRight, Check, ChevronLeft, ChevronRight, Clapperboard, Layers, Loader2, Users, X, Zap } from 'lucide-react'
 import { Dialog, DialogClose, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { PlanChangeDialog } from '@/components/billing/plan-change-dialog'
 import { useCheckout } from '@/lib/billing/use-checkout'
 import { isPurchasable } from '@/lib/billing/catalog'
-import { PRICING_FAMILIES, pricingOptions, pricingReturnPath, pricingSelectionFromSearch, type PricingFamily, type PricingOption, type PricingSelection } from '@/lib/billing/pricing-selection'
+import { PRICING_FAMILIES, pricingOptions, pricingReturnPath, pricingSelectionFromSearch, purchaseButton, type PricingFamily, type PricingOption, type PricingSelection } from '@/lib/billing/pricing-selection'
 import { useT } from '@/lib/i18n'
 import { countText } from '@/lib/i18n/count-text'
 import { cn } from '@/lib/utils'
@@ -77,6 +78,7 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
   const options = selection ? pricingOptions(selection.family) : []
   const option = selection ? options[selection.index] : undefined
   const copy = selection ? FAMILY_COPY[selection.family] : null
+  const purchase = option ? purchaseButton({ checkoutEnabled, purchasable: isPurchasable(option.item), busy }) : null
 
   function choose(index: number) {
     if (!selection || !Number.isInteger(index) || index < 0 || index >= options.length || busy) return
@@ -199,10 +201,14 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
                   size="lg"
                   className="w-full"
                   data-pricing-purchase
-                  disabled={!checkoutEnabled || busy || !isPurchasable(option.item)}
-                  onClick={() => void startCheckout({ kind: option.kind, id: option.item.id, returnTo: pricingReturnPath(option), onReady: handOff })}
+                  disabled={purchase?.disabled ?? true}
+                  onClick={() => {
+                    // 구매가 닫힌 동안에는 계정 화면 Take 충전과 같은 안내만 띄운다.
+                    if (purchase?.notice) toast.error(t(purchase.notice))
+                    else void startCheckout({ kind: option.kind, id: option.item.id, returnTo: pricingReturnPath(option), onReady: handOff })
+                  }}
                 >
-                  {!checkoutEnabled ? t('Payments are being prepared') : busy ? <><Loader2 className="size-4 animate-spin motion-reduce:animate-none" />{t('Preparing checkout…')}</> : !isPurchasable(option.item) ? t('Coming soon') : option.kind === 'plan' ? t('Continue with {plan}', { plan: option.item.name }) : countText(t, quantityOf(option), 'Buy 1 Take', 'Buy {n} Takes', { n: quantityOf(option).toLocaleString('en-US') })}
+                  {busy ? <><Loader2 className="size-4 animate-spin motion-reduce:animate-none" />{t('Preparing checkout…')}</> : checkoutEnabled && !isPurchasable(option.item) ? t('Coming soon') : option.kind === 'plan' ? t('Continue with {plan}', { plan: option.item.name }) : countText(t, quantityOf(option), 'Buy 1 Take', 'Buy {n} Takes', { n: quantityOf(option).toLocaleString('en-US') })}
                 </Button>
                 <p className="mt-2 text-center text-xs text-muted-foreground">{t(checkoutEnabled ? 'Pay in USD by card. Review the final total in Paddle.' : 'You can browse plans and Take packs. Purchases are not open yet.')}</p>
               </div>

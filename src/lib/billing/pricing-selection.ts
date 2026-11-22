@@ -28,3 +28,19 @@ export function pricingSelectionFromSearch(search: Pick<URLSearchParams, 'getAll
 export function pricingReturnPath(option: PricingOption): string {
   return `/pricing?${option.kind}=${encodeURIComponent(option.item.id)}`
 }
+
+/** 운영 구매가 닫힌 동안 구매 버튼이 띄우는 안내. 서버가 payments_not_open 으로 거절할 때(계정 화면 Take 충전)와 같은 문장이다. */
+export const PAYMENTS_NOT_OPEN_COPY = 'Payments are being prepared'
+
+/**
+ * 요금표 구매 버튼의 상태(2026-11-22 오너: "눌러도 Take 충전처럼 아직 안 된다고 뜨게").
+ * 구매가 닫힌 동안에는 버튼을 죽이지 않고, 누르면 서버에 가지 않고 준비 중 안내만 띄운다 — 로그인 전 방문자도 같은 안내를 본다.
+ */
+export function purchaseButton(input: { checkoutEnabled: boolean; purchasable: boolean; busy: boolean }): {
+  disabled: boolean
+  action: 'checkout' | 'notice'
+  notice: string | null
+} {
+  if (!input.checkoutEnabled) return { disabled: input.busy, action: 'notice', notice: PAYMENTS_NOT_OPEN_COPY }
+  return { disabled: input.busy || !input.purchasable, action: 'checkout', notice: null }
+}

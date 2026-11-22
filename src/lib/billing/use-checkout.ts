@@ -12,9 +12,10 @@ import { refetchBillingAccount } from '@/lib/billing/use-billing-account'
 import type { CheckoutDenyReason, CheckoutKind } from '@/lib/billing/checkout'
 import type { PlanChangePreview } from '@/components/billing/plan-change-dialog'
 import { PADDLE_PLANS } from '@/lib/billing/catalog'
+import { PAYMENTS_NOT_OPEN_COPY } from '@/lib/billing/pricing-selection'
 
 const DENY_COPY: Record<CheckoutDenyReason, string> = {
-  payments_not_open: 'Payments are being prepared',
+  payments_not_open: PAYMENTS_NOT_OPEN_COPY,
   unknown_item: 'That product is not available.',
   not_purchasable: 'Payments for this product open soon.',
   free_pack_limit: 'Free plans can buy one pack. Subscribe to keep topping up.',
