@@ -1,8 +1,9 @@
 // 소품 그림 제출 계획(서버) — 지시문에 작품 그림체를 붙이고 모델 갈래를 고른다. DB · 외부 호출 없이 순수하다.
 //   그림체 기준 그림이 있으면 참고 그림으로 붙이되 인물 조각(Figure rules · Priority)은 싣지 않는다 — 소품에는 사람이 없다(사물 시트 규칙과 같다).
-//   기준 그림 없이 그리는 그림체(실사, 2026-10-13 오너)는 배경과 같이 글자 금지 줄을 붙이고 크기로 비율을 정한다.
+//   기준 그림 없이 그리는 그림체(실사, 2026-10-13 오너)는 배경과 같이 글자 금지 줄을 붙이고 크기로 비율을 정한다
+//   (글씨 스위치를 켜면 — 설명에 적힌 글씨만 남김 — 글자 금지 줄은 붙이지 않는다. 덧붙인 글씨 금지는 지시문 안에 있다).
 //   약속: tests/artist/prop-image.test.ts
-import { buildPropImagePrompt } from '@/lib/artist/prop-image'
+import { buildPropImagePrompt, PROP_TEXT_RULE, type PropTextRule } from '@/lib/artist/prop-image'
 import { imageSizeForAspect } from '@/lib/fal/aspect-size'
 import { DEFAULT_WORLD_IMAGE_MODEL, resolveImageEndpoint, type ImageModelKey } from '@/lib/image-models'
 import { applyStyleAnchor, type AnchorableSubmit, type ResolvedStyleAnchor } from '@/lib/style-anchor'
@@ -27,16 +28,19 @@ export function planPropImageSubmit(input: {
   anchor: ResolvedStyleAnchor | null
   styleWithoutReference: boolean
   model?: ImageModelKey | null
+  textRule?: PropTextRule
 }): PropImagePlan {
   const modelKey = input.model ?? DEFAULT_WORLD_IMAGE_MODEL
-  const prompt = buildPropImagePrompt(input)
+  const textRule = input.textRule ?? PROP_TEXT_RULE
+  const prompt = buildPropImagePrompt({ ...input, textRule })
   const withoutReference = !input.anchor && input.styleWithoutReference
   const base: AnchorableSubmit = {
-    prompt: withoutReference ? `${prompt}\n${FACET_NO_TEXT}` : prompt,
+    prompt: withoutReference && textRule === 'none' ? `${prompt}\n${FACET_NO_TEXT}` : prompt,
     aspect_ratio: PROP_IMAGE_ASPECT,
     ...(withoutReference ? { image_size: imageSizeForAspect(PROP_IMAGE_ASPECT) } : {}),
   }
-  const submit = input.anchor ? applyStyleAnchor(input.anchor, base, 'single', { people: false }) : base
+  // 글씨 스위치를 켜면 그림체 줄의 전면 글자 금지도 빼야 설명의 글씨가 남는다(첫 시험: 펼친 편지가 빈 종이로 나옴).
+  const submit = input.anchor ? applyStyleAnchor(input.anchor, base, 'single', { people: false, ...(textRule === 'described' ? { describedText: true } : {}) }) : base
   const model = resolveImageEndpoint(modelKey, !!submit.reference_image_urls?.length).endpoint
   return { submit: { ...submit, model }, model, modelKey }
 }

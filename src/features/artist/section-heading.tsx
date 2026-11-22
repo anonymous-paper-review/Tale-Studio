@@ -4,6 +4,7 @@
 //   이름 · 수는 위 바로가기 단추와 같은 말이다(단추가 가리키는 곳이 어디인지 알게). 약속: tests/artist/section-jump.test.ts
 import { useT } from '@/lib/i18n'
 import type { ArtistSection } from '@/lib/artist/card-filter'
+import { propEmptyLine } from '@/lib/artist/prop-source'
 
 export const SECTION_LABEL: Record<ArtistSection, string> = {
   characters: 'Characters {count}',
@@ -11,10 +12,11 @@ export const SECTION_LABEL: Record<ArtistSection, string> = {
   props: 'Props {count}',
 }
 
+// 소품 한 줄은 소품 출처(prop-source.ts)를 따른다 — 출처가 바뀌면 그 출처의 말로.
 const EMPTY_LINE: Record<ArtistSection, string> = {
   characters: 'No characters yet. Characters come from the confirmed prose.',
   world: 'No backgrounds yet. Backgrounds come from the confirmed prose.',
-  props: 'No props yet. Objects you set in Producer become props.',
+  props: propEmptyLine(),
 }
 
 export function ArtistSectionHeading({ section, count }: { section: ArtistSection; count: number }) {
