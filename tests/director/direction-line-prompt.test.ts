@@ -73,6 +73,19 @@ describe('혼자 정한 것', () => {
     expect(buildVideoPrompt({ ...BASE, directionLine: long }).prompt_parts.directionRead).toHaveLength(400)
   })
 
+  // 왜: 영상 QA(2026-11-23)에서 찾음 — 읽은 줄이 마침표로 끝나는데 뒤 조각을 '. '로 이어 "…subtly.. Full shot"처럼 마침표가 겹쳤다(리드 11/23 "쉬움").
+  //   줄 끝 문장 부호는 그대로 두고 띄어쓰기 하나로 잇는다. 마침표 없이 끝난 줄은 지금처럼 마침표 하나로 잇는다.
+  it('읽은 줄이 마침표(. 。 ! ?)로 끝나도 영상 지시에 마침표가 두 번 붙지 않는다', () => {
+    const head = 'Movement (from the edited direction sketch): '
+    for (const end of ['.', '。', '!', '?']) {
+      const line = `The figure stands up${end}`
+      const { fullPrompt } = buildVideoPrompt({ ...BASE, referenceImageRoles: ['start'], videoMode: 'start_prompt', directionLine: line })
+      expect({ end, joined: fullPrompt.startsWith(`${head}${line} `) }).toEqual({ end, joined: true })
+    }
+    const plain = buildVideoPrompt({ ...BASE, referenceImageRoles: ['start'], videoMode: 'start_prompt', directionLine: 'The figure stands up' })
+    expect(plain.fullPrompt.startsWith(`${head}The figure stands up. `)).toBe(true)
+  })
+
   // 왜: 읽은 줄은 그 미들 스케치를 글로 옮긴 것이다 — "글과 스케치가 다르면 스케치를 따르라"와 다투지 않으니 그 문장을 그대로 둔다.
   it('시작+미들에서도 읽은 줄을 싣고 스케치를 따르라는 문장은 그대로 둔다', () => {
     const { fullPrompt } = buildVideoPrompt({ ...BASE, referenceImageRoles: ['start', 'direction'], videoMode: 'start_middle', middleSource: 'rough', directionLine: LINE })
