@@ -127,4 +127,14 @@ describe('채팅 모델이 첨부 그림을 그림체로 쓰자고 할 때', () 
       expect(system).not.toContain('does NOT set the style')
     }
   })
+
+  it('그림을 붙이고 "이 그림체로"라고 해도, 채팅은 그림을 보고 가까운 스타일을 고르거나 권하지 않고, 고를 수 있는 네 가지 이름과 고르는 곳(Artist 스타일 창)만 알려 준다', () => {
+    // 왜: QA(2026-11-23, 운영 프로젝트 복사본)에서 그림을 붙여 "이 그림체로 해줘"라고 하자 모델이 그림을 보고 "가장 가까운 건 수채예요"라고 권했다 —
+    //   리드 결정 "그림 보고 권하기 안 함(이름만)"과 어긋난다. 모델이 지키는지는 시험으로 못 잡는다 — 첨부 그림 규칙 자리에 그 지시가 있는지만 고정한다.
+    for (const locale of ['ko', 'en'] as const) {
+      const system = buildProducerSystem(locale)
+      const rule = system.slice(system.indexOf('<attached_images>'), system.indexOf('</attached_images>'))
+      expect(rule).toContain('Do not look at the picture to pick or recommend the closest of the four styles either — only name the four and the place to pick them (the style window in Artist).')
+    }
+  })
 })
