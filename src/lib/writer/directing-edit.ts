@@ -577,6 +577,44 @@ export interface EditedDirectionLine {
   lang: 'ko' | 'en'
 }
 
+/** 사람이 고친 줄 → 러프 기록에 남길 줄 — 한국어면 영어로 옮긴다(못 옮기면 DirectionTranslateError, 아무것도 남기지 않는다).
+ *  지시는 영어만이라 한국어를 그대로 싣지 않는다. 화면엔 고친 한국어가 그대로 보인다(ko). 끝 장 표시는 비운다(아직 그 줄로 안 그림). */
+async function userDirectionRead(shotId: string, line: EditedDirectionLine, direction: string, locale: AppLocale): Promise<DirectionRead> {
+  const edited = line.text.trim()
+  let en = edited
+  if (line.lang === 'ko') {
+    const translated = (await deriveEnBatch([{ id: shotId, native: edited }], 'storyboard motion line')).get(shotId)?.trim()
+    if (!translated) throw new DirectionTranslateError(locale)
+    en = translated
+  }
+  return { en, ko: line.lang === 'ko' ? edited : null, source: 'user', direction, at: Date.now(), endDrawn: null }
+}
+
+/**
+ * 물음 창 [그대로] + 고친 줄(리드 (A) 2026-11-23) — 끝 장은 그리지 않고 고친 줄만 러프 기록에 남긴다. 영상은 이 줄을 쓴다(리드 D2).
+ *   한국어면 영어로 옮겨 남기고, 못 옮기면 아무것도 바꾸지 않는다(DirectionTranslateError — 전에 있던 줄, 대개 AI 가 읽은 줄이 그대로 남는다).
+ *   화면이 본 연출 장(expectDirection)이 지금 연출 장과 다르면(다른 창에서 저장) 옛 화살표에 대한 줄이라 남기지 않는다(StaleDirectionError).
+ *   영어 줄이 그 전 줄과 같으면(한국어 말만 다듬음) "그 줄로 그린 끝 장" 표시를 그대로 둔다 — 다르면 지운다(끝 장 · 실사엔 아직 안 쓴 줄).
+ *   그림 · 읽기 값이 들지 않는다(한국어면 옮기기만 한 번). 약속: tests/writer/end-frame-read-draw.test.ts
+ */
+export async function keepEditedDirectionLine(
+  projectId: string,
+  shotId: string,
+  line: EditedDirectionLine,
+  locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK,
+  opts: { expectDirection?: string } = {},
+): Promise<DirectionRead> {
+  const rb = await loadRough(projectId, shotId)
+  const direction = rb?.frames?.direction
+  if (rb?.status !== 'completed' || !direction) throw new StaleDirectionError(locale)
+  if (opts.expectDirection && opts.expectDirection !== direction) throw new StaleDirectionError(locale)
+  const read = await userDirectionRead(shotId, line, direction, locale)
+  const prev = freshDirectionRead(rb)
+  const kept: DirectionRead = prev && prev.en === read.en ? { ...read, endDrawn: prev.endDrawn } : read
+  if (!(await storeDirectionRead(projectId, shotId, kept))) throw new StaleDirectionError(locale)
+  return kept
+}
+
 /**
  * 끝 장 다시 그리기(②) — 물음의 [다시 그리기] · [이 장만 다시 만들기](끝) · 옛 regenerate-end 요청이 모두 여기로 온다.
  *   줄: 사람이 고친 줄(다시 읽지 않음, 한국어면 영어로 옮김) → 지금 연출 장을 읽은 줄 → 그래도 없으면 지금 읽는다.
@@ -607,15 +645,8 @@ export async function regenerateEndFrame(
   if (running) return { jobId: running, read: freshDirectionRead(rb), replayed: true }
 
   let read: DirectionRead | null
-  const edited = opts.line?.text?.trim()
-  if (edited) {
-    let en = edited
-    if (opts.line?.lang === 'ko') {
-      const translated = (await deriveEnBatch([{ id: shotId, native: edited }], 'storyboard motion line')).get(shotId)?.trim()
-      if (!translated) throw new DirectionTranslateError(locale)
-      en = translated
-    }
-    read = { en, ko: opts.line?.lang === 'ko' ? edited : null, source: 'user', direction: frames.direction!, at: Date.now(), endDrawn: null }
+  if (opts.line?.text?.trim()) {
+    read = await userDirectionRead(shotId, opts.line, frames.direction!, locale)
     if (!(await storeDirectionRead(projectId, shotId, read))) throw new StaleDirectionError(locale)
   } else {
     read = freshDirectionRead(rb) ?? (await readDirection(projectId, shotId))

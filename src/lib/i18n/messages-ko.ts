@@ -687,7 +687,12 @@ export const KO: Record<string, string> = {
   'Motion the AI read': 'AI 가 읽은 움직임',
   'Reading the arrows…': '화살표를 읽는 중…',
   'The AI could not read the arrows. Write the motion yourself.': 'AI 가 화살표를 읽지 못했어요. 움직임을 직접 적어 주세요.',
-  'You can edit the line. The end frame is drawn from it.': '줄을 고칠 수 있어요. 끝 장은 이 줄대로 그려요.',
+  // 리드 (A) · D2(2026-11-23): [그대로]를 골라도 영상에는 이 줄이 들어간다 — 고친 줄은 [그대로]에서도 남는다.
+  'You can edit the line. The end frame is drawn from it, and videos use it even if you choose Keep as is.': '줄을 고칠 수 있어요. 끝 장은 이 줄대로 그리고, [그대로]를 골라도 영상에는 이 줄이 들어가요.',
+  'Kept your line. The end frame stays as it is.': '고친 줄을 남겼어요. 끝 장은 그대로예요.',
+  'Could not translate your line, so it was not kept. The previous line stays. Try again.': '고친 줄을 영어로 옮기지 못해 남기지 못했어요. 전에 있던 줄은 그대로예요. 다시 시도해 주세요.',
+  'The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.': '그사이 연출 장이 바뀌어 고친 줄을 남기지 않았어요. 연출 탭을 다시 열어 주세요.',
+  'Could not keep your line. The previous line stays.': '고친 줄을 남기지 못했어요. 전에 있던 줄은 그대로예요.',
   'Describe how the shot ends, for example: the figure on the left walks out to the right.': '샷이 어떻게 끝나는지 적어 주세요. 예: 왼쪽 인물이 오른쪽 밖으로 걸어 나간다.',
   'Redrawing the end frame, which takes over a minute': '끝 장을 다시 그리는 중이에요. 1분 넘게 걸려요.',
   'The AI could not read the arrows, so the end frame was not redrawn. Write the motion in the directing tab.': 'AI 가 화살표를 읽지 못해 끝 장을 다시 그리지 않았어요. 연출 탭에서 움직임을 직접 적어 주세요.',

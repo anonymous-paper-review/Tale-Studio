@@ -1,9 +1,9 @@
-// 가운데 장에 그린 화살표를 저장하면 끝 장도 다시 그릴지 묻고(읽은 한 줄을 보이고 고칠 수 있게), 고른 대로만 끝 장을 다시 그리는지 검사한다(D10 · 2026-11-22 리드 Q2 · 오너 Q1 · Q3)
+// 가운데 장에 그린 화살표를 저장하면 끝 장도 다시 그릴지 묻고(읽은 한 줄을 보이고 고칠 수 있게), 고른 대로만 끝 장을 다시 그리고 [그대로]면 고친 줄만 남기는지 검사한다(D10 · 2026-11-22 리드 Q2 · 오너 Q1 · Q3 · 2026-11-23 리드 (A))
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { describe, expect, it, vi } from 'vitest'
-import { askLineText, canRedrawEnd, editedLinePayload, endAskAfterSave, redrawEndFrame, resolveEndAsk, roughFrameRedrawBody, type EndRedrawDeps } from '@/lib/writer/end-frame-ask'
+import { askLineText, canRedrawEnd, editedLinePayload, endAskAfterSave, keepEditedLine, keepLineBody, redrawEndFrame, resolveEndAsk, roughFrameRedrawBody, type EndRedrawDeps, type KeepLineDeps } from '@/lib/writer/end-frame-ask'
 import { applyDirectionTab } from '@/features/writer/unsaved-arrows-confirm'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
 import { mergeRoughFrame } from '@/lib/writer/directing-edit'
@@ -197,5 +197,92 @@ describe('연출 탭의 읽은 한 줄', () => {
       expect(read(rel), rel).toMatch(/onRedrawEnd=\{\(\) => guard\.askEnd\(/)
     }
     expect(messagesKo['Edit and redraw the end frame']).toBe('고쳐서 끝 장 다시 그리기')
+  })
+})
+
+describe('물음 창 [그대로]와 고친 줄', () => {
+  function keepDeps(post: KeepLineDeps['post']) {
+    return {
+      post: vi.fn(post),
+      reload: vi.fn(async () => undefined),
+      notify: { success: vi.fn(), error: vi.fn() },
+      messages: { kept: 'kept', translateFailed: 'keep-translate-failed', stale: 'keep-stale', failed: 'keep-failed' },
+    }
+  }
+  const EDITED = { text: '왼쪽 인물이 바닥에 쓰러진다.', lang: 'ko' as const }
+
+  // 왜(리드 (A) 2026-11-23): 영상은 지금 연출 장을 읽은 줄을 쓴다(리드 D2) — [그대로]에서 고친 줄을 버리면 AI 가 잘못 읽은 줄이 영상에 들어가고,
+  //   바로잡는 길이 끝 장 다시 그리기(그림 값 · 1분 넘게) 하나뿐이다. 끝 장은 그리지 않고 고친 줄만 남긴다.
+  it('물음 창에서 줄을 고치고 [그대로]를 누르면 끝 장은 다시 그리지 않고 고친 줄만 남긴다', async () => {
+    const redraw = vi.fn()
+    const keepLine = vi.fn()
+    expect(resolveEndAsk('keep-line', redraw, keepLine)).toBe(false)
+    expect(redraw).not.toHaveBeenCalled()
+    expect(keepLine).toHaveBeenCalledTimes(1)
+    const d = keepDeps(async () => ({ ok: true }))
+    await expect(keepEditedLine('p1', 'sh_1', d, EDITED, 'https://media.test/r/direction.png?v=2')).resolves.toBe(true)
+    expect(d.post).toHaveBeenCalledWith({ action: 'keep-line', projectId: 'p1', shotId: 'sh_1', line: EDITED, direction: 'https://media.test/r/direction.png?v=2' })
+    expect(d.post.mock.invocationCallOrder[0]).toBeLessThan(d.reload.mock.invocationCallOrder[0])
+    expect(d.notify.success).toHaveBeenCalledWith('kept')
+    const confirm = read('src/features/writer/unsaved-arrows-confirm.tsx')
+    expect(confirm).toMatch(/onClick=\{\(\) => onChoose\('keep-line'\)\} data-testid="end-redraw-keep"/)
+    expect(confirm).toMatch(/void keepEditedLine\(current\.target\.projectId, current\.target\.shotId, keepLineDeps\(current\.target, t\), line, current\.read\?\.direction \?\? null\)/)
+    expect(messagesKo['Kept your line. The end frame stays as it is.']).toBe('고친 줄을 남겼어요. 끝 장은 그대로예요.')
+  })
+
+  // 왜(혼자 정한 것 a · 정상 경로 고정): 읽은 줄은 물음 창을 열 때 이미 러프 기록에 남는다 — 안 고쳤으면 보낼 것이 없다. 못 읽은 샷도 연출 장 주소 없이 보낸다.
+  it('줄을 고치지 않고 [그대로]를 누르면 아무것도 보내지 않는다', async () => {
+    const d = keepDeps(async () => ({ ok: true }))
+    expect(editedLinePayload(LINE, LINE.ko, 'ko')).toBeNull()
+    await expect(keepEditedLine('p1', 'sh_1', d, null, 'https://media.test/r/direction.png?v=2')).resolves.toBe(false)
+    expect(d.post).not.toHaveBeenCalled()
+    expect(d.notify.success).not.toHaveBeenCalled()
+    expect(keepLineBody('p1', 'sh_1', EDITED, null)).toEqual({ action: 'keep-line', projectId: 'p1', shotId: 'sh_1', line: EDITED })
+  })
+
+  // 왜(리드 (A)): Esc · ✕ · 바깥 누르기는 잘못 눌러도 일어난다 — 고친 줄을 남기지 않고 지금처럼 버린다.
+  it('물음 창을 Esc · ✕ · 바깥을 눌러 닫으면 고친 줄을 남기지 않는다', () => {
+    const redraw = vi.fn()
+    const keepLine = vi.fn()
+    expect(resolveEndAsk('keep', redraw, keepLine)).toBe(false)
+    expect(keepLine).not.toHaveBeenCalled()
+    expect(redraw).not.toHaveBeenCalled()
+    const confirm = read('src/features/writer/unsaved-arrows-confirm.tsx')
+    expect(confirm).toMatch(/onOpenChange=\{\(next\) => \{ if \(!next\) onChoose\('keep'\) \}\}/)
+  })
+
+  // 왜(리드 (A) · 혼자 정한 것 c): 옮기지 못한 한국어를 지시에 섞지 않는다 — 전에 있던 줄(AI 가 읽은 줄)을 그대로 두고, 그렇다고 알리고 다시 시도하게 한다.
+  it('한국어로 고친 줄을 영어로 옮기지 못하면 전에 있던 줄을 그대로 두고 그렇다고 알린다', async () => {
+    const d = keepDeps(async () => ({ ok: false, code: 'direction_translate_failed' }))
+    await expect(keepEditedLine('p1', 'sh_1', d, EDITED, null)).resolves.toBe(false)
+    expect(d.reload).not.toHaveBeenCalled()
+    expect(d.notify.success).not.toHaveBeenCalled()
+    const [message, retry] = d.notify.error.mock.calls[0]
+    expect(message).toBe('keep-translate-failed')
+    retry()
+    expect(d.post).toHaveBeenCalledTimes(2)
+    // 그 밖의 실패(요청이 안 닿음 등)도 전에 있던 줄은 그대로라고 알리고 다시 시도하게 한다.
+    const offline = keepDeps(async () => { throw new Error('offline') })
+    await keepEditedLine('p1', 'sh_1', offline, { text: 'Camera pulls back.', lang: 'en' }, null)
+    expect(offline.notify.error.mock.calls[0][0]).toBe('keep-failed')
+    expect(typeof offline.notify.error.mock.calls[0][1]).toBe('function')
+    expect(messagesKo['Could not translate your line, so it was not kept. The previous line stays. Try again.']).toBe('고친 줄을 영어로 옮기지 못해 남기지 못했어요. 전에 있던 줄은 그대로예요. 다시 시도해 주세요.')
+    expect(messagesKo['Could not keep your line. The previous line stays.']).toBe('고친 줄을 남기지 못했어요. 전에 있던 줄은 그대로예요.')
+  })
+
+  // 왜(혼자 정한 것 e): 그새 다른 창에서 화살표를 저장했으면 고친 줄은 옛 화살표에 대한 줄이다 — 새 화살표의 줄로 남기지 않는다. 다시 시도해도 같으니 단추를 달지 않는다.
+  it('그새 연출 장이 바뀌었으면 고친 줄을 남기지 않았다고 알리고 다시 시도를 달지 않는다', async () => {
+    const d = keepDeps(async () => ({ ok: false, code: 'stale_direction' }))
+    await expect(keepEditedLine('p1', 'sh_1', d, EDITED, 'https://media.test/r/direction.png?v=2')).resolves.toBe(false)
+    expect(d.notify.error).toHaveBeenCalledWith('keep-stale', null)
+    expect(d.reload).not.toHaveBeenCalled()
+    expect(messagesKo['The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.']).toBe('그사이 연출 장이 바뀌어 고친 줄을 남기지 않았어요. 연출 탭을 다시 열어 주세요.')
+  })
+
+  // 왜(리드 (A) · D2): [그대로]를 골라도 영상에는 이 줄이 들어간다 — 고르기 전에 물음 창에서 알린다.
+  it('물음 창은 [그대로]를 골라도 영상에는 이 줄이 들어간다고 알린다', () => {
+    const confirm = read('src/features/writer/unsaved-arrows-confirm.tsx')
+    expect(confirm).toMatch(/t\('You can edit the line\. The end frame is drawn from it, and videos use it even if you choose Keep as is\.'\)/)
+    expect(messagesKo['You can edit the line. The end frame is drawn from it, and videos use it even if you choose Keep as is.']).toBe('줄을 고칠 수 있어요. 끝 장은 이 줄대로 그리고, [그대로]를 골라도 영상에는 이 줄이 들어가요.')
   })
 })

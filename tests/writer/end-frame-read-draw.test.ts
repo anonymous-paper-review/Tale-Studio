@@ -1,4 +1,4 @@
-// 끝 장 ②(읽는 AI 가 연출 장을 한 줄로 읽고 GPT Image 2 가 시작 장 + 그 줄로 그린다)가 읽기 · 작업 내기 · 끼우기를 약속대로 하는지 검사한다(D10 · 2026-11-22 오너 Q1 · Q3)
+// 끝 장 ②(읽는 AI 가 연출 장을 한 줄로 읽고 GPT Image 2 가 시작 장 + 그 줄로 그린다)가 읽기 · 작업 내기 · 끼우기 · [그대로]로 고친 줄 남기기를 약속대로 하는지 검사한다(D10 · 2026-11-22 오너 Q1 · Q3 · 2026-11-23 리드 (A))
 import sharp from 'sharp'
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -36,7 +36,7 @@ vi.mock('@/lib/storage/media', () => ({
 vi.mock('@/lib/storage-thumb', () => ({ uploadThumbnail: mocks.thumb }))
 vi.mock('@/lib/fal/generate-image', () => ({ generateReservedImage: mocks.generateReservedImage }))
 
-import { DirectionTranslateError, DirectionUnreadableError, END_FRAME_METHOD, endFrameImageSize, finalizeRoughEndFrameJob, readDirection, regenerateEndFrame } from '@/lib/writer/directing-edit'
+import { DirectionTranslateError, DirectionUnreadableError, END_FRAME_METHOD, StaleDirectionError, endFrameImageSize, finalizeRoughEndFrameJob, keepEditedDirectionLine, readDirection, regenerateEndFrame } from '@/lib/writer/directing-edit'
 import { freshDirectionLine } from '@/lib/writer/direction-read'
 
 // 이 시험을 위해 지은 샷 — 행동 글(이름 · 대사 · 카메라 문장)과 샷 설계의 카메라 무브가 있다. 연출 장은 사람이 화살표를 고친 것이다.
@@ -265,5 +265,54 @@ describe('끝 장 끼우기', () => {
     const route = readFileSync('src/app/api/writer/rough-directing-edit/route.ts', 'utf8')
     expect(route).toMatch(/action: z\.literal\('read-direction'\)/)
     expect(route).toMatch(/regenerateEndFrame\(body\.projectId, body\.shotId, undefined, \{ line, userId: user\.id, projectFolderOnly: true \}\)/)
+  })
+})
+
+describe('[그대로]로 고친 줄 남기기', () => {
+  // 왜(리드 (A) 2026-11-23): 끝 장은 그리지 않고 고친 줄만 남긴다 — 영상이 이 줄을 쓴다(리드 D2). 그림 값 · 읽기 값이 들지 않고 러프 세 장은 그대로다(약속 I).
+  it('[그대로]로 남긴 고친 줄은 사람이 고친 줄로 남고 끝 장은 그리지 않는다', async () => {
+    const read = await keepEditedDirectionLine(PROJECT, 'sh_1', { text: 'Camera pulls back to a wide shot.', lang: 'en' })
+    expect(read).toMatchObject({ en: 'Camera pulls back to a wide shot.', ko: null, source: 'user', direction: FRAMES.direction, endDrawn: null })
+    expect(lastRough().directionRead).toMatchObject({ en: 'Camera pulls back to a wide shot.', ko: null, source: 'user', direction: FRAMES.direction, endDrawn: null })
+    expect(lastRough().frames).toEqual(FRAMES)
+    expect(mocks.deriveEnBatch).not.toHaveBeenCalled()
+    expect(geminiCalls).toHaveLength(0)
+    expect(mocks.reserve).not.toHaveBeenCalled()
+    expect(mocks.submit).not.toHaveBeenCalled()
+    const route = readFileSync('src/app/api/writer/rough-directing-edit/route.ts', 'utf8')
+    expect(route).toMatch(/action: z\.literal\('keep-line'\)/)
+    expect(route).toMatch(/keepEditedDirectionLine\(body\.projectId, body\.shotId, body\.line, undefined, \{ expectDirection: body\.direction \}\)/)
+  })
+
+  // 왜(리드 (A)): 지시는 영어만이다 — 한국어로 고친 줄은 영어로 옮겨 남기고(화면엔 한국어 그대로), 못 옮기면 아무것도 바꾸지 않는다(AI 가 읽은 줄이 그대로 남는다).
+  it('한국어로 고친 줄은 영어로 옮겨 남기고, 옮기지 못하면 러프 기록을 바꾸지 않는다', async () => {
+    await keepEditedDirectionLine(PROJECT, 'sh_1', { text: '왼쪽 인물이 바닥에 쓰러진다.', lang: 'ko' })
+    expect(mocks.deriveEnBatch).toHaveBeenCalledTimes(1)
+    expect(lastRough().directionRead).toMatchObject({ en: 'The figure on the left collapses to the floor.', ko: '왼쪽 인물이 바닥에 쓰러진다.', source: 'user', endDrawn: null })
+    updates = []
+    mocks.deriveEnBatch.mockImplementation(async () => new Map())
+    await expect(keepEditedDirectionLine(PROJECT, 'sh_1', { text: '왼쪽 인물이 쓰러진다.', lang: 'ko' })).rejects.toBeInstanceOf(DirectionTranslateError)
+    expect(updates).toHaveLength(0)
+  })
+
+  // 왜(혼자 정한 것 b): 한국어 말만 다듬어 영어 줄이 같으면 끝 장은 이미 그 줄로 그려져 있다 — "끝 장 · 실사는 다시 그려야" 알림이 잘못 뜨지 않게 표시를 둔다.
+  //   영어 줄이 달라지면 끝 장은 아직 그 줄로 그리지 않았다 — 표시를 지워 실사 지시에 싣지 않는다(영상은 쓴다).
+  it('남길 줄의 영어가 그 전 줄과 같으면 그 줄로 그린 끝 장 표시를 그대로 두고, 다르면 지운다', async () => {
+    shotRow.rough_storyboard = { ...(shotRow.rough_storyboard as object), directionRead: { en: 'The figure on the left collapses to the floor.', ko: '왼쪽 인물이 쓰러진다.', source: 'ai', direction: FRAMES.direction, at: 1, endDrawn: FRAMES.end } }
+    await keepEditedDirectionLine(PROJECT, 'sh_1', { text: '왼쪽 인물이 바닥에 쓰러진다.', lang: 'ko' })
+    expect(lastRough().directionRead).toMatchObject({ ko: '왼쪽 인물이 바닥에 쓰러진다.', source: 'user', endDrawn: FRAMES.end })
+    expect(freshDirectionLine(lastRough())).toBe('The figure on the left collapses to the floor.')
+    await keepEditedDirectionLine(PROJECT, 'sh_1', { text: 'Camera pulls back to a wide shot.', lang: 'en' })
+    expect(lastRough().directionRead).toMatchObject({ en: 'Camera pulls back to a wide shot.', endDrawn: null })
+    expect(freshDirectionLine(lastRough())).toBeNull()
+  })
+
+  // 왜(혼자 정한 것 e): 화면이 본 연출 장과 지금 연출 장이 다르면(다른 창에서 저장) 고친 줄은 옛 화살표에 대한 줄이다 — 새 화살표의 줄로 남기지 않는다.
+  it('화면이 본 연출 장과 지금 연출 장이 다르면 고친 줄을 남기지 않는다', async () => {
+    await expect(keepEditedDirectionLine(PROJECT, 'sh_1', { text: 'Camera pulls back to a wide shot.', lang: 'en' }, 'ko', { expectDirection: `${BASE}/sh_1_direction.png?v=1` })).rejects.toBeInstanceOf(StaleDirectionError)
+    expect(updates).toHaveLength(0)
+    // 본 연출 장이 지금 연출 장이면 남긴다.
+    await keepEditedDirectionLine(PROJECT, 'sh_1', { text: 'Camera pulls back to a wide shot.', lang: 'en' }, 'ko', { expectDirection: FRAMES.direction })
+    expect(lastRough().directionRead).toMatchObject({ en: 'Camera pulls back to a wide shot.', direction: FRAMES.direction })
   })
 })

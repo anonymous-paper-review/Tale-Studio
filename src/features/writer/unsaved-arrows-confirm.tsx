@@ -22,10 +22,12 @@ import {
   askLineText,
   canRedrawEnd,
   editedLinePayload,
+  keepEditedLine,
   redrawEndFrame,
   resolveEndAsk,
   type EndAskChoice,
   type EndRedrawDeps,
+  type KeepLineDeps,
 } from '@/lib/writer/end-frame-ask'
 import type { DirectionRead } from '@/lib/writer/direction-read'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
@@ -135,6 +137,32 @@ export function endRedrawDeps(target: EndAskTarget, t: ReturnType<typeof useT>):
   }
 }
 
+/** [그대로] + 고친 줄 남기기의 실제 부품(리드 (A) 2026-11-23) — 요청 · 다시 읽기(편집기 아래 줄이 고친 줄로 바뀐다) · 알림. */
+export function keepLineDeps(target: EndAskTarget, t: ReturnType<typeof useT>): KeepLineDeps {
+  return {
+    post: async (body) => {
+      const res = await fetch('/api/writer/rough-directing-edit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const j = await res.json().catch(() => null)
+      return { ok: res.ok, code: res.ok ? null : (j?.code ?? null) }
+    },
+    reload: () => reloadAfterRoughFrameEdit(target.projectId, target.onRedrawn),
+    notify: {
+      success: (message) => toast.success(message),
+      error: (message, retry) => toast.error(message, retry ? { action: { label: t('Try again'), onClick: retry } } : undefined),
+    },
+    messages: {
+      kept: t('Kept your line. The end frame stays as it is.'),
+      translateFailed: t('Could not translate your line, so it was not kept. The previous line stays. Try again.'),
+      stale: t('The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.'),
+      failed: t('Could not keep your line. The previous line stays.'),
+    },
+  }
+}
+
 /** 지금 연출 장을 읽은 줄 — 이미 읽은 줄이 있으면 서버가 다시 읽지 않는다. 못 읽었거나 요청이 안 되면 null. */
 async function fetchDirectionRead(projectId: string, shotId: string): Promise<DirectionRead | null> {
   try {
@@ -201,7 +229,12 @@ export function useUnsavedArrowsGuard(close: () => void) {
     if (!current) return
     if (choice === 'redraw' && !canRedrawEnd(current)) return current.done()
     const line = editedLinePayload(current.read, current.text, locale)
-    resolveEndAsk(choice, () => void redrawEndFrame(current.target.projectId, current.target.shotId, endRedrawDeps(current.target, t), line))
+    // [그대로] 단추는 고친 줄만 남긴다(리드 (A)) — 안 고쳤으면 keepEditedLine 이 아무것도 보내지 않는다. Esc · ✕ 는 'keep' 이라 버린다.
+    resolveEndAsk(
+      choice,
+      () => void redrawEndFrame(current.target.projectId, current.target.shotId, endRedrawDeps(current.target, t), line),
+      () => void keepEditedLine(current.target.projectId, current.target.shotId, keepLineDeps(current.target, t), line, current.read?.direction ?? null),
+    )
     current.done()
   }
   const setEndText = (text: string) => setEndAsk((current) => (current ? { ...current, text } : current))
@@ -226,7 +259,9 @@ export function useUnsavedArrowsGuard(close: () => void) {
   }
 }
 
-/** "끝 장도 이 화살표대로 다시 그릴까요?" — 읽은 한 줄(고칠 수 있음) · [그대로] · [다시 그리기]. Esc · ✕ · 바깥 누르기는 [그대로](그림 값이 들지 않는 쪽).
+/** "끝 장도 이 화살표대로 다시 그릴까요?" — 읽은 한 줄(고칠 수 있음) · [그대로] · [다시 그리기].
+ *  [그대로] 단추는 끝 장을 그리지 않고, 줄을 고쳤으면 고친 줄을 남긴다('keep-line' — 영상이 그 줄을 쓴다, 리드 (A) · D2 2026-11-23).
+ *  Esc · ✕ · 바깥 누르기는 끝 장도 그리지 않고 고친 줄도 버린다('keep' — 그림 값이 들지 않는 쪽, 잘못 눌러도 아무것도 바뀌지 않는다).
  *  읽는 동안은 "화살표를 읽는 중…"으로 [다시 그리기]를 잠그고, 못 읽었으면 빈 줄에 직접 적게 한다(줄을 적어야 켜진다). */
 export function EndRedrawAsk({
   open,
@@ -273,11 +308,11 @@ export function EndRedrawAsk({
             />
           )}
           <p className="break-keep text-caption text-muted-foreground">
-            {unreadable ? t('The AI could not read the arrows. Write the motion yourself.') : t('You can edit the line. The end frame is drawn from it.')}
+            {unreadable ? t('The AI could not read the arrows. Write the motion yourself.') : t('You can edit the line. The end frame is drawn from it, and videos use it even if you choose Keep as is.')}
           </p>
         </div>
         <DialogFooter>
-          <Button variant="secondary" onClick={() => onChoose('keep')} data-testid="end-redraw-keep">
+          <Button variant="secondary" onClick={() => onChoose('keep-line')} data-testid="end-redraw-keep">
             {t('Keep as is')}
           </Button>
           <Button onClick={() => onChoose('redraw')} disabled={!canRedrawEnd({ reading, text })} data-testid="end-redraw-redraw">
