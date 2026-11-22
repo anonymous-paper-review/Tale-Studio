@@ -32,7 +32,7 @@ vi.mock('@/lib/generation-jobs-client', async (importOriginal) => ({
 }))
 
 import { finalizeGenerationJob } from '@/lib/fal/finalize'
-import { buildPropImagePrompt, propImageStale, propImageStamp } from '@/lib/artist/prop-image'
+import { buildPropImagePrompt, propImageStale, propImageStamp, PROP_TEXT_RULE } from '@/lib/artist/prop-image'
 import { planPropImageSubmit } from '@/lib/artist/prop-image-plan'
 import { IMAGE_JOB_KINDS, VIDEO_JOB_KINDS } from '@/lib/generation-quota'
 import { LANE_OF_KIND } from '@/lib/generation-batches'
@@ -83,6 +83,20 @@ describe('소품 그림 지시문', () => {
     expect(text).toMatch(/front/i)
     expect(text).toMatch(/plain neutral background/i)
     for (const word of ['No people', 'no hands', 'no text']) expect(text).toContain(word)
+  })
+
+  // 왜: 오너 결정 대기(리드 2026-11-22 "(c)") — 글씨가 뜻을 나르는 소품(편지 · 간판 · 책 표지)은 글씨를 빼면 다른 물건이 된다(실측: 번진 잉크 글씨 편지 → 글씨 없는 봉투).
+  //   스위치 하나로 (b)를 켜 볼 수 있게 하고, 기본은 지금처럼 글자 없음 (a). 켜도 모델이 덧붙이는 이름 · 라벨 · 로고 · 워터마크는 계속 막는다.
+  it('글씨 스위치는 기본으로 꺼져 있고, 켜면 설명에 적힌 글씨만 남기고 덧붙인 이름 · 라벨 · 로고는 그리지 않는다', () => {
+    expect(PROP_TEXT_RULE).toBe('none')
+    expect(buildPropImagePrompt(prop)).toBe(buildPropImagePrompt({ ...prop, textRule: 'none' }))
+    const described = buildPropImagePrompt({ ...prop, textRule: 'described' })
+    expect(described).not.toContain('no text,')
+    expect(described).toMatch(/Writing that the description says is on the object stays on it/)
+    for (const word of ['No people', 'no hands', 'no labels', 'no logo', 'no watermark']) expect(described).toContain(word)
+    // 기준 그림 없이 그리는 그림체(실사)도 켰을 때는 글자 금지 줄을 붙이지 않는다 — 꺼져 있으면 지금처럼 붙인다.
+    expect(planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true, textRule: 'described' }).submit.prompt).not.toContain(FACET_NO_TEXT)
+    expect(planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true }).submit.prompt).toContain(FACET_NO_TEXT)
   })
 
   // 왜: 작품 그림체와 같은 그림이어야 샷 이미지에서 겉돌지 않는다. 소품에는 사람이 없어 인물 조각(Figure rules · Priority)은 효과가 없다(사물 시트 규칙과 같다).
