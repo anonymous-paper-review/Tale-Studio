@@ -24,10 +24,10 @@ describe('[영상 만들기] 단추', () => {
     expect(label(newTakeButton(ready), 5, false)).toBe(ko('Make a new Take'))
   })
 
-  it('시작 · 끝 그림이 없거나 다시 그리는 중이거나 Take 를 만드는 중이거나 영상 일괄이 돌면 [영상 만들기]가 꺼지고 까닭 한 줄이 보인다', () => {
+  it('시작 그림이 없거나 다시 그리는 중이거나 Take 를 만드는 중이거나 영상 일괄이 돌면 [영상 만들기]가 꺼지고 까닭 한 줄이 보인다', () => {
     // 왜: 리드 검토 c ① — 다시 그리는 중에 누르면 옛 그림으로 Take 가 나간다. 까닭은 마우스를 올리지 않아도 보인다.
-    expect(newTakeButton({ ...ready, hasImage: false })).toMatchObject({ disabled: true, reason: 'Make the start and end images first.' })
-    expect(newTakeButton({ ...ready, imageBusy: true })).toMatchObject({ disabled: true, reason: 'The start and end images are being remade. Make the Take when they are done.' })
+    expect(newTakeButton({ ...ready, hasImage: false })).toMatchObject({ disabled: true, reason: 'Make the start image first.' })
+    expect(newTakeButton({ ...ready, imageBusy: true })).toMatchObject({ disabled: true, reason: 'The images are being remade. Make the Take when they are done.' })
     expect(newTakeButton({ ...ready, takeMaking: true })).toMatchObject({ disabled: true, reason: 'A Take is being made. You can make a new one when it is done.' })
     expect(newTakeButton({ ...ready, batchBusy: true })).toMatchObject({ disabled: true, reason: 'You can make it after the video batch finishes' })
     expect(newTakeButton({ ...ready, sending: true })).toMatchObject({ disabled: true, reason: null })
@@ -49,7 +49,7 @@ describe('[이미지 고치기]', () => {
     // 왜: 11/14 답 5 · 샷 상세 이미지 고치기와 같은 단추(다시 그리면 확인 창 "지금 이미지는 버전으로 남아요").
     const panel = readFileSync('src/features/camera/fix-panel.tsx', 'utf8')
     expect(panel).toMatch(/<StoryboardImageButton[\s\S]{0,120}changeNote=\{imageChange\}/)
-    expect(panel).toContain("'Remake start and end images · Takes 0'")
+    expect(panel).toContain("'Remake images · Takes 0'")
   })
 })
 
