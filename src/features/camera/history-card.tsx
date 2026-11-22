@@ -12,6 +12,10 @@ import { mediaFrameStyle } from '@/lib/project-aspect'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { useProjectFormatStore } from '@/stores/project-format-store'
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import type { ActiveJob } from '@/lib/generation-queue'
+import { shotStopTarget } from '@/lib/director/stop-work'
+import { StopMakingButton } from '@/features/director/stop-making-button'
+import { MoveFirstButton } from '@/features/director/move-first-button'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import { GeneratedImage } from '@/components/generating-frame'
 import { Lumi } from '@/components/lumi/lumi'
@@ -19,16 +23,35 @@ import { historyActions, type HistoryEntry, type HistoryPhrase } from './shot-hi
 
 const PILL = 'inline-flex h-6 items-center rounded-full px-2.5 text-micro font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50'
 
-export function HistoryCard({ entry, shotNodeId, shotName }: { entry: HistoryEntry; shotNodeId: string; shotName: string }) {
+export function HistoryCard({ entry, shotNodeId, shotName, writerShotId, activeJobs }: {
+  entry: HistoryEntry
+  shotNodeId: string
+  shotName: string
+  /** 멈추기 · 먼저 하기가 고를 샷(Writer 샷 id) — 손으로 더한 샷은 없다. */
+  writerShotId: string | null
+  /** 지금 도는 작업 — [멈추기]가 이 샷이 만드는 그림 · 영상을 고른다(스토리보드 카드와 같은 길, 오너 7번). */
+  activeJobs: readonly ActiveJob[]
+}) {
   const t = useT()
   const format = useProjectFormatStore((s) => s.format)
   const frame = mediaFrameStyle(format)
   const [busy, setBusy] = useState(false)
   const summary = entry.summary.map((phrase: HistoryPhrase) => t(phrase.key, phrase.params)).join(' · ')
-  const title = entry.kind === 'image' ? t('Image v{n}', { n: entry.n }) : entry.kind === 'take' ? t('Take {n}', { n: entry.takeNumber }) : t('New image')
+  const title = entry.kind === 'image' ? t('Image v{n}', { n: entry.n })
+    : entry.kind === 'take' ? t('Take {n}', { n: entry.takeNumber })
+      : entry.kind === 'video-pending' ? t('New Take') : t('New image')
+  // [멈추기] — 그리는 중인 그림 자리 · 만드는 중인 Take 만(차례를 기다리는 자리는 보낸 작업이 없다). 이미지는 4샷 한 장 단위.
+  const imageStop = writerShotId && entry.kind === 'image-pending' && entry.phase === 'drawing' ? shotStopTarget(activeJobs, writerShotId, 'image') : null
+  const videoStop = writerShotId && entry.kind === 'take' && entry.phase === 'making' ? shotStopTarget(activeJobs, writerShotId, 'video') : null
+  const stop = imageStop ?? videoStop
+  const kind = imageStop ? 'image' : 'video'
+  // [먼저 하기] — 영상 묶음에서 맨 앞이 아닌 차례(시안 D4, 리드 S4-2 7).
+  const linePosition = entry.kind === 'video-pending' ? entry.position : -1
 
   const border =
-    entry.kind === 'image-pending'
+    entry.kind === 'video-pending'
+      ? 'border-dashed border-state-video'
+      : entry.kind === 'image-pending'
       ? entry.phase === 'failed' ? 'border-destructive' : 'border-dashed border-stage-director'
       : entry.kind === 'image'
         ? entry.current ? 'border-stage-director' : 'border-dashed border-border opacity-60 hover:opacity-100'
@@ -78,6 +101,8 @@ export function HistoryCard({ entry, shotNodeId, shotName }: { entry: HistoryEnt
         <p className="line-clamp-2 text-micro leading-snug text-muted-foreground" title={summary}>{summary}</p>
       ) : null}
       <div className="mt-auto flex flex-wrap gap-1.5">
+        {stop ? <StopMakingButton target={stop} kind={kind} /> : null}
+        {linePosition > 0 && writerShotId ? <MoveFirstButton shotId={writerShotId} /> : null}
         {historyActions(entry).map((action) =>
           action === 'useImage' ? (
             <button key={action} type="button" disabled={busy} onClick={() => void chooseImage()} className={cn(PILL, 'bg-background text-foreground hover:bg-accent')}>
@@ -104,12 +129,15 @@ export function HistoryCard({ entry, shotNodeId, shotName }: { entry: HistoryEnt
 function Thumb({ entry, alt }: { entry: HistoryEntry; alt: string }) {
   const t = useT()
   const videoRef = useRef<HTMLVideoElement>(null)
-  if (entry.kind === 'image-pending') {
+  if (entry.kind === 'image-pending' || entry.kind === 'video-pending') {
+    const failed = entry.kind === 'image-pending' && entry.phase === 'failed'
+    const drawing = entry.kind === 'image-pending' && entry.phase === 'drawing'
     return (
       <div className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 p-2 text-center">
-        {entry.phase === 'drawing' ? <Lumi persona={STAGE_PERSONA.camera} state="loading" size="xs" still /> : null}
-        <span className={cn('text-micro font-semibold', entry.phase === 'failed' ? 'text-destructive' : 'text-foreground')}>
-          {entry.phase === 'failed' ? t('Remake failed') : t('Drawing the image')}
+        {drawing ? <Lumi persona={STAGE_PERSONA.camera} state="loading" size="xs" still /> : null}
+        <span className={cn('text-micro font-semibold', failed ? 'text-destructive' : 'text-foreground')}>
+          {entry.kind === 'video-pending' ? t('Waiting in line · #{n}', { n: entry.position + 1 })
+            : failed ? t('Remake failed') : drawing ? t('Drawing the image') : t('Waiting to generate image')}
         </span>
       </div>
     )

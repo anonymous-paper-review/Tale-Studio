@@ -38,10 +38,19 @@ export type HistoryEntry =
       summary: HistoryPhrase[]
     }
   | {
-      /** 다시 그리는 중이거나 다시 그리기가 실패한 자리 — 판이 아니라 줄 끝의 알림 자리다(지금 그림은 그대로). */
+      /** 그리는 중 · 일괄 차례를 기다림 · 다시 그리기 실패 자리 — 판이 아니라 줄 끝의 알림 자리다(지금 그림은 그대로). */
       kind: 'image-pending'
       id: 'image-pending'
-      phase: 'drawing' | 'failed'
+      phase: 'drawing' | 'waiting' | 'failed'
+      at: number
+      used: false
+      summary: HistoryPhrase[]
+    }
+  | {
+      /** 영상 묶음에서 차례를 기다리는 자리(아직 Take 가 없다). position 0 = 다음 차례. */
+      kind: 'video-pending'
+      id: 'video-pending'
+      position: number
       at: number
       used: false
       summary: HistoryPhrase[]
@@ -49,8 +58,8 @@ export type HistoryEntry =
 
 export type HistoryAction = 'useImage' | 'setFinal' | 'unsetFinal'
 
-/** 그 샷의 그림 일 — 그리는 중(또는 일괄 차례를 기다림)이거나 다시 그리기가 실패했다. 화면이 생성 상태 훅으로 정해 넘긴다. */
-export type ImageWork = { phase: 'drawing' } | { phase: 'failed'; message?: string | null }
+/** 그 샷의 그림 일 — 그리는 중 · 일괄이 맡아 차례를 기다림 · 다시 그리기 실패. 화면이 생성 상태 훅으로 정해 넘긴다. */
+export type ImageWork = { phase: 'drawing' } | { phase: 'waiting' } | { phase: 'failed'; message?: string | null }
 
 const ms = (value: string | null | undefined): number => {
   const parsed = Date.parse(String(value ?? ''))
@@ -125,6 +134,8 @@ export function shotHistory(input: {
   final: { id: string; auto: boolean } | null
   shot: Pick<ShotNodeData, 'provider'>
   imageWork?: ImageWork | null
+  /** 영상 묶음에서 이 샷의 차례(0 = 다음 차례). 기다리지 않으면 없음. */
+  videoLine?: number | null
 }): HistoryEntry[] {
   const versions = [...storyboardImageVersions(input.image)].sort((a, b) => a.n - b.n)
   const currentId = currentStoryboardVersion(input.image)?.id ?? null
@@ -169,7 +180,21 @@ export function shotHistory(input: {
       phase: input.imageWork.phase,
       at: Number.MAX_SAFE_INTEGER,
       used: false,
-      summary: [failed ? (message ? { key: 'Remake failed: {reason}', params: { reason: message } } : { key: 'Remake failed' }) : { key: 'Drawing the image' }],
+      summary: [
+        failed
+          ? message ? { key: 'Remake failed: {reason}', params: { reason: message } } : { key: 'Remake failed' }
+          : input.imageWork.phase === 'waiting' ? { key: 'Waiting to generate image' } : { key: 'Drawing the image' },
+      ],
+    })
+  }
+  if (typeof input.videoLine === 'number' && input.videoLine >= 0) {
+    entries.push({
+      kind: 'video-pending',
+      id: 'video-pending',
+      position: input.videoLine,
+      at: Number.MAX_SAFE_INTEGER,
+      used: false,
+      summary: [{ key: 'Waiting in line · #{n}', params: { n: input.videoLine + 1 } }],
     })
   }
   return entries

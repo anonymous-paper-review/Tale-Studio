@@ -3765,6 +3765,7 @@ export const KO: Record<string, string> = {
   'Could not change the current image. Please try again.': '지금 그림을 바꾸지 못했어요. 다시 눌러 주세요.',
   'No image or video yet.': '아직 그림 · 영상이 없어요.',
   '{shot} history': '{shot} 이력',
+  'New Take': '새 Take',
   'This is a shared preview. In the real project, you make real images and videos shot by shot here and keep every version.':
     '공유 미리보기 모드예요. 실제로는 샷마다 실사 이미지와 영상을 만들고 모든 판을 남겨요.',
 }
