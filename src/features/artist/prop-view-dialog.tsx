@@ -3,8 +3,8 @@
 // 소품 그림 창(D7, 2026-11-22) — 인물 · 배경 상세 팝업(프로토타입 A7)과 같은 두 칸 틀(DetailFrame).
 //   왼쪽: 큰 그림 · 바뀜 표시 · 바꿀 점(선택) · [다시 그리기] · 실패 안내(정책 거절이면 [순화해서 다시]). 오른쪽: 생김새(✎ 고치기 → 적용) · 나오는 곳.
 //   생김새를 고쳐도 그림은 그대로다 — [다시 그리기] 전까지 "설명 바뀜". 그림은 무료(Take 없음). 약속: tests/artist/prop-image.test.ts
-import { useState } from 'react'
-import { Loader2, RefreshCw } from 'lucide-react'
+import { useRef, useState } from 'react'
+import { Loader2, RefreshCw, Upload } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -12,6 +12,10 @@ import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { DescriptionBox, DetailFrame, DetailSection } from '@/features/artist/detail-parts'
 import { propImageStale } from '@/lib/artist/prop-image'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
+import { BREAKDOWN_IMAGE_ERROR_TEXT } from '@/lib/artist/breakdown-image'
+import { addPropImage } from '@/lib/artist/prop-upload'
+import { useImageUploadConsent } from '@/components/upload/image-upload-consent'
+import { useProjectStore } from '@/stores/project-store'
 import { isDemoSession } from '@/lib/demo/context'
 import { styleIdOf } from '@/lib/series/snapshot'
 import { useT } from '@/lib/i18n'
@@ -41,6 +45,18 @@ function PropDetailLeft({ propId }: { propId: string }) {
   const [instruction, setInstruction] = useState('')
   // 데모(보기 전용 공유)는 그리지 않는다 — 그림 · 바뀜 표시만 보인다.
   const demo = isDemoSession()
+  // 그림 올리기(D7) — 글 목록 레퍼런스 올리기와 같은 순서 · 같은 그림 사용 권리 확인. 올린 그림은 그대로 이 소품의 그림이 된다.
+  const projectId = useProjectStore((s) => s.projectId)
+  const { requestImageUploadConsent, imageUploadConsentDialog } = useImageUploadConsent(projectId)
+  const fileRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  const [uploadError, setUploadError] = useState<string | null>(null)
+  const onFile = async (file: File) => {
+    if (!projectId) return
+    setUploadError(null)
+    const result = await addPropImage({ projectId, propId }, file, { confirm: requestImageUploadConsent, onBusy: setUploading })
+    if (result.status === 'error') setUploadError(t(BREAKDOWN_IMAGE_ERROR_TEXT[result.error]))
+  }
   if (!prop) return null
   const redraw = (safeMode = false) => {
     void useArtistStore.getState().generateProp(propId, 'ui', { instruction, safeMode })
@@ -65,6 +81,16 @@ function PropDetailLeft({ propId }: { propId: string }) {
             data-testid="prop-detail-instruction"
           />
           <div className="flex flex-wrap items-center justify-end gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              disabled={generating || uploading}
+              onClick={() => fileRef.current?.click()}
+              data-testid="prop-detail-upload"
+            >
+              {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+              {t('Upload a reference image')}
+            </Button>
             {failure?.moderation ? (
               <Button
                 variant="outline"
@@ -81,6 +107,20 @@ function PropDetailLeft({ propId }: { propId: string }) {
               {t(prop.imageUrl ? 'Redraw' : 'Draw')}
             </Button>
           </div>
+          {uploadError ? <p className="text-xs text-destructive" role="alert">{uploadError}</p> : null}
+          <input
+            ref={fileRef}
+            type="file"
+            accept=".jpg,.jpeg,.png,.webp"
+            className="hidden"
+            tabIndex={-1}
+            onChange={(event) => {
+              const file = event.target.files?.[0]
+              event.target.value = ''
+              if (file) void onFile(file)
+            }}
+          />
+          {imageUploadConsentDialog}
         </>
       )}
       {failure ? (
