@@ -125,25 +125,40 @@ export interface ActivityItem {
   at: string
 }
 
+/** 관리자 화면(/admin)의 [저장]·[해지]·Take 수 바꾸기가 남기는 ref_kind. */
+const ADMIN_PAGE_REF_KINDS = new Set(['voucher_admin_revoke', 'voucher_admin_plan', 'admin_take_set'])
+
+/** 관리자 저장 한 번의 id — voucher_admin_* 는 ref_id 끝 ':' 뒤, admin_take_set 은 ref_id 그대로. */
+function adminSaveId(refId: string): string {
+  return refId.slice(refId.lastIndexOf(':') + 1)
+}
+
 /**
  * 최근 내역 — 한 영상(ref)에 여러 lot 으로 쪼개진 hold 행을 한 줄로 합친다. 최신순.
  * 그룹 키 = kind + ref. ref 가 없는 행(적립·수동 조정)은 행마다 한 줄.
+ * 관리자 화면에서 생긴 행은 원래 종류와 상관없이 조정(manual_adjust)으로 보이고, 저장 한 번에서 같은 방향(+/−)끼리
+ * 한 줄로 합친다. 고객에게 영어 내부 메모를 보이지 않도록 사유는 비운다. (오너 2026-11-22: 환불 대신 조정)
  */
 export function groupRecentActivity(rows: readonly LedgerRow[], limit = 20): ActivityItem[] {
   const groups = new Map<string, ActivityItem>()
   for (const row of rows) {
-    const key = row.ref_id ? `${row.kind}:${row.ref_kind ?? ''}:${row.ref_id}` : `row:${row.id}`
+    const byAdminPage = row.ref_id !== null && row.ref_kind !== null && ADMIN_PAGE_REF_KINDS.has(row.ref_kind)
+    const key = byAdminPage
+      ? `admin:${adminSaveId(row.ref_id as string)}:${row.delta < 0 ? '-' : '+'}`
+      : row.ref_id
+        ? `${row.kind}:${row.ref_kind ?? ''}:${row.ref_id}`
+        : `row:${row.id}`
     const existing = groups.get(key)
     if (existing) {
       existing.delta += row.delta
       if (row.created_at > existing.at) existing.at = row.created_at
     } else {
       groups.set(key, {
-        kind: row.kind,
+        kind: byAdminPage ? 'manual_adjust' : row.kind,
         delta: row.delta,
         refKind: row.ref_kind,
         refId: row.ref_id,
-        reason: row.reason,
+        reason: byAdminPage ? null : row.reason,
         at: row.created_at,
       })
     }

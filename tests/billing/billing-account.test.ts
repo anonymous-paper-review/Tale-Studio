@@ -70,6 +70,75 @@ describe('최근 내역', () => {
     expect(items[0]).toMatchObject({ kind: 'hold_release', delta: 4, refId: 'job-9' })
     expect(items[1]).toMatchObject({ kind: 'hold', delta: -4, refId: 'job-9' })
   })
+
+  // 계정 화면은 kind 를 이름표로 바꾼다 — manual_adjust = '조정', refund_revoke = '환불'.
+  const REDEMPTION = 'a30b382e-0904-45cc-8f5c-000000000001'
+  const SAVE = 'c0ffee00-0000-4000-8000-000000000001'
+  const T1 = '2026-11-22T08:11:56.000Z'
+
+  it('관리자가 해지하거나 종료일·티어를 바꿔 회수한 Take는 환불이 아니라 조정으로 보인다', () => {
+    const rows: LedgerRow[] = [
+      row({ id: 'g', kind: 'grant_plan', delta: 30, ref_kind: 'voucher_redemption', ref_id: REDEMPTION }),
+      row({ id: 'r', kind: 'refund_revoke', delta: -30, grant_id: 'g', ref_kind: 'voucher_admin_revoke', ref_id: `g:${SAVE}`, created_at: T1 }),
+    ]
+    expect(groupRecentActivity(rows)[0]).toMatchObject({ kind: 'manual_adjust', delta: -30 })
+  })
+
+  it('결제 환불로 회수된 Take는 계속 환불로 보인다', () => {
+    const rows: LedgerRow[] = [
+      row({ id: 'p', kind: 'grant_purchase', delta: 50, ref_kind: 'paddle_transaction', ref_id: 'txn_1' }),
+      row({ id: 'r', kind: 'refund_revoke', delta: -50, grant_id: 'p', ref_kind: 'paddle_adjustment', ref_id: 'adj_1', created_at: T1 }),
+    ]
+    expect(groupRecentActivity(rows)[0]).toMatchObject({ kind: 'refund_revoke', delta: -50 })
+  })
+
+  it('관리자 화면에서 늘리거나 다시 넣은 Take도 조정으로 보이고 양수다', () => {
+    const rows: LedgerRow[] = [
+      row({ id: 'a', kind: 'grant_plan', delta: 104, ref_kind: 'voucher_admin_plan', ref_id: `${REDEMPTION}:${SAVE}`, created_at: T1 }),
+      row({ id: 'b', kind: 'grant_bonus', delta: 10, ref_kind: 'admin_take_set', ref_id: 'c0ffee00-0000-4000-8000-000000000002', created_at: '2026-11-22T09:00:00.000Z' }),
+    ]
+    expect(groupRecentActivity(rows)).toMatchObject([
+      { kind: 'manual_adjust', delta: 10 },
+      { kind: 'manual_adjust', delta: 104 },
+    ])
+  })
+
+  it('관리자가 한 번 저장할 때 여러 묶음에서 빠진 Take는 조정 한 줄로 합쳐진다', () => {
+    const rows: LedgerRow[] = [
+      row({ id: 'r1', kind: 'refund_revoke', delta: -30, grant_id: 'g1', ref_kind: 'voucher_admin_revoke', ref_id: `g1:${SAVE}`, created_at: T1 }),
+      row({ id: 'r2', kind: 'refund_revoke', delta: -104, grant_id: 'g2', ref_kind: 'voucher_admin_revoke', ref_id: `g2:${SAVE}`, created_at: T1 }),
+      row({ id: 'm1', kind: 'manual_adjust', delta: -6, grant_id: 'g3', ref_kind: 'admin_take_set', ref_id: 'c0ffee00-0000-4000-8000-000000000003', created_at: '2026-11-22T09:00:00.000Z' }),
+      row({ id: 'm2', kind: 'manual_adjust', delta: -4, grant_id: 'g4', ref_kind: 'admin_take_set', ref_id: 'c0ffee00-0000-4000-8000-000000000003', created_at: '2026-11-22T09:00:00.000Z' }),
+    ]
+    expect(groupRecentActivity(rows)).toMatchObject([
+      { kind: 'manual_adjust', delta: -10 },
+      { kind: 'manual_adjust', delta: -134 },
+    ])
+  })
+
+  it('종료일만 옮긴 저장은 조정 − 한 줄과 조정 + 한 줄로 보인다', () => {
+    const rows: LedgerRow[] = [
+      row({ id: 'r', kind: 'refund_revoke', delta: -20, grant_id: 'g', ref_kind: 'voucher_admin_revoke', ref_id: `g:${SAVE}`, created_at: T1 }),
+      row({ id: 'a', kind: 'grant_plan', delta: 20, ref_kind: 'voucher_admin_plan', ref_id: `${REDEMPTION}:${SAVE}`, created_at: T1 }),
+    ]
+    const items = groupRecentActivity(rows)
+    expect(items.map((i) => [i.kind, i.delta])).toEqual([
+      ['manual_adjust', -20],
+      ['manual_adjust', 20],
+    ])
+    expect(new Set(items.map((i) => i.refId)).size).toBe(2)
+  })
+
+  it('관리자 화면에서 생긴 줄에는 영어 내부 메모가 붙지 않는다', () => {
+    const rows: LedgerRow[] = [
+      row({ id: 'r', kind: 'refund_revoke', delta: -30, grant_id: 'g', ref_kind: 'voucher_admin_revoke', ref_id: `g:${SAVE}`, reason: 'voucher entitlement adjusted by admin', created_at: T1 }),
+      row({ id: 'a', kind: 'grant_plan', delta: 104, ref_kind: 'voucher_admin_plan', ref_id: `${REDEMPTION}:${SAVE}`, reason: 'admin set takes to 400', created_at: T1 }),
+      row({ id: 'm', kind: 'manual_adjust', delta: -6, ref_kind: 'admin_take_set', ref_id: 'c0ffee00-0000-4000-8000-000000000004', reason: 'admin set takes to 260', created_at: '2026-11-22T09:00:00.000Z' }),
+    ]
+    const items = groupRecentActivity(rows)
+    expect(items).toHaveLength(3)
+    expect(items.map((i) => i.reason)).toEqual([null, null, null])
+  })
 })
 
 describe('구독 상태', () => {
