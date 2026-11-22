@@ -208,6 +208,20 @@ export function normalizeProvider(p: string): VideoModelKey {
   return DEFAULT_VIDEO_MODEL
 }
 
+/** 고를 수 있는 영상 모델 이름인가 — 모르는 이름을 기본 모델로 바꾸지 않고 아니라고 답한다('constructor' 같은 이름도 아니다). */
+export function isVideoModelKey(value: unknown): value is VideoModelKey {
+  return typeof value === 'string' && Object.hasOwn(VIDEO_MODELS, value)
+}
+
+/**
+ * 작업 기록의 모델 칸(그 작업이 실제로 부른 fal 주소 — 다른 모델로 넘어가면 넘어간 주소) → 고를 수 있는 모델 이름(리드 2026-11-22).
+ * 목록에 없는 주소(대체 MiniMax · 예전 주소)면 null — 기본 모델로 짐작하지 않는다.
+ */
+export function videoModelKeyOfEndpoint(endpoint: unknown): VideoModelKey | null {
+  if (typeof endpoint !== 'string' || !endpoint) return null
+  return Object.values(VIDEO_MODELS).find((spec) => spec.endpoint === endpoint)?.key ?? null
+}
+
 const FRAME_SLOT_ROLES: ReadonlySet<'start' | 'end'> = new Set(['start', 'end'] as const)
 const NO_FRAME_SLOT_ROLES: ReadonlySet<'start' | 'end'> = new Set()
 

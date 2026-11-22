@@ -5,6 +5,7 @@ import { releaseTakesForJob } from '@/lib/billing/take-hold'
 import type { Json, Tables } from '@/types/database'
 import { DEFAULT_VIDEO_MODE, isVideoMode, type VideoMode } from '@/lib/director/video-modes'
 import { isDialogueFingerprint } from '@/lib/director/dialogue-fingerprint'
+import { videoModelKeyOfEndpoint, type VideoModelKey } from '@/lib/video-models'
 export {
   compareDirectorVideoTakeOrder,
   selectHandoffTake,
@@ -163,6 +164,9 @@ export type LiveDirectorVideoTake = DirectorVideoTake & {
   made_video_mode: VideoMode | null
   /** 지금 영상을 낸 작업이 남긴 대사 지문(오너 2026-11-22 E3) — 다시 만드는 중 · 실패한 시도 · 지문 없는 옛 작업이면 null. */
   made_dialogue_fingerprint: string | null
+  /** 지금 영상을 낸 작업의 모델(리드 2026-11-22 · fb-camera 발견) — 판의 모델 이름 근거. 다시 만드는 중 · 실패한 시도 ·
+   *  고를 수 없는 대체 모델(MiniMax)이면 null(판은 지금처럼 Take 에 고른 값 · 샷 설정으로 보인다). */
+  made_model: VideoModelKey | null
   /** 그 Take 의 마지막 작업을 화면에서 멈춘 때(오너 2026-11-14 7번). 멈추지 않았으면 없음. */
   cancelled_at?: string
 }
@@ -232,6 +236,18 @@ export function madeDialogueFingerprint(
 }
 
 /**
+ * 지금 영상을 낸 작업의 모델(리드 2026-11-22) — 작업 기록의 모델 칸은 그 작업이 실제로 부른 주소라, 고른 모델이 실패해
+ * 다른 모델로 넘어갔으면 넘어간 모델이다. 판은 이것을 먼저 쓰고, 다음 Take 를 만드는 모델은 이것을 따르지 않는다. 모르면 null.
+ */
+export function madeModel(
+  take: Pick<DirectorVideoTake, 'url' | 'storage_path'>,
+  job: LastAttemptJob | null | undefined,
+): VideoModelKey | null {
+  if (!madeByJob(take, job)) return null
+  return videoModelKeyOfEndpoint(job.model)
+}
+
+/**
  * 지금 영상 파일이 실제로 1080p 로 만들어졌는가. 근거는 그 파일을 낸 작업뿐이다 — 마지막 시도가 완료되어 같은 파일을
  * 냈을 때만 판단하고(다시 만드는 중 · 다시 만들기 실패면 모른다 = null), 대체 모델 미니맥스는 늘 768P 다.
  */
@@ -259,14 +275,14 @@ export async function listLiveDirectorVideoTakes(projectId: string): Promise<Liv
   const withJob = await selectLiveTakes(projectId, LIVE_TAKE_WITH_LAST_JOB)
   if (!withJob.error) {
     const takes = ((withJob.data ?? []) as unknown as Array<DirectorVideoTake & { last_attempt_job?: LastAttemptJob | null }>)
-      .map(({ last_attempt_job: job, ...take }) => ({ ...take, video_resolution: madeVideoResolution(take, job), made_frames: madeFrames(take, job), made_video_mode: madeVideoMode(take, job), made_dialogue_fingerprint: madeDialogueFingerprint(take, job) }))
+      .map(({ last_attempt_job: job, ...take }) => ({ ...take, video_resolution: madeVideoResolution(take, job), made_frames: madeFrames(take, job), made_video_mode: madeVideoMode(take, job), made_dialogue_fingerprint: madeDialogueFingerprint(take, job), made_model: madeModel(take, job) }))
     return withCancellations(takes)
   }
   // 작업 기록을 함께 읽지 못해도 캔버스의 영상 테이크는 떠야 한다 — 해상도 표시만 빠진다.
   console.error('[director-video-takes] last attempt job embed failed:', withJob.error.message)
   const { data, error } = await selectLiveTakes(projectId, '*')
   if (error) throw error
-  return withCancellations(((data ?? []) as unknown as DirectorVideoTake[]).map((take) => ({ ...take, video_resolution: null, made_frames: null, made_video_mode: null, made_dialogue_fingerprint: null })))
+  return withCancellations(((data ?? []) as unknown as DirectorVideoTake[]).map((take) => ({ ...take, video_resolution: null, made_frames: null, made_video_mode: null, made_dialogue_fingerprint: null, made_model: null })))
 }
 
 /** 화면에서 멈춘 Take(마지막 작업이 멈춤 표에 있음)에 멈춘 때를 붙인다 — 읽지 못하면 그대로(종전 동작). */
