@@ -26,6 +26,10 @@ import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, resolveStyleAnchor, type AnchorableSubmit } from '@/lib/style-anchor'
 import { appendCheckConstraints, parseCheckConstraints } from '@/lib/writer/check-notes'
+import { englishTimeOfDay, isReflectionShot, quotePreviousShot, roughIsStaticHold, stillCharacterLabel, stillConstraints } from '@/lib/director/still-prompt'
+import { buildPhotoStripPrompt, type PhotoCharacterLabel } from '@/lib/director/photo-strip'
+import { realCineLine } from '@/lib/director/real-cine-line'
+import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
 import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
 import { moderationRejectionResponse, recordModerationPass } from '@/lib/api/moderation'
 import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
@@ -100,13 +104,15 @@ export async function POST(req: Request) {
         .maybeSingle(),
       supabaseAdmin
         .from('shots')
-        .select('shot_id, scene_id, sort_order, rough_storyboard, check_notes, characters, character_appearance_keys, static_spec, director_refs')
+        .select('shot_id, scene_id, source, sort_order, rough_storyboard, check_notes, characters, character_appearance_keys, static_spec, director_refs, dynamic_spec, design_ref, prompt, action_description, action_description_native')
         .eq('project_id', projectId)
         .eq('shot_id', writerShotId)
         .maybeSingle(),
     ])
     if (!project) return NextResponse.json({ error: 'Project not found' }, { status: 404 })
     const anchor = await resolveStyleAnchor(project)
+    // 실사 그림체(오너 2026-11-23 "2 모두 적용을 실사 스타일로") — 기준 그림 없이 그리는 실사만 사진 지시문. 다른 그림체는 지금 그대로.
+    const photoLook = anchor ? null : await resolvePhotoLook(project)
     // #fal-canvas(2026-08-17): 프로듀서 포맷이 화면비의 진실 — 클라 aspectRatio 는 포맷 미상
     //   구 프로젝트의 폴백일 뿐이다 (director-store 가 '16:9'를 하드코딩하던 결함의 교정).
     const projectFormat = parseProjectFormat(
@@ -128,7 +134,7 @@ export async function POST(req: Request) {
     //   전원의 시트가 있어야 하고, 하나라도 없으면 code 있는 409 로 막는다. 클라 참조는 서버가 붙인
     //   것과 겹치지 않는 추가 입력(프레임 참조)만 덧붙인다. characters 미정의(레거시) 샷은 종전 경로.
     const serverPlan = shot && Array.isArray((shot as { characters?: unknown }).characters)
-      ? (await loadShotReferencePlans(projectId, [shot as ShotRowForReferences])).get(shot.shot_id as string) ?? null
+      ? (await loadShotReferencePlans(projectId, [shot as ShotRowForReferences], { photo: !!photoLook })).get(shot.shot_id as string) ?? null
       : null
     if (serverPlan && serverPlan.missing.length > 0) {
       return NextResponse.json(
@@ -171,8 +177,12 @@ export async function POST(req: Request) {
           extraRefCount: clientExtras.length + (seriesFrameUrl ? 1 : 0),
         }
       : { ...refSplit, extraRefCount: seriesFrameUrl ? 1 : 0 }
-    const characterRefLabels = serverPlan
-      ? serverPlan.characterRefs.map((r) => ({ name: r.name, position: r.position, pose: r.pose }))
+    const staticSpec = (shot as { static_spec?: unknown } | null)?.static_spec
+    const characterRefLabels: PhotoCharacterLabel[] | undefined = serverPlan
+      ? serverPlan.characterRefs.map((r) =>
+          photoLook
+            ? stillCharacterLabel({ characterId: r.characterId, name: r.promptName || r.name, look: r.look ?? null, position: r.position, pose: r.pose }, staticSpec)
+            : { name: r.name, position: r.position, pose: r.pose })
       : undefined
 
     // #u17-2(2026-08-31 오너 지시): 수동 샷(shots.prompt=NULL)의 한국어 액션 원문 유출 방어 —
@@ -227,8 +237,9 @@ export async function POST(req: Request) {
         .maybeSingle()
       const prevText = (((prev?.prompt as string) || (prev?.action_description as string)) ?? '').trim()
       if (prev?.scene_id === shotMeta.scene_id && prevText) {
-        continuityPrevText = prevText.slice(0, 110)
-        continuityLine = `\nContinuity: moments earlier the previous shot showed "${prevText.slice(0, 110)}". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.`
+        // 실사 그림체는 앞 샷 글을 문장 단위로 인용한다 — 110자에서 잘라 문장 중간에서 끊겼다(2026-11-23). 다른 그림체는 지금 그대로.
+        continuityPrevText = photoLook ? quotePreviousShot(prevText) : prevText.slice(0, 110)
+        continuityLine = `\nContinuity: moments earlier the previous shot showed "${continuityPrevText}". Carry over the character's wardrobe, props, lighting and surrounding environment from it, while depicting this shot's own moment.`
       }
     }
 
@@ -240,9 +251,19 @@ export async function POST(req: Request) {
     //   서버 진실(shots.characters)로만 판정한다.)
     const noPeopleShot =
       Array.isArray((shot as { characters?: unknown } | null)?.characters) &&
-      ((shot as { characters: unknown[] }).characters.length === 0)
+      ((shot as { characters: unknown[] }).characters.length === 0) &&
+      // 실사 그림체: 목록은 비었지만 이 샷에 나오는 인물(비친 모습 샷 등)을 찾았으면 "사람 없음"이 아니다.
+      !(photoLook && serverPlan?.characterRefs.length)
+    const checkNotes = (shot as { check_notes?: unknown } | null)?.check_notes
+    // 실사 그림체: 동작량 주의와, 자리 글과 다른 자세에서 시작하는 움직임 주의는 싣지 않는다(stillConstraints). 다른 그림체는 지금 그대로.
+    const constraints = photoLook
+      ? stillConstraints(checkNotes, (serverPlan?.characterRefs ?? []).map((r) => r.characterId), staticSpec)
+      : null
+    const cineLine = photoLook && stripFrames ? realCineLine(staticSpec) : null
     const guardedPrompt =
-      appendCheckConstraints(promptEn, (shot as { check_notes?: unknown } | null)?.check_notes) +
+      (constraints
+        ? promptEn + (constraints.length ? `\nContinuity constraints: ${constraints.join('; ')}` : '')
+        : appendCheckConstraints(promptEn, checkNotes)) +
       continuityLine +
       (seriesFrameUrl ? `\n${seriesContinuityPromptLine()}` : '') +
       (noPeopleShot
@@ -263,7 +284,7 @@ export async function POST(req: Request) {
           .eq('project_id', projectId)
           .eq('scene_id', shotMeta.scene_id)
           .maybeSingle()
-        sceneLighting = (((scene?.time_of_day as string) ?? '').trim() || null)
+        sceneLighting = photoLook ? englishTimeOfDay(scene?.time_of_day as string | null) : (((scene?.time_of_day as string) ?? '').trim() || null)
       }
       // 합성 스트립 업로드 — 결정적 경로 upsert (재생성마다 교체, 잔재 누적 없음).
       //   #sheet-formats: 시트는 프레임 AR 로 선택되고(레거시 가로 프레임 → 레거시 적층 시트),
@@ -278,7 +299,21 @@ export async function POST(req: Request) {
       // 레퍼런스 계약(buildRealStripPrompt 와 합치): [스트립, ...캐릭터/월드, 앵커?].
       //   applyStyleAnchor 는 앵커를 1번에 놓아 스트립 프롬프트와 충돌 → 스트립 모드는 수동 조립.
       finalOpts = {
-        prompt: buildRealStripPrompt(guardedPrompt, {
+        prompt: photoLook
+          ? buildPhotoStripPrompt(guardedPrompt, {
+              photoLook,
+              characterRefCount: refCounts.characterRefCount,
+              worldRefCount: refCounts.worldRefCount,
+              extraRefCount: refCounts.extraRefCount,
+              characterRefs: characterRefLabels,
+              cineLine,
+              sceneLighting,
+              reflection: isReflectionShot((shot ?? {}) as Parameters<typeof isReflectionShot>[0], (characterRefLabels ?? []).map((r) => r.name)),
+              staticHold: roughIsStaticHold(shot as Parameters<typeof roughIsStaticHold>[0]),
+              noPeople: noPeopleShot,
+              frameAxis: composed.geometry.frameAxis,
+            })
+          : buildRealStripPrompt(guardedPrompt, {
           // #ref-gate: 서버가 붙인 인물·배경·추가 입력의 경계. 레거시 샷(characters 미정의)만 클라 경계.
           characterRefCount: refCounts.characterRefCount,
           worldRefCount: refCounts.worldRefCount,
@@ -358,9 +393,10 @@ export async function POST(req: Request) {
       moderation = await assertUserTextAllowed(
         [
           promptEn,
-          ...parseCheckConstraints((shot as { check_notes?: unknown } | null)?.check_notes),
+          ...(constraints ?? parseCheckConstraints(checkNotes)),
           continuityPrevText,
-          ...(characterRefLabels ?? []).flatMap((r) => [r.name, r.pose]),
+          ...(characterRefLabels ?? []).flatMap((r) => [r.name, r.pose, ...(photoLook ? [r.look] : [])]),
+          ...(photoLook ? [cineLine] : []),
         ],
         { projectId, kind: 'shot_storyboard', userId: access.userId },
       )

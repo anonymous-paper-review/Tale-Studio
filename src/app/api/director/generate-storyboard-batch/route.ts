@@ -23,13 +23,16 @@ import { moderationRejectionResponse, recordModerationPass } from '@/lib/api/mod
 import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
+import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
+import { englishTimeOfDay, extraCharactersInShot, isReflectionShot, promptName, roughIsStaticHold, stillCharacterLabel, subjectAnchor } from '@/lib/director/still-prompt'
+import { buildPhotoGridPrompt, type PhotoCharacterLabel } from '@/lib/director/photo-strip'
+import { realCineLine } from '@/lib/director/real-cine-line'
 import { styleFromUserAnalysis } from '@/lib/artist/sheet-prompt-input'
 import { resolveImageEndpoint, resolveSheetImageModel } from '@/lib/image-models'
 import {
   composeRoughReferenceGrid,
   buildRealGridPrompt,
   realSheetCanvas,
-  type CharacterRefLabel,
 } from '@/lib/director/storyboard-strip'
 import { applyDirectorRefs, directorRefsExcludeWorld, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking, readOffFrame } from '@/lib/director/shot-references'
 import { loadSeriesFirstShotContinuity, seriesContinuityPromptLine } from '@/lib/series/continuity'
@@ -73,6 +76,8 @@ interface EligibleShot {
   excludeWorld: boolean
   /** 약속 I4: 참조한 러프의 generatedAt. */
   roughGeneratedAt: number | null
+  /** 실사 그림체(2026-11-23 오너 "2 모두 적용")만 채운다 — 샷 설계 · 빛 줄 · 비친 모습 샷 · 멈춘 러프 · 사람 없는 샷. 다른 그림체는 null. */
+  photo: { staticSpec: unknown; cineLine: string | null; reflection: boolean; staticHold: boolean; noPeople: boolean } | null
 }
 
 class CharacterAppearanceContractError extends Error {}
@@ -136,10 +141,13 @@ export async function POST(req: NextRequest) {
       (project.settings as { format?: unknown } | null)?.format,
     )
     const sheetCanvas = realSheetCanvas(projectFormat, 'grid4')
+    const anchor = await resolveStyleAnchor(project)
+    // 실사 그림체(오너 2026-11-23 "2 모두 적용을 실사 스타일로") — 한 샷 길과 같은 규칙. 다른 그림체는 지금 그대로.
+    const photoLook = anchor ? null : await resolvePhotoLook(project)
 
     const { data: rows } = await supabaseAdmin
       .from('shots')
-      .select('shot_id, scene_id, characters, character_appearance_keys, rough_storyboard, storyboard_image, static_spec, director_refs')
+      .select('shot_id, scene_id, source, characters, character_appearance_keys, rough_storyboard, storyboard_image, static_spec, director_refs, dynamic_spec, design_ref, prompt, action_description, action_description_native')
       .eq('project_id', projectId)
       .order('sort_order')
 
@@ -187,6 +195,21 @@ export async function POST(req: NextRequest) {
     const inProgressList = () =>
       [...inProgress].map(([jobId, e]) => ({ jobId, shotIds: e.shotIds, ...(e.sameRun ? { sameRun: true } : {}) }))
 
+    // 실사 그림체: 인물 목록에서 빠졌지만 그 샷에 나오는 인물(한 샷 길과 같은 규칙) — 설계와 글에 있는 인물 · 비친 모습 샷.
+    const { data: castRows } = photoLook
+      ? await supabaseAdmin.from('characters').select('character_id, name, name_en, name_en_source').eq('project_id', projectId)
+      : { data: [] as Array<Record<string, unknown>> }
+    const castById = new Map(((castRows ?? []) as Array<Record<string, unknown>>).map((c) => [c.character_id as string, c]))
+    const castNames = new Map(
+      [...castById.values()].map((c) => [c.character_id as string, [String(c.name ?? ''), promptName(c), String(c.character_id ?? '').replace(/_/g, ' ')].filter(Boolean)]),
+    )
+    const extrasByShot = new Map(photoLook ? (rows ?? []).map((s) => [s.shot_id as string, extraCharactersInShot(s, castNames)]) : [])
+    const extraIds = [...new Set([...extrasByShot.values()].flat())]
+    const { data: extraDefaults } = extraIds.length
+      ? await supabaseAdmin.from('character_appearances').select('character_id, appearance_key').eq('project_id', projectId).in('character_id', extraIds).eq('is_default', true)
+      : { data: [] as Array<Record<string, unknown>> }
+    const extraKeyById = new Map((extraDefaults ?? []).map((a) => [a.character_id as string, a.appearance_key as string]))
+
     const eligible: EligibleShot[] = []
     // #ref-gate(2026-09-02): 건너뛴 샷은 이유와 함께 돌려준다 — 클라가 선행 산출물을 기다렸다가 자동 재개한다.
     const skipped: Array<{
@@ -223,15 +246,28 @@ export async function POST(req: NextRequest) {
       const directorRefs = parseDirectorRefs((s as { director_refs?: unknown }).director_refs)
       // 프레임 밖 봉인(2026-09-05): 무대가 프레임 밖으로 판정한 인물의 시트는 붙이지 않는다.
       const offFrame = new Set(readOffFrame(s.static_spec))
+      const extras = extrasByShot.get(s.shot_id as string) ?? []
       eligible.push({
         shot_id: s.shot_id as string,
         scene_id: s.scene_id as string,
-        characters: applyDirectorRefs(characters, directorRefs).filter((id) => !offFrame.has(id)),
-        characterAppearanceKeys,
+        characters: applyDirectorRefs(characters, directorRefs).filter((id) => !offFrame.has(id)).concat(extras),
+        characterAppearanceKeys: extras.length
+          ? { ...Object.fromEntries(extras.map((id) => [id, extraKeyById.get(id) ?? 'current'])), ...characterAppearanceKeys }
+          : characterAppearanceKeys,
         excludeWorld: directorRefsExcludeWorld(directorRefs),
         roughGeneratedAt: (s.rough_storyboard as { generatedAt?: number } | null)?.generatedAt ?? null,
         frames: { start: f.start, direction: f.direction, end: f.end },
         blocking: readCharacterBlocking(s.static_spec),
+        photo: photoLook
+          ? {
+              staticSpec: s.static_spec,
+              cineLine: realCineLine(s.static_spec),
+              reflection: isReflectionShot(s, [...castNames.values()].flat()),
+              staticHold: roughIsStaticHold(s),
+              // 한 샷 길과 같은 규칙 — 인물 목록이 빈 샷이고, 샷에 나오는 인물도 찾지 못했다.
+              noPeople: Array.isArray(s.characters) && s.characters.length === 0 && extras.length === 0,
+            }
+          : null,
       })
     }
 
@@ -259,6 +295,17 @@ export async function POST(req: NextRequest) {
           .in('character_id', allCharIds)
       : { data: [] as Array<Record<string, unknown>> }
     const charById = new Map((chars ?? []).map((c) => [c.character_id as string, c]))
+    // 실사 그림체: 이름 뒤에 적을 짧은 겉모습 — 시트를 고르는 조회와 따로 읽는다. 못 읽으면 겉모습 없이 적는다.
+    const { data: lookRows } = photoLook && appearancePairs.length
+      ? await supabaseAdmin
+          .from('character_appearances')
+          .select('character_id, appearance_key, appearance')
+          .eq('project_id', projectId)
+          .in('character_id', allCharIds)
+      : { data: [] as Array<Record<string, unknown>> }
+    const lookByPair = new Map(
+      (Array.isArray(lookRows) ? lookRows : []).map((row) => [`${row.character_id as string}\u0000${row.appearance_key as string}`, row.appearance as string | null]),
+    )
     const { data: appearanceRows } = appearancePairs.length
       ? await supabaseAdmin
           .from('character_appearances')
@@ -314,7 +361,6 @@ export async function POST(req: NextRequest) {
       throw new CharacterAppearanceContractError('Character appearance contract error: a shot snapshot references a missing character identity')
     }
 
-    const anchor = await resolveStyleAnchor(project)
     // 올린 그림체의 분석 결과(2026-10-10 오너) — 시트에도 그림체 앵커와 피할 것을 싣는다. 프리셋은 손으로 쓴 그림체 문장만 그대로.
     const userStyleFacets = styleFromUserAnalysis(project.custom_style_anchor) ? anchor?.facets ?? null : null
     // #F-006(2026-08-13): 시트 프롬프트에 씬 정보가 전무해 시트마다 시간대를 지어냈다(실측 1e166e55
@@ -385,31 +431,49 @@ export async function POST(req: NextRequest) {
           return {
             characterId,
             appearanceKey,
-            name: ((character.name as string) || characterId).trim() || characterId,
+            // 실사 그림체의 지시문 이름은 영어 이름이 있으면 그것, 그리고 짧은 겉모습(한 샷 길과 같다).
+            name: photoLook
+              ? promptName(castById.get(characterId) ?? character, characterId)
+              : ((character.name as string) || characterId).trim() || characterId,
+            look: photoLook ? subjectAnchor(lookByPair.get(`${characterId}\u0000${appearanceKey}`), 80) : null,
             url: appearance.sheet_url as string,
           }
         })
       const nameById = new Map(groupRefs.map((r) => [r.characterId, r.name]))
       // #ref-gate: 이름에 러프 위치·포즈를 붙여 칸 안의 인형↔인물 대응까지 준다.
-      const columnCharacters: CharacterRefLabel[][] = group.map((s) =>
+      const columnCharacters: PhotoCharacterLabel[][] = group.map((s) =>
         s.characters
-          .map((id): CharacterRefLabel | null => {
+          .map((id): PhotoCharacterLabel | null => {
             const name = nameById.get(id)
             if (!name) return null
             const b = s.blocking.get(id)
-            return { name, position: b?.position ?? null, pose: b?.pose ?? null }
+            const label = { name, position: b?.position ?? null, pose: b?.pose ?? null }
+            return s.photo ? stillCharacterLabel({ characterId: id, ...label }, s.photo.staticSpec) : label
           })
-          .filter((c): c is CharacterRefLabel => c !== null),
+          .filter((c): c is PhotoCharacterLabel => c !== null),
       )
 
-      const sceneLighting = todByScene.get(group[0].scene_id) || null
+      const sceneLighting = photoLook ? englishTimeOfDay(todByScene.get(group[0].scene_id)) : todByScene.get(group[0].scene_id) || null
       // #anchor-wiring(2026-08-14 오너 확정): 앵커별 검증 절 + 서브룩 그레이드 권위 + watercolor
       //   A안(preview 2번 스타일 레퍼런스). 전부 DB(style_anchors)가 진실.
       const anchorTwoRef = !!(anchor?.usePreviewRef && anchor.previewUrl)
       const worldRef = group.every((s) => s.excludeWorld) ? null : (worldRefByScene.get(group[0].scene_id) ?? null)
       const seriesFrameColumn = continuity ? group.findIndex((s) => s.shot_id === continuity.firstShotId) : -1
       const seriesFrameUrl = continuity && seriesFrameColumn >= 0 ? continuity.frameUrl : null
-      const prompt = buildRealGridPrompt(group.length, {
+      const prompt = (photoLook
+        ? buildPhotoGridPrompt(group.length, {
+            photoLook,
+            characterRefCount: groupRefs.length,
+            worldRefCount: worldRef ? 1 : 0,
+            cineLines: group.map((s) => s.photo?.cineLine ?? null),
+            characterRefs: groupRefs.map((r) => ({ name: r.name, look: r.look })),
+            columnCharacters,
+            sceneLighting,
+            reflection: group.some((s) => s.photo?.reflection),
+            staticColumns: group.map((s) => !!s.photo?.staticHold),
+            noPeople: group.every((s) => s.photo?.noPeople),
+          })
+        : buildRealGridPrompt(group.length, {
         characterRefCount: groupRefs.length,
         worldRefCount: worldRef ? 1 : 0,
         hasStyleRef: !!anchor,
@@ -421,7 +485,7 @@ export async function POST(req: NextRequest) {
         styleRefCount: anchorTwoRef ? 2 : 1,
         styleAnchors: userStyleFacets?.probeAnchors ?? null,
         styleAvoid: userStyleFacets?.negative ?? null,
-      }) + (seriesFrameUrl ? `\n- ${seriesContinuityPromptLine(seriesFrameColumn + 1)}` : '')
+      })) + (seriesFrameUrl ? `\n- ${seriesContinuityPromptLine(seriesFrameColumn + 1)}` : '')
       const referenceImageUrls = [
         refUrl,
         ...groupRefs.map((r) => r.url),
@@ -440,6 +504,7 @@ export async function POST(req: NextRequest) {
         moderation = await assertUserTextAllowed(
           [
             ...columnCharacters.flatMap((column) => column.flatMap((c) => [c.name, c.pose, c.position])),
+            ...(photoLook ? [...groupRefs.map((r) => r.look), ...group.map((s) => s.photo?.cineLine ?? null)] : []),
             sceneLighting,
           ],
           { projectId, kind: 'storyboard_real_grid', userId: access.userId },

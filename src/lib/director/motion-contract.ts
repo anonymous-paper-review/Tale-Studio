@@ -20,6 +20,7 @@
 //   같은 사고로 인물 magnitude `moderate`(어휘 밖)가 최소값으로 떨어져 "보통 크기 고갯짓"이
 //   "a barely-perceptible micro movement"로 뒤집혀 발주됐다.
 //   이제 motion-vocabulary 교정기를 먼저 통과시켜 정본 낱말로 만든 뒤 조회한다.
+import type { ContractSubject } from '@/lib/director/video-design'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import {
   normalizeCameraMotion,
@@ -33,6 +34,8 @@ export interface MotionContract {
   text: string
   /** 카메라가 정지 계약인가 — START/END 수렴 지시문 분기(P0)에 사용. */
   cameraStatic: boolean
+  /** 겉모습과 함께 이름을 적은 인물(실사 그림체, 2026-11-23) — 대사에서는 이름만 적는다. */
+  introduced?: ReadonlySet<string>
 }
 
 const w = (x: unknown) => String(x ?? '').replace(/[_-]+/g, ' ').trim()
@@ -62,9 +65,30 @@ function magnitudeWord(m: unknown): string {
   return m === 'large' || m === 'high' ? 'large' : m === 'moderate' || m === 'medium' ? 'moderate' : 'small'
 }
 
+/** 제자리 회전(팬 · 틸트)에 뜻이 서는 방향 — 나머지(앞 · 뒤, 팬의 위아래, 틸트의 좌우)는 싣지 않는다(실사 그림체, 2026-11-23). */
+const ROTATION_DIRECTIONS: Record<string, RegExp> = { pan: /left|right/i, tilt: /up|down/i }
+
+/**
+ * 팬 · 틸트에 앞 · 뒤 방향이 붙은 설계(오너 2026-11-23, 지하철 샷 9) — 제자리 회전은 앞뒤로 가지 않는다. 움직임 글이 다가간다 · 물러난다고
+ *   하면 그것이 맞다(러프도 그 글로 그려졌다). 움직임 글에 없으면 방향만 뺀다(cameraClause). 실사 그림체만.
+ */
+function withoutRotationTravel(cam: NormalizedCameraMotion, motionPrompt: unknown): NormalizedCameraMotion {
+  // 설계는 멈춤인데 움직임 글(러프를 그린 글)이 손으로 든 흔들림이면 제자리 흔들림이다(지하철 샷 4 러프의 HANDHELD DRIFT).
+  if (cam.type === 'static' && typeof motionPrompt === 'string' && /\bhand-?held\s+(?:[\w-]+\s+){0,2}(?:drift|shake|sway|breathing|float|movement)\b/i.test(motionPrompt)) {
+    return { ...cam, type: 'handheld_drift' }
+  }
+  if ((cam.type !== 'pan' && cam.type !== 'tilt') || !/forward|backward/i.test(cam.direction ?? '')) return cam
+  const text = typeof motionPrompt === 'string' ? motionPrompt : ''
+  // 카메라가 주어일 때만 — "Mina pulls back the curtain" 같은 사람의 동작을 카메라로 읽지 않는다.
+  if (/forward/i.test(cam.direction ?? '') && /\bcamera\b[^.;]{0,30}\b(?:doll(?:y|ies|ying)\s+(?:\w+\s+)?in|push(?:es|ing)?\s+(?:\w+\s+)?in|moves?\s+(?:\w+\s+)?in|clos(?:es|ing)\s+in|creeps?\s+in|zooms?\s+in)\b|^(?:\w+\s+)?(?:push|dolly)[- ]in\b/i.test(text)) return { ...cam, type: 'dolly_in' }
+  if (/backward/i.test(cam.direction ?? '') && /\bcamera\b[^.;]{0,30}\b(?:doll(?:y|ies|ying)\s+(?:\w+\s+)?(?:out|back)|pull(?:s|ing)?\s+(?:\w+\s+)?(?:back|out|away)|moves?\s+(?:\w+\s+)?(?:back|away)|zooms?\s+out)\b|^(?:\w+\s+)?(?:pull[- ](?:back|out)|dolly[- ]out)\b/i.test(text)) return { ...cam, type: 'dolly_out' }
+  return cam
+}
+
 function cameraClause(
   cam: NormalizedCameraMotion,
   durationSeconds: number,
+  aligned: boolean,
 ): { clause: string; isStatic: boolean } {
   const type = cam.type
   if (!type || type === 'static') {
@@ -83,7 +107,8 @@ function cameraClause(
   }
   const speed = speedWord(cam.speed)
   const mag = magnitudeWord(cam.magnitude)
-  const dirs = cam.direction && cam.direction !== 'none' ? screenDirections(cam.direction) : null
+  const rotation = aligned ? ROTATION_DIRECTIONS[type] : undefined
+  const dirs = cam.direction && cam.direction !== 'none' && (!rotation || rotation.test(cam.direction)) ? screenDirections(cam.direction) : null
   const dirText = dirs
     ? ` toward ${dirs.view} — on-screen content flows toward ${dirs.content}`
     : ''
@@ -139,8 +164,27 @@ function characterMotions(raw: ShotDynamicSpec['character_motion'] | string | nu
 //   끝난 뒤에도 화면이 죽지 않게 후속 여파(무게 이동·호흡·옷자락)까지 이어가도록 요구한다.
 const LONG_SHOT_SECONDS = 7
 
-function subjectClauses(dyn: ShotDynamicSpec, durationSeconds: number): string[] {
+// 빠른 동작 — 크기가 작아도 "작고 절제된"이라고 적으면 "홱 돌린다"와 다툰다(실사 그림체, 2026-11-23 지하철 샷 8).
+const ABRUPT = /\b(?:sharply|abruptly|suddenly|quickly|snaps?|jerks?|whips?|startles?|flinch(?:es)?|bolts?|lunges?|darts?|jolts?)\b/i
+
+function subjectClauses(
+  dyn: ShotDynamicSpec,
+  durationSeconds: number,
+  aligned: boolean,
+  subjects: ReadonlyMap<string, ContractSubject> | null,
+  introduced: Set<string>,
+): string[] {
   const out: string[] = []
+  // 이름을 아는 인물은 이름(처음 한 번은 겉모습과 함께)으로, 모르면 번호로(2026-11-23 — "subject 1 · 2 · 3"이 누구인지 적혀 있지 않았다).
+  const mentioned = new Set<string>()
+  const called = (id: string | undefined): string | null => {
+    const s = id ? subjects?.get(id) : undefined
+    if (!s?.name) return null
+    const note = mentioned.has(id!) ? '' : [s.anchor, s.entry].filter(Boolean).join('; ')
+    mentioned.add(id!)
+    if (s.anchor) introduced.add(id!)
+    return note ? `${s.name} (${note})` : s.name
+  }
   const isLong = durationSeconds >= LONG_SHOT_SECONDS
   // #coverage-first(2026-09-02): 같은 인물의 연속 동사는 **순서**가 계약이다(눈을 뜬다 → 몸을
   //   일으킨다). 옛 문안은 subject 1/2 를 병렬 나열해 모델이 동시에 하거나 하나만 골랐다.
@@ -165,9 +209,11 @@ function subjectClauses(dyn: ShotDynamicSpec, durationSeconds: number): string[]
         ? 'a large, clearly visible movement that completes fully'
         : mag === 'medium'
           ? 'a clear movement that completes'
-          : mag === 'small'
-            ? 'a small, restrained movement'
-            : 'a barely-perceptible micro movement'
+          : aligned && ABRUPT.test(m.verb)
+            ? 'a small but quick movement'
+            : mag === 'small'
+              ? 'a small, restrained movement'
+              : 'a barely-perceptible micro movement'
     // 긴 샷에서 작은 동작 하나만 지시하면 남는 시간이 정지 화면이 된다 — 그 시간을 채울
     //   후속 여파를 함께 요구한다. 새 동작을 지어내라는 게 아니라 같은 동작의 뒤끝이다.
     const tail =
@@ -175,17 +221,41 @@ function subjectClauses(dyn: ShotDynamicSpec, durationSeconds: number): string[]
         ? ' — then let its aftermath carry the remaining time (weight settling, breath, cloth and hair still moving); never freeze after it lands'
         : ''
     if (sameSubject) chained = true
-    out.push(`${sameSubject ? 'then the same subject: ' : `subject ${subjectNo}: `}"${w(m.verb)}" — ${scale}${tail}`)
+    const name = called(m.character_id)
+    out.push(`${sameSubject ? (name ? `then ${name}: ` : 'then the same subject: ') : name ? `${name}: ` : `subject ${subjectNo}: `}"${w(m.verb)}" — ${scale}${tail}`)
   })
   if (chained) out.push('movements of the same subject happen strictly in the order given, one after another, never at once')
   ;(dyn.gaze_arc ?? []).forEach((g) => {
-    if (g && g.from !== g.to) out.push(`gaze turns from ${w(g.from)} to ${w(g.to)}`)
+    if (!g || g.from === g.to) return
+    const owner = called(g.character_id)
+    const place = (x: string) => subjects?.get(x)?.name ?? w(x)
+    out.push(`${owner ? `${owner}'s gaze` : 'gaze'} turns from ${place(g.from)} to ${place(g.to)}`)
   })
   ;(dyn.environmental_change ?? []).forEach((e) => {
     if (e?.type) out.push(`environment: ${w(e.type)} (${w(e.magnitude) || 'moderate'})`)
   })
   return out
 }
+
+// 긴 샷은 "고르게 펴라"만 말하면 모델이 전체를 느리게 만든다(#g1). 완결 시점을 앞에 두고
+//   남은 시간은 여파로 채우게 나눠 말한다 — 동작 자체는 제 속도로 일어나야 한다.
+// #d3(2026-08-31 오너 확정): 짧은 샷의 옛 문장("전체 N초에 걸쳐 페이싱")이 남은 주 슬로모
+//   경로였다 — 실측 126샷의 87.3%가 7초 미만이라 #g1 은 12.7%만 고친 상태였고, 5초 샷에
+//   2초 동작이면 그 문장이 곧 2.5배 슬로모 지시가 된다. 짧은 샷도 자연 속도 원칙으로 통일하되,
+//   짧은 샷의 원래 목적(마지막 프레임 전 완결 보장)은 유지한다.
+function paceClause(durationSeconds: number): string {
+  return durationSeconds >= LONG_SHOT_SECONDS
+    ? `Timing: perform each scripted movement at natural, lifelike speed — do NOT slow it down to fill ${durationSeconds} seconds. The main action completes well before the end; the remaining time is carried by its aftermath and ambient life, not by stretching the action.`
+    : `Timing: perform each scripted movement at natural, lifelike speed — do NOT stretch or slow it to fill ${durationSeconds} seconds. Every scripted movement completes by the final frame; leftover time is carried by natural follow-through and ambient life, never slow motion.`
+}
+
+// 금지절의 범위(#motion-vocab 2026-08-11): 옛 문구는 "beyond this contract" 로 끝나
+//   이 계약문을 프롬프트의 **유일한** 권위로 선언했다. 그런데 계약문 뒤에는 모델이 쓴 장면
+//   묘사문(motion_prompt)이 이어 붙고, 거기에만 있는 연출 정보가 있다 — 실측에서 계약문은
+//   "pan right" 까지만 말했고 "레버를 드러낸다"는 목적은 묘사문에만 있었다.
+//   그래서 금지 대상을 "지어내기"로 좁히고, 뒤따르는 묘사문을 명시적으로 계약 안에 포함시킨다.
+const BAN =
+  'Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.'
 
 /**
  * dynamic_spec + 샷 길이 → 영상 모션 계약문.
@@ -197,44 +267,49 @@ export function compileMotionContract(
   opts?: {
     /** #camera-motivation: 대상 id → 이름(인물)·라벨(표지). 없으면 대상 없는 "왜" 문장. */
     names?: ReadonlyMap<string, string> | null
+    /** 실사 그림체(오너 2026-11-23 "2 모두 적용을 실사 스타일로") — 카메라 · 동작 크기의 어긋난 말을 고친다. 없으면 지금과 글자까지 같다. */
+    aligned?: boolean
+    /** 인물 id → 이름 · 겉모습 — 동작과 시선의 주인을 이름으로 적는다. 없으면 번호. */
+    subjects?: ReadonlyMap<string, ContractSubject> | null
+    /** 사람이 고친 카메라 값 — 있으면 설계의 카메라 대신 이 움직임이 약속의 카메라다. 예: "pans steadily to the right". */
+    cameraOverride?: string | null
+    /** 설계가 없는 샷에도 시간 · 지어내기 금지 규칙을 싣는다. */
+    fallback?: boolean
   },
 ): MotionContract {
-  if (!dyn) return { text: '', cameraStatic: false }
-  const { motion } = normalizeCameraMotion(dyn.camera_motion)
-  const camBase = cameraClause(motion, durationSeconds)
+  const aligned = opts?.aligned === true
+  const override = opts?.cameraOverride?.trim() || null
+  if (!dyn) {
+    if (!opts?.fallback) return { text: '', cameraStatic: false }
+    const camera = override
+      ? `Camera: ${override}.`
+      : 'Camera: hold a steady, unmoving camera unless the scene description says otherwise.'
+    return { text: `Motion contract: ${camera} Subjects: only the actions in the scene description. ${paceClause(durationSeconds)} ${BAN}`, cameraStatic: false }
+  }
+  const { motion: rawMotion } = normalizeCameraMotion(dyn.camera_motion)
+  const motion = aligned ? withoutRotationTravel(rawMotion, dyn.motion_prompt) : rawMotion
+  const retyped = motion.type !== rawMotion.type
+  const camBase = override ? { clause: `Camera: ${override}.`, isStatic: false } : cameraClause(motion, durationSeconds, aligned)
   // #camera-motivation(2026-09-07): 카메라 절 뒤에 "왜"를 붙인다 — 영상 모델이 무브의 목적(드러낼 대상·강조할 것)을 안다.
   const motivation = (dyn.camera_motion as { motivation?: unknown } | undefined)?.motivation
   const target = (dyn.camera_motion as { target?: unknown } | undefined)?.target
-  const why = !camBase.isStatic || motivation === 'pov'
+  // 사람이 카메라를 고쳤으면 설계 카메라의 까닭("왜")은 싣지 않는다 — 다른 움직임의 까닭이다.
+  //   팬을 다가감으로 읽은 샷의 "화면 밖을 드러내려고"도 다가감의 까닭이 아니다.
+  const why = !override && !(retyped && motivation === 'reveal') && (!camBase.isStatic || motivation === 'pov')
     ? cameraWhyClause(
         typeof motivation === 'string' ? (motivation as Parameters<typeof cameraWhyClause>[0]) : null,
         typeof target === 'string' ? (opts?.names?.get(target) ?? null) : null,
       )
     : null
   const cam = why ? { ...camBase, clause: `${camBase.clause} Purpose: ${why}.` } : camBase
-  const subjects = subjectClauses(dyn, durationSeconds)
+  const introduced = new Set<string>()
+  const subjects = subjectClauses(dyn, durationSeconds, aligned, opts?.subjects ?? null, introduced)
   const subjectText = subjects.length
     ? `Subjects: ${subjects.join('; ')}.`
     : 'Subjects: no scripted action — only subtle natural life (breathing, cloth, hair, atmosphere), never frozen.'
-  // 긴 샷은 "고르게 펴라"만 말하면 모델이 전체를 느리게 만든다(#g1). 완결 시점을 앞에 두고
-  //   남은 시간은 여파로 채우게 나눠 말한다 — 동작 자체는 제 속도로 일어나야 한다.
-  // #d3(2026-08-31 오너 확정): 짧은 샷의 옛 문장("전체 N초에 걸쳐 페이싱")이 남은 주 슬로모
-  //   경로였다 — 실측 126샷의 87.3%가 7초 미만이라 #g1 은 12.7%만 고친 상태였고, 5초 샷에
-  //   2초 동작이면 그 문장이 곧 2.5배 슬로모 지시가 된다. 짧은 샷도 자연 속도 원칙으로 통일하되,
-  //   짧은 샷의 원래 목적(마지막 프레임 전 완결 보장)은 유지한다.
-  const pace =
-    durationSeconds >= LONG_SHOT_SECONDS
-      ? `Timing: perform each scripted movement at natural, lifelike speed — do NOT slow it down to fill ${durationSeconds} seconds. The main action completes well before the end; the remaining time is carried by its aftermath and ambient life, not by stretching the action.`
-      : `Timing: perform each scripted movement at natural, lifelike speed — do NOT stretch or slow it to fill ${durationSeconds} seconds. Every scripted movement completes by the final frame; leftover time is carried by natural follow-through and ambient life, never slow motion.`
-  // 금지절의 범위(#motion-vocab 2026-08-11): 옛 문구는 "beyond this contract" 로 끝나
-  //   이 계약문을 프롬프트의 **유일한** 권위로 선언했다. 그런데 계약문 뒤에는 모델이 쓴 장면
-  //   묘사문(motion_prompt)이 이어 붙고, 거기에만 있는 연출 정보가 있다 — 실측에서 계약문은
-  //   "pan right" 까지만 말했고 "레버를 드러낸다"는 목적은 묘사문에만 있었다.
-  //   그래서 금지 대상을 "지어내기"로 좁히고, 뒤따르는 묘사문을 명시적으로 계약 안에 포함시킨다.
-  const ban =
-    'Do NOT invent camera movement, framing change, new character, new prop or extra action beyond this contract and the scene description that follows.'
   return {
-    text: `Motion contract: ${cam.clause} ${subjectText} ${pace} ${ban}`,
+    text: `Motion contract: ${cam.clause} ${subjectText} ${paceClause(durationSeconds)} ${BAN}`,
     cameraStatic: cam.isStatic,
+    ...(introduced.size ? { introduced } : {}),
   }
 }

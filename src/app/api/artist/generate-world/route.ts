@@ -22,6 +22,7 @@ import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/
 import { assertUserTextAllowed } from '@/lib/moderation/creem'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
+import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
 import { styleDrawsWithoutReference } from '@/lib/style-facets/reference-image'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { submitWorldShotJob } from '@/lib/artist/world-submit'
@@ -173,6 +174,8 @@ export async function POST(req: Request) {
     const anchor = await resolveStyleAnchor(project)
     // 기준 그림 없이 그리는 그림체(실사, 2026-10-13 오너)의 배경은 글자 금지 줄과 16:9 크기로 그린다 — 기준 그림이 있으면 그림체 글이 막던 글자.
     const styleWithoutReference = !anchor && (await styleDrawsWithoutReference(project))
+    // 실사 계열의 사진 글(2026-11-23 오너) — 기준 그림 없이 그리는 실사 계열만.
+    const photoLook = anchor ? null : await resolvePhotoLook(project)
 
     // 약속 C10: 변형(모습)은 존재해야 하고, 기본 모습의 wide_shot 을 연속성 참조로 붙인다(캐릭터의 기본 얼굴 참조와 같다).
     let referenceImageUrls: string[] = []
@@ -239,6 +242,7 @@ export async function POST(req: Request) {
         sourceHash: sourceHash ?? null,
         anchor,
         styleWithoutReference,
+        photoLook,
         chatTraceId: traceId ?? null,
         model,
         safeMode: effectiveSafeMode,

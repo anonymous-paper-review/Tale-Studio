@@ -42,6 +42,7 @@ import {
 import { computeImageSourceHash, computeLookFingerprint } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
+import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { sheetIdentityReferences } from '@/lib/artist/source-image'
 import { parseSeries, styleIdOf } from '@/lib/series/snapshot'
@@ -219,6 +220,8 @@ export async function POST(req: Request) {
       )
     }
     const anchor = await resolveStyleAnchor(project)
+    // 실사 계열의 사진 글(2026-11-23 오너) — 기준 그림 없이 그리는 실사 계열만.
+    const photoLook = anchor ? null : await resolvePhotoLook(project)
 
     const dt = (project.design_tokens ?? {}) as DesignTokens
     // 입력 조립은 서버 초안(draft-trigger)과 공용 — 의상·디자인 토큰(앵커 시 매체어 정밀 드롭)·팔레트.
@@ -287,6 +290,7 @@ export async function POST(req: Request) {
               hasSeriesSheet: !!seriesSheetUrl,
               hasSeriesStyleSample: !!styleSampleUrl,
               seriesWorld,
+              photoLook,
             }),
             // 템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(기준얼굴·직전 시트).
             //   순서가 뒤바뀌면 모델이 얼굴 이미지를 레이아웃으로 오인한다.
@@ -308,7 +312,10 @@ export async function POST(req: Request) {
           styleAnchorMode = 'single'
           submitOpts = {
             model: endpoint,
-            prompt: buildCharacterTurnaroundPrompt(input, { seriesWorld }),
+            prompt: buildCharacterTurnaroundPrompt(input, {
+              seriesWorld,
+              photoLook,
+            }),
             aspect_ratio: '3:2',
             webhookUrl,
           }

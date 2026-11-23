@@ -8,6 +8,7 @@ import {
 import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { applyStyleAnchor, type AnchorableSubmit, type ResolvedStyleAnchor } from '@/lib/style-anchor'
 import { FACET_NO_TEXT } from '@/lib/style-facets/no-text'
+import { withPhotoWorld, type PhotoLook } from '@/lib/style-facets/photo-look'
 import { imageSizeForAspect } from '@/lib/fal/aspect-size'
 import { falImageSubmit } from '@/lib/writer/llm/fal'
 import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
@@ -43,6 +44,8 @@ export interface SubmitWorldShotJobInput {
    *  붙이고(기준 그림이 있을 때는 그림체 글이 막던 글자), 화면 비율을 크기(image_size)로 정해 보낸다(새로 그리기 모델은 비율을 무시해
    *  4:3 으로 나왔다). 그림체가 없는 프로젝트는 종전 그대로. */
   styleWithoutReference?: boolean
+  /** 실사 계열을 기준 그림 없이 그릴 때의 사진 글(2026-11-23 오너) — 맨 앞에 "현장에서 실제 카메라로 찍은 영화 스틸", 끝에 색감 문장. 없으면 지금 그대로. */
+  photoLook?: PhotoLook | null
   /** 시리즈 다음 화(2026-10-27): 같은 그림체로 새로 나온 배경에 붙이는 앞 화 다른 배경 한 장(그림체 견본). 참고 그림의 마지막 장이다.
    *  같은 장소가 아니라 "장소를 지켜라"(multiref) 절을 붙이지 않는다 — 절은 referenceImageUrls 가 있을 때만. 그림체 기준 그림(anchor)이 없으면 싣지 않는다. */
   styleSampleUrl?: string | null
@@ -57,7 +60,7 @@ export async function submitWorldShotJob(
   const allRefs = styleSample ? [...refs, styleSample] : refs
   const withoutReference = !input.anchor && input.styleWithoutReference === true
   const baseOpts: AnchorableSubmit = {
-    prompt: withoutReference ? `${input.prompt}\n${FACET_NO_TEXT}` : input.prompt,
+    prompt: withoutReference ? `${withPhotoWorld(input.prompt, input.photoLook ?? null)}\n${FACET_NO_TEXT}` : input.prompt,
     aspect_ratio: input.aspectRatio ?? '16:9',
     ...(withoutReference ? { image_size: imageSizeForAspect(input.aspectRatio ?? '16:9') } : {}),
     ...(allRefs.length ? { reference_image_urls: allRefs } : {}),

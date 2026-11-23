@@ -45,6 +45,7 @@ import {
   type LookTokens,
 } from '@/lib/image-provenance'
 import { applyStyleAnchor, resolveStyleAnchor } from '@/lib/style-anchor'
+import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
 import { styleDrawsWithoutReference } from '@/lib/style-facets/reference-image'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 import {
@@ -160,6 +161,8 @@ export async function triggerCharacterDrafts(
     }
     const webhookUrl = resolveWebhookUrl()
     const anchor = await resolveStyleAnchor(project)
+    // 실사 계열의 사진 글(2026-11-23 오너) — 단추로 그리는 시트(generate-sheet)와 같은 규칙.
+    const photoLook = anchor ? null : await resolvePhotoLook(project)
     // 시리즈 다음 화(2026-10-26): 이어받았는데 이 화 시트가 비어 있는 인물은 앞 화 시트를 정체성 참고로 넣어 이 화 그림체로 다시 그린다.
     const series = parseSeries((project as { series?: unknown } | null)?.series)
     const defaultAppearances = new Map<string, DraftAppearanceRow>()
@@ -237,6 +240,7 @@ export async function triggerCharacterDrafts(
           hasSeriesSheet: !!seriesSheetUrl,
           hasSeriesStyleSample: !!styleSampleUrl,
           seriesWorld: seriesWorldLine(series, 'character', c.character_id),
+          photoLook,
         })
         // 모델 = Artist 기본(레지스트리) — 템플릿이 있으면 edit 갈래, 없으면 T2I 폴백.
         //   템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(출처 원본). 순서가 뒤바뀌면 모델이 원본을 레이아웃으로 오인한다.
@@ -436,6 +440,7 @@ export async function triggerWorldDrafts(
     const series = parseSeries((project as { series?: unknown } | null)?.series)
     // 기준 그림 없이 그리는 그림체(실사, 2026-10-13 오너)의 배경은 글자 금지 줄과 16:9 크기로 그린다(generate-world 와 같은 규칙).
     const styleWithoutReference = !anchor && (await styleDrawsWithoutReference(project))
+    const photoLook = anchor ? null : await resolvePhotoLook(project)
 
     for (const location of locations as DraftLocationRow[]) {
       if (location.wide_shot) {
@@ -500,6 +505,7 @@ export async function triggerWorldDrafts(
             workspaceId: project?.workspace_id ?? undefined,
             anchor,
             styleWithoutReference,
+            photoLook,
             moderation,
           })
         } catch (error) {

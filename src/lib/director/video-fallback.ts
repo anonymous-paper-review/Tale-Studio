@@ -32,6 +32,7 @@ import {
   buildFalReferenceToVideoRequest,
   submitFalReferenceToVideo,
 } from '@/lib/director/fal-video-request'
+import { fitPromptForModel } from '@/lib/director/video-prompt'
 import type { Json } from '@/types/database'
 
 /** 실패 후 넘어갈 모델 순서. 처음 요청한 모델과 이미 시도한 모델은 건너뛴다. */
@@ -156,7 +157,8 @@ function buildFallbackRequest(model: VideoFallbackModel, plan: FallbackPlan): Fa
   const aspectRatio = typeof plan.snapshot.aspect_ratio === 'string' ? plan.snapshot.aspect_ratio : '16:9'
   if (model === 'minimax') return buildMinimaxRequest(plan, prompt, durationSeconds, aspectRatio)
   const resolution = typeof plan.snapshot.resolution === 'string' ? plan.snapshot.resolution : null
-  return buildFalReferenceToVideoRequest(model, prompt, plan.imageUrls, durationSeconds, aspectRatio, resolution)
+  // Happy Horse 는 2,500자까지만 받는다 — 처음 모델(글 상한 없음)로 만든 긴 지시문은 문장 경계에서 줄인다(2026-11-23).
+  return buildFalReferenceToVideoRequest(model, fitPromptForModel(prompt, model, plan.snapshot.prompt_parts), plan.imageUrls, durationSeconds, aspectRatio, resolution)
 }
 
 /** 실패한 요청 id 를 아직 들고 있는 queued 작업만 'reserved:' 로 차지한다. 다른 처리가 먼저 가져갔으면 false. */

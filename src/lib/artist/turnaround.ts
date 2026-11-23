@@ -9,6 +9,7 @@
 //
 // ⚠️ source-agnostic: 프롬프트 입력 토큰을 "인자로" 받는다. 토큰이 writer 로그/DB 어디서 오든
 //    호출자가 채우면 된다 → 데이터 출처와 무관.
+import { hasPhotoTexture, PHOTO_SHEET_FROM_PICTURES, PHOTO_SHEET_LINE, PHOTO_TEXTURE_PEOPLE } from '@/lib/style-facets/photo-sheet-line'
 
 /** main(정면) 을 제외한 방향 뷰 (개별 i2i 생성 대상) */
 export const CHARACTER_DIRECTIONAL_VIEWS = ['back', 'sideLeft', 'sideRight'] as const
@@ -60,6 +61,8 @@ const SAFE_GRAPHIC_RE =
   /(유혈|혈흔|선혈|피범벅|피투성이|낭자|상처|훼손|시체|시신|사체|고문|학살|절단|\bblood(?:y|stained|ied)?\b|\bgore\b|\bgory\b|\bwounds?\b|\bwounded\b|\bmutilat\w*|\bcorpses?\b|\bdismember\w*|\bgruesome\b|\bviscera\w*)/gi
 const SAFE_TOKENS =
   'depicted as an adult, age-ambiguous, stylized non-graphic illustration, tasteful, safe-for-work'
+// 사진 시트(실사 계열, 2026-11-23) — "일러스트"라는 말이 사진 글과 다툰다.
+const SAFE_TOKENS_PHOTO = SAFE_TOKENS.replace('stylized non-graphic illustration', 'tasteful non-graphic photograph')
 
 function safeScrub(s: string): string {
   return s.replace(SAFE_MINOR_AGE_RE, ' ').replace(SAFE_GRAPHIC_RE, ' ').replace(/\s{2,}/g, ' ').trim()
@@ -173,11 +176,17 @@ export function buildCharacterTurnaroundPrompt(
     hasSeriesStyleSample?: boolean
     /** 시리즈 새 인물의 앞 화 세계 한 줄(redraw-reference.ts seriesWorldLine). 없으면 싣지 않는다. */
     seriesWorld?: string | null
+    /** 실사 계열을 기준 그림 없이 그릴 때의 사진 글(2026-11-23 오너, style-facets/photo-look.ts). 없으면 지금 그대로. */
+    photoLook?: { clause: string | null } | null
   },
 ): string {
   const d = describeParts(input)
+  const photoLook = opts?.photoLook ?? null
+  const photoClause = photoLook?.clause?.trim() || null
   const head = [
     `Fill in this character reference-sheet template with ${input.name}`,
+    // 실사 계열(2026-11-23): 시트 지시문에 "사진"이 한 번도 없어 컨셉아트 · 게임 일러스트로 읽혔다 — 앞쪽에 둔다.
+    ...(photoLook ? [PHOTO_SHEET_LINE] : []),
     // 시리즈 다음 화(2026-10-27 오너 "가로 하자"): 새 인물은 앞 화 세계에 산다. 운영 2화 뱃사공은 "짚 모자 · 삼베 셔츠"만 보고
     //   삿갓 · 매듭 단추 차림으로 그려졌다 — 옷차림 낱말을 그 세계로 읽게 한다. 머리 쪽에 두어 길이 상한에 잘리지 않는다.
     ...(opts?.seriesWorld
@@ -230,12 +239,14 @@ export function buildCharacterTurnaroundPrompt(
           'one of the reference images is the PREVIOUS render of this exact character — keep the same face, identity, design and proportions so it stays recognisably the same person; apply ONLY the adjustments described above and never drift into a different face',
         ]
       : []),
+    // 실사 계열(2026-11-23): 옛 시트 · 올린 그림은 그림일 수 있다 — 위 "그대로 유지" 문장이 그림 느낌까지 가져오지 않게 바로 뒤에 못박는다.
+    ...(photoLook && (opts?.hasPriorRender || opts?.hasBaseFace || opts?.hasSourceImage || opts?.hasSeriesSheet) ? [PHOTO_SHEET_FROM_PICTURES] : []),
   ]
   const tail = [
     ...d.costumes,
     ...styleTokens(input),
     ...deltaClause(input),
-    ...(input.safeMode ? [SAFE_TOKENS] : []),
+    ...(input.safeMode ? [photoLook ? SAFE_TOKENS_PHOTO : SAFE_TOKENS] : []),
     // 템플릿 v4(2026-10-27 오너): 팔레트 · 포즈 2 · 3/4 정면 칸을 지운 정형 타일 + 최소 라벨. 칸별 내용은 이 절이
     //   전담한다(시트-프롬프트 한 쌍, sheet-template.ts 참조). v3(#f8): 마네킹·사이즈 가이드·스케치 열·노트 칸 제거.
     'keep the template EXACTLY as-is — every tile border, divider and small label stays in place; draw only INSIDE the tiles and never add any extra text',
@@ -247,13 +258,20 @@ export function buildCharacterTurnaroundPrompt(
     'TURNAROUND tile: three full-body views of the same standing character in its labeled slots — FRONT, SIDE, BACK — same height and same neutral standing pose across all three',
     'EXPRESSION tiles (JOY, SORROW, ANGER, SURPRISE): the same face as a close-up with that labeled expression, one per tile',
     'DETAIL tiles: two close-up callouts of signature costume or prop details',
-    'identical character design, outfit, colors and proportions across every tile, consistent art style',
+    photoLook
+      ? 'the same actor, outfit, colors and proportions in every tile, as if all of them were photographed in one studio session'
+      : 'identical character design, outfit, colors and proportions across every tile, consistent art style',
     // #B: 옛 "clean line art"(애니 토큰) 삭제 + 애니 디폴트 차단. "declared art style"을 따르라는 조건부
     //   표현이라 아트 스타일 자체가 애니인 프로젝트와는 충돌하지 않는다(디폴트 회귀만 금지).
     //   올린 그림의 분석 결과가 그림체를 정하면 싣지 않는다(2026-10-10 — 애니 · 치비 그림체와 정면으로 부딪쳤다).
-    ...(input.followAnchorStyle ? [] : ['follow the declared art style exactly — never fall back to a generic anime, chibi or mascot look']),
+    //   실사 계열 사진 시트에는 그림 말("art style")을 싣지 않는다 — 사진 글이 정한다(2026-11-23).
+    ...(input.followAnchorStyle || photoLook ? [] : ['follow the declared art style exactly — never fall back to a generic anime, chibi or mascot look']),
+    ...(photoLook && !hasPhotoTexture(photoClause) ? [PHOTO_TEXTURE_PEOPLE] : []),
+    ...(photoClause ? [photoClause] : []),
   ]
-  return fitToCap([...head, ...d.lead], d.appearance, tail, SHEET_PROMPT_CAP)
+  // 사진 글을 더한 만큼 상한을 늘린다 — 인물 외형 설명이 사진 글에 밀려 잘리지 않게.
+  const photoExtra = photoLook ? PHOTO_SHEET_LINE.length + PHOTO_SHEET_FROM_PICTURES.length + PHOTO_TEXTURE_PEOPLE.length + (photoClause?.length ?? 0) + 120 : 0
+  return fitToCap([...head, ...d.lead], d.appearance, tail, SHEET_PROMPT_CAP + photoExtra)
 }
 
 /**

@@ -1,9 +1,10 @@
 import { cameraToText } from '@/lib/director/camera-text'
 import { compileMotionContract, type MotionContract } from '@/lib/director/motion-contract'
+import type { ContractSubject, GearDesign } from '@/lib/director/video-design'
 import { findCameraBrand, findCameraMovement } from '@/lib/knowledge'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import type { VideoModelKey } from '@/lib/video-models'
-import type { CameraConfig, CameraPreset, GenerationMethod } from '@/types'
+import { DEFAULT_CAMERA_PRESET, type CameraConfig, type CameraPreset, type GenerationMethod } from '@/types'
 
 export type VideoPromptParts = {
   prompt: string
@@ -46,6 +47,88 @@ export type BuildVideoPromptInput = {
   dialogueSpeakers?: Record<string, DialogueSpeaker> | null
   /** #camera-motivation(2026-09-07): 카메라 동기의 대상 id → 이름. 계약문의 "Purpose" 절이 이름을 쓴다. */
   characterNames?: Record<string, string> | null
+  /**
+   * 실사 그림체(오너 2026-11-23 "2 모두 적용을 실사 스타일로") — 글을 문장 중간에서 자르지 않고, 카메라 · 동작 · 말투의 어긋난 말을 고친다.
+   *   없으면(다른 그림체 · 독립 영상 · 옛 요청) 지금과 글자까지 같다(tests/director/other-styles-unchanged.test.ts).
+   */
+  aligned?: boolean
+  /**
+   * 샷 설계에서 나온 카메라 값(설계가 없으면 null) — 샷의 카메라 값이 이것과 같거나 모두 0 이면 움직임 약속의 카메라만 싣고,
+   *   다르면(사람이 고침) 그 값이 약속의 카메라가 된다. 안 보내면(undefined) 지금처럼 약속 뒤에 카메라 값 글을 덧붙인다.
+   */
+  designCamera?: CameraConfig | null
+  /** 설계의 정지 각도만의 카메라 값 — 저장된 값에서 이 축은 움직임이 아니다(내려다보는 각도 = 위아래 회전 -5). */
+  designAngle?: CameraConfig | null
+  /** 샷 설계의 렌즈 · 초점 · 빛 — 샷에 저장된 카메라 값이 처음 값이면 이것을 쓴다. */
+  gearDesign?: GearDesign | null
+  /** 인물 id → 이름 · 겉모습 — 움직임 약속이 인물을 이름으로 부른다. */
+  subjects?: ReadonlyMap<string, ContractSubject> | null
+  /** 설계가 없는 샷에도 시간 · 지어내기 금지 규칙을 싣는다. */
+  fallbackContract?: boolean
+}
+
+/** 실사 그림체 영상 지시문의 앞부분 상한 — 글 상한이 없는 모델(Seedance · Veo …)도 이만큼까지만(옛 1,400 · 1,650자는 문장 중간에서 잘렸다). */
+export const CONTRACT_BODY_MAX_CHARS = 4000
+
+/** 글 상한이 있는 모델(fal 스키마 2026-11-23 확인). */
+const PROMPT_MAX_CHARS: Partial<Record<VideoModelKey, number>> = { 'kling-o3': 2500, 'happy-horse': 2500 }
+/** 그림 없는 글 영상 입구(Kling 2.1 T2V)의 글 상한 — fal 스키마 2026-11-23 확인. */
+const T2V_PROMPT_MAX_CHARS = 2500
+
+/** 조각을 문장으로 잇는다 — 끝이 문장 부호면 띄어쓰기, 아니면 마침표. */
+function joinSentences(parts: string[]): string {
+  return parts
+    .map((p) => p.trim())
+    .filter(Boolean)
+    .reduce((out, part) => (out ? `${out}${/[.。!?！？…]["'”’)]*$/u.test(out) ? ' ' : '. '}${part}` : part), '')
+}
+
+/** 끝이 문장 부호가 아니면 마침표를 붙인다 — 뒤에 그림 순서 문장이 이어진다. */
+const closeSentence = (text: string) => (text && !/[.。!?！？…]["'”’)]*$/u.test(text) ? `${text}.` : text)
+
+/** 상한을 넘으면 문장 경계에서 줄인다 — 문장 경계가 앞쪽(상한의 60% 아래)에만 있으면 내용이 통째로 빠지므로 낱말 경계에서. */
+export function clipSentences(text: string, max: number): string {
+  if (text.length <= max) return text
+  const head = text.slice(0, max)
+  const ends = [...head.matchAll(/[.!?。！？]["'”’)]?(?=\s|$)/gu)]
+  const last = ends.length ? ends[ends.length - 1] : null
+  if (last && last.index !== undefined && last.index + last[0].length >= max * 0.6) return head.slice(0, last.index + last[0].length)
+  const word = head.replace(/\s+\S*$/, '').replace(/[\s,;:]+$/, '')
+  return `${word.slice(0, Math.max(0, max - 1))}.`
+}
+
+const AXES = ['horizontal', 'vertical', 'pan', 'tilt', 'roll', 'zoom'] as const
+const isZeroCamera = (c: CameraConfig) => AXES.every((k) => (c[k] ?? 0) === 0)
+const sameCamera = (a: CameraConfig, b: CameraConfig) => AXES.every((k) => (a[k] ?? 0) === (b[k] ?? 0))
+
+/** 사람이 고친 카메라 움직임 — 설계에서 온 그대로거나 모두 0 이면 null. 설계의 정지 각도와 같은 축은 움직임이 아니라 뺀다(설계가 그 축을 움직이면 각도가 아니다). */
+function editedCamera(saved: CameraConfig | null | undefined, designCamera: CameraConfig | null | undefined, designAngle: CameraConfig | null | undefined): CameraConfig | null {
+  if (designCamera === undefined || !saved || isZeroCamera(saved) || (designCamera && sameCamera(saved, designCamera))) return null
+  const isAngle = (k: (typeof AXES)[number]) => {
+    const angle = designAngle?.[k] ?? 0
+    return angle !== 0 && saved[k] === angle && (designCamera?.[k] ?? angle) === angle
+  }
+  const camera = Object.fromEntries(AXES.map((k) => [k, isAngle(k) ? 0 : (saved[k] ?? 0)])) as unknown as CameraConfig
+  return isZeroCamera(camera) ? null : camera
+}
+
+/** 사람이 고친 카메라 값이면 약속에 실을 글("pans steadily to the right; zooms slowly in"), 아니면 null. */
+function cameraOverrideText(camera: CameraConfig | null): string | null {
+  return camera ? cameraToText(camera).split('. ').map((s) => s.replace(/^Camera\s+/, '')).join('; ') || null : null
+}
+
+/** 카메라 기종 글 — 저장된 값이 처음 값이면 샷 설계의 렌즈 · 초점 · 빛, 사람이 고친 값이면 그 값. 설계를 안 보내면 지금과 같다. */
+function gearText(preset: CameraPreset | null | undefined, design: GearDesign | null | undefined): string {
+  if (!preset) return ''
+  const brand = `shot on ${findCameraBrand(preset.brand)?.full_name ?? preset.brand}`
+  const untouched = (['brand', 'focalLength', 'aperture', 'whiteBalance'] as const).every((k) => preset[k] === DEFAULT_CAMERA_PRESET[k])
+  if (!design || !untouched) return `${brand}, ${preset.focalLength}mm, f/${preset.aperture}, white balance ${preset.whiteBalance}K`
+  return [
+    brand,
+    design.lensMm ? `${design.lensMm}mm lens` : `${preset.focalLength}mm`,
+    design.focus ?? `f/${preset.aperture}`,
+    design.kelvin ? `scene light around ${design.kelvin}K` : `white balance ${preset.whiteBalance}K`,
+  ].join(', ')
 }
 
 function referenceRolesClause(roles: VideoReferenceImageRole[]): string {
@@ -110,6 +193,8 @@ function speakerAnchor(appearance: string | null | undefined): string {
 export function dialogueClause(
   lines: DialogueLine[] | null | undefined,
   speakers?: Record<string, DialogueSpeaker> | null,
+  /** 실사 그림체만(2026-11-23): 말투는 목소리만이라고 적고, 움직임 약속이 겉모습과 함께 이름을 이미 적은 인물(introduced)은 이름만 적는다. */
+  opts?: { aligned?: boolean; introduced?: ReadonlySet<string> | null },
 ): string {
   const said = (lines ?? []).filter((l) => (l?.text ?? '').trim())
   if (said.length === 0) return ''
@@ -118,7 +203,7 @@ export function dialogueClause(
     const tone = [l.emotion, l.delivery].map((x) => (x ?? '').trim()).filter(Boolean).join(', ')
     const order = said.length > 1 ? `line ${i + 1}: ` : ''
     const sp = l.characterId ? speakers?.[l.characterId] : undefined
-    const anchor = sp ? speakerAnchor(sp.appearance) : ''
+    const anchor = sp && !opts?.introduced?.has(l.characterId ?? '') ? speakerAnchor(sp.appearance) : ''
     const who = isVo(l)
       ? 'a voice-over narration'
       : sp
@@ -135,18 +220,52 @@ export function dialogueClause(
     voCount === said.length
       ? `These lines are voice-over narration — no on-screen character mouths them${orderNote}; time the scripted action to the words.`
       : `The character's mouth moves in sync with these words${orderNote}; time the scripted action to the words.${voCount > 0 ? ' The voice-over line is narration — no on-screen lip movement for it.' : ''}`
-  return `${head}: ${parts.join('; ')}. ${tail}`
+  // 말투 글("반쯤 일어서며")이 몸 동작까지 시키지 않게 — 몸은 움직임 약속이 정한다(2026-11-23 시브셀러 샷 27).
+  const voice = opts?.aligned && said.some((l) => (l.emotion ?? '').trim() || (l.delivery ?? '').trim()) ? ' Delivery notes describe the voice only.' : ''
+  return `${head}: ${parts.join('; ')}. ${tail}${voice}`
+}
+
+/**
+ * 만들어 둔 지시문을 다른 모델로 보낼 때(자동 대체) 그 모델의 글 상한 안으로 — 뒤에 붙은 그림 순서 문장은 남기고 앞 글을 문장 경계에서 줄인다.
+ *   Happy Horse 는 2,500자까지만 받는데 Seedance 로 만든 실사 그림체 지시문은 더 길 수 있다(상한 안의 글은 그대로).
+ */
+export function fitPromptForModel(fullPrompt: string, modelKey: VideoModelKey, promptParts?: unknown): string {
+  const limit = PROMPT_MAX_CHARS[modelKey]
+  if (!limit || fullPrompt.length <= limit) return fullPrompt
+  const p = (promptParts ?? {}) as Partial<VideoPromptParts>
+  // Veo 의 검은 화면 지시(길이 맞추기)는 다른 모델에 필요 없고, 맨 끝이라 아래 그림 순서 문장을 가린다 — 먼저 뗀다.
+  if (typeof p.black === 'string' && p.black && fullPrompt.endsWith(p.black)) fullPrompt = fullPrompt.slice(0, -p.black.length).trimEnd()
+  if (fullPrompt.length <= limit) return fullPrompt
+  const tail = [p.referenceRoles, p.startEnd, p.referenceAuthority].filter((x): x is string => typeof x === 'string' && !!x).join(' ')
+  if (tail && tail.length + 1 < limit && fullPrompt.endsWith(tail)) {
+    const head = fullPrompt.slice(0, fullPrompt.length - tail.length).trimEnd()
+    return `${clipSentences(head, limit - tail.length - 1)} ${tail}`
+  }
+  return clipSentences(fullPrompt, limit)
 }
 
 export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: string; prompt_parts: VideoPromptParts } {
   const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, referenceImageRoles, dynamicSpec, dialogueLines, dialogueSpeakers, characterNames } = parts
+  const aligned = parts.aligned === true
+  const moved = editedCamera(camera, parts.designCamera, parts.designAngle)
   const contract: MotionContract = compileMotionContract(dynamicSpec, durationSeconds, {
     names: characterNames ? new Map(Object.entries(characterNames)) : null,
+    aligned,
+    subjects: parts.subjects ?? null,
+    cameraOverride: cameraOverrideText(moved),
+    fallback: parts.fallbackContract === true,
   })
-  const dialogue = dialogueClause(dialogueLines, dialogueSpeakers)
-  const cameraText = camera ? cameraToText(camera) : ''
+  const dialogue = dialogueClause(dialogueLines, dialogueSpeakers, { aligned, introduced: contract.introduced })
+  // 설계의 카메라 값을 아는 요청은 카메라를 움직임 약속 한 곳에서만 말한다.
+  const cameraText = !camera
+    ? ''
+    : parts.designCamera === undefined
+      ? cameraToText(camera)
+      : contract.text || !moved
+        ? ''
+        : cameraToText(moved)
   const movementFragment = generationMethod === 'T2V' && movementPreset ? findCameraMovement(movementPreset)?.prompt_fragment ?? '' : ''
-  const gearFragment = cameraPreset ? `shot on ${findCameraBrand(cameraPreset.brand)?.full_name ?? cameraPreset.brand}, ${cameraPreset.focalLength}mm, f/${cameraPreset.aperture}, white balance ${cameraPreset.whiteBalance}K` : ''
+  const gearFragment = gearText(cameraPreset, parts.gearDesign)
   const prompt_parts: VideoPromptParts = { prompt, movement: movementFragment, gear: gearFragment, camera: cameraText }
   if (contract.text) prompt_parts.motionContract = contract.text
   if (dialogue) prompt_parts.dialogue = dialogue
@@ -158,11 +277,23 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   // #coverage-first(2026-09-02 리뷰 M3): 순차 계약(then·순서 문장·gaze)이 계약문을 ~1000자까지 키워
   //   옛 캡(950)에서 ban 절과 장면 묘사문(prompt — 리빌 대상을 나르는 유일한 채널)이 통째로 잘렸다.
   //   계약 경로 캡 +450.
-  const cap = contract.text ? (dialogue ? 1650 : 1400) : dialogue ? 750 : 500
-  let fullPrompt = [contract.text, dialogue, prompt, movementFragment, gearFragment, cameraText]
-    .filter(Boolean)
-    .join('. ')
-    .slice(0, cap)
+  // 실사 그림체(2026-11-23): 움직임 약속이 있는 길은 1,400 · 1,650자에서 자르지 않는다 — 샷 글이 문장 중간에서 끊겼다(시브셀러 2 · 4 · 6 · 8, 우산 1).
+  //   CONTRACT_BODY_MAX_CHARS 까지, 넘치면 문장 경계에서 줄인다. 글 상한이 있는 입구(Kling · Happy Horse, 그림 없는 글 영상)는 그 상한까지.
+  const designed = aligned && !!contract.text
+  const cap = designed ? CONTRACT_BODY_MAX_CHARS : contract.text ? (dialogue ? 1650 : 1400) : dialogue ? 750 : 500
+  // Veo 로 고른 영상은 맨 끝에 검은 화면 지시가 붙는다 — 글 영상 입구의 상한은 그 자리까지 합친 것이다.
+  const blackInstruction = modelKey === 'veo' && durationSeconds < 8
+    ? `Show the described action only for the first ${durationSeconds} seconds; after ${durationSeconds}s the frame must be a completely black screen — no subject, no motion — until the video ends.`
+    : null
+  const limit = generationMethod === 'T2V' ? T2V_PROMPT_MAX_CHARS - (blackInstruction ? blackInstruction.length + 1 : 0) : (PROMPT_MAX_CHARS[modelKey] ?? null)
+  const withTail = (head: string, tail: string, legacyMax: number) =>
+    designed
+      ? `${limit === null ? head : clipSentences(head, Math.max(0, limit - tail.length - 1))} ${tail}`
+      : `${head} ${tail}`.slice(0, legacyMax)
+  const pieces = [contract.text, dialogue, prompt, movementFragment, gearFragment, cameraText].filter(Boolean)
+  let fullPrompt = designed
+    ? clipSentences(closeSentence(joinSentences(pieces)), limit === null ? cap : Math.min(cap, limit))
+    : pieces.join('. ').slice(0, cap)
 
   // #u17-3(2026-08-31 오너 확정, 실측 sh_02_04): 장면 묘사문(shots.prompt)은 writer 가 상상한
   //   프레임 묘사라 실제 생성된 레퍼런스와 조명·배경·질감이 어긋날 수 있다 — 이미지 경로는
@@ -173,7 +304,7 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
     const roleInstruction = referenceRolesClause(referenceImageRoles)
     prompt_parts.referenceRoles = roleInstruction
     prompt_parts.referenceAuthority = referenceAuthority
-    fullPrompt = `${fullPrompt} ${roleInstruction} ${referenceAuthority}`.slice(0, cap + (contract.text ? 700 : 650))
+    fullPrompt = withTail(fullPrompt, `${roleInstruction} ${referenceAuthority}`, cap + (contract.text ? 700 : 650))
   }
 
   // V2(previz 실측 검증: END 프레이밍 수렴) — 첫 레퍼런스=START, 마지막=END 로 시작·끝 구도를 고정.
@@ -185,11 +316,10 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
       : `The first reference image is the shot's START frame and the last reference image is its END frame — begin exactly at the START composition and finish exactly at the END composition, with one continuous camera and subject movement between them.`
     prompt_parts.startEnd = startEndInstruction
     prompt_parts.referenceAuthority = referenceAuthority
-    fullPrompt = `${fullPrompt} ${startEndInstruction} ${referenceAuthority}`.slice(0, cap + (contract.text ? 500 : 550))
+    fullPrompt = withTail(fullPrompt, `${startEndInstruction} ${referenceAuthority}`, cap + (contract.text ? 500 : 550))
   }
 
-  if (modelKey === 'veo' && durationSeconds < 8) {
-    const blackInstruction = `Show the described action only for the first ${durationSeconds} seconds; after ${durationSeconds}s the frame must be a completely black screen — no subject, no motion — until the video ends.`
+  if (blackInstruction) {
     prompt_parts.black = blackInstruction
     // 리뷰 R2: 옛 하드코딩 1400 이 캡 인상(1400/1650)과 함께 안 움직여 black 지시가 통째로 잘렸다.
     //   black 지시는 기능 요구사항이라 항상 뒤에 붙인다(앞 본문은 이미 cap(+확장)으로 잘려 있다).

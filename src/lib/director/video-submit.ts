@@ -3,6 +3,10 @@ import { videoAspectRatioFromFormat } from '@/lib/project-aspect'
 import { parseProjectFormat } from '@/types/project'
 import { NextResponse } from 'next/server'
 import { resolveStyleAnchorByKey } from '@/lib/style-anchor'
+import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
+import { promptName } from '@/lib/director/still-prompt'
+import { designGear, entryNote, subjectAnchor, withoutCameraMoves, withoutContradictedLedgerMotions, type ContractSubject } from '@/lib/director/video-design'
+import { cameraConfigFromShotDesign, isDefaultCamera } from '@/lib/writer/shot-config-from-design'
 import { getUser } from '@/lib/supabase/auth'
 import { resolveSubmitIdentity } from '@/lib/director/video-submit-identity'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
@@ -18,7 +22,7 @@ import {
   buildVideoPrompt,
 } from '@/lib/director/video-prompt'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
-import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
+import type { ShotDesign, ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, linkGenerationJobToChatTrace, userOwnsProject } from '@/lib/generation-jobs'
 import { isChatTraceId } from '@/lib/chat-trace'
 import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
@@ -79,6 +83,37 @@ type VideoSubmission = {
 }
 
 class CharacterAppearanceContractError extends Error {}
+
+/** 설계 → 카메라 값. 설계 칸 모양이 이상하면 null — 근사값 하나 때문에 유료 생성 요청이 끊기지 않게. */
+function designCameraOf(staticSpec: unknown, dynamicSpec: unknown): CameraConfig | null {
+  try {
+    return cameraConfigFromShotDesign({ static_spec: staticSpec ?? undefined, dynamic_spec: dynamicSpec ?? undefined } as unknown as ShotDesign)
+  } catch {
+    return null
+  }
+}
+
+// 실행 기록의 샷 설계는 크다 — 영상 일괄은 한 번에 100샷까지 차례로 준비하므로 프로젝트마다 잠깐 기억해 다시 읽지 않는다.
+//   읽지 못했거나 빈 결과는 기억하지 않는다(loadShotDesignByMainId 는 실패를 빈 표로 돌려준다).
+const DESIGN_MEMO_MS = 60_000
+const designMemo = new Map<string, { at: number; designs: ReturnType<typeof loadShotDesignByMainId> }>()
+function designsOfRun(projectId: string): ReturnType<typeof loadShotDesignByMainId> {
+  const now = Date.now()
+  for (const [key, memo] of designMemo) if (now - memo.at >= DESIGN_MEMO_MS) designMemo.delete(key)
+  const hit = designMemo.get(projectId)
+  if (hit) return hit.designs
+  const designs = loadShotDesignByMainId(projectId)
+  designMemo.set(projectId, { at: now, designs })
+  designs.then((byId) => { if (!byId.size) designMemo.delete(projectId) }, () => designMemo.delete(projectId))
+  return designs
+}
+export function _clearDesignMemoForTest(): void {
+  designMemo.clear()
+}
+
+const CAMERA_AXES = ['horizontal', 'vertical', 'pan', 'tilt', 'roll', 'zoom'] as const
+const sameCameraConfig = (a: CameraConfig | null | undefined, b: CameraConfig | null | undefined) =>
+  !!a && !!b && CAMERA_AXES.every((axis) => (a[axis] ?? 0) === (b[axis] ?? 0))
 
 function requireCharacterAppearanceKeys(value: unknown, shotId: string): Record<string, string> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
@@ -506,11 +541,11 @@ async function prepareVideoRequest(
     }
 
     const [{ data: project, error: projectError }, { data: shot, error: shotError }] = await Promise.all([
-      supabaseAdmin.from('projects').select('workspace_id, style_anchor_key, settings').eq('id', projectId).maybeSingle(),
+      supabaseAdmin.from('projects').select('workspace_id, style_anchor_key, custom_style_anchor, settings').eq('id', projectId).maybeSingle(),
       // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
       standalone
         ? Promise.resolve({ data: null, error: null })
-        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, design_ref, dialogue_lines, character_appearance_keys, prompt, storyboard_image').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
+        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, static_spec, design_ref, dialogue_lines, character_appearance_keys, prompt, storyboard_image').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
     ])
     if (projectError) throw projectError
     if (shotError) throw shotError
@@ -618,6 +653,7 @@ async function prepareVideoRequest(
     //   둘 다 없으면 null → 계약 없는 레거시 프롬프트(기존 동작 그대로).
     //   replay/recovery(exactReplay)는 스냅샷 프롬프트를 재사용하므로 state 폴백을 건너뛴다.
     let dynamicSpec = standalone ? null : (shot!.dynamic_spec as ShotDynamicSpec | null) ?? null
+    let staticSpec: unknown = standalone ? null : ((shot as { static_spec?: unknown } | null)?.static_spec ?? null)
     if (!standalone && !dynamicSpec && !exactReplay) {
       try {
         // #split-spec: ref 체계 프로젝트에서 ref 없는 샷(분할 자식)은 main-id 폴백 금지 —
@@ -629,9 +665,9 @@ async function prepareVideoRequest(
           .eq('project_id', projectId)
           .not('design_ref', 'is', null)
         const designById = await loadShotDesignByMainId(projectId)
-        dynamicSpec =
-          resolveShotDesign(designById, { shotId: writerShotId, designRef }, (count ?? 0) > 0)
-            ?.dynamicSpec ?? null
+        const design = resolveShotDesign(designById, { shotId: writerShotId, designRef }, (count ?? 0) > 0)
+        dynamicSpec = design?.dynamicSpec ?? null
+        staticSpec = staticSpec ?? design?.staticSpec ?? null
       } catch {
         dynamicSpec = null // best-effort — 계약 없이 진행
       }
@@ -654,6 +690,10 @@ async function prepareVideoRequest(
       (project as { style_anchor_key?: string | null }).style_anchor_key ?? null,
     ).catch(() => null)
     const suppressGear = !!(videoAnchor?.medium && videoAnchor.medium !== 'live_action')
+    // 실사 그림체(오너 2026-11-23 "2 모두 적용을 실사 스타일로 지정해주고 바로 main에") — 기준 그림 없이 그리는 실사만 새 영상 지시문을 쓴다.
+    //   일본 멜로를 비롯한 다른 그림체 · 사용자가 올린 그림체 · 독립 영상은 지금 지시문 그대로다.
+    const photoLook = videoAnchor?.medium === 'live_action' ? await resolvePhotoLook(project as { style_anchor_key?: string | null; custom_style_anchor?: unknown }) : null
+    const aligned = !standalone && !!photoLook
     // #w-c(2026-08-31 오너 확정, 실측 sh_02_09): 수동 샷(shots.prompt=NULL)은 한국어 액션
     //   원문이 그대로 영상 프롬프트로 흘러온다 — EN 파생은 previz 라우트에만 있었다(감사 W3).
     //   서버 최종 방어로 여기서 파생한다: 이미 영어면 deriveEnBatch 가 LLM 없이 통과라 파이프라인
@@ -679,9 +719,11 @@ async function prepareVideoRequest(
     })()
     const promptIsStoredComposition =
       !standalone && typeof shot?.prompt === 'string' && shot.prompt.trim() === prompt.trim()
+    // 실사 그림체: 카메라는 움직임 약속 한 곳이 정한다 — 작가의 움직임 글에서 카메라 말을 빼고 인물 · 환경의 움직임만 싣는다.
+    const motionProse = aligned && writerMotionPrompt && dynamicSpec ? withoutCameraMoves(writerMotionPrompt) : writerMotionPrompt
     const promptForVideo =
-      writerMotionPrompt && promptIsStoredComposition && !promptEn.includes(writerMotionPrompt)
-        ? `${writerMotionPrompt} ${promptEn}`
+      motionProse && writerMotionPrompt && promptIsStoredComposition && !promptEn.includes(writerMotionPrompt)
+        ? `${motionProse} ${promptEn}`
         : promptEn
     const dialogueLines = !standalone && Array.isArray(shot!.dialogue_lines) ? (shot!.dialogue_lines as DialogueLine[]) : null
     let dialogueSpeakers: Record<string, DialogueSpeaker> | null = null
@@ -699,12 +741,12 @@ async function prepareVideoRequest(
         return { characterId, appearanceKey }
       })
       const [{ data: chars, error: charsError }, { data: appearanceRows, error: appearancesError }] = await Promise.all([
-        supabaseAdmin.from('characters').select('character_id, name').eq('project_id', projectId).in('character_id', speakerIds),
+        supabaseAdmin.from('characters').select(aligned ? 'character_id, name, name_en, name_en_source' : 'character_id, name').eq('project_id', projectId).in('character_id', speakerIds),
         supabaseAdmin.from('character_appearances').select('character_id, appearance_key, appearance').eq('project_id', projectId).in('character_id', speakerIds).in('appearance_key', [...new Set(speakerPairs.map(({ appearanceKey }) => appearanceKey))]),
       ])
       if (charsError) throw charsError
       if (appearancesError) throw appearancesError
-      const charsById = new Map((chars ?? []).map((character) => [character.character_id as string, character]))
+      const charsById = new Map(((chars ?? []) as unknown as Array<Record<string, unknown>>).map((character) => [character.character_id as string, character]))
       const appearancesByPair = new Map((appearanceRows ?? []).map((appearance) => [
         `${appearance.character_id as string}\u0000${appearance.appearance_key as string}`,
         appearance,
@@ -718,7 +760,8 @@ async function prepareVideoRequest(
         if (!appearance || typeof appearance.appearance !== 'string' || !appearance.appearance.trim()) {
           throw new CharacterAppearanceContractError(`Character appearance contract error: ${characterId}/${appearanceKey} has no required appearance`)
         }
-        return [characterId, { name: character.name, appearance: appearance.appearance }] as const
+        // 실사 그림체는 움직임 약속과 같은 이름으로 부른다 — 저장된 영어 이름이 있으면 그것.
+        return [characterId, { name: aligned ? promptName(character, character.name) : character.name, appearance: appearance.appearance }] as const
       }))
     }
     // #camera-motivation(2026-09-07): 카메라 동기의 대상이 인물이면 이름을 찾아 계약문의 Purpose 절에 싣는다.
@@ -728,12 +771,70 @@ async function prepareVideoRequest(
     if (!standalone && typeof motivationTarget === 'string' && motivationTarget.trim()) {
       const { data: targetRows } = await supabaseAdmin
         .from('characters')
-        .select('character_id, name')
+        .select(aligned ? 'character_id, name, name_en, name_en_source' : 'character_id, name')
         .eq('project_id', projectId)
         .eq('character_id', motivationTarget.trim())
         .limit(1)
-      const row = targetRows?.[0]
-      if (row && typeof row.name === 'string' && row.name.trim()) motivationTargetNames = { [row.character_id as string]: row.name }
+      const row = (targetRows as unknown as Array<Record<string, unknown>> | null)?.[0]
+      if (row && typeof row.name === 'string' && row.name.trim()) motivationTargetNames = { [row.character_id as string]: aligned ? promptName(row, row.name) : row.name }
+    }
+    // 실사 그림체: 움직임 약속의 동작 · 시선 주인도 이름과 짧은 겉모습으로 부른다 — "subject 1 · 2"가 누구인지 적혀 있지 않았다.
+    //   부를 인물이 없으면 조회 없음(비용 0). 조회 실패는 그대로 진행한다 — 이름은 정확도 보조지 유료 생성의 조건이 아니다.
+    const contractSpec = aligned ? withoutContradictedLedgerMotions(dynamicSpec, staticSpec) : dynamicSpec
+    let subjects: Map<string, ContractSubject> | null = null
+    const movers = aligned
+      ? [
+          ...(Array.isArray(contractSpec?.character_motion) ? contractSpec.character_motion.map((m) => m?.character_id) : []),
+          ...(Array.isArray(contractSpec?.gaze_arc) ? contractSpec.gaze_arc.flatMap((g) => [g?.character_id, g?.from, g?.to]) : []),
+        ]
+      : []
+    const namedIds = [...new Set(movers.filter((id): id is string => typeof id === 'string' && !!id.trim()).map((id) => id.trim()))].sort()
+    if (namedIds.length) {
+      try {
+        const { data: nameRows } = await supabaseAdmin
+          .from('characters')
+          .select('character_id, name, name_en, name_en_source')
+          .eq('project_id', projectId)
+          .in('character_id', namedIds)
+        const people = (Array.isArray(nameRows) ? nameRows : []).filter((row) => typeof row?.name === 'string' && row.name.trim())
+        if (people.length) {
+          const { data: looks } = await supabaseAdmin
+            .from('character_appearances')
+            .select('character_id, appearance_key, appearance, is_default')
+            .eq('project_id', projectId)
+            .in('character_id', people.map((row) => row.character_id as string))
+          const lookOf = (id: string) => {
+            const rows = (Array.isArray(looks) ? looks : []).filter((row) => row.character_id === id)
+            return rows.find((row) => row.appearance_key === characterAppearanceKeys[id]) ?? rows.find((row) => row.is_default)
+          }
+          subjects = new Map(people.map((row) => [
+            row.character_id as string,
+            {
+              name: promptName(row, row.name),
+              anchor: subjectAnchor(lookOf(row.character_id as string)?.appearance as string | null | undefined),
+              entry: entryNote(staticSpec, row.character_id as string),
+            },
+          ]))
+        }
+      } catch (err) {
+        console.warn('[director/generate-video] contract names skipped:', err instanceof Error ? err.message : err)
+      }
+    }
+    // 실사 그림체: 샷의 카메라 값이 설계에서 온 그대로인가 — Director 는 설계의 카메라 값으로 빈 카메라를 채워 저장한다. 그 값은 움직임 약속이
+    //   이미 말하므로 다시 싣지 않고, 사람이 고친 값이면 그 값이 약속의 카메라가 된다. 채울 때는 실행 기록(writer_runs)의 설계를 쓰므로,
+    //   지금 샷 설계와 다르면 그 설계와도 견준다 — 설계를 나중에 고친 샷, 그리고 나누거나 번호를 바꾼 프로젝트에서 같은 번호의 다른 샷
+    //   설계로 잘못 채운 값(shot-configs 는 화면 번호로 찾는다)을 사람이 고친 것으로 보지 않게.
+    let designCamera: CameraConfig | null = aligned && (dynamicSpec || staticSpec) ? designCameraOf(staticSpec, dynamicSpec) : null
+    if (aligned && dynamicSpec && camera && !isDefaultCamera(camera) && !sameCameraConfig(camera, designCamera)) {
+      try {
+        const designById = await designsOfRun(projectId)
+        const designRef = (shot!.design_ref as string | null) ?? null
+        const filledBy = [designRef ? designById.get(designRef) : null, designById.get(writerShotId)]
+        const filled = filledBy.map((spec) => (spec ? designCameraOf(spec.staticSpec, spec.dynamicSpec) : null)).find((value) => sameCameraConfig(camera, value))
+        if (filled) designCamera = filled
+      } catch {
+        // 실행 기록을 못 읽으면 지금 설계와만 견준다.
+      }
     }
     const { fullPrompt, prompt_parts: promptParts } = buildVideoPrompt({
       prompt: promptForVideo, // #direction-unify
@@ -745,19 +846,35 @@ async function prepareVideoRequest(
       durationSeconds: dur,
       startEndReference: (submitRefUrls?.length ?? 0) >= 2,
       ...(alignedReferenceImageRoles ? { referenceImageRoles: alignedReferenceImageRoles } : {}),
-      dynamicSpec,
+      dynamicSpec: contractSpec,
       // #g7 (2026-08-27 오너 확정: 음성은 영상 생성기에 맡긴다) — 대사를 프롬프트에 싣는다.
       //   DB 에 있는데 여태 아무도 읽지 않아 모델이 대사의 존재를 몰랐다.
       dialogueLines,
       dialogueSpeakers, // #g7-speakers
       characterNames: motivationTargetNames, // #camera-motivation
+      // 실사 그림체만: 카메라 한 번 · 설계 렌즈와 빛 · 인물 이름 · 설계 없는 샷의 규칙. 다른 그림체는 지금 그대로.
+      ...(aligned ? {
+        aligned: true,
+        designCamera,
+        designAngle: staticSpec ? designCameraOf(staticSpec, null) : null,
+        gearDesign: designGear(staticSpec),
+        subjects,
+        fallbackContract: !dynamicSpec,
+      } : {}),
     })
     // #creem-moderation(2026-10-11): 최종 프롬프트가 확정된 직후·자리 예약(submitPreparedVideo) 전에
     //   사용자 글만 검사한다 — 샷 산문(모션 프롬프트 포함)과 대사. 모션 계약·카메라 기재·negative_prompt
     //   같은 우리 고정 문구는 보내지 않는다. 이 경로는 지금 요청이 아니라 나중 요청(묶음 이어가기)이
     //   저장된 스냅샷을 그대로 다시 내므로, 영수증을 input_snapshot 에 남긴다(해시 포함) — 이 경로는
     //   작업 행 자체가 영수증을 들고 있어 별도 관측 이벤트를 더 쓰지 않는다(이미지·previz 는 반대).
-    const moderationParts = [promptForVideo, ...(dialogueLines ?? []).map((line) => line?.text)]
+    // 실사 그림체: 움직임 약속 · 대사에 싣는 인물 이름과 겉모습도 사람이 고쳐 쓸 수 있는 글이다 — 같이 검사한다.
+    const moderationParts = [
+      promptForVideo,
+      ...(dialogueLines ?? []).map((line) => line?.text),
+      ...(subjects ? [...subjects.values()].flatMap((person) => [person.name, person.anchor]) : []),
+      ...(aligned && dialogueSpeakers ? Object.values(dialogueSpeakers).flatMap((speaker) => [speaker.name, speaker.appearance]) : []),
+      ...(aligned && motivationTargetNames ? Object.values(motivationTargetNames) : []),
+    ]
     // 재생(exactReplay)은 이미 통과한 예약을 다시 내는 것이다 — 저장된 영수증의 해시가 지금 글의
     //   해시와 같을 때만 그 영수증을 다시 쓴다. 다르면 새로 검사한다(예전 영수증이 다른 글을 통과시키지 못하게).
     let moderation = exactReplay

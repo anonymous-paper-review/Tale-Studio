@@ -17,6 +17,7 @@
 //     못 붙였다. 여기서는 scenes.location 우선, locations.scene_id 폴백.
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { applyDirectorRefs, directorRefsExcludeWorld, parseDirectorRefs } from '@/lib/director/director-refs'
+import { designCharacterIds, extraCharactersInShot, promptName, subjectAnchor } from '@/lib/director/still-prompt'
 
 export { applyDirectorRefs, directorRefsExcludeWorld, parseDirectorRefs, type DirectorRefs } from '@/lib/director/director-refs'
 
@@ -27,6 +28,10 @@ export interface ShotCharacterRef {
   appearanceKey: string
   /** 표시명(characters.name) — 프롬프트의 "reference image N = 이름" */
   name: string
+  /** 실사 그림체 지시문에 쓸 이름 — 저장된 영어 이름이 있으면 그것(실사 그림체로 부를 때만 채운다, 2026-11-23). */
+  promptName?: string
+  /** 짧은 겉모습(영어 첫 마디) — 실사 그림체로 부를 때만 채운다. 없으면 null. */
+  look?: string | null
   url: string
   /** static_spec.character_blocking.position_in_frame (예: left_third) — 없으면 null */
   position: string | null
@@ -72,12 +77,24 @@ export interface ShotRowForReferences {
   static_spec?: unknown
   /** 약속 F·G(2026-09-04): Director 에서 사람이 손댄 참조 목록(shots.director_refs). null = Writer 그대로. */
   director_refs?: unknown
+  /** 실사 그림체에서 인물 목록에 빠졌지만 이 샷에 나오는 인물을 찾을 때만 본다(2026-11-23, still-prompt extraCharactersInShot). */
+  dynamic_spec?: unknown
+  prompt?: unknown
+  action_description?: unknown
+  action_description_native?: unknown
+}
+
+/** 실사 그림체(2026-11-23 오너 "2 모두 적용")의 참조 계획 — 빠진 인물을 더하고 지시문 이름 · 겉모습을 함께 준다. 없으면 지금 그대로. */
+export interface ReferencePlanOptions {
+  photo?: boolean
 }
 
 
 export interface ReferenceLookup {
-  /** characters.character_id → { name } */
-  characterById: Map<string, { name: string }>
+  /** characters.character_id → { name, promptName? } */
+  characterById: Map<string, { name: string; promptName?: string }>
+  /** `${characterId}\u0000${appearanceKey}` → 모습 설명(영어) — 실사 그림체만. */
+  lookByPair?: Map<string, string>
   /** `${characterId}\u0000${appearanceKey}` → sheet_url(null 가능) */
   sheetByPair: Map<string, string | null>
   /** characterId → 기본 모습 appearance_key (character_appearance_keys 가 없는 레거시 샷의 폴백) */
@@ -134,15 +151,26 @@ export function readOffFrame(staticSpec: unknown): string[] {
 export function planShotCharacterRefs(
   shot: ShotRowForReferences,
   lookup: ReferenceLookup,
+  opts?: ReferencePlanOptions,
 ): { characterRefs: ShotCharacterRef[]; missing: MissingSheet[] } {
   if (!Array.isArray(shot.characters)) return { characterRefs: [], missing: [] }
   const offFrame = new Set(readOffFrame(shot.static_spec))
-  const ids = applyDirectorRefs(
+  const listed = applyDirectorRefs(
     [...new Set(
       (shot.characters as unknown[]).filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim()),
     )].sort((a, b) => a.localeCompare(b)),
     parseDirectorRefs(shot.director_refs),
   ).filter((id) => !offFrame.has(id)) // 프레임 밖 인물의 시트는 붙이지 않는다 — 남은 참조로 인물을 지어내는 원천
+  // 목록에서 빠졌지만 이 샷에 나오는 인물(설계와 글에 있는 인물 · 비친 모습 샷) — 시트 없이 그리면 얼굴을 지어낸다. 실사 그림체만.
+  const ids = opts?.photo
+    ? [...new Set([
+        ...listed,
+        ...extraCharactersInShot(
+          shot,
+          new Map([...lookup.characterById].map(([id, c]) => [id, [c.name, c.promptName ?? '', id.replace(/_/g, ' ')].filter(Boolean)])),
+        ),
+      ])].sort((a, b) => a.localeCompare(b))
+    : listed
   const keys = readAppearanceKeys(shot.character_appearance_keys)
   const blocking = readCharacterBlocking(shot.static_spec)
   const characterRefs: ShotCharacterRef[] = []
@@ -161,6 +189,12 @@ export function planShotCharacterRefs(
       characterId,
       appearanceKey,
       name,
+      ...(opts?.photo
+        ? {
+            promptName: (character.promptName ?? '').trim() || name,
+            look: subjectAnchor(lookup.lookByPair?.get(pairKey(characterId, appearanceKey)), 80),
+          }
+        : {}),
       url: url.trim(),
       position: b?.position ?? null,
       pose: b?.pose ?? null,
@@ -176,24 +210,25 @@ export function planShotCharacterRefs(
 export async function loadShotReferencePlans(
   projectId: string,
   shots: ShotRowForReferences[],
+  opts?: ReferencePlanOptions,
 ): Promise<Map<string, ShotReferencePlan>> {
   const planned = shots.filter((s) => Array.isArray(s.characters))
   const out = new Map<string, ShotReferencePlan>()
   if (!planned.length) return out
 
   const allIds = [...new Set(
-    planned.flatMap((s) => (s.characters as unknown[]).filter((x): x is string => typeof x === 'string')),
+    planned.flatMap((s) => [...(s.characters as unknown[]).filter((x): x is string => typeof x === 'string'), ...(opts?.photo ? designCharacterIds(s) : [])]),
   )]
   const sceneIds = [...new Set(planned.map((s) => s.scene_id).filter((x): x is string => typeof x === 'string' && x.length > 0))]
 
   const [{ data: chars, error: cErr }, { data: appearances, error: aErr }, worldByScene] = await Promise.all([
     allIds.length
-      ? supabaseAdmin.from('characters').select('character_id, name').eq('project_id', projectId).in('character_id', allIds)
+      ? supabaseAdmin.from('characters').select(opts?.photo ? 'character_id, name, name_en, name_en_source' : 'character_id, name').eq('project_id', projectId).in('character_id', allIds)
       : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
     allIds.length
       ? supabaseAdmin
           .from('character_appearances')
-          .select('character_id, appearance_key, is_default, sheet_url')
+          .select(opts?.photo ? 'character_id, appearance_key, is_default, sheet_url, appearance' : 'character_id, appearance_key, is_default, sheet_url')
           .eq('project_id', projectId)
           .in('character_id', allIds)
       : Promise.resolve({ data: [] as Array<Record<string, unknown>>, error: null }),
@@ -202,19 +237,23 @@ export async function loadShotReferencePlans(
   if (cErr) throw cErr
   if (aErr) throw aErr
 
+  const characterRows = (chars ?? []) as unknown as Array<Record<string, unknown>>
+  const appearanceRows = (appearances ?? []) as unknown as Array<Record<string, unknown>>
   const lookup: ReferenceLookup = {
-    characterById: new Map((chars ?? []).map((c) => [c.character_id as string, { name: String(c.name ?? '') }])),
+    characterById: new Map(characterRows.map((c) => [c.character_id as string, { name: String(c.name ?? ''), ...(opts?.photo ? { promptName: promptName(c) } : {}) }])),
     sheetByPair: new Map(),
     defaultKeyById: new Map(),
+    ...(opts?.photo ? { lookByPair: new Map<string, string>() } : {}),
   }
-  for (const a of appearances ?? []) {
+  for (const a of appearanceRows) {
     const id = a.character_id as string
     const key = a.appearance_key as string
     lookup.sheetByPair.set(pairKey(id, key), typeof a.sheet_url === 'string' ? a.sheet_url : null)
     if (a.is_default === true && !lookup.defaultKeyById.has(id)) lookup.defaultKeyById.set(id, key)
+    if (lookup.lookByPair && typeof a.appearance === 'string' && a.appearance.trim()) lookup.lookByPair.set(pairKey(id, key), a.appearance)
   }
   for (const shot of planned) {
-    const { characterRefs, missing } = planShotCharacterRefs(shot, lookup)
+    const { characterRefs, missing } = planShotCharacterRefs(shot, lookup, opts)
     out.set(shot.shot_id, {
       characterRefs,
       missing,
