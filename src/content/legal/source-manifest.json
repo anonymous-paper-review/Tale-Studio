@@ -4,24 +4,24 @@
   "policyLastUpdated": "19 November 2026",
   "files": {
     "terms-of-service.md": {
-      "sha256": "992c78ef8534a28386d2427e5472e33742a6614c1958cc0b361d2a533876c271",
-      "characters": 13506
+      "sha256": "ec8d88490e675c1e7892705f8f7e63e459a73fd34a76908417312df77335bd8b",
+      "characters": 13528
     },
     "refund-policy.md": {
       "sha256": "3a191744a50b9a3a8018317b64db249aea030776a47ea8c7d867e23c27e90642",
       "characters": 5827
     },
     "privacy-policy.md": {
-      "sha256": "ef448fd307c44739652a64f48c445bda4f757c0fae7b25019e0b471813d22c96",
-      "characters": 13111
+      "sha256": "c7ccea649c60efd6e2ba00b253f03a5df32b651adbaba403a096db79e604df00",
+      "characters": 13133
     },
     "acceptable-use-policy.md": {
       "sha256": "4f1563d6664ed7cdcda1157a22d0f4760b77565907a7de53b6392a88ec2f6fe6",
       "characters": 2729
     },
     "footer.md": {
-      "sha256": "4f93695f94db94bcf7e4b0433bf95c1be56cd5e19f5c12eb22e16c306bba86ae",
-      "characters": 268
+      "sha256": "380cfc74bb447bb83ea40a4edef182cfe2189ec95217fb257718e3367ec12524",
+      "characters": 304
     }
   }
 }
