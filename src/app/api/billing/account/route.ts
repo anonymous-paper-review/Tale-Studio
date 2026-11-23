@@ -9,6 +9,7 @@ import { pickActiveSubscription, type SubscriptionRow } from '@/lib/billing/subs
 import { isAdminWorkspaceOwner } from '@/lib/admin'
 import { isQuotaExemptWorkspaceOwner } from '@/lib/quota-exempt'
 import { takeBillingMode } from '@/lib/billing/take-hold'
+import { isPortOneSubscriptionId } from '@/lib/billing/portone-public'
 import {
   canBuyTakePack,
   groupRecentActivity,
@@ -33,6 +34,8 @@ export interface BillingAccountResponse {
   canBuyPack: boolean
   /** Paddle 고객이 있으면 포털(구독 관리·결제 수단·영수증)을 열 수 있다 (P9). */
   hasPaddleCustomer: boolean
+  /** 국내 카드(PortOne) 구독이면 true — 해지는 Paddle 포털이 아니라 우리 해지 버튼으로 한다(2026-11-19). */
+  portoneSubscription?: boolean
 }
 
 export async function GET() {
@@ -103,6 +106,7 @@ export async function GET() {
       packPurchasedBefore,
       canBuyPack: canBuyTakePack({ plan, packPurchasedBefore }),
       hasPaddleCustomer: typeof customer?.mor_customer_id === 'string',
+      portoneSubscription: isPortOneSubscriptionId(subscription?.mor_subscription_id),
     }
     return NextResponse.json(body)
   } catch (err) {

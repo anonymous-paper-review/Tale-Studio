@@ -8,9 +8,25 @@
 //
 //   실패는 던진다. 계정 삭제 라우트가 이걸 받고 삭제를 중단한다 — 계정은 없는데 결제는 계속되는
 //   상태가 가장 나쁘다.
+//
+//   국내 카드(PortOne) 구독(2026-11-19)은 PortOne 쪽에 예약이 없다 — 청구는 우리 매시간 점검이 한다.
+//   그래서 상태를 canceled 로 내려 다음 청구를 멈추고, 저장된 카드(빌링키)를 PortOne 에서 지운다.
 import { paddleRequest } from '@/lib/billing/paddle-api'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { deleteBillingKey, findBillingKey } from '@/lib/billing/portone-server'
+import { isPortOneSubscriptionId } from '@/lib/billing/portone-public'
 
 export async function cancelSubscriptionNow(subscriptionId: string): Promise<void> {
+  if (isPortOneSubscriptionId(subscriptionId)) {
+    const { error } = await supabaseAdmin
+      .from('subscriptions')
+      .update({ status: 'canceled', updated_at: new Date().toISOString() })
+      .eq('mor_subscription_id', subscriptionId)
+    if (error) throw error
+    const billingKey = await findBillingKey(subscriptionId)
+    if (billingKey) await deleteBillingKey(billingKey)
+    return
+  }
   await paddleRequest('POST', `/subscriptions/${encodeURIComponent(subscriptionId)}/cancel`, {
     effective_from: 'immediately',
   })
