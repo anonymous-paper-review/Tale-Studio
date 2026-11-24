@@ -915,22 +915,24 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
   saveDraftNow: async () => {
     cancelDraftSave()
     const projectId = useProjectStore.getState().projectId
+    const saveError = translate(contentLocale(), 'Could not save your changes. Please try again.')
     // 잠긴 Producer 는 바뀐 것이 없다 — 초안을 다시 쓰지 않는다.
     if (!projectId || isDemoSession() || castLocked()) return false
     // 늦게 비워진 뒤 아직 다시 읽지 않은 자료 — 저장된 초안을 빈 상태로 덮지 않고, 저장하지 못했다고 알린다.
     if (wipedProjectId === projectId) {
-      set({ error: translate(contentLocale(), 'Could not save your changes. Please try again.') })
+      set({ error: saveError })
       return false
     }
     const draft = buildProducerDraft(boardOf(get()))
     try {
       await persistDraft(projectId, draft)
       if (useProjectStore.getState().projectId !== projectId) return false
-      set({ error: null })
+      // 초안 저장과 만들기는 함께 실행될 수 있다. 저장 성공이 다른 작업의 실패 안내를 지우지 않는다.
+      if (get().error === saveError) set({ error: null })
       return true
     } catch (err) {
       if (useProjectStore.getState().projectId === projectId) {
-        set({ error: translate(contentLocale(), 'Could not save your changes. Please try again.') })
+        set({ error: saveError })
       }
       console.error('[producer-store] draft save failed:', err)
       return false

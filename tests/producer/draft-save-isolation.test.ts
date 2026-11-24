@@ -37,6 +37,38 @@ afterEach(() => {
 })
 
 describe('프로젝트별 초안 저장', () => {
+  it('초안 저장 중 만들기가 실패하면 늦은 저장 성공이 실패 안내를 지우지 않는다', async () => {
+    // 왜: 레퍼런스를 붙이는 저장과 만들기가 겹쳐도 만들기 실패 이유가 화면에 남아야 한다.
+    let finish!: (result: SaveResult) => void
+    db.save.mockImplementationOnce(() => new Promise<SaveResult>(resolve => { finish = resolve }))
+    const saving = useProducerStore.getState().saveDraftNow()
+    await vi.advanceTimersByTimeAsync(0)
+    const failure = '올린 레퍼런스 그림을 붙이지 못했어요. 다시 시도해 주세요.'
+    useProducerStore.setState({ error: failure })
+    finish({ data: db.save.mock.calls[0][1] as SavedDraft, error: null })
+
+    expect(await saving).toBe(true)
+    expect(useProducerStore.getState().error).toBe(failure)
+  })
+
+  it('다른 작업의 실패 안내가 있으면 초안 저장 성공만으로 지우지 않는다', async () => {
+    // 왜: 저장에 성공했다고 그림 만들기나 그림체 변경까지 성공한 것은 아니다.
+    const failure = 'Could not attach the uploaded reference pictures. Please try again.'
+    useProducerStore.setState({ error: failure })
+
+    expect(await useProducerStore.getState().saveDraftNow()).toBe(true)
+    expect(useProducerStore.getState().error).toBe(failure)
+  })
+
+  it('초안 저장 실패를 다시 저장해 해결하면 그 저장 실패 안내를 지운다', async () => {
+    // 왜: 정상 경로 고정. 저장 문제를 해결한 뒤까지 같은 경고를 남기지 않는다.
+    useProjectStore.setState({ projectLocale: 'en' })
+    useProducerStore.setState({ error: 'Could not save your changes. Please try again.' })
+
+    expect(await useProducerStore.getState().saveDraftNow()).toBe(true)
+    expect(useProducerStore.getState().error).toBeNull()
+  })
+
   it('같은 프로젝트를 연이어 저장하면 먼저 요청한 저장부터 순서대로 완료한다', async () => {
     // 왜: 자동저장이 느린 동안 다시 저장해도 오래된 설정이 최신 설정을 덮으면 안 된다.
     let finishFirst!: (result: SaveResult) => void

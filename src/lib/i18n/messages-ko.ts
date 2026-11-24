@@ -283,6 +283,15 @@ export const KO: Record<string, string> = {
   'Incorrect email or password': '이메일 또는 비밀번호가 맞지 않아요',
   'Could not sign in with Google. Please try again.': 'Google로 로그인하지 못했어요. 다시 시도해 주세요.',
   'Caps Lock is on. Passwords are case-sensitive.': 'Caps Lock이 켜져 있어요. 비밀번호는 대문자와 소문자를 가려요.',
+  'Sign up': '가입하기',
+  'Signing up…': '가입하는 중…',
+  'New to Tale Studio?': '처음 오셨나요?',
+  'Nickname': '닉네임',
+  'Terms of service': '이용약관',
+  'Privacy policy': '개인정보 처리방침',
+  'Could not create your account. Check your details or try logging in.': '가입하지 못했어요. 입력 내용을 확인하거나 로그인해 주세요.',
+  'Check your email to confirm your account. If you already have an account, log in.': '메일함에서 가입 확인 링크를 확인해 주세요. 이미 가입했다면 로그인해 주세요.',
+  'Menu': '메뉴',
   // ── 대시보드 공통 ──
   Projects: '프로젝트',
   // 위 막대 탭(11/5 시안 R2~R6) — 탭 이름은 변수로 번역해서 사전 누락 검사가 못 잡는다

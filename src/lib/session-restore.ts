@@ -18,6 +18,7 @@ export function sanitizeNextPath(raw: string | null | undefined): string | null 
   // '/' 로 시작하되 '//'(protocol-relative)·'/\' 는 거부, 로그인 루프 방지
   if (!raw.startsWith('/') || raw.startsWith('//') || raw.startsWith('/\\')) return null
   if (raw.startsWith('/login')) return null
+  if (/^\/signup\/?(?:[?#]|$)/.test(raw)) return null
   return raw
 }
 

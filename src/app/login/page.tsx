@@ -113,7 +113,7 @@ export default function LoginPage() {
       </div>
       {/* 11/5 시안 R1 — 스튜디오 밖 바탕(lobby) 가운데 카드(400 · 안쪽 50/30 · 사이 15 · 모서리 22), 칸 · Google 단추는 카드 위 한 단 밝은 칸(side-raised)
           · 높이 48 · 모서리 12, 꼬리글은 화면 아래.
-          글은 고른 화면 언어를 따르고, 가입하기는 두지 않는다(Google 로 처음 로그인하면 계정이 생긴다 — 오너 2026-11-09 추천대로). */}
+          글은 고른 화면 언어를 따르고, 이메일 가입은 별도 회원가입 화면으로 연결한다. */}
       <main className="relative flex w-full flex-1 items-center justify-center py-12">
         <div className="flex w-full max-w-[400px] flex-col gap-[15px] rounded-[22px] bg-side px-[30px] py-[50px]">
           {/* 11/5 시안 R1 — 이름 대신 로고 묶음(틀 32). 글자 "Tale Studio" 는 로고 안의 글이라 머리글로 그대로 읽힌다. */}
@@ -187,6 +187,21 @@ export default function LoginPage() {
               {submitting ? t('Logging in…') : t('Log in')}
             </Button>
           </form>
+          <p className="mt-2 text-center text-sm text-muted-foreground">
+            {t('New to Tale Studio?')}{' '}
+            <a
+              href="/signup"
+              className="rounded-sm font-semibold text-foreground underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              onClick={(event) => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return
+                event.preventDefault()
+                const next = sanitizeNextPath(new URLSearchParams(window.location.search).get('next'))
+                router.push(next ? `/signup?next=${encodeURIComponent(next)}` : '/signup')
+              }}
+            >
+              {t('Sign up')}
+            </a>
+          </p>
         </div>
       </main>
       {/* 꼬리글은 시안대로 두 언어 모두 영어 표어다. */}
