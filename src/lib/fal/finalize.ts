@@ -11,8 +11,11 @@
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { keepsSourcePortrait } from '@/lib/artist/source-image'
 import {
+  claimGenerationJobFinalize,
   completeGenerationJob,
+  GenerationJobFinalizeInProgressError,
   patchGenerationJobResponseSnapshotByRequestId,
+  releaseGenerationJobFinalizeClaim,
   type GenerationJob,
 } from '@/lib/generation-jobs'
 import { selectCandidatesToEvict, type CandidateView } from '@/lib/image-provenance'
@@ -1402,7 +1405,27 @@ function assertNever(value: never): never {
   throw new Error(`unsupported generation job kind: ${String(value)}`)
 }
 
+/**
+ * 종류별 마무리로 보내기 전에 자리를 찍는다(2026-11-24). 웹훅과 폴링이 같은 순간 "끝났다"를 받으면 둘 다 내려받아
+ *   저장했다(운영 재현 60장 중 12장). 아래 종류별 함수의 마지막 CAS(completeGenerationJob)는 상태만 지켰고 내려받기·올리기·후보 행은 못 막았다.
+ *   자리를 못 찍으면 내려받기 전에 GenerationJobFinalizeInProgressError 로 멈춘다 — 실패가 아니라 내 차례가 아님이다.
+ *   저장 도중 오류가 나면 자리를 풀고(못 풀어도 2분 뒤 이어받는다) 그 오류를 그대로 올린다 — 호출처의 일시·영구 구분은 그대로다.
+ */
 export async function finalizeGenerationJob(job: GenerationJob, result: FinalizeProviderResult): Promise<string> {
+  if (!(await claimGenerationJobFinalize(job.id))) throw new GenerationJobFinalizeInProgressError(job.id)
+  try {
+    return await finalizeGenerationJobByKind(job, result)
+  } catch (error) {
+    try {
+      await releaseGenerationJobFinalizeClaim(job.id)
+    } catch (releaseError) {
+      console.warn('[finalize] claim release failed:', job.id, releaseError instanceof Error ? releaseError.message : releaseError)
+    }
+    throw error
+  }
+}
+
+async function finalizeGenerationJobByKind(job: GenerationJob, result: FinalizeProviderResult): Promise<string> {
   switch (job.kind) {
     case 'image_generation':
       if (result.media !== 'image') throw new Error('image_generation requires an image result')

@@ -11,6 +11,9 @@ vi.mock('@/lib/storage-thumb', () => ({ uploadThumbnail: mocks.thumbnail }))
 vi.mock('@/lib/writer/rough-grid-crop', () => ({ cropRoughGridFrames: mocks.crop }))
 vi.mock('@/lib/generation-jobs', () => ({
   completeGenerationJob: mocks.complete, patchGenerationJobResponseSnapshotByRequestId: vi.fn(),
+  // 마무리 자리(2026-11-24): 이 시험은 완료 숫자만 보므로 자리는 항상 찍힌 것으로 둔다.
+  claimGenerationJobFinalize: vi.fn(async () => true), releaseGenerationJobFinalizeClaim: vi.fn(async () => undefined),
+  GenerationJobFinalizeInProgressError: class GenerationJobFinalizeInProgressError extends Error {},
 }))
 vi.mock('@/lib/director-video-takes', () => ({ completeDirectorVideoAttempt: vi.fn() }))
 vi.mock('@/lib/artist/portrait', () => ({ cropTurnaroundPortrait: vi.fn() }))

@@ -24,6 +24,8 @@ vi.mock('@/lib/generation-jobs', () => ({
   classifyFalFailure: mocks.classify,
   STALE_QUEUED_MS: 600_000,
   GenerationJobTerminalTransitionError: class GenerationJobTerminalTransitionError extends Error {},
+  // webhook 이 instanceof 로 가르는 마무리 자리 오류(2026-11-24) — 목에도 제공.
+  GenerationJobFinalizeInProgressError: class GenerationJobFinalizeInProgressError extends Error {},
 }))
 vi.mock('@/lib/director-video-takes', () => ({ markDirectorVideoAttemptFailed: mocks.markFailed }))
 vi.mock('@/lib/director/video-fallback', () => ({ failDirectorVideoAttemptOrFallback: mocks.fallback }))

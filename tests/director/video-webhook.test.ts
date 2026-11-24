@@ -20,6 +20,8 @@ vi.mock('@/lib/generation-jobs', () => ({
   classifyFalFailure: () => 'generic',
   // webhook 의 터미널 전이 dedupe(2026-07-22)가 instanceof 로 판별하는 클래스 — 목에도 제공.
   GenerationJobTerminalTransitionError: class GenerationJobTerminalTransitionError extends Error {},
+  // 마무리 자리 오류(2026-11-24)도 같은 방식으로 가른다.
+  GenerationJobFinalizeInProgressError: class GenerationJobFinalizeInProgressError extends Error {},
 }))
 vi.mock('@/lib/director-video-takes', () => ({
   markDirectorVideoAttemptFailed: mocks.failLinked,

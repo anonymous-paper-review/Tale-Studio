@@ -10,6 +10,7 @@
 import {
   failGenerationJob,
   getGenerationJobById,
+  GenerationJobFinalizeInProgressError,
   GenerationJobTerminalTransitionError,
   staleQueuedOrFilter,
   type GenerationJob,
@@ -71,6 +72,11 @@ async function completeOrTerminalizeJob(
       //   경쟁의 승자가 실패로 종결했을 수도 있으므로 status 까지 DB 값을 그대로 채택한다.
       console.warn('[fal/reconcile] duplicate finalize ignored (already terminal):', job.id)
       return (await getGenerationJobById(job.id)) ?? { ...job, status: 'completed' }
+    }
+    if (error instanceof GenerationJobFinalizeInProgressError) {
+      // 다른 쪽(웹훅)이 지금 저장하는 중이다(2026-11-24 finalize claim). 실패가 아니라 내 차례가 아닌 것 —
+      //   queued 그대로 돌려주면 화면은 다음 폴링(3초 뒤)에서 완료를 본다. 저장하는 쪽이 죽으면 2분 뒤 이어받는다.
+      return job
     }
     if (error instanceof DirectorVideoCompletionPersistenceError) {
       // 영상·이미지 공통(#image-persist-retryable 2026-09-08).

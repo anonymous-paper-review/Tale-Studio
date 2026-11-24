@@ -20,6 +20,10 @@ vi.mock('@/lib/generation-jobs', () => ({
   failGenerationJob: mocks.fail,
   rejectGenerationJobReservation: mocks.reject,
   patchGenerationJobResponseSnapshotByRequestId: mocks.patchSnapshot,
+  // 마무리 자리(2026-11-24): 동기 경로는 경쟁 상대가 없으니 자리는 항상 찍힌 것으로 둔다.
+  claimGenerationJobFinalize: vi.fn(async () => true),
+  releaseGenerationJobFinalizeClaim: vi.fn(async () => undefined),
+  GenerationJobFinalizeInProgressError: class GenerationJobFinalizeInProgressError extends Error {},
 }))
 vi.mock('@/lib/writer/llm/fal', () => ({
   DEFAULT_IMAGE_MODEL: 'openai/gpt-image-2',

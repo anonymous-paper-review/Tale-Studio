@@ -49,3 +49,9 @@ export const WEBHOOK_GRACE_MS = 45_000
 
 /** 서버 폴링 라우트: 웹훅 유예가 지난 잡도 인스턴스당 이 간격으로만 fal 에 묻는다. */
 export const POLL_RECONCILE_THROTTLE_MS = 30_000
+
+/**
+ * 마무리(저장) 자리: 웹훅과 폴링이 같은 그림을 동시에 마무리하면 먼저 자리를 찍은 쪽만 저장한다(2026-11-24).
+ *   찍은 쪽이 이 시간 안에 끝내지 못하면(함수가 죽음) 다른 쪽이 이어받는다. 웹훅 함수는 60초(maxDuration) 안에 끝나거나 죽으므로 2분이면 넘넉하다.
+ */
+export const FINALIZE_CLAIM_STALE_MS = 2 * 60 * 1000

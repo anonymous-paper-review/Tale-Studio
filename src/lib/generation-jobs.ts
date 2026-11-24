@@ -127,7 +127,7 @@ const COLUMNS = COLUMNS_LIST.join(', ') as Join<typeof COLUMNS_LIST, ', '>
 //   job.input_snapshot.source_hash 를 읽으므로 둘 다 반드시 포함돼야 한다(누락 시 후보 source_hash=null → stale 무력화).
 export const GENERATION_JOB_COLUMNS = COLUMNS
 
-import { STALE_QUEUED_MS, STALE_QUEUED_VIDEO_MS, staleQueuedMsFor, staleQueuedOrFilter } from '@/lib/generation-job-timing'
+import { FINALIZE_CLAIM_STALE_MS, STALE_QUEUED_MS, STALE_QUEUED_VIDEO_MS, staleQueuedMsFor, staleQueuedOrFilter } from '@/lib/generation-job-timing'
 export { STALE_QUEUED_MS, STALE_QUEUED_VIDEO_MS, staleQueuedMsFor, staleQueuedOrFilter }
 
 function toJsonSnapshot(value: unknown): Json {
@@ -940,6 +940,44 @@ export class GenerationJobTerminalTransitionError extends Error {
       : `generation job ${id} was not found during terminal transition`)
     this.name = 'GenerationJobTerminalTransitionError'
   }
+}
+
+/** 다른 쪽(웹훅 ↔ 폴링)이 이미 이 잡을 마무리하는 중이다 — 실패가 아니라 "내 차례가 아님"이다. 호출처는 잡을 queued 그대로 둔다. */
+export class GenerationJobFinalizeInProgressError extends Error {
+  constructor(id: string) {
+    super(`generation job ${id} is being finalized by another caller`)
+    this.name = 'GenerationJobFinalizeInProgressError'
+  }
+}
+
+/**
+ * 마무리 자리 찍기(2026-11-24): 저장을 시작하기 전에 queued 잡의 finalize_claimed_at 을 지금 시각으로 찍는다.
+ *   빈 값이거나 FINALIZE_CLAIM_STALE_MS 보다 오래된 자리만 찍는다 — 한 줄 UPDATE 라 웹훅과 폴링이 동시에 와도 한 쪽만 행을 받는다.
+ *   상태(status)는 건드리지 않는다: 저장이 중간에 실패해도 queued 가 남아 다음 웹훅·폴링이 다시 시도한다(finalize.ts 멱등 규약 그대로).
+ *   운영 재현(2026-11-24)에서 그림 60장 중 12장이 두 쪽에서 내려받아 후보 행에 2번 기록됐다 — 그 구멍을 막는다.
+ * @returns true = 이 호출이 자리를 찍었다(저장 진행). false = 다른 쪽이 찍어 둔 자리가 아직 살아 있거나 잡이 이미 queued 가 아니다.
+ */
+export async function claimGenerationJobFinalize(id: string, now = Date.now()): Promise<boolean> {
+  const cutoff = new Date(now - FINALIZE_CLAIM_STALE_MS).toISOString()
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .update({ finalize_claimed_at: new Date(now).toISOString() })
+    .eq('id', id)
+    .eq('status', 'queued')
+    .or(`finalize_claimed_at.is.null,finalize_claimed_at.lt.${cutoff}`)
+    .select('id')
+  if (error) throw error
+  return Array.isArray(data) && data.length > 0
+}
+
+/** 저장이 중간에 실패했을 때 자리를 풀어 다음 시도가 2분을 기다리지 않게 한다. 이미 종결된 잡은 건드리지 않는다. */
+export async function releaseGenerationJobFinalizeClaim(id: string): Promise<void> {
+  const { error } = await supabaseAdmin
+    .from('generation_jobs')
+    .update({ finalize_claimed_at: null })
+    .eq('id', id)
+    .eq('status', 'queued')
+  if (error) throw error
 }
 
 export class GenerationJobLinkedVideoTerminalizationError extends Error {

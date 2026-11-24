@@ -815,6 +815,7 @@ export type Database = {
           error: string | null
           error_class: string | null
           fal_key_id: string | null
+          finalize_claimed_at: string | null
           id: string
           idempotency_key: string | null
           input_snapshot: Json
@@ -845,6 +846,7 @@ export type Database = {
           error?: string | null
           error_class?: string | null
           fal_key_id?: string | null
+          finalize_claimed_at?: string | null
           id?: string
           idempotency_key?: string | null
           input_snapshot?: Json
@@ -875,6 +877,7 @@ export type Database = {
           error?: string | null
           error_class?: string | null
           fal_key_id?: string | null
+          finalize_claimed_at?: string | null
           id?: string
           idempotency_key?: string | null
           input_snapshot?: Json

@@ -25,6 +25,10 @@ vi.mock('@/lib/generation-jobs', () => ({
   failGenerationJob: vi.fn(),
   patchGenerationJobResponseSnapshotByRequestId: vi.fn(),
   GenerationJobTerminalTransitionError: class GenerationJobTerminalTransitionError extends Error {},
+  // 마무리 자리(2026-11-24): 이 시험은 미리보기 저장만 보므로 자리는 항상 찍힌 것으로 둔다.
+  claimGenerationJobFinalize: vi.fn(async () => true),
+  releaseGenerationJobFinalizeClaim: vi.fn(async () => undefined),
+  GenerationJobFinalizeInProgressError: class GenerationJobFinalizeInProgressError extends Error {},
 }))
 vi.mock('@/lib/director-video-takes', () => ({
   completeDirectorVideoAttempt: vi.fn(),

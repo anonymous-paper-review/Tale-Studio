@@ -16,6 +16,7 @@ import {
   confirmGenerationJobReceipt,
   failGenerationJob,
   classifyFalFailure,
+  GenerationJobFinalizeInProgressError,
   GenerationJobTerminalTransitionError,
 } from '@/lib/generation-jobs'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
@@ -202,6 +203,12 @@ export async function POST(req: Request) {
       // 중복 finalize 경쟁(webhook ↔ 폴링 reconcile) — 다른 경로가 이미 종결한 잡.
       //   실패 아님: fail 마킹을 시도하면 같은 에러가 또 나서 500 이 됐다(2026-07-22 previz 실측).
       console.warn('[fal/webhook] duplicate finalize ignored (already terminal):', job.id)
+      return
+    }
+    if (e instanceof GenerationJobFinalizeInProgressError) {
+      // 폴링(reconcile)이 먼저 자리를 찍고 저장하는 중이다(2026-11-24 finalize claim). 실패 아님 — 그 쪽이 끝낸다.
+      //   죽으면 2분 뒤 다음 폴링이 이어받는다. 여기서 fail 로 굳히면 저장된 그림이 화면에서 실패로 보인다.
+      console.warn('[fal/webhook] finalize in progress elsewhere; leaving queued:', job.id)
       return
     }
     if (e instanceof DirectorVideoCompletionPersistenceError) {
