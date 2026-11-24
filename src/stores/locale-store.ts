@@ -1,11 +1,10 @@
-import { useEffect } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { isDemoSession } from '@/lib/demo/context'
 import { translate } from '@/lib/i18n/translate'
-import { initialLocaleFor, parseAppLocale, type AppLocale } from '@/lib/locale'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
 
 /**
  * UI 표시 언어 (#i18n-s5) — 진실은 auth user_metadata.locale(서버도 같은 값을 읽어
@@ -69,18 +68,3 @@ export const useLocaleStore = create<LocaleState>()(
   ),
 )
 
-/**
- * 처음 온 방문자(저장된 언어 없음)는 브라우저 언어로 시작한다(오너 2026-11-24 ③A).
- * 서버 그림(en)과 첫 그림을 맞추려고 그린 뒤에 바꾼다 — 초기값으로 넣으면 하이드레이션이 어긋난다.
- */
-export function useFirstVisitLocale() {
-  useEffect(() => {
-    try {
-      if (window.localStorage.getItem('tale-locale')) return
-    } catch {
-      return
-    }
-    const first = initialLocaleFor(navigator.languages)
-    if (first !== useLocaleStore.getState().locale) useLocaleStore.setState({ locale: first })
-  }, [])
-}

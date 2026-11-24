@@ -5,7 +5,7 @@ import { TaleLockup } from '@/components/tale-lockup'
 import { LocaleToggle } from '@/components/marketing/locale-toggle'
 import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { useT } from '@/lib/i18n'
-import { useFirstVisitLocale } from '@/stores/locale-store'
+import { useFirstVisitLocale } from '@/components/marketing/use-first-visit-locale'
 
 /**
  * 공개(마케팅) 페이지 공용 헤더 (#landing-v2 2026-08-03) — 랜딩·Playground·Pricing·Docs.

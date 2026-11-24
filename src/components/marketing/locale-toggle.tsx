@@ -6,7 +6,8 @@
 import { useEffect } from 'react'
 import { Check, ChevronDown, Globe } from 'lucide-react'
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu'
-import { useFirstVisitLocale, useLocaleStore } from '@/stores/locale-store'
+import { useLocaleStore } from '@/stores/locale-store'
+import { useFirstVisitLocale } from '@/components/marketing/use-first-visit-locale'
 import type { AppLocale } from '@/lib/locale'
 
 // 언어 표시명은 자기 언어로 고정 표기(언어 선택 UI 관례 — 번역하지 않는다).
