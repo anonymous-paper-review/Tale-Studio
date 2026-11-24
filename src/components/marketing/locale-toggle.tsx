@@ -10,7 +10,7 @@ import { useLocaleStore } from '@/stores/locale-store'
 import type { AppLocale } from '@/lib/locale'
 
 // 언어 표시명은 자기 언어로 고정 표기(언어 선택 UI 관례 — 번역하지 않는다).
-const LOCALE_LABELS: Record<AppLocale, string> = { en: 'English', ko: '한국어' } // i18n-ok
+export const LOCALE_LABELS: Record<AppLocale, string> = { en: 'English', ko: '한국어' } // i18n-ok
 
 export function LocaleToggle() {
   const locale = useLocaleStore((s) => s.locale)

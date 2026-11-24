@@ -4,7 +4,7 @@ import { toast } from 'sonner'
 import { createClient } from '@/lib/supabase/client'
 import { isDemoSession } from '@/lib/demo/context'
 import { translate } from '@/lib/i18n/translate'
-import { parseAppLocale, type AppLocale } from '@/lib/locale'
+import { initialLocaleFor, parseAppLocale, type AppLocale } from '@/lib/locale'
 
 /**
  * UI 표시 언어 (#i18n-s5) — 진실은 auth user_metadata.locale(서버도 같은 값을 읽어
@@ -26,7 +26,8 @@ interface LocaleState {
 export const useLocaleStore = create<LocaleState>()(
   persist(
     (set, get) => ({
-      locale: 'en',
+      // 처음 온 방문자는 브라우저 언어로 시작한다(③A). 저장된 언어가 있으면 persist 가 덮어쓴다.
+      locale: typeof navigator === 'undefined' ? 'en' : initialLocaleFor(navigator.languages),
       hydrated: false,
       hydrateFromUser: async () => {
         if (get().hydrated) return

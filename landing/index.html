@@ -1,0 +1,562 @@
+<!doctype html>
+<html lang="ko" data-theme="dark">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Tale Studio · 이야기를 쓰면, 영상이 됩니다</title>
+<meta name="description" content="기획부터 글 · 인물 · 스토리보드 · 영상 · 편집까지 한 곳에서. Lumi와 함께하는 올인원 프리비즈 스튜디오, Tale Studio." />
+<link rel="icon" type="image/svg+xml" href="./assets/tale-symbol.svg" />
+<link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/orioncactus/pretendard@v1.3.9/dist/web/variable/pretendardvariable-dynamic-subset.css" />
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&display=swap" />
+<script>try{var s=localStorage.getItem("tale-theme-v2");if(s)document.documentElement.dataset.theme=s}catch(e){}</script>
+</head>
+<body>
+<a class="skip" href="#main">본문으로 건너뛰기</a>
+<svg class="defs" aria-hidden="true" focusable="false">
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#070b16"/><stop offset=".55" stop-color="#121a30"/><stop offset="1" stop-color="#1a1d2c"/></linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#151925"/><stop offset="1" stop-color="#05060a"/></linearGradient>
+    <radialGradient id="cone" cx=".5" cy="0" r="1"><stop offset="0" stop-color="#ffcf86" stop-opacity=".55"/><stop offset=".6" stop-color="#f2a33a" stop-opacity=".12"/><stop offset="1" stop-color="#f2a33a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="pool" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ffcf86" stop-opacity=".45"/><stop offset="1" stop-color="#ffcf86" stop-opacity="0"/></radialGradient>
+    <radialGradient id="tail" cx=".5" cy=".5" r=".5"><stop offset="0" stop-color="#ff4a5a" stop-opacity=".9"/><stop offset="1" stop-color="#ff4a5a" stop-opacity="0"/></radialGradient>
+    <radialGradient id="faceW" cx=".62" cy=".4" r=".7"><stop offset="0" stop-color="#e7b48c"/><stop offset=".7" stop-color="#8a5f45"/><stop offset="1" stop-color="#3a2a22"/></radialGradient>
+    <radialGradient id="faceM" cx=".35" cy=".4" r=".7"><stop offset="0" stop-color="#c79a7a"/><stop offset=".7" stop-color="#6e4c3a"/><stop offset="1" stop-color="#2a2020"/></radialGradient>
+    <g id="world">
+      <rect width="320" height="180" fill="url(#sky)"/>
+      <!-- 먼 건물 -->
+      <g fill="#0b1020">
+        <rect x="0" y="52" width="38" height="70"/><rect x="36" y="38" width="30" height="84"/><rect x="64" y="60" width="26" height="62"/>
+        <rect x="196" y="46" width="22" height="76"/><rect x="250" y="30" width="40" height="92"/><rect x="288" y="56" width="32" height="66"/>
+      </g>
+      <g fill="#f6c27a">
+        <rect x="8" y="62" width="3" height="3" opacity=".7"/><rect x="20" y="74" width="3" height="3" opacity=".4"/><rect x="44" y="50" width="3" height="3" opacity=".8"/>
+        <rect x="52" y="66" width="3" height="3" opacity=".35"/><rect x="72" y="70" width="3" height="3" opacity=".6"/><rect x="258" y="42" width="3" height="3" opacity=".5"/>
+        <rect x="272" y="58" width="3" height="3" opacity=".8"/><rect x="262" y="78" width="3" height="3" opacity=".35"/><rect x="298" y="66" width="3" height="3" opacity=".6"/><rect x="204" y="60" width="3" height="3" opacity=".45"/>
+      </g>
+      <!-- 길 -->
+      <rect y="122" width="320" height="58" fill="url(#road)"/>
+      <rect y="122" width="320" height="1" fill="#2a3044"/>
+      <!-- 떠난 막차 -->
+      <ellipse cx="22" cy="132" rx="9" ry="5" fill="url(#tail)"/><ellipse cx="38" cy="132" rx="9" ry="5" fill="url(#tail)"/>
+      <rect x="20" y="148" width="20" height="14" fill="#ff4a5a" opacity=".08"/>
+      <!-- 가로등 -->
+      <polygon points="226,34 178,138 276,138" fill="url(#cone)"/>
+      <line x1="232" y1="30" x2="232" y2="136" stroke="#1a2030" stroke-width="2.2"/>
+      <path d="M232 31 Q232 27 226 28" stroke="#1a2030" stroke-width="2" fill="none"/>
+      <ellipse cx="224" cy="31" rx="5" ry="2.2" fill="#ffe1a8"/>
+      <ellipse cx="226" cy="150" rx="40" ry="14" fill="url(#pool)"/>
+      <rect x="222" y="138" width="6" height="40" fill="#ffcf86" opacity=".14"/>
+      <!-- 정류장 -->
+      <rect x="84" y="76" width="104" height="50" fill="#9db4e8" opacity=".06"/>
+      <rect x="80" y="70" width="114" height="5" rx="2" fill="#a9c0f0" opacity=".22"/>
+      <rect x="86" y="75" width="2" height="51" fill="#2a3246"/><rect x="186" y="75" width="2" height="51" fill="#2a3246"/>
+      <rect x="96" y="82" width="22" height="30" rx="1.5" fill="#ffe9c2" opacity=".18"/>
+      <!-- 서윤 (왼쪽, 트렌치코트) -->
+      <path d="M140 132 L141 108 Q141 101 148 101 Q155 101 155 108 L157 132 Z" fill="#4a3d2f"/>
+      <path d="M147 102 L148 132" stroke="#2c241c" stroke-width=".8"/>
+      <circle cx="148" cy="96" r="5.2" fill="url(#faceW)"/>
+      <path d="M142.6 96 Q142.4 89.6 148 89.6 Q153.8 89.6 153.6 96 L153.4 99 Q152 93 148 92.8 Q144 93 143 99 Z" fill="#0d0b0c"/>
+      <!-- 도현 (오른쪽, 검정 코트) -->
+      <path d="M159 132 L160 105 Q160 98 167 98 Q174 98 174 105 L176 132 Z" fill="#141826"/>
+      <path d="M163 99 Q167 102 171 99 L171 104 Q167 106 163 104 Z" fill="#26324f"/>
+      <circle cx="167" cy="93" r="5" fill="url(#faceM)"/>
+      <path d="M162 92 Q162 87 167 87 Q172.4 87 172 92 Q169 89.6 165 90.6 Z" fill="#0a0a0d"/>
+      <!-- 투명 비닐 우산 -->
+      <line x1="171" y1="84" x2="173" y2="112" stroke="#d8e2f0" stroke-width=".8" opacity=".8"/>
+      <path d="M144 86 Q160 62 186 80 Q178 80 172 84 Q166 80 158 82 Q150 82 144 86 Z" fill="#dfeaff" opacity=".2" stroke="#eef4ff" stroke-opacity=".55" stroke-width=".6"/>
+      <!-- 얼굴에 닿는 빛 -->
+      <circle cx="150" cy="95" r="2.4" fill="#ffd8a8" opacity=".35"/>
+      <!-- 젖은 길 위 반사 -->
+      <rect x="140" y="134" width="36" height="20" fill="#9db4e8" opacity=".05"/>
+    </g>
+  </defs>
+</svg>
+
+<!-- 0 · 내비게이션 -->
+<header class="nav" id="top">
+  <div class="wrap nav__in">
+    <a href="#home" class="nav__logo" aria-label="Tale Studio 처음으로">
+      <img class="only-dark" src="./assets/tale-lockup.svg" alt="tale studio" width="138" height="35" />
+      <img class="only-light" src="./assets/tale-lockup-light.svg" alt="tale studio" width="138" height="35" />
+    </a>
+    <nav class="nav__links" aria-label="주요 메뉴">
+      <a href="#service">Tale 서비스</a>
+      <a href="#works">작품</a>
+      <a href="#pricing">요금</a>
+    </nav>
+    <div class="nav__end">
+      <div class="lang-pick">
+        <button type="button" class="lang-pick__btn" aria-haspopup="menu" aria-expanded="false" aria-label="언어 선택">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M3 12h18M12 3c2.5 2.7 3.8 5.7 3.8 9s-1.3 6.3-3.8 9c-2.5-2.7-3.8-5.7-3.8-9S9.5 5.7 12 3Z"/></svg>
+          <b data-lang-now>KO</b><i aria-hidden="true">▾</i>
+        </button>
+        <div class="lang-pick__menu" role="menu">
+          <button type="button" role="menuitemradio" data-lang-pick="ko" aria-checked="true">한국어</button>
+          <button type="button" role="menuitemradio" data-lang-pick="en" aria-checked="false">English</button>
+        </div>
+      </div>
+      <button class="theme-toggle" type="button" aria-label="밝게 · 어둡게 바꾸기" title="밝게 · 어둡게">
+        <svg class="only-dark" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><circle cx="12" cy="12" r="5"/><path d="M12 1.5v3M12 19.5v3M1.5 12h3M19.5 12h3M4.6 4.6l2.1 2.1M17.3 17.3l2.1 2.1M4.6 19.4l2.1-2.1M17.3 6.7l2.1-2.1" stroke="currentColor" stroke-width="2" stroke-linecap="round"/></svg>
+        <svg class="only-light" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M21 14.5A8.5 8.5 0 0 1 9.5 3a.6.6 0 0 0-.76-.7A9.5 9.5 0 1 0 21.7 15.26a.6.6 0 0 0-.7-.76Z"/></svg>
+      </button>
+      <a href="#start" class="btn btn--primary btn--sm">시작하기</a>
+    </div>
+  </div>
+</header>
+
+<main id="main">
+<div class="view" id="home" data-view>
+
+<!-- 1 · 히어로 -->
+<section class="hero hero--v3" id="start">
+  <div class="hero__glow" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i></div>
+  <div class="wrap hero__in">
+    <p class="pill reveal"><span class="pill__dot"></span><b class="aio">All-in-one</b> Lumi와 함께 만드는 프리비즈 스튜디오</p>
+    <h1 class="hero__h reveal">이야기를 적어 주세요.<br />영상까지는 <span class="hl-lumi" aria-label="Lumi"><img class="hl-lumi__c" alt="" /><span class="pt pt--flow hl-lumi__t">Lumi</span></span>가 이어 갈게요.</h1>
+    <p class="hero__sub reveal">아이디어 한 줄이면 충분해요. Lumi가 산문을 쓰고, 인물과 배경을 그리고,<br class="br-wide" /> 스토리보드로 먼저 보여 드려요. 마음에 들 때만 영상으로 옮겨요.</p>
+    <form class="prompt reveal" onsubmit="return false" aria-label="이야기 적고 프로젝트 시작하기">
+      <label class="sr" for="idea">아이디어나 대본</label>
+      <textarea id="idea" rows="3" placeholder="아이디어나 대본을 작성해 주세요"></textarea>
+      <div class="prompt__file" hidden><span></span><button type="button" aria-label="첨부 파일 빼기">✕</button></div>
+      <div class="prompt__foot">
+        <div class="prompt__opts">
+          <label class="attach" title="파일 첨부 · txt · md · docx · pdf · hwp"><input type="file" accept=".txt,.md,.docx,.pdf,.hwp,image/*" hidden /><span aria-hidden="true">+</span><em class="sr">파일 첨부</em></label>
+          <span class="cat" data-cat="len"><button type="button" class="cat__btn" aria-haspopup="listbox" aria-expanded="false"><small>길이</small><b>15초 이하</b><i aria-hidden="true">▾</i></button><span class="cat__menu" role="listbox" aria-label="길이"><button type="button" role="option" aria-selected="true">15초 이하</button><button type="button" role="option" aria-selected="false">15–60초</button><button type="button" role="option" aria-selected="false">1–5분</button><button type="button" role="option" aria-selected="false">5–20분</button></span></span><span class="cat" data-cat="ratio"><button type="button" class="cat__btn" aria-haspopup="listbox" aria-expanded="false"><small>화면 비율</small><b>16:9</b><i aria-hidden="true">▾</i></button><span class="cat__menu" role="listbox" aria-label="화면 비율"><button type="button" role="option" aria-selected="true">16:9</button><button type="button" role="option" aria-selected="false">9:16</button><button type="button" role="option" aria-selected="false">1:1</button><button type="button" role="option" aria-selected="false">2.39:1</button></span></span><span class="cat" data-cat="genre"><button type="button" class="cat__btn" aria-haspopup="listbox" aria-expanded="false"><small>장르</small><b>로맨스</b><i aria-hidden="true">▾</i></button><span class="cat__menu" role="listbox" aria-label="장르"><button type="button" role="option" aria-selected="false">코미디</button><button type="button" role="option" aria-selected="false">드라마</button><button type="button" role="option" aria-selected="true">로맨스</button><button type="button" role="option" aria-selected="false">스릴러</button><button type="button" role="option" aria-selected="false">일상</button></span></span>
+        </div>
+        <button type="submit" class="btn btn--primary">새 프로젝트 만들기 <span aria-hidden="true">→</span></button>
+      </div>
+    </form>
+  </div>
+</section>
+
+<!-- 3 · 제품 화면 (stageshow 데모) -->
+<section class="product" id="flow">
+  <div class="wrap">
+    <div class="sec-head sec-head--center reveal">
+      <p class="eyebrow">All-in-one · 한 줄의 여정</p>
+      <h2>한 줄이 이렇게 <span class="pt">영상</span>이 돼요</h2>
+      <p class="sec-sub">기획 · 글 · 인물 · 콘티 · 영상 · 편집까지 한 곳에서 이어져요. 다른 툴로 옮겨 다니지 않아도 돼요.</p>
+    </div>
+  </div>
+  <div class="product__stage reveal">
+    <div class="shots" id="shots">
+      <div class="glass-tabs" role="tablist" aria-label="단계 고르기"><div class="glass-row"><button type="button" role="tab" class="glass" data-s="producer" style="--c:#F2A33A" aria-selected="true"><img src="./assets/lumi-producer.webp" alt="" width="40" height="31" /><span><b>Producer</b></span><i></i></button><button type="button" role="tab" class="glass" data-s="writer" style="--c:#E8606F" aria-selected="false"><img src="./assets/lumi-writer.webp" alt="" width="40" height="31" /><span><b>Writer</b></span><i></i></button><button type="button" role="tab" class="glass" data-s="artist" style="--c:#8B63E8" aria-selected="false"><img src="./assets/lumi-artist.webp" alt="" width="40" height="31" /><span><b>Artist</b></span><i></i></button><button type="button" role="tab" class="glass" data-s="storyboard" style="--c:#5A6AE6" aria-selected="false"><img src="./assets/lumi-storyboard.webp" alt="" width="40" height="31" /><span><b>Storyboard</b></span><i></i></button><button type="button" role="tab" class="glass" data-s="director" style="--c:#3E9BE0" aria-selected="false"><img src="./assets/lumi-director.webp" alt="" width="40" height="31" /><span><b>Director</b></span><i></i></button><button type="button" role="tab" class="glass" data-s="editor" style="--c:#2DB39A" aria-selected="false"><img src="./assets/lumi-editor.webp" alt="" width="40" height="31" /><span><b>Editor</b></span><i></i></button></div></div>
+      <div class="sim" id="sim" role="img" aria-label="Tale Studio 작업 화면 예시. 한 줄을 적으면 Producer부터 Editor까지 이어지는 과정이 자동으로 재생돼요."></div>
+    </div>
+  </div>
+</section>
+
+<!-- 3 · 왜 Tale (스크롤하면 오른쪽이 그 강점의 동작을 보여 줘요) -->
+<section class="six six--why" id="why-tale">
+  <div class="wrap six__in">
+    <div class="six__list">
+      <div class="six__head reveal">
+        <p class="eyebrow">왜 Tale인가요</p>
+        <h2>글 한 줄이 영상이 되기까지,<br /><span class="pt">한곳에서</span> Lumi와 함께 만들어요.</h2>
+      </div>
+      <article class="six__item" data-p="flow" style="--c:#F2A33A">
+        <p class="six__n">01 · <b class="aio-x">All-in-one</b></p>
+        <h3>현장과 같은 제작 프로세스</h3>
+        <p class="six__d">기획 → 글 → 인물·배경 → 콘티 → 연출 → 편집까지, 실제 영상 현장과 같은 순서로 한 서비스 안에서 진행돼요. 단계마다 할 일이 정해져 있어서 어디서 무엇을 고치면 되는지 헷갈리지 않아요.</p>
+        <ul class="six__out"><li>6단계를 한 서비스에서</li><li>현장과 같은 순서</li><li>단계마다 정해진 할 일</li></ul>
+      </article>
+      <article class="six__item" data-p="write" style="--c:#E8606F">
+        <p class="six__n">02</p>
+        <h3>프롬프트 몰라도 글 한 줄로 시작</h3>
+        <p class="six__d">Lumi가 대화로 기획을 잡고 이야기로 풀어 줘요. 어려운 프롬프트도, 영상 지식도 없어도 누구나 시작할 수 있어요.</p>
+        <ul class="six__out"><li>대화로 기획</li><li>산문으로 풀어 줘요</li><li>영상 지식 없이</li></ul>
+      </article>
+      <article class="six__item" data-p="cast" style="--c:#8B63E8">
+        <p class="six__n">03</p>
+        <h3>인물 템플릿으로 오류 없는 캐스팅</h3>
+        <p class="six__d">이야기에 필요한 인물과 배경을 먼저 뽑아 템플릿으로 만들어 두고, 각 샷에 그대로 붙여요. 그래서 컷마다 얼굴이나 장소가 바뀌는 오류가 크게 줄어요.</p>
+        <ul class="six__out"><li>인물 · 배경 템플릿</li><li>샷마다 그대로 붙이기</li><li>얼굴 · 장소 유지</li></ul>
+      </article>
+      <article class="six__item" data-p="direct" style="--c:#5A6AE6">
+        <p class="six__n">04</p>
+        <h3>콘티로 먼저 보고, 손으로 연출해요</h3>
+        <p class="six__d">영상을 만들기 전에 러프 콘티로 확인하고 고쳐서 크레딧 낭비가 적어요. 카메라와 움직임은 말 대신 그림 위에 색 화살표로 그려서 지시해요.</p>
+        <ul class="six__out"><li>러프 콘티로 먼저</li><li>크레딧 낭비 줄이기</li><li>색 화살표로 연출</li></ul>
+      </article>
+    </div>
+    <div class="six__stage" aria-hidden="true">
+      <div class="six__card" style="--c:#E8606F">
+        <div class="six__glow"></div>
+        <div class="six__win"><div class="six__screens"><div id="sim2"></div><div class="six__panel pf" data-panel="flow"><p class="pf__cap">한 서비스 안에서 · 현장과 같은 순서</p><ol class="pf__grid"><li style="--i:0"><img src="./assets/lumi-producer.webp" alt="" /><b>기획</b><small>Producer</small><em>장르 · 길이 정하기</em></li><li style="--i:1"><img src="./assets/lumi-writer.webp" alt="" /><b>글</b><small>Writer</small><em>산문으로 풀기</em></li><li style="--i:2"><img src="./assets/lumi-artist.webp" alt="" /><b>인물·배경</b><small>Artist</small><em>템플릿 만들기</em></li><li style="--i:3"><img src="./assets/lumi-storyboard.webp" alt="" /><b>콘티</b><small>Storyboard</small><em>컷 구도 확인</em></li><li style="--i:4"><img src="./assets/lumi-director.webp" alt="" /><b>연출</b><small>Director</small><em>카메라 · 영상</em></li><li style="--i:5"><img src="./assets/lumi-editor.webp" alt="" /><b>편집</b><small>Editor</small><em>자르고 잇기</em></li></ol><p class="pf__foot">단계마다 할 일이 정해져 있어요 · 고칠 곳은 그 단계로 돌아가면 돼요</p></div><div class="six__panel pc" data-panel="cast">
+  <p class="pf__cap">① 템플릿을 먼저 만들고</p>
+  <div class="pc__tpl"><span class="pc__t" style="--i:0"><img src="./assets/gen/artist-01.webp" alt="" /><b>@서윤</b></span><span class="pc__t" style="--i:1"><img src="./assets/gen/artist-02.webp" alt="" /><b>@도현</b></span><span class="pc__t" style="--i:2"><img src="./assets/gen/bg-01.webp" alt="" /><b>#버스 정류장</b></span></div>
+  <p class="pf__cap">② 샷마다 그대로 붙여요</p>
+  <div class="pc__shots"><span class="pc__s" style="--i:0"><img src="./assets/gen/dir-01.webp" alt="" /><i>@서윤 #정류장</i><em>✓ 같은 얼굴</em></span><span class="pc__s" style="--i:1"><img src="./assets/gen/dir-02.webp" alt="" /><i>@도현 #정류장</i><em>✓ 같은 얼굴</em></span><span class="pc__s" style="--i:2"><img src="./assets/gen/dir-03.webp" alt="" /><i>@서윤 @도현</i><em>✓ 같은 얼굴</em></span><span class="pc__s" style="--i:3"><img src="./assets/gen/dir-04.webp" alt="" /><i>@서윤 @도현</i><em>✓ 같은 얼굴</em></span></div>
+</div><div class="six__panel pd" data-panel="direct">
+  <div class="pd__board"><img src="./assets/gen/sb-03.webp" alt="" />
+    <svg viewBox="0 0 400 225" preserveAspectRatio="none" aria-hidden="true"><defs><marker id="pdH1" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0 10 5 0 10z" fill="#F2A33A"/></marker><marker id="pdH2" viewBox="0 0 10 10" refX="6" refY="5" markerWidth="4" markerHeight="4" orient="auto"><path d="M0 0 10 5 0 10z" fill="#3E9BE0"/></marker></defs>
+      <path class="pd__a pd__a--1" marker-end="url(#pdH1)" d="M40 200 C 90 150, 130 140, 170 120" />
+      <path class="pd__a pd__a--2" marker-end="url(#pdH2)" d="M300 70 C 330 95, 330 140, 290 165" />
+    </svg>
+    <span class="pd__tag pd__tag--1">카메라 · 천천히 다가가기</span>
+    <span class="pd__tag pd__tag--2">도현 · 우산을 기울여요</span>
+  </div>
+  <div class="pd__cmp"><span><small>바로 영상부터</small><s>20 Takes</s></span><span class="on"><small>콘티로 먼저 확인</small><b>5 Takes</b></span></div>
+</div></div></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7 · 작품 쇼케이스 -->
+<section class="works" id="works">
+  <div class="wrap">
+    <div class="sec-head sec-head--row reveal">
+      <div><p class="eyebrow">작품</p><h2>Tale로 만든 이야기들</h2></div>
+      <a class="link" href="#works">전체 보기 →</a>
+    </div>
+    <div class="carousel" aria-label="작품 목록">
+      <div class="carousel__track">
+          <figure class="ph slide slide--video" style="--t:#E8606F"><video src="./assets/gen/umbrella-15s.mp4" poster="./assets/gen/umbrella-poster.jpg" muted loop playsinline preload="metadata" aria-label="우산 하나 아래 영상"></video><figcaption><b>우산 하나 아래</b>로맨스 · 15초</figcaption></figure>
+          <figure class="ph slide slide--video" style="--t:#F2A33A"><video src="./assets/gen/work-cherry.mp4" poster="./assets/gen/work-cherry.jpg" muted loop playsinline preload="metadata" aria-label="벚꽃이 지기 전에 영상"></video><figcaption><b>벚꽃이 지기 전에</b>로맨스 · 30초</figcaption></figure>
+          <figure class="ph slide slide--video" style="--t:#8B63E8"><video src="./assets/gen/work-market.mp4" poster="./assets/gen/work-market.jpg" muted loop playsinline preload="metadata" aria-label="야시장 한 입 영상"></video><figcaption><b>야시장 한 입</b>로맨틱 코미디 · 30초</figcaption></figure>
+          <figure class="ph slide slide--video" style="--t:#3E9BE0"><video src="./assets/gen/work-river.mp4" poster="./assets/gen/work-river.jpg" muted loop playsinline preload="metadata" aria-label="강가의 조약돌 영상"></video><figcaption><b>강가의 조약돌</b>드라마 · 30초</figcaption></figure>
+          <figure class="ph slide slide--video" style="--t:#2DB39A"><video src="./assets/gen/work-tea.mp4" poster="./assets/gen/work-tea.jpg" muted loop playsinline preload="metadata" aria-label="차밭의 아침 영상"></video><figcaption><b>차밭의 아침</b>힐링 드라마 · 30초</figcaption></figure>
+        </div>
+    </div>
+  </div>
+</section>
+
+<!-- 7-1 · 함께 쓰는 AI 모델 -->
+<section class="explore" aria-labelledby="explore-h">
+  <div class="wrap explore__in reveal">
+    <p class="eyebrow"><b class="aio-x">All-in-one</b></p>
+    <h2 id="explore-h">검증된 AI 모델을 한곳에서</h2>
+    <p class="sec-sub">단계마다 잘 맞는 모델을 골라 써요. 따로 가입하거나 툴을 옮겨 다니지 않아도 돼요.</p>
+    <ul class="explore__chips explore__chips--model"><li><i class="ai-logo"><svg aria-hidden="true" focusable="false" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Claude</title><path d="M4.709 15.955l4.72-2.647.08-.23-.08-.128H9.2l-.79-.048-2.698-.073-2.339-.097-2.266-.122-.571-.121L0 11.784l.055-.352.48-.321.686.06 1.52.103 2.278.158 1.652.097 2.449.255h.389l.055-.157-.134-.098-.103-.097-2.358-1.596-2.552-1.688-1.336-.972-.724-.491-.364-.462-.158-1.008.656-.722.881.06.225.061.893.686 1.908 1.476 2.491 1.833.365.304.145-.103.019-.073-.164-.274-1.355-2.446-1.446-2.49-.644-1.032-.17-.619a2.97 2.97 0 01-.104-.729L6.283.134 6.696 0l.996.134.42.364.62 1.414 1.002 2.229 1.555 3.03.456.898.243.832.091.255h.158V9.01l.128-1.706.237-2.095.23-2.695.08-.76.376-.91.747-.492.584.28.48.685-.067.444-.286 1.851-.559 2.903-.364 1.942h.212l.243-.242.985-1.306 1.652-2.064.73-.82.85-.904.547-.431h1.033l.76 1.129-.34 1.166-1.064 1.347-.881 1.142-1.264 1.7-.79 1.36.073.11.188-.02 2.856-.606 1.543-.28 1.841-.315.833.388.091.395-.328.807-1.969.486-2.309.462-3.439.813-.042.03.049.061 1.549.146.662.036h1.622l3.02.225.79.522.474.638-.079.485-1.215.62-1.64-.389-3.829-.91-1.312-.329h-.182v.11l1.093 1.068 2.006 1.81 2.509 2.33.127.578-.322.455-.34-.049-2.205-1.657-.851-.747-1.926-1.62h-.128v.17l.444.649 2.345 3.521.122 1.08-.17.353-.608.213-.668-.122-1.374-1.925-1.415-2.167-1.143-1.943-.14.08-.674 7.254-.316.37-.729.28-.607-.461-.322-.747.322-1.476.389-1.924.315-1.53.286-1.9.17-.632-.012-.042-.14.018-1.434 1.967-2.18 2.945-1.726 1.845-.414.164-.717-.37.067-.662.401-.589 2.388-3.036 1.44-1.882.93-1.086-.006-.158h-.055L4.132 18.56l-1.13.146-.487-.456.061-.746.231-.243 1.908-1.312-.006.006z" fill="#D97757" fill-rule="nonzero"></path></svg></i><span>Claude Sonnet 4.6</span><small>글</small></li><li><i class="ai-logo"><svg aria-hidden="true" focusable="false" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Gemini</title><path d="M20.616 10.835a14.147 14.147 0 01-4.45-3.001 14.111 14.111 0 01-3.678-6.452.503.503 0 00-.975 0 14.134 14.134 0 01-3.679 6.452 14.155 14.155 0 01-4.45 3.001c-.65.28-1.318.505-2.002.678a.502.502 0 000 .975c.684.172 1.35.397 2.002.677a14.147 14.147 0 014.45 3.001 14.112 14.112 0 013.679 6.453.502.502 0 00.975 0c.172-.685.397-1.351.677-2.003a14.145 14.145 0 013.001-4.45 14.113 14.113 0 016.453-3.678.503.503 0 000-.975 13.245 13.245 0 01-2.003-.678z" fill="#3186FF"></path><path d="M20.616 10.835a14.147 14.147 0 01-4.45-3.001 14.111 14.111 0 01-3.678-6.452.503.503 0 00-.975 0 14.134 14.134 0 01-3.679 6.452 14.155 14.155 0 01-4.45 3.001c-.65.28-1.318.505-2.002.678a.502.502 0 000 .975c.684.172 1.35.397 2.002.677a14.147 14.147 0 014.45 3.001 14.112 14.112 0 013.679 6.453.502.502 0 00.975 0c.172-.685.397-1.351.677-2.003a14.145 14.145 0 013.001-4.45 14.113 14.113 0 016.453-3.678.503.503 0 000-.975 13.245 13.245 0 01-2.003-.678z" fill="url(#lobe-icons-gemini-0-_R_0_)"></path><path d="M20.616 10.835a14.147 14.147 0 01-4.45-3.001 14.111 14.111 0 01-3.678-6.452.503.503 0 00-.975 0 14.134 14.134 0 01-3.679 6.452 14.155 14.155 0 01-4.45 3.001c-.65.28-1.318.505-2.002.678a.502.502 0 000 .975c.684.172 1.35.397 2.002.677a14.147 14.147 0 014.45 3.001 14.112 14.112 0 013.679 6.453.502.502 0 00.975 0c.172-.685.397-1.351.677-2.003a14.145 14.145 0 013.001-4.45 14.113 14.113 0 016.453-3.678.503.503 0 000-.975 13.245 13.245 0 01-2.003-.678z" fill="url(#lobe-icons-gemini-1-_R_0_)"></path><path d="M20.616 10.835a14.147 14.147 0 01-4.45-3.001 14.111 14.111 0 01-3.678-6.452.503.503 0 00-.975 0 14.134 14.134 0 01-3.679 6.452 14.155 14.155 0 01-4.45 3.001c-.65.28-1.318.505-2.002.678a.502.502 0 000 .975c.684.172 1.35.397 2.002.677a14.147 14.147 0 014.45 3.001 14.112 14.112 0 013.679 6.453.502.502 0 00.975 0c.172-.685.397-1.351.677-2.003a14.145 14.145 0 013.001-4.45 14.113 14.113 0 016.453-3.678.503.503 0 000-.975 13.245 13.245 0 01-2.003-.678z" fill="url(#lobe-icons-gemini-2-_R_0_)"></path><defs><linearGradient gradientUnits="userSpaceOnUse" id="lobe-icons-gemini-0-_R_0_" x1="7" x2="11" y1="15.5" y2="12"><stop stop-color="#08B962"></stop><stop offset="1" stop-color="#08B962" stop-opacity="0"></stop></linearGradient><linearGradient gradientUnits="userSpaceOnUse" id="lobe-icons-gemini-1-_R_0_" x1="8" x2="11.5" y1="5.5" y2="11"><stop stop-color="#F94543"></stop><stop offset="1" stop-color="#F94543" stop-opacity="0"></stop></linearGradient><linearGradient gradientUnits="userSpaceOnUse" id="lobe-icons-gemini-2-_R_0_" x1="3.5" x2="17.5" y1="13.5" y2="12"><stop stop-color="#FABC12"></stop><stop offset=".46" stop-color="#FABC12" stop-opacity="0"></stop></linearGradient></defs></svg></i><span>Gemini 3.6 Flash</span><small>글</small></li><li><i class="ai-logo"><svg aria-hidden="true" focusable="false" fill="currentColor" fill-rule="evenodd" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>OpenAI</title><path d="M9.205 8.658v-2.26c0-.19.072-.333.238-.428l4.543-2.616c.619-.357 1.356-.523 2.117-.523 2.854 0 4.662 2.212 4.662 4.566 0 .167 0 .357-.024.547l-4.71-2.759a.797.797 0 00-.856 0l-5.97 3.473zm10.609 8.8V12.06c0-.333-.143-.57-.429-.737l-5.97-3.473 1.95-1.118a.433.433 0 01.476 0l4.543 2.617c1.309.76 2.189 2.378 2.189 3.948 0 1.808-1.07 3.473-2.76 4.163zM7.802 12.703l-1.95-1.142c-.167-.095-.239-.238-.239-.428V5.899c0-2.545 1.95-4.472 4.591-4.472 1 0 1.927.333 2.712.928L8.23 5.067c-.285.166-.428.404-.428.737v6.898zM12 15.128l-2.795-1.57v-3.33L12 8.658l2.795 1.57v3.33L12 15.128zm1.796 7.23c-1 0-1.927-.332-2.712-.927l4.686-2.712c.285-.166.428-.404.428-.737v-6.898l1.974 1.142c.167.095.238.238.238.428v5.233c0 2.545-1.974 4.472-4.614 4.472zm-5.637-5.303l-4.544-2.617c-1.308-.761-2.188-2.378-2.188-3.948A4.482 4.482 0 014.21 6.327v5.423c0 .333.143.571.428.738l5.947 3.449-1.95 1.118a.432.432 0 01-.476 0zm-.262 3.9c-2.688 0-4.662-2.021-4.662-4.519 0-.19.024-.38.047-.57l4.686 2.71c.286.167.571.167.856 0l5.97-3.448v2.26c0 .19-.07.333-.237.428l-4.543 2.616c-.619.357-1.356.523-2.117.523zm5.899 2.83a5.947 5.947 0 005.827-4.756C22.287 18.339 24 15.84 24 13.296c0-1.665-.713-3.282-1.998-4.448.119-.5.19-.999.19-1.498 0-3.401-2.759-5.947-5.946-5.947-.642 0-1.26.095-1.88.31A5.962 5.962 0 0010.205 0a5.947 5.947 0 00-5.827 4.757C1.713 5.447 0 7.945 0 10.49c0 1.666.713 3.283 1.998 4.448-.119.5-.19 1-.19 1.499 0 3.401 2.759 5.946 5.946 5.946.642 0 1.26-.095 1.88-.309a5.96 5.96 0 004.162 1.713z"></path></svg></i><span>GPT Image 2</span><small>이미지</small></li><li><i class="ai-logo"><svg aria-hidden="true" focusable="false" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>NanoBanana</title><path d="M1.5 19.824c0-.548.444-.992.991-.992h.744a.991.991 0 010 1.983H2.49a.991.991 0 01-.991-.991z" fill="#F3AD61"></path><path d="M14.837 13.5h7.076c.522 0 .784-.657.413-1.044l-1.634-1.704a3.183 3.183 0 00-4.636 0l-1.633 1.704c-.37.385-.107 1.044.414 1.044zM3.587 13.5h7.076c.521 0 .784-.659.414-1.044l-1.635-1.704a3.183 3.183 0 00-4.636 0l-1.633 1.704c-.37.385-.107 1.044.414 1.044z" fill="#F9C23C"></path><path d="M12.525 1.521c3.69-.53 5.97 8.923 4.309 12.744-1.662 3.82-5.248 4.657-9.053 6.152a3.49 3.49 0 01-1.279.244c-1.443 0-2.227 1.187-2.774-.282-.707-1.9.22-4.031 2.069-4.757 2.014-.79 3.084-2.308 3.89-4.364.82-2.096.877-2.956.873-5.241-.003-1.827-.123-4.195 1.965-4.496z" fill="#FEEFC2"></path><path d="M16.834 14.264l-7.095-3.257c-.815 1.873-2.29 3.308-4.156 4.043-2.16.848-3.605 3.171-2.422 5.54 2.364 4.727 13.673-.05 13.673-6.325z" fill="#FCD53F"></path><path clip-rule="evenodd" d="M13.68 12.362c.296.094.46.41.365.707-1.486 4.65-5.818 6.798-9.689 6.997a.562.562 0 11-.057-1.124c3.553-.182 7.372-2.138 8.674-6.216a.562.562 0 01.707-.364z" fill="#F9C23C" fill-rule="evenodd"></path><path d="M17.43 19.85l-7.648-8.835h6.753c1.595.08 2.846 1.433 2.846 3.073v5.664c0 .997-.898 1.302-1.95.098z" fill="#FFF478"></path></svg></i><span>Nano Banana 2</span><small>이미지</small></li><li><i class="ai-logo"><svg aria-hidden="true" focusable="false" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>ByteDance</title><path d="M14.944 18.587l-1.704-.445V10.01l1.824-.462c1-.254 1.84-.461 1.88-.453.032 0 .056 2.235.056 4.972v4.973l-.176-.008c-.104 0-.952-.207-1.88-.446z" fill="#00C8D2" fill-rule="nonzero"></path><path d="M7 16.542c0-2.736.024-4.98.064-4.98.032-.008.872.2 1.88.454l1.816.461-.016 4.05-.024 4.049-1.632.422c-.896.23-1.736.445-1.856.469L7 21.523v-4.98z" fill="#3C8CFF" fill-rule="nonzero"></path><path d="M19.24 12.477c0-9.03.008-9.515.144-9.475.072.024.784.207 1.576.406.792.207 1.576.405 1.744.445l.296.08-.016 8.56-.024 8.568-1.624.414c-.888.23-1.728.437-1.856.47l-.24.055v-9.523z" fill="#78E6DC" fill-rule="nonzero"></path><path d="M1 12.509c0-4.678.024-8.505.064-8.505.032 0 .872.207 1.872.454l1.824.461v7.582c0 4.16-.016 7.574-.032 7.574-.024 0-.872.215-1.88.47L1 21.013v-8.505z" fill="#325AB4"></path></svg></i><span>Seedream 4</span><small>이미지</small></li><li><i class="ai-logo"><svg aria-hidden="true" focusable="false" fill="currentColor" fill-rule="evenodd" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Flux</title><path d="M0 20.683L12.01 2.5 24 20.683h-2.233L12.009 5.878 3.471 18.806h12.122l1.239 1.877H0z"></path><path d="M8.069 16.724l2.073-3.115 2.074 3.115H8.069zM18.24 20.683l-5.668-8.707h2.177l5.686 8.707h-2.196zM19.74 11.676l2.13-3.19 2.13 3.19h-4.26z"></path></svg></i><span>Flux Kontext</span><small>이미지</small></li><li><i class="ai-logo"><svg aria-hidden="true" focusable="false" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>ByteDance</title><path d="M14.944 18.587l-1.704-.445V10.01l1.824-.462c1-.254 1.84-.461 1.88-.453.032 0 .056 2.235.056 4.972v4.973l-.176-.008c-.104 0-.952-.207-1.88-.446z" fill="#00C8D2" fill-rule="nonzero"></path><path d="M7 16.542c0-2.736.024-4.98.064-4.98.032-.008.872.2 1.88.454l1.816.461-.016 4.05-.024 4.049-1.632.422c-.896.23-1.736.445-1.856.469L7 21.523v-4.98z" fill="#3C8CFF" fill-rule="nonzero"></path><path d="M19.24 12.477c0-9.03.008-9.515.144-9.475.072.024.784.207 1.576.406.792.207 1.576.405 1.744.445l.296.08-.016 8.56-.024 8.568-1.624.414c-.888.23-1.728.437-1.856.47l-.24.055v-9.523z" fill="#78E6DC" fill-rule="nonzero"></path><path d="M1 12.509c0-4.678.024-8.505.064-8.505.032 0 .872.207 1.872.454l1.824.461v7.582c0 4.16-.016 7.574-.032 7.574-.024 0-.872.215-1.88.47L1 21.013v-8.505z" fill="#325AB4"></path></svg></i><span>Seedance 2.0</span><small>영상</small></li><li><i class="ai-logo"><svg aria-hidden="true" focusable="false" fill="currentColor" fill-rule="evenodd" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>HappyHorse</title><path clip-rule="evenodd" d="M2.93 18.812a.79.79 0 01.45.142v-.002c.944.7 1.97 1.28 3.058 1.727a13.955 13.955 0 008.47.665c1.22-.288 2.397-.74 3.496-1.344.567-.311 1.113-.66 1.632-1.046a.787.787 0 01.327-.131l.123-.01c.444 0 .804.371.804.829 0 .14-.034.276-.1.399.03-.015.06-.032.09-.049l-.166.167a.82.82 0 01-.174.166C18.501 22.608 15.26 24 11.71 24c-3.55 0-6.787-1.389-9.223-3.668l-.19-.181a.842.842 0 01-.17-.51c0-.457.36-.829.804-.829H2.93zM5.536 0c.461.047.91.178 1.324.388a4.561 4.561 0 014.119.954 4.828 4.828 0 011.653 3.09l.856 5.005.1.586 2.1.411c.387.075.746.23 1.06.446.085-.155.185-.3.299-.433a2.39 2.39 0 011.818-.845c.84 0 1.581.441 2.016 1.11.243.373.391.816.409 1.293h.006a3.04 3.04 0 001.204 2.277c-.352.3-.8.467-1.262.469-.466 0-.893-.167-1.231-.444a2.032 2.032 0 01-.716-1.238l-.01.002c-.158-.905-.926-1.592-1.85-1.592l-.043.001a3.04 3.04 0 01.464 2.893c-.13.365-.327.695-.577.976l.022.002a3.266 3.266 0 00-.401 2.829l.557 1.9c-.862.403-1.764.713-2.692.926l-1.604-3.696a2.31 2.31 0 001.301-.62 2.81 2.81 0 01-1.624-.127c-.033-.013-.064-.025-.095-.039l-.377-.132-1.691-.621-1.257-.462-2.598 1.726.596 2.187H7.41c.023.093.035.192.035.293 0 .407-.202.765-.508.975a13.504 13.504 0 01-1.23-.531l-.334-1.112-.662-2.206a1.12 1.12 0 01.067-.915 1.1 1.1 0 01.375-.4l1.482-1.04-2.626-.964-.437 1.786H3.57c-.202.81-.916 1.41-1.766 1.41a1.8 1.8 0 01-.304-.027l.002-.014.785-3.216.1-.404.222-.91h.003a1.113 1.113 0 011.071-.854c.088 0 .172.01.253.03l.004.002.016.005c.238.073.476.148.713.223.444.14.93.3.956.326l.07-.212.275-.836.364-1.104.67-2.027.453-1.375a3.12 3.12 0 00.708-.866c.184-.332.313-.701.371-1.094-.165.43-.445.807-.808 1.09L6.7 5.718l-1.93.866-.011.005a.948.948 0 01-.325.075l-.054.003a.982.982 0 01-.884-.57 1.03 1.03 0 01.145-1.116l.424-.643L5.874 1.6 5.718.86 5.704.793 5.646.516 5.536 0z"></path></svg></i><span>Happy Horse</span><small>영상</small></li><li><i class="ai-logo"><svg aria-hidden="true" focusable="false" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>Kling</title><path d="M5.412 13.775A23.193 23.193 0 017.41 9.32c3.17-5.492 7.795-8.757 10.33-7.294C12.038-1.266 4.598.944 1.122 6.964A13.378 13.378 0 00.085 9.22c-.259.739.092 1.534.77 1.926l4.557 2.63z" fill="url(#lobe-icons-kling-0-_R_0_)"></path><path d="M18.588 10.164a23.188 23.188 0 01-1.999 4.455c-3.17 5.492-7.795 8.758-10.33 7.294 5.703 3.293 13.143 1.082 16.619-4.938a13.392 13.392 0 001.037-2.255c.259-.738-.092-1.534-.77-1.925l-4.557-2.63z" fill="url(#lobe-icons-kling-1-_R_0_)"></path><path d="M16.59 14.62c3.17-5.492 3.686-11.13 1.15-12.594C15.207.563 10.582 3.83 7.41 9.32c2.074-3.59 5.809-5.315 8.344-3.852 2.534 1.464 2.908 5.56.835 9.151z" fill="url(#lobe-icons-kling-2-_R_0_)"></path><path d="M7.41 9.32c-3.17 5.492-3.686 11.13-1.15 12.593 2.534 1.464 7.159-1.802 10.33-7.294-2.074 3.591-5.809 5.316-8.344 3.852-2.534-1.463-2.908-5.56-.835-9.15z" fill="url(#lobe-icons-kling-3-_R_0_)"></path><defs><radialGradient cx="0" cy="0" gradientTransform="matrix(7.47772 -12.51022 17.14368 10.24728 5.173 13.637)" gradientUnits="userSpaceOnUse" id="lobe-icons-kling-0-_R_0_" r="1"><stop offset=".095" stop-color="#FFF959"></stop><stop offset=".326" stop-color="#0DF35E"></stop><stop offset=".64" stop-color="#0BF2F9"></stop><stop offset="1" stop-color="#04A6F0"></stop></radialGradient><radialGradient cx="0" cy="0" gradientTransform="rotate(120.868 6.491 10.491) scale(14.5747 19.9728)" gradientUnits="userSpaceOnUse" id="lobe-icons-kling-1-_R_0_" r="1"><stop offset=".095" stop-color="#FFF959"></stop><stop offset=".326" stop-color="#0DF35E"></stop><stop offset=".64" stop-color="#0BF2F9"></stop><stop offset="1" stop-color="#04A6F0"></stop></radialGradient><linearGradient gradientUnits="userSpaceOnUse" id="lobe-icons-kling-2-_R_0_" x1="15.578" x2="18.062" y1="1.798" y2="9.861"><stop stop-color="#003EFF"></stop><stop offset="1" stop-color="#0BFFE7"></stop></linearGradient><linearGradient gradientUnits="userSpaceOnUse" id="lobe-icons-kling-3-_R_0_" x1="8.422" x2="5.938" y1="22.142" y2="14.079"><stop stop-color="#003EFF"></stop><stop offset="1" stop-color="#0BFFE7"></stop></linearGradient></defs></svg></i><span>Kling O3 Pro</span><small>영상</small></li><li><i class="ai-logo"><svg aria-hidden="true" focusable="false" style="flex:none;line-height:1" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><title>DeepMind</title><path d="M5.988 1.622A8.539 8.539 0 003.45 8.446c.349 4.408 4.506 7.995 8.276 7.995 3.507 0 4.88-3.061 4.541-5.14a4.318 4.318 0 00-.95-2.073c.632.34 1.244.776 1.809 1.3 1.52 1.415 2.44 3.229 2.587 5.1C20.04 19.763 16.98 24 11.863 24c-1.695 0-3.48-.432-4.98-1.143C2.816 20.937 0 16.797 0 12.002 0 7.571 2.405 3.7 5.988 1.622zM12.136 0c1.696 0 3.481.432 4.98 1.143C21.186 3.063 24 7.203 24 11.998c0 4.431-2.405 8.303-5.988 10.38a8.539 8.539 0 002.538-6.824c-.349-4.408-4.506-7.995-8.276-7.995-3.507 0-4.88 3.061-4.541 5.14a4.3 4.3 0 00.953 2.073 8.723 8.723 0 01-1.81-1.3c-1.52-1.415-2.44-3.227-2.589-5.1C3.96 4.237 7.02 0 12.137 0z" fill="#4285F4" fill-rule="evenodd"></path></svg></i><span>Veo 3.1</span><small>영상</small></li></ul>
+  </div>
+</section>
+
+<!-- 5 · 마지막: 첫 장 + 당신의 것 -->
+<section class="finale">
+  <div class="burst" id="burst" aria-hidden="true"></div>
+  <div class="wrap finale__in reveal">
+    <img class="finale__symbol only-dark" src="./assets/tale-symbol.svg" alt="" width="125" height="110" />
+    <img class="finale__symbol only-light" src="./assets/tale-symbol-light.svg" alt="" width="125" height="110" />
+    <h2>당신의 이야기,<br /><span class="pt pt--flow">첫 장을 써 볼까요?</span></h2>
+    <p class="sec-sub">당신의 이야기는 당신의 것이에요. 만든 프로젝트 · 프롬프트 · 생성물은 어떤 AI 학습에도 쓰지 않아요.</p>
+    <div class="finale__btns">
+      <a href="#start" class="btn btn--primary btn--lg">Lumi와 시작하기 <span aria-hidden="true">→</span></a>
+      <a href="#pricing" class="btn btn--ghost btn--lg">요금 확인하기</a>
+    </div>
+    <ul class="finale__trust">
+      <li><b>학습에 쓰지 않아요</b>프로젝트 · 프롬프트 · 생성물 모두</li>
+      <li><b>분리된 작업 공간</b>프로젝트마다 격리된 환경</li>
+      <li><b>검증된 영상 모델</b>Seedance · Kling · Hunyuan · Tale 자체 모델</li>
+    </ul>
+  </div>
+</section>
+
+</div>
+
+<div class="view" id="service" data-view hidden>
+
+<!-- Tale 서비스 -->
+<section class="svc-hero">
+  <div class="wrap svc-hero__in">
+    <p class="pill reveal"><span class="pill__dot"></span><b class="aio">All-in-one</b> Tale 서비스</p>
+    <h1 class="svc-hero__h reveal">이야기부터 영상까지,<br /><span class="pt">한 화면에서</span></h1>
+    <p class="hero__sub reveal">기획부터 편집까지 한 곳에서 끝나는 올인원 프리비즈 스튜디오예요. Tale이 잘하는 세 가지와 필요한 기능을 모았어요.</p>
+  </div>
+</section>
+
+<!-- 4 · Tale이 잘하는 세 가지 -->
+<section class="why">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="eyebrow">왜 Tale인가요</p>
+      <h2>영상 AI는 많아요.<br />이야기부터 같이 쓰는 곳은 드물어요.</h2>
+    </div>
+
+    <!-- 4-1 글을 써 줘요 -->
+    <div class="why__row reveal">
+      <div class="why__copy">
+        <span class="num">01</span>
+        <h3>글을 써 줘요</h3>
+        <p>한 줄 아이디어를 장면이 보이는 산문으로 바꿔요. 마음에 안 드는 문단만 골라 “더 설레게”, “대사를 줄여서”처럼 말하면 그 부분만 다시 써요.</p>
+        <ul class="ticks"><li>아이디어 · 대본 · 파일 어디서든 시작</li><li>문단 단위로 고치고 비교</li><li>@인물 태그로 인물 설정을 그대로 유지</li></ul>
+      </div>
+      <div class="ui ui--write" aria-hidden="true">
+        <div class="ui__bar"><span class="badge" data-step="writer"><i></i>Writer</span><span class="ui__title">1화 · 우산 하나</span></div>
+        <p class="ui__p">막차를 놓친 <span class="mention">@서윤</span>은 정류장 지붕 끝에 서서 비를 피했다.</p>
+        <p class="ui__p ui__p--sel"><del>옆자리 남자가 말없이 우산을 기울였다.</del> <ins>옆자리 남자가 말없이 우산을 기울였다. 우산 끝에서 떨어진 빗방울이 그의 어깨만 적셨다.</ins></p>
+        <p class="ui__p ui__p--dim">둘의 어깨가 한 뼘쯤 젖었을 때, <span class="mention">@서윤</span>은 그가 같은 회사 신입이라는 걸 알아챘다.</p>
+        <div class="ui__ask">
+          <img src="./assets/lumi-writer.webp" alt="" width="28" height="22" />
+          <span>“우산 장면을 조금 더 설레게”</span>
+          <span class="ui__chip">이 문단만 고치기</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4-2 아이디어를 넓혀 줘요 -->
+    <div class="why__row why__row--flip reveal">
+      <div class="why__copy">
+        <span class="num">02</span>
+        <h3>아이디어를 넓혀 줘요</h3>
+        <p>막연한 한 줄도 괜찮아요. Lumi가 장르, 인물 관계, 결말 방향을 몇 갈래로 펼쳐 보여 주고, 고르는 대로 이야기가 단단해져요.</p>
+        <ul class="ticks"><li>장르 · 분위기 · 길이 · 화면 비율 추천</li><li>인물과 배경을 자동으로 정리</li><li>고른 갈래만 다음 단계로</li></ul>
+      </div>
+      <div class="ui ui--branch" aria-hidden="true">
+        <div class="seed">우산 하나를 같이 쓴 두 사람</div>
+        <svg class="branch__lines" viewBox="0 0 400 160" preserveAspectRatio="none"><path d="M200 0 C200 60 70 60 70 110"/><path d="M200 0 V110"/><path d="M200 0 C200 60 330 60 330 110"/></svg>
+        <div class="branch">
+          <div class="leaf leaf--on"><small>장르</small><b>로맨틱 코미디</b><span>상사와 신입, 비밀 연애의 시작</span></div>
+          <div class="leaf"><small>장르</small><b>잔잔한 드라마</b><span>매일 같은 버스, 말 없는 동행</span></div>
+          <div class="leaf"><small>장르</small><b>미스터리</b><span>우산 주인은 왜 나타나지 않을까</span></div>
+        </div>
+        <div class="branch__next">
+          <span class="opt opt--on">결말 · 해피엔딩</span><span class="opt">인물 2명 + 1</span><span class="opt">60초</span><span class="opt">9:16</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- 4-3 스토리보드 먼저 -->
+    <div class="why__row reveal">
+      <div class="why__copy">
+        <span class="num">03</span>
+        <h3>스토리보드로 먼저 확인해요</h3>
+        <p>영상부터 뽑으면 마음에 들 때까지 계속 다시 만들어야 해요. Tale은 컷마다 구도 · 카메라 · 조명을 콘티로 먼저 보여 줘요. 확정한 컷만 영상으로 옮기니 결과가 원하는 모습에 가까워요.</p>
+        <ul class="ticks"><li>콘티 · 인물 시트 · 컨셉 이미지는 항상 무료</li><li>Take는 확정한 컷에만 써요</li><li>인물 얼굴이 컷마다 바뀌지 않아요</li></ul>
+      </div>
+      <div class="ui ui--compare" aria-hidden="true">
+        <div class="cmp cmp--bad">
+          <div class="cmp__h"><span>바로 영상 생성</span><em>다시 · 다시 · 다시</em></div>
+          <div class="cmp__row">
+            <span class="vid vid--x"></span><span class="vid vid--x"></span><span class="vid vid--x"></span><span class="vid vid--ok"></span>
+          </div>
+          <p class="cmp__f">4번 생성 · <b>20 Takes</b></p>
+        </div>
+        <div class="cmp cmp--good">
+          <div class="cmp__h"><span>Tale · 콘티 먼저</span><em>확인 → 확정 → 생성</em></div>
+          <div class="cmp__row">
+            <span class="sb sb--ok">1</span><span class="sb sb--ok">2</span><span class="sb sb--redo">3<i>다시 그리기 · 무료</i></span><span class="sb sb--ok">4</span>
+          </div>
+          <p class="cmp__f">콘티 확인 무료 · 확정 후 <b>5 Takes</b></p>
+        </div>
+        <p class="cmp__note">Seedance 2.0 720p 기준 예시. 실제 사용량은 컷 수와 모델에 따라 달라요.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- 6 · 기능 벤토 -->
+<section class="bento-sec">
+  <div class="wrap">
+    <div class="sec-head reveal">
+      <p class="eyebrow">All-in-one</p>
+      <h2>프리비즈에 필요한 건<br />한 화면에</h2>
+    </div>
+    <div class="bento">
+      <article class="tile tile--chat reveal">
+        <div class="tile__copy"><h3>채팅으로 기획</h3><p>길이 · 결말 · 분위기, 말로 바꾸면 Lumi가 이야기와 컷 구성을 같이 고쳐요.</p></div>
+        <div class="cp" aria-hidden="true">
+          <div class="cp__log">
+            <span class="cp-me">60초짜리로 줄여 줘</span>
+            <div class="cp-lumi"><img src="./assets/lumi-hd.webp" alt="" /><div class="cp-b"><b>Lumi</b>정류장 장면 두 개를 하나로 합쳤어요.
+              <span class="cp-diff"><s>8컷 · 90초</s><i>→</i><em>6컷 · 60초</em></span></div></div>
+            <span class="cp-me">결말을 반전으로 바꿔 줘</span>
+            <div class="cp-lumi"><img src="./assets/lumi-hd.webp" alt="" /><div class="cp-b"><b>Lumi</b>이런 결말은 어때요?
+              <span class="cp-opt cp-opt--on">도현이 사실 우산 주인을 찾고 있었다</span>
+              <span class="cp-opt">다음 날, 서윤이 같은 우산을 들고 온다</span></div></div>
+          </div>
+          <div class="cp__in"><span>Lumi에게 말하기…</span><i></i></div>
+        </div>
+      </article>
+      <article class="tile tile--cast reveal">
+        <div class="tile__copy"><h3>인물 보드</h3><p>얼굴이 컷마다 바뀌지 않게, Lumi가 인물마다 보드를 먼저 만들어요. 얼굴 · 정면 · 측면 · 뒷모습을 한 장에.</p></div>
+        <figure class="ph cast-board" data-img="IMG-B1" aria-hidden="true"><img src="./assets/gen/artist-01.webp" alt="" /><figcaption>서윤 · 인물 보드</figcaption></figure>
+      </article>
+      <article class="tile tile--cam reveal">
+        <div class="tile__copy"><h3>컷마다 카메라 · 조명</h3><p>6축 카메라 앵글과 조명을 컷 단위로.</p></div>
+        <div class="cam" aria-hidden="true">
+          <div class="cam__row"><span>앵글</span><span class="seg"><em>아이레벨</em><em class="on">로우</em><em>하이</em></span></div>
+          <div class="cam__row"><span>샷</span><span class="seg"><em>와이드</em><em>미디엄</em><em class="on">클로즈업</em></span></div>
+          <div class="cam__row"><span>조명</span><span class="slider"><i style="width:68%"></i></span></div>
+        </div>
+      </article>
+      <article class="tile tile--sheet reveal">
+        <div class="tile__copy"><h3>마스터 시트 내보내기</h3><p>컷 · 대사 · 카메라를 한 장으로. 팀과 바로 공유해요.</p></div>
+        <div class="msheet" aria-hidden="true">
+          <div class="msheet__row msheet__row--h"><span>컷</span><span>샷</span><span>대사</span></div>
+          <div class="msheet__row"><span>1</span><span>와이드</span><span>—</span></div>
+          <div class="msheet__row"><span>2</span><span>미디엄</span><span>“이 버스 타세요?”</span></div>
+          <div class="msheet__row"><span>3</span><span>클로즈업</span><span>“…네.”</span></div>
+        </div>
+      </article>
+      <article class="tile tile--video reveal">
+        <div class="tile__copy"><h3>영상 생성 · T2V · I2V</h3><p>글에서 바로, 또는 확정한 콘티 이미지에서 영상으로.</p></div>
+        <figure class="ph ph--video" data-img="IMG-V1"><video src="./assets/gen/umbrella-15s.mp4" poster="./assets/gen/umbrella-poster.jpg" muted loop playsinline autoplay></video><span class="play" aria-hidden="true"></span><figcaption>컷 3 · 5초 · 720p</figcaption></figure>
+      </article>
+    </div>
+  </div>
+</section>
+
+<section class="finale finale--sm">
+  <div class="burst" aria-hidden="true"></div>
+  <div class="wrap finale__in reveal">
+    <h2>한 줄로 <span class="pt pt--flow">시작해 볼까요?</span></h2>
+    <div class="finale__btns">
+      <a href="#start" class="btn btn--primary btn--lg">Lumi와 시작하기 <span aria-hidden="true">→</span></a>
+      <a href="#pricing" class="btn btn--ghost btn--lg">요금 확인하기</a>
+    </div>
+  </div>
+</section>
+
+</div>
+
+<div class="view" id="pricing" data-view hidden>
+<!-- 9 · 요금 -->
+<section class="pricing">
+  <div class="wrap">
+    <div class="sec-head sec-head--center reveal">
+      <p class="eyebrow">요금</p>
+      <h2>기획한 분량과 쓴 Take만큼</h2>
+      <p class="sec-sub">이미지는 언제나 무료예요. 콘티 · 컨셉 아트 · 인물 시트에는 Take를 쓰지 않아요.</p>
+      <p class="notice"><span class="notice__dot"></span>결제는 준비 중이에요. 요금제와 Take 팩은 둘러볼 수 있어요.</p>
+    </div>
+
+    <div class="plans">
+      <article class="plan reveal">
+        <p class="plan__kind">월 구독</p>
+        <h3>Starter</h3>
+        <p class="plan__for">혼자 만드는 크리에이터</p>
+        <p class="price"><span class="cur">$</span><span class="amt">15</span><small>부터 / 월</small></p>
+        <p class="plan__desc">한 번에 프로젝트 하나. 필요한 영상 분량을 골라요.</p>
+        <ul class="ticks"><li>프로젝트당 영상 분량 선택</li><li>720p 첫 생성 포함</li><li>이미지 무제한 무료</li></ul>
+        <a href="#start" class="btn btn--ghost">옵션 고르기</a>
+      </article>
+      <article class="plan plan--pick reveal">
+        <p class="plan__kind">월 구독 <span class="tag">팀 추천</span></p>
+        <h3>Producer</h3>
+        <p class="plan__for">제작팀</p>
+        <p class="price"><span class="cur">$</span><span class="amt">199</span><small>부터 / 월</small></p>
+        <p class="plan__desc">더 많은 프로젝트와 계정, 팀을 위한 프리비즈 내보내기.</p>
+        <ul class="ticks"><li>연결 프로젝트 · 계정 확장</li><li>프리비즈 데이터 · AX 에이전트 설정 내보내기</li><li>월 Take 넉넉하게</li></ul>
+        <a href="#start" class="btn btn--primary">옵션 고르기</a>
+      </article>
+      <article class="plan reveal">
+        <p class="plan__kind">1회 충전</p>
+        <h3>Take</h3>
+        <p class="plan__for">다음 생성을 위해</p>
+        <p class="price"><span class="cur">$</span><span class="amt">29</span><small>부터 · 1회</small></p>
+        <p class="plan__desc">다시 만들기와 프리미엄 영상 모델에 쓸 Take를 충전해요.</p>
+        <ul class="ticks"><li>팩 Take는 12개월 유효</li><li>1080p · 프리미엄 모델</li><li>요금제와 함께 써요</li></ul>
+        <a href="#start" class="btn btn--ghost">옵션 고르기</a>
+      </article>
+    </div>
+
+    <div class="axes reveal">
+      <h3>요금제가 주는 네 가지</h3>
+      <p class="axes__sub">모든 요금제는 같은 네 가지로 재요. 높은 요금제는 기능을 더 여는 게 아니라 여유를 더 줘요.</p>
+      <div class="axes__grid">
+        <div><b>프로젝트당 분량</b><span>프로젝트마다 쓸 수 있는 영상 분(分). 720p 첫 생성 포함.</span></div>
+        <div><b>연결 프로젝트</b><span>동시에 둘 수 있고 한 편으로 이어 붙일 수 있는 프로젝트 수.</span></div>
+        <div><b>월 Take</b><span>다시 만들기 · 1080p · 프리미엄 모델에 써요. 이미지는 쓰지 않아요.</span></div>
+        <div><b>내보내기</b><span>프리비즈 데이터와 AX 에이전트 설정을 밖으로. 최종 영상은 모든 요금제에서.</span></div>
+      </div>
+    </div>
+
+    <div class="takes reveal">
+      <div class="takes__copy">
+        <h3>Take가 뭔가요?</h3>
+        <p>Take 1개는 720p 영상 한 번 생성이에요. 컷을 다시 만들거나, 1080p로 뽑거나, 프리미엄 모델을 쓰면 더 들어요. 생성 전에 항상 비용을 먼저 보여 드려요.</p>
+        <ul class="takes__rules">
+          <li><b>이미지는 무료</b>콘티 · 컨셉 아트 · 인물 시트는 어떤 요금제에서도 Take를 쓰지 않아요.</li>
+          <li><b>요금제 Take는 매달 새로</b>남은 요금제 Take는 결제 주기가 끝나면 사라져요. 팩 Take는 12개월.</li>
+          <li><b>무료 → 요금제 → 팩 순서로</b>무료 Take부터 써서, 낸 돈이 먼저 사라지지 않아요.</li>
+        </ul>
+      </div>
+      <table class="takes__table">
+        <caption class="sr">모델별 Take 사용량</caption>
+        <thead><tr><th scope="col">모델</th><th scope="col">Take</th></tr></thead>
+        <tbody>
+          <tr><td>Seedance Pro 720p</td><td>1</td></tr>
+          <tr><td>Seedance Pro 1080p</td><td>4</td></tr>
+          <tr><td>Seedance 2.0 Fast 720p</td><td>4</td></tr>
+          <tr><td>Seedance 2.0 720p</td><td>5</td></tr>
+          <tr><td>Seedance 2.0 1080p</td><td>10</td></tr>
+          <tr class="free"><td>스토리보드 · 인물 시트 · 컨셉 이미지</td><td>0</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="studio reveal">
+      <div><h3>Studio</h3><p>연결 프로젝트 4개 또는 계정 8개가 넘나요? Studio는 연간 계약으로 Take를 함께 쓰고, 세금계산서와 전담 지원을 드려요. Studio S는 계정 10개 · 연 30,000 Take부터예요.</p></div>
+      <a href="mailto:support@talestudio.art" class="btn btn--ghost">문의하기</a>
+    </div>
+  </div>
+</section>
+
+<!-- 10 · 자주 묻는 질문 -->
+<section class="faq">
+  <div class="wrap faq__in">
+    <div class="sec-head reveal"><p class="eyebrow">자주 묻는 질문</p><h2>궁금한 게 있나요?</h2></div>
+    <div class="faq__list reveal">
+      <details open><summary>영상 만들기를 몰라도 쓸 수 있나요?</summary><p>네. 한 줄만 적으면 Lumi가 장르와 길이를 묻고, 산문 · 인물 · 콘티 순서로 이어 가요. 각 단계에서 고르기만 하면 돼요.</p></details>
+      <details><summary>스토리보드를 먼저 보는 게 왜 좋아요?</summary><p>영상은 한 번 만들 때마다 Take가 들어요. 콘티는 무료라서, 구도와 인물을 먼저 맞추고 확정한 컷만 영상으로 옮기면 다시 만드는 횟수가 확 줄어요.</p></details>
+      <details><summary>이미지도 Take를 쓰나요?</summary><p>아니요. 스토리보드 · 컨셉 아트 · 인물 시트는 어떤 요금제에서도 Take를 쓰지 않아요.</p></details>
+      <details><summary>쓰지 않은 Take는 어떻게 되나요?</summary><p>요금제 Take는 결제 주기가 끝나면 사라지고, 충전한 팩 Take는 12개월 동안 쓸 수 있어요. 무료 Take → 요금제 Take → 팩 Take 순서로 써요.</p></details>
+      <details><summary>제 작업물이 AI 학습에 쓰이나요?</summary><p>아니요. Tale에서 만든 프로젝트 · 프롬프트 · 생성물은 AI 모델 학습에 쓰지 않아요.</p></details>
+      <details><summary>지금 결제할 수 있나요?</summary><p>결제는 준비 중이에요. 요금제와 Take 팩은 미리 둘러볼 수 있어요.</p></details>
+    </div>
+  </div>
+</section>
+
+<section class="finale finale--sm">
+  <div class="burst" aria-hidden="true"></div>
+  <div class="wrap finale__in reveal">
+    <h2>한 줄로 <span class="pt pt--flow">시작해 볼까요?</span></h2>
+    <div class="finale__btns"><a href="#start" class="btn btn--primary btn--lg">Lumi와 시작하기 <span aria-hidden="true">→</span></a></div>
+  </div>
+</section>
+</div>
+
+<div class="view" id="legal" data-view hidden>
+<section class="legal">
+  <div class="wrap legal__in">
+    <aside class="legal__side">
+      <p class="eyebrow" data-ko="약관 및 정책" data-en="Legal">약관 및 정책</p>
+      <nav class="legal__nav" aria-label="약관 및 정책">
+        <a href="#terms" data-ko="이용약관" data-en="Terms of service">이용약관</a>
+        <a href="#refund" data-ko="환불·해지 정책" data-en="Refunds &amp; cancellation">환불·해지 정책</a>
+        <a href="#privacy" data-ko="개인정보처리방침" data-en="Privacy policy">개인정보처리방침</a>
+        <a href="#acceptable-use" data-ko="이용 정책" data-en="Acceptable use policy">이용 정책</a>
+      </nav>
+    </aside>
+    <div class="legal__body">
+      <article class="legal__doc" id="terms"></article>
+      <article class="legal__doc" id="refund" hidden></article>
+      <article class="legal__doc" id="privacy" hidden></article>
+      <article class="legal__doc" id="acceptable-use" hidden></article>
+    </div>
+  </div>
+</section>
+</div>
+</main>
+
+<footer class="foot">
+  <div class="wrap foot__in">
+    <div class="foot__brand">
+      <img class="only-dark" src="./assets/tale-lockup.svg" alt="tale studio" width="118" height="30" />
+      <img class="only-light" src="./assets/tale-lockup-light.svg" alt="tale studio" width="118" height="30" />
+      <p>한 줄 이야기에서 프리비즈 영상까지. AI 제작팀과 함께하는 올인원 프리프로덕션 스튜디오.</p>
+    </div>
+    <nav class="foot__links" aria-label="푸터">
+      <a href="#service">Tale 서비스</a><a href="#pricing">요금</a><a href="mailto:support@talestudio.art">문의</a>
+      <a href="#terms">이용약관</a><a href="#refund">환불·해지</a><a href="#privacy"><b>개인정보처리방침</b></a><a href="#acceptable-use">이용 정책</a>
+    </nav>
+    <p class="foot__biz">Talestudio · 대표 Daewon Yoon · 사업자등록번호 333-27-02069 · 13606 경기도 성남시 분당구 돌마로 169 · support@talestudio.art<br />결제는 준비 중이에요 · © 2026 Tale Studio. All rights reserved.</p>
+  </div>
+</footer>
+
+<!--LUMI_PERSONA-->
+<script type="module" src="./src/main.tsx"></script>
+</body>
+</html>

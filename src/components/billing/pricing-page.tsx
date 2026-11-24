@@ -10,7 +10,9 @@ import { ContactPopover } from '@/components/contact-popover'
 import { PricingFamilies } from '@/components/billing/pricing-families'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
-import { useT } from '@/lib/i18n'
+import { useLocale, useT } from '@/lib/i18n'
+import { pricingSurface } from '@/lib/billing/pricing-selection'
+import { readPortOneBillingChannelKey, readPortOnePublicConfig } from '@/lib/billing/portone-public'
 import { TAKE_COEFFICIENT_NOTES } from '@/lib/billing/catalog'
 
 // 라벨은 영어 원문 = i18n 사전 키 (#i18n-s5).
@@ -46,6 +48,35 @@ function SectionHeading({ title, body }: { title: string; body: string }) {
   )
 }
 
+/** 맨 위 안내: 원화 화면은 작은 알약 "Take 팩은 바로 살 수 있어요", 닫힌 달러 화면은 종전 "결제 준비 중" 상자. */
+function PricingBanner({ checkoutEnabled }: { checkoutEnabled: boolean }) {
+  const t = useT()
+  const locale = useLocale()
+  const surface = pricingSurface({
+    locale,
+    checkoutEnabled,
+    koreanCardReady: readPortOnePublicConfig() !== null,
+    koreanSubscriptionReady: readPortOneBillingChannelKey() !== null,
+  })
+  if (surface.banner === 'korean-card') {
+    return (
+      <div className="mb-12 flex justify-center" role="status">
+        <p className="inline-flex items-center gap-2 rounded-full bg-chip px-4 py-2 text-label text-muted-foreground">
+          <span className="size-1.5 rounded-full bg-primary" aria-hidden="true" />
+          {t(surface.koreanSubscriptionReady ? 'Pay by Korean card' : 'Take packs can be bought now with a Korean card. Subscriptions open soon.')}
+        </p>
+      </div>
+    )
+  }
+  if (surface.banner !== 'preparing') return null
+  return (
+    <div className="mb-16 rounded-xl border border-border bg-muted/30 px-5 py-4 text-center text-sm text-foreground" role="status">
+      <p className="font-medium">{t('Payments are being prepared')}</p>
+      <p className="mt-1 text-muted-foreground">{t('You can browse plans and Take packs. Purchases are not open yet.')}</p>
+    </div>
+  )
+}
+
 export function PricingPageContent({ checkoutEnabled }: { checkoutEnabled: boolean }) {
   const t = useT()
 
@@ -60,12 +91,7 @@ export function PricingPageContent({ checkoutEnabled }: { checkoutEnabled: boole
           </p>
         </div>
 
-        {!checkoutEnabled && (
-          <div className="mb-16 rounded-xl border border-border bg-muted/30 px-5 py-4 text-center text-sm text-foreground" role="status">
-            <p className="font-medium">{t('Payments are being prepared')}</p>
-            <p className="mt-1 text-muted-foreground">{t('You can browse plans and Take packs. Purchases are not open yet.')}</p>
-          </div>
-        )}
+        <PricingBanner checkoutEnabled={checkoutEnabled} />
 
         <section className="mb-20" aria-label={t('Choose a plan or Take pack')}>
           <PricingFamilies checkoutEnabled={checkoutEnabled} />

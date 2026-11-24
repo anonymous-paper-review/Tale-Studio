@@ -1,0 +1,443 @@
+/* Tale Studio 앱 시뮬레이션 — 실제 앱 CSS 변수(reference-app/tokens.md)와 캡처 배치를 따름 (1440 × 900 설계, 비율 유지로 축소) */
+.sim { --shell: #262624; --side: #1f1e1d; --navon: #2f2e2b; --card: #30302e; --chip: #3a3936; --raised: #2a2927; --tab: #34332f; --elev: #45443f; --canvas: #1a1918;
+  --lumi-bub: #2a2927; --my-bub: #34332f; --c-lumi-bub: #34332f; --c-my-bub: #45443f;
+  --t1: #f5f4ee; --t2: #c2c0b6; --t3: #8e8b82; --t4: #5c5a55; --cream: #edeae0; --onc: #1f1e1d; --line: #2f2e2b; --line2: #3a3936;
+  --lock: #d9967c; --mention: #8eb2ff; --warn: #ffcd29; --ok: #14ae5c;
+  --stage: #f2a33a; --badge: linear-gradient(90deg, #ea8a2c, #ffb84f); --badge-fg: #1f1e1d;
+  position: relative; width: 100%; aspect-ratio: 16 / 10; overflow: hidden; border-radius: 18px; background: var(--shell);
+  box-shadow: 0 0 0 1px rgba(255, 255, 255, 0.06), 0 40px 100px -30px rgba(0, 0, 0, 0.55); font-family: 'Pretendard Variable', Pretendard, system-ui, sans-serif; color: var(--t1); }
+.sim[data-s='producer'] { --stage: #f2a33a; --badge: linear-gradient(90deg, #ea8a2c, #ffb84f); --badge-fg: #1f1e1d; }
+.sim[data-s='writer'] { --stage: #e8606f; --badge: linear-gradient(90deg, #b54b57, #ea707d); --badge-fg: #fff; }
+.sim[data-s='artist'] { --stage: #8b63e8; --badge: linear-gradient(90deg, #6c4db5, #9773ea); --badge-fg: #fff; }
+.sim[data-s='storyboard'] { --stage: #5a6ae6; --badge: linear-gradient(90deg, #4653b3, #6b79e8); --badge-fg: #fff; }
+.sim[data-s='director'] { --stage: #3e9be0; --badge: linear-gradient(90deg, #3079af, #51a5e3); --badge-fg: #fff; }
+.sim[data-s='editor'] { --stage: #2db39a; --badge: linear-gradient(90deg, #238c78, #42bba4); --badge-fg: #fff; }
+.sim__canvas { position: absolute; left: 0; top: 0; width: 1440px; height: 900px; transform-origin: 0 0; }
+.sim * { box-sizing: border-box; }
+.sim p { margin: 0; }
+
+/* 사이드바: 폭 74 · 위 · 왼쪽 8 · 모서리 16 */
+.sim-side { position: absolute; left: 8px; top: 8px; width: 74px; height: 884px; border-radius: 16px; background: var(--side); display: flex; flex-direction: column; align-items: center; padding: 16px 0 14px; gap: 6px; }
+.sim-side__logo { width: 24px; margin-bottom: 18px; }
+.sim-nav { position: relative; display: grid; justify-items: center; gap: 5px; width: 60px; padding: 10px 0 8px; border-radius: 12px; font: 500 11.5px/1.3 Pretendard, sans-serif; color: var(--t3); transition: background-color .4s, color .4s; }
+.sim-nav i { width: 20px; height: 20px; border-radius: 6px; background: var(--t4); transition: background-color .4s, box-shadow .4s; }
+.sim-nav.on { background: var(--navon); color: var(--t1); }
+.sim-nav.on i { background: var(--c); box-shadow: 0 0 12px -2px var(--c); }
+.sim-nav.done i { background: var(--t2); }
+.sim-nav.done::after { content: '✓'; position: absolute; right: 12px; top: 6px; width: 12px; height: 12px; border-radius: 50%; background: var(--t1); color: var(--side); font: 800 8px/12px Inter, sans-serif; text-align: center; }
+.sim-side__end { margin-top: auto; display: grid; gap: 12px; justify-items: center; font: 500 11px/1.3 Pretendard, sans-serif; color: var(--t3); }
+.sim-side__end i { display: block; width: 18px; height: 18px; margin: 0 auto 3px; border-radius: 5px; background: var(--t4); }
+.sim-av { width: 28px; height: 28px; border-radius: 50%; background: var(--chip); display: grid; place-items: center; color: var(--t1); font: 700 12px Inter, sans-serif; }
+
+/* 위쪽 바: 그라데이션 단계 배지 + 제목 + 연필 */
+.sim-top { position: absolute; left: 104px; top: 16px; display: flex; align-items: center; gap: 12px; }
+.sim-badge { padding: 4px 11px; border-radius: 999px; background: var(--badge); color: var(--badge-fg); font: 600 12px/1.4 Pretendard, sans-serif; }
+.sim-title { font: 500 15px/1.4 Pretendard, sans-serif; }
+.sim-pen { width: 14px; height: 14px; border-radius: 3px; border: 1.5px solid var(--t2); transform: rotate(45deg) scaleX(.35); }
+.sim-btns { position: absolute; top: 12px; right: 20px; display: flex; gap: 8px; }
+.sim--chat .sim-btns { right: 412px; top: 66px; }
+.sim-btn { padding: 9px 14px; border-radius: 10px; background: var(--card); color: var(--t1); font: 500 13.5px/1.4 Pretendard, sans-serif; white-space: nowrap; transition: transform .15s, background-color .2s; }
+.sim-btn--cream { background: var(--cream); color: var(--onc); font-weight: 600; }
+.sim-btn.press, .sim-chipq.press, .sim-pick__c.press, .sim-styles__c.press { transform: scale(.94); }
+.sim-seg { display: flex; padding: 3px; border-radius: 12px; background: var(--side); font: 500 13px Pretendard, sans-serif; }
+.sim-seg span { padding: 6px 12px; border-radius: 9px; color: var(--t3); }
+.sim-seg span.on { background: var(--tab); color: var(--t1); }
+.sim-seg--top { background: var(--raised); }
+
+/* 장면 */
+.sim-scene { position: absolute; left: 90px; top: 56px; right: 8px; bottom: 8px; opacity: 0; transition: opacity .5s ease; pointer-events: none; }
+.sim-scene.on { opacity: 1; }
+.sim--chat .sim-scene { right: 400px; }
+
+/* 채팅 공통: 아바타 옆 말풍선, 이름은 말풍선 안 단계색 */
+.sim-msg { display: grid; grid-template-columns: 30px minmax(0, 1fr); gap: 10px; align-items: start; animation: simIn .45s cubic-bezier(.2, .8, .2, 1) both; }
+.sim-msg__av { width: 30px; height: 30px; display: grid; place-items: center; }
+.sim-msg__av img { width: 28px; }
+.sim-msg__name { font: 600 12px/1.4 Pretendard, sans-serif; color: var(--stage); margin-bottom: 6px !important; }
+.sim-bub { justify-self: start; max-width: 100%; padding: 14px 18px; border-radius: 16px; background: var(--lumi-bub); color: var(--t1); font: 400 13.5px/1.6 Pretendard, sans-serif; }
+.sim-msg--c .sim-bub { background: var(--c-lumi-bub); }
+.sim-me { justify-self: end; align-self: end; max-width: 78%; padding: 11px 16px; border-radius: 16px; background: var(--my-bub); color: var(--t1); font: 400 13.5px/1.55 Pretendard, sans-serif; animation: simIn .4s cubic-bezier(.2, .8, .2, 1) both; }
+.sim-pro .sim-me { background: var(--c-my-bub); }
+.sim-qs { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
+.sim-chipq { display: inline-flex; align-items: center; gap: 6px; padding: 7px 13px; border-radius: 999px; background: var(--chip); color: var(--t1); font: 500 13px/1.4 Pretendard, sans-serif; transition: box-shadow .3s, opacity .3s, transform .15s; }
+.sim-pro .sim-chipq { background: var(--c-my-bub); }
+.sim-chipq em, .sim-pick__c em { font-style: normal; padding: 1px 6px; border-radius: 999px; background: var(--stage); color: var(--onc); font: 600 10.5px/1.5 Pretendard, sans-serif; }
+.sim-chipq.rec { box-shadow: inset 0 0 0 1.5px var(--stage); }
+.sim-chipq.pick { box-shadow: inset 0 0 0 1.5px var(--stage); background: color-mix(in srgb, var(--stage) 18%, var(--c-my-bub)); }
+.sim-qs.done .sim-chipq:not(.pick) { opacity: .4; }
+.sim-why { margin-top: 10px !important; color: var(--t2); font-size: 12.5px; }
+.sim-lock { margin-top: 2px !important; color: var(--lock); font-weight: 600; font-size: 13px; }
+/* 길이 · 비율: 4칸 카드 */
+.sim-pick { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; margin-top: 12px; }
+.sim-pick__c { position: relative; display: grid; align-content: start; gap: 6px; min-height: 92px; padding: 12px; border-radius: 12px; background: var(--raised); transition: box-shadow .3s, opacity .3s, transform .15s, background-color .3s; }
+.sim-pick__c b { font: 700 15px/1.3 Pretendard, sans-serif; }
+.sim-pick__c small { font: 400 12px/1.4 Pretendard, sans-serif; color: var(--t2); }
+.sim-pick__c em { position: absolute; right: -4px; top: 10px; }
+.sim-pick__c.rec { box-shadow: inset 0 0 0 1.5px var(--stage); background: color-mix(in srgb, var(--stage) 16%, var(--raised)); }
+.sim-pick__c.pick { box-shadow: inset 0 0 0 1.5px var(--stage); background: color-mix(in srgb, var(--stage) 22%, var(--raised)); }
+.sim-pick.done .sim-pick__c:not(.pick) { opacity: .4; box-shadow: none; background: var(--raised); }
+.sim-dots { display: inline-flex; gap: 4px; padding: 14px 16px; border-radius: 16px; background: var(--lumi-bub); }
+.sim-msg--c .sim-dots { background: var(--c-lumi-bub); }
+.sim-dots i { width: 6px; height: 6px; border-radius: 50%; background: var(--stage); animation: simDot 1s ease-in-out infinite; }
+.sim-dots i:nth-child(2) { animation-delay: .15s; } .sim-dots i:nth-child(3) { animation-delay: .3s; }
+@keyframes simDot { 50% { transform: translateY(-4px); opacity: .4; } }
+@keyframes simIn { from { opacity: 0; transform: translateY(10px); } }
+.sim-input { display: flex; align-items: center; gap: 10px; min-height: 52px; padding: 0 9px 0 16px; border-radius: 16px; background: var(--card); box-shadow: inset 0 0 0 1px var(--line2); font: 400 13.5px Pretendard, sans-serif; color: var(--t3); transition: box-shadow .3s; }
+.sim-input.ready { box-shadow: inset 0 0 0 1.5px var(--stage); }
+.sim-input b { font-weight: 400; color: var(--t1); white-space: nowrap; overflow: hidden; }
+.sim-input .ph { position: static; overflow: visible; border-radius: 0; background: none; }
+.sim-input .ph::after { content: none; }
+.sim-input .ph[hidden] { display: none; }
+.sim-input__plus { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; color: var(--t2); font: 500 16px/1 Inter, sans-serif; }
+.sim-input__send { margin-left: auto; flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--chip); transition: background-color .3s; display: grid; place-items: center; color: var(--t3); font-weight: 800; }
+.sim-input.ready .sim-input__send { background: var(--cream); color: var(--onc); }
+
+/* 오른쪽 Lumi 패널 */
+.sim-chat { position: absolute; right: 0; top: 0; bottom: 0; width: 388px; background: var(--side); display: grid; grid-template-rows: auto 1fr auto auto; transform: translateX(100%); transition: transform .6s cubic-bezier(.2, .8, .2, 1); }
+.sim--chat .sim-chat { transform: none; }
+.sim-chat__head { display: flex; align-items: center; gap: 10px; padding: 18px 20px; font: 600 14px Pretendard, sans-serif; }
+.sim-chat__head img { width: 24px; }
+.sim-chat__head span { margin-left: auto; width: 26px; height: 26px; border-radius: 8px; background: var(--card); display: grid; place-items: center; color: var(--t2); font-size: 13px; }
+.sim-chat__log { display: flex; flex-direction: column; justify-content: flex-end; gap: 14px; padding: 0 18px 14px; overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 40px); mask-image: linear-gradient(transparent, #000 40px); }
+.sim-chat .sim-input { margin: 0 14px 8px; }
+.sim-chat__foot { display: flex; padding: 0 16px 14px; }
+.sim-chat__stage { padding: 4px 11px; border-radius: 999px; background: var(--stage); color: var(--badge-fg); font: 600 12px/1.4 Pretendard, sans-serif; }
+
+/* Producer: 가운데 채팅 + 지금까지 정한 것 */
+.sim-pro { position: absolute; left: 50%; top: -42px; bottom: 0; width: 600px; margin-left: -300px; display: grid; grid-template-rows: auto 1fr auto; padding-bottom: 16px; }
+.sim-set { justify-self: center; display: flex; align-items: center; gap: 6px; padding: 5px; border-radius: 12px; background: var(--side); font: 500 12px Pretendard, sans-serif; color: var(--t3); white-space: nowrap; }
+.sim-set em { font-style: normal; padding: 0 6px 0 8px; color: var(--t2); }
+.sim-set span { padding: 5px 10px; border-radius: 999px; background: var(--raised); transition: box-shadow .3s; }
+.sim-set span.ask { box-shadow: inset 0 0 0 1.5px var(--stage); }
+.sim-set b { font-weight: 500; color: var(--t3); margin-left: 3px; transition: color .3s; }
+.sim-set span.set b { color: var(--t1); font-weight: 700; }
+.sim-pro__log { display: flex; flex-direction: column; justify-content: flex-end; gap: 16px; padding: 20px 0; overflow: hidden; -webkit-mask-image: linear-gradient(transparent, #000 60px); mask-image: linear-gradient(transparent, #000 60px); }
+.sim-sum { margin-top: 12px; display: grid; padding: 4px 16px; border-radius: 12px; background: var(--side); }
+.sim-sum div { display: grid; grid-template-columns: 104px 1fr; padding: 10px 0; font: 400 13px/1.45 Pretendard, sans-serif; color: var(--t1); }
+.sim-sum div + div { border-top: 1px solid var(--line); }
+.sim-sum span { color: var(--t3); }
+.sim-sum-btns { display: flex; gap: 8px; margin-top: 14px; }
+.sim-sum-btns .sim-btn { border-radius: 999px; }
+.sim-pro .sim-sum-btns .sim-btn:not(.sim-btn--cream) { background: var(--elev); }
+
+/* Writer */
+.sim-h { display: flex; align-items: baseline; gap: 10px; padding: 18px 40px 0; }
+.sim-h b { font: 700 28px/1.3 Pretendard, sans-serif; letter-spacing: -.02em; }
+.sim-h span { font: 500 12.5px Pretendard, sans-serif; color: var(--t3); }
+.sim-meta { display: flex; align-items: center; gap: 6px; padding: 12px 40px 18px; }
+.sim-meta em { font: 500 11.5px Pretendard, sans-serif; font-style: normal; color: var(--t3); margin-right: 2px; }
+.sim-meta span { padding: 5px 10px; border-radius: 999px; background: var(--raised); font: 500 12px Pretendard, sans-serif; color: var(--t3); }
+.sim-meta b { color: var(--t1); font-weight: 700; margin-left: 4px; }
+.sim-prose { margin: 0 40px; padding: 26px 28px; border-radius: 16px; background: var(--side); box-shadow: 0 20px 50px -24px rgba(0, 0, 0, .6); display: grid; gap: 18px; }
+.sim-para { display: grid; grid-template-columns: 24px 1fr; gap: 8px; padding: 8px 10px; margin: -8px -10px; border-radius: 12px; box-shadow: inset 0 0 0 0 var(--stage); font: 400 16px/1.75 Pretendard, sans-serif; color: var(--t1); transition: box-shadow .3s, background-color .3s; }
+.sim-para em { font: 700 11.5px/2.4 Inter, sans-serif; color: var(--t1); font-style: normal; }
+.sim-para .w { opacity: 0; transition: opacity .3s; }
+.sim-para .w.on { opacity: 1; }
+.sim-para.sel { box-shadow: inset 0 0 0 1.5px var(--stage); background: color-mix(in srgb, var(--stage) 10%, var(--side)); }
+.sim-para.old .sim-para__t { color: var(--t3); text-decoration: line-through; text-decoration-color: var(--t4); }
+.sim-fix { grid-column: 2; margin-top: 10px; padding: 16px 18px; border-radius: 12px; background: color-mix(in srgb, var(--stage) 7%, var(--side)); box-shadow: inset 0 0 0 1.5px var(--stage); font: 400 15px/1.7 Pretendard, sans-serif; color: var(--t1); animation: simIn .45s both; }
+.sim-fix small { display: block; font: 600 12px Pretendard, sans-serif; color: var(--stage); margin-bottom: 6px; }
+.sim-fix .sim-sum-btns { margin-top: 10px; }
+.sim-hint { padding: 14px 40px 0; font: 400 12px Pretendard, sans-serif; color: var(--t3); }
+
+/* Artist */
+.sim-style { display: flex; align-items: center; gap: 12px; margin: 12px 40px 6px; padding: 10px 12px; border-radius: 14px; background: var(--side); }
+.sim-style i { position: relative; width: 40px; height: 40px; border-radius: 8px; overflow: hidden; }
+.sim-style i svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sim-style b { display: block; font: 600 14px Pretendard, sans-serif; }
+.sim-style small { font: 400 12px Pretendard, sans-serif; color: var(--t3); }
+.sim-style .sim-btn { margin-left: auto; }
+.sim-tabs { display: flex; gap: 6px; padding: 10px 40px 14px; }
+.sim-tabs span { padding: 7px 14px; border-radius: 999px; background: var(--raised); font: 500 13px Pretendard, sans-serif; color: var(--t1); }
+.sim-tabs span.on { box-shadow: inset 0 0 0 1.5px var(--stage); background: color-mix(in srgb, var(--stage) 14%, var(--raised)); font-weight: 600; }
+.sim-tabs span.ghost { background: var(--card); color: var(--t1); }
+.sim-tabs--sb span.ghost:first-of-type { margin-left: 8px; }
+.sim-cards { display: grid; gap: 14px; padding: 0 40px; }
+.sim-cards--art { grid-template-columns: 1fr 1fr; }
+.sim-cards--sb { grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 14px; }
+.sim-scn { display: flex; align-items: baseline; gap: 10px; padding: 0 40px 10px; font: 600 15px Pretendard, sans-serif; }
+.sim-scn b { font-size: 12.5px; color: var(--t1); }
+.sim-scn span { font: 400 12.5px Pretendard, sans-serif; color: var(--t3); }
+.sim-card { padding: 14px; border-radius: 16px; background: var(--side); opacity: .35; transition: opacity .5s, box-shadow .4s; }
+.sim-card.on { opacity: 1; }
+.sim-card--sheet.on:first-child { box-shadow: inset 0 0 0 1.5px var(--stage); }
+.sim-card > p:first-child { display: flex; gap: 8px; align-items: center; margin-bottom: 10px; font: 600 14.5px Pretendard, sans-serif; }
+.sim-kind { padding: 2px 8px; border-radius: 6px; background: var(--card); font: 500 11.5px Pretendard, sans-serif; color: var(--t2); }
+.sim-card small { display: block; margin-top: 10px; font: 400 12.5px/1.45 Pretendard, sans-serif; color: var(--t3); }
+.sim-card__img { position: relative; overflow: hidden; border-radius: 10px; background: var(--raised); aspect-ratio: 16 / 9; }
+.sim-card--sheet .sim-card__img { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 3px; padding: 3px; background: #f3f1ea; aspect-ratio: 16 / 8.6; }
+.sim-card--sheet .sim-card__img i { position: relative; overflow: hidden; border-radius: 3px; }
+.sim-card--wide { grid-column: span 1; }
+.sim-card__img svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: 0; transition: opacity .8s; }
+.sim-card.on .sim-card__img svg { opacity: 1; }
+.sim-card__img::after { content: ''; position: absolute; inset: 0; background: linear-gradient(100deg, transparent 30%, rgba(255, 255, 255, .06) 50%, transparent 70%); background-size: 250% 100%; animation: simShimmer 1.4s linear infinite; }
+.sim-card.on .sim-card__img::after { display: none; }
+@keyframes simShimmer { from { background-position: 100% 0; } to { background-position: -150% 0; } }
+.sim-card__img .flip, .sim-card__img i .flip { transform: scaleX(-1); }
+/* 스타일 고르기 모달 */
+.sim-modal { position: absolute; left: 50%; top: 60px; width: 640px; margin-left: -320px; padding: 26px 26px 20px; border-radius: 22px; background: var(--side); box-shadow: 0 0 0 1px var(--line), 0 40px 90px -20px rgba(0, 0, 0, .8); opacity: 0; transform: translateY(10px) scale(.98); transition: opacity .35s, transform .35s; z-index: 4; }
+.sim-modal.on { opacity: 1; transform: none; }
+.sim-modal__h { text-align: center; font: 700 20px Pretendard, sans-serif; margin-bottom: 18px !important; }
+.sim-styles { display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px; }
+.sim-styles__c { display: grid; gap: 8px; font: 500 13px Pretendard, sans-serif; transition: transform .15s; }
+.sim-styles__c i { position: relative; overflow: hidden; aspect-ratio: 4 / 2.8; border-radius: 10px; background: var(--raised); transition: box-shadow .3s; }
+.sim-styles__c i svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sim-styles__c.pick i { box-shadow: 0 0 0 2px var(--stage); }
+.sim-styles__c.pick::before { content: '✓ '; }
+.sim-modal__f { display: flex; align-items: center; justify-content: space-between; margin-top: 20px; }
+.sim-modal__f small { font: 400 12.5px/1.5 Pretendard, sans-serif; color: var(--t2); }
+
+/* Storyboard: 연출 점검 띠 + 샷 카드 */
+.sim-check { margin: 0 40px 14px; padding: 12px 16px; border-radius: 12px; background: color-mix(in srgb, var(--warn) 14%, var(--shell)); font: 600 13.5px Pretendard, sans-serif; color: var(--t1); }
+.sim-cards--sb .sim-card { padding: 12px; }
+.sim-card__h { margin-bottom: 10px; font: 600 12.5px Pretendard, sans-serif; color: var(--t1); }
+.sim-cards--sb .sim-card__img svg { filter: grayscale(1) contrast(1.25) brightness(1.5); }
+.sim-card__d { margin-top: 10px; font: 400 12.5px/1.5 Pretendard, sans-serif; color: var(--t2); }
+.sim-chips { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 10px; }
+.sim-chips em { font: 500 11px Pretendard, sans-serif; font-style: normal; padding: 3px 8px; border-radius: 6px; background: var(--card); color: var(--t1); }
+.sim-card.redo { box-shadow: inset 0 0 0 1.5px var(--stage); }
+.sim-tag { position: absolute; left: 8px; bottom: 8px; padding: 4px 10px; border-radius: 999px; background: var(--cream); color: var(--onc); font: 600 11.5px Pretendard, sans-serif; opacity: 0; transition: opacity .4s, transform .15s; }
+.sim-card.redo .sim-tag { opacity: 1; }
+.sim-redraw { position: absolute; inset: 0; display: grid; place-content: center; justify-items: center; gap: 6px; background: var(--side); font: 600 12px Pretendard, sans-serif; opacity: 0; transition: opacity .3s; }
+.sim-redraw img { width: 40px; animation: lumiBob 2.6s ease-in-out infinite; }
+.sim-card.drawing { box-shadow: inset 0 0 0 1.5px var(--stage); }
+.sim-card.drawing .sim-redraw { opacity: 1; }
+
+/* Director: 노드 */
+.sim-tool { display: flex; align-items: center; gap: 10px; padding: 6px 16px 0; }
+.sim-tool b { font: 700 15px Pretendard, sans-serif; }
+.sim-tool small { font: 500 12px Pretendard, sans-serif; color: var(--t3); }
+.sim-pill { padding: 7px 13px; border-radius: 999px; background: var(--raised); font: 500 12.5px Pretendard, sans-serif; color: var(--t1); }
+.sim[data-s='director'] .sim-btns { top: 12px; }
+.sim-bar { display: flex; align-items: center; gap: 12px; margin: 10px 10px 0; padding: 10px 14px; border-radius: 14px; background: var(--raised); font: 600 13.5px Pretendard, sans-serif; }
+.sim-check-box { width: 18px; height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--t3); }
+.sim-bar__live { display: inline-flex; align-items: center; gap: 6px; padding-left: 12px; border-left: 1px solid var(--line2); font-weight: 500; color: var(--t1); }
+.sim-bar__live img { width: 20px; }
+.sim-bar__end { margin-left: auto; display: flex; gap: 8px; }
+.sim-bar .sim-btn { border-radius: 999px; padding: 8px 14px; font-size: 13px; }
+.sim-btn--ghost { background: transparent; color: var(--t3); box-shadow: inset 0 0 0 1px var(--line2); }
+.sim-pill--live { margin-left: auto; background: color-mix(in srgb, #3e9be0 22%, #262624); color: #d7ebff; box-shadow: inset 0 0 0 1px #3e9be0; }
+.sim-board { position: absolute; left: 10px; right: 10px; top: 112px; bottom: 10px; border-radius: 16px; background-color: var(--canvas); background-image: radial-gradient(rgba(194, 192, 182, .12) 1px, transparent 1.2px); background-size: 20px 20px; overflow: hidden; }
+.sim-board svg.lines { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sim-board svg.lines path { fill: none; stroke: rgba(255, 255, 255, .2); stroke-width: 1.5; stroke-dasharray: 600; stroke-dashoffset: 600; transition: stroke-dashoffset 1s ease, stroke .4s; }
+.sim-board svg.lines path.on { stroke-dashoffset: 0; }
+.sim-board svg.lines path.on:nth-child(n+5) { stroke: #3e9be0; stroke-width: 2; }
+.sim-node { position: absolute; width: 200px; padding: 10px; border-radius: 12px; background: var(--shell); box-shadow: 0 0 0 1px var(--line2); opacity: 0; transform: scale(.94); transition: opacity .5s, transform .5s, box-shadow .4s; }
+.sim-node.on { opacity: 1; transform: none; }
+.sim-node.hot { box-shadow: 0 0 0 1.5px #8f7ae0, 0 12px 30px -10px rgba(143, 122, 224, .55); }
+.sim-live { position: absolute; left: 6px; top: 6px; padding: 2px 7px; border-radius: 6px; background: rgba(0, 0, 0, .55); font: 600 10px Pretendard, sans-serif; color: #fff; }
+.sim-node__ok--vid { color: #8f7ae0 !important; }
+.sim-stop { margin-top: 2px; padding: 4px 10px; border-radius: 999px; background: var(--card); font: 600 10.5px Pretendard, sans-serif; color: var(--t1); }
+.sim-node small { display: block; font: 500 10.5px Pretendard, sans-serif; color: var(--t3); margin-bottom: 4px; }
+.sim-node small::before { content: '● '; font-size: 7px; vertical-align: 2px; }
+.sim-node b { display: flex; gap: 6px; align-items: center; font: 700 13px Pretendard, sans-serif; margin-bottom: 8px; }
+.sim-node b em { font: 500 10.5px Pretendard, sans-serif; font-style: normal; padding: 2px 6px; border-radius: 5px; background: var(--card); color: var(--t2); }
+.sim-node__img { position: relative; overflow: hidden; border-radius: 8px; aspect-ratio: 16 / 9; background: var(--raised); }
+.sim-node__img svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sim-node__ok { margin-top: 8px; font: 600 11px Pretendard, sans-serif; color: var(--ok); opacity: 0; transition: opacity .4s; }
+.sim-node.done .sim-node__ok { opacity: 1; }
+.sim-load { display: grid; justify-items: center; gap: 8px; padding: 14px 6px 6px; text-align: center; }
+.sim-load img { width: 50px; animation: lumiBob 2.6s ease-in-out infinite; }
+.sim-load p { font: 600 13px Pretendard, sans-serif; }
+.sim-load span { font: 500 11px Pretendard, sans-serif; color: var(--t3); }
+.sim-prog { width: 100%; height: 4px; border-radius: 4px; background: rgba(255, 255, 255, .08); overflow: hidden; }
+.sim-prog i { display: block; height: 100%; width: 0; background: #3e9be0; transition: width .3s linear; }
+
+/* Editor: 16:9 플레이어 */
+.sim-ed { position: absolute; left: 24px; right: 24px; top: 60px; bottom: 16px; display: flex; flex-direction: column; align-items: center; gap: 16px; }
+.sim-player { position: relative; flex: none; width: 1040px; aspect-ratio: 16 / 9; border-radius: 14px; overflow: hidden; background: #0b0f1c; }
+.sim-player svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.sim-player .tri { position: absolute; left: 50%; top: 50%; width: 58px; height: 58px; margin: -29px; border-radius: 50%; background: rgba(255, 255, 255, .9); transition: opacity .3s; }
+.sim-player .tri::after { content: ''; position: absolute; left: 23px; top: 18px; border-left: 16px solid #141312; border-top: 11px solid transparent; border-bottom: 11px solid transparent; }
+.sim-player.is-playing .tri { opacity: 0; }
+.sim-tl { position: relative; align-self: stretch; display: flex; gap: 4px; height: 64px; padding: 6px; border-radius: 12px; background: var(--side); }
+.sim-tl i { position: relative; overflow: hidden; border-radius: 7px; background: color-mix(in srgb, #2db39a 30%, #30302e); box-shadow: inset 0 0 0 1.5px #2db39a; }
+.sim-tl i svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .55; }
+.sim-head { position: absolute; top: 2px; bottom: 2px; left: 6px; width: 2px; background: var(--cream); border-radius: 2px; box-shadow: 0 0 10px rgba(255, 255, 255, .6); transition: left .1s linear; }
+
+/* 커서 */
+.sim-cursor { position: absolute; left: 1300px; top: 860px; width: 22px; height: 22px; z-index: 20; transition: left .7s cubic-bezier(.45, 0, .2, 1), top .7s cubic-bezier(.45, 0, .2, 1), transform .12s; pointer-events: none; filter: drop-shadow(0 2px 4px rgba(0, 0, 0, .5)); }
+.sim-cursor.press { transform: scale(.85); }
+.sim-cursor::after { content: ''; position: absolute; left: -10px; top: -10px; width: 20px; height: 20px; border-radius: 50%; border: 2px solid rgba(255, 255, 255, .7); opacity: 0; }
+.sim-cursor.press::after { animation: simRip .5s ease-out; }
+@keyframes simRip { from { opacity: 1; transform: scale(.4); } to { opacity: 0; transform: scale(1.6); } }
+
+@media (prefers-reduced-motion: reduce) { .sim * { animation: none !important; transition: none !important; } }
+
+/* 산문 초안 로딩 (화면 잠금) */
+.sim-busy { position: absolute; inset: 0; z-index: 10; display: grid; place-items: center; background: rgba(20, 19, 18, .62); opacity: 0; transition: opacity .35s; pointer-events: none; }
+.sim-busy.on { opacity: 1; }
+.sim-busy__card { width: 360px; padding: 28px 30px 26px; border-radius: 22px; background: var(--side); box-shadow: 0 0 0 1px var(--line), 0 40px 90px -20px rgba(0, 0, 0, .8); text-align: center; transform: translateY(10px) scale(.98); transition: transform .4s; }
+.sim-busy.on .sim-busy__card { transform: none; }
+.sim-busy__card img { width: 96px; margin: 0 auto 12px; display: block; animation: lumiBob 2.6s ease-in-out infinite; }
+.sim-busy__h { font: 700 17px Pretendard, sans-serif; }
+.sim-busy__s { margin-top: 6px !important; font: 400 12.5px/1.5 Pretendard, sans-serif; color: var(--t2); }
+.sim-busy ul { margin: 18px 0 0; padding: 0 0 0 22px; list-style: none; text-align: left; display: grid; gap: 9px; }
+.sim-busy li { position: relative; font: 500 13px Pretendard, sans-serif; color: var(--t3); transition: color .3s; }
+.sim-busy li::before { content: ''; position: absolute; left: -20px; top: 4px; width: 10px; height: 10px; border-radius: 50%; box-shadow: inset 0 0 0 1.5px var(--t3); transition: background-color .3s, box-shadow .3s; }
+.sim-busy li.on { color: var(--t1); }
+.sim-busy li.on::before { background: var(--stage); box-shadow: none; }
+
+/* 고른 문단이 입력창에 붙어요 */
+.sim-input.has-attach { flex-wrap: wrap; height: auto; padding-top: 8px; padding-bottom: 8px; box-shadow: inset 0 0 0 1.5px var(--stage); }
+.sim-attach { flex-basis: 100%; display: flex; align-items: center; gap: 8px; padding: 8px 10px; border-radius: 10px; background: var(--chip); color: var(--t2); font: 400 12px/1.4 Pretendard, sans-serif; white-space: nowrap; overflow: hidden; animation: simIn .35s both; }
+.sim-attach b { color: var(--stage); font: 600 11.5px Inter, sans-serif; }
+.sim-attach i { margin-left: auto; font-style: normal; color: var(--t3); }
+
+/* 사이드바: Figma 실제 아이콘 (마스크로 색을 입혀요) */
+.sim-nav i, .sim-side__end i { border-radius: 0; background: var(--t3); -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
+.sim-nav i { width: 22px; height: 22px; }
+.sim-side__end i { width: 22px; height: 22px; }
+.sim-nav.on i { background: var(--c); box-shadow: none; filter: drop-shadow(0 0 6px color-mix(in srgb, var(--c) 60%, transparent)); }
+.sim-nav.done i { background: var(--t2); }
+.sim-nav { font-weight: 600; }
+
+/* ===== Director: 실제 앱 노드 화면 ===== */
+.dn-tool { display: flex; align-items: center; gap: 12px; padding: 0 16px 0 16px; height: 48px; }
+.dn-tool b { font: 700 16px Pretendard, sans-serif; }
+.dn-tool small { font: 500 12.5px Pretendard, sans-serif; color: var(--t3); }
+.dn-tool__end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.dn-pill { padding: 8px 13px; border-radius: 999px; background: var(--raised); color: var(--t1); font: 500 12.5px Pretendard, sans-serif; white-space: nowrap; transition: transform .15s, opacity .3s, background-color .3s; }
+.dn-pill--off { color: var(--t3); background: transparent; }
+.dn-pill--go { background: var(--cream); color: var(--onc); font-weight: 600; }
+.dn-pill--go.off { background: transparent; color: var(--t3); }
+.dn-pill.press { transform: scale(.94); }
+.dn-lumi { width: 34px; height: 34px; border-radius: 50%; background: var(--raised); display: grid; place-items: center; }
+.dn-lumi img { width: 28px; }
+.dn-bar { position: relative; display: flex; align-items: center; gap: 10px; margin: 6px 16px 0; padding: 12px 16px 26px; border-radius: 14px; background: var(--side); font: 600 14px Pretendard, sans-serif; }
+.dn-check { width: 18px; height: 18px; border-radius: 5px; box-shadow: inset 0 0 0 1.5px var(--t3); transition: background-color .25s, box-shadow .25s; }
+.dn-check.on { background: #3E9BE0; box-shadow: none; }
+.dn-check.on::after { content: '✓'; display: block; text-align: center; color: #fff; font: 800 12px/18px Inter, sans-serif; }
+.dn-bar__end { margin-left: auto; display: flex; align-items: center; gap: 8px; }
+.dn-toggle { display: inline-flex; align-items: center; gap: 8px; color: var(--t3); font: 500 12.5px Pretendard, sans-serif; margin-right: 6px; }
+.dn-toggle i { width: 26px; height: 15px; border-radius: 999px; background: var(--raised); position: relative; }
+.dn-toggle i::after { content: ''; position: absolute; left: 2px; top: 2px; width: 11px; height: 11px; border-radius: 50%; background: var(--t3); }
+.dn-hint { position: absolute; right: 18px; bottom: 7px; font: 400 11.5px Pretendard, sans-serif; color: var(--t3); }
+.dn-board { position: absolute; left: 16px; right: 16px; top: 132px; bottom: 8px; overflow: hidden; border-radius: 12px; background-color: #1c1b1a; background-image: radial-gradient(rgba(255, 255, 255, .06) 1px, transparent 1.2px); background-size: 18px 18px; }
+.dn-lines { position: absolute; left: 0; top: 18px; width: 1316px; height: 640px; }
+.dn-lines path { fill: none; stroke: rgba(255, 255, 255, .22); stroke-width: 1.2; stroke-dasharray: 3 4; }
+.dn-node { position: absolute; top: 0; padding: 9px 10px 10px; border-radius: 12px; background: #262624; box-shadow: 0 0 0 1px rgba(255, 255, 255, .08); transition: box-shadow .4s; margin-top: 18px; }
+.dn-node--asset { width: 190px; }
+.dn-node--img { width: 230px; box-shadow: 0 0 0 1.5px rgba(95, 207, 143, .55); }
+.dn-node--vid { width: 200px; }
+.dn-node__h { display: flex; align-items: center; gap: 6px; font: 500 10.5px Pretendard, sans-serif; color: var(--t3); }
+.dn-node__h i { width: 6px; height: 6px; border-radius: 50%; background: var(--t3); }
+.dn-node__h span { margin-left: auto; }
+.dn-node b { display: flex; align-items: center; gap: 6px; margin: 4px 0 6px; font: 700 13px Pretendard, sans-serif; }
+.dn-node b em { font: 500 10.5px Pretendard, sans-serif; font-style: normal; padding: 1px 6px; border-radius: 5px; background: var(--raised); color: var(--t2); }
+.dn-node--asset small { display: block; margin-top: 6px; font: 400 10.5px Pretendard, sans-serif; color: var(--t3); }
+.dn-desc { font: 400 11px/1.45 Pretendard, sans-serif; color: var(--t2); height: 32px; overflow: hidden; margin-bottom: 6px !important; }
+.dn-img { position: relative; overflow: hidden; border-radius: 7px; aspect-ratio: 16 / 9.5; background: #0f1015; }
+.dn-node--asset .dn-img { aspect-ratio: 16 / 9; }
+.dn-img svg, .dn-done svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dn-live { position: absolute; left: 6px; top: 6px; padding: 2px 7px; border-radius: 5px; background: rgba(0, 0, 0, .6); color: #fff; font: 600 10px Pretendard, sans-serif; }
+.dn-state { display: flex; align-items: center; gap: 6px; margin-top: 7px !important; font: 600 11px Pretendard, sans-serif; color: var(--t1); }
+.dn-state i { width: 7px; height: 7px; border-radius: 50%; background: #5fcf8f; }
+.dn-node--img.vdone .dn-state span::before { content: '영상 완료 · '; }
+.dn-vbox { position: relative; aspect-ratio: 16 / 9.5; border-radius: 7px; overflow: hidden; }
+.dn-empty { position: absolute; inset: 0; display: grid; place-content: center; gap: 4px; text-align: center; border: 1.5px dashed rgba(255, 255, 255, .14); border-radius: 7px; font: 600 11.5px Pretendard, sans-serif; color: var(--t2); }
+.dn-empty small { font: 400 10px Pretendard, sans-serif; color: var(--t3); }
+.dn-load, .dn-done { position: absolute; inset: 0; opacity: 0; transition: opacity .35s; }
+.dn-load { display: grid; place-content: center; justify-items: center; gap: 6px; padding: 0 14px; background: #1f1e1d; text-align: center; font: 600 11.5px Pretendard, sans-serif; }
+.dn-load img { width: 44px; animation: lumiBob 2.4s ease-in-out infinite; }
+.dn-load .sim-prog { width: 130px; }
+.dn-len { position: absolute; left: 6px; bottom: 6px; padding: 2px 7px; border-radius: 6px; background: rgba(0, 0, 0, .65); color: #fff; font: 600 10.5px Inter, sans-serif; }
+.dn-node--vid.loading { box-shadow: 0 0 0 1.5px #3E9BE0, 0 12px 30px -12px rgba(62, 155, 224, .7); }
+.dn-node--vid.loading .dn-load { opacity: 1; }
+.dn-node--vid.done { box-shadow: 0 0 0 1.5px rgba(95, 207, 143, .55); }
+.dn-node--vid.done .dn-done { opacity: 1; }
+.dn-node--vid.done .dn-empty, .dn-node--vid.loading .dn-empty { opacity: 0; }
+.dn-ok { display: inline-block; margin-top: 7px; padding: 3px 9px; border-radius: 999px; background: #2a6fb5; color: #fff; font: 600 10.5px Pretendard, sans-serif; opacity: 0; transition: opacity .3s; }
+.dn-node--vid.done .dn-ok { opacity: 1; }
+.dn-zoom { position: absolute; left: 14px; bottom: 14px; padding: 8px 14px; border-radius: 999px; background: var(--side); font: 500 12px Inter, sans-serif; color: var(--t2); }
+.dn-mini { position: absolute; right: 14px; bottom: 14px; width: 190px; padding: 8px 10px 10px; border-radius: 12px; background: var(--side); }
+.dn-mini small { font: 500 11px Pretendard, sans-serif; color: var(--t3); }
+.dn-mini div { display: grid; grid-template-columns: repeat(5, 1fr); gap: 4px; margin-top: 6px; }
+.dn-mini i { height: 14px; border-radius: 3px; background: #4a4946; }
+
+/* ===== Artist 스타일 창: 실제 앱처럼 ===== */
+.sim-modal--style { top: 24px; width: 760px; margin-left: -380px; padding: 22px 30px 22px; text-align: center; }
+.sim-modal__x { position: absolute; right: 22px; top: 18px; color: var(--t2); font-size: 18px; }
+.sim-modal__lumi { width: 86px; margin: 0 auto 6px; display: block; animation: lumiBob 3s ease-in-out infinite; }
+.sim-modal--style .sim-modal__h { margin-bottom: 6px !important; }
+.sim-modal__s { font: 400 12.5px/1.55 Pretendard, sans-serif; color: var(--t2); margin: 0 30px 16px !important; }
+.sim-modal--style .sim-styles { gap: 12px 12px; text-align: left; }
+.sim-modal--style .sim-styles__c { gap: 6px; font: 500 13px Pretendard, sans-serif; }
+.sim-modal--style .sim-styles__c i { aspect-ratio: 16 / 10.5; border-radius: 10px; }
+.sim-modal--style .sim-styles__c img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.sim-modal--style .sim-styles__c:nth-child(n+9) { display: none; }
+.sim-modal--style .sim-modal__f { text-align: left; }
+.sim-modal__btns { display: flex; gap: 8px; }
+
+/* Director 연결선: 재서 그린 선 */
+.dn-lines { left: 0; top: 0; width: 100%; height: 100%; overflow: visible; pointer-events: none; }
+.dn-lines path { fill: none; stroke: rgba(255, 255, 255, .26); stroke-width: 1.3; stroke-dasharray: 3 4; }
+.dn-lines path.iv, .dn-lines path.prev { stroke: rgba(255, 255, 255, .34); }
+.dn-lines path.far { stroke: rgba(255, 255, 255, .14); }
+/* 서윤 · 도현: 인물 시트 전체가 보이게 */
+.dn-node--asset .dn-img { aspect-ratio: 16 / 9; background: #f4f3ef; }
+
+/* ===== Editor: 실제 편집 화면 (프로그램 모니터 · 프로젝트 · 도구 · 타임라인 · 미터) ===== */
+.ed-top { display: flex; align-items: center; gap: 12px; height: 44px; padding: 0 16px; }
+.ed-top b { font: 700 16px Pretendard, sans-serif; }
+.ed-top small { font: 500 12.5px Inter, sans-serif; color: var(--t3); }
+.ed-top__end { margin-left: auto; display: flex; gap: 6px; }
+.ed-grid { position: absolute; left: 16px; right: 16px; top: 52px; bottom: 8px; display: grid; grid-template-columns: 260px 44px minmax(0, 1fr) 34px; grid-template-rows: 340px minmax(0, 1fr); gap: 10px; }
+.ed-panel { position: relative; border-radius: 14px; background: var(--side); overflow: hidden; }
+.ed-src { grid-column: 1 / 3; }
+.ed-prog { grid-column: 3 / 5; display: grid; grid-template-rows: auto 1fr auto auto; }
+.ed-proj { grid-column: 1; padding: 0 12px; }
+.ed-tools { grid-column: 2; display: grid; align-content: start; justify-items: center; gap: 10px; padding-top: 12px; }
+.ed-tools i { width: 30px; height: 30px; border-radius: 9px; display: grid; place-items: center; font-style: normal; color: var(--t2); font-size: 14px; }
+.ed-tools i.on { box-shadow: inset 0 0 0 1.5px #2DB39A; color: #6fe0c6; }
+.ed-tl { grid-column: 3; }
+.ed-meter { grid-column: 4; display: flex; align-items: flex-end; justify-content: center; padding: 10px 0; }
+.ed-meter i { width: 6px; height: 40%; border-radius: 3px; background: linear-gradient(#e8606f, #f2a33a 30%, #5fcf8f 60%); transition: height .09s; }
+.ed-tabs { display: flex; gap: 18px; padding: 12px 14px 0; font: 600 13px Pretendard, sans-serif; color: var(--t3); }
+.ed-tabs .on { color: var(--t1); box-shadow: inset 0 -2px 0 var(--t1); padding-bottom: 8px; }
+.ed-empty { position: absolute; inset: 44px 18px 18px; display: grid; place-content: center; text-align: center; gap: 8px; font: 400 13px/1.6 Pretendard, sans-serif; color: var(--t2); }
+.ed-empty small { font-size: 11.5px; color: var(--t3); }
+.ed-screen { position: relative; margin: 10px 0 0; background: #000; display: grid; place-items: center; overflow: hidden; }
+.ed-screen video { height: 100%; max-height: 220px; aspect-ratio: 16 / 9; object-fit: cover; display: block; background: #0b0f1c; }
+.ed-dur { position: absolute; right: 14px; top: 10px; font: 600 11.5px Inter, sans-serif; color: var(--t2); }
+.ed-scrub { height: 3px; margin: 10px 14px 0; border-radius: 3px; background: var(--raised); overflow: hidden; }
+.ed-scrub i { display: block; width: 0; height: 100%; background: var(--t1); }
+.ed-ctrl { display: flex; align-items: center; gap: 14px; padding: 10px 14px 12px; font: 600 12.5px Inter, sans-serif; }
+.ed-btns { flex: 1; display: flex; justify-content: center; align-items: center; gap: 14px; color: var(--t2); }
+.ed-btns i { font-style: normal; }
+.ed-play { width: 34px; height: 34px; border-radius: 50%; background: var(--raised); display: grid; place-items: center; color: var(--t1); font-size: 12px; transition: transform .15s; }
+.ed-play.press { transform: scale(.9); }
+.ed-end { display: flex; align-items: center; gap: 8px; color: var(--t3); font-weight: 500; }
+.ed-vol { width: 60px; height: 3px; border-radius: 3px; background: var(--t2); }
+.ed-proj__btns { display: flex; gap: 6px; margin: 12px 0 10px; }
+.ed-cap { display: block; margin: 6px 0; font: 500 11px Pretendard, sans-serif; color: var(--t3); }
+.ed-row { display: grid; grid-template-columns: 30px 1fr auto; align-items: center; gap: 10px; padding: 7px 0; font: 500 12.5px Pretendard, sans-serif; }
+.ed-row i { position: relative; width: 30px; height: 30px; border-radius: 6px; overflow: hidden; }
+.ed-row i svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.ed-row small { font: 500 11.5px Inter, sans-serif; color: var(--t3); }
+.ed-tl__bar { display: flex; align-items: center; gap: 8px; padding: 10px 12px; font: 700 13px Pretendard, sans-serif; white-space: nowrap; }
+.ed-tc2 { font-family: Inter, sans-serif; margin-right: 4px; }
+.ed-snap { padding: 6px 11px; border-radius: 999px; box-shadow: inset 0 0 0 1.5px #2DB39A; color: #8ff0d8; font: 600 12px Pretendard, sans-serif; }
+.ed-tl__bar small { margin-left: auto; font: 400 11px Pretendard, sans-serif; color: var(--t3); overflow: hidden; text-overflow: ellipsis; }
+.ed-ruler { position: relative; height: 18px; margin-left: 90px; border-bottom: 1px solid var(--line); font: 500 10px Inter, sans-serif; color: var(--t3); }
+.ed-ruler span { position: absolute; top: 2px; }
+.ed-ruler span:nth-child(2) { left: 200px; }
+.ed-track { position: relative; height: 48px; border-bottom: 1px solid var(--line); }
+.ed-track > b { position: absolute; left: 14px; top: 50%; transform: translateY(-50%); font: 700 12px Inter, sans-serif; color: var(--t2); }
+.ed-track--v1 { height: 72px; }
+.ed-clips { position: absolute; left: 90px; top: 8px; bottom: 8px; display: flex; gap: 2px; }
+.ed-clips i { position: relative; overflow: hidden; border-radius: 6px; background: #0b0f1c; }
+.ed-clips i svg { position: absolute; inset: 0; width: 100%; height: 100%; opacity: .85; }
+.ed-clips b { position: absolute; left: 5px; top: 4px; padding: 1px 5px; border-radius: 4px; background: rgba(0, 0, 0, .65); font: 700 9.5px Inter, sans-serif; color: #fff; }
+.ed-clips small { position: absolute; left: 5px; bottom: 3px; font: 600 9.5px Inter, sans-serif; color: rgba(255, 255, 255, .8); }
+.ed-track--a1 { height: 56px; }
+.ed-wave { position: absolute; left: 90px; top: 10px; bottom: 10px; width: 300px; border-radius: 6px; background: repeating-linear-gradient(90deg, rgba(255,255,255,.35) 0 2px, transparent 2px 5px); -webkit-mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent); mask-image: linear-gradient(transparent, #000 25%, #000 75%, transparent); opacity: .5; }
+.ed-head { position: absolute; left: 90px; top: 44px; bottom: 0; width: 2px; background: var(--t1); box-shadow: 0 0 8px rgba(255, 255, 255, .5); }
+.ed-head::before { content: ''; position: absolute; left: -5px; top: -2px; width: 12px; height: 12px; border-radius: 50%; background: var(--t1); }
+/* 타임코드가 바뀌어도 옆 버튼이 흔들리지 않게: 고정폭 숫자 + 고정 칸 */
+.ed-ctrl { display: grid; grid-template-columns: 120px 1fr 160px; }
+.ed-ctrl [data-tc], .ed-tc2, .ed-end { font-variant-numeric: tabular-nums; font-feature-settings: 'tnum' 1; }
+.ed-ctrl [data-tc] { width: 120px; }
+.ed-tc2 { display: inline-block; width: 92px; flex: none; }
+.ed-end { justify-content: flex-end; }
+.ed-play { flex: none; }

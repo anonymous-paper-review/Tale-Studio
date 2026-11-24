@@ -12,6 +12,15 @@ export const DEFAULT_LOCALE = 'en'
 /** 앱이 지원하는 언어 — UI 크롬(i18n 사전)과 파이프라인 출력 강제가 공유하는 집합. */
 export type AppLocale = 'en' | 'ko'
 
+/**
+ * 처음 온 방문자(저장된 언어 없음)의 화면 언어 (오너 2026-11-24 ③A).
+ * 브라우저가 고른 첫 언어가 한국어면 ko, 아니면 en. 한 번 고른 언어(저장값)가 있으면 그쪽이 이긴다.
+ */
+export function initialLocaleFor(languages: readonly string[] | undefined): AppLocale {
+  const first = languages?.[0]?.toLowerCase() ?? ''
+  return first === 'ko' || first.startsWith('ko-') ? 'ko' : 'en'
+}
+
 export function parseAppLocale(v: unknown): AppLocale | null {
   return v === 'en' || v === 'ko' ? v : null
 }
