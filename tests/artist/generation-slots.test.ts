@@ -58,10 +58,11 @@ describe('Artist 동시 생성 장수', () => {
     expect(artistGenerationLimit(4)).toBe(1)
   })
 
-  it('러프 스토리보드가 없거나 끝났으면 Artist는 한 번에 3장까지 만든다', () => {
-    // 왜: gpt-image-2 는 한 장 75~80초라 한 장씩이면 인물 11명 · 배경 7곳에 25분이 걸렸다(10/9 운영 재시험).
-    expect(ARTIST_SLOTS_IDLE).toBe(3)
-    expect(artistGenerationLimit(0)).toBe(3)
+  it('러프 스토리보드가 없거나 끝났으면 Artist는 한 번에 2장까지 만든다', () => {
+    // 왜: 한 장씩이면 인물 11명 · 배경 7곳에 25분(10/9 운영 재시험). 3장씩은 20명 수업에서 fal 자리(34)를 넘겨
+    //   넘친 그림이 잔액 없는 열쇠로 가 자동 그리기가 포기했다(2026-11-24 운영 재현, 오너 결정으로 3 → 2).
+    expect(ARTIST_SLOTS_IDLE).toBe(2)
+    expect(artistGenerationLimit(0)).toBe(2)
   })
 
   it('러프 스토리보드가 만들어지는 중인지 알 수 없으면 Artist는 1장씩 만든다', async () => {
@@ -71,8 +72,11 @@ describe('Artist 동시 생성 장수', () => {
     await expect(fetchArtistGenerationLimit(failing as unknown as typeof fetch)).resolves.toBe(1)
     const notOk = vi.fn().mockResolvedValue(new Response('nope', { status: 500 }))
     await expect(fetchArtistGenerationLimit(notOk as unknown as typeof fetch)).resolves.toBe(1)
-    const ok = vi.fn().mockResolvedValue(Response.json({ limit: 3, roughActive: 0 }))
-    await expect(fetchArtistGenerationLimit(ok as unknown as typeof fetch)).resolves.toBe(3)
+    const ok = vi.fn().mockResolvedValue(Response.json({ limit: 2, roughActive: 0 }))
+    await expect(fetchArtistGenerationLimit(ok as unknown as typeof fetch)).resolves.toBe(2)
+    // 서버가 더 큰 수를 답해도 화면은 정한 상한(2)까지만 연다.
+    const tooMany = vi.fn().mockResolvedValue(Response.json({ limit: 3, roughActive: 0 }))
+    await expect(fetchArtistGenerationLimit(tooMany as unknown as typeof fetch)).resolves.toBe(2)
   })
 })
 
@@ -86,12 +90,12 @@ describe('Artist 생성 자리 수를 알려주는 창구', () => {
     // 왜: 유저당 그림 작업 상한(6)을 러프와 Artist 가 같이 쓴다 — 다른 프로젝트의 러프도 밀릴 수 있다.
     mocks.countQueuedJobsByUser.mockResolvedValueOnce(2).mockResolvedValueOnce(0)
     expect(await (await GET()).json()).toEqual({ limit: 1, roughActive: 2 })
-    expect(await (await GET()).json()).toEqual({ limit: 3, roughActive: 0 })
+    expect(await (await GET()).json()).toEqual({ limit: 2, roughActive: 0 })
     expect(mocks.countQueuedJobsByUser).toHaveBeenCalledWith('user-1', ['shot_rough_storyboard'])
   })
 
   it('러프 스토리보드 작업 수를 세지 못하면 1장씩 만들라고 알려준다', async () => {
-    // 왜: DB 조회가 실패한 순간에 3장을 열어 주면 러프가 밀릴 수 있다.
+    // 왜: DB 조회가 실패한 순간에 2장을 열어 주면 러프가 밀릴 수 있다.
     mocks.countQueuedJobsByUser.mockRejectedValueOnce(new Error('db down'))
     expect(await (await GET()).json()).toEqual({ limit: 1, roughActive: null })
   })

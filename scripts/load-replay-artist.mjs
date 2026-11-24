@@ -5,14 +5,14 @@
 //
 // 흐름(브라우저가 Artist 화면에서 하는 일을 그대로 흉내 낸다. src/app/studio/artist/page.tsx · src/stores/artist-store.ts):
 //   1) 화면 진입: GET /studio/artist (미들웨어 로그인 확인) · GET /api/writer/status/<pid>?assets=1 · GET /api/artist/generation-slots
-//   2) 그림 보내기: 인물 시트 POST /api/artist/generate-sheet · 배경 POST /api/artist/generate-world — 한 번에 3장(runAdaptivePool)
+//   2) 그림 보내기: 인물 시트 POST /api/artist/generate-sheet · 배경 POST /api/artist/generate-world — 한 번에 2장(runAdaptivePool, --pool 로 바꿈)
 //   3) 틱(4초 · 끝나야 다음): 브라우저 → Supabase 직접 8쿼리(loadData) + GET /api/artist/generation-status
 //   4) 잡 상태 묶음 폴링(3초): GET /api/generation-jobs?ids=… (영구 상태가 될 때까지 · 일시 오류면 3→6→12→24→30초)
 //   5) 그림이 다 끝나거나 --duration 이 지나면 끝. 정원(429)이면 10초 뒤 다시 보낸다(이어 그리기와 같은 규칙).
 //
 // 사용(순서대로):
 //   node scripts/load-replay-artist.mjs prepare --target live --run 1124a --users 20 --template <projectId>
-//   node scripts/load-replay-artist.mjs run     --target live --run 1124a --base https://www.talestudio.art --duration 480 [--writer-poll] [--ramp 60]
+//   node scripts/load-replay-artist.mjs run     --target live --run 1124a --base https://www.talestudio.art --duration 480 [--writer-poll] [--ramp 60] [--images N] [--canary] [--pool 2]
 //   node scripts/load-replay-artist.mjs reset   --target live --run 1124a            (그림 · 작업 행만 비워 다시 잰다)
 //   node scripts/load-replay-artist.mjs cleanup --target live --run 1124a --base https://www.talestudio.art
 //   · prepare: loadtest-<run>-NN@tale.studio 계정 N개 + 작업 공간 + 본보기 프로젝트 복제(그림 URL 은 비워서 Artist 가 새로 그리게).
@@ -206,7 +206,7 @@ async function run() {
   const canary = !!args.canary // 가벼운 길(generation-slots)을 2초마다 따로 쳐서 "서버 함수 자체가 느려졌나"를 가른다
   const userCount = Math.min(Number(args.users ?? manifest.users.length), manifest.users.length)
   const maxImages = Number(args.images ?? 99)
-  const POOL = 3 // runAdaptivePool: 러프가 안 돌 때 3장씩
+  const POOL = Number(args.pool ?? 2) // runAdaptivePool: 러프가 안 돌 때 ARTIST_SLOTS_IDLE 장씩(2026-11-24 3→2). --pool 3 으로 옛 모양 재현.
   const t0 = Date.now()
   const log = [] // {u, name, status, ms, t}
   const abort = { on: false, why: null }

@@ -129,11 +129,11 @@
 <div class="wrap">
 
 <header class="page">
-  <p class="eyebrow">작업 보고서 · 2026-11-24 · 운영 부하 재현</p>
+  <p class="eyebrow">작업 보고서 · 2026-11-24 · 운영 부하 재현 · 2판(22:50, 실패 경로 추적 · 오너 답 반영)</p>
   <h1>11/23 수업 모양으로 운영 서버에 다시 부하를 걸었다</h1>
-  <p class="bluf">가상 사용자 20명이 Artist 화면에서 그림 6장씩을 동시에 그렸다. <b>DB 는 버텼다</b>(브라우저가 DB 에 직접 묻는 질문은 끝까지 0.15~0.5초). <b>서버 함수(Vercel)가 밀렸다</b>: 그림 제출이 몰린 2~3분 동안 서버를 거치는 모든 요청이 5~22초 걸렸고, 제출이 끝나자 0.2초로 돌아왔다.</p>
-  <p class="bluf">그 밖에 찾은 것: fal 열쇠 <code>prod-2000</code> 의 잔액이 0 이라 그 열쇠로 간 그림 48장이 전부 즉시 실패했다(5xx 의 전부). <b>결정할 것 4개</b>. <b>알아둘 것 5개</b>.</p>
-  <p class="asof">실측 시각 2026-11-24 21:28~22:02 KST · 대상 https://www.talestudio.art(sin1 · 커밋 b1e734be) · DB Micro · 결과 파일 .claude/docs/2026-11-24/loadtest/1124a/ · 스크립트 scripts/load-replay-artist.mjs</p>
+  <p class="bluf">가상 사용자 20명이 Artist 화면에서 그림 6장씩을 동시에 그렸다. <b>DB 는 버텼다</b>(브라우저가 DB 에 직접 묻는 질문은 끝까지 0.15~0.5초). <b>서버 함수(Vercel)는 느려졌지만 그 때문에 실패한 그림은 0장</b>이다. 제출이 몰린 2~3분 동안 서버를 거치는 요청이 5~22초 걸렸고, 제출이 끝나자 0.2초로 돌아왔다.</p>
+  <p class="bluf"><b>그림을 못 받은 길은 하나다.</b> 잔액 0 인 fal 열쇠 <code>prod-2000</code> 이 넘치는 그림을 받아 즉시 거절하고, 같은 칸이 2번 거절되면 자동 그리기가 그 칸을 포기한다. 실행 B 에서 60장 중 12장이 이 길로 갔다. <b>결정된 것 2</b>(열쇠 빼기 · 동시 장수 3 → 2). <b>결정할 것 4</b>. <b>알아둘 것 8</b>.</p>
+  <p class="asof">실측 시각 2026-11-24 21:28~22:02 KST · 대상 https://www.talestudio.art(sin1 · 커밋 b1e734be) · DB Micro · 결과 파일 .claude/docs/2026-11-24/loadtest/1124a/ · 스크립트 scripts/load-replay-artist.mjs · 2판은 같은 결과 파일을 다시 읽어 썼다(새 실행 없음)</p>
 </header>
 
 <section>
@@ -144,25 +144,38 @@
       <tr><td>가상 사용자</td><td>브라우저가 Artist 화면에서 보내는 요청을 그대로 보내는 프로그램 1개. 계정 · 작업 공간 · 프로젝트를 따로 가진다.</td></tr>
       <tr><td>서버를 거치는 요청</td><td>브라우저 → Vercel 서버 함수 → DB 순서로 가는 요청. <code>/api/…</code> 와 화면 HTML.</td></tr>
       <tr><td>직접 질문</td><td>브라우저가 Vercel 을 거치지 않고 Supabase DB 에 바로 보내는 질문. Artist 화면의 <code>loadData</code> 8개가 이것이다.</td></tr>
-      <tr><td>카나리</td><td>부하와 상관없는 가장 가벼운 길(<code>/api/artist/generation-slots</code>)을 2초마다 따로 쳐서 "서버 함수 자체가 느려졌나"를 재는 요청.</td></tr>
+      <tr><td>카나리</td><td>부하를 거는 동안 <b>2초마다 따로 보낸 가벼운 시험 요청</b>(<code>/api/artist/generation-slots</code>, 내 자리가 몇 개 남았나 세는 것. DB 1번, 검열 · fal 없음, 혼자일 때 0.16초). 이것이 느려지면 "무거운 제출만 느린 것"이 아니라 "서버 입구 전체가 막힌 것"이다.</td></tr>
       <tr><td>중앙값 · p95</td><td>요청 시간을 줄 세웠을 때 가운데 값 · 위에서 5% 자리 값. 둘 다 초 단위 실측.</td></tr>
-      <tr><td>제출</td><td>그림 한 장을 그려 달라는 요청(<code>generate-sheet</code> · <code>generate-world</code>). 서버가 검열 · fal 접수 · DB 예약을 하고 답한다.</td></tr>
+      <tr><td>제출</td><td>그림 한 장을 그려 달라는 요청(<code>generate-sheet</code> · <code>generate-world</code>). 서버가 검열 → DB 자리 예약 → fal 접수를 차례로 하고 답한다. 혼자일 때 4~5초.</td></tr>
+      <tr><td>열쇠 자리</td><td>fal 열쇠(계정)마다 동시에 그릴 수 있는 장수. 운영 설정(<code>FAL_KEYS</code>)은 <code>legacy-1000</code> 34장 · <code>prod-2000</code> 1장. 그림을 보낼 때 "남은 자리가 가장 많은 열쇠"를 고른다.</td></tr>
+      <tr><td>자동 그리기 포기</td><td>Artist 가 빈칸을 스스로 채울 때, 같은 칸이 2번 실패하면 그 칸을 더 안 그린다(<code>AUTO_GENERATION_GIVE_UP_THRESHOLD = 2</code>). 화면엔 실패 표시가 남고 사람이 카드에서 "다시 그리기"를 눌러야 다시 그린다.</td></tr>
+      <tr><td>동시 장수</td><td>한 사람의 Artist 화면이 한 번에 보내는 그림 수(러프 스토리보드가 돌면 1장, 아니면 3장이었다 → 2장으로 바꿈). <b>그림만</b>이다. 영상 자리(사용자당 3)는 다른 상수다.</td></tr>
     </tbody>
   </table></div>
 </section>
 
 <section>
-  <div class="sec-head"><span class="sec-num">1</span><h2>혼자 정한 것</h2></div>
-  <p class="sec-lede">오너 지시는 "push 뒤 운영에서 11/23 재현 · Artist 까지 동시성 측정 · 돈 써도 됨". 아래는 그 안에서 내가 정했다.</p>
+  <div class="sec-head"><span class="sec-num">1</span><h2>혼자 정한 것 · 같이 정한 것</h2></div>
+  <p class="sec-lede">오너 지시는 "push 뒤 운영에서 11/23 재현 · Artist 까지 동시성 측정 · 돈 써도 됨". 1판 뒤 오너가 질문 5개에 답을 주며 아래 "같이 정한 것"이 더해졌다.</p>
+  <h3>같이 정한 것(2026-11-24 밤, 오너)</h3>
+  <ul class="plain">
+    <li>fal 열쇠 <code>prod-2000</code> 을 <code>FAL_KEYS</code> 에서 뺀다. 충전하지 않는다. 뒤에 fal 비즈니스 플랜 열쇠가 나오면 그것을 넣는다.</li>
+    <li>동시 장수 3 → 2(<code>ARTIST_SLOTS_IDLE</code>). 열쇠가 늘면 상수만 올린다. 이 2판과 함께 커밋했다(테스트 3개의 이름과 기대값을 2 로 바꿈 · <code>tests/artist/generation-slots.test.ts</code>).</li>
+    <li>"같은 글은 검열 1번만"은 지금 안 한다. 나중에 크게 본다.</li>
+    <li>내용 검사 거절(검열에 걸려 그림 · 영상이 안 만들어지는 경우)은 <b>이 작업이 끝난 뒤 첫 번째 과제</b>로 원장 10절에 올렸다. 오늘은 손대지 않는다.</li>
+    <li>Vercel Fluid Compute 는 켜져 있다(오너 확인). 1판의 "꺼져 있을 때 모양" 추정은 접는다.</li>
+  </ul>
+  <h3>혼자 정한 것</h3>
   <div class="tbl"><table>
     <thead><tr><th>번호</th><th>정한 것</th><th>왜</th><th>되돌리기</th></tr></thead>
     <tbody>
       <tr><td class="num">1</td><td>운영 DB 에 시험 계정 20개(<code>loadtest-1124a-NN@tale.studio</code>)를 만들고 끝나면 앱의 계정 삭제 길(<code>POST /api/account/delete</code>)로 지웠다</td><td>실제 사용자와 같은 권한 검사 · 같은 작업 공간 구조로 재야 한다. 앱의 삭제 길은 프로젝트 · 보관함 파일 · 작업 공간 · 계정을 한 번에 지운다</td><td>끝남. 계정 0 · 프로젝트 0 · 보관함 파일 0 확인</td></tr>
       <tr><td class="num">2</td><td>본보기는 오너 프로젝트 "숲속의 호빗과 백설공주"(<code>a9b4ef12</code> · 11/23 수업 때 만든 것). 인물 3 · 배경 3 · 작가 완료 행을 복제하고 그림 URL 만 비웠다</td><td>11/23 의 "1명당 그림 6장"과 같다. 작가 완료 상태라 Artist 가 바로 그린다</td><td>본보기 원본은 읽기만 했다(수정 시각 불변 확인)</td></tr>
       <tr><td class="num">3</td><td>작가 상태 폴링(3초)을 켠 채로 쟀다(<code>--writer-poll</code>)</td><td>11/23 에는 19명의 작가 실행이 10:42~10:46 에 몰려 있었고 Artist 그림은 그 안에서 11장만 돌았다. 그 모양을 따랐다</td><td>끄는 실행도 했다(3절 실행 B)</td></tr>
-      <tr><td class="num">4</td><td>안전 중단: 60초 창에서 p95 가 15초를 넘거나 5xx 가 30% 를 넘으면 모두 멈춘다</td><td>운영에 실제 사용자가 있을 수 있다. 11/23 처럼 14분을 끌지 않는다</td><td>실행 A 가 187초에 이 규칙으로 멈췄다</td></tr>
+      <tr><td class="num">4</td><td>안전 중단: 60초 창에서 p95 가 15초를 넘거나 5xx 가 30% 를 넘으면 모두 멈춘다</td><td>운영에 실제 사용자가 있을 수 있다. 11/23 처럼 14분을 끌지 않는다</td><td>실행 A 가 187초에 이 규칙으로 멈췄다. 그래서 A 의 그림 41장은 "실패"가 아니라 "그려지는 중에 끊김"이다</td></tr>
       <tr><td class="num">5</td><td>개발 DB(tale-dev)도 Micro 로 올렸다</td><td>같은 Pro 조직이라 Nano 인데도 Micro 값을 내고 있었다. 추가 비용 0</td><td>같은 화면에서 Nano 선택</td></tr>
-      <tr><td class="num">6</td><td>세션은 계정당 1번만 발급하고 /tmp 에 둔다</td><td>같은 계정에 마법 링크를 동시에 2번 만들면 먼저 것이 무효가 되고(otp_expired), 발급을 많이 하면 Supabase 가 429 로 막는다. 실행 B · C 의 401 · 429 는 이 도구 문제였고 앱 문제가 아니다</td><td>해당 없음</td></tr>
+      <tr><td class="num">6</td><td>세션은 계정당 1번만 발급하고 /tmp 에 둔다</td><td>같은 계정에 로그인 링크를 동시에 2번 만들면 먼저 것이 무효가 되고, 발급을 많이 하면 Supabase 가 429 로 막는다(5절 "시험 도구 로그인 실패")</td><td>해당 없음</td></tr>
+      <tr><td class="num">7</td><td>부하 스크립트의 동시 장수 기본값도 2 로 맞췄다(<code>--pool 3</code> 이면 옛 모양)</td><td>스크립트는 브라우저를 흉내 내는 것이라 브라우저와 같아야 한다. 옛 모양과 비교할 길은 남긴다</td><td>옵션 1개</td></tr>
     </tbody>
   </table></div>
 </section>
@@ -175,13 +188,13 @@
     <tbody>
       <tr><td>DB</td><td class="gate-cell">14분 정지. 메모리 0.38 GB 중 Swap 0.8 GB · Disk IO 예산 0%</td><td>버팀. CPU 일하는 시간 10% 미만 · 메모리 사용 0.5/1.06 GB · Swap 0.15 GB</td><td>버팀. 같음</td></tr>
       <tr><td>직접 질문(브라우저→DB)</td><td>기록 없음</td><td>중앙값 0.24초 · p95 0.44초 · 최대 0.51초</td><td>중앙값 0.15초 · p95 0.45초</td></tr>
-      <tr><td>서버를 거치는 요청</td><td>1.2~2.4초씩 늘어남 → 끊김</td><td class="gate-cell">중앙값 5.8~11.5초 · p95 20~23초(제출 몰린 2~3분)</td><td>중앙값 0.16~0.40초 · p95 0.3~0.8초</td></tr>
-      <tr><td>오류</td><td>generation-status 실패 181회 · 60초 초과 5회</td><td>5xx 48건 = 전부 fal 잔액 0(아래 3절) · 끊김 0</td><td>0</td></tr>
+      <tr><td>서버를 거치는 요청</td><td>왕복 1.2~2.4초(정지 전)</td><td class="gate-cell">중앙값 5.8~11.5초 · p95 20~23초(제출이 몰린 동안)</td><td>중앙값 0.16~0.40초 · p95 0.3~0.8초</td></tr>
+      <tr><td>오류</td><td>generation-status 실패 181회 · 60초 초과 5회</td><td>5xx 48건 = 전부 fal 잔액 0(아래 3절) · 끊김 0 · 서버 느림으로 실패한 그림 0</td><td>0</td></tr>
       <tr><td>분당 요청</td><td>DB 3,419 · 로그인 확인 551</td><td>서버 경유 약 240 · 직접 DB 약 380(멈춘 187초 기준)</td><td>서버 경유 529 · 직접 DB 1,684 · 로그인 확인 0(서버 안에서 끝냄)</td></tr>
-      <tr><td>그림</td><td>11장</td><td>187초에 61/120 완료(제출→완료 중앙값 68초 · p95 86초)</td><td>없음(폴링만)</td></tr>
+      <tr><td>그림</td><td>11장</td><td>187초에 53장 완료 · 41장 그려지는 중 · 나머지 열쇠 포기(제출→완료 중앙값 68초 · p95 86초)</td><td>없음(폴링만)</td></tr>
     </tbody>
   </table></div>
-  <div class="callout"><b class="label">읽는 법</b><p>11/23 의 병목(DB)은 사라졌다. 실행 C 가 그 증거다: 11/23 을 죽인 "20명 폴링"을 그대로 걸어도 모든 요청이 1초 안이다. 그러나 그림 제출이 몰리면 새 병목(서버 함수)이 나타난다. 이것은 11/23 에는 DB 가 먼저 죽어서 보이지 않았던 층이다.</p></div>
+  <div class="callout"><b class="label">읽는 법</b><p>11/23 의 병목(DB)은 사라졌다. 실행 C 가 그 증거다: 11/23 을 죽인 "20명 폴링"을 그대로 걸어도 모든 요청이 1초 안이다. 그림 제출이 몰리면 서버 함수가 느려지지만 실패는 만들지 않는다. 그림을 못 받게 한 것은 fal 열쇠 쪽이고, 11/23 에는 그림이 11장뿐이라 이 길이 열리지 않았다(운영 DB 에 잔액 실패 기록 최근 30일 0건).</p></div>
 </section>
 
 <section>
@@ -192,11 +205,35 @@
     <thead><tr><th>실행</th><th>조건</th><th>요청</th><th>서버 경유 중앙값 / p95</th><th>직접 질문 중앙값 / p95</th><th>5xx</th><th>그림</th></tr></thead>
     <tbody>
       <tr><td>준비</td><td class="cond">1명 · 그림 6장</td><td class="num">139</td><td class="num">0.2~0.9초 / 제출 4.5초</td><td class="num">0.30 / 0.34초</td><td class="num">0</td><td class="num">6/6</td></tr>
-      <tr><td><b>A</b></td><td class="cond">20명 · 그림 6장 · 작가 폴링 · 입장 2분</td><td class="num">754</td><td class="num gate-cell">5.8~11.5초 / 20~23초</td><td class="num">0.24 / 0.44초</td><td class="num">48</td><td class="num">61/120 (187초에 안전 중단)</td></tr>
-      <tr><td><b>B</b></td><td class="cond">10명 · 그림 6장 · 카나리</td><td class="num">1,252</td><td class="num">제출 중 2.6~6.4초 / 10~13초 → 제출 끝난 뒤 0.16초</td><td class="num">0.14 / 0.40초</td><td class="num">26</td><td class="num">40/60</td></tr>
+      <tr><td><b>A</b></td><td class="cond">20명 · 그림 6장 · 작가 폴링 · 입장 2분</td><td class="num">754</td><td class="num gate-cell">5.8~11.5초 / 20~23초</td><td class="num">0.24 / 0.44초</td><td class="num">48</td><td class="num">53 완료 · 41 그리는 중(187초에 안전 중단)</td></tr>
+      <tr><td><b>B</b></td><td class="cond">10명 · 그림 6장 · 카나리</td><td class="num">1,252</td><td class="num">제출 중 2.6~6.4초 / 10~13초 → 제출 끝난 뒤 0.16초</td><td class="num">0.14 / 0.40초</td><td class="num">26</td><td class="num">40/60(아래 표)</td></tr>
       <tr><td><b>C</b></td><td class="cond">20명 · 폴링만(틱 4초 + 작가 3초) · 카나리 · 3분</td><td class="num">2,280</td><td class="num">0.16~0.40초 / 0.3~0.8초</td><td class="num">0.15 / 0.45초</td><td class="num">0</td><td class="num">없음</td></tr>
     </tbody>
   </table></div>
+
+  <h3>그림이 어디로 갔나(실행 B, 60장을 끝까지 따라감)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>어디로</th><th>장수</th><th>앱 문제인가</th></tr></thead>
+    <tbody>
+      <tr><td>완료</td><td class="num">40</td><td></td></tr>
+      <tr><td>시험 도구가 1명 로그인에 실패해 그 사람 6장은 보내지도 못함</td><td class="num">6</td><td>아니오. 도구 문제(5절)</td></tr>
+      <tr><td>fal 내용 검사 거절(프롬프트의 "호빗", 422 content_policy)</td><td class="num">2</td><td>예. 실제 수업에서도 단어에 따라 생긴다. 학생이 글을 고쳐야 한다. 원장 10절(다음 과제)</td></tr>
+      <tr><td class="gate-cell"><b>잔액 0 열쇠에 2번 걸려 자동 그리기가 포기</b></td><td class="num gate-cell">12</td><td class="gate-cell"><b>예. 주범.</b> 아래 "열쇠 포기가 생기는 길"</td></tr>
+      <tr><td>서버 함수 느림</td><td class="num">0</td><td>느리기만 했다</td></tr>
+    </tbody>
+  </table></div>
+  <p>실행 A(120장)는 53장 완료, 41장은 fal 이 그리는 중에 안전 중단으로 끊었고(앱 실패 아님), 나머지는 같은 열쇠 포기다. 5xx 74건(A 48 · B 26)은 전부 <code>fal submit: 403 User is locked. Reason: Exhausted balance</code> 다.</p>
+
+  <h3>열쇠 포기가 생기는 길(코드로 확인)</h3>
+  <ol class="plain">
+    <li>열쇠 자리는 <code>legacy-1000</code> 34 + <code>prod-2000</code> 1(운영 <code>FAL_KEYS</code>). 화면 요청(<code>pickFalKey</code>)과 DB 트리거 모두 "남은 자리가 가장 많은 열쇠"를 고른다.</li>
+    <li><code>legacy-1000</code> 에 34장이 그려지는 중이면 다음 그림은 <code>prod-2000</code> 으로 간다. 잔액이 0 이라 fal 이 즉시 거절한다.</li>
+    <li>거절된 그림은 실패로 기록된다(종류 <code>billing</code>). <b>즉시 실패해서 <code>prod-2000</code> 의 자리는 항상 비어 보인다.</b> 그래서 넘치는 그림은 전부 이 죽은 열쇠로 빨려 들어간다.</li>
+    <li>화면이 10초 뒤 같은 칸을 다시 보낸다. 아직 34장이 차 있으면 또 죽은 열쇠, 두 번째 실패.</li>
+    <li>자동 그리기는 같은 칸 실패 2번이면 포기한다(<code>billing</code> 은 면제 종류가 아니다). 서버는 "건너뜀"이라고 200 으로 답하고 그림 번호를 주지 않는다. 학생 화면엔 실패 표시, 사람이 직접 "다시 그리기"를 눌러야 산다.</li>
+  </ol>
+  <p>20명 × 3장 = 60장 동시 → 34장을 넘는 26장이 이 길로 간다. 20명 × 2장 = 40장이면 6장이다. 열쇠를 빼면 넘치는 그림은 죽은 열쇠 대신 "정원 찼음"(429)을 받고, 화면이 10초 뒤 다시 보낸다. 기다리는 것이고 실패가 아니다.</p>
+  <div class="callout"><b class="label">11/23 에는 일어나지 않았다</b><p>운영 DB 의 <code>generation_jobs</code> 에 잔액 실패(<code>error_class = 'billing'</code>)는 최근 30일 0건. <code>prod-2000</code> 의 마지막 성공은 11/09. 11/23 수업은 그림이 11장이라 34장 자리를 넘지 않았다. 오늘 20명 × 3장 재현에서 처음 드러난 길이다. 수업에서 학생 20명이 Artist 에 동시에 들어가면 그대로 터진다.</p></div>
 
   <h3>병목을 가른 실험(그림 값 외 비용 없음)</h3>
   <div class="tbl"><table>
@@ -204,39 +241,65 @@
     <tbody>
       <tr><td>가벼운 길 40개 동시</td><td class="num">전체 0.6초 · 인스턴스 23개</td><td>서버 함수는 짧은 요청을 동시에 잘 받는다</td></tr>
       <tr><td>작가 상태(DB 10쿼리) 40개 동시</td><td class="num">중앙값 1.2초 · 최대 1.5초</td><td>DB 읽기 묶음도 문제 없다</td></tr>
-      <tr><td>화면 HTML 40개 동시 + 카나리</td><td class="num">1.1초 · 카나리 0.16~0.21초 그대로</td><td>화면 그리기도 다른 요청을 막지 않는다</td></tr>
-      <tr><td><b>제출 30개 동시 + 카나리 4종</b></td><td class="num gate-cell">제출 5~11초 · 서버 경유 카나리 7.8~11.9초 · <b>같은 순간 직접 DB 질문 0.11초 · 로그인 공개키 0.03초</b></td><td>제출이 몰리면 서버 함수만 막힌다. DB · 로그인 서버는 그 순간에도 즉시 답했다</td></tr>
+      <tr><td>화면 HTML 40개 동시 + 카나리</td><td class="num">1.1초 · 카나리 0.16~0.21초 그대로</td><td>화면 열기는 다른 요청을 막지 않는다</td></tr>
+      <tr><td><b>제출 30개 동시 + 카나리 4종</b></td><td class="num gate-cell">제출 5~11초 · 서버 경유 카나리 7.8~11.9초 · <b>같은 순간 직접 DB 질문 0.11초 · 로그인 공개키 0.03초</b></td><td>제출이 몰리면 서버 함수 입구가 막힌다. DB · 로그인 서버는 그 순간에도 즉시 답했다</td></tr>
     </tbody>
   </table></div>
-  <p>제출 30개는 인스턴스 16개에 1~4개씩 나뉘었는데 1개만 받은 인스턴스도 5~11초가 걸렸다. 제출 1건은 혼자일 때 4~5초다(검열 호출 + fal 접수 + DB 예약 · 대부분 바깥 서비스를 기다리는 시간). 즉 "기다리는 요청"이 동시에 30~60개 생기면 서버 함수 자리가 모자라 새 요청이 줄을 선다. 이 줄에 폴링 · 화면 · 카나리가 다 같이 선다.</p>
-  <div class="callout warn"><b class="label">확인 못 한 것</b><p>Vercel 대시보드에 로그인이 없어 함수 로그(실행 시간 · 콜드 스타트 · Fluid Compute 켬/끔)를 보지 못했다. 위 모양은 "인스턴스 하나가 요청 하나씩 처리(Fluid Compute 끔)"일 때 나오는 모양과 같다. Vercel 프로젝트 설정 → Functions → Fluid Compute 를 보면 바로 안다.</p></div>
-
-  <h3>fal 열쇠 잔액</h3>
-  <p>실행 A · B 의 5xx 74건 가운데 72건이 같은 오류다: <code>fal submit: 403 User is locked. Reason: Exhausted balance</code>. 열쇠 <code>prod-2000</code> 으로 간 그림은 전부 즉시 실패했고 <code>legacy-1000</code> 으로 간 그림은 전부 성공했다. 최근 7일 운영 그림 196장은 모두 <code>legacy-1000</code> 이었고 <code>prod-2000</code> 의 마지막 성공은 11/09 다. 열쇠 고르기 트리거는 한 열쇠가 바쁘면 다음 열쇠로 넘기므로, 수업처럼 몰리는 날에만 이 열쇠가 쓰이고 그때만 1/3 이 실패한다. 나머지 2건은 fal 내용 검사기(422, 프롬프트의 "호빗")다.</p>
+  <p><b>"1개만 받은 인스턴스도 5~11초"가 뜻하는 것.</b> 그 서버가 일을 느리게 한 것이 아니다. 요청이 서버 안에 들어가기 전에 밖에서 기다린 시간이 응답 시간에 들어간 것이다. 카나리(검열 · fal 을 거치지 않는 요청)도 같은 순간 8~12초였으니 기다린 자리는 라우트 안이 아니라 공통 입구다.</p>
+  <p><b>왜 기다렸나, 후보 둘.</b> (가) 새 인스턴스를 켜는 시간: 제출 30개가 인스턴스 16개로 갈렸다는 것은 그 순간 새 서버가 많이 켜졌다는 뜻이고, 하나 켜는 데 1~3초가 든다. (나) 한 인스턴스 안에서 CPU 를 나눠 쓰는 경합: Fluid Compute 가 켜져 있으면(오너 확인) 한 서버가 여러 요청을 같이 받는다. 바깥 서비스를 기다리는 것은 CPU 를 안 먹지만, 제출 요청이 그림 입력을 꾸미고 로그인 서명을 확인하는 동안은 CPU 를 쓴다. 그 서버에 함께 올라탄 카나리 · 폴링이 그만큼 늦어진다. 1판의 "한 번에 1요청만 받아 자리가 모자란다"는 Fluid 가 꺼져 있을 때의 설명이라 접는다. <b>둘 중 어느 쪽인지는 Vercel 함수 로그(콜드 스타트 표시 · 함수별 소요 시간)에서 1분 안에 갈린다.</b></p>
+  <p><b>오너 질문 "Vercel 문제는 아닌 것 맞지?"에 대한 답.</b> 반은 맞다. <b>그림을 실패시킨 것은 Vercel 이 아니다</b>(열쇠다). 그러나 <b>느려진 곳은 Vercel 서버 함수가 맞다</b>: 같은 순간 DB 직접 질문 0.11초 vs Vercel 경유 8~12초. 실제 브라우저에서 이 느림은 잡 상태 폴링(한도 10초)이 끊겨 3→6→12초로 물러나는 모양으로 나타난다. 그림은 결국 뜨지만 "완료" 표시가 늦게 온다. 제출 요청에는 한도가 없어 20초를 그냥 기다린다.</p>
+  <div class="callout warn"><b class="label">확인 못 한 것</b><p>Vercel 함수 로그. 대시보드 로그인이 없다. aside 브라우저에 Vercel 로그인 탭을 열어 두었다. 로그인만 해 주면 (가)/(나)를 가르고 <code>FAL_KEYS</code> 도 바로 고친다.</p></div>
 
   <h3>덤으로 본 것</h3>
   <ul class="plain">
-    <li><b>완료 처리 2번.</b> 시험 그림 60장 가운데 12장(20%)이 같은 파일로 후보 행에 2번 기록됐다(<code>?v=</code> 만 다름). 웹훅 완료와 폴링 reconcile 이 같은 그림을 둘 다 마무리한 것이다. 원장 2절 "구조적 약점 (2) 부작용 중복"의 실측이다. 사용자 화면에는 1장만 보인다. 저장 · 내려받기 · 올리기가 2배로 든다.</li>
+    <li><b>완료 처리 2번.</b> 시험 그림 60장 가운데 12장(20%)이 같은 파일로 후보 행에 2번 기록됐다(<code>?v=</code> 만 다름). 그림이 끝나면 fal 이 우리 서버에 알려주고(웹훅), 동시에 우리 폴링도 fal 에 "끝났나"를 묻는다. 둘이 거의 같은 순간 "끝났다"를 받으면 각자 그림을 내려받아 저장하고 후보 행을 쓴다. 화면엔 1장만 보인다. fal 과금은 1번이다. 저장 공간 · 내려받기 · DB 행이 2배다. 원장 2절 "구조적 약점 (2)"의 실측. 고치는 법은 4절 1번.</li>
     <li><b>제출→완료 시간</b>(fal 생성 포함): 중앙값 68초 · p95 86초 · 최대 96초. 10분 · 30분 유령 기준은 넉넉하다.</li>
     <li><b>DB 메모리 약속(commitment)</b>은 Micro 에서 1.63 GB(WARNING). Nano 11/23 은 2.62 GB(SEVERE). 5절에 뜻을 적었다.</li>
   </ul>
 </section>
 
 <section>
-  <div class="sec-head"><span class="sec-num">4</span><h2>결정이 필요한 것</h2></div>
+  <div class="sec-head"><span class="sec-num">4</span><h2>결정된 것 · 결정이 필요한 것</h2></div>
+  <h3>결정된 것(오너 2026-11-24 밤)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>번호</th><th>무엇</th><th>상태</th><th>남은 손</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td><code>FAL_KEYS</code> 에서 <code>prod-2000</code> 빼기</td><td class="gate-cell">아직. Vercel 환경변수라 로그인이 필요하다</td><td>(a) aside 의 Vercel 탭에 로그인 → 내가 고치고 재배포 (b) 직접: Vercel → 프로젝트 <code>tale</code> → Settings → Environment Variables → <code>FAL_KEYS</code>(Production) → Edit → JSON 배열에서 <code>{"id":"prod-2000", …}</code> 객체 하나를 지움 → Save → Deployments → 최신 배포 → Redeploy. 배포가 끝나면 서버가 <code>fal_key_limits</code> 표에서 그 열쇠 행을 스스로 지운다</td></tr>
+      <tr><td class="num">2</td><td>동시 장수 3 → 2</td><td>커밋 · push 됨</td><td>없음. 열쇠가 늘면 <code>src/lib/artist/generation-slots.ts</code> 의 <code>ARTIST_SLOTS_IDLE</code> 하나만 올리고 같은 파일 테스트 기대값을 맞춘다</td></tr>
+    </tbody>
+  </table></div>
+  <h3>결정이 필요한 것</h3>
   <div class="tbl"><table>
     <thead><tr><th>번호</th><th>무엇</th><th>선택지</th><th>추천</th></tr></thead>
     <tbody>
-      <tr><td class="num">1</td><td>fal 열쇠 <code>prod-2000</code> 잔액 0</td><td>(a) fal.ai/dashboard/billing 에서 충전 (b) Vercel 환경변수 <code>FAL_KEYS</code> 에서 이 열쇠를 뺀다</td><td class="gate-cell">수업 전에 (a) 또는 (b). 둘 다 안 하면 몰리는 날 그림 1/3 이 5xx</td></tr>
-      <tr><td class="num">2</td><td>Vercel Fluid Compute</td><td>(a) 켜져 있는지 확인하고 꺼져 있으면 켠다(설정 1번, 재배포 1번, 추가 비용 없음) (b) 그대로</td><td class="gate-cell">(a). 기다리는 요청(검열 · fal · DB)을 한 인스턴스가 여러 개 같이 받게 된다. 켠 뒤 같은 스크립트로 실행 A 를 다시 재서 숫자로 본다</td></tr>
-      <tr><td class="num">3</td><td>제출 라우트를 빨리 답하게 바꾸기(코드)</td><td>(a) DB 예약만 하고 바로 답한 뒤 검열 · fal 접수를 뒤에서 한다(C05 의 <code>?jobId=</code> 웹훅이 늦은 접수를 받는다) (b) 그대로</td><td>2번 결과를 본 뒤. 2번으로 충분하면 안 한다. 부족하면 (a). 되돌리기 비쌈이라 구현 전 확인</td></tr>
-      <tr><td class="num">4</td><td>완료 처리 2번(20%)</td><td>(a) 원장에 케이스로 올리고 다음 작업에 넣는다 (b) 둔다</td><td>(a). 사용자 피해는 없고 비용 문제다</td></tr>
+      <tr><td class="num">1</td><td>완료 처리 2번(20%)</td><td>(a) 고친다: 저장을 시작하기 전에 "이 잡을 queued → completed 로 바꾼다, 아직 queued 일 때만" 한 줄을 먼저 실행하고 바꾸는 데 성공한 쪽만 저장한다. 늦은 쪽은 바뀐 행이 0 이라 멈춘다 (b) 둔다</td><td class="gate-cell">(a). 되돌리기 쌈(함수 2개 · 테스트 묶음 <code>tests/job/</code>). 수업 전 필수는 아니다. 허락하면 바로 한다</td></tr>
+      <tr><td class="num">2</td><td>잔액 실패가 난 열쇠를 코드가 몇 분간 피하게 할지</td><td>(a) 어떤 열쇠에서 <code>billing</code> 실패가 나면 10분간 그 열쇠를 고르지 않는다(열쇠가 수업 중에 마를 때 대비) (b) 열쇠를 사람이 관리한다(지금 방식)</td><td>(b) 로 두고 비즈니스 플랜 열쇠를 넣을 때 (a) 를 같이 본다. 열쇠가 하나뿐인 동안은 (a) 가 할 일이 없다</td></tr>
+      <tr><td class="num">3</td><td>제출 라우트를 빨리 답하게 바꾸기(5절에 뜻을 적었다)</td><td>(a) DB 자리 예약(0.3초)만 하고 바로 "접수됐어요"라고 답한 뒤 검열 · fal 접수를 응답 뒤에 이어서 한다 (b) 그대로</td><td>지금은 (b). Fluid 가 켜져 있으면 이 변경은 학생 체감(4~5초 → 0.5초)만 바꾸고 서버가 하는 일은 같다. 검열 거절 안내가 "즉시"에서 "몇 초 뒤 폴링"으로 바뀌는 정책 변화가 있어 10절 과제와 함께 본다</td></tr>
+      <tr><td class="num">4</td><td>Vercel 함수 로그 보기 · 열쇠 뺀 뒤 재측정</td><td>(a) aside 의 Vercel 탭에 로그인 (b) 안 본다</td><td class="gate-cell">(a). 로그로 (가)/(나)를 가르고, 열쇠 뺀 뒤 2장 상태로 실행 A 를 다시 재서(5절 "다시 재는 법") 수업 전에 숫자를 본다</td></tr>
     </tbody>
   </table></div>
 </section>
 
 <section>
   <div class="sec-head"><span class="sec-num">5</span><h2>알고만 있을 것</h2></div>
+
+  <h3>시험 도구 로그인 실패가 무엇인가</h3>
+  <p>부하 스크립트는 시험 계정 20개로 들어가기 위해 이메일 없이 서버에서 로그인 링크(마법 링크)를 직접 만들어 바로 쓴다. 같은 계정에 이 링크를 연달아 2번 만들면 먼저 것이 무효가 되고(<code>otp_expired</code>), 짧은 시간에 많이 만들면 Supabase 로그인 서버가 429 로 막는다. 실행 B 에서 1명이 이 때문에 못 들어갔고 실행 C 전에 스크립트를 고쳤다(계정당 1번 발급). <b>실제 학생은 이 길을 쓰지 않는다</b>(이메일 · 비밀번호 로그인). 앱 문제가 아니다.</p>
+
+  <h3>"제출 라우트를 DB 자리 예약만 하고 바로 답한다"가 무슨 뜻인가</h3>
+  <p>지금 학생이 "그려줘"를 누르면 서버는 차례로 ① 글 검열 회사(Creem)에 묻고 답을 기다린다(1~3초) ② DB 에 그림 자리를 예약한다(0.3초) ③ fal 에 그림을 주문하고 접수증을 기다린다(1~2초) ④ 그 다음에야 학생에게 "접수됐어요"라고 답한다. 학생은 4~5초 동안 단추가 돌아가는 것을 본다. 바꾸면 ② 자리 예약만 하고 0.5초 안에 "접수됐어요"라고 답하고, 서버는 답을 보낸 뒤에도 그 요청의 나머지(① 검열 → ③ fal 주문)를 이어서 한다(Vercel 의 "응답 뒤 작업"). 검열에 걸리거나 fal 이 거절하면 그 자리를 실패로 바꾸고, 화면은 지금처럼 폴링으로 실패를 본다. 좋은 점: 학생 체감이 빠르고, 서버 연결이 짧게 끝난다. 주의할 점: 지금은 검열 거절을 즉시 안내문으로 보여주는데, 바꾸면 몇 초 뒤 폴링으로 알게 되어 안내 길을 다시 짜야 한다. Fluid 가 켜져 있으면 서버가 하는 일의 양은 같다. 그래서 지금은 하지 않는다.</p>
+
+  <h3>동시 장수 3 → 2 가 바꾸는 것</h3>
+  <ul class="plain">
+    <li><b>그림만</b>이다. Artist 화면이 빈칸을 스스로 채울 때 한 사람이 한 번에 보내는 장수. 영상은 다른 상수(사용자당 영상 자리 3)이고 건드리지 않았다.</li>
+    <li>학생 1명이 6장을 받는 시간: 3장씩 2번 ≈ 2.5분 → 2장씩 3번 ≈ 3.7분(장당 68초 기준).</li>
+    <li>20명이 동시에 들어올 때 fal 자리(34)를 넘는 장수: 26장 → 6장. 서버 함수에 동시에 걸리는 제출: 60 → 40.</li>
+    <li>러프 스토리보드가 도는 동안의 1장 규칙은 그대로다.</li>
+    <li>되돌리기: 상수 1개(<code>ARTIST_SLOTS_IDLE</code>)와 같은 이름의 테스트 기대값.</li>
+  </ul>
+
+  <h3>화면 그리기 · 그림 내려받기가 없어도 병목 측정이 맞는 까닭</h3>
+  <p>화면 그리기는 학생 컴퓨터에서 일어난다. 그림 내려받기는 Supabase 파일 저장소(DB 도 Vercel 서버 함수도 아닌 별도 서버)에서 온다. 병목 후보 둘을 하나도 거치지 않는다. 그림이 뜨기까지 1~2초가 더 걸릴 뿐이다. 오히려 실제 브라우저는 탭이 뒤에 있으면 폴링을 느리게 하므로, 스크립트가 실제보다 조금 더 가혹하다.</p>
 
   <h3>DB 메모리 "약속 2.6 GB" 가 무엇인가</h3>
   <p>대시보드의 Memory commitment 는 "기계 안 모든 프로그램이 쓰겠다고 <b>예약한</b> 양의 합"이다. 실제로 쓴 양(Used)이 아니다. Postgres 는 연결 1개마다 작업 메모리를 예약하고(최대 60연결), 공유 버퍼를 예약한다. 같은 기계에 로그인 서버 · 조회 서버(PostgREST) · 연결 풀러 · 저장소 서버도 산다. 예약 합이 기계 메모리를 넘으면 배지가 WARNING, 메모리 + Swap 까지 넘으면 SEVERE 다. 11/23 은 0.38 GB 기계에 2.62 GB 를 약속해 둔 상태에서 20명이 실제로 쓰기 시작하자 Swap(디스크)으로 넘쳤고, Swap 이 디스크 예산을 태웠다. 오늘 Micro 는 1.06 GB 기계에 1.63 GB 약속 · Swap 0.15 GB 로 끝났다. 수업 뒤 같은 화면에서 Swap 이 0.3 GB 를 넘으면 Small(2 GB · 월 $5 추가)로 간다.</p>
@@ -247,11 +310,11 @@
       <li>로그인은 프로젝트에 묶여 있다. 두 번째 DB 는 같은 사용자를 모른다. 소유 확인(RLS · workspaces)을 다시 만들어야 한다.</li>
       <li>11/23 의 부하는 "사용자별 폴링"이었다. 데이터를 어디로 옮기든 폴링은 그 데이터를 따라간다. 요청 수는 안 줄고 자리만 바뀐다.</li>
       <li>무료 티어는 Nano(0.5 GB)이고 1주일 안 쓰면 멈춘다. 지금 Micro 보다 약하다.</li>
-      <li>Supabase 문서(Read Replicas): 읽기가 많아도 "가장 큰 컴퓨트(16XL)에 닿은 뒤" 복제본을 권한다. 그 전에는 컴퓨트 크기를 올리라는 뜻이다.</li>
+      <li>Supabase 문서(Read Replicas): 읽기가 많아도 "가장 큰 컴퓨트(16XL)에 닿은 뒤" 복제본을 권한다. 그 전에는 컴퓨트 크기를 올리라는 뜻이다. 그리고 오늘 실측에서 DB 는 이미 병목이 아니다.</li>
     </ul></div>
     <div class="yes"><h4>대신 하는 것. 순서대로</h4><ul>
       <li>이번에 한 것: Nano → Micro(비용 0). 다음은 Small(월 $5 추가). 돈으로 사는 것이 코드보다 싸다.</li>
-      <li>서버 함수 쪽: Fluid Compute(4절 2번). 지금 병목은 DB 가 아니라 여기다.</li>
+      <li>열쇠 빼기 · 동시 장수 2(결정됨). 그 다음 Vercel 로그로 느림의 원인을 가른다.</li>
       <li>폴링을 밀어주기(Realtime 2층)로 바꾸면 DB 질문 자체가 준다. 1층 보고서 6절에 적었다.</li>
       <li>자주 읽는 작은 상태(작업 상태)만 캐시(Vercel KV 등)에 두는 방법도 있다. 두 번째 DB 가 아니라 두 번째 "서랍"이다. 지금은 필요 없다.</li>
     </ul></div>
@@ -261,22 +324,23 @@
   <p>fal 로 완료된 그림 147장(gpt-image-2 · 실사 스타일). 금액은 fal 대시보드가 정본이다. Supabase · Vercel 추가 비용 없음. 시험 계정 · 프로젝트 · 보관함 파일은 모두 지웠다.</p>
 
   <h3>다시 재는 법</h3>
-  <pre><span class="path">Fluid Compute 를 바꾼 뒤 같은 조건으로 다시 잰다: 20명 · 그림 6장 · 작가 폴링</span>node scripts/load-replay-artist.mjs prepare --target live --run 1125a --users 20 --template a9b4ef12-298e-4c95-94fd-2f0ecd780c19
-node scripts/load-replay-artist.mjs run     --target live --run 1125a --base https://www.talestudio.art --users 20 --duration 420 --ramp 120 --writer-poll --canary
+  <pre><span class="path">열쇠를 뺀 배포가 끝난 뒤 같은 조건으로 다시 잰다: 20명 · 그림 6장 · 작가 폴링 · 동시 2장</span>node scripts/load-replay-artist.mjs prepare --target live --run 1125a --users 20 --template a9b4ef12-298e-4c95-94fd-2f0ecd780c19
+node scripts/load-replay-artist.mjs run     --target live --run 1125a --base https://www.talestudio.art --users 20 --duration 480 --ramp 120 --writer-poll --canary
 node scripts/load-replay-artist.mjs cleanup --target live --run 1125a --base https://www.talestudio.art</pre>
-  <p>실행 A 와 같은 조건이다. 카나리 p95 가 1초 안이고 제출 중앙값이 5초 안이면 2번이 먹힌 것이다.</p>
+  <p>볼 것 셋. 5xx 가 0 인가(열쇠 빼기가 먹힘). 그림이 120/120 인가(포기 없음). 카나리 p95 가 1초 안인가(느림이 남았나). 옛 모양과 비교하려면 <code>--pool 3</code>.</p>
 
   <h3>이 시험이 11/23 과 다른 점</h3>
   <ul class="plain">
     <li>11/23 은 작가(LLM 파이프라인)가 19명분 실제로 돌았다. 오늘은 작가 상태 폴링만 걸었다(LLM 호출 · 작가 쓰기 없음).</li>
-    <li>11/23 은 실제 브라우저였다. 오늘은 같은 요청을 보내는 프로그램이다. 화면 그리기 · 그림 내려받기는 없다.</li>
+    <li>11/23 은 실제 브라우저였다. 오늘은 같은 요청을 보내는 프로그램이다. 화면 그리기 · 그림 내려받기는 없다(위 "병목 측정이 맞는 까닭").</li>
     <li>11/23 은 입장이 6분에 걸쳤다. 오늘 실행 A 는 2분이다(더 가혹하다).</li>
+    <li>11/23 은 그림 11장이라 fal 자리 34 를 넘지 않았다. 오늘은 120장이라 넘었고, 그래서 열쇠 길이 처음 보였다.</li>
   </ul>
 </section>
 
 <footer>
-  <p><b>근거로 쓴 것.</b> 결과 <code>.claude/docs/2026-11-24/loadtest/1124a/run-*.json</code>(요청별 시간은 <code>*.log.json</code>) · 스크립트 <code>scripts/load-replay-artist.mjs</code> · Supabase 대시보드 Observability → Database(21:28~21:52 KST) · 운영 DB <code>generation_jobs</code> 의 오류 문자열 · Vercel 문서 fluid-compute · Supabase 문서 read-replicas.</p>
-  <p><b>이 문서가 하지 않는 것.</b> Vercel 함수 로그 확인. 작가 파이프라인 실행. 브라우저 실화면. 코드 변경(이 보고서로는 아무 코드도 바꾸지 않았다).</p>
+  <p><b>근거로 쓴 것.</b> 결과 <code>.claude/docs/2026-11-24/loadtest/1124a/run-*.json</code>(요청별 시간은 <code>*.log.json</code>) · 스크립트 <code>scripts/load-replay-artist.mjs</code> · Supabase 대시보드 Observability → Database(21:28~21:52 KST) · 운영 DB <code>generation_jobs</code> · <code>fal_key_limits</code>(service role 읽기) · 코드 <code>src/lib/fal/keys.ts</code> · <code>src/lib/fal/failure-class.ts</code> · <code>src/lib/generation-jobs.ts</code>(give-up) · <code>src/app/api/artist/generate-sheet/route.ts</code> · 트리거 <code>supabase/migrations/20261027100000_generation_capacity_per_user_limit.sql</code> · Vercel 문서 fluid-compute · Supabase 문서 read-replicas.</p>
+  <p><b>이 문서가 하지 않는 것.</b> Vercel 함수 로그 확인. 작가 파이프라인 실행. 브라우저 실화면. 2판과 함께 바꾼 코드는 동시 장수 상수 하나(3 → 2)와 그 테스트 · 주석 · 부하 스크립트 기본값이다. 그 밖의 코드는 바꾸지 않았다.</p>
 </footer>
 
 </div>

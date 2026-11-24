@@ -172,7 +172,7 @@ export type AppearanceCreationOptions = GenerationRequestOptions & {
 // 보수적으로 유지한다. 계정 전역 공정성은 generation_jobs dispatcher 도입 시 중앙화한다.
 // 1로 하향(#c1 2026-07-15): artist 턴어라운드(장당 1~2분)가 동시 2개면 유저 쿼터·fal 슬롯을
 //   길게 점유해 러프 스토리보드 첫 일괄 생성이 굶는다 — artist 는 하나씩, 나머지는 러프보드 몫.
-// 가변(2026-10-09 오너): 그 유저의 러프 스토리보드가 만들어지는 중일 때만 1장, 없거나 끝났으면 3장까지 —
+// 가변(2026-10-09 오너, 2026-11-24 3→2): 그 유저의 러프 스토리보드가 만들어지는 중일 때만 1장, 없거나 끝났으면 2장까지 —
 //   runAdaptivePool + fetchArtistGenerationLimit(src/lib/artist/generation-slots.ts)가 보낼 때마다 다시 묻는다.
 
 export { WORLD_SHOT_LABELS }
@@ -2124,7 +2124,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   autoGenerateBaseImages: async () => {
     const { characterAssets, worldAssets } = get()
     const projectId = useProjectStore.getState().projectId
-    // 동시 in-flight 상한은 가변이다 — 러프 스토리보드가 도는 동안 1장, 아니면 3장(runAdaptivePool).
+    // 동시 in-flight 상한은 가변이다 — 러프 스토리보드가 도는 동안 1장, 아니면 2장(runAdaptivePool).
 
     // 방향뷰(main reference i2i) + 월드 빈칸 보강. main 은 서버 초안이 채우므로 client 는 main 제출 안 함.
     const restTasks: Array<() => Promise<void>> = []
