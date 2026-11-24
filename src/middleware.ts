@@ -55,9 +55,11 @@ export async function middleware(request: NextRequest) {
     pathname.startsWith('/playground')
   // 정책은 가입·결제 전에 공개한다. 비슷한 이름이나 하위 보호 경로까지 열지 않는다.
   const isLegalPath = /^\/(?:terms|refunds?|privacy|acceptable-use)\/?$/.test(pathname)
+  const isSignupPath = /^\/signup\/?$/.test(pathname)
   const isPublicPath =
     isMarketingPath ||
     isLegalPath ||
+    isSignupPath ||
     pathname === '/checkout' ||
     pathname.startsWith('/login') ||
     isPublicAsset ||
@@ -87,7 +89,7 @@ export async function middleware(request: NextRequest) {
   //   demo_share 가 남으면 playground 의 /api fetch 까지 데모 shim 에 중립화된다.)
   if (
     hasDemoShare &&
-    (isMarketingPath || pathname.startsWith('/login') || pathname.startsWith('/projects'))
+    (isMarketingPath || pathname.startsWith('/login') || isSignupPath || pathname.startsWith('/projects'))
   ) {
     supabaseResponse.cookies.set('demo_share', '', { path: '/', maxAge: 0 })
     request.cookies.delete('demo_share')
@@ -114,8 +116,8 @@ export async function middleware(request: NextRequest) {
     return redirectWithSession(url)
   }
 
-  // Logged in but on /login → next 가 있으면 그곳으로(검증 통과분만), 없으면 프로젝트 페이지
-  if (user && request.nextUrl.pathname.startsWith('/login')) {
+  // 로그인·가입 화면은 이미 로그인했으면 안전한 next 또는 프로젝트 목록으로 보낸다.
+  if (user && (pathname.startsWith('/login') || isSignupPath)) {
     const next = sanitizeNextPath(request.nextUrl.searchParams.get('next'))
     return redirectWithSession(new URL(next ?? '/projects', request.url))
   }

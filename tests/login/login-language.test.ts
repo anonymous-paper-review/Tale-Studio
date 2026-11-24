@@ -1,4 +1,4 @@
-// 로그인 화면은 다른 화면처럼 고른 화면 언어로 보이고, 바탕에 랜딩과 같은 흐린 빛을 깔며, 가입하기는 두지 않는다(11/5 시안 R1, 오너 2026-11-09 추천대로)
+// 로그인 화면은 고른 언어로 표시하고, 새 계정이 필요한 사람에게 회원가입 링크를 제공한다.
 import { readFileSync } from 'node:fs'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
@@ -71,10 +71,13 @@ describe('로그인 화면', () => {
     expect(page).toContain('blur-[80px]')
   })
 
-  // 왜: 이메일 가입 흐름이 없다 — Google 로 처음 로그인하면 계정이 생긴다(오너 2026-11-09 가입하기 빼기).
-  it('계정이 없나요? 가입하기는 두지 않는다', () => {
+  // 왜: 이메일·비밀번호·닉네임 가입 요청에 따라 Google 계정 없이도 가입 화면을 찾을 수 있어야 한다.
+  it('새 계정이 필요한 방문자이면 로그인 화면에서 가입하기 링크를 볼 수 있다', () => {
     mocks.locale = 'ko'
-    expect(texts().join(' ')).not.toContain('가입하기')
-    expect(source()).not.toMatch(/Sign up|sign up/)
+    expect(texts()).toContain('가입하기')
+    mocks.cursor = 0
+    expect(elements(LoginPage()).some(node => node.props.href === '/signup')).toBe(true)
+    mocks.locale = 'en'
+    expect(texts()).toContain('Sign up')
   })
 })

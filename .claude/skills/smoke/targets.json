@@ -19,6 +19,11 @@
       "note": "로그인 폼. 2026-08-18 i18n 배치(26cd18a)로 한국어 고정 문구가 영어로 바뀌어 낡음 — src/app/login/page.tsx 의 placeholder 는 t() 를 안 타는 리터럴이라 로케일과 무관하게 항상 이 값이다 (#smoke-targets-rot 2026-08-25)"
     },
     {
+      "path": "/signup",
+      "expect": ["Sign up", "Nickname"],
+      "note": "이메일·비밀번호·닉네임 가입 화면. 기본 영어 화면의 실제 접근성 트리 확인(2026-11-24). 한국어 화면에서는 가입하기·닉네임으로 보인다."
+    },
+    {
       "path": "/pricing",
       "expect": ["Pricing", "All features are free during the beta."],
       "note": "요금. src/app/pricing/page.tsx 의 부제도 t() 없는 리터럴 — 2026-08-18 i18n 배치로 낡았던 한국어 문구를 실제 텍스트로 교체 (#smoke-targets-rot 2026-08-25)"

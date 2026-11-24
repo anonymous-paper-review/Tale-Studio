@@ -26,6 +26,7 @@ import { railStageState } from '@/lib/stage-rail'
 import { STAGE_ACCESS_KEY, stageForShortcut } from '@/lib/stage-shortcuts'
 import { navigateWithStageSlide } from '@/lib/stage-transition'
 import { UserMenu } from '@/components/layout/user-menu'
+import { SidebarActions } from '@/components/layout/sidebar-actions'
 import { ContactPopover } from '@/components/contact-popover'
 import { ExportMenu } from '@/components/export-menu'
 import { useProjectStore } from '@/stores/project-store'
@@ -42,6 +43,7 @@ import { useT } from '@/lib/i18n'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { directorHasFinishedVideo, railEditorViaHandoff } from '@/lib/director/shot-state'
+import './sidebar-responsive.css'
 
 // 아이콘은 화면 이름을 따른다(리뉴얼 1차) — v3 채움 아이콘: Producer(entry)=전구, Writer(producer)=책, Storyboard(writer)=네 칸.
 const STAGE_ICONS: Record<StageId, React.ElementType> = {
@@ -158,7 +160,7 @@ export function Sidebar() {
   //   프로젝트 이름 바꾸기는 위 막대(StudioTopBar)의 연필로 옮겼다.
   return (
     <aside
-      className="fixed z-40 flex flex-col items-center gap-1.5 rounded-xl bg-sidebar pb-4 pt-3"
+      className="studio-sidebar fixed z-40 flex flex-col items-center gap-1.5 rounded-xl bg-sidebar pb-4 pt-3"
       style={{
         left: SHELL_INSET,
         top: SHELL_INSET,
@@ -186,8 +188,8 @@ export function Sidebar() {
 
       {/* Stage navigation — STAGES(constants.ts) 순서 그대로 (writer 탭 2026-06-12 부활).
           아이콘 + 라벨이 한 버튼 안에 들어간다: 활성 배경이 둘을 함께 감싸야 하나의 탭으로 읽힌다.
-          라벨이 5줄 늘어난 만큼 세로가 빠듯해질 수 있어 낮은 뷰포트에선 이 영역만 스크롤한다. */}
-      <div className="flex min-h-0 flex-1 flex-col items-center gap-1.5 overflow-y-auto">
+          단계 칸은 줄이거나 스크롤하지 않고, 높이가 부족하면 아래 보조 단추를 메뉴로 접는다. */}
+      <div className="sidebar-stage-nav flex min-h-max flex-1 shrink-0 flex-col items-center gap-1.5">
         {STAGES.map((stage) => {
           const Icon = STAGE_ICONS[stage.id]
           const isCommitted = pathname.startsWith(stage.path)
@@ -321,7 +323,7 @@ export function Sidebar() {
           AI 가 일하는 동안은 통째로 inert(누르기 · 키보드 포커스 모두 막힘, 2026-10-27 오너 재확인).
           inert 안쪽에는 마우스가 닿지 않는다 — 막힌 까닭(title) · 금지 커서는 막지 않는 바깥 묶음에 둔다(검토). */}
       <div
-        className={cn('mt-2 shrink-0', footerBlocked && 'cursor-not-allowed')}
+        className={cn('sidebar-footer-wrap mt-2 shrink-0', footerBlocked && 'cursor-not-allowed')}
         title={footerBlocked ? t('AI is working. You can move once it finishes.') : undefined}
       >
         <div
@@ -329,6 +331,14 @@ export function Sidebar() {
           data-testid="sidebar-footer"
           inert={footerBlocked || undefined}
         >
+          <SidebarActions
+            blocked={footerBlocked}
+            profile={(
+              <OwnerOnly>
+                <UserMenu />
+              </OwnerOnly>
+            )}
+          >
           <SidebarTakeBalance />
           <OwnerOnly>
             <FooterIconItem label={t('Share')}>
@@ -369,12 +379,7 @@ export function Sidebar() {
               }
             />
           </FooterIconItem>
-          {/* 프로필은 v3 처럼 동그란 머리글자만 — 캡션 없이(이름은 누르면 열리는 메뉴에 있다). */}
-          <OwnerOnly>
-            <div className="mt-1">
-              <UserMenu />
-            </div>
-          </OwnerOnly>
+          </SidebarActions>
         </div>
       </div>
     </aside>

@@ -81,7 +81,7 @@ dev 서버는 없으면 스스로 띄우고 끝나면 정리한다(`--no-serve` 
 
 ## 로그인 (`--auth`)
 
-- `/`, `/pricing`, `/playground`, `/login`, `/share` 는 공개. 그 외는 `/login?next=...` 로 튕긴다.
+- `/`, `/pricing`, `/playground`, `/login`, `/signup`, `/share` 는 공개. 그 외는 `/login?next=...` 로 튕긴다.
   (`/docs` 는 미들웨어가 공개로 허용하지만 실제로는 404 라 targets 에서 제외했다.)
 - `--auth` 는 프로파일 `tale-auth` 를 쓰고, 세션이 없으면 **자동으로 로그인**한다.
   자격증명은 `.env.local` 의 `TALE_SMOKE_EMAIL` / `TALE_SMOKE_PASSWORD` 를 읽는다.
