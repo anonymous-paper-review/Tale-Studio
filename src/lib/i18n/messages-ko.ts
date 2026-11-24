@@ -2283,6 +2283,8 @@ export const KO: Record<string, string> = {
   'Continue to payment': '결제 계속',
   'Pay {amount} by Korean card': '국내 카드로 {amount} 결제',
   'Payment details': '결제 정보',
+  'From · one time': '부터 · 1회',
+  'From / month': '부터 / 월',
   'Docs': '문서',
   'Get started': '시작하기',
   'From a one-line story to a previz video. The pre-production studio built with an AI production team.': '한 줄 이야기에서 프리비즈 영상까지. AI 제작팀과 함께하는 올인원 프리프로덕션 스튜디오.',

@@ -471,8 +471,8 @@ export const TEXT = {
   '이용 정책': 'Acceptable use policy',
   '환불·해지': 'Refunds',
   '한 줄 이야기에서 프리비즈 영상까지. AI 제작팀과 함께하는 올인원 프리프로덕션 스튜디오.': 'From a one-line story to previz video. The all-in-one pre-production studio with an AI crew.',
-  'Talestudio · 대표 Daewon Yoon · 사업자등록번호 333-27-02069 · 13606 경기도 성남시 분당구 돌마로 169 · support@talestudio.art': 'Talestudio · CEO Daewon Yoon · Business Reg. No. 333-27-02069 · 169 Dolma-ro, Bundang-gu, Seongnam-si, Gyeonggi-do 13606, Korea · support@talestudio.art',
-  '결제는 준비 중이에요 · © 2026 Tale Studio. All rights reserved.': 'Payments coming soon · © 2026 Tale Studio. All rights reserved.',
+  '테일스튜디오 · 대표 윤대원 · 사업자등록번호 333-27-02069 · 통신판매업 신고 제2026-성남수정-0914호': 'Talestudio · Daewon Yoon · Business Reg. 333-27-02069 · Mail-order Sales Reg. 제2026-성남수정-0914호',
+  '경기도 성남시 수정구 위례서일로 46, 1동 20층 2010호 · 전화 010-6766-3007 · support@talestudio.art': 'Unit 2010, 20F, Bldg. 1, 46 Wiryeseoil-ro, Sujeong-gu, Seongnam-si, Gyeonggi-do, Republic of Korea · Tel. +82-10-6766-3007 · support@talestudio.art',
 
   // 챗봇
   'Lumi와 이야기': 'Chat with Lumi',

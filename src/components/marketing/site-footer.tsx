@@ -19,7 +19,7 @@ export function SiteFooter() {
             {t('From a one-line story to a previz video. The pre-production studio built with an AI production team.')}
           </p>
         </div>
-        <div className="flex flex-col gap-3 text-body text-muted-foreground">
+        <div className="flex flex-col items-start gap-3 text-body text-muted-foreground">
           <Link href="/playground" className="w-fit transition-colors hover:text-foreground">
             Playground
           </Link>

@@ -2,13 +2,19 @@
 // - 언어는 localStorage 'tale-lang' 또는 주소의 ?lang=en|ko 로 정해요. 바꾸면 페이지를 다시 불러요.
 // - 영어일 때: 화면의 한국어 글자를 사전(i18n/en.js)으로 바꾸고, 나중에 생기는 글자(채팅 · 시연)도 따라 바꿔요.
 import { BLOCK, TEXT, PROSE } from './i18n/en.js'
+import { pickLandingLang, appLocaleRecord, readAppLocale } from './lang.js'
 
 const read = () => {
   try {
     const q = new URLSearchParams(location.search).get('lang')
-    if (q === 'en' || q === 'ko') { localStorage.setItem('tale-lang', q); return q }
-    return localStorage.getItem('tale-lang') || 'ko'
+    const v = pickLandingLang({ query: q, saved: localStorage.getItem('tale-lang'), app: readAppLocale(localStorage.getItem('tale-locale')), languages: navigator.languages })
+    save(v)
+    return v
   } catch { return 'ko' }
+}
+// 고른 언어를 첫 화면(tale-lang)과 앱(tale-locale) 둘 다에 적는다 — 요금 화면도 같은 언어로 열린다.
+function save(v) {
+  try { localStorage.setItem('tale-lang', v); localStorage.setItem('tale-locale', appLocaleRecord(v)) } catch {}
 }
 export const lang = read()
 const EN = lang === 'en'
@@ -67,7 +73,7 @@ if (pick) {
   menu.querySelectorAll('[data-lang-pick]').forEach((o) => o.addEventListener('click', () => {
     const v = o.dataset.langPick
     if (v === lang) return close()
-    try { localStorage.setItem('tale-lang', v) } catch {}
+    save(v)
     const u = new URL(location.href)
     if (u.searchParams.has('lang')) { u.searchParams.delete('lang'); location.replace(u.toString()) } else location.reload()
   }))

@@ -14,7 +14,7 @@ const lumiPersona = () => ({
   name: 'lumi-persona',
   transformIndexHtml(html, ctx) {
     if (single) return html
-    const src = ctx.server ? '/vendor/lumi-persona.js' : './lumi-persona.js'
+    const src = ctx.server ? '/vendor/lumi-persona.js' : '/landing/lumi-persona.js'
     return html.replace('<!--LUMI_PERSONA-->', `<script src="${src}"></script>`)
   },
   generateBundle() {
@@ -24,7 +24,8 @@ const lumiPersona = () => ({
 })
 
 export default defineConfig({
-  base: './',
+  // 사이트(Next) 의 public/landing 에 얹는다. 첫 화면은 / 주소로 보이므로(미들웨어 rewrite) 경로는 절대값이어야 한다.
+  base: single ? './' : '/landing/',
   plugins: [lumiPersona()],
   build: single
     ? {
@@ -35,5 +36,5 @@ export default defineConfig({
         modulePreload: false,
         rollupOptions: { input: `${page}.html`, output: { inlineDynamicImports: true } },
       }
-    : { outDir: 'build/web', emptyOutDir: true },
+    : { outDir: '../public/landing', emptyOutDir: true },
 })

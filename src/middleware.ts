@@ -52,7 +52,9 @@ export async function middleware(request: NextRequest) {
     pathname === '/' ||
     pathname.startsWith('/pricing') ||
     pathname.startsWith('/docs') ||
-    pathname.startsWith('/playground')
+    pathname.startsWith('/playground') ||
+    // 디자이너 랜딩(2026-11-24): public/landing 의 그림·영상·스크립트. 로그인 없이 열려야 첫 화면이 그려진다.
+    pathname.startsWith('/landing/')
   // 정책은 가입·결제 전에 공개한다. 비슷한 이름이나 하위 보호 경로까지 열지 않는다.
   const isLegalPath = /^\/(?:terms|refunds?|privacy|acceptable-use)\/?$/.test(pathname)
   const isSignupPath = /^\/signup\/?$/.test(pathname)
@@ -126,6 +128,14 @@ export async function middleware(request: NextRequest) {
   //   재방문 사용자에게 매번 랜딩을 보여주는 건 마찰이므로 프로젝트 페이지로 보낸다.
   if (user && pathname === '/') {
     return redirectWithSession(new URL('/projects', request.url))
+  }
+
+  // 로그인 전 첫 화면은 디자이너 랜딩(public/landing, 오너 2026-11-24). 주소는 / 그대로 두고 내용만 바꿔 보인다.
+  //   약속: tests/login/landing-access.test.ts
+  if (!user && pathname === '/') {
+    const rewritten = NextResponse.rewrite(new URL('/landing/index.html', request.url))
+    supabaseResponse.cookies.getAll().forEach((cookie) => rewritten.cookies.set(cookie))
+    return rewritten
   }
 
   return supabaseResponse

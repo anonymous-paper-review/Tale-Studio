@@ -63,7 +63,7 @@ function FamilyCards({ onSelect, surface }: { onSelect?: (family: PricingFamily,
             <p className="mt-1 text-body text-muted-foreground">{t(copy.audience)}</p>
             <p className="mb-2 mt-6 flex flex-wrap items-baseline gap-x-2">
               <span className="font-num text-5xl font-extrabold tabular-nums tracking-tight">{priceText(first, surface)}</span>
-              <span className="text-label text-muted-foreground">{t('From')} · {t(family === 'take' ? 'One time' : '/ month')}</span>
+              <span className="text-label text-muted-foreground">{t(family === 'take' ? 'From · one time' : 'From / month')}</span>
             </p>
             <p className="min-h-12 text-body text-muted-foreground">{t(copy.description)}</p>
             <span className={cn('mt-auto flex h-12 w-full items-center justify-center gap-2 rounded-full text-body font-bold', primary ? 'bg-primary text-primary-foreground' : 'bg-chip text-foreground')}>

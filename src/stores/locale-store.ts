@@ -1,3 +1,4 @@
+import { useEffect } from 'react'
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
 import { toast } from 'sonner'
@@ -26,8 +27,7 @@ interface LocaleState {
 export const useLocaleStore = create<LocaleState>()(
   persist(
     (set, get) => ({
-      // 처음 온 방문자는 브라우저 언어로 시작한다(③A). 저장된 언어가 있으면 persist 가 덮어쓴다.
-      locale: typeof navigator === 'undefined' ? 'en' : initialLocaleFor(navigator.languages),
+      locale: 'en',
       hydrated: false,
       hydrateFromUser: async () => {
         if (get().hydrated) return
@@ -68,3 +68,19 @@ export const useLocaleStore = create<LocaleState>()(
     { name: 'tale-locale', partialize: (s) => ({ locale: s.locale }) },
   ),
 )
+
+/**
+ * 처음 온 방문자(저장된 언어 없음)는 브라우저 언어로 시작한다(오너 2026-11-24 ③A).
+ * 서버 그림(en)과 첫 그림을 맞추려고 그린 뒤에 바꾼다 — 초기값으로 넣으면 하이드레이션이 어긋난다.
+ */
+export function useFirstVisitLocale() {
+  useEffect(() => {
+    try {
+      if (window.localStorage.getItem('tale-locale')) return
+    } catch {
+      return
+    }
+    const first = initialLocaleFor(navigator.languages)
+    if (first !== useLocaleStore.getState().locale) useLocaleStore.setState({ locale: first })
+  }, [])
+}

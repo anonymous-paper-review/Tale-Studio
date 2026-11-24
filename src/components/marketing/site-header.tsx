@@ -5,6 +5,7 @@ import { TaleLockup } from '@/components/tale-lockup'
 import { LocaleToggle } from '@/components/marketing/locale-toggle'
 import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { useT } from '@/lib/i18n'
+import { useFirstVisitLocale } from '@/stores/locale-store'
 
 /**
  * 공개(마케팅) 페이지 공용 헤더 (#landing-v2 2026-08-03) — 랜딩·Playground·Pricing·Docs.
@@ -14,6 +15,7 @@ import { useT } from '@/lib/i18n'
 // showLocale: 사전을 타는 페이지(/pricing)만 언어 토글을 보인다. 영어 고정 페이지에 붙이면 토글해도 안 바뀌어 혼란.
 export function SiteHeader({ showLocale = false }: { showLocale?: boolean } = {}) {
   const t = useT()
+  useFirstVisitLocale()
   return (
     <header className="fixed inset-x-0 top-0 z-50 bg-gradient-to-b from-black/80 via-black/40 to-transparent">
       <div className="mx-auto flex h-18 max-w-7xl items-center gap-8 px-6">
