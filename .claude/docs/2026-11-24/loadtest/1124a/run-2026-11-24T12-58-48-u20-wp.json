@@ -1,0 +1,166 @@
+{
+  "run": "1124a",
+  "target": "live",
+  "base": "https://www.talestudio.art",
+  "at": "2026-11-24T12:58:48.093Z",
+  "users": 20,
+  "duration_s": 180,
+  "ramp_s": 40,
+  "writerPoll": true,
+  "elapsed_s": 185,
+  "aborted": null,
+  "requests": 2280,
+  "summary": [
+    {
+      "name": "canary generation-slots",
+      "n": 82,
+      "median_s": 0.164,
+      "p95_s": 0.342,
+      "max_s": 1.38,
+      "ok": 82,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "page /studio/artist",
+      "n": 18,
+      "median_s": 0.157,
+      "p95_s": 0.301,
+      "max_s": 0.316,
+      "ok": 18,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "writer/status?assets=1",
+      "n": 864,
+      "median_s": 0.395,
+      "p95_s": 0.821,
+      "max_s": 2.909,
+      "ok": 864,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "artist/generation-slots",
+      "n": 18,
+      "median_s": 0.158,
+      "p95_s": 0.216,
+      "max_s": 0.25,
+      "ok": 18,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "loadData 8쿼리(직접)",
+      "n": 649,
+      "median_s": 0.152,
+      "p95_s": 0.454,
+      "max_s": 3.282,
+      "ok": 649,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "artist/generation-status",
+      "n": 649,
+      "median_s": 0.238,
+      "p95_s": 0.45,
+      "max_s": 2.715,
+      "ok": 649,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    }
+  ],
+  "buckets": [
+    {
+      "from_s": 0,
+      "n": 237,
+      "median_ms": 234,
+      "p95_ms": 469,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 30,
+      "n": 394,
+      "median_ms": 279,
+      "p95_ms": 1561,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 60,
+      "n": 416,
+      "median_ms": 302,
+      "p95_ms": 867,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 90,
+      "n": 398,
+      "median_ms": 272,
+      "p95_ms": 518,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 120,
+      "n": 422,
+      "median_ms": 298,
+      "p95_ms": 836,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 150,
+      "n": 401,
+      "median_ms": 276,
+      "p95_ms": 534,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 180,
+      "n": 12,
+      "median_ms": 364,
+      "p95_ms": 472,
+      "errors": 0,
+      "s429": 0
+    }
+  ],
+  "jobs": {
+    "completed": 0,
+    "failed": 0,
+    "queued": 0,
+    "other": 0
+  },
+  "images": {
+    "sheets": 26,
+    "wides": 22,
+    "wanted": 120
+  },
+  "userErrors": [
+    {
+      "u": 18,
+      "error": "Error: verify 실패: {\"code\":429,\"error_code\":\"over_request_rate_limit\",\"msg\":\"Request rate limit reached\"}"
+    },
+    {
+      "u": 19,
+      "error": "Error: verify 실패: {\"code\":429,\"error_code\":\"over_request_rate_limit\",\"msg\":\"Request rate limit reached\"}"
+    }
+  ]
+}

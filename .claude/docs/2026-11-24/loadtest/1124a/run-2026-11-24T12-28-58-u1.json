@@ -1,0 +1,197 @@
+{
+  "run": "1124a",
+  "target": "live",
+  "base": "https://www.talestudio.art",
+  "at": "2026-11-24T12:28:58.818Z",
+  "users": 1,
+  "duration_s": 240,
+  "ramp_s": 0,
+  "writerPoll": false,
+  "elapsed_s": 245,
+  "aborted": null,
+  "requests": 139,
+  "summary": [
+    {
+      "name": "page /studio/artist",
+      "n": 1,
+      "median_s": 0.861,
+      "p95_s": 0.861,
+      "max_s": 0.861,
+      "ok": 1,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "writer/status?assets=1",
+      "n": 1,
+      "median_s": 0.573,
+      "p95_s": 0.573,
+      "max_s": 0.573,
+      "ok": 1,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "artist/generation-slots",
+      "n": 1,
+      "median_s": 0.186,
+      "p95_s": 0.186,
+      "max_s": 0.186,
+      "ok": 1,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "loadData 8쿼리(직접)",
+      "n": 52,
+      "median_s": 0.299,
+      "p95_s": 0.337,
+      "max_s": 0.479,
+      "ok": 52,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "artist/generate-sheet",
+      "n": 3,
+      "median_s": 4.545,
+      "p95_s": 5.843,
+      "max_s": 5.843,
+      "ok": 3,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "artist/generation-status",
+      "n": 52,
+      "median_s": 0.309,
+      "p95_s": 0.434,
+      "max_s": 4.322,
+      "ok": 52,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "artist/generate-world",
+      "n": 3,
+      "median_s": 3.945,
+      "p95_s": 4.007,
+      "max_s": 4.007,
+      "ok": 3,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "generation-jobs?ids=",
+      "n": 26,
+      "median_s": 0.205,
+      "p95_s": 0.796,
+      "max_s": 2.779,
+      "ok": 26,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    }
+  ],
+  "buckets": [
+    {
+      "from_s": 0,
+      "n": 27,
+      "median_ms": 313,
+      "p95_ms": 4545,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 30,
+      "n": 21,
+      "median_ms": 303,
+      "p95_ms": 760,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 60,
+      "n": 23,
+      "median_ms": 275,
+      "p95_ms": 334,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 90,
+      "n": 14,
+      "median_ms": 299,
+      "p95_ms": 348,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 120,
+      "n": 14,
+      "median_ms": 300,
+      "p95_ms": 327,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 150,
+      "n": 12,
+      "median_ms": 314,
+      "p95_ms": 372,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 180,
+      "n": 14,
+      "median_ms": 296,
+      "p95_ms": 335,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 210,
+      "n": 12,
+      "median_ms": 307,
+      "p95_ms": 376,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 240,
+      "n": 2,
+      "median_ms": 308,
+      "p95_ms": 308,
+      "errors": 0,
+      "s429": 0
+    }
+  ],
+  "jobs": {
+    "completed": 6,
+    "failed": 0,
+    "queued": 0,
+    "other": 0
+  },
+  "images": {
+    "sheets": 3,
+    "wides": 0,
+    "wanted": 6
+  },
+  "userErrors": []
+}

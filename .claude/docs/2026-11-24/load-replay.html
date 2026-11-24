@@ -1,0 +1,284 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>운영 부하 재현</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain,ol.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li,ol.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  th{white-space:nowrap}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td.cond{min-width:230px}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+  .callout{border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--surface);
+    border-radius:0 8px 8px 0;padding:12px 16px;margin:14px 0;font-size:14.5px;max-width:64ch}
+  .callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+  .callout.caution{border-left-color:var(--fail);background:var(--fail-soft)}
+  .callout b.label{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;display:block;margin-bottom:4px}
+  .callout p{margin:0}
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">작업 보고서 · 2026-11-24 · 운영 부하 재현</p>
+  <h1>11/23 수업 모양으로 운영 서버에 다시 부하를 걸었다</h1>
+  <p class="bluf">가상 사용자 20명이 Artist 화면에서 그림 6장씩을 동시에 그렸다. <b>DB 는 버텼다</b>(브라우저가 DB 에 직접 묻는 질문은 끝까지 0.15~0.5초). <b>서버 함수(Vercel)가 밀렸다</b>: 그림 제출이 몰린 2~3분 동안 서버를 거치는 모든 요청이 5~22초 걸렸고, 제출이 끝나자 0.2초로 돌아왔다.</p>
+  <p class="bluf">그 밖에 찾은 것: fal 열쇠 <code>prod-2000</code> 의 잔액이 0 이라 그 열쇠로 간 그림 48장이 전부 즉시 실패했다(5xx 의 전부). <b>결정할 것 4개</b>. <b>알아둘 것 5개</b>.</p>
+  <p class="asof">실측 시각 2026-11-24 21:28~22:02 KST · 대상 https://www.talestudio.art(sin1 · 커밋 b1e734be) · DB Micro · 결과 파일 .claude/docs/2026-11-24/loadtest/1124a/ · 스크립트 scripts/load-replay-artist.mjs</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">0</span><h2>용어</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>말</th><th>뜻</th></tr></thead>
+    <tbody>
+      <tr><td>가상 사용자</td><td>브라우저가 Artist 화면에서 보내는 요청을 그대로 보내는 프로그램 1개. 계정 · 작업 공간 · 프로젝트를 따로 가진다.</td></tr>
+      <tr><td>서버를 거치는 요청</td><td>브라우저 → Vercel 서버 함수 → DB 순서로 가는 요청. <code>/api/…</code> 와 화면 HTML.</td></tr>
+      <tr><td>직접 질문</td><td>브라우저가 Vercel 을 거치지 않고 Supabase DB 에 바로 보내는 질문. Artist 화면의 <code>loadData</code> 8개가 이것이다.</td></tr>
+      <tr><td>카나리</td><td>부하와 상관없는 가장 가벼운 길(<code>/api/artist/generation-slots</code>)을 2초마다 따로 쳐서 "서버 함수 자체가 느려졌나"를 재는 요청.</td></tr>
+      <tr><td>중앙값 · p95</td><td>요청 시간을 줄 세웠을 때 가운데 값 · 위에서 5% 자리 값. 둘 다 초 단위 실측.</td></tr>
+      <tr><td>제출</td><td>그림 한 장을 그려 달라는 요청(<code>generate-sheet</code> · <code>generate-world</code>). 서버가 검열 · fal 접수 · DB 예약을 하고 답한다.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>혼자 정한 것</h2></div>
+  <p class="sec-lede">오너 지시는 "push 뒤 운영에서 11/23 재현 · Artist 까지 동시성 측정 · 돈 써도 됨". 아래는 그 안에서 내가 정했다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>번호</th><th>정한 것</th><th>왜</th><th>되돌리기</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td>운영 DB 에 시험 계정 20개(<code>loadtest-1124a-NN@tale.studio</code>)를 만들고 끝나면 앱의 계정 삭제 길(<code>POST /api/account/delete</code>)로 지웠다</td><td>실제 사용자와 같은 권한 검사 · 같은 작업 공간 구조로 재야 한다. 앱의 삭제 길은 프로젝트 · 보관함 파일 · 작업 공간 · 계정을 한 번에 지운다</td><td>끝남. 계정 0 · 프로젝트 0 · 보관함 파일 0 확인</td></tr>
+      <tr><td class="num">2</td><td>본보기는 오너 프로젝트 "숲속의 호빗과 백설공주"(<code>a9b4ef12</code> · 11/23 수업 때 만든 것). 인물 3 · 배경 3 · 작가 완료 행을 복제하고 그림 URL 만 비웠다</td><td>11/23 의 "1명당 그림 6장"과 같다. 작가 완료 상태라 Artist 가 바로 그린다</td><td>본보기 원본은 읽기만 했다(수정 시각 불변 확인)</td></tr>
+      <tr><td class="num">3</td><td>작가 상태 폴링(3초)을 켠 채로 쟀다(<code>--writer-poll</code>)</td><td>11/23 에는 19명의 작가 실행이 10:42~10:46 에 몰려 있었고 Artist 그림은 그 안에서 11장만 돌았다. 그 모양을 따랐다</td><td>끄는 실행도 했다(3절 실행 B)</td></tr>
+      <tr><td class="num">4</td><td>안전 중단: 60초 창에서 p95 가 15초를 넘거나 5xx 가 30% 를 넘으면 모두 멈춘다</td><td>운영에 실제 사용자가 있을 수 있다. 11/23 처럼 14분을 끌지 않는다</td><td>실행 A 가 187초에 이 규칙으로 멈췄다</td></tr>
+      <tr><td class="num">5</td><td>개발 DB(tale-dev)도 Micro 로 올렸다</td><td>같은 Pro 조직이라 Nano 인데도 Micro 값을 내고 있었다. 추가 비용 0</td><td>같은 화면에서 Nano 선택</td></tr>
+      <tr><td class="num">6</td><td>세션은 계정당 1번만 발급하고 /tmp 에 둔다</td><td>같은 계정에 마법 링크를 동시에 2번 만들면 먼저 것이 무효가 되고(otp_expired), 발급을 많이 하면 Supabase 가 429 로 막는다. 실행 B · C 의 401 · 429 는 이 도구 문제였고 앱 문제가 아니다</td><td>해당 없음</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>11/23 과 오늘</h2></div>
+  <p class="sec-lede">같은 사람 수, 같은 화면. 바뀐 것은 코드(폴링 1층 · 큐 구멍 3개) · 서버 위치(미국 동부 → 싱가포르) · DB 크기(Nano → Micro).</p>
+  <div class="tbl"><table>
+    <thead><tr><th></th><th>11/23 수업(운영 기록)</th><th>오늘 실행 A(20명 · 그림 6장 · 작가 폴링)</th><th>오늘 실행 C(20명 · 폴링만)</th></tr></thead>
+    <tbody>
+      <tr><td>DB</td><td class="gate-cell">14분 정지. 메모리 0.38 GB 중 Swap 0.8 GB · Disk IO 예산 0%</td><td>버팀. CPU 일하는 시간 10% 미만 · 메모리 사용 0.5/1.06 GB · Swap 0.15 GB</td><td>버팀. 같음</td></tr>
+      <tr><td>직접 질문(브라우저→DB)</td><td>기록 없음</td><td>중앙값 0.24초 · p95 0.44초 · 최대 0.51초</td><td>중앙값 0.15초 · p95 0.45초</td></tr>
+      <tr><td>서버를 거치는 요청</td><td>1.2~2.4초씩 늘어남 → 끊김</td><td class="gate-cell">중앙값 5.8~11.5초 · p95 20~23초(제출 몰린 2~3분)</td><td>중앙값 0.16~0.40초 · p95 0.3~0.8초</td></tr>
+      <tr><td>오류</td><td>generation-status 실패 181회 · 60초 초과 5회</td><td>5xx 48건 = 전부 fal 잔액 0(아래 3절) · 끊김 0</td><td>0</td></tr>
+      <tr><td>분당 요청</td><td>DB 3,419 · 로그인 확인 551</td><td>서버 경유 약 240 · 직접 DB 약 380(멈춘 187초 기준)</td><td>서버 경유 529 · 직접 DB 1,684 · 로그인 확인 0(서버 안에서 끝냄)</td></tr>
+      <tr><td>그림</td><td>11장</td><td>187초에 61/120 완료(제출→완료 중앙값 68초 · p95 86초)</td><td>없음(폴링만)</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><b class="label">읽는 법</b><p>11/23 의 병목(DB)은 사라졌다. 실행 C 가 그 증거다: 11/23 을 죽인 "20명 폴링"을 그대로 걸어도 모든 요청이 1초 안이다. 그러나 그림 제출이 몰리면 새 병목(서버 함수)이 나타난다. 이것은 11/23 에는 DB 가 먼저 죽어서 보이지 않았던 층이다.</p></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>확인한 것 · 안 한 것</h2></div>
+
+  <h3>실행 4개</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>실행</th><th>조건</th><th>요청</th><th>서버 경유 중앙값 / p95</th><th>직접 질문 중앙값 / p95</th><th>5xx</th><th>그림</th></tr></thead>
+    <tbody>
+      <tr><td>준비</td><td class="cond">1명 · 그림 6장</td><td class="num">139</td><td class="num">0.2~0.9초 / 제출 4.5초</td><td class="num">0.30 / 0.34초</td><td class="num">0</td><td class="num">6/6</td></tr>
+      <tr><td><b>A</b></td><td class="cond">20명 · 그림 6장 · 작가 폴링 · 입장 2분</td><td class="num">754</td><td class="num gate-cell">5.8~11.5초 / 20~23초</td><td class="num">0.24 / 0.44초</td><td class="num">48</td><td class="num">61/120 (187초에 안전 중단)</td></tr>
+      <tr><td><b>B</b></td><td class="cond">10명 · 그림 6장 · 카나리</td><td class="num">1,252</td><td class="num">제출 중 2.6~6.4초 / 10~13초 → 제출 끝난 뒤 0.16초</td><td class="num">0.14 / 0.40초</td><td class="num">26</td><td class="num">40/60</td></tr>
+      <tr><td><b>C</b></td><td class="cond">20명 · 폴링만(틱 4초 + 작가 3초) · 카나리 · 3분</td><td class="num">2,280</td><td class="num">0.16~0.40초 / 0.3~0.8초</td><td class="num">0.15 / 0.45초</td><td class="num">0</td><td class="num">없음</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>병목을 가른 실험(그림 값 외 비용 없음)</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>실험</th><th>결과</th><th>뜻</th></tr></thead>
+    <tbody>
+      <tr><td>가벼운 길 40개 동시</td><td class="num">전체 0.6초 · 인스턴스 23개</td><td>서버 함수는 짧은 요청을 동시에 잘 받는다</td></tr>
+      <tr><td>작가 상태(DB 10쿼리) 40개 동시</td><td class="num">중앙값 1.2초 · 최대 1.5초</td><td>DB 읽기 묶음도 문제 없다</td></tr>
+      <tr><td>화면 HTML 40개 동시 + 카나리</td><td class="num">1.1초 · 카나리 0.16~0.21초 그대로</td><td>화면 그리기도 다른 요청을 막지 않는다</td></tr>
+      <tr><td><b>제출 30개 동시 + 카나리 4종</b></td><td class="num gate-cell">제출 5~11초 · 서버 경유 카나리 7.8~11.9초 · <b>같은 순간 직접 DB 질문 0.11초 · 로그인 공개키 0.03초</b></td><td>제출이 몰리면 서버 함수만 막힌다. DB · 로그인 서버는 그 순간에도 즉시 답했다</td></tr>
+    </tbody>
+  </table></div>
+  <p>제출 30개는 인스턴스 16개에 1~4개씩 나뉘었는데 1개만 받은 인스턴스도 5~11초가 걸렸다. 제출 1건은 혼자일 때 4~5초다(검열 호출 + fal 접수 + DB 예약 · 대부분 바깥 서비스를 기다리는 시간). 즉 "기다리는 요청"이 동시에 30~60개 생기면 서버 함수 자리가 모자라 새 요청이 줄을 선다. 이 줄에 폴링 · 화면 · 카나리가 다 같이 선다.</p>
+  <div class="callout warn"><b class="label">확인 못 한 것</b><p>Vercel 대시보드에 로그인이 없어 함수 로그(실행 시간 · 콜드 스타트 · Fluid Compute 켬/끔)를 보지 못했다. 위 모양은 "인스턴스 하나가 요청 하나씩 처리(Fluid Compute 끔)"일 때 나오는 모양과 같다. Vercel 프로젝트 설정 → Functions → Fluid Compute 를 보면 바로 안다.</p></div>
+
+  <h3>fal 열쇠 잔액</h3>
+  <p>실행 A · B 의 5xx 74건 가운데 72건이 같은 오류다: <code>fal submit: 403 User is locked. Reason: Exhausted balance</code>. 열쇠 <code>prod-2000</code> 으로 간 그림은 전부 즉시 실패했고 <code>legacy-1000</code> 으로 간 그림은 전부 성공했다. 최근 7일 운영 그림 196장은 모두 <code>legacy-1000</code> 이었고 <code>prod-2000</code> 의 마지막 성공은 11/09 다. 열쇠 고르기 트리거는 한 열쇠가 바쁘면 다음 열쇠로 넘기므로, 수업처럼 몰리는 날에만 이 열쇠가 쓰이고 그때만 1/3 이 실패한다. 나머지 2건은 fal 내용 검사기(422, 프롬프트의 "호빗")다.</p>
+
+  <h3>덤으로 본 것</h3>
+  <ul class="plain">
+    <li><b>완료 처리 2번.</b> 시험 그림 60장 가운데 12장(20%)이 같은 파일로 후보 행에 2번 기록됐다(<code>?v=</code> 만 다름). 웹훅 완료와 폴링 reconcile 이 같은 그림을 둘 다 마무리한 것이다. 원장 2절 "구조적 약점 (2) 부작용 중복"의 실측이다. 사용자 화면에는 1장만 보인다. 저장 · 내려받기 · 올리기가 2배로 든다.</li>
+    <li><b>제출→완료 시간</b>(fal 생성 포함): 중앙값 68초 · p95 86초 · 최대 96초. 10분 · 30분 유령 기준은 넉넉하다.</li>
+    <li><b>DB 메모리 약속(commitment)</b>은 Micro 에서 1.63 GB(WARNING). Nano 11/23 은 2.62 GB(SEVERE). 5절에 뜻을 적었다.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>결정이 필요한 것</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>번호</th><th>무엇</th><th>선택지</th><th>추천</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td>fal 열쇠 <code>prod-2000</code> 잔액 0</td><td>(a) fal.ai/dashboard/billing 에서 충전 (b) Vercel 환경변수 <code>FAL_KEYS</code> 에서 이 열쇠를 뺀다</td><td class="gate-cell">수업 전에 (a) 또는 (b). 둘 다 안 하면 몰리는 날 그림 1/3 이 5xx</td></tr>
+      <tr><td class="num">2</td><td>Vercel Fluid Compute</td><td>(a) 켜져 있는지 확인하고 꺼져 있으면 켠다(설정 1번, 재배포 1번, 추가 비용 없음) (b) 그대로</td><td class="gate-cell">(a). 기다리는 요청(검열 · fal · DB)을 한 인스턴스가 여러 개 같이 받게 된다. 켠 뒤 같은 스크립트로 실행 A 를 다시 재서 숫자로 본다</td></tr>
+      <tr><td class="num">3</td><td>제출 라우트를 빨리 답하게 바꾸기(코드)</td><td>(a) DB 예약만 하고 바로 답한 뒤 검열 · fal 접수를 뒤에서 한다(C05 의 <code>?jobId=</code> 웹훅이 늦은 접수를 받는다) (b) 그대로</td><td>2번 결과를 본 뒤. 2번으로 충분하면 안 한다. 부족하면 (a). 되돌리기 비쌈이라 구현 전 확인</td></tr>
+      <tr><td class="num">4</td><td>완료 처리 2번(20%)</td><td>(a) 원장에 케이스로 올리고 다음 작업에 넣는다 (b) 둔다</td><td>(a). 사용자 피해는 없고 비용 문제다</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>알고만 있을 것</h2></div>
+
+  <h3>DB 메모리 "약속 2.6 GB" 가 무엇인가</h3>
+  <p>대시보드의 Memory commitment 는 "기계 안 모든 프로그램이 쓰겠다고 <b>예약한</b> 양의 합"이다. 실제로 쓴 양(Used)이 아니다. Postgres 는 연결 1개마다 작업 메모리를 예약하고(최대 60연결), 공유 버퍼를 예약한다. 같은 기계에 로그인 서버 · 조회 서버(PostgREST) · 연결 풀러 · 저장소 서버도 산다. 예약 합이 기계 메모리를 넘으면 배지가 WARNING, 메모리 + Swap 까지 넘으면 SEVERE 다. 11/23 은 0.38 GB 기계에 2.62 GB 를 약속해 둔 상태에서 20명이 실제로 쓰기 시작하자 Swap(디스크)으로 넘쳤고, Swap 이 디스크 예산을 태웠다. 오늘 Micro 는 1.06 GB 기계에 1.63 GB 약속 · Swap 0.15 GB 로 끝났다. 수업 뒤 같은 화면에서 Swap 이 0.3 GB 를 넘으면 Small(2 GB · 월 $5 추가)로 간다.</p>
+
+  <h3>DB 를 둘로 나누는가(무료 티어 하나 더 등)</h3>
+  <div class="split">
+    <div class="no"><h4>나누지 않는다. 까닭 4개</h4><ul>
+      <li>로그인은 프로젝트에 묶여 있다. 두 번째 DB 는 같은 사용자를 모른다. 소유 확인(RLS · workspaces)을 다시 만들어야 한다.</li>
+      <li>11/23 의 부하는 "사용자별 폴링"이었다. 데이터를 어디로 옮기든 폴링은 그 데이터를 따라간다. 요청 수는 안 줄고 자리만 바뀐다.</li>
+      <li>무료 티어는 Nano(0.5 GB)이고 1주일 안 쓰면 멈춘다. 지금 Micro 보다 약하다.</li>
+      <li>Supabase 문서(Read Replicas): 읽기가 많아도 "가장 큰 컴퓨트(16XL)에 닿은 뒤" 복제본을 권한다. 그 전에는 컴퓨트 크기를 올리라는 뜻이다.</li>
+    </ul></div>
+    <div class="yes"><h4>대신 하는 것. 순서대로</h4><ul>
+      <li>이번에 한 것: Nano → Micro(비용 0). 다음은 Small(월 $5 추가). 돈으로 사는 것이 코드보다 싸다.</li>
+      <li>서버 함수 쪽: Fluid Compute(4절 2번). 지금 병목은 DB 가 아니라 여기다.</li>
+      <li>폴링을 밀어주기(Realtime 2층)로 바꾸면 DB 질문 자체가 준다. 1층 보고서 6절에 적었다.</li>
+      <li>자주 읽는 작은 상태(작업 상태)만 캐시(Vercel KV 등)에 두는 방법도 있다. 두 번째 DB 가 아니라 두 번째 "서랍"이다. 지금은 필요 없다.</li>
+    </ul></div>
+  </div>
+
+  <h3>오늘 쓴 돈</h3>
+  <p>fal 로 완료된 그림 147장(gpt-image-2 · 실사 스타일). 금액은 fal 대시보드가 정본이다. Supabase · Vercel 추가 비용 없음. 시험 계정 · 프로젝트 · 보관함 파일은 모두 지웠다.</p>
+
+  <h3>다시 재는 법</h3>
+  <pre><span class="path">Fluid Compute 를 바꾼 뒤 같은 조건으로 다시 잰다: 20명 · 그림 6장 · 작가 폴링</span>node scripts/load-replay-artist.mjs prepare --target live --run 1125a --users 20 --template a9b4ef12-298e-4c95-94fd-2f0ecd780c19
+node scripts/load-replay-artist.mjs run     --target live --run 1125a --base https://www.talestudio.art --users 20 --duration 420 --ramp 120 --writer-poll --canary
+node scripts/load-replay-artist.mjs cleanup --target live --run 1125a --base https://www.talestudio.art</pre>
+  <p>실행 A 와 같은 조건이다. 카나리 p95 가 1초 안이고 제출 중앙값이 5초 안이면 2번이 먹힌 것이다.</p>
+
+  <h3>이 시험이 11/23 과 다른 점</h3>
+  <ul class="plain">
+    <li>11/23 은 작가(LLM 파이프라인)가 19명분 실제로 돌았다. 오늘은 작가 상태 폴링만 걸었다(LLM 호출 · 작가 쓰기 없음).</li>
+    <li>11/23 은 실제 브라우저였다. 오늘은 같은 요청을 보내는 프로그램이다. 화면 그리기 · 그림 내려받기는 없다.</li>
+    <li>11/23 은 입장이 6분에 걸쳤다. 오늘 실행 A 는 2분이다(더 가혹하다).</li>
+  </ul>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것.</b> 결과 <code>.claude/docs/2026-11-24/loadtest/1124a/run-*.json</code>(요청별 시간은 <code>*.log.json</code>) · 스크립트 <code>scripts/load-replay-artist.mjs</code> · Supabase 대시보드 Observability → Database(21:28~21:52 KST) · 운영 DB <code>generation_jobs</code> 의 오류 문자열 · Vercel 문서 fluid-compute · Supabase 문서 read-replicas.</p>
+  <p><b>이 문서가 하지 않는 것.</b> Vercel 함수 로그 확인. 작가 파이프라인 실행. 브라우저 실화면. 코드 변경(이 보고서로는 아무 코드도 바꾸지 않았다).</p>
+</footer>
+
+</div>
+</body>
+</html>

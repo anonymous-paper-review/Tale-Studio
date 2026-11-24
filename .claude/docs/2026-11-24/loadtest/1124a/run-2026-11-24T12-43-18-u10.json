@@ -1,0 +1,230 @@
+{
+  "run": "1124a",
+  "target": "live",
+  "base": "https://www.talestudio.art",
+  "at": "2026-11-24T12:43:18.836Z",
+  "users": 10,
+  "duration_s": 300,
+  "ramp_s": 30,
+  "writerPoll": false,
+  "elapsed_s": 302,
+  "aborted": null,
+  "requests": 1252,
+  "summary": [
+    {
+      "name": "canary generation-slots",
+      "n": 107,
+      "median_s": 0.167,
+      "p95_s": 4.507,
+      "max_s": 11.653,
+      "ok": 107,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "page /studio/artist",
+      "n": 9,
+      "median_s": 1.877,
+      "p95_s": 12.603,
+      "max_s": 12.603,
+      "ok": 9,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "writer/status?assets=1",
+      "n": 9,
+      "median_s": 2.616,
+      "p95_s": 10.3,
+      "max_s": 10.3,
+      "ok": 9,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "artist/generation-slots",
+      "n": 9,
+      "median_s": 3.759,
+      "p95_s": 10.335,
+      "max_s": 10.335,
+      "ok": 9,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "loadData 8쿼리(직접)",
+      "n": 468,
+      "median_s": 0.141,
+      "p95_s": 0.395,
+      "max_s": 0.894,
+      "ok": 468,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "artist/generate-sheet",
+      "n": 37,
+      "median_s": 5.257,
+      "p95_s": 13.43,
+      "max_s": 14.136,
+      "ok": 27,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 10,
+      "dropped": 0
+    },
+    {
+      "name": "artist/generation-status",
+      "n": 468,
+      "median_s": 0.241,
+      "p95_s": 7.272,
+      "max_s": 12.681,
+      "ok": 468,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    },
+    {
+      "name": "artist/generate-world",
+      "n": 43,
+      "median_s": 6.376,
+      "p95_s": 11.89,
+      "max_s": 14.581,
+      "ok": 27,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 16,
+      "dropped": 0
+    },
+    {
+      "name": "generation-jobs?ids=",
+      "n": 102,
+      "median_s": 0.771,
+      "p95_s": 10.488,
+      "max_s": 13.844,
+      "ok": 102,
+      "s429": 0,
+      "s4xx": 0,
+      "s5xx": 0,
+      "dropped": 0
+    }
+  ],
+  "buckets": [
+    {
+      "from_s": 0,
+      "n": 80,
+      "median_ms": 2589,
+      "p95_ms": 5320,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 30,
+      "n": 75,
+      "median_ms": 9417,
+      "p95_ms": 12566,
+      "errors": 12,
+      "s429": 0
+    },
+    {
+      "from_s": 60,
+      "n": 95,
+      "median_ms": 3958,
+      "p95_ms": 10524,
+      "errors": 14,
+      "s429": 0
+    },
+    {
+      "from_s": 90,
+      "n": 138,
+      "median_ms": 317,
+      "p95_ms": 11316,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 120,
+      "n": 161,
+      "median_ms": 213,
+      "p95_ms": 798,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 150,
+      "n": 155,
+      "median_ms": 190,
+      "p95_ms": 318,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 180,
+      "n": 144,
+      "median_ms": 173,
+      "p95_ms": 285,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 210,
+      "n": 135,
+      "median_ms": 172,
+      "p95_ms": 283,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 240,
+      "n": 129,
+      "median_ms": 198,
+      "p95_ms": 322,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 270,
+      "n": 140,
+      "median_ms": 181,
+      "p95_ms": 402,
+      "errors": 0,
+      "s429": 0
+    },
+    {
+      "from_s": 300,
+      "n": 0,
+      "median_ms": null,
+      "p95_ms": null,
+      "errors": 0,
+      "s429": 0
+    }
+  ],
+  "jobs": {
+    "completed": 40,
+    "failed": 2,
+    "queued": 0,
+    "other": 0
+  },
+  "images": {
+    "sheets": 21,
+    "wides": 19,
+    "wanted": 60
+  },
+  "userErrors": [
+    {
+      "u": 1,
+      "error": "Error: verify 실패: {\"code\":403,\"error_code\":\"otp_expired\",\"msg\":\"Email link is invalid or has expired\"}"
+    }
+  ]
+}
