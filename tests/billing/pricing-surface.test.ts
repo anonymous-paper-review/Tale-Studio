@@ -1,6 +1,7 @@
 // 요금 화면이 화면 언어와 결제 준비 상태에 따라 어떤 통화·안내·구매 버튼을 보일지 검사한다 (오너 2026-11-24 시안 v2).
 import { describe, expect, it } from 'vitest'
-import { pricingSurface, purchaseAction } from '@/lib/billing/pricing-selection'
+import { pricingSurface, purchaseAction, pricingOptions } from '@/lib/billing/pricing-selection'
+import { optionPrice } from '@/components/billing/pricing-families'
 
 const koReady = pricingSurface({ locale: 'ko', checkoutEnabled: false, koreanCardReady: true, koreanSubscriptionReady: false })
 const enClosed = pricingSurface({ locale: 'en', checkoutEnabled: false, koreanCardReady: true, koreanSubscriptionReady: false })
@@ -59,5 +60,12 @@ describe('요금 화면 표시', () => {
     const open = pricingSurface({ locale: 'en', checkoutEnabled: true, koreanCardReady: true, koreanSubscriptionReady: false })
     expect(open.banner).toBe(null)
     expect(purchaseAction(open, 'pack')).toBe('paddle')
+  })
+
+  // 왜: 오너 2026-11-25 "한국어랑 영문이랑 상이한 부분". 한국어 옵션 칸에는 수량 아래 원화가 있는데 영어 칸에는 가격이 없었다.
+  it('옵션 칸 수량 아래 가격은 한국어 화면이면 원화, 영어 화면이면 달러로 보인다', () => {
+    const mini = pricingOptions('take')[0]
+    expect(optionPrice(mini, koReady)).toBe('₩49,900')
+    expect(optionPrice(mini, enClosed)).toBe('$29')
   })
 })

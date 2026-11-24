@@ -201,7 +201,7 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
                         className={cn('min-h-11 min-w-0 flex-1 rounded-md px-1 py-2 font-mono text-xs tabular-nums transition-colors focus-visible:outline-2 focus-visible:outline-ring', selection.index === index ? 'bg-primary/15 font-semibold text-primary' : 'text-muted-foreground hover:bg-accent')}
                       >
                         {quantityOf(value).toLocaleString('en-US')}
-                        {surface.currency === 'krw' && <span className="block text-micro font-normal text-muted-foreground">{priceText(value, surface)}</span>}
+                        <span className="block text-micro font-normal text-muted-foreground">{optionPrice(value, surface)}</span>
                       </button>
                     ))}
                   </div>
@@ -316,6 +316,11 @@ function usePricingSurface(checkoutEnabled: boolean): PricingSurface {
     koreanCardReady: readPortOnePublicConfig() !== null,
     koreanSubscriptionReady: readPortOneBillingChannelKey() !== null,
   })
+}
+
+/** 옵션 칸 수량 아래 가격: 한국어 화면은 원화, 영어 화면은 달러 (오너 2026-11-25). */
+export function optionPrice(option: PricingOption, surface: PricingSurface): string {
+  return priceText(option, surface)
 }
 
 function priceText(option: PricingOption, surface: PricingSurface): string {

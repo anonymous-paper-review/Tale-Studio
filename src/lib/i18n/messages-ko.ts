@@ -2194,7 +2194,10 @@ export const KO: Record<string, string> = {
   'Could not open billing portal. Please try again.': '결제 관리 화면을 열지 못했어요. 다시 시도해주세요.',
 
   // ── 가격 페이지 /pricing (P4 · 2026-09-08 오너: 한국어도 보이게) ──
-  Pricing: '요금제',
+  Pricing: '요금',
+  // 2026-11-25 오너: 공개 머리글 메뉴는 첫 화면(랜딩)과 같은 이름.
+  Product: 'Tale 서비스',
+  Showcase: '작품',
   'Pay for the minutes you plan and the Takes you spend. Images are always free.': '기획한 분량과 쓴 Take만큼만 냅니다. 이미지는 언제나 무료예요.',
   Beta: '베타',
   // 결제 준비 중 안내 — 도메인 승인 나면 pricing 배너와 함께 지운다 (2026-09-08)

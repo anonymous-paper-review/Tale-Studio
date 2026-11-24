@@ -25,7 +25,7 @@ export function LocaleToggle() {
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          className="flex h-10 items-center gap-1.5 rounded-full bg-chip px-3 font-num text-label font-semibold text-muted-foreground transition-colors hover:text-foreground focus:outline-none"
+          className="flex h-10 items-center gap-1.5 rounded-full bg-foreground/[0.06] px-3 font-num text-label font-semibold text-muted-foreground transition-colors hover:bg-shell hover:text-foreground focus:outline-none"
           aria-label="Language"
         >
           <Globe className="size-4" />
