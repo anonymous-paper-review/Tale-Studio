@@ -1136,14 +1136,14 @@ fal 에 그림·영상을 맡기고 결과를 받아오는 길. 모든 단계가
 
 | 날짜 | 행 | 전 | 후 | 커밋 |
 |---|---|---|---|---|
-| 2026-11-24 | 7-a | Auth 1 + DB 3 (+fal 1) | Auth 0(`getClaims()` 공개키 로컬 검증) + DB 2(소유 1 + 잡 1). fal 은 웹훅 주소가 있으면 제출 뒤 45초 유예 · 잡별 30초 스로틀. 로컬 측정 중앙값 0.395s → 0.21s | (이 커밋) |
-| 2026-11-24 | 7-c | 완료 이력 전체 읽기 포함 8회 이상 순차 | 질문 4개를 `Promise.all` 로 동시 전송. 왕복 시간 7 → 2. 완료 이력 전량 읽기는 그대로(후속). 로컬 측정 0.688s → 0.21s | (이 커밋) |
-| 2026-11-24 | 2-d | 틱당 왕복 4~5 × 잡 수 | 탭당 스케줄러 1개가 잡을 묶어 `GET /api/generation-jobs?ids=`(최대 50). 잡 6개 = 왕복 2. 로컬 측정 6개 동시 0.71s → 묶음 0.275s | (이 커밋) |
-| 2026-11-24 | 2-b | 500 1회면 throw · 화면 실패 | 3분류. 2xx 성공 / 401·403·404·그 밖 4xx 영구 / 5xx·네트워크·10초 초과·408·429 일시(queued 유지). 포기는 유령 기준(그림 10분·영상 30분)에서만 | (이 커밋) |
-| 2026-11-24 | 2-c | 3초 고정 | 일시 오류 연속 횟수로 3→6→12→24→30초. 성공하면 3초. 요청 한도 `AbortSignal.timeout(10s)` | (이 커밋) |
-| 2026-11-24 | 2-a | `loadData` 3초마다 겹쳐 나감 | 프로젝트별 in-flight 1개(`dedupeLoadData`). 3·4·5초 반복은 `useSequentialPoll` 순차. DB 질문 8개 자체는 그대로(후속) | (이 커밋) |
-| 2026-11-24 | 7-b | DB 6~10 | 소유 1(embed) + 예외표 0(사용자별 10분 memo) + 키 세기(키 수, 동시) + insert. `pickFalKey` → `fal_key_id: null` 은 `generation-reserve.test.ts:189` 기대와 충돌해 보류(결정 필요) | (이 커밋) |
-| 2026-11-24 | 5-a | reserved 영구 | 접수 기록 DB 오류만 300ms·900ms 재시도(0행은 즉시 throw) · 웹훅 주소 `?jobId=` 로 reserved 잡 되찾아 늦게 기록(5 경로; rough-storyboard·storyboard-batch·previz-video·video-fallback 4 경로는 미적용) · 워치독 스윕 `.not('request_id','like','reserved:%')`. 시간만으로 실패·환급하지 않는 원칙 유지 | (이 커밋) |
-| 2026-11-24 | 5-b | 10분(화면·유령) vs 30분(자리) 불일치 | 종류별 시계 `staleQueuedMsFor`: 영상 30분 · 그림 10분. 화면 포기 · `listActiveGenerationJobs` · 유령 청소 · 배치 집계가 모두 한 함수(`staleQueuedOrFilter` 로 DB 측 필터). `BATCH_STALE_QUEUED_MS` 제거 | (이 커밋) |
+| 2026-11-24 | 7-a | Auth 1 + DB 3 (+fal 1) | Auth 0(`getClaims()` 공개키 로컬 검증) + DB 2(소유 1 + 잡 1). fal 은 웹훅 주소가 있으면 제출 뒤 45초 유예 · 잡별 30초 스로틀. 로컬 측정 중앙값 0.395s → 0.21s | f8189f2c |
+| 2026-11-24 | 7-c | 완료 이력 전체 읽기 포함 8회 이상 순차 | 질문 4개를 `Promise.all` 로 동시 전송. 왕복 시간 7 → 2. 완료 이력 전량 읽기는 그대로(후속). 로컬 측정 0.688s → 0.21s | f8189f2c |
+| 2026-11-24 | 2-d | 틱당 왕복 4~5 × 잡 수 | 탭당 스케줄러 1개가 잡을 묶어 `GET /api/generation-jobs?ids=`(최대 50). 잡 6개 = 왕복 2. 로컬 측정 6개 동시 0.71s → 묶음 0.275s | f8189f2c |
+| 2026-11-24 | 2-b | 500 1회면 throw · 화면 실패 | 3분류. 2xx 성공 / 401·403·404·그 밖 4xx 영구 / 5xx·네트워크·10초 초과·408·429 일시(queued 유지). 포기는 유령 기준(그림 10분·영상 30분)에서만 | f8189f2c |
+| 2026-11-24 | 2-c | 3초 고정 | 일시 오류 연속 횟수로 3→6→12→24→30초. 성공하면 3초. 요청 한도 `AbortSignal.timeout(10s)` | f8189f2c |
+| 2026-11-24 | 2-a | `loadData` 3초마다 겹쳐 나감 | 프로젝트별 in-flight 1개(`dedupeLoadData`). 3·4·5초 반복은 `useSequentialPoll` 순차. DB 질문 8개 자체는 그대로(후속) | f8189f2c |
+| 2026-11-24 | 7-b | DB 6~10 | 소유 1(embed) + 예외표 0(사용자별 10분 memo) + 키 세기(키 수, 동시) + insert. `pickFalKey` → `fal_key_id: null` 은 `generation-reserve.test.ts:189` 기대와 충돌해 보류(결정 필요) | f8189f2c |
+| 2026-11-24 | 5-a | reserved 영구 | 접수 기록 DB 오류만 300ms·900ms 재시도(0행은 즉시 throw) · 웹훅 주소 `?jobId=` 로 reserved 잡 되찾아 늦게 기록(5 경로; rough-storyboard·storyboard-batch·previz-video·video-fallback 4 경로는 미적용) · 워치독 스윕 `.not('request_id','like','reserved:%')`. 시간만으로 실패·환급하지 않는 원칙 유지 | f8189f2c |
+| 2026-11-24 | 5-b | 10분(화면·유령) vs 30분(자리) 불일치 | 종류별 시계 `staleQueuedMsFor`: 영상 30분 · 그림 10분. 화면 포기 · `listActiveGenerationJobs` · 유령 청소 · 배치 집계가 모두 한 함수(`staleQueuedOrFilter` 로 DB 측 필터). `BATCH_STALE_QUEUED_MS` 제거 | f8189f2c |
 
 보고서: `.claude/docs/2026-11-24/polling-layer1.html` · `queue-gaps.html`. 측정 파일: `.claude/docs/2026-11-24/measure/`. Supabase Realtime 조사 결론은 폴링 보고서 6절(Free 범위 · Broadcast 방식 권장 · 1층 실측 뒤 결정).
