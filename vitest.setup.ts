@@ -56,3 +56,8 @@ for (const key of Object.keys(process.env)) {
 // vi.mock('@/lib/moderation/creem') 으로 판정을 직접 정한다(tests/moderation/*).
 // 운영(VERCEL_ENV=production)에서는 이 스위치가 무시되므로 심사 약속은 그대로다.
 process.env.CREEM_MODERATION_MODE = 'off'
+
+// 2026-11-24(1층 폴링): 화면은 한 틱에 도는 잡 여러 개를 /api/generation-jobs?ids= 한 번으로 묻는다. 기존 테스트 20여 파일은
+//   fetch 를 잡 하나씩 /api/generation-jobs/<id> 로 가로채 가짜 응답을 돌려주므로, 테스트에서는 묶는 최대 개수를 1로 두어
+//   잡 하나씩 묻는 예전 주소를 그대로 쓴다. 묶어 묻는 동작을 검증하는 파일은 vi.stubEnv('NEXT_PUBLIC_POLL_BATCH_MAX', '50') 로 직접 켠다.
+process.env.NEXT_PUBLIC_POLL_BATCH_MAX = '1'

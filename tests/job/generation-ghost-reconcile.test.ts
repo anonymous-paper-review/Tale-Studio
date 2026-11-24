@@ -57,7 +57,7 @@ function ghostRow(id: string, overrides: Record<string, unknown> = {}) {
 
 /**
  * generation_jobs 체이너블 스텁 — 세 체인을 실제 모양대로 서빙한다:
- *   목록: select('id').eq('project_id',·).eq('status','queued').lt(...).order(...).limit(N)
+ *   목록: select('id').eq('project_id',·).eq('status','queued').or(종류별 created_at.lt 필터).order(...).limit(N)
  *   행:   select(COLUMNS).eq('id', X).maybeSingle()
  *   실패: update({...}).eq('id', X).eq('status','queued').is(...).select('id').maybeSingle()
  */
@@ -85,7 +85,7 @@ function installGenerationJobsStub(opts: {
       if (name === 'eq' && args[0] === 'id') eqId = args[1] as string
       return b
     }
-    for (const m of ['select', 'eq', 'lt', 'order', 'is', 'update']) b[m] = self(m)
+    for (const m of ['select', 'eq', 'lt', 'or', 'order', 'is', 'update']) b[m] = self(m)
     b.limit = (...args: unknown[]) => {
       chain.limit = args
       recorded.listChains.push(chain)
@@ -125,12 +125,15 @@ describe('reconcileGhostQueuedJobs', () => {
     expect(settled).toBe(1)
     expect(mocks.falImageFetch).toHaveBeenCalledWith('openai/gpt-image-2/edit', 'fal-req-job-1', 'prod-2000')
     expect(mocks.finalizeGenerationJob).toHaveBeenCalledTimes(1)
-    // S5 — 목록 체인 인자 검증: 뒤집히면(.lt→.gte 등) 유령 대신 활성 잡을 쓸어버린다.
+    // S5 — 목록 체인 인자 검증: 뒤집히면(lt→gte 등) 유령 대신 활성 잡을 쓸어버린다.
+    //   기준은 종류별(영상 30분 · 그림 10분, 2026-11-24 C12)이라 .or() 한 질문에 created_at.lt 가 두 번 들어가고 gte 는 없다.
     const list = recorded.listChains[0]
     expect(list.select).toEqual(['id'])
     expect(list.eq).toEqual(['status', 'queued'])
-    expect(list.lt?.[0]).toBe('created_at')
-    expect(typeof list.lt?.[1]).toBe('string')
+    const orFilter = String(list.or?.[0])
+    expect(orFilter).toContain('kind.in.(shot_video,shot_previz_video),created_at.lt.')
+    expect(orFilter).toContain('kind.not.in.(shot_video,shot_previz_video),created_at.lt.')
+    expect(orFilter).not.toContain('gte')
     expect(list.order).toEqual(['created_at', { ascending: false }])
     expect(list.limit).toEqual([5])
   })

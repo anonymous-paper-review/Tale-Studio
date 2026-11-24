@@ -62,6 +62,8 @@ export async function GET(req: NextRequest) {
         .from('generation_jobs')
         .select('id')
         .eq('status', 'queued')
+        // 접수 번호 없는 예약은 reconcile 이 그대로 돌려준다. 오래된 순 10건 머리를 영구히 막지 않게 뺀다.
+        .not('request_id', 'like', 'reserved:%')
         .lt('created_at', staleCutoff)
         .order('created_at', { ascending: true })
         .limit(10);

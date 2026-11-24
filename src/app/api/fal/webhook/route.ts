@@ -12,6 +12,8 @@ import {
 } from '@/lib/fal/verify-webhook'
 import {
   getGenerationJobByRequestId,
+  getGenerationJobById,
+  confirmGenerationJobReceipt,
   failGenerationJob,
   classifyFalFailure,
   GenerationJobTerminalTransitionError,
@@ -104,8 +106,30 @@ export async function POST(req: Request) {
     )
   }
 
-  const job = await getGenerationJobByRequestId(requestId)
-  if (!job) return NextResponse.json({ ok: true }) // 추적 안 하는 작업 → 무시
+  let job = await getGenerationJobByRequestId(requestId)
+  if (!job) {
+    // 접수 번호 기록을 놓친 예약 작업 되찾기(C05): 제출 주소에 심은 jobId 로 찾아 번호를 늦게라도 기록한다.
+    //   fal 은 알림을 다시 보내지 않으므로 여기서 놓치면 그 잡은 queued 좀비로 남는다.
+    const jobId = new URL(req.url).searchParams.get('jobId')
+    const reserved = jobId ? await getGenerationJobById(jobId) : null
+    if (!reserved || reserved.status !== 'queued' || reserved.request_id !== `reserved:${reserved.id}`) {
+      return NextResponse.json({ ok: true }) // 추적 안 하는 작업 → 무시
+    }
+    // 키를 모르면 fal 조회가 불가능하므로 기록하지 않는다.
+    if (!reserved.fal_key_id) return NextResponse.json({ ok: true })
+    try {
+      await confirmGenerationJobReceipt(reserved.id, reserved.project_id, {
+        request_id: requestId,
+        model: reserved.model,
+        fal_key_id: reserved.fal_key_id,
+      })
+    } catch (e) {
+      // 실패해도 200: 다음 폴·스윕이 다시 본다.
+      console.error('[fal/webhook] late receipt confirm failed:', reserved.id, e instanceof Error ? e.message : e)
+      return NextResponse.json({ ok: true })
+    }
+    job = { ...reserved, request_id: requestId }
+  }
   if (job.status !== 'queued') return NextResponse.json({ ok: true }) // 멱등: 이미 처리됨
 
   if (body.status !== 'OK') {

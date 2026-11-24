@@ -626,7 +626,7 @@ interface ArtistState {
    *  생성 도중 탭 전환 시 프로그레스 바가 재등장하던 버그 방지. reset()(프로젝트 전환)에만 비워진다. */
   enteredProjects: Record<string, boolean>
 
-  loadData: () => void
+  loadData: () => Promise<void>
   /** 새 캐릭터 카드를 추가 (낙관적 로컬 + projectId 있으면 DB persist). 새 characterId 반환. */
   addCharacter: (input: NewCharacterInput) => Promise<string>
   /** 캐릭터 메타(이름/역할/설정/외형) 인라인 편집 — 낙관적 로컬 + 디바운스 DB PATCH. */
@@ -762,6 +762,20 @@ interface ArtistState {
   reset: () => void
 }
 
+// 프로젝트별로 진행 중인 loadData 읽기. 같은 프로젝트의 읽기가 끝나기 전에 또 부르면 그 읽기를 기다린다(DB 질문 8개를 겹쳐 보내지 않는다).
+const loadDataInFlight = new Map<string, Promise<void>>()
+
+function dedupeLoadData(projectId: string | null, run: () => Promise<void>): Promise<void> {
+  if (!projectId) return run()
+  const running = loadDataInFlight.get(projectId)
+  if (running) return running
+  const started = run().finally(() => {
+    if (loadDataInFlight.get(projectId) === started) loadDataInFlight.delete(projectId)
+  })
+  loadDataInFlight.set(projectId, started)
+  return started
+}
+
 export const useArtistStore = create<ArtistState>((set, get) => ({
   sceneManifest: null,
   characterAssets: [],
@@ -808,7 +822,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   error: null,
   enteredProjects: {},
 
-  loadData: async () => {
+  loadData: () => dedupeLoadData(useProjectStore.getState().projectId, async () => {
     const projectId = useProjectStore.getState().projectId
 
     // Try loading from DB first
@@ -1077,7 +1091,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
 
     // No data available — keep empty state (don't show fake mock data)
-  },
+  }),
 
   // 새 캐릭터 카드 추가. 채팅(createCharacter)은 2026-10-27(디자이너 QA 1차 #04)부터 이 길을 쓰지 않는다.
   //   1) 낙관적으로 store(characterAssets + sceneManifest.characters)에 즉시 반영 → 카드 "뿅" 등장

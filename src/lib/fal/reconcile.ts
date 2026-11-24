@@ -11,7 +11,7 @@ import {
   failGenerationJob,
   getGenerationJobById,
   GenerationJobTerminalTransitionError,
-  STALE_QUEUED_MS,
+  staleQueuedOrFilter,
   type GenerationJob,
 } from '@/lib/generation-jobs'
 import { describeFinalizeError, normalizeFailureEvidence } from '@/lib/fal/error-evidence'
@@ -194,7 +194,8 @@ export async function reconcileGhostQueuedJobs(projectId: string): Promise<numbe
       .select('id')
       .eq('project_id', projectId)
       .eq('status', 'queued')
-      .lt('created_at', new Date(now - STALE_QUEUED_MS).toISOString())
+      // 영상은 30분 · 그림은 10분을 넘긴 것만(2026-11-24 C12) — 진행 목록(listActiveGenerationJobs)이 쓰는 기준의 반대쪽이다.
+      .or(staleQueuedOrFilter('stale', now))
       .order('created_at', { ascending: false })
       .limit(GHOST_SWEEP_MAX_JOBS)
     if (error) {

@@ -114,10 +114,16 @@ class GenerationCapacityExemptSyncError extends Error {
   }
 }
 
+const PERSONAL_CAPACITY_SYNC_TTL_MS = 10 * 60 * 1000
+const personalCapacitySynced = new Map<string, { value: PersonalCapacity; at: number }>()
+
 /** 유저당 상한 판정을 DB 예외 표에 반영하고(관리자 = 한도 칸 비움 · 시연 계정 = 10 · 그 밖 = 행 없음),
  *  이번 판정을 돌려준다. DB 트리거 · 영상 일괄 예약이 이 표의 한도로 자리를 센다. */
 async function syncPersonalCapacity(userId: string): Promise<PersonalCapacity> {
   const personal = await personalCapacityOf(userId)
+  // 같은 값을 방금 적었으면 다시 쓰지 않는다(예약마다 DB 한 번씩 쓰던 것을 줄인다). 값이 바뀌거나 10분이 지나면 쓴다.
+  const last = personalCapacitySynced.get(userId)
+  if (last && last.value === personal && Date.now() - last.at < PERSONAL_CAPACITY_SYNC_TTL_MS) return personal
   try {
     if (personal !== null) {
       const { error } = await supabaseAdmin
@@ -136,9 +142,15 @@ async function syncPersonalCapacity(userId: string): Promise<PersonalCapacity> {
       if (error) throw error
     }
   } catch (err) {
+    personalCapacitySynced.delete(userId)
     throw new GenerationCapacityExemptSyncError(err)
   }
+  personalCapacitySynced.set(userId, { value: personal, at: Date.now() })
   return personal
+}
+
+export function _resetPersonalCapacitySyncForTests(): void {
+  personalCapacitySynced.clear()
 }
 
 /** 관리자 여부(유저당 상한 없음)를 돌려준다 — 동기화는 syncPersonalCapacity 가 한다. */

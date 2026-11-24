@@ -148,7 +148,8 @@ describe('접수된 작업과 새 요청의 경계', () => {
     useGlobalChatStore.getState().restorePendingProposal(id)
     await expect(useGlobalChatStore.getState().approvePendingProposal()).resolves.toBe(true)
     expect(create).toHaveBeenCalledTimes(1)
-    expect(fetch).toHaveBeenCalledWith('/api/generation-jobs/accepted-job')
+    // 두 번째 인자는 요청 시간 제한(AbortSignal.timeout) — 어느 잡을 물었는지만 확인한다(2026-11-24 1층 폴링).
+    expect(fetch).toHaveBeenCalledWith('/api/generation-jobs/accepted-job', expect.anything())
     expect(useGlobalChatStore.getState().deferredProposals).toHaveLength(0)
   })
 
@@ -323,6 +324,8 @@ it('다른 화면이 이미 확인 중인 작업이 끝나면 재조회도 완�
   let respond!: (value: Response) => void
   vi.stubGlobal('fetch', vi.fn(() => new Promise<Response>(resolve => { respond = resolve })))
   const existing = pollGenerationJob('already-polling')
+  // 첫 질문은 같은 틱에 등록된 잡을 묶기 위해 한 박자 뒤에 나간다(2026-11-24 1층 폴링) — 요청이 나갈 때까지 기다린다.
+  await vi.waitFor(() => expect(fetch).toHaveBeenCalled())
   useGlobalChatStore.getState().offerPendingProposal(createPendingProposal({
     stage: 'artist', kind: 'artistRegenerateWorldAsset', target: '옥상', action: '기존 작업 확인', impact: [], payload: { locationId: 'roof' }, jobIds: ['already-polling'],
   }))

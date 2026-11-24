@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
+import { useSequentialPoll } from '@/hooks/use-sequential-poll'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowRight, Check, Loader2, ZoomIn, ZoomOut } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -227,11 +228,7 @@ export default function VisualPage() {
 
   // 백그라운드 파이프라인이 DB(scenes/characters/locations + view_main)를 채울 때까지 폴링 재로드.
   // loadData는 idempotent — 데이터/이미지가 들어오면 빈 화면(progress)에서 카드 UI로 자동 전환.
-  useEffect(() => {
-    if (!projectId || ready) return
-    const id = setInterval(() => loadData(), 3000)
-    return () => clearInterval(id)
-  }, [projectId, ready, loadData])
+  useSequentialPoll(() => loadData(), 3000, !!projectId && !ready)
 
   // writer 완료 이벤트(writerReady flip) → 데이터 1회 재로드(룩/writer-추가 캐릭터 반영). 폴링 아님.
   const writerReadyReloadRef = useRef<string | null>(null)
@@ -358,11 +355,7 @@ export default function VisualPage() {
   }, [styleAnchors.length])
   // 만드는 동안은 디자인 · 그림이 들어오는 대로 다시 읽는다.
   const making = phase === 'making' || (phase === 'cards' && !progress.done)
-  useEffect(() => {
-    if (!projectId || !making) return
-    const id = setInterval(() => void loadData(), 4000)
-    return () => clearInterval(id)
-  }, [projectId, making, loadData])
+  useSequentialPoll(() => loadData(), 4000, !!projectId && making)
   const overlayOpen = making && makingDismissed !== projectId
   // 2026-10-20 오너 "Artist 만들면서 Storyboard 도 같이": 씬 · 샷이 다 나뉘고 Artist 그림을 다 그렸으면 이 화면에 있는 동안 러프를 미리 그린다.
   const roughs = useBackgroundRoughs(
@@ -464,11 +457,7 @@ export default function VisualPage() {
   // 그리는 동안 진행(k/N)을 몇 초마다 다시 읽는다 — 한 묶음(동시 3장)이 다 끝날 때까지 숫자가 멈춰 보이지 않게.
   //   멈춘 재생성이라도 그리던 그림이 남았거나 버전을 불러오는 중이면 계속 읽는다(2026-10-31 재검토 지적).
   const versionsPolling = useArtistVersionStore((s) => !isDemoSession() && versionsNeedRefresh(s))
-  useEffect(() => {
-    if (!projectId || !versionsPolling) return
-    const id = setInterval(() => void useArtistVersionStore.getState().refresh(), 5000)
-    return () => clearInterval(id)
-  }, [projectId, versionsPolling])
+  useSequentialPoll(() => useArtistVersionStore.getState().refresh(), 5000, !!projectId && versionsPolling)
   const regenOverlayOpen = regenPending && overlayDismissedFor !== regen.n
   const regenStyleLabel = regenVersion ? versionStyleLabel(regenVersion, styleAnchors, locale) : styleLabel ?? ''
   const regenNameOf = (entity: { kind: 'character' | 'location'; id: string }) =>

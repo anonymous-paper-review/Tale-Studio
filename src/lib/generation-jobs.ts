@@ -77,6 +77,8 @@ export interface GenerationJob {
   result_url: string | null
   error: string | null
   submitted_at?: string | null
+  /** 폴링 라우트의 웹훅 유예 판정(poll-reconcile-gate)이 제출 시각이 없을 때 쓴다. */
+  created_at?: string
   completed_at?: string | null
   attempts?: number
   last_error?: string | null
@@ -115,6 +117,9 @@ const COLUMNS_LIST = [
   'fal_key_id',
   'batch_id',
   'batch_total',
+  // 2026-11-24 1층 폴링: 폴링 라우트가 "제출 뒤 45초 안이면 웹훅을 믿고 fal 에 묻지 않는다"를 판정하려면 둘 다 읽어야 한다.
+  'submitted_at',
+  'created_at',
 ] as const satisfies readonly (keyof Tables<'generation_jobs'>)[]
 const COLUMNS = COLUMNS_LIST.join(', ') as Join<typeof COLUMNS_LIST, ', '>
 
@@ -122,8 +127,8 @@ const COLUMNS = COLUMNS_LIST.join(', ') as Join<typeof COLUMNS_LIST, ', '>
 //   job.input_snapshot.source_hash 를 읽으므로 둘 다 반드시 포함돼야 한다(누락 시 후보 source_hash=null → stale 무력화).
 export const GENERATION_JOB_COLUMNS = COLUMNS
 
-import { STALE_QUEUED_MS } from '@/lib/generation-job-timing'
-export { STALE_QUEUED_MS }
+import { STALE_QUEUED_MS, STALE_QUEUED_VIDEO_MS, staleQueuedMsFor, staleQueuedOrFilter } from '@/lib/generation-job-timing'
+export { STALE_QUEUED_MS, STALE_QUEUED_VIDEO_MS, staleQueuedMsFor, staleQueuedOrFilter }
 
 function toJsonSnapshot(value: unknown): Json {
   try {
@@ -175,13 +180,15 @@ async function resolveJobOwnership(input: {
   let userId = input.userId ?? null
 
   if (!workspaceId) {
+    // 프로젝트 → 워크스페이스 → 소유자를 한 번에 읽는다(2026-11-24 C04: 예약 한 번에 DB 왕복 2회를 1회로).
     const { data: project, error } = await supabaseAdmin
       .from('projects')
-      .select('workspace_id')
+      .select('workspace_id, workspaces(owner_id)')
       .eq('id', input.projectId)
       .maybeSingle()
     if (error) throw error
     workspaceId = (project?.workspace_id as string | undefined) ?? null
+    if (!userId) userId = ownerIdOfEmbed(project?.workspaces)
   }
 
   if (workspaceId && !userId) {
@@ -400,25 +407,37 @@ export async function confirmGenerationJobReceipt(
   jobId: string,
   projectId: string,
   receipt: { request_id: string; model: string; fal_key_id: string },
+  opts?: { sleep?: (ms: number) => Promise<void> },
 ): Promise<void> {
-  const now = new Date().toISOString()
-  const { data, error } = await supabaseAdmin
-    .from('generation_jobs')
-    .update({
-      request_id: receipt.request_id,
-      model: receipt.model,
-      fal_key_id: receipt.fal_key_id,
-      submitted_at: now,
-      updated_at: now,
-      attempts: 1,
-    })
-    .eq('id', jobId)
-    .eq('project_id', projectId)
-    .eq('status', 'queued')
-    .eq('request_id', `reserved:${jobId}`)
-    .select('id')
-  if (error) throw error
-  if (!data?.length) throw new Error('generation job reservation changed before the receipt was saved')
+  // DB 오류에만 300ms·900ms 뒤 두 번 더 시도한다(총 3회): 이미 제출한 유료 작업의 접수 번호를 일시 장애로 잃지 않기 위함.
+  //   0행(예약이 바뀜)은 일시 장애가 아니므로 재시도 없이 바로 던진다.
+  const sleep = opts?.sleep ?? ((ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms)))
+  const retryDelaysMs = [300, 900]
+  for (let attempt = 0; ; attempt++) {
+    const now = new Date().toISOString()
+    const { data, error } = await supabaseAdmin
+      .from('generation_jobs')
+      .update({
+        request_id: receipt.request_id,
+        model: receipt.model,
+        fal_key_id: receipt.fal_key_id,
+        submitted_at: now,
+        updated_at: now,
+        attempts: 1,
+      })
+      .eq('id', jobId)
+      .eq('project_id', projectId)
+      .eq('status', 'queued')
+      .eq('request_id', `reserved:${jobId}`)
+      .select('id')
+    if (error) {
+      if (attempt >= retryDelaysMs.length) throw error
+      await sleep(retryDelaysMs[attempt])
+      continue
+    }
+    if (!data?.length) throw new Error('generation job reservation changed before the receipt was saved')
+    return
+  }
 }
 
 /**
@@ -688,14 +707,14 @@ export interface ActiveGenerationJob {
 export async function listActiveGenerationJobs(
   projectId: string,
 ): Promise<ActiveGenerationJob[]> {
-  const since = new Date(Date.now() - STALE_QUEUED_MS).toISOString()
+  // 영상은 30분 · 그림은 10분까지 진행 중으로 본다(2026-11-24 C12) — DB 에서 한 번에 거른다.
   const query = (columns: string) => supabaseAdmin
     .from('generation_jobs')
     .select(columns)
     .eq('project_id', projectId)
     .eq('status', 'queued')
-    .gte('created_at', since)
-  // 화면에서 멈춘 작업(오너 2026-11-14 7번)은 끝날 때까지 목록에 남되 멈춘 때를 붙인다 — 화면이 "멈췄어요"로 보이고 다시 만들기를 연다.
+    .or(staleQueuedOrFilter('fresh'))
+  // 화면에서 멈춘 작업(오너 2026-11-14 7번)은 끝날 때까지 목록에 남되 멈춘 때를 붙인다 — 화면이 "멈췼어요"로 보이고 다시 만들기를 연다.
   //   멈춤 표를 함께 읽지 못하면(표가 아직 없는 DB 등) 종전처럼 목록만 준다.
   let result = await query('id, kind, target, submitted_at, created_at, cancellation:director_job_cancellations(cancelled_at)')
   if (result.error) result = await query('id, kind, target, submitted_at, created_at')
@@ -763,11 +782,11 @@ export async function listGenerationCompletionRows(projectId: string, untilMs = 
   }
 }
 
-/** STALE_QUEUED_MS 안에 들어온 대기 작업인가 — 시각이 없으면(예전 행 · 시험 행) 막 들어온 것으로 본다. */
-function freshQueued(row: { created_at?: unknown }, now = Date.now()): boolean {
+/** 종류별 유령 기준(그림 10분 · 영상 30분) 안에 들어온 대기 작업인가 — 시각이 없으면(예전 행 · 시험 행) 막 들어온 것으로 본다. */
+export function freshQueued(row: { created_at?: unknown; kind?: unknown }, now = Date.now()): boolean {
   if (typeof row.created_at !== 'string') return true
   const at = Date.parse(row.created_at)
-  return !Number.isFinite(at) || now - at < STALE_QUEUED_MS
+  return !Number.isFinite(at) || now - at < staleQueuedMsFor(typeof row.kind === 'string' ? row.kind : null)
 }
 
 /** queued 인 character_view main 잡 목록(클라가 [id] reconcile 로 마무리하고 "그리는 중"으로 세는 대상).
@@ -875,6 +894,17 @@ export async function getGenerationJobById(
     .maybeSingle()
   if (error) throw error
   return (data as GenerationJob | null) ?? null
+}
+
+/** 여러 잡을 한 번에 읽는다(2026-11-24 1층 폴링: 화면이 잡 N개를 N번 묻던 것을 한 번으로). 순서는 보장하지 않는다. */
+export async function getGenerationJobsByIds(ids: readonly string[]): Promise<GenerationJob[]> {
+  if (ids.length === 0) return []
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .select(COLUMNS)
+    .in('id', [...ids])
+  if (error) throw error
+  return ((data ?? []) as GenerationJob[])
 }
 
 export async function getGenerationJobByRequestId(
@@ -1260,18 +1290,22 @@ export async function userOwnsProject(
   projectId: string,
   userId: string,
 ): Promise<boolean> {
-  const { data: project, error: projectError } = await supabaseAdmin
+  // 프로젝트 → 워크스페이스 소유자를 한 번에 읽는다(2026-11-24 1층 폴링: 틱마다 DB 왕복 2회 → 1회).
+  //   projects.workspace_id 는 workspaces(id) 외래키라 PostgREST 가 한 질문으로 붙여 준다.
+  const { data: project, error } = await supabaseAdmin
     .from('projects')
-    .select('workspace_id')
+    .select('workspace_id, workspaces(owner_id)')
     .eq('id', projectId)
     .maybeSingle()
-  if (projectError) throw projectError
+  if (error) throw error
   if (!project?.workspace_id) return false
-  const { data: ws, error: workspaceError } = await supabaseAdmin
-    .from('workspaces')
-    .select('owner_id')
-    .eq('id', project.workspace_id)
-    .maybeSingle()
-  if (workspaceError) throw workspaceError
-  return !!ws && ws.owner_id === userId
+  const ownerId = ownerIdOfEmbed(project.workspaces)
+  return !!ownerId && ownerId === userId
+}
+
+/** PostgREST 가 붙여 준 workspaces 행(객체 또는 1칸 배열)에서 owner_id 를 꺼낸다. */
+function ownerIdOfEmbed(embed: unknown): string | null {
+  const row = Array.isArray(embed) ? embed[0] : embed
+  const ownerId = (row as { owner_id?: unknown } | null | undefined)?.owner_id
+  return typeof ownerId === 'string' ? ownerId : null
 }

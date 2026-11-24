@@ -445,7 +445,7 @@ export async function POST(req: Request) {
         moderatedSubmitInput({
           ...finalOpts,
           ...(requestedImageModel ? { model: requestedImageModel } : {}),
-          webhookUrl: resolveWebhookUrl(),
+          webhookUrl: resolveWebhookUrl(job.id),
         }, moderation),
         // 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 키로 제출한다.
         { retry: false, falKeyId: job.fal_key_id },

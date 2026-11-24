@@ -3,6 +3,7 @@ import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { STALE_QUEUED_MS } from '@/lib/generation-jobs'
+import { STALE_QUEUED_VIDEO_MS } from '@/lib/generation-job-timing'
 
 /**
  * 화면이 5분에 포기하는데 서버는 10분까지 "진행 중" 으로 보면 그 사이 구간에서
@@ -23,7 +24,7 @@ describe('생성 대기 포기 시각', () => {
     const source = sourceOf('src/stores/director-store.ts')
 
     // 숫자를 직접 적으면 서버 기준이 바뀔 때 조용히 어긋난다.
-    expect(source).toMatch(/VIDEO_POLL_TIMEOUT_MS\s*=\s*STALE_QUEUED_MS/)
+    expect(source).toMatch(/VIDEO_POLL_TIMEOUT_MS\s*=\s*STALE_QUEUED_VIDEO_MS/)
     expect(source).not.toMatch(/VIDEO_POLL_TIMEOUT_MS\s*=\s*\d/)
   })
 
@@ -35,5 +36,9 @@ describe('생성 대기 포기 시각', () => {
 
   it('서버 기준은 10분이다', () => {
     expect(STALE_QUEUED_MS).toBe(10 * 60 * 1000)
+  })
+
+  it('영상 기준은 30분이다', () => {
+    expect(STALE_QUEUED_VIDEO_MS).toBe(30 * 60 * 1000)
   })
 })

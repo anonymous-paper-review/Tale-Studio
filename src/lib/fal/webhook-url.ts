@@ -17,8 +17,13 @@ export function resolveWebhookBaseUrl(): string | undefined {
   return undefined
 }
 
-/** FAL submit에 넘길 절대 webhook URL. base를 못 구하면 undefined. */
-export function resolveWebhookUrl(): string | undefined {
+/**
+ * FAL submit에 넘길 절대 webhook URL. base를 못 구하면 undefined.
+ * jobId 를 주면 쿼리로 심는다. 접수 번호 기록을 놓친 예약 작업을 웹훅이 되찾는 단서다.
+ */
+export function resolveWebhookUrl(jobId?: string): string | undefined {
   const base = resolveWebhookBaseUrl()
-  return base ? `${base}${WEBHOOK_PATH}` : undefined
+  if (!base) return undefined
+  const url = `${base}${WEBHOOK_PATH}`
+  return jobId ? `${url}?jobId=${encodeURIComponent(jobId)}` : url
 }

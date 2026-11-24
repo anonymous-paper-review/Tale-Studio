@@ -1120,7 +1120,7 @@ async function submitPreparedVideo(
       try {
         result = await submitFalReferenceToVideo(
           reservedSubmission.falRequest,
-          resolveWebhookUrl(),
+          resolveWebhookUrl(reservedJob.id),
           reservedJob.fal_key_id,
           moderation,
         )

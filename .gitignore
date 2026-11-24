@@ -91,6 +91,8 @@ scripts/*
 !scripts/check-mvp-feedback-ui.mjs
 !scripts/check-mvp-feedback-followup-ui.mjs
 !scripts/check-mvp-dialogue-ui.mjs
+# 폴링 틱 전후 측정(2026-11-24 폴링 1층) — .claude/docs/2026-11-24/polling-layer1.html 3절 표의 재현 스크립트.
+!scripts/measure-poll-tick.mjs
 !scripts/test-rough-reservation-dev-db.mjs
 !scripts/test-rough-reservation-db.mjs
 # 68칸·80칸 메인 동시성 검사와 개발 DB 격리 실험을 재현하는 실행기.

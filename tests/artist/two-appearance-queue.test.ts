@@ -52,12 +52,18 @@ let beforeAppearance: (() => Promise<void>) | null
 let releaseAppearance: (() => void) | null
 
 // DB 네트워크만 메모리 어댑터로 바꾼다. 라우트의 대상 검사·키 생성·중복 검사·잡 저장 함수는 실제로 실행한다.
+//   select('a, other_table(col)') 같은 붙이기(PostgREST embed)는 외래키 이름으로 표를 찾아 한 칸으로 놓았다
+//   (projects.workspace_id → workspaces — 소유 확인이 질문 한 번으로 바뀜 2026-11-24).
 function from(table: string) {
   const filters: Array<[string, unknown]> = []
   let inserted: Row | null = null
   let patch: Row | null = null
+  let embeds: Array<{ table: string; column: string }> = []
   const chain = {
-    select: () => chain,
+    select: (columns?: string) => {
+      embeds = [...(columns ?? '').matchAll(/(\w+)\((\w+)\)/g)].map((m) => ({ table: m[1], column: m[2] }))
+      return chain
+    },
     eq: (key: string, value: unknown) => { filters.push([key, value]); return chain },
     insert: (value: Row) => { inserted = value; return chain },
     update: (value: Row) => { patch = value; return chain },
@@ -77,7 +83,16 @@ function from(table: string) {
     }
     const matched = rows.filter(row => filters.every(([key, value]) => row[key] === value))
     if (patch) for (const row of matched) Object.assign(row, patch)
-    return matched
+    if (embeds.length === 0) return matched
+    return matched.map(row => {
+      const out: Row = { ...row }
+      for (const embed of embeds) {
+        const fk = `${embed.table.replace(/s$/, '')}_id`
+        const related = (tables[embed.table] ?? []).find(r => r.id === row[fk])
+        out[embed.table] = related ? { [embed.column]: related[embed.column] } : null
+      }
+      return out
+    })
   }
   return chain
 }
@@ -165,7 +180,8 @@ beforeEach(() => {
     if (url.startsWith('/api/generation-jobs/')) {
       const jobId = url.split('/').at(-1)!
       const job = tables.generation_jobs.find(row => row.id === jobId)
-      if (losePollResponse && (job?.target as Row | undefined)?.characterId === losePollResponse) throw new TypeError('Failed to fetch')
+      // 화면은 네트워크 오류·5xx 를 일시 오류로 보고 계속 묻는다(2026-11-24). 확인이 끊긴 상황은 영구 응답(로그인 풀림 401)으로 만든다.
+      if (losePollResponse && (job?.target as Row | undefined)?.characterId === losePollResponse) return Response.json({ error: { message: 'Unauthorized' } }, { status: 401 })
       if (finishImmediately) return completion(jobId)
       return new Promise<Response>(resolve => { pollWaiters.set(jobId, resolve) })
     }

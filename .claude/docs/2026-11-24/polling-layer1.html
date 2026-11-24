@@ -1,0 +1,513 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>폴링 1층</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain,ol.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li,ol.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  th{white-space:nowrap}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+  .callout{border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--surface);
+    border-radius:0 8px 8px 0;padding:12px 16px;margin:14px 0;font-size:14.5px;max-width:64ch}
+  .callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+  .callout.caution{border-left-color:var(--fail);background:var(--fail-soft)}
+  .callout b.label{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;display:block;margin-bottom:4px}
+  .callout p{margin:0}
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">작업 보고서 · 2026-11-24 · 폴링</p>
+  <h1>폴링 1층</h1>
+  <p class="bluf">화면이 작업 상태를 묻는 한 번(틱)을 가볍게 만들었다. 로컬 개발 서버 기준으로 작업 1개 상태 조회는 0.395초에서 0.21초, 프로젝트 진행 목록은 0.688초에서 0.21초가 됐다. 왕복 수는 4회에서 2회, 7회에서 2회가 됐다.</p>
+  <p class="bluf"><b>결정할 것 2개</b>: 로그인 확인을 서버 안에서 끝내는 방식 유지, Supabase Realtime 2층 착수 시기. <b>알아둘 것 6개</b>.</p>
+  <p class="asof">문장 규칙: ASD-STE100(한 문장에 한 뜻 · 능동형 · 같은 뜻에는 같은 말 · 절차는 번호). 측정 파일 .claude/docs/2026-11-24/measure/ · 원장 specs/api-failure-ledger.md</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">0</span><h2>용어</h2></div>
+  <p class="sec-lede">이 문서는 아래 말을 아래 뜻으로만 쓴다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>말</th><th>뜻</th></tr></thead>
+    <tbody>
+      <tr><td><b>잡</b></td><td><code>generation_jobs</code> 표의 행 하나. 그림 또는 영상 하나를 만드는 작업.</td></tr>
+      <tr><td><b>틱</b></td><td>화면이 서버에 상태를 한 번 묻는 것. 지금 3초마다 한 번.</td></tr>
+      <tr><td><b>왕복</b></td><td>서버가 DB 또는 로그인 서버에 질문 하나를 보내고 답을 받는 것. 실서비스에서는 1회에 1.2~2.4초가 든다(11/23 측정).</td></tr>
+      <tr><td><b>웹훅</b></td><td>fal 이 작업을 끝내고 우리 서버 주소로 보내는 완료 알림(HTTP 요청).</td></tr>
+      <tr><td><b>유령</b></td><td>웹훅을 잃어 대기 상태로 남은 잡. 그림은 10분, 영상은 30분이 넘으면 유령으로 본다.</td></tr>
+      <tr><td><b>묶음</b></td><td>잡 여러 개의 상태를 요청 하나로 묻는 것. 한 묶음은 최대 50개.</td></tr>
+      <tr><td><b>일시 오류</b></td><td>다시 물으면 답이 바뀔 수 있는 오류. 5xx, 네트워크 끊김, 10초 안에 답 없음, 408, 429.</td></tr>
+      <tr><td><b>영구 오류</b></td><td>다시 물어도 같은 오류. 401(로그인 풀림), 403(내 것 아님), 404(없음), 그 밖의 4xx.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>혼자 정한 것</h2></div>
+  <p class="sec-lede">오너에게 묻지 않고 정했다. 되돌리기는 전부 <code>쉬움</code>이다(코드만 되돌리면 된다. DB 변경 없음). 첫 행은 보안에 닿아 4절에도 올렸다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>결정</th><th>왜</th><th>버린 선택지</th><th>되돌리기</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>로그인 확인을 서버 안에서 끝낸다. 토큰 서명을 공개키로 검사한다.<span class="path">src/lib/supabase/auth.ts:18-29</span></td>
+        <td>틱마다 로그인 서버(싱가포르) 왕복 1회가 사라진다. 이 프로젝트의 서명키는 비대칭(ES256)이라 가능하다.</td>
+        <td>지금처럼 <code>getUser()</code> 로 매번 왕복.</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>소유 확인은 DB 질문 1회. 프로젝트와 워크스페이스 소유자를 한 질문으로 읽는다.<span class="path">src/lib/generation-jobs.ts:1289-1303</span></td>
+        <td>왕복 2회가 1회가 된다. 외래키가 있어 PostgREST 가 붙여 준다.</td>
+        <td>프로젝트 읽기 → 워크스페이스 읽기 2회.</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>웹훅 주소가 있으면 제출 뒤 45초 안에는 fal 에 묻지 않는다. 그 뒤에는 잡마다 30초에 한 번만 묻는다.<span class="path">src/lib/fal/poll-reconcile-gate.ts</span></td>
+        <td>틱이 fal 왕복을 들고 있지 않게 한다. 웹훅이 정상이면 fal 질문은 0회다.</td>
+        <td>틱마다 fal 에 묻기(지금까지). 또는 아예 묻지 않기(로컬 개발이 끊긴다).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>한 탭의 잡을 묶어 한 번에 묻는다. 묶음 최대 50개. 잡이 1개면 예전 주소를 그대로 쓴다.<span class="path">src/lib/generation-jobs-client.ts · src/app/api/generation-jobs/route.ts</span></td>
+        <td>그림 6장을 그릴 때 요청 6개가 1개가 된다.</td>
+        <td>잡마다 요청(지금까지).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>질문 하나는 10초를 넘기지 않는다. 넘기면 그 시도만 접는다.<span class="path">generation-job-timing.ts POLL_REQUEST_TIMEOUT_MS</span></td>
+        <td>11/23 에 응답 없는 요청이 5분씩 매달렸다(148회).</td>
+        <td>한도 없음(지금까지). 60초(서버 함수 한도와 같아 의미 없음).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>일시 오류는 실패가 아니다. 간격을 3→6→12→24→30초로 늘리며 다시 묻는다. 성공하면 3초로 돌아온다.</td>
+        <td>11/23 에 조회 실패 1회로 화면이 실패로 굳었다. 서버가 느릴 때 요청이 몰리는 것도 막는다.</td>
+        <td>오류 1회면 실패(지금까지). 일시 오류 N회 뒤 실패(같은 길을 짧게 다시 만드는 것이라 버림).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>영구 오류만 실패로 끝낸다. 401 · 403 · 404 · 그 밖의 4xx. 408 과 429 는 일시로 본다.</td>
+        <td>로그인이 풀렸거나 잡이 지워진 경우는 더 물어도 답이 같다.</td>
+        <td>모든 4xx 를 일시로 보기(로그인 풀림을 10분 기다리게 된다).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>영상 잡은 30분까지 기다린다. 그림은 10분 그대로.<span class="path">generation-job-timing.ts STALE_QUEUED_VIDEO_MS</span></td>
+        <td>DB 자리 집계 창이 30분이다. 화면 10분과 어긋나 20분 동안 "화면에는 없는데 자리는 먹는" 구간이 있었다(원장 C12). 큐 보고서 2절에 상세.</td>
+        <td>10분 하나(지금까지).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>Artist 화면의 데이터 읽기(<code>loadData</code>)는 같은 프로젝트에서 한 번에 하나만 돈다. 3초·4초·5초 반복은 앞 읽기가 끝난 뒤에 다음을 예약한다.<span class="path">src/stores/artist-store.ts:766-776 · src/hooks/use-sequential-poll.ts</span></td>
+        <td>읽기 하나가 DB 질문 8개다. 느릴 때 겹치면 16개, 24개로 쌓인다.</td>
+        <td><code>setInterval</code> 그대로(끝나기 전에 다음이 나간다).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>테스트 흉내(mock) 7곳을 새 동작에 맞췄다. 테스트 문장과 기대값은 바꾸지 않았다.<span class="path">tests/artist/two-appearance-queue · tests/director/job-cancel · job-cancel-store · tests/chat/request-preservation · tests/job/number-sync · generation-ghost-reconcile · poll-timeout-matches-server</span></td>
+        <td>DB 체인 흉내에 <code>or</code> 가 없었고, fetch 흉내가 두 번째 인자(시간 한도 신호)를 몰랐다. 유령 픽스처 20분은 영상 30분 기준에 걸렸다(31분으로).</td>
+        <td>테스트 이름 바꾸기(오너 결정 없이는 안 한다).</td>
+        <td>쉬움</td>
+      </tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn"><b class="label">주의</b><p>첫 행은 보안 성질이 바뀐다. 토큰이 만료되기 전(기본 1시간)에는 다른 기기에서 한 로그아웃과 계정 삭제가 서버 요청에 바로 반영되지 않는다. 4절 1행에서 결정한다.</p></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>같이 정한 것이 코드에 어떻게 들어갔나</h2></div>
+  <p class="sec-lede">앞 대화에서 1층으로 정한 항목 7개. 각각 실제 코드와 대조했다.</p>
+
+  <div class="card same">
+    <div class="card-head"><h3>틱의 로그인 확인은 왕복 0회</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> 요청마다 로그인 서버에 묻지 않는다. 토큰을 서버 안에서 검증한다.</p>
+    <p class="code-what">쿠키의 토큰을 공개키로 검증하고 사용자 id · 이메일 · 설정을 돌려준다. 실패하면 null.</p>
+<pre><span class="path">src/lib/supabase/auth.ts:18-29</span>export async function getUser(): Promise&lt;AuthUser | null&gt; {
+  const supabase = await createClient()
+  const { data, error } = await supabase.auth.<b>getClaims()</b>
+  if (error || !data?.claims) return null
+  const claims = data.claims
+  return {
+    id: claims.sub,
+    email: claims.email,
+    user_metadata: claims.user_metadata ?? {},
+    app_metadata: claims.app_metadata ?? {},
+  }
+}</pre>
+    <div class="tbl"><table>
+      <thead><tr><th>이름</th><th>뭐가 들어가나</th><th>실제 값</th></tr></thead>
+      <tbody>
+        <tr><td><code>getClaims()</code></td><td>토큰을 읽고 서명을 검사하는 함수. 공개키(JWKS)는 10분 동안 서버 메모리에 둔다.</td><td>첫 요청 1회만 공개키를 내려받는다. 그 뒤 왕복 0회.</td></tr>
+        <tr><td><code>claims.sub</code></td><td>토큰 안의 사용자 id</td><td><code>'1511efdf-356b-…'</code></td></tr>
+        <tr><td><code>error</code></td><td>서명이 틀리거나 만료됐을 때의 오류</td><td>정상이면 <code>null</code></td></tr>
+      </tbody>
+    </table></div>
+    <p class="code-diff"><span class="chip c-pass">같다</span><code>getUser()</code> 를 부르는 파일 76개는 바뀌지 않았다. 돌려주는 모양이 <code>id · email · user_metadata · app_metadata</code> 4칸으로 줄었다. 라우트가 쓰는 칸은 이 셋(<code>id · email · user_metadata</code>)뿐이다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>소유 확인은 DB 질문 1회</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> 프로젝트 → 워크스페이스 → 소유자 두 번 읽기를 한 번으로.</p>
+    <p class="code-what">프로젝트 행에 워크스페이스의 <code>owner_id</code> 를 붙여 한 번에 읽는다.</p>
+<pre><span class="path">src/lib/generation-jobs.ts:1295-1303</span>  const { data: project, error } = await supabaseAdmin
+    .from('projects')
+    .select(<b>'workspace_id, workspaces(owner_id)'</b>)
+    .eq('id', projectId)
+    .maybeSingle()
+  if (error) throw error
+  if (!project?.workspace_id) return false
+  const ownerId = ownerIdOfEmbed(project.workspaces)
+  return !!ownerId &amp;&amp; ownerId === userId</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span><code>userOwnsProject</code> 를 쓰는 라우트 38곳이 모두 혜택을 받는다. 예약 경로의 <code>resolveJobOwnership</code> 도 같은 방식으로 1회가 됐다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>틱은 DB 만 읽는다. fal 질문은 웹훅이 늦을 때만</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> 틱이 fal 왕복을 들고 있지 않게 한다. fal 조회와 마무리는 웹훅과 유령 청소가 맡는다.</p>
+    <p class="code-what">웹훅 주소가 없으면 늘 묻는다(로컬). 있으면 제출 뒤 45초를 기다리고, 그 뒤에는 잡마다 30초에 한 번만 묻는다.</p>
+<pre><span class="path">src/lib/fal/poll-reconcile-gate.ts:16-31</span>export function shouldAskProvider(job, opts): boolean {
+  if (job.request_id?.startsWith('reserved:')) return false
+  if (!opts.webhookConfigured) return true
+
+  const now = opts.now ?? Date.now()
+  const since = Date.parse(job.submitted_at ?? job.created_at ?? '')
+  if (!Number.isFinite(since)) return true
+  if (now - since &lt; <b>WEBHOOK_GRACE_MS</b>) return false
+
+  const last = lastAskedAt.get(job.id)
+  if (last !== undefined &amp;&amp; now - last &lt; <b>POLL_RECONCILE_THROTTLE_MS</b>) return false</pre>
+    <ol class="plain">
+      <li>예약만 되고 접수 번호가 없는 잡은 묻지 않는다. fal 이 모르는 잡이다.</li>
+      <li>웹훅 주소가 없으면 묻는다. 로컬 개발은 폴링이 유일한 완결 경로다.</li>
+      <li>제출 뒤 45초 안이면 묻지 않는다. 웹훅을 기다린다.</li>
+      <li>45초가 지났으면 30초에 한 번만 묻는다. 잃은 웹훅은 이 길로 45~75초 안에 회수된다.</li>
+    </ol>
+    <p class="code-diff"><span class="chip c-pass">같다</span>단일 라우트와 묶음 라우트가 같은 문지기를 쓴다. 이 판정에 필요한 <code>submitted_at · created_at</code> 두 칸을 읽기 컬럼에 추가했다(없으면 늘 묻는 것으로 되돌아간다).</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>프로젝트당 폴러 1개: 잡을 묶어 묻는다</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> 그림 6장을 그리면 요청 6개가 3초마다 나간다. 하나로 묶는다.</p>
+    <p class="code-what">서버는 잡 id 목록을 한 질문으로 읽고, 프로젝트마다 소유 확인을 한 번만 한다. 내 것이 아닌 id 는 내용 없이 <code>missing</code> 에만 적는다.</p>
+<pre><span class="path">src/app/api/generation-jobs/route.ts:35-41</span>  const rows = await <b>getGenerationJobsByIds(ids)</b>
+  const projectIds = [...new Set(rows.map((row) =&gt; row.project_id))]
+  const ownership = await Promise.all(
+    projectIds.map(async (projectId) =&gt; [projectId, await userOwnsProject(projectId, user.id)] as const),
+  )
+  const owned = new Set(ownership.filter(([, ok]) =&gt; ok).map(([projectId]) =&gt; projectId))
+  const mine = rows.filter((row) =&gt; owned.has(row.project_id))</pre>
+    <p class="code-what">화면은 묶음에 잡이 1개면 예전 주소를, 2개 이상이면 <code>?ids=</code> 를 쓴다. 호출하는 곳 10곳의 함수 서명은 바뀌지 않았다.</p>
+<pre><span class="path">src/lib/generation-jobs-client.ts:189-192</span>  const single = ids.length === 1
+  const url = single
+    ? `/api/generation-jobs/${encodeURIComponent(ids[0])}`
+    : `/api/generation-jobs<b>?ids=</b>${ids.map(encodeURIComponent).join(',')}`</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>잡 6개의 상태 조회가 DB 질문 2회(잡 읽기 1 + 소유 확인 1)다. 고치기 전에는 24회였다(잡마다 4회).</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>응답 3분류 · 질문 한도 10초 · 백오프</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> 성공 / 영구 오류 / 일시 오류로 나눈다. 질문 하나는 10초 한도. 일시 오류는 3→6→12 초로 간격을 늘려 다시 묻는다.</p>
+    <p class="code-what">영구 오류의 기준.</p>
+<pre><span class="path">src/lib/generation-jobs-client.ts:180-184</span>function isPermanentStatus(status: number): boolean {
+  if (status === 401 || status === 403 || status === 404) return true
+  return status &gt;= 400 &amp;&amp; status &lt; 500 &amp;&amp; status !== <b>408</b> &amp;&amp; status !== <b>429</b>
+}</pre>
+    <p class="code-what">질문에 10초 한도를 건다. 일시 오류면 잡을 대기 상태로 유지하고 상태 번호만 알린다.</p>
+<pre><span class="path">src/lib/generation-jobs-client.ts:197-215</span>    res = await fetch(url, { signal: <b>AbortSignal.timeout(POLL_REQUEST_TIMEOUT_MS)</b> })
+  …
+  const data = res?.ok ? (body as { data?: unknown } | undefined)?.data : undefined
+  if (!res || !res.ok || !data || typeof data !== 'object') {
+    for (const job of batch) notify(job, { jobId: job.jobId, status: <b>'queued'</b>, httpStatus: status })
+    return true
+  }</pre>
+    <p class="code-what">다음 틱까지의 간격. 일시 오류가 이어진 횟수만큼 2배씩 늘고 30초에서 멈춘다.</p>
+<pre><span class="path">src/lib/generation-jobs-client.ts:256-263</span>function scheduleNext(): void {
+  if (timer) return
+  const waiting = [...jobs.values()].filter((job) =&gt; !job.asking)
+  if (waiting.length === 0) return
+  const base = Math.min(...waiting.map((job) =&gt; job.intervalMs))
+  const delay = Math.min(POLL_BACKOFF_MAX_MS, base * <b>2 ** consecutiveTransientFailures</b>)
+  timer = setTimeout(tick, delay)
+}</pre>
+    <div class="tbl"><table>
+      <thead><tr><th>이름</th><th>뭐가 들어가나</th><th>실제 값</th></tr></thead>
+      <tbody>
+        <tr><td><code>consecutiveTransientFailures</code></td><td>이어진 일시 오류 횟수. 성공하면 0.</td><td>0 → 1 → 2 → 3 → 4</td></tr>
+        <tr><td><code>delay</code></td><td>다음 질문까지 기다리는 밀리초</td><td>3000 → 6000 → 12000 → 24000 → 30000</td></tr>
+        <tr><td><code>POLL_BACKOFF_MAX_MS</code></td><td>간격 상한</td><td>30000</td></tr>
+      </tbody>
+    </table></div>
+    <p class="code-diff"><span class="chip c-pass">같다</span>포기 시각은 서버 유령 기준과 같다. 그림 10분, 영상 30분. 첫 응답의 <code>kind</code> 가 영상이면 30분으로 늘린다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>진행 목록 라우트는 DB 질문 4개를 동시에 보낸다</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> 4초마다 도는 <code>/api/generation/active</code> 는 질문을 순서대로 보내 왕복 7회였다.</p>
+    <p class="code-what">네 읽기를 한 번에 보내고 함께 기다린다. 왕복 시간은 4회 분에서 1회 분이 된다.</p>
+<pre><span class="path">src/app/api/generation/active/route.ts:48-55</span>  const [jobs, usedVideo, recentRows, completionRows] = await <b>Promise.all</b>([
+    listActiveGenerationJobs(projectId),
+    countProjectVideoGenerations(projectId),
+    listRecentGenerationJobRows(projectId),
+    listGenerationCompletionRows(projectId),
+  ])</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>질문 수는 그대로 4개다. 시간만 줄었다. 완료 기록 전량 읽기(<code>listGenerationCompletionRows</code>)는 남은 숙제다. 5절 1행.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>Artist 화면 읽기는 겹치지 않는다</h3><span class="chip c-pass">같다</span></div>
+    <p class="agreed"><b>논의:</b> <code>loadData</code> 가 끝나기 전에 다음 <code>loadData</code> 가 나가지 않게 한다.</p>
+    <p class="code-what">같은 프로젝트의 읽기가 진행 중이면 새 질문을 보내지 않고 그 결과를 돌려준다.</p>
+<pre><span class="path">src/stores/artist-store.ts:766-776</span>const loadDataInFlight = new Map&lt;string, Promise&lt;void&gt;&gt;()
+
+function dedupeLoadData(projectId: string | null, run: () =&gt; Promise&lt;void&gt;): Promise&lt;void&gt; {
+  if (!projectId) return run()
+  const running = loadDataInFlight.get(projectId)
+  <b>if (running) return running</b>
+  const started = run().finally(() =&gt; {
+    if (loadDataInFlight.get(projectId) === started) loadDataInFlight.delete(projectId)
+  })
+  loadDataInFlight.set(projectId, started)
+  return started
+}</pre>
+    <p class="code-what">반복 읽기는 앞 읽기가 끝난 뒤 간격을 두고 다음을 예약한다.</p>
+<pre><span class="path">src/hooks/use-sequential-poll.ts:12-20 · src/app/studio/artist/page.tsx:231,358,460</span>  const schedule = () =&gt; {
+    timer = setTimeout(async () =&gt; {
+      try { await fn() } catch { }
+      if (!cancelled) <b>schedule()</b>
+    }, intervalMs)
+  }
+…
+  useSequentialPoll(() =&gt; loadData(), 3000, !!projectId &amp;&amp; !ready)
+  useSequentialPoll(() =&gt; loadData(), 4000, !!projectId &amp;&amp; making)
+  useSequentialPoll(() =&gt; useArtistVersionStore.getState().refresh(), 5000, !!projectId &amp;&amp; versionsPolling)</pre>
+    <p class="code-diff"><span class="chip c-pass">같다</span>읽기 한 번의 DB 질문 8개는 그대로다. 겹침만 막았다. 5절 2행.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>확인한 것 / 안 한 것</h2></div>
+  <p class="sec-lede">측정은 로컬 개발 서버(한국)와 개발 DB 로 했다. 같은 계정 · 같은 잡 · 같은 프로젝트에 요청을 20회 보내 중앙값과 p95 를 적었다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>요청</th><th>고치기 전 중앙값 / p95</th><th>고친 뒤 중앙값 / p95 (2회)</th><th>DB 왕복 수</th></tr></thead>
+    <tbody>
+      <tr><td>작업 1개 상태 <span class="path">GET /api/generation-jobs/[id]</span></td><td class="num">0.395s / 0.440s</td><td class="num">0.210s / 0.255s · 0.208s / 0.230s</td><td>로그인 1 + 소유 2 + 잡 1 = <b>4</b> → 소유 1 + 잡 1 = <b>2</b></td></tr>
+      <tr><td>프로젝트 진행 목록 <span class="path">GET /api/generation/active</span></td><td class="num">0.688s / 0.734s</td><td class="num">0.211s / 0.262s · 0.205s / 0.219s</td><td>1 + 2 + 4(순서대로) = <b>7</b> → 1 + 4(동시) = 시간상 <b>2</b></td></tr>
+      <tr><td>잡 6개를 한 번에 <span class="path">GET /api/generation-jobs?ids=</span></td><td class="num">(없던 길)</td><td class="num">0.275s / 0.479s · 0.284s / 0.379s</td><td>잡 1 + 소유 1 = <b>2</b></td></tr>
+      <tr><td>잡 6개를 따로 동시에(고치기 전 화면이 하던 일)</td><td class="num">0.710s / 0.902s</td><td class="num">0.226s / 0.347s · 0.227s / 0.385s</td><td>24 → 12</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout"><b class="label">참고</b><p>로컬에서 왕복 1회는 약 0.1초다. 실서비스(서버 미국 동부, DB 싱가포르)는 1회에 1.2~2.4초다(11/23 측정). 왕복 수가 같은 비율로 줄었으므로 실서비스 추정은 작업 1개 상태 4.8~9.6초 → 2.4~4.8초다. 이 숫자는 계산이다. 측정이 아니다.</p></div>
+  <div class="split">
+    <div class="yes">
+      <h4>확인한 것</h4>
+      <ul>
+        <li>위 측정 2회(고치기 전 1회, 고친 뒤 2회). 파일 <code>.claude/docs/2026-11-24/measure/*.json</code>. 재현 스크립트 <code>scripts/measure-poll-tick.mjs</code>.</li>
+        <li>테스트 976 파일 8,244건 통과(흉내 DB 기준). 이번에 새로 쓴 테스트 파일 14개 · 문장 45개(큐 보고서 몫 포함).</li>
+        <li><code>pnpm typecheck</code> · <code>pnpm lint:design</code> 통과.</li>
+        <li>개발 DB(pbiumdd…) · 실서비스 DB(qnjnrih…) 둘 다 서명키가 ES256 인 것. <code>/auth/v1/.well-known/jwks.json</code> 을 직접 조회했다.</li>
+        <li>auth-js 가 <code>getClaims()</code> 에서 만료(<code>exp</code>)를 검사하고 공개키를 10분 캐시하는 것(라이브러리 소스 확인).</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>안 한 것</h4>
+      <ul>
+        <li>실서비스(Vercel + 싱가포르 DB)에서 측정하지 않았다. 배포 전이다.</li>
+        <li>20명 동시 접속 부하를 재현하지 않았다. 수업 1회 실측이 남아 있다.</li>
+        <li>브라우저 실화면에서 묶음 요청 · 백오프를 눈으로 보지 않았다. 테스트로만 확인했다.</li>
+        <li>웹훅 유예 45초가 fal 의 실제 완료 시간 분포와 맞는지 실측하지 않았다.</li>
+        <li>Supabase Realtime 은 조사만 했다(6절). 코드는 없다.</li>
+        <li>Artist 화면의 <code>loadData</code> DB 질문 8개 자체는 줄이지 않았다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>결정이 필요한 것</h2></div>
+  <p class="sec-lede">오너가 지금 답할 수 있는 것.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면</th><th>선택지</th><th>추천</th><th>언제까지</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>로그인 확인을 서버 안에서 끝내는 방식(토큰 서명 검사)을 유지하나</td>
+        <td>지금 코드가 그대로 배포된다. 다른 기기에서 로그아웃한 사용자가 최대 1시간 동안 API 를 계속 쓸 수 있다. 계정 삭제도 같다.</td>
+        <td>(가) 유지. 틱마다 왕복 1회 절약. (나) 되돌리기. 틱마다 1.2~2.4초 추가. (다) 유지하되 토큰 수명을 Supabase 대시보드에서 1시간 → 15분으로 줄인다.</td>
+        <td>(가). 이 앱에서 1시간 지연으로 생기는 피해가 없다(결제 · 삭제는 별도 확인을 거친다). 필요하면 (다)를 더한다.</td>
+        <td>배포 전</td>
+      </tr>
+      <tr>
+        <td>Supabase Realtime(2층)을 언제 시작하나</td>
+        <td>폴링이 유일한 길로 남는다. 20명 수업에서 3초마다 요청 20개 · DB 질문 40개가 그대로 간다(진행 목록 4초 폴링 별도).</td>
+        <td>(가) 1층 배포 → 수업 1회 실측 → 그 결과로 결정. (나) 지금 바로 2층 착수. (다) 하지 않는다.</td>
+        <td>(가). 6절 결론: 쓸 수 있고 무료 범위다. 그러나 1층만으로 충분할 수 있다. 실측 1회가 가장 싼 정보다.</td>
+        <td>다음 수업 뒤</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>알고만 있으면 되는 것</h2></div>
+  <p class="sec-lede">결정은 필요 없다. 모르면 나중에 놀란다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>가정</th><th>틀리면 뭐가 깨지나</th><th>확인 방법</th></tr></thead>
+    <tbody>
+      <tr><td>진행 목록 라우트는 4초마다 프로젝트의 완료 기록 전량을 읽는다(<code>listGenerationCompletionRows</code>, 500행씩). 이번에 손대지 않았다.</td><td>완료가 수천 건인 프로젝트는 이 질문 하나가 무겁다. 20명 수업에서는 프로젝트마다 수십 건이라 문제가 안 된다.</td><td>큐 콘솔에서 완료 수가 많은 프로젝트의 진행 목록 응답 시간을 본다.</td></tr>
+      <tr><td>Artist 화면 <code>loadData</code> 는 브라우저가 DB 에 직접 묻는 질문 8개다. 3~4초마다 한 번. 이번에 겹침만 막았다.</td><td>20명이면 DB 질문 초당 40~50개가 이 길로 간다. 11/23 DB 정지에 이 길의 지분이 있다.</td><td>다음 슬라이스에서 8개를 1~2개로 합치는 것을 검토한다. 수업 실측에서 DB 질문 종류별 수를 본다.</td></tr>
+      <tr><td>7가지 폴링 주기 가운데 이번에 손댄 것은 셋이다: 잡 상태(3초 · 묶음 · 백오프), 진행 목록(4초 · 동시 질문), Artist 읽기(3/4/5초 · 순차). 60초 · 2분 cron · 하루 1회 워치독은 그대로다.</td><td>없음. 기록용.</td><td>원장 1-1 절.</td></tr>
+      <tr><td>공개키(JWKS) 캐시는 서버 프로세스마다 10분이다. Vercel 함수가 새로 뜨면 첫 요청 1회만 공개키를 내려받는다.</td><td>Supabase 가 키를 교체(rotate)하면 최대 10분 동안 옛 키로 검증이 실패해 401 이 난다. 화면은 영구 오류로 보고 로그인 화면으로 간다.</td><td>키 교체는 사람이 대시보드에서 할 때만 일어난다. 그날은 사용자에게 다시 로그인을 안내한다.</td></tr>
+      <tr><td>화면은 첫 응답 전까지 잡 종류를 모른다. 그동안 포기 기준은 그림(10분)이다.</td><td>영상 잡의 첫 응답이 10분 넘게 전부 실패하는 경우만 10분에 포기한다. 현실적으로 없다.</td><td>없음.</td></tr>
+      <tr><td>묶음 최대 개수 <code>NEXT_PUBLIC_POLL_BATCH_MAX</code>(기본 50)는 빌드 때 번들에 고정된다. 테스트에서는 1 로 둬 잡 하나씩 예전 주소를 쓴다.</td><td>운영 중 환경변수만 바꿔도 반영되지 않는다. 재배포가 필요하다.</td><td>바꿀 일이 생기면 재배포한다.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>지뢰</h3>
+  <ul class="plain">
+    <li>묶음 라우트는 id 1~50개가 아니면 400 으로 답한다. 화면은 400 을 영구 오류로 본다. 묶음 상한(50)은 서버와 화면이 같은 숫자를 각자 들고 있다(<code>MAX_IDS</code> · <code>DEFAULT_BATCH_MAX</code>). 한쪽만 바꾸면 전체 묶음이 실패로 끝난다.</li>
+    <li><code>getUser()</code> 가 돌려주는 칸이 4개로 줄었다. 새 라우트가 <code>user.created_at</code> 같은 다른 칸을 쓰면 타입 오류로 바로 걸린다. 조용히 깨지지는 않는다.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>Supabase Realtime 조사</h2></div>
+  <p class="sec-lede">오너 질문 3개에 답한다. 실제로 쓰는가, 공학적으로 이득인가, 유료만 되는가. 근거는 Supabase 공식 문서(2026-11-24 열람).</p>
+  <div class="callout"><b class="label">먼저 알아둘 것</b><p>Realtime 은 브라우저와 Supabase 사이에 열어 두는 연결(WebSocket)이다. DB 행이 바뀌면 Supabase 가 그 연결로 알림을 밀어 준다. 화면이 3초마다 묻는 대신 바뀔 때 한 번 받는다.</p></div>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>답</th><th>근거</th></tr></thead>
+    <tbody>
+      <tr><td>실제로 쓰는 기능인가</td><td>그렇다. 두 방식이 있다. <b>Postgres Changes</b>(표의 변경을 그대로 구독)와 <b>Broadcast</b>(DB 트리거가 채널로 메시지를 보냄). 문서는 구독자가 많으면 Broadcast 를 권한다.</td><td>docs/guides/realtime/postgres-changes · subscribing-to-database-changes</td></tr>
+      <tr><td>유료만 되는가</td><td>아니다. Free: 동시 연결 200 · 초당 메시지 100. Pro: 500 · 500. 수업 20명은 Free 범위 안이다.</td><td>docs/guides/realtime/limits 표</td></tr>
+      <tr><td>공학적 이득이 있는가</td><td>있다. 잡 상태 폴링(3초마다 요청)과 진행 목록 폴링(4초마다 요청)이 0 이 된다. 남는 것은 30초 안전망 폴링 1개다. 단, 1층 경량화는 그 안전망과 다른 라우트에 그대로 필요하다.</td><td>이 문서 3절 측정 · 원장 1절</td></tr>
+    </tbody>
+  </table></div>
+  <h3>우리 구조에서 필요한 것</h3>
+  <div class="tbl"><table>
+    <thead><tr><th>층</th><th>하는 일</th><th>누구 몫</th><th>지금 상태</th></tr></thead>
+    <tbody>
+      <tr><td>DB</td><td><code>generation_jobs</code> 행이 바뀌면 트리거가 <code>realtime.broadcast_changes()</code> 로 <code>project:&lt;id&gt;</code> 채널에 메시지를 보낸다.</td><td>우리(마이그레이션 1개)</td><td>없음</td></tr>
+      <tr><td>DB 권한</td><td><code>realtime.messages</code> 에 "그 프로젝트 소유자만 받는다" RLS 정책.</td><td>우리(마이그레이션에 포함)</td><td>없음. <code>generation_jobs</code> 는 RLS 켜짐 · 정책 없음이라 Postgres Changes 방식은 아무 행도 전달하지 않는다. Broadcast 방식이 표를 그대로 닫아 둔다.</td></tr>
+      <tr><td>Supabase</td><td>연결 유지 · 메시지 배달 · 끊긴 연결 재접속.</td><td>Supabase</td><td>제공됨. 이미 쓰는 <code>@supabase/supabase-js</code> 에 들어 있다.</td></tr>
+      <tr><td>화면</td><td>채널 구독 → 메시지로 잡 상태 갱신. 연결이 끊긴 사이를 메우는 30초 안전망 폴링 1개.</td><td>우리</td><td>없음. <code>generation-queue.ts</code> 폴러와 <code>pollGenerationJob</code> 을 구독으로 바꾼다.</td></tr>
+    </tbody>
+  </table></div>
+  <div class="callout warn"><b class="label">주의</b><p>Postgres Changes 는 변경 1건마다 구독자 수만큼 권한 검사를 한다. 구독자 500 · RLS 켬 기준 초당 변경 30건이 상한이다(문서 표, Micro). 우리 쓰기 빈도(초당 1건 미만)에서는 문제가 없다. 그래도 표를 열지 않는 Broadcast 방식이 우리 구조에 맞다.</p></div>
+  <p><b>결론.</b> 쓸 수 있다. 무료 범위다. 그러나 1층이 수업 1회를 버티는지 먼저 본다. 1층이 충분하면 2층은 비용 대비 이득이 작다. 1층이 부족하면 2층의 첫 작업은 위 표 1행(DB 트리거)이다.</p>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것.</b> 측정 <code>.claude/docs/2026-11-24/measure/measure-before.json · measure-after.json · measure-after-2.json</code> · 스크립트 <code>scripts/measure-poll-tick.mjs</code> · 원장 <code>specs/api-failure-ledger.md</code> 0절 · 1절 · 11/23 조사 <code>.claude/docs/2026-11-23/</code> · Supabase 문서 realtime/limits · realtime/postgres-changes · realtime/subscribing-to-database-changes · auth-js 2.98.0 <code>GoTrueClient.getClaims</code>.</p>
+  <p><b>이 문서가 하지 않는 것.</b> 실서비스 측정. 20명 부하 재현. Realtime 구현. 브라우저 실화면 확인. 큐 구멍 3개(C05 · C04 · C12)는 같은 날의 다른 보고서 <code>queue-gaps.html</code> 에 있다.</p>
+</footer>
+
+</div>
+</body>
+</html>

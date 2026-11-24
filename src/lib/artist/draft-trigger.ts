@@ -159,7 +159,6 @@ export async function triggerCharacterDrafts(
       console.warn(`[draft-trigger] ${projectId} — design_tokens absent, skipping character drafts (defense gate)`)
       return { submitted: 0, skipped: chars.length, failed: 0 }
     }
-    const webhookUrl = resolveWebhookUrl()
     const anchor = await resolveStyleAnchor(project)
     // 실사 계열의 사진 글(2026-11-23 오너) — 단추로 그리는 시트(generate-sheet)와 같은 규칙.
     const photoLook = anchor ? null : await resolvePhotoLook(project)
@@ -254,16 +253,14 @@ export async function triggerCharacterDrafts(
                 ...(seriesSheetUrl ? [seriesSheetUrl] : []),
                 ...(styleSampleUrl ? [styleSampleUrl] : []),
               ],
-              webhookUrl,
             }
-          : { model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, false).endpoint, prompt, aspect_ratio: '3:2', webhookUrl }
+          : { model: resolveImageEndpoint(DEFAULT_IMAGE_MODEL, false).endpoint, prompt, aspect_ratio: '3:2' }
         if (anchor) {
-          const { webhookUrl: wh, ...anchorable } = submitOpts
           // 사람 시트(사물은 위에서 건너뛴다) — facet 인물 조각을 싣는다(2026-10-08).
           const anchored = templateUrl
-            ? applyStyleAnchor(anchor, anchorable, 'turnaround', { pinAspectRatio: '16:9', people: true })
-            : applyStyleAnchor(anchor, anchorable, 'single', { people: true })
-          submitOpts = { ...anchored, webhookUrl: wh }
+            ? applyStyleAnchor(anchor, submitOpts, 'turnaround', { pinAspectRatio: '16:9', people: true })
+            : applyStyleAnchor(anchor, submitOpts, 'single', { people: true })
+          submitOpts = anchored
         }
         // #creem-moderation(2026-10-11): 자동 초안도 사람이 누른 것과 같은 검사를 거친다 — 사용자가 쓴 칸만
         //   보내고, 막히면 이 초안은 자리 예약 없이 실패로 닫는다(자동 재시도 없음).
@@ -337,7 +334,8 @@ export async function triggerCharacterDrafts(
           // 외부 접수는 한 번뿐 — 예약이 자리를 잡고 있으니 재시도는 같은 그림의 이중 발주다.
           //   falKeyId 는 반드시 예약 행의 값 — 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있다.
           falResult = await falImageSubmit(
-            moderatedSubmitInput(submitOpts, moderation),
+            // 완료 알림 주소에 예약한 작업 번호를 심는다.
+            moderatedSubmitInput({ ...submitOpts, webhookUrl: resolveWebhookUrl(job.id) }, moderation),
             { retry: false, falKeyId: job.fal_key_id },
           )
         } catch (error) {

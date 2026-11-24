@@ -77,8 +77,8 @@ describe('약속 D — 숫자 싱크', () => {
   })
 
   it('서버에 도는 작업이 없으면 핀이 보이지 않는다. 화면에서만 기다리는 표시는 세지 않는다', () => {
-    // 유령 queued(10분 넘게 제출 뒤 소식 없음)도 도는 것으로 세지 않는다.
-    const ghost = row({ id: 'g', kind: 'shot_video', status: 'queued', created_at: iso(-20 * 60_000) })
+    // 유령 queued(영상 30분 · 그림 10분 넘게 제출 뒤 소식 없음)도 도는 것으로 세지 않는다(영상 기준 30분: 2026-11-24 C12).
+    const ghost = row({ id: 'g', kind: 'shot_video', status: 'queued', created_at: iso(-31 * 60_000) })
     expect(summarizeGenerationBatches([ghost], T0)).toEqual([])
     // 핀은 서버 배치와 writer 파이프라인 상태만 입력으로 받는다(store 의 in-flight 플래그 없음).
     const pin = read('src/components/layout/chat-progress-pin.tsx')

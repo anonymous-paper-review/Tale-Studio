@@ -11,6 +11,8 @@ import {
   userOwnsProject,
 } from '@/lib/generation-jobs'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
+import { forgetProviderAsk, shouldAskProvider } from '@/lib/fal/poll-reconcile-gate'
+import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { releaseTakesForJob } from '@/lib/billing/take-hold'
 import { translate } from '@/lib/i18n/translate'
 import { parseAppLocale } from '@/lib/locale'
@@ -54,13 +56,15 @@ export async function GET(
   //   나중에 webhook 이 정상 처리해도 그 화면은 갱신되지 않는다.
   //   알 수 없는 오류도 같이 삼킨다 — 확인 한 번 실패했다고 진행 중인 생성을 죽일 이유가 없고,
   //   다음 폴링·webhook·유령 청소부가 다시 묻는다. DB 상태(queued)를 그대로 돌려준다.
-  if (job.status === 'queued') {
+  //   웹훅 주소가 있으면 제출 직후 45초는 웹훅을 믿고 기다리고, 그 뒤에도 30초에 한 번만 묻는다(poll-reconcile-gate).
+  if (job.status === 'queued' && shouldAskProvider(job, { webhookConfigured: resolveWebhookUrl() !== undefined })) {
     try {
       job = await reconcileJobFromFal(job)
     } catch (err) {
       console.error('[generation-jobs] reconcile failed; keeping queued:', id, err instanceof Error ? err.message : err)
     }
   }
+  if (job.status !== 'queued') forgetProviderAsk(id)
 
   return NextResponse.json({
     ok: true,

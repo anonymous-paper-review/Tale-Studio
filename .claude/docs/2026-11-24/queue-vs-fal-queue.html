@@ -1,0 +1,444 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>큐 두 개</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .gate-cell{color:var(--gate);font-weight:750}
+  .gate-empty{display:inline-block;min-width:60px;border-bottom:1.5px dashed var(--gate);opacity:.7}
+
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+  a:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:2px}
+</style>
+</head>
+<body>
+<div class="wrap">
+<header class="page">
+  <p class="eyebrow">개념 정리 · 2026-11-24</p>
+  <h1>큐 두 개</h1>
+  <p class="bluf">우리 <code>generation_jobs</code> 는 대기줄이 아니라 장부와 입장 통제다. 대기줄은 2026-09-11 오너 결정(커밋 09f8a08d)으로 뺐다.</p>
+  <p class="bluf"><b>결정할 것 1개</b>: 정원이 찼을 때 기다리게 할 것인가. <b>알아둘 것 3개</b>.</p>
+  <p class="asof">근거 커밋 34d853d4 → 89be927c · src/lib/generation-jobs.ts · src/lib/fal/keys.ts</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>큐라는 낱말의 두 뜻</h2></div>
+  <p class="sec-lede">먼저 알아둘 것: 이 문서에서 큐(queue, 요청을 줄 세워 두는 구조)는 두 가지 다른 물건을 가리킨다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>뜻</th><th>하는 일</th><th>누구의 것</th></tr></thead>
+    <tbody>
+      <tr><td>(a) 대기줄</td><td>요청을 받아 두고 자리가 나면 차례로 처리한다</td><td>fal 큐</td></tr>
+      <tr><td>(b) 장부와 입장 통제</td><td>요청을 기록하고 정원을 넘으면 거절한다</td><td>우리 <code>generation_jobs</code></td></tr>
+    </tbody>
+  </table></div>
+  <h3>fal 큐의 동작</h3>
+  <ul class="plain">
+    <li>우리가 <code>https://queue.fal.run/&lt;model&gt;</code> 로 요청을 보내면 <code>request_id</code> 를 즉시 돌려준다.</li>
+    <li>fal 이 GPU 가 빌 때 처리한다. 초과 제출도 거부하지 않고 자기 큐에 태운다.</li>
+    <li>끝나면 우리가 적어 준 <code>fal_webhook</code> 주소로 HTTP 요청을 1회 보낸다(웹훅, 서버가 일이 끝난 뒤 상대 주소로 보내는 알림 요청). 우리가 status 를 직접 물어도 된다.</li>
+    <li>결과 파일은 fal CDN(파일을 내려받게 해 주는 서버)에 잠시 있다 사라진다. 보존 시간은 미확인이다.</li>
+  </ul>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>책임 경계</h2></div>
+  <p class="sec-lede">먼저 알아둘 것: fal 은 초과 제출을 거부하지 않는다. 정원(동시에 돌 수 있는 작업 수)을 지키는 일은 전부 우리 쪽에 있다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>층</th><th>하는 일</th><th>누구 몫</th><th>우리 코드</th></tr></thead>
+    <tbody>
+      <tr><td>요청 접수·대기·GPU 배정</td><td>요청을 받고 순서를 세워 GPU 에 붙인다</td><td>fal</td><td>없음<span class="path">queue.fal.run POST 만 한다</span></td></tr>
+      <tr><td>완료 알림 웹훅</td><td>끝나면 fal 이 우리 주소로 1회 요청한다. 우리는 서명을 검증한다</td><td>fal → 우리</td><td><span class="path">src/app/api/fal/webhook/route.ts</span>verify-webhook</td></tr>
+      <tr><td>결과 파일 영구 보존</td><td>fal CDN 에서 내려받아 Supabase Storage 에 올리고 DB 를 갱신한다(finalize)</td><td>우리</td><td><span class="path">finalizeGenerationJob</span></td></tr>
+      <tr><td>누가 뭘 요청했나, Take 과금, 소유권</td><td>요청마다 <code>generation_jobs</code> 행을 만든다</td><td>우리</td><td><span class="path">src/lib/generation-jobs.ts</span></td></tr>
+      <tr><td>동시 정원</td><td>개인 영상 3·이미지 6, 계정별 maxInflight, 전체는 계정 합. 넘으면 insert 트리거(DB 가 행을 넣을 때 자동 실행하는 검사)가 거절한다</td><td>우리 DB 트리거<span class="path">fal 은 초과를 거부하지 않는다</span></td><td><span class="path">generation-jobs.ts:301 USER_AXIS_LIMIT</span></td></tr>
+      <tr><td>여러 fal 계정 배분</td><td>여유가 가장 큰 키로 보낸다</td><td>우리</td><td><span class="path">pickFalKey</span></td></tr>
+      <tr><td>웹훅 유실 안전망</td><td>웹훅이 안 와도 완료를 회수한다</td><td>우리</td><td>reconcile · ghost sweep · cron</td></tr>
+      <tr><td>대기줄</td><td>없다. Artist 는 브라우저의 <code>runAdaptivePool</code> 이 탭 안에서만(이름 기준 추정: 동시 실행 수를 조절하는 풀), Director 일괄은 서버 <code>continueVideoBatch</code> 가 부분적으로 이어 낸다</td><td>없음</td><td>화면·서버 각자</td></tr>
+      <tr><td>예상 완료 시각</td><td>아무도 계산하지 않는다. fal status 의 <code>queue_position</code> 은 코드가 읽기만 하고 화면에서 쓰는지는 미확인이다</td><td>없음</td><td><span class="path">src/lib/writer/llm/fal.ts:315-320</span></td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>자리 예약</h3>
+  <p class="code-what">fal 에 보내기 전에 <code>generation_jobs</code> 행부터 넣는다. 접수 번호 자리에는 <code>reserved:&lt;id&gt;</code> 를 임시로 둔다.</p>
+  <pre><span class="path">src/lib/generation-jobs.ts:362-369</span>  const id = crypto.randomUUID()
+  const falKey = await pickFalKey()
+  const { data, error } = await supabaseAdmin
+    .from('generation_jobs')
+    .insert({
+      id,
+      project_id: input.projectId,
+      request_id: `reserved:${id}`,</pre>
+  <pre><span class="path">src/lib/generation-jobs.ts:379-386</span>      fal_key_id: falKey.id,
+      submitted_at: null,
+      attempts: 0,
+      status: 'queued',
+    })
+    .select(`${COLUMNS}, actor`)
+    .single()
+  if (error) throw capacityRejectionFrom(error) ?? error</pre>
+  <div class="tbl"><table>
+    <thead><tr><th>번호</th><th>줄</th><th>무슨 일</th><th>여기서 멈추나</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td class="num">362</td><td>id 를 미리 정한다</td><td>아니오</td></tr>
+      <tr><td class="num">2</td><td class="num">363</td><td><code>pickFalKey</code> 가 키마다 queued 개수를 DB 에서 센다</td><td>예, DB 응답까지</td></tr>
+      <tr><td class="num">3</td><td class="num">364-369, 379-383</td><td>넣을 행을 만든다. <code>request_id</code> 는 임시값, <code>status</code> 는 queued</td><td>아니오</td></tr>
+      <tr><td class="num">4</td><td class="num">384-385</td><td>insert 를 보내고 행을 돌려받는다. 이때 DB 트리거가 정원을 검사한다</td><td>예, insert 가 끝날 때까지</td></tr>
+      <tr><td class="num">5</td><td class="num">386</td><td>트리거가 거절했으면 여기서 예외를 던진다(429 안내로 이어진다)</td><td>여기서 함수가 끝난다</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl"><table>
+    <thead><tr><th>이름</th><th>뭐가 들어가나</th><th>실제 값 예</th></tr></thead>
+    <tbody>
+      <tr><td><code>id</code></td><td><code>crypto.randomUUID()</code> 결과</td><td>UUID 한 개</td></tr>
+      <tr><td><code>request_id</code></td><td>접수 전 임시 번호</td><td><code>reserved:</code> 뒤에 위 id 를 붙인 문자열</td></tr>
+      <tr><td><code>status</code></td><td>처음 상태</td><td><code>queued</code></td></tr>
+      <tr><td><code>fal_key_id</code></td><td>서버가 고른 fal 키 id. 그 키가 가득 찼으면 트리거가 여유 있는 계정으로 바꿔 넣는다</td><td>FAL_KEYS 에 적힌 id 중 하나</td></tr>
+    </tbody>
+  </table></div>
+  <p class="code-diff"><span class="chip c-acc">대조</span>정원을 넘는 요청은 이 insert 에서 거절된다. fal 까지 가지 못하므로 fal 큐에는 정원 이하만 들어간다.</p>
+
+  <h3>fal 에 제출</h3>
+  <p class="code-what">예약이 끝난 뒤 fal 큐에 POST 한다. 응답은 <code>request_id</code> 뿐이고 결과는 나중에 웹훅이나 조회로 받는다.</p>
+  <pre><span class="path">src/lib/fal/keys.ts:65-78</span>        const url = new URL(`https://queue.fal.run/${model}`)
+        if (webhookUrl) url.searchParams.set('fal_webhook', webhookUrl)
+        const response = await fetch(url.toString(), {
+          method: 'POST', redirect: 'error',
+          headers: { Authorization: `Key ${entry.key}`, Accept: 'application/json', 'Content-Type': 'application/json' },
+          body: JSON.stringify(input),
+        })
+        if (!response.ok) {
+          const body: unknown = await response.json().catch(() =&gt; null)
+          throw Object.assign(new Error(response.statusText || 'fal queue rejected the request'), { status: response.status, body })
+        }
+        const receipt: unknown = await response.json()
+        if (!receipt || typeof receipt !== 'object' || !('request_id' in receipt) || typeof receipt.request_id !== 'string' || !receipt.request_id.trim()) throw new Error('fal queue response has no request ID')
+        return { request_id: receipt.request_id }</pre>
+  <div class="tbl"><table>
+    <thead><tr><th>번호</th><th>줄</th><th>무슨 일</th><th>여기서 멈추나</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td class="num">65-66</td><td>주소를 만들고 완료 알림 받을 <code>fal_webhook</code> 을 붙인다</td><td>아니오</td></tr>
+      <tr><td class="num">2</td><td class="num">67-71</td><td>fal 에 POST 한다. 시간 한도 코드는 없다</td><td>예, fal 이 응답할 때까지</td></tr>
+      <tr><td class="num">3</td><td class="num">72-75</td><td>응답이 실패면 상태 코드를 담아 예외를 던진다</td><td>여기서 함수가 끝난다</td></tr>
+      <tr><td class="num">4</td><td class="num">76-78</td><td>본문을 읽어 <code>request_id</code> 가 있는지 확인하고 돌려준다</td><td>예, 본문을 읽는 동안</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl"><table>
+    <thead><tr><th>이름</th><th>뭐가 들어가나</th><th>실제 값 예</th></tr></thead>
+    <tbody>
+      <tr><td><code>model</code></td><td>fal 모델 경로</td><td>정규식을 통과하는 <code>제공자/모델</code> 형태</td></tr>
+      <tr><td><code>webhookUrl</code></td><td>완료 알림을 받을 우리 주소</td><td>운영은 <code>/api/fal/webhook</code> 주소. 로컬은 공개 주소가 없다</td></tr>
+      <tr><td><code>receipt.request_id</code></td><td>fal 이 즉시 돌려주는 접수 번호</td><td>문자열 한 개</td></tr>
+    </tbody>
+  </table></div>
+  <p class="code-diff"><span class="chip c-acc">대조</span>접수 번호는 즉시 오지만 결과 시각은 이 응답에 없다. 이 응답이 알려 주는 것은 접수됐다는 사실뿐이다.</p>
+
+  <h3>접수 번호 기록</h3>
+  <p class="code-what">fal 이 준 번호로 예약 행을 채운다. 예약 상태 그대로인 행만 갱신한다.</p>
+  <pre><span class="path">src/lib/generation-jobs.ts:407-421</span>    .update({
+      request_id: receipt.request_id,
+      model: receipt.model,
+      fal_key_id: receipt.fal_key_id,
+      submitted_at: now,
+      updated_at: now,
+      attempts: 1,
+    })
+    .eq('id', jobId)
+    .eq('project_id', projectId)
+    .eq('status', 'queued')
+    .eq('request_id', `reserved:${jobId}`)
+    .select('id')
+  if (error) throw error
+  if (!data?.length) throw new Error('generation job reservation changed before the receipt was saved')</pre>
+  <div class="tbl"><table>
+    <thead><tr><th>번호</th><th>줄</th><th>무슨 일</th><th>여기서 멈추나</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td class="num">407-414</td><td>실제 <code>request_id</code>·키·제출 시각을 넣을 갱신 내용을 만든다</td><td>아니오</td></tr>
+      <tr><td class="num">2</td><td class="num">415-418</td><td>id, 프로젝트, 상태 queued, 번호가 아직 <code>reserved:&lt;id&gt;</code> 인 행만 고른다(CAS, 예상한 값일 때만 바꾸는 방식)</td><td>아니오</td></tr>
+      <tr><td class="num">3</td><td class="num">405 (블록 바로 위)</td><td><code>await</code> 로 갱신을 보내고 결과를 받는다</td><td>예, DB 응답까지</td></tr>
+      <tr><td class="num">4</td><td class="num">420-421</td><td>DB 오류이거나 갱신된 행이 0개면 예외를 던진다</td><td>여기서 함수가 끝난다</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl"><table>
+    <thead><tr><th>이름</th><th>뭐가 들어가나</th><th>실제 값 예</th></tr></thead>
+    <tbody>
+      <tr><td><code>jobId</code></td><td>예약 때 만든 id</td><td>UUID 한 개</td></tr>
+      <tr><td><code>receipt.request_id</code></td><td>fal 접수 번호</td><td>임시값 <code>reserved:…</code> 를 대체한다</td></tr>
+      <tr><td><code>attempts</code></td><td>제출 횟수</td><td><code>1</code></td></tr>
+    </tbody>
+  </table></div>
+  <p class="code-diff"><span class="chip c-acc">대조</span>제출 라우트의 호출부(<code>world-submit.ts:119-127</code>)는 이 기록이 실패해도 로그만 남기고 진행한다.</p>
+
+  <h3>여러 계정 배분</h3>
+  <p class="code-what">헤더 주석은 fal 이 초과를 거부하지 않는다고 적고, <code>pickFalKey</code> 는 여유가 가장 큰 키를 고른다.</p>
+  <pre><span class="path">src/lib/fal/keys.ts:114-123</span>/**
+ * headroom(maxInflight - inflight)이 가장 큰 키를 고른다. 동률이면 배열 앞쪽(레지스트리 순서 우선).
+ * 전부 포화여도 최소부하 키를 반환한다 — 429(quota 게이트)는 generation-quota.ts 의 몫이고,
+ * 여기는 "어느 키로 보낼까"만 배분한다(fal 은 초과 제출을 거부하지 않고 큐에 태운다, #fal-key-pool ②).
+ */
+export async function pickFalKey(): Promise&lt;FalKeyEntry&gt; {
+  const keys = falKeys()
+  const inflightByKey = await Promise.all(keys.map((k) =&gt; countQueuedJobsByKey(k.id)))
+  let best = keys[0]
+  let bestHeadroom = best.maxInflight - inflightByKey[0]</pre>
+  <div class="tbl"><table>
+    <thead><tr><th>번호</th><th>줄</th><th>무슨 일</th><th>여기서 멈추나</th></tr></thead>
+    <tbody>
+      <tr><td class="num">1</td><td class="num">120</td><td>등록된 키 목록을 읽는다</td><td>아니오</td></tr>
+      <tr><td class="num">2</td><td class="num">121</td><td>키마다 queued 잡 수를 DB 에서 동시에 센다</td><td>예, 가장 느린 조회까지</td></tr>
+      <tr><td class="num">3</td><td class="num">122-123</td><td>첫 키를 임시 최선으로 잡고 여유(maxInflight - 진행 수)를 계산한다</td><td>아니오</td></tr>
+    </tbody>
+  </table></div>
+  <div class="tbl"><table>
+    <thead><tr><th>이름</th><th>뭐가 들어가나</th><th>실제 값 예</th></tr></thead>
+    <tbody>
+      <tr><td><code>keys</code></td><td>FAL_KEYS 환경변수에서 읽은 키 목록</td><td>로컬 .env.local 은 maxInflight 10, live 값은 미확인</td></tr>
+      <tr><td><code>inflightByKey</code></td><td>키별 queued 잡 수</td><td>키 개수만큼의 숫자 배열</td></tr>
+      <tr><td><code>bestHeadroom</code></td><td>지금까지 본 가장 큰 여유</td><td>maxInflight 10 이고 진행 3개면 7</td></tr>
+    </tbody>
+  </table></div>
+  <p class="code-diff"><span class="chip c-acc">대조</span>이 함수는 배분만 한다. 상한을 집행하는 쪽은 DB 트리거다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>오너 질문에 대한 답</h2></div>
+  <p class="sec-lede">질문은 이렇다. fal 에 큐가 있는데 내부 큐를 만든 이유가 "우리가 관리할 수 있다"였고, 그래도 유저가 결과를 언제 받을지 모르는 문제는 못 푸는 것 아닌가.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>문제</th><th>fal 큐</th><th>우리 generation_jobs</th></tr></thead>
+    <tbody>
+      <tr><td>결과를 언제 받을지</td><td>모른다</td><td>모른다. 같다</td></tr>
+      <tr><td>탭을 닫아도 결과 보존</td><td>아니오. CDN 에 임시로만 있다</td><td>예. 웹훅과 finalize 가 한다. 2026-06-05 설계 목적이다</td></tr>
+      <tr><td>이중 과금 방지, Take 정산</td><td>없다</td><td>있다. 예약과 CAS 로 한다</td></tr>
+      <tr><td>20명이 몰릴 때</td><td>받아서 줄 세운다</td><td>정원을 넘으면 429(요청이 너무 많다는 HTTP 응답)로 거절한다. 기다리지 않는다</td></tr>
+      <tr><td>무슨 일이 있는지 사람이 보기</td><td>fal 대시보드</td><td>큐 콘솔 <code>/queue</code></td></tr>
+      <tr><td>실패 분류, 재시도 정책</td><td>없다</td><td><code>error_class</code> 8종</td></tr>
+    </tbody>
+  </table></div>
+  <p>"관리 가능"에 해당하는 장부·과금·안전망·분류는 이뤘다. "기다리는 경험"에 해당하는 대기줄·예상 시각은 애초에 만들지 않았고, 그 자리에 폴링 비용이 들어왔다. 오너 판단 "결과적으로 같은 문제를 못 푼다"는 결과 도착 시각에 한해 맞다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>웹훅이 있는데 폴링이 자란 경위</h2></div>
+  <p class="sec-lede">먼저 알아둘 것: 폴링(브라우저가 주기적으로 "끝났나" 하고 서버에 묻는 방식)과 웹훅은 받는 쪽이 다르다. 웹훅은 서버가 받고 브라우저는 받지 못한다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>날짜</th><th>커밋</th><th>무엇</th><th>폴링·웹훅 관계</th></tr></thead>
+    <tbody>
+      <tr><td class="num">2026-06-05</td><td><code>34d853d4</code></td><td>비동기 생성 인프라, generation_jobs DB + fal webhook 코어</td><td>웹훅 첫 도입. 본문: fal 큐 submit 후 webhook 콜백, 탭을 닫아도 서버가 결과를 영속화. 같은 커밋에 <code>generation-jobs-client.ts</code> "브라우저 polling 헬퍼"</td></tr>
+      <tr><td class="num">2026-06-05</td><td><code>176c7885</code></td><td>/api/generation-jobs/[id], 브라우저 polling 창구</td><td>queued 상태면 fal 을 직접 reconcile(조회해 맞춘다). 웹훅 미수신 시 안전망</td></tr>
+      <tr><td class="num">2026-07-02</td><td><code>c28a08ad</code></td><td><code>reconcileJobFromFal</code></td><td>안전망 함수를 따로 만들었다</td></tr>
+      <tr><td class="num">2026-07-22</td><td><code>196dd9e0</code></td><td>중복 finalize 경쟁 수리</td><td>웹훅과 폴링이 동시에 저장하는 경쟁을 고쳤다</td></tr>
+      <tr><td class="num">2026-07-31</td><td><code>b35ccbd8</code></td><td>중복 finalize 경쟁 수리(재차)</td><td>같은 종류의 경쟁을 한 번 더 고쳤다</td></tr>
+      <tr><td class="num">2026-08-17</td><td><code>be2be659</code></td><td>유령 queued 잡 회수</td><td>본문: "웹훅 없는 로컬은 폴링이 유일한 완결 경로". rough 잡이 5시간 방치된 것을 실측했다</td></tr>
+      <tr><td class="num">2026-09-01</td><td><code>86ceadb9</code></td><td>fal 다중 키 풀</td><td>fal 상태 조회는 제출한 키로만 되므로 잡마다 <code>fal_key_id</code> 를 기록한다(keys.ts 주석)</td></tr>
+      <tr><td class="num">2026-09-02</td><td><code>e45a0040</code></td><td>Take hold</td><td>폴링·웹훅과 직접 관계는 이번 조사에서 확인하지 않았다</td></tr>
+      <tr><td class="num">2026-09-08</td><td><code>86fc98fb</code></td><td>화면 포기 시각을 서버 유령 시각(10분)과 정렬</td><td>폴링을 그만두는 시각을 서버 회수 시각에 맞췄다</td></tr>
+      <tr><td class="num">2026-09-11</td><td><code>09f8a08d</code></td><td>자리 부족 자동 재시도 제거(오너 결정)</td><td>제출 쪽 결정. 정원 대기를 없앴다</td></tr>
+      <tr><td class="num">2026-09-14</td><td><code>8dcbd07b</code></td><td>자리 예약을 DB 트리거 1개로 원자화</td><td>감사에서 세고 넣기 사이 경쟁으로 전체 67→79, 개인 5→17 로 초과한 것을 고쳤다</td></tr>
+      <tr><td class="num">2026-11-14</td><td><code>89be927c</code></td><td>진행 중 생성 멈추기</td><td>폴링·웹훅과 직접 관계는 이번 조사에서 확인하지 않았다</td></tr>
+    </tbody>
+  </table></div>
+
+  <h3>"웹훅이 없어서 폴링" 기억의 정확한 모양</h3>
+  <ul class="plain">
+    <li>웹훅은 2026-06-05 첫날부터 있었다.</li>
+    <li>브라우저는 웹훅을 받지 못해 어차피 서버에 물어야 했고, 같은 날 polling 헬퍼가 같은 커밋에 들어갔다.</li>
+    <li>로컬 개발은 fal 이 보낼 공개 주소가 없고(be2be659 본문 "웹훅 없는 로컬은 폴링이 유일한 완결 경로"), 운영에서도 웹훅이 가끔 유실돼 폴링 틱이 fal 에 직접 묻는 안전망이 주 경로로 자랐다. 유실이 얼마나 자주 일어나는지 측정한 기록은 이번 조사에 없다.</li>
+  </ul>
+  <p>지금 완료를 회수하는 경로는 4개다: 웹훅, 폴링 reconcile, 유령 청소, cron.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>단계별 API 사용처</h2></div>
+  <p class="sec-lede">방식은 세 가지다. <code>동기(응답 한 번)</code>, <code>fal 큐+웹훅+폴링</code>, <code>서버 이어가기+cron+폴링</code>. "미확인"은 이번 조사에서 값을 확인하지 못한 칸이다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>단계</th><th>무엇</th><th>외부</th><th>방식</th><th>진행 확인</th><th>함수 시간</th></tr></thead>
+    <tbody>
+      <tr><td>Producer</td><td>/api/produce/entry/start</td><td>LLM</td><td>동기(응답 한 번)</td><td>시작 화면 entry-store <code>pollWriter</code> 가 /api/writer/status 를 2.5초마다. 시한·멈춤 판정 없음</td><td class="num">300초</td></tr>
+      <tr><td>Producer</td><td>/api/produce/entry/recommend</td><td>LLM</td><td>동기(응답 한 번)</td><td>화면 25초 시한이 있으나 호출을 끊지 않는다</td><td class="num">60초</td></tr>
+      <tr><td>Producer</td><td>style-facets</td><td>LLM</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">300초</td></tr>
+      <tr><td>Producer</td><td>comic-script</td><td>LLM</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">300초</td></tr>
+      <tr><td>Producer</td><td>produce/chat</td><td>LLM</td><td>동기(응답 한 번). 스트리밍 아님</td><td>없음</td><td class="num">300초</td></tr>
+      <tr><td>Writer</td><td>/api/writer/step 체인. 단계마다 새 함수가 <code>after()</code> 로 다음 step 을 자기 호출</td><td>LLM</td><td>서버 이어가기+cron+폴링</td><td>status 3초 폴링(<code>use-writer-status</code>, 순차 setTimeout + 15초 abort 로 겹치지 않음)</td><td class="num">300초</td></tr>
+      <tr><td>Writer</td><td>watchdog</td><td>없음</td><td>서버 이어가기+cron+폴링</td><td>cron 하루 1회(03:00)</td><td class="num">60초</td></tr>
+      <tr><td>Writer</td><td>resume</td><td>LLM</td><td>서버 이어가기+cron+폴링</td><td>화면이 180초 멈춤을 보면 60초마다 호출. 서버는 330초가 지나야 다시 띄움</td><td class="num">30초</td></tr>
+      <tr><td>Writer</td><td>rough-storyboard</td><td>fal</td><td>fal 큐+웹훅+폴링</td><td>브라우저 펌프가 라운드마다 60초 함수를 부른다</td><td class="num">60초</td></tr>
+      <tr><td>Writer</td><td>rough-directing-edit</td><td>Grok</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">120초</td></tr>
+      <tr><td>Writer</td><td>dialogue. 씬 순차 LLM</td><td>LLM</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">300초</td></tr>
+      <tr><td>Writer</td><td>scene-gate, scene-story-rewrite. 백그라운드 실행 + CAS 저장</td><td>LLM</td><td>서버 이어가기+cron+폴링</td><td>미확인</td><td class="num">300초</td></tr>
+      <tr><td>Writer</td><td>writer/chat</td><td>LLM</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">300초</td></tr>
+      <tr><td>Artist</td><td>generate-sheet, generate-world</td><td>fal</td><td>fal 큐+웹훅+폴링</td><td><code>pollGenerationJob</code> 3초</td><td class="num">60초</td></tr>
+      <tr><td>Artist</td><td>generation-status</td><td>없음(DB)</td><td>동기(응답 한 번)</td><td>화면이 3·4·5초마다 부른다(setInterval)</td><td class="num">미확인</td></tr>
+      <tr><td>Artist</td><td>generation-slots</td><td>없음(DB)</td><td>동기(응답 한 번)</td><td>자동 그리기가 작업마다 조회한다</td><td class="num">미확인</td></tr>
+      <tr><td>Artist</td><td>versions/*</td><td>미확인</td><td>서버 이어가기+cron+폴링</td><td>재생성 중 5초 폴링</td><td class="num">300초</td></tr>
+      <tr><td>Artist</td><td>artist/chat</td><td>LLM</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">300초</td></tr>
+      <tr><td>Artist</td><td>retry-drafts</td><td>미확인</td><td>동기(응답 한 번)</td><td>미확인</td><td class="num">60초</td></tr>
+      <tr><td>Director</td><td>generate-storyboard</td><td>fal</td><td>fal 큐+웹훅+폴링</td><td><code>pollGenerationJob</code> 3초</td><td class="num">60초</td></tr>
+      <tr><td>Director</td><td>generate-storyboard-batch</td><td>fal</td><td>fal 큐+웹훅+폴링</td><td><code>pollGenerationJob</code> 3초</td><td class="num">300초</td></tr>
+      <tr><td>Director</td><td>generate-video</td><td>fal</td><td>fal 큐+웹훅+폴링</td><td><code>director-store.ts</code> 자체 5초 루프. 상한 10분(<code>VIDEO_POLL_TIMEOUT_MS</code>)</td><td class="num">300초</td></tr>
+      <tr><td>Director</td><td>video-batches. 서버가 다음 영상을 이어 낸다</td><td>fal</td><td>서버 이어가기+cron+폴링</td><td>cron 2분 + 영상 일괄 화면 2.5초</td><td class="num">300초</td></tr>
+      <tr><td>Director</td><td>generate-previz-video</td><td>fal</td><td>fal 큐+웹훅+폴링</td><td>미확인</td><td class="num">60초</td></tr>
+      <tr><td>Director</td><td>video-adherence</td><td>LLM</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">60초</td></tr>
+      <tr><td>Director</td><td>director/chat</td><td>LLM</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">300초</td></tr>
+      <tr><td>Editor</td><td>trim, speed, state, title-image</td><td>없음(DB·Storage 만)</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">미확인</td></tr>
+      <tr><td>Editor</td><td>editor/chat</td><td>LLM</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">미확인</td></tr>
+      <tr><td>공통</td><td>GET /api/generation-jobs/[id]</td><td>fal</td><td>fal 큐+웹훅+폴링(폴링 창구)</td><td>이 주소를 3초마다 묻는다</td><td class="num">60초</td></tr>
+      <tr><td>공통</td><td>GET /api/generation/active</td><td>없음(DB)</td><td>동기(응답 한 번)</td><td>탭마다 1개 단일 폴러, 4초 (숨김 탭 15초). 유령 청소를 인라인으로 한다</td><td class="num">미확인</td></tr>
+      <tr><td>공통</td><td>POST /api/fal/webhook. <code>after()</code> 로 응답 먼저, finalize 는 뒤에</td><td>fal</td><td>fal 큐+웹훅+폴링(웹훅 쪽)</td><td>해당 없음</td><td class="num">60초</td></tr>
+      <tr><td>공통</td><td>POST /api/generate/image. fal 을 1초 간격 90초 폴링한 뒤 바이트로 응답</td><td>fal</td><td>동기(응답 한 번)</td><td>없음</td><td class="num">300초</td></tr>
+      <tr><td>공통</td><td>cron video-batches</td><td>fal</td><td>서버 이어가기+cron+폴링</td><td>2분</td><td class="num">300초</td></tr>
+    </tbody>
+  </table></div>
+  <p>같은 "진행 확인"이 7가지 주기(2.5·3·4·5초, 60초, 2분, 하루 1회)로 흩어져 있다.</p>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">6</span><h2>결정이 필요한 것</h2></div>
+  <p class="sec-lede">오너가 답할 수 있는 것은 하나다. 2026-09-11 결정을 바꿀지 묻는다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면 뭐가 막히나</th><th>선택지</th><th>추천</th><th>언제까지</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>정원이 찼을 때 기다리게 할 것인가(2026-09-11 결정을 바꾸는가)</td>
+        <td>단체 수업에서 정원(계정별 maxInflight 합)을 넘는 사람부터 '자리 없음' 안내를 보고 직접 다시 눌러야 한다</td>
+        <td>A 유지(거절+안내)<br>B 서버 대기줄(generation_jobs 에 대기 상태를 두고 자리가 나면 서버가 제출)<br>C 브라우저 대기줄 유지(탭을 닫으면 사라짐)</td>
+        <td>보류. 폴링 비용을 먼저 줄이고 수업 1회 실측 뒤 정한다</td>
+        <td>다음 단체 수업 전</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">7</span><h2>알고만 있으면 되는 것</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>가정</th><th>틀리면 뭐가 깨지나</th><th>확인 방법</th></tr></thead>
+    <tbody>
+      <tr><td>fal CDN 의 결과 파일 보존 시간은 미확인이다</td><td>짧으면 finalize 가 늦어질 때 결과를 못 받는다. 2026-11-23 사고에서 finalize 는 25~31분 뒤 끝났다</td><td>fal 문서 또는 문의</td></tr>
+      <tr><td>live FAL_KEYS 의 maxInflight 값은 미확인이다(로컬은 10)</td><td>전체 정원은 계정 합이므로, 값을 모르면 몇 명부터 거절되는지 말할 수 없다</td><td>Vercel 환경변수 확인</td></tr>
+      <tr><td><code>queue_position</code> 을 화면에서 쓰는지는 미확인이다</td><td>쓰고 있지 않다면 예상 시각을 보여 줄 재료가 이미 있는데 버리는 셈이다(추정)</td><td>화면 코드에서 <code>queue_position</code> 사용처 검색</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것</b> 커밋 34d853d4, 176c7885, c28a08ad, 196dd9e0, b35ccbd8, be2be659, 86ceadb9, e45a0040, 86fc98fb, 09f8a08d, 8dcbd07b, 89be927c (git log 실측). 코드 <code>src/lib/generation-jobs.ts</code>, <code>src/lib/fal/keys.ts</code>, <code>src/lib/generation-jobs-client.ts</code>, <code>src/app/api/fal/webhook/route.ts</code>. 감사 문서 <code>.claude/docs/2026-09-11/concurrency-audit/report.md</code>. 코드 블록은 파일에서 줄 번호 그대로 옮겼다.</p>
+  <p><b>이 문서가 하지 않는 것</b> 대기줄을 만들지 않았다. fal 실제 대기 시간을 측정하지 않았다. 고치는 순서를 정하지 않았다.</p>
+</footer>
+
+</div>
+</body>
+</html>

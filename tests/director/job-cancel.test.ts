@@ -63,7 +63,7 @@ describe('진행 중 작업 멈추기', () => {
   it('지금 도는 작업 목록은 화면에서 멈춘 작업에 멈춘 때를 붙인다', async () => {
     // 왜: 멈춘 작업도 fal 에서는 끝날 때까지 돈다(리드 c) — 화면은 그 샷을 "멈췄어요"로 보이고 다시 만들기를 연다(set 갈래가 읽는 칸).
     const chain = {
-      select: vi.fn(() => chain), eq: vi.fn(() => chain), gte: vi.fn(() => chain),
+      select: vi.fn(() => chain), eq: vi.fn(() => chain), gte: vi.fn(() => chain), or: vi.fn(() => chain),
       then: (resolve: (value: unknown) => unknown) => Promise.resolve({ data: [
         { id: JOB, kind: 'shot_video', target: { writerShotId: 'sh_01_01' }, submitted_at: null, created_at: '2026-11-14T00:00:00Z', cancellation: { cancelled_at: '2026-11-14T00:05:00Z' } },
         { id: 'job-2', kind: 'shot_storyboard', target: { writerShotId: 'sh_01_02' }, submitted_at: null, created_at: '2026-11-14T00:00:00Z', cancellation: null },

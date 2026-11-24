@@ -72,7 +72,7 @@ describe('화면에서 멈추기', () => {
     vi.stubGlobal('fetch', fetcher)
 
     const running = api().generateStoryboardImage(shotId)
-    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledWith(`/api/generation-jobs/${JOB_I}`))
+    await vi.waitFor(() => expect(fetcher).toHaveBeenCalledWith(`/api/generation-jobs/${JOB_I}`, expect.anything()))
     await api().cancelRunningJobs([JOB_I])
     finish()
     const result = await running

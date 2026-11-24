@@ -5,6 +5,7 @@
 //   같은 창 안에서 끝난 것). 창은 지금 도는 잡 중 가장 오래된 것의 시각에서 BATCH_WINDOW_MS 만큼 앞이다 — 일괄 생성은
 //   몇 초 안에 제출되므로 같은 창에 들어오고, 30분 전에 따로 만든 이미지는 들어오지 않는다.
 import type { GenerationJobKind, GenerationJobStatus, GenerationJobTarget } from '@/lib/generation-jobs'
+import { staleQueuedMsFor } from '@/lib/generation-job-timing'
 import type { StageId } from '@/types'
 
 export type GenerationLane = 'artist' | 'writer-rough' | 'director-storyboard' | 'director-video' | 'director-previz'
@@ -30,8 +31,6 @@ export const LANE_STAGE: Record<GenerationLane, StageId> = {
 
 /** 일괄 제출은 몇 초 안에 끝나므로 2분이면 한 배치를 넉넉히 덮고, 한참 전의 단건 생성은 섞이지 않는다. */
 export const BATCH_WINDOW_MS = 2 * 60 * 1000
-/** 유령 queued(웹훅 유실)는 큐에서 빼는 것과 같은 기준(generation-jobs.STALE_QUEUED_MS). */
-export const BATCH_STALE_QUEUED_MS = 10 * 60 * 1000
 /** 실사 일괄 판의 시트 사이 빈틈(앞 시트가 끝나고 다음 시트가 접수되기까지, 보통 15~30초)을 덮는 시간.
  *  판이 멈추면(탭을 닫음 · 실패로 멈춤) 마지막 작업 뒤 이만큼 지나 진행 표시를 내린다. */
 export const RUN_IDLE_GRACE_MS = BATCH_WINDOW_MS
@@ -89,7 +88,7 @@ function runRemainingOf(row: Pick<GenerationBatchRow, 'target'>): number {
 
 /**
  * 순수: 잡 행들(최근 것) → 레인별 배치. 도는 잡이 없는 레인은 배치가 없다(핀이 사라지는 근거, 약속 D4·D5).
- *   유령 queued(제출 뒤 BATCH_STALE_QUEUED_MS 초과)는 도는 것으로 세지 않는다.
+ *   유령 queued(제출 뒤 종류별 기준 staleQueuedMsFor 초과: 영상 30분 · 그림 10분)는 도는 것으로 세지 않는다.
  */
 export function summarizeGenerationBatches(rows: readonly GenerationBatchRow[], nowMs: number = Date.now()): GenerationBatch[] {
   const byLane = new Map<GenerationLane, GenerationBatchRow[]>()
@@ -100,7 +99,7 @@ export function summarizeGenerationBatches(rows: readonly GenerationBatchRow[], 
   }
   const out: GenerationBatch[] = []
   for (const [lane, laneRows] of byLane) {
-    const isActive = (r: GenerationBatchRow) => r.status === 'queued' && nowMs - ms(r.created_at) <= BATCH_STALE_QUEUED_MS
+    const isActive = (r: GenerationBatchRow) => r.status === 'queued' && nowMs - ms(r.created_at) <= staleQueuedMsFor(r.kind)
     const activeRows = laneRows.filter(isActive)
     // 판(실사 일괄 버튼 한 번, target.batchRunId — 2026-10-10 오너 요청): 같은 판의 시트는 시각과 상관없이 한 배치다.
     //   2분 창으로만 묶으면 시트 2장씩 몇 분 간격으로 나가는 판의 앞 시트가 빠져 완료 수가 0으로 돌아가고 전체 수가 줄었다.
@@ -144,7 +143,7 @@ export function summarizeGenerationBatches(rows: readonly GenerationBatchRow[], 
       const u = unitsOf(r)
       if (r.status === 'completed') done += u
       else if (r.status === 'failed') failed += u
-      else if (nowMs - ms(r.created_at) <= BATCH_STALE_QUEUED_MS) active += u
+      else if (nowMs - ms(r.created_at) <= staleQueuedMsFor(r.kind)) active += u
     }
     out.push({
       lane,

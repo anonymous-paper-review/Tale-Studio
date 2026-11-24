@@ -113,7 +113,7 @@ export async function submitWorldShotJob(
     //   예약이 이미 자리를 잡고 있으니 재시도는 같은 그림의 이중 발주다).
     // falKeyId: 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 값으로 제출한다.
     const receipt = await falImageSubmit(
-      moderatedSubmitInput({ ...finalOpts, webhookUrl: resolveWebhookUrl() }, input.moderation),
+      moderatedSubmitInput({ ...finalOpts, webhookUrl: resolveWebhookUrl(job.id) }, input.moderation),
       { retry: false, falKeyId: job.fal_key_id },
     )
     try {

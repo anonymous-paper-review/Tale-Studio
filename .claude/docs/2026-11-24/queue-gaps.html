@@ -1,0 +1,405 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>큐 구멍 3개</title>
+<style>
+  :root {
+    --bg:#F1F3F5; --surface:#FFFFFF; --surface-2:#E8EBEF;
+    --ink:#16181D; --ink-2:#3B4048; --muted:#676D77;
+    --line:#D6DBE1; --line-2:#BFC6CE;
+    --accent:#1F5F7A; --accent-soft:#DCEAF1;
+    --pass:#2E7350; --pass-soft:#DFEDE5;
+    --fail:#A33A38; --fail-soft:#F6E2E1;
+    --gate:#6A579E; --gate-soft:#EAE4F5;
+    --warn:#8A6412; --warn-soft:#F4EBD6;
+    --mono:ui-monospace,"SF Mono",SFMono-Regular,Menlo,Consolas,monospace;
+    --sans:-apple-system,BlinkMacSystemFont,"Apple SD Gothic Neo","Segoe UI","Malgun Gothic",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+      --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+      --line:#2B3038; --line-2:#3C434D;
+      --accent:#74B4D0; --accent-soft:#17303C;
+      --pass:#5FB98A; --pass-soft:#17301F;
+      --fail:#E0817D; --fail-soft:#3A2321;
+      --gate:#A794D8; --gate-soft:#272040;
+      --warn:#D2A64F; --warn-soft:#33290F;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg:#131519; --surface:#1B1E24; --surface-2:#23272E;
+    --ink:#E7E9ED; --ink-2:#C2C7CE; --muted:#949AA4;
+    --line:#2B3038; --line-2:#3C434D;
+    --accent:#74B4D0; --accent-soft:#17303C;
+    --pass:#5FB98A; --pass-soft:#17301F;
+    --fail:#E0817D; --fail-soft:#3A2321;
+    --gate:#A794D8; --gate-soft:#272040;
+    --warn:#D2A64F; --warn-soft:#33290F;
+  }
+  *{box-sizing:border-box}
+  body{margin:0;padding:0 20px 110px;background:var(--bg);color:var(--ink);
+    font-family:var(--sans);font-size:16px;line-height:1.82;-webkit-font-smoothing:antialiased}
+  .wrap{max-width:880px;margin:0 auto}
+  header.page{padding:56px 0 20px}
+  .eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.14em;text-transform:uppercase;
+    color:var(--accent);margin:0 0 14px;font-weight:600}
+  h1{font-size:clamp(27px,5vw,40px);font-weight:800;letter-spacing:-.028em;line-height:1.22;
+    margin:0 0 18px;text-wrap:balance}
+  .bluf{font-size:17.5px;color:var(--ink);margin:0 0 6px;max-width:64ch}
+  .bluf b{color:var(--gate)}
+  .asof{font-family:var(--mono);font-size:12px;color:var(--muted);margin:10px 0 0}
+  header.page::after{content:"";display:block;height:3px;background:var(--ink);margin-top:26px;opacity:.9}
+  section{margin:58px 0 0}
+  .sec-head{display:flex;align-items:baseline;gap:12px;flex-wrap:wrap;margin-bottom:8px}
+  .sec-num{font-family:var(--mono);font-size:12px;font-weight:700;color:var(--accent);
+    border:1.5px solid var(--accent);border-radius:3px;padding:0 7px;line-height:1.7}
+  h2{font-size:23px;font-weight:800;letter-spacing:-.018em;margin:0;text-wrap:balance}
+  .sec-lede{color:var(--muted);font-size:15px;margin:0 0 24px;max-width:62ch}
+  p{margin:0 0 16px;max-width:64ch}
+  h3{font-size:17px;font-weight:750;margin:28px 0 10px;letter-spacing:-.01em}
+  h3:first-child{margin-top:0}
+  ul.plain,ol.plain{margin:0 0 16px;padding-left:22px;max-width:64ch}
+  ul.plain li,ol.plain li{margin-bottom:8px}
+  strong,b{font-weight:750}
+  .card{background:var(--surface);border:1px solid var(--line);border-radius:10px;
+    padding:24px 26px 20px;margin:0 0 18px}
+  .card.same{border-left:3px solid var(--pass)}
+  .card.diff{border-left:3px solid var(--warn)}
+  .card > :last-child{margin-bottom:0}
+  .card-head{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;margin-bottom:12px}
+  .card-head h3{flex:1 1 240px;margin:0}
+  .agreed{font-size:15px;color:var(--ink-2);margin:0 0 12px}
+  .agreed b{color:var(--ink);font-weight:750}
+  .chip{font-family:var(--mono);font-size:11px;font-weight:700;letter-spacing:.03em;
+    border-radius:3px;padding:2px 8px;white-space:nowrap}
+  .c-pass{background:var(--pass-soft);color:var(--pass)}
+  .c-fail{background:var(--fail-soft);color:var(--fail)}
+  .c-warn{background:var(--warn-soft);color:var(--warn)}
+  .c-gate{background:var(--gate-soft);color:var(--gate)}
+  .c-acc{background:var(--accent-soft);color:var(--accent)}
+  pre{background:var(--surface-2);border:1px solid var(--line);border-left:3px solid var(--line-2);
+    border-radius:0 6px 6px 0;padding:14px 16px;overflow-x:auto;
+    font-family:var(--mono);font-size:12px;line-height:1.68;margin:8px 0;color:var(--ink-2);
+    white-space:pre;tab-size:2}
+  pre b{color:var(--ink);font-weight:700}
+  pre .path{display:block;color:var(--muted);margin-bottom:8px;font-size:11.5px}
+  code{font-family:var(--mono);font-size:.87em;background:var(--surface-2);padding:1px 6px;border-radius:3px}
+  .code-what{font-size:14.5px;color:var(--ink-2);margin:0 0 4px}
+  .code-diff{font-size:14.5px;margin:8px 0 0}
+  .code-diff .chip{margin-right:8px}
+  .tbl{overflow-x:auto;margin:14px 0}
+  table{border-collapse:collapse;width:100%;font-size:14px;min-width:560px}
+  th{text-align:left;font-size:12.5px;color:var(--muted);font-weight:700;
+    padding:10px 12px;border-bottom:2px solid var(--line-2);vertical-align:bottom}
+  td{padding:11px 12px;border-bottom:1px solid var(--line);vertical-align:top}
+  tr:last-child td{border-bottom:none}
+  th{white-space:nowrap}
+  td.num{font-variant-numeric:tabular-nums;white-space:nowrap}
+  td .path{font-family:var(--mono);font-size:11.5px;color:var(--muted);display:block;margin-top:3px}
+  .split{display:grid;grid-template-columns:1fr 1fr;gap:0;border:1px solid var(--line);
+    border-radius:10px;overflow:hidden;margin:16px 0}
+  @media (max-width:640px){.split{grid-template-columns:1fr}}
+  .split > div{padding:18px 20px}
+  .split .yes{background:var(--pass-soft);border-right:1px solid var(--line)}
+  .split .no{background:var(--fail-soft)}
+  .split h4{margin:0 0 10px;font-size:14.5px;font-weight:800}
+  .split .yes h4{color:var(--pass)}
+  .split .no h4{color:var(--fail)}
+  .split ul{margin:0;padding-left:20px;font-size:14px;line-height:1.7}
+  .split li{margin-bottom:7px}
+  .callout{border:1px solid var(--line);border-left:4px solid var(--accent);background:var(--surface);
+    border-radius:0 8px 8px 0;padding:12px 16px;margin:14px 0;font-size:14.5px;max-width:64ch}
+  .callout.warn{border-left-color:var(--warn);background:var(--warn-soft)}
+  .callout.caution{border-left-color:var(--fail);background:var(--fail-soft)}
+  .callout b.label{font-family:var(--mono);font-size:11.5px;letter-spacing:.08em;display:block;margin-bottom:4px}
+  .callout p{margin:0}
+  footer{margin-top:66px;padding-top:20px;border-top:2px solid var(--ink);font-size:13.5px;color:var(--muted)}
+  footer b{color:var(--ink)}
+  footer p{max-width:none}
+  a{color:var(--accent)}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+<header class="page">
+  <p class="eyebrow">작업 보고서 · 2026-11-24 · 큐</p>
+  <h1>큐 구멍 3개</h1>
+  <p class="bluf">원장의 C05(접수 번호를 잃은 예약이 영구 좀비), C04(예약 1건에 DB 왕복 6~10회), C12(시계가 셋)를 고쳤다. C05 와 C12 는 닫혔다. C04 는 왕복을 줄였고, 키 고르기 중복 제거 1건은 기존 테스트와 충돌해 오너 결정으로 남겼다.</p>
+  <p class="bluf"><b>결정할 것 3개</b>: 예약 때 키 고르기를 DB 에 맡길지, 웹훅 주소에 잡 번호를 안 심는 경로 4곳을 어떻게 할지, 30분 넘은 예약 잡의 Take 를 어떻게 할지. <b>알아둘 것 5개</b>.</p>
+  <p class="asof">문장 규칙: ASD-STE100(한 문장에 한 뜻 · 능동형 · 같은 뜻에는 같은 말 · 절차는 번호). 원장 specs/api-failure-ledger.md C04 · C05 · C12 · 폴링 보고서 polling-layer1.html</p>
+</header>
+
+<section>
+  <div class="sec-head"><span class="sec-num">0</span><h2>용어</h2></div>
+  <p class="sec-lede">이 문서는 아래 말을 아래 뜻으로만 쓴다. 폴링 보고서와 같은 뜻이다.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>말</th><th>뜻</th></tr></thead>
+    <tbody>
+      <tr><td><b>잡</b></td><td><code>generation_jobs</code> 표의 행 하나. 그림 또는 영상 하나를 만드는 작업.</td></tr>
+      <tr><td><b>예약</b></td><td>fal 에 보내기 전에 잡 행을 먼저 만들어 자리를 잡는 것. 이때 접수 번호 칸에는 <code>reserved:&lt;잡 id&gt;</code> 가 들어간다.</td></tr>
+      <tr><td><b>접수 번호</b></td><td>fal 이 작업을 받고 돌려주는 번호(<code>request_id</code>). 웹훅과 상태 조회는 이 번호로 잡을 찾는다.</td></tr>
+      <tr><td><b>접수 기록</b></td><td>예약 행의 <code>reserved:…</code> 를 접수 번호로 바꾸는 DB 갱신. 함수 이름은 <code>confirmGenerationJobReceipt</code>.</td></tr>
+      <tr><td><b>좀비</b></td><td>fal 은 작업을 받았는데 우리 DB 에는 <code>reserved:…</code> 가 남은 잡. 웹훅이 찾지 못한다. 결과도 자리 반환도 되지 않는다.</td></tr>
+      <tr><td><b>유령</b></td><td>접수 번호는 있는데 대기 상태로 오래 남은 잡. 그림 10분, 영상 30분이 기준.</td></tr>
+      <tr><td><b>자리</b></td><td>동시에 돌 수 있는 잡 수. 개인 그림 6 · 개인 영상 3 · fal 키마다 상한. DB 트리거가 넣기 전에 센다.</td></tr>
+      <tr><td><b>왕복</b></td><td>서버가 DB 에 질문 하나를 보내고 답을 받는 것. 실서비스에서 1회에 1.2~2.4초.</td></tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">1</span><h2>혼자 정한 것</h2></div>
+  <p class="sec-lede">오너에게 묻지 않고 정했다. 되돌리기는 전부 <code>쉬움</code>이다(코드만 되돌린다. DB 변경 없음).</p>
+  <div class="tbl"><table>
+    <thead><tr><th>결정</th><th>왜</th><th>버린 선택지</th><th>되돌리기</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>접수 기록이 DB 오류로 실패하면 0.3초 · 0.9초 뒤 두 번 더 시도한다(총 3회). "예약이 바뀌었다"(0행)는 다시 시도하지 않는다.<span class="path">src/lib/generation-jobs.ts:406-441</span></td>
+        <td>이미 돈을 낸 작업의 번호를 일시 장애로 잃지 않기 위함. 0행은 장애가 아니라 상태가 바뀐 것이다.</td>
+        <td>재시도 없음(지금까지). 무한 재시도(함수 시간 한도를 넘긴다).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>웹훅 주소에 잡 id 를 심는다. 웹훅이 접수 번호로 잡을 못 찾으면 잡 id 로 예약 행을 찾아 번호를 늦게 기록하고 그대로 처리한다.<span class="path">src/lib/fal/webhook-url.ts:24-29 · src/app/api/fal/webhook/route.ts:110-131</span></td>
+        <td>fal 은 웹훅을 다시 보내지 않는다. 그 한 번에 잡을 찾아야 한다. 접수 기록 3회가 다 실패해도 이 길로 회수된다.</td>
+        <td>fal 의 metadata 칸에 심기(fal 의 모든 모델이 지원하는지 확인 못 함). 시간이 지나면 예약을 실패 처리(2026-09-11 오너 결정에 어긋남).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>워치독의 유령 청소에서 <code>reserved:…</code> 잡을 뺀다.<span class="path">src/app/api/writer/watchdog/route.ts:66</span></td>
+        <td>청소는 오래된 순으로 10건만 본다. 예약 잡은 청소가 처리하지 못하는데 머리를 차지해 뒤의 유령이 영원히 차례를 못 받았다.</td>
+        <td>10건 상한 늘리기(머리는 그대로 막힌다).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>개인 자리 예외표 동기화는 사용자마다 10분에 한 번만 DB 에 쓴다. 값이 같으면 건너뛴다.<span class="path">src/lib/generation-quota.ts:117-126</span></td>
+        <td>일반 사용자도 예약마다 예외표에 삭제 1회를 보냈다. 값이 바뀌지 않는데 쓰는 것이다.</td>
+        <td>예약마다 쓰기(지금까지). 서버가 시작할 때 1회(관리자 승격이 10분 아닌 재배포까지 늦는다).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>영상 잡의 유령 기준을 30분으로 올린다. 그림은 10분. 화면 포기 · 진행 목록 · 유령 청소 · 배치 집계가 모두 한 함수(<code>staleQueuedMsFor</code>)를 쓴다.<span class="path">src/lib/generation-job-timing.ts:16-36</span></td>
+        <td>DB 자리 집계 창이 30분이다. 영상 10분 기준은 정상 영상을 "시간 초과"로 보이게 했고, 유령은 화면에서 사라진 뒤 20분 더 자리를 먹었다.</td>
+        <td>자리 집계 창을 10분으로 내리기(DB 마이그레이션. 영상이 10분 넘으면 자리를 두 번 센다). 종류 상관없이 30분(그림 유령이 20분 더 자리를 먹는다).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>종류별 기준은 DB 질문 안에서 거른다(<code>.or()</code> 필터). JS 로 받아서 거르지 않는다.<span class="path">generation-jobs.ts:716 · fal/reconcile.ts:198</span></td>
+        <td>진행 목록과 유령 청소가 같은 함수로 반대 방향 필터를 만든다. 한쪽만 바뀌는 일이 없다.</td>
+        <td>전부 읽어 JS 에서 거르기(과거 날짜를 넣은 기존 테스트가 깨진다).</td>
+        <td>쉬움</td>
+      </tr>
+      <tr>
+        <td>테스트 흉내(mock) 3곳을 새 동작에 맞췄다. 유령 픽스처 20분을 31분으로 바꿨다. 테스트 문장과 기대값은 바꾸지 않았다.<span class="path">tests/job/number-sync.test.ts · generation-ghost-reconcile.test.ts · director/job-cancel.test.ts</span></td>
+        <td>영상 유령 픽스처가 20분이었다. 새 기준(30분)에서는 유령이 아니다. 테스트가 말하는 것(유령은 세지 않는다)은 그대로다.</td>
+        <td>테스트 이름 바꾸기(오너 결정 없이는 안 한다).</td>
+        <td>쉬움</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">2</span><h2>같이 정한 것이 코드에 어떻게 들어갔나</h2></div>
+  <p class="sec-lede">원장의 구멍 3개. 각각 실제 코드와 대조했다.</p>
+
+  <div class="card same">
+    <div class="card-head"><h3>C05 · 접수 번호를 잃은 예약이 영구 좀비가 된다</h3><span class="chip c-pass">닫힘</span></div>
+    <p class="agreed"><b>논의:</b> fal 제출은 됐는데 접수 기록 DB 갱신이 실패하면 그 잡은 어디서도 회수되지 않는다. 시간으로 실패 처리하지는 않는다(2026-09-11 결정 유지).</p>
+    <p class="code-what">막는 길 3개를 넣었다. 순서대로 작동한다.</p>
+    <ol class="plain">
+      <li>접수 기록을 3회 시도한다. DB 오류일 때만 0.3초 · 0.9초 뒤에 다시 쓴다.</li>
+      <li>그래도 실패하면 웹훅이 잡 id 로 예약 행을 찾아 번호를 기록하고 결과를 처리한다.</li>
+      <li>워치독 청소가 예약 잡을 건너뛴다. 뒤의 유령이 차례를 받는다.</li>
+    </ol>
+<pre><span class="path">src/lib/generation-jobs.ts:415-441</span>  const retryDelaysMs = <b>[300, 900]</b>
+  for (let attempt = 0; ; attempt++) {
+    const { data, error } = await supabaseAdmin
+      .from('generation_jobs')
+      .update({ request_id: receipt.request_id, … })
+      .eq('id', jobId)
+      .eq('status', 'queued')
+      .eq('request_id', `reserved:${jobId}`)
+      .select('id')
+    if (error) {
+      if (attempt &gt;= retryDelaysMs.length) throw error
+      await sleep(retryDelaysMs[attempt])
+      continue
+    }
+    if (!data?.length) throw new Error('generation job reservation changed before the receipt was saved')
+    return
+  }</pre>
+<pre><span class="path">src/app/api/fal/webhook/route.ts:110-131</span>  let job = await getGenerationJobByRequestId(requestId)
+  if (!job) {
+    const jobId = new URL(req.url).searchParams.get(<b>'jobId'</b>)
+    const reserved = jobId ? await getGenerationJobById(jobId) : null
+    if (!reserved || reserved.status !== 'queued' || reserved.request_id !== `reserved:${reserved.id}`) {
+      return NextResponse.json({ ok: true })
+    }
+    if (!reserved.fal_key_id) return NextResponse.json({ ok: true })
+    try {
+      await <b>confirmGenerationJobReceipt</b>(reserved.id, reserved.project_id, { request_id: requestId, … })
+    } catch (e) {
+      return NextResponse.json({ ok: true })
+    }
+    job = { ...reserved, request_id: requestId }
+  }</pre>
+<pre><span class="path">src/app/api/writer/watchdog/route.ts:66-69</span>        .not('request_id', 'like', <b>'reserved:%'</b>)
+        .lt('created_at', staleCutoff)
+        .order('created_at', { ascending: true })
+        .limit(10);</pre>
+    <div class="tbl"><table>
+      <thead><tr><th>제출 경로</th><th>웹훅 주소에 잡 id</th><th>위치</th></tr></thead>
+      <tbody>
+        <tr><td>Artist 인물 시트</td><td><span class="chip c-pass">심음</span></td><td><span class="path">src/app/api/artist/generate-sheet/route.ts:424</span></td></tr>
+        <tr><td>Artist 세계 그림</td><td><span class="chip c-pass">심음</span></td><td><span class="path">src/lib/artist/world-submit.ts:116</span></td></tr>
+        <tr><td>Artist 초안 자동 생성</td><td><span class="chip c-pass">심음</span></td><td><span class="path">src/lib/artist/draft-trigger.ts:338</span></td></tr>
+        <tr><td>Director 실사 스토리보드</td><td><span class="chip c-pass">심음</span></td><td><span class="path">src/app/api/director/generate-storyboard/route.ts:448</span></td></tr>
+        <tr><td>Director 영상</td><td><span class="chip c-pass">심음</span></td><td><span class="path">src/lib/director/video-submit.ts:1123</span></td></tr>
+        <tr><td>Writer 러프 스토리보드</td><td><span class="chip c-warn">안 심음</span></td><td><span class="path">src/app/api/writer/rough-storyboard/route.ts:550</span></td></tr>
+        <tr><td>Director 스토리보드 일괄</td><td><span class="chip c-warn">안 심음</span></td><td><span class="path">src/app/api/director/generate-storyboard-batch/route.ts:388</span></td></tr>
+        <tr><td>Director 프리비즈 영상</td><td><span class="chip c-warn">안 심음</span></td><td><span class="path">src/app/api/director/generate-previz-video/route.ts:197</span></td></tr>
+        <tr><td>Director 영상 대체 모델</td><td><span class="chip c-warn">안 심음</span></td><td><span class="path">src/lib/director/video-fallback.ts:231</span></td></tr>
+      </tbody>
+    </table></div>
+    <p class="code-diff"><span class="chip c-pass">닫힘</span>심은 5곳은 좀비가 생기지 않는다. 안 심은 4곳은 길 1(3회 시도)과 길 3(청소 건너뛰기)만 받는다. 이 4곳은 잡을 만드는 시점이 웹훅 주소를 만드는 시점보다 뒤라 호출 순서를 바꿔야 한다. 4절 2행.</p>
+  </div>
+
+  <div class="card diff">
+    <div class="card-head"><h3>C04 · 예약 1건에 DB 왕복 6~10회</h3><span class="chip c-warn">일부</span></div>
+    <p class="agreed"><b>논의:</b> 예약 함수가 소유 확인 2회 · 예외표 쓰기 1회 · 키마다 자리 세기 · 넣기를 순서대로 한다. DB 가 느리면 제출이 60초를 넘긴다.</p>
+    <div class="tbl"><table>
+      <thead><tr><th>단계</th><th>고치기 전 왕복</th><th>고친 뒤 왕복</th><th>어떻게</th></tr></thead>
+      <tbody>
+        <tr><td>소유 확인 <code>resolveJobOwnership</code></td><td class="num">2</td><td class="num">1</td><td>프로젝트와 워크스페이스 소유자를 한 질문으로 읽는다(폴링 보고서 2절 2행과 같은 함수).</td></tr>
+        <tr><td>개인 자리 예외표 <code>syncGenerationCapacityExemption</code></td><td class="num">1</td><td class="num">0 (10분에 1)</td><td>사용자마다 값과 시각을 기억한다. 같으면 쓰지 않는다.</td></tr>
+        <tr><td>키 고르기 <code>pickFalKey</code></td><td class="num">키 수(동시)</td><td class="num">키 수(동시)</td><td><b>안 바꿈.</b> DB 트리거가 <code>fal_key_id</code> 가 비어 있으면 여유가 가장 큰 키를 고른다. 서버가 또 고르는 것은 중복이다. 기존 테스트가 insert 에 <code>'key-1'</code> 이 들어가는 것을 확인해 보류했다. 4절 1행.</td></tr>
+        <tr><td>넣기 <code>insert</code> (트리거 안에서 자리 세기 3~5회)</td><td class="num">1 + 트리거</td><td class="num">1 + 트리거</td><td>안 바꿈. 자리 판정은 DB 가 한 줄로 세워 하는 것이 설계다.</td></tr>
+      </tbody>
+    </table></div>
+<pre><span class="path">src/lib/generation-quota.ts:117-126</span>const PERSONAL_CAPACITY_SYNC_TTL_MS = <b>10 * 60 * 1000</b>
+const personalCapacitySynced = new Map&lt;string, { value: PersonalCapacity; at: number }&gt;()
+…
+  const last = personalCapacitySynced.get(userId)
+  if (last &amp;&amp; last.value === personal &amp;&amp; Date.now() - last.at &lt; PERSONAL_CAPACITY_SYNC_TTL_MS) return personal</pre>
+    <p class="code-diff"><span class="chip c-warn">일부</span>왕복이 5~6회에서 3~4회가 됐다(키 1개 기준). 키 고르기를 DB 에 맡기면 2~3회가 된다. 전역 잠금 안의 자리 세기는 그대로다.</p>
+  </div>
+
+  <div class="card same">
+    <div class="card-head"><h3>C12 · 시계가 셋</h3><span class="chip c-pass">닫힘</span></div>
+    <p class="agreed"><b>논의:</b> 화면 포기 10분 · 자리 집계 30분 · 배치 상수 10분이 따로 있었다. 영상은 10분을 넘기는 일이 있어 정상 영상이 "시간 초과"로 보였다. 유령은 화면에서 사라진 뒤 20분 더 자리를 먹었다.</p>
+    <p class="code-what">기준을 한 곳에 둔다. 종류를 넣으면 밀리초가 나온다. DB 질문용 필터 문자열도 같은 곳에서 만든다.</p>
+<pre><span class="path">src/lib/generation-job-timing.ts:16-36</span>export const STALE_QUEUED_VIDEO_MS = <b>30 * 60 * 1000</b>
+export const VIDEO_JOB_KINDS = ['shot_video', 'shot_previz_video'] as const
+
+export function staleQueuedMsFor(kind): number {
+  return VIDEO_JOB_KINDS.includes(kind ?? '') ? STALE_QUEUED_VIDEO_MS : STALE_QUEUED_MS
+}
+
+export function staleQueuedOrFilter(side: 'fresh' | 'stale', now = Date.now()): string {
+  const op = side === 'fresh' ? 'gte' : 'lt'
+  …
+  return `and(kind.in.${kinds},created_at.${op}.${videoCut}),and(kind.not.in.${kinds},created_at.${op}.${imageCut})`
+}</pre>
+    <div class="tbl"><table>
+      <thead><tr><th>시계를 보는 곳</th><th>고치기 전</th><th>고친 뒤</th><th>위치</th></tr></thead>
+      <tbody>
+        <tr><td>화면 포기(잡 상태 폴링)</td><td>10분</td><td>그림 10 · 영상 30. 첫 응답의 <code>kind</code> 로 정한다.</td><td><span class="path">src/lib/generation-jobs-client.ts</span></td></tr>
+        <tr><td>Director 영상 폴링 한도</td><td>10분</td><td>30분</td><td><span class="path">src/stores/director-store.ts VIDEO_POLL_TIMEOUT_MS</span></td></tr>
+        <tr><td>진행 목록 <code>listActiveGenerationJobs</code></td><td>10분</td><td>종류별 <code>.or(staleQueuedOrFilter('fresh'))</code></td><td><span class="path">src/lib/generation-jobs.ts:716</span></td></tr>
+        <tr><td>유령 청소 <code>reconcileGhostQueuedJobs</code></td><td>10분</td><td>종류별 <code>.or(staleQueuedOrFilter('stale', now))</code></td><td><span class="path">src/lib/fal/reconcile.ts:198</span></td></tr>
+        <tr><td>배치 집계 <code>summarizeGenerationBatches</code></td><td>따로 적은 10분</td><td><code>staleQueuedMsFor(r.kind)</code>. 따로 적은 상수는 지웠다.</td><td><span class="path">src/lib/generation-batches.ts:102,146</span></td></tr>
+        <tr><td>DB 자리 집계 창</td><td>30분</td><td>30분 (안 바꿈)</td><td><span class="path">supabase/migrations/20261027100000_…:25</span></td></tr>
+      </tbody>
+    </table></div>
+    <p class="code-diff"><span class="chip c-pass">닫힘</span>영상은 화면 · 진행 목록 · 청소 · 자리 집계가 모두 30분이다. 20분 구간이 없다. 그림은 10분 그대로다. 그림 유령은 여전히 화면에서 사라진 뒤 20분 더 자리를 먹는다. 유령 청소가 그 사이 fal 진실로 종결하는 것이 방어다. 5절 1행.</p>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">3</span><h2>확인한 것 / 안 한 것</h2></div>
+  <div class="split">
+    <div class="yes">
+      <h4>확인한 것</h4>
+      <ul>
+        <li>새 테스트 7파일 · 문장 18개. 접수 기록 재시도(DB 오류만 · 0행은 즉시 실패) · 웹훅 잡 id 되찾기 · 워치독 예약 건너뛰기 · 제출 경로 5곳이 잡 id 를 심는 것 · 종류별 시계 · 예외표 10분 기억.</li>
+        <li>기존 테스트 976 파일 8,244건 통과(흉내 DB 기준). <code>pnpm typecheck</code> · <code>pnpm lint:design</code> 통과.</li>
+        <li>DB 트리거가 <code>fal_key_id</code> 가 비어 있을 때 키를 고르는 것(마이그레이션 <code>20261027100000</code> 본문 확인).</li>
+        <li><code>projects.workspace_id</code> 외래키가 있어 한 질문 소유 확인이 가능한 것(마이그레이션 <code>20260305082450</code>).</li>
+      </ul>
+    </div>
+    <div class="no">
+      <h4>안 한 것</h4>
+      <ul>
+        <li>실제 DB 트리거와 함께 돌려 보지 않았다. 테스트는 DB 를 흉내 낸다.</li>
+        <li>실제 fal 웹훅이 <code>?jobId=</code> 가 붙은 주소로 그대로 오는지 확인하지 않았다. fal 문서는 웹훅 URL 을 그대로 호출한다고 적지만 실측은 없다.</li>
+        <li>접수 기록이 실제로 실패하는 상황을 만들어 보지 않았다. 11/23 장애 때 추정으로 남은 원인이다.</li>
+        <li>예약 왕복 수 변화를 시간으로 측정하지 않았다. 폴링 보고서의 측정 스크립트는 상태 조회만 잰다.</li>
+        <li>안 심은 4곳의 제출 경로는 손대지 않았다.</li>
+      </ul>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">4</span><h2>결정이 필요한 것</h2></div>
+  <p class="sec-lede">오너가 지금 답할 수 있는 것.</p>
+  <div class="tbl"><table>
+    <thead><tr><th>질문</th><th>안 정하면</th><th>선택지</th><th>추천</th><th>언제까지</th></tr></thead>
+    <tbody>
+      <tr>
+        <td>예약 때 fal 키를 서버가 고르지 않고 DB 트리거에 맡기나(<code>fal_key_id: null</code> 로 넣기)</td>
+        <td>서버가 키 수만큼 자리를 세고 트리거가 또 센다. 2026-09-11 에 트리거가 고르게 정했는데 서버 쪽 코드가 남아 있다.</td>
+        <td>(가) 트리거에 맡긴다. 테스트 <code>tests/job/generation-reserve.test.ts:189</code> 의 문장 "예약은 접수 번호 없이 자리만 잡고 제출 뒤에 접수 번호를 채운다" 안의 기대 <code>fal_key_id === 'key-1'</code> 을 <code>null</code> 로 바꿔야 한다. (나) 지금처럼 서버가 고른다.</td>
+        <td>(가). 그 기대값은 문장이 말하는 것(자리만 잡는다)의 일부가 아니다. 키를 누가 고르는지는 2026-09-11 에 이미 정했다.</td>
+        <td>다음 큐 작업 전</td>
+      </tr>
+      <tr>
+        <td>웹훅 주소에 잡 id 를 안 심는 제출 경로 4곳(러프 스토리보드 · 스토리보드 일괄 · 프리비즈 영상 · 영상 대체 모델)을 고치나</td>
+        <td>이 4곳에서 접수 기록이 3회 다 실패하면 좀비가 남는다. 수업에서 가장 많이 쓰는 길은 심은 5곳이다.</td>
+        <td>(가) 고친다. 호출 순서를 바꿔 잡 id 를 먼저 받는다(각 1~2시간). (나) 두고 수업 실측 뒤 결정.</td>
+        <td>(나). 접수 기록 3회 시도가 먼저 막는다. 이 4곳에서 좀비가 실제로 생긴 기록은 아직 없다.</td>
+        <td>다음 수업 뒤</td>
+      </tr>
+      <tr>
+        <td>영상 예약 잡이 30분 넘게 <code>reserved:…</code> 로 남으면 Take(영상 자리)를 어떻게 하나</td>
+        <td>영구히 묶인다. 사용자는 그 Take 로 다시 만들 수 없다. 큐 콘솔의 DELETE 로 사람이 풀어야 한다.</td>
+        <td>(가) 지금처럼 사람이 큐 콘솔에서 푼다. (나) 30분 뒤 화면에 "자리 되돌리기" 버튼을 보여 사용자가 직접 푼다(실패 처리 · 환급은 없음, 자리만 반환). (다) 시간으로 자동 반환(2026-09-11 결정과 어긋남).</td>
+        <td>(가). 웹훅 잡 id 되찾기가 들어가 이 상황 자체가 드물어졌다. 실제로 생기면 그때 (나)를 본다.</td>
+        <td>급하지 않음</td>
+      </tr>
+    </tbody>
+  </table></div>
+</section>
+
+<section>
+  <div class="sec-head"><span class="sec-num">5</span><h2>알고만 있으면 되는 것</h2></div>
+  <div class="tbl"><table>
+    <thead><tr><th>가정</th><th>틀리면 뭐가 깨지나</th><th>확인 방법</th></tr></thead>
+    <tbody>
+      <tr><td>그림 유령은 화면에서 10분에 사라지고 자리는 30분까지 먹는다. 20분 구간이 남아 있다. 영상만 맞췄다.</td><td>그림 6장 중 유령 1개가 있으면 20분 동안 5장만 만들 수 있다. 유령 청소가 그 사이 fal 에 물어 종결하면 자리가 돌아온다.</td><td>큐 콘솔에서 10분 넘은 그림 잡의 수를 본다.</td></tr>
+      <tr><td>예외표 10분 기억은 서버 프로세스마다 따로다. Vercel 함수가 새로 뜨면 첫 예약에서 1회 쓴다.</td><td>관리자로 승격된 사용자가 최대 10분 동안 일반 한도(6장)를 받는다.</td><td>승격한 날은 10분 기다리거나 재배포한다.</td></tr>
+      <tr><td>웹훅 잡 id 되찾기는 <code>fal_key_id</code> 가 있는 예약 잡만 처리한다.</td><td>4절 1행을 (가)로 정해도 트리거가 insert 때 키를 채우므로 행에는 늘 키가 있다. 깨지지 않는다.</td><td>없음.</td></tr>
+      <tr><td>접수 기록 재시도는 fal 제출이 끝난 뒤 최대 1.2초를 더 쓴다(0.3 + 0.9).</td><td>제출 라우트의 60초 한도 안이다. 실서비스 DB 왕복 2.4초 × 3회 = 7.2초가 더해져도 한도 안이다.</td><td>없음.</td></tr>
+      <tr><td>워치독은 하루 1회 돈다. 예약 잡을 건너뛴 효과는 하루 뒤부터 보인다.</td><td>없음. 기록용.</td><td><code>vercel.json</code> cron 항목.</td></tr>
+    </tbody>
+  </table></div>
+  <h3>지뢰</h3>
+  <ul class="plain">
+    <li><code>staleQueuedOrFilter</code> 가 만드는 문자열은 PostgREST 의 <code>.or()</code> 문법이다. 잡 종류를 <code>VIDEO_JOB_KINDS</code> 에 더하면 문자열도 같이 바뀐다. 종류 이름에 쉼표나 괄호가 들어가면 깨진다. 지금 이름에는 없다.</li>
+    <li>fal 웹훅 서명은 접수 번호 · 사용자 id · 시간 · 본문 해시만 덮는다(<code>src/lib/fal/verify-webhook.ts:86-93</code>). 주소의 <code>?jobId=</code> 는 서명 밖이다. 서명이 유효한 웹훅을 5분 안에 가로채 다른 잡 id 로 다시 보내면, 그 예약 잡에 다른 작업의 접수 번호가 붙을 수 있다. 조건이 세개 같이 필요하다(유효 서명 탈취 · 5분 안 · 예약 상태인 잡 id). 지금은 감수한다. 막으려면 접수 번호의 fal 사용자 id 와 예약 잡의 키가 가리키는 계정을 대조하면 된다.</li>
+  </ul>
+</section>
+
+<footer>
+  <p><b>근거로 쓴 것.</b> 원장 <code>specs/api-failure-ledger.md</code> C04 · C05 · C12 · C13 · 마이그레이션 <code>20261027100000_generation_capacity_per_user_limit.sql</code> · <code>20260305082450_create_mvp_tables.sql</code> · 2026-09-11 오너 결정(정원 차면 안내만 · 자동 재시도 없음 · 예약은 시간만으로 실패하지 않음) · <code>tests/job/reserved-zombie-recovery.test.ts</code>.</p>
+  <p><b>이 문서가 하지 않는 것.</b> 실제 DB 트리거 · 실제 fal 과의 통합 확인. 예약 시간 측정. 안 심은 4곳 수정. 폴링(틱 경량화 · 묶음 · 백오프 · Realtime)은 같은 날의 다른 보고서 <code>polling-layer1.html</code> 에 있다.</p>
+</footer>
+
+</div>
+</body>
+</html>

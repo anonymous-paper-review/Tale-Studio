@@ -255,7 +255,6 @@ export async function POST(req: Request) {
         : null
     // 새로 나온 인물(2026-10-27 오너 "가로 하자"): 앞 화 세계 한 줄을 그림 지시에 넣는다(그림체 · 참고 그림과 상관없이).
     const seriesWorld = seriesWorldLine(series, 'character', characterId)
-    const webhookUrl = resolveWebhookUrl()
     let submitOpts: FalImageOptions
     let styleAnchorMode: 'turnaround' | 'single' | null = null
     if (view === 'main') {
@@ -295,7 +294,6 @@ export async function POST(req: Request) {
             // 템플릿이 첫 장(레이아웃 기준), 그 뒤가 정체성 이미지(기준얼굴·직전 시트).
             //   순서가 뒤바뀌면 모델이 얼굴 이미지를 레이아웃으로 오인한다.
             reference_image_urls: [templateUrl, ...identityRefs],
-            webhookUrl,
             // aspect_ratio 생략 → edit 모델이 템플릿 비율(≈16:9)을 따름
           }
         } else {
@@ -317,7 +315,6 @@ export async function POST(req: Request) {
               photoLook,
             }),
             aspect_ratio: '3:2',
-            webhookUrl,
           }
         }
       } else {
@@ -328,7 +325,6 @@ export async function POST(req: Request) {
           model: endpoint,
           prompt: buildCharacterMainPrompt(input),
           aspect_ratio: '1:1',
-          webhookUrl,
         }
       }
     } else {
@@ -340,19 +336,17 @@ export async function POST(req: Request) {
             model: endpoint,
             prompt,
             reference_image_urls: references,
-            webhookUrl,
           } // aspect_ratio 생략 → edit 모델이 reference 비율을 따른다.
-        : { model: endpoint, prompt, aspect_ratio: '1:1', webhookUrl }
+        : { model: endpoint, prompt, aspect_ratio: '1:1' }
     }
     if (anchor && styleAnchorMode) {
-      const { webhookUrl: wh, ...anchorable } = submitOpts
       // facet 인물 조각(Figure rules · Priority)은 사람 시트에만 — 사물(소품) 시트는 인물이 없다(2026-10-08).
       const people = character.entity_type !== 'object'
       const anchored =
         styleAnchorMode === 'turnaround'
-          ? applyStyleAnchor(anchor, anchorable, 'turnaround', { pinAspectRatio: '16:9', people })
-          : applyStyleAnchor(anchor, anchorable, 'single', { people })
-      submitOpts = { ...anchored, webhookUrl: wh }
+          ? applyStyleAnchor(anchor, submitOpts, 'turnaround', { pinAspectRatio: '16:9', people })
+          : applyStyleAnchor(anchor, submitOpts, 'single', { people })
+      submitOpts = anchored
     }
 
     // provenance(#57): 생성 입력(외모) 지문을 예약 시점에 함께 계산해 input_snapshot 에 동봉.
@@ -369,7 +363,6 @@ export async function POST(req: Request) {
       safe_mode: effectiveSafeMode,
       style_anchor_key: anchor?.key ?? null,
     }
-    delete inputSnapshot.webhookUrl
 
     // #creem-moderation(2026-10-11): 프롬프트 확정 뒤·자리 예약 전에 사용자가 쓴 칸만 검사한다 — 막히면
     //   작업 행도 모델 제출도 없다. 시트 지시문·스타일 앵커 절은 보내지 않는다(우리 문구가 오탐을 만든다).
@@ -427,7 +420,8 @@ export async function POST(req: Request) {
       // 외부 접수는 한 번뿐이다 — 응답을 잃은 호출을 SDK 재시도로 복제하면 같은 그림을 두 번 결제한다.
       // falKeyId: 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 값으로 제출한다.
       const receipt = await falImageSubmit(
-        moderatedSubmitInput(submitOpts, moderation),
+        // 완료 알림 주소에 예약한 작업 번호를 심는다(웹훅이 요청 번호 없이도 이 작업을 찾는다).
+        moderatedSubmitInput({ ...submitOpts, webhookUrl: resolveWebhookUrl(job.id) }, moderation),
         { retry: false, falKeyId: job.fal_key_id },
       )
       try {
