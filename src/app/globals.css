@@ -365,6 +365,18 @@
 @utility bg-stage-gradient { background-image: var(--stage-gradient); }
 @utility bg-pearl-vivid { background-image: var(--pearl-vivid); }
 @utility bg-art-placeholder { background-image: var(--art-placeholder); }
+/* 요금 옵션 슬라이더(오너 2026-11-25 "요금 늘리면 무지개색 바"): 채운 만큼 여섯 단계 색이 이어진다.
+   --fill(0%~100%)은 컴포넌트가 inline style 로 넣는다. 새 색 없음 — 단계 색 토큰만 쓴다. */
+@utility range-rainbow {
+  appearance: none;
+  height: 6px;
+  border-radius: 9999px;
+  background:
+    linear-gradient(to right, transparent var(--fill, 0%), var(--chip) var(--fill, 0%)),
+    linear-gradient(90deg, var(--stage-producer), var(--stage-writer), var(--stage-artist), var(--stage-storyboard), var(--stage-director), var(--stage-editor));
+  &::-webkit-slider-thumb { appearance: none; width: 18px; height: 18px; border-radius: 9999px; background: var(--primary); box-shadow: 0 1px 4px rgb(0 0 0 / 0.5); }
+  &::-moz-range-thumb { width: 18px; height: 18px; border: 0; border-radius: 9999px; background: var(--primary); }
+}
 @utility text-gradient {
   background-image: var(--text-gradient);
   -webkit-background-clip: text;

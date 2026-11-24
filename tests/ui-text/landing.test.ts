@@ -90,4 +90,14 @@ describe('첫 화면 AI 모델 목록', () => {
   it('첫 화면에는 서비스가 쓰지 않는 모델 이름이 없다', () => {
     for (const name of ['Flux Kontext', 'Hunyuan', '자체 모델', 'Nano Banana Pro']) expect(html).not.toContain(name)
   })
+
+  // 왜: 오너 2026-11-25 "p1, p2, ㅡ, v1, v2 이런거 다 코딩할 때 남은 단어들". 화면 문구에 긴 대시와 버전 표기가 남아 있었다.
+  //   (편집기 트랙 이름 V1·V2·A1 은 실제 Editor 화면과 같은 이름이라 남긴다.)
+  it('첫 화면 문구에 긴 대시(–)와 버전 표기(v1)가 없다', () => {
+    const sim = readFileSync(path.join(process.cwd(), 'landing', 'src', 'appsim.js'), 'utf8')
+    for (const text of [html, sim, en]) {
+      expect(text).not.toMatch(/[–—]/)
+      expect(text).not.toMatch(/· v1/)
+    }
+  })
 })

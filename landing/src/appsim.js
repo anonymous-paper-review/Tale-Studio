@@ -93,7 +93,7 @@ function template() {
 
   <section class="sim-scene" data-scene="artist">
     <div class="sim-h"><b>인물 · 배경</b><span>인물 2 · 배경 1</span></div>
-    <div class="sim-style"><i>${shot('128 76 40 53')}</i><div><b>실사</b><small>작품 스타일 · v1</small></div><span class="sim-btn">다시 만들기</span></div>
+    <div class="sim-style"><i>${shot('128 76 40 53')}</i><div><b>실사</b><small>작품 스타일</small></div><span class="sim-btn">다시 만들기</span></div>
     <div class="sim-tabs"><span class="on">모두 3</span><span>인물 2</span><span>배경 1</span></div>
     <div class="sim-cards sim-cards--art">
       <div class="sim-card sim-card--sheet"><p>서윤<span class="sim-kind">인물</span></p><div class="sim-card__img"><i>${shot('128 76 40 53')}</i><i>${shot('120 60 56 110')}</i><i>${shot('120 60 56 110', true)}</i></div><small>29세 팀장, 베이지 트렌치코트</small></div>
@@ -273,7 +273,7 @@ export function createSim(host, { loop = false, onStep, last = 'editor' } = {}) 
       const chip = q.querySelector('.rec'); await click(chip); chip.classList.add('pick'); q.querySelector('.sim-qs').classList.add('done')
       $('[data-k="genre"]').textContent = '로맨스'; $('[data-q="genre"]').classList.add('set')
       ask('len')
-      const q2 = add(log, msg(`어느 정도 길이로 할까요?${pick([['15초 이하', '숏폼'], ['15–60초', '광고 · 티저', true], ['1–5분', '뮤비 · 웹드라마'], ['5–20분', '단편']])}`, true))
+      const q2 = add(log, msg(`어느 정도 길이로 할까요?${pick([['15초 이하', '숏폼'], ['15~60초', '광고 · 티저', true], ['1~5분', '뮤비 · 웹드라마'], ['5~20분', '단편']])}`, true))
       await sleep(800); if (!alive()) return
       const c1 = q2.querySelector('.sim-pick__c'); await click(c1); c1.classList.add('pick'); q2.querySelector('.sim-pick').classList.add('done')
       $('[data-k="len"]').textContent = '15초 이하'; $('[data-q="len"]').classList.add('set')

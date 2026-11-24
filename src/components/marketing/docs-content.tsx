@@ -99,7 +99,7 @@ export function DocsContent() {
             {STAGE_GUIDE.map((stage, i) => (
               <div key={stage.id} className="rounded-2xl border border-white/10 bg-white/[0.03] p-6">
                 <h3 className={`mb-2 font-semibold ${stage.color}`}>
-                  <span className="mr-2 font-mono text-xs text-gray-500">P{i + 1}</span>
+                  <span className="mr-2 font-num text-xs text-muted-foreground">{i + 1}</span>
                   {t(stage.name)}
                 </h3>
                 <p className="text-sm font-light leading-relaxed text-gray-300">{t(stage.body)}</p>

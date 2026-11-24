@@ -182,7 +182,8 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
                       disabled={busy}
                       aria-label={t('{family} options', { family: copy.title })}
                       aria-valuetext={`${option.item.name}, ${optionLabel(option)}, ${priceText(option, surface)} ${t(option.kind === 'plan' ? '/ month' : 'One time')}`}
-                      className="h-10 min-w-0 flex-1 cursor-pointer accent-primary focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring disabled:cursor-wait"
+                      style={{ '--fill': `${options.length > 1 ? (selection.index / (options.length - 1)) * 100 : 0}%` } as React.CSSProperties}
+                      className="range-rainbow min-w-0 flex-1 cursor-pointer focus-visible:outline-2 focus-visible:outline-offset-4 focus-visible:outline-ring disabled:cursor-wait"
                     />
                     <Button variant="outline" size="icon-lg" disabled={busy || selection.index === options.length - 1} onClick={() => choose(selection.index + 1)} aria-label={t('Next option')}>
                       <ChevronRight aria-hidden="true" />
