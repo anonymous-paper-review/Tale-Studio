@@ -65,12 +65,21 @@ describe('요금표를 숨겨 둔 동안의 메뉴', () => {
   })
 
   // 왜: Playground·Docs·정책 페이지가 함께 쓰는 머리글과 바닥글도 요금표로 가는 길이다.
-  it('요금표를 숨겨 두면 공개 페이지 머리글과 바닥글에 Pricing이 없고 Playground와 Docs는 그대로다', async () => {
-    for (const html of await publicHeaderAndFooter()) {
+  //   2026-11-25 오너 "문서 탭은 바닥글로 내려야" — Docs 는 바닥글에만 있다.
+  it('요금표를 숨겨 두면 공개 페이지 머리글과 바닥글에 Pricing이 없고 Playground는 그대로, Docs는 바닥글에 있다', async () => {
+    const [header, footer] = await publicHeaderAndFooter()
+    for (const html of [header, footer]) {
       expect(html).not.toContain('href="/pricing"')
       expect(html).toContain('href="/playground"')
-      expect(html).toContain('href="/docs"')
     }
+    expect(footer).toContain('href="/docs"')
+  })
+
+  // 왜: 2026-11-25 오너. 문서(이용 가이드)는 머리글 탭으로 둘 만큼 자주 가는 곳이 아니다.
+  it('공개 페이지 머리글에는 문서 탭이 없고 바닥글에서 문서로 간다', async () => {
+    const [header, footer] = await publicHeaderAndFooter()
+    expect(header).not.toContain('href="/docs"')
+    expect(footer).toContain('href="/docs"')
   })
 
   // 왜: 정책 페이지의 돌아가기 링크가 숨긴 요금표를 가리키면 누른 사람이 엉뚱한 곳에 떨어진다.

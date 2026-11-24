@@ -9,6 +9,7 @@ import { useFirstVisitLocale } from '@/components/marketing/use-first-visit-loca
 
 /**
  * 공개(마케팅) 페이지 공용 헤더 (#landing-v2 2026-08-03) — 랜딩·Playground·Pricing·Docs.
+ * 2026-11-25 오너: 문서(Docs)는 머리글에서 빼고 바닥글에만 둔다.
  * 2026-11-24 오너 ④: 디자이너 랜딩 머리글 모양 — 로고 묶음, 회색 메뉴, KO/EN 알약, 크림 "시작하기" 알약. 밝게·어둡게 단추는 넣지 않는다.
  * 로그인 사용자가 "시작하기"를 누르면 middleware 가 /login → /projects 로 이어 보낸다.
  */
@@ -31,9 +32,6 @@ export function SiteHeader({ showLocale = false }: { showLocale?: boolean } = {}
               {t('Pricing')}
             </Link>
           )}
-          <Link href="/docs" className="hidden text-muted-foreground transition-colors hover:text-foreground sm:block">
-            {t('Docs')}
-          </Link>
         </nav>
         <div className="flex items-center gap-2.5">
           {showLocale && <LocaleToggle />}

@@ -235,6 +235,13 @@ function PricingPicker({ initialSelection, checkoutEnabled }: { initialSelection
                       <Lock className="size-3" aria-hidden="true" />{t('Korean card payment · KG Inicis')}
                     </p>
                   </>
+                ) : action === 'notice' && surface.currency === 'krw' ? (
+                  <>
+                    <Button size="lg" className="w-full rounded-full" data-pricing-purchase onClick={() => toast(t('Payments are being prepared'))}>
+                      {buyLabel(option, krwAmount)}
+                    </Button>
+                    <p className="mt-2 text-center text-xs text-muted-foreground">{t('You can browse plans and Take packs. Purchases are not open yet.')}</p>
+                  </>
                 ) : action === 'subscription-soon' ? (
                   <>
                     <Button size="lg" variant="secondary" className="w-full rounded-full" data-pricing-purchase onClick={() => toast(t('Subscriptions open soon'))}>

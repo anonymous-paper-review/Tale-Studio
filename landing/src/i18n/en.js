@@ -337,7 +337,7 @@ export const TEXT = {
   '분리된 작업 공간': 'Isolated workspaces',
   '프로젝트마다 격리된 환경': 'Every project runs in its own space',
   '검증된 영상 모델': 'Proven video models',
-  'Seedance · Kling · Hunyuan · Tale 자체 모델': 'Seedance · Kling · Hunyuan · Tale’s own models',
+  'Seedance · Kling · Veo · MiniMax': 'Seedance · Kling · Veo · MiniMax',
 
   // Tale 서비스
   '기획부터 편집까지 한 곳에서 끝나는 올인원 프리비즈 스튜디오예요. Tale이 잘하는 세 가지와 필요한 기능을 모았어요.': 'An all-in-one previz studio that takes you from planning to the final edit. Here’s what Tale does best, and everything else you need.',

@@ -19,15 +19,15 @@ amb.innerHTML = '<i></i><i></i><i></i><i></i>' +
 document.body.prepend(amb)
 
 // ---------- 챗봇 ----------
-const PRICING = 'https://talestudio.art/pricing'
+const PRICING = '/pricing'
 const EN = lang === 'en'
 const ANSWERS = [
   { k: ['뭐', '무엇', '소개', 'tale', '테일', '서비스', 'what', 'about'], a: EN ? 'Tale is a previz studio that turns a one-line story into prose, characters, storyboards and video. I’m Lumi, and I walk through all six stages with you.' : 'Tale은 한 줄 이야기를 산문 · 인물 · 콘티 · 영상으로 이어 주는 프리비즈 스튜디오예요. 저는 그 여섯 단계를 같이 걷는 Lumi고요.' },
-  { k: ['요금', '가격', '얼마', '비용', 'take', '테이크', '크레딧', 'price', 'pricing', 'cost', 'much', 'plan'], a: EN ? `Starter begins at $15/month, and Producer for teams at $199/month. Images and storyboards are always free; Takes are only used for video. <a href="${PRICING}">See pricing →</a>` : `Starter는 월 $15부터, 팀용 Producer는 월 $199부터예요. 이미지와 콘티는 항상 무료고, 영상에만 Take를 써요. <a href="${PRICING}">요금 자세히 보기 →</a>` },
+  { k: ['요금', '가격', '얼마', '비용', 'take', '테이크', '크레딧', 'price', 'pricing', 'cost', 'much', 'plan'], a: EN ? `Starter begins at $15/month, and Producer for teams at $199/month. Images and storyboards are always free; Takes are only used for video. <a href="${PRICING}">See pricing →</a>` : `Starter는 월 ₩29,900부터, 팀용 Producer는 월 ₩299,000부터예요. 이미지와 콘티는 항상 무료고, 영상에만 Take를 써요. <a href="${PRICING}">요금 자세히 보기 →</a>` },
   { k: ['콘티', '스토리보드', '먼저', 'storyboard', 'board', 'first'], a: EN ? 'Every video generation costs Takes, but storyboards are free. Lock the framing and characters on the storyboard first, then only turn final cuts into video, and you’ll regenerate far less.' : '영상은 만들 때마다 Take가 들지만 콘티는 무료예요. 구도와 인물을 콘티로 먼저 맞추고, 확정한 컷만 영상으로 옮기면 다시 만드는 횟수가 확 줄어요.' },
   { k: ['시작', '어떻게', '처음', '사용', 'start', 'how', 'begin', 'use'], a: EN ? 'Just write one line of story. I’ll ask about genre and length, then take it from story to characters to storyboard. You only need to pick.' : '이야기 한 줄만 적어 주세요. 제가 장르와 길이를 여쭤보고, 산문 → 인물 → 콘티 순서로 이어 갈게요. 고르기만 하면 돼요.' },
   { k: ['학습', '보안', '저작권', '내 것', '데이터', 'train', 'privacy', 'security', 'data', 'copyright'], a: EN ? 'Your projects, prompts and outputs are never used to train AI. Every project runs in its own isolated workspace.' : '만드신 프로젝트 · 프롬프트 · 생성물은 어떤 AI 학습에도 쓰지 않아요. 프로젝트마다 분리된 공간에서 작업해요.' },
-  { k: ['모델', 'seedance', 'kling', 'hunyuan', 'model', 'veo'], a: EN ? 'We use Seedance, Kling, Hunyuan and Tale’s own models. You’ll always see the model and the Take cost before you generate.' : 'Seedance · Kling · Hunyuan, 그리고 Tale 자체 모델을 써요. 생성 전에 모델과 Take를 먼저 보여 드려요.' },
+  { k: ['모델', 'seedance', 'kling', 'model', 'veo', 'minimax', 'nano banana'], a: EN ? 'Video runs on Seedance, Kling, Veo and MiniMax, and images on GPT Image, Nano Banana and more. You’ll always see the model and the Take cost before you generate.' : '영상은 Seedance · Kling · Veo · MiniMax, 이미지는 GPT Image · Nano Banana 등을 써요. 생성 전에 모델과 Take를 먼저 보여 드려요.' },
 ]
 const CHIPS = ['Tale은 뭐예요?', '요금이 궁금해요', '콘티 먼저가 뭐예요?', '어떻게 시작해요?']
 

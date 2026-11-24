@@ -71,3 +71,23 @@ describe('첫 화면 언어', () => {
     expect(JSON.parse(appLocaleRecord('ko'))).toEqual({ state: { locale: 'ko' }, version: 0 })
   })
 })
+
+describe('첫 화면 AI 모델 목록', () => {
+  const chips = (() => {
+    const i = html.indexOf('explore__chips--model')
+    const seg = html.slice(i, html.indexOf('</ul>', i))
+    return [...seg.matchAll(/<span>([^<]+)<\/span>/g)].map((m) => m[1])
+  })()
+
+  // 왜: 오너 2026-11-25 "더 최신의 좋은 애들 추가". 목록은 실제로 서비스가 부르는 모델과 같아야 한다(코드 기준: video-models · image-models · chat-model-settings · writer dispatch · video-fallback).
+  it('첫 화면 AI 모델 목록에 지금 서비스가 쓰는 최신 모델이 보인다', () => {
+    for (const name of ['Claude Opus 5.5', 'Claude Sonnet 5.5', 'Gemini 3.6 Flash', 'GPT Image 2', 'Nano Banana 2', 'FLUX.2 Klein', 'Grok Imagine', 'Seedance 2.5', 'Seedance 2.0', 'Kling O3 Pro', 'Veo 3.1', 'MiniMax H3 Max']) {
+      expect(chips).toContain(name)
+    }
+  })
+
+  // 왜: 시안에는 서비스가 쓰지 않는 모델(Flux Kontext, Hunyuan, Tale 자체 모델)이 적혀 있었다. 쓰지 않는 모델을 쓴다고 하면 안 된다.
+  it('첫 화면에는 서비스가 쓰지 않는 모델 이름이 없다', () => {
+    for (const name of ['Flux Kontext', 'Hunyuan', '자체 모델', 'Nano Banana Pro']) expect(html).not.toContain(name)
+  })
+})

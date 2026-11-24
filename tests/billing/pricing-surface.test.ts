@@ -45,11 +45,12 @@ describe('요금 화면 표시', () => {
     expect(koReady.switchToKorean).toBe(false)
   })
 
-  // 왜: 국내 카드 키가 없는 미리보기 환경에서는 한국어여도 지금처럼 달러·준비 중으로 보인다.
-  it('국내 카드 결제가 준비되지 않았으면 한국어 화면도 달러 가격과 "결제 준비 중" 안내를 보인다', () => {
+  // 왜: 오너 2026-11-25 "한국어일 때는 원화로 표기". 국내 카드 키가 없는 미리보기에서도 한국어면 원화다.
+  it('한국어 화면은 국내 카드 결제가 준비되지 않았어도 가격을 원화로 보이고 구매 단추는 준비 중 안내만 띄운다', () => {
     const notReady = pricingSurface({ locale: 'ko', checkoutEnabled: false, koreanCardReady: false, koreanSubscriptionReady: false })
-    expect(notReady.currency).toBe('usd')
+    expect(notReady.currency).toBe('krw')
     expect(notReady.banner).toBe('preparing')
+    expect(purchaseAction(notReady, 'pack')).toBe('notice')
     expect(notReady.switchToKorean).toBe(false)
   })
 
