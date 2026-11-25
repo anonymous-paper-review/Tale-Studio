@@ -10,6 +10,8 @@ import { ContactPopover } from '@/components/contact-popover'
 import { PricingFamilies } from '@/components/billing/pricing-families'
 import { SiteHeader } from '@/components/marketing/site-header'
 import { SiteFooter } from '@/components/marketing/site-footer'
+import { DASHBOARD_CONTAINER, DashboardHeader } from '@/components/dashboard/dashboard-header'
+import { useSignedIn } from '@/lib/supabase/use-signed-in'
 import { useLocale, useT } from '@/lib/i18n'
 import { pricingSurface } from '@/lib/billing/pricing-selection'
 import { readPortOneBillingChannelKey, readPortOnePublicConfig } from '@/lib/billing/portone-public'
@@ -92,11 +94,16 @@ function PricingBanner({ checkoutEnabled }: { checkoutEnabled: boolean }) {
 
 export function PricingPageContent({ checkoutEnabled }: { checkoutEnabled: boolean }) {
   const t = useT()
+  // 2026-11-25 오너 "pricing 메뉴만 진입했을 때 루프가 꼬여있다": 앱 안 Pricing 탭·Change plan 으로 들어온 사람에게
+  //   첫 화면 메뉴를 보이면 앱으로 돌아갈 길 없이 첫 화면 ↔ 요금표만 오간다. 로그인했으면 앱 안 메뉴를 보인다(Playground 와 같은 방식).
+  //   약속: tests/billing/pricing-signed-in.test.ts
+  const signedIn = useSignedIn()
 
   return (
     <div className="flex min-h-screen flex-col bg-black text-white">
-      <SiteHeader showLocale />
-      <main className="mx-auto w-full max-w-6xl flex-1 px-6 pb-20 pt-32">
+      {signedIn === true && <DashboardHeader active="pricing" />}
+      {signedIn === false && <SiteHeader showLocale />}
+      <main className={signedIn === true ? `${DASHBOARD_CONTAINER} flex-1 pb-20 pt-10` : 'mx-auto w-full max-w-6xl flex-1 px-6 pb-20 pt-32'}>
         <div className="mb-8 text-center">
           <p className="mb-2 text-label font-bold text-muted-foreground">{t('Pricing')}</p>
           <h1 className="mb-3 text-4xl font-bold tracking-tight md:text-5xl">{t('Pay for what you plan and the Takes you spend')}</h1>
