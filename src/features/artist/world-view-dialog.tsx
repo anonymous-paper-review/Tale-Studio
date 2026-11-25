@@ -24,6 +24,7 @@ import {
 } from '@/lib/image-models'
 import { classifyWorldImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
+import { failureNotice } from '@/lib/artist/failure-badge'
 import { boardShotLabels } from '@/lib/writer/board-summary'
 import { cn } from '@/lib/utils'
 import { useLocale, useT } from '@/lib/i18n'
@@ -111,6 +112,9 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
     setManageError(null)
   }
   const failure = useArtistStore((s) => (locationId ? s.worldFailures[worldFailureKey(locationId, variantKey)] : undefined))
+  // 제출 전 내용 검사(Creem) 거절 — 작업 기록이 없어 failure 가 없다. 순화 재시도 자격도 없으므로 설명 고치기만 알린다.
+  const contentRefused = useArtistStore((s) => (locationId ? !!s.contentRefusals[worldFailureKey(locationId, variantKey)] : false))
+  const notice = failureNotice({ failure, contentRefused })
   const isGenerating = useArtistStore((s) =>
     locationId ? s.generatingLocations.includes(worldFailureKey(locationId, variantKey)) : false,
   )
@@ -265,17 +269,19 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
         {styleLabel ? t('Background image · style {style}', { style: styleLabel }) : t('Background image')}
       </p>
 
-      {failure ? (
+      {notice ? (
         <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <AlertTriangle className="size-3.5 shrink-0" />
           <span>
-            {failure.moderation
-              ? t('Generation was declined by content policy. You can retry below with "Retry with a softer prompt."')
-              : t('Generation failed. Please try again.')}
+            {notice === 'content-check-softer'
+              ? t('This description did not pass the content check, so it was not drawn. Press "Retry with a softer prompt" below, or edit the description and draw again.')
+              : notice === 'content-check-edit'
+                ? t('This description did not pass the content check, so it was not drawn. Edit the description and draw again.')
+                : t('Generation failed. Please try again.')}
           </span>
         </div>
       ) : null}
-      {failure?.moderation ? (
+      {notice === 'content-check-softer' ? (
         <Button variant="outline" disabled={safeRetry.locked || capReached} onClick={safeRetry.run}>
           {safeRetry.locked ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           {capReached ? t('Softer prompt retry limit reached') : t('Retry with a softer prompt')}

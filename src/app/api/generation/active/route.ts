@@ -7,7 +7,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { listActiveGenerationJobs, listGenerationCompletionRows, listRecentGenerationJobRows, userOwnsProject } from '@/lib/generation-jobs'
 import { completionsOf, summarizeGenerationBatches } from '@/lib/generation-batches'
-import { countProjectVideoGenerations } from '@/lib/generation-quota'
+import { countProjectVideoGenerations, userSlotUsage } from '@/lib/generation-quota'
 import { PROJECT_VIDEO_GENERATION_LIMIT } from '@/lib/plan-limits'
 import { reconcileGhostQueuedJobs } from '@/lib/fal/reconcile'
 import { supabaseAdmin } from '@/lib/supabase/admin'
@@ -41,17 +41,19 @@ export async function GET(req: Request) {
   //   프로젝트당 60s 스로틀 + 실패 무해라 4s 폴링 경로에 있어도 안전하다.
   await reconcileGhostQueuedJobs(projectId)
 
-  // 네 읽기는 서로 독립이라 동시에 보낸다(순차 4왕복 → 1왕복 시간).
+  // 다섯 읽기는 서로 독립이라 동시에 보낸다(순차 5왕복 → 1왕복 시간).
   // #f4: 프로젝트당 영상 생성 사용량 — 이 라우트는 이미 모든 탭이 공유 폴링하므로(4s/15s),
   //   여기 실어 보내면 사이드바 게이지가 추가 폴러 없이 실시간이 된다. count(head) 라 가볍다.
   //   집계 자실은 게이트와 공용 함수다 — 게이지와 게이트가 다른 수를 보면 "다 썼다"와 "생성된다"가 엇갈린다.
-  const [jobs, usedVideo, recentRows, completionRows] = await Promise.all([
+  const [jobs, usedVideo, recentRows, completionRows, slots] = await Promise.all([
     listActiveGenerationJobs(projectId),
     countProjectVideoGenerations(projectId),
     // 약속 D(2026-09-04): 핀 "n/N"·왼쪽 탭 숫자·Director 버튼 숫자의 단일 근거 — 서버 큐에서 파생한 배치와 완료 기록.
     listRecentGenerationJobRows(projectId),
     // 미확인 완료는 최근 진행 배치와 달리 하루가 지났거나 500건을 넘어도 남아야 한다.
     listGenerationCompletionRows(projectId),
+    // 내가 지금 쓰는 동시 생성 자리 — 프로젝트가 아니라 사람 기준이다. 자리 줄이 제출 게이트·DB 트리거와 같은 수를 보게 같은 함수를 여기 실어 보낸다.
+    userSlotUsage(user.id),
   ])
   const videoUsage = { used: usedVideo, limit: PROJECT_VIDEO_GENERATION_LIMIT }
   const batches = summarizeGenerationBatches(recentRows)
@@ -60,7 +62,7 @@ export async function GET(req: Request) {
   // 복귀 마운트에서만 최근 완료·미반영 잡을 받아 DB 재수화 뒤 ui_reflected 를 찍는다.
   // 평상시 4초 active 폴링에는 쿼리 2개를 더하지 않도록 opt-in 이다(#a2-stage-away).
   if (new URL(req.url).searchParams.get('includeUnreflected') !== '1') {
-    return NextResponse.json({ ok: true, data: { jobs, videoUsage, batches, completions } })
+    return NextResponse.json({ ok: true, data: { jobs, videoUsage, slots, batches, completions } })
   }
 
   const cutoff = new Date(Date.now() - RECENT_COMPLETED_MS).toISOString()
@@ -95,5 +97,5 @@ export async function GET(req: Request) {
       target: job.target,
       startedAt: Date.parse(job.created_at),
     }))
-  return NextResponse.json({ ok: true, data: { jobs, unreflected, videoUsage, batches, completions } })
+  return NextResponse.json({ ok: true, data: { jobs, unreflected, videoUsage, slots, batches, completions } })
 }

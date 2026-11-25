@@ -194,7 +194,8 @@ export async function POST(req: Request) {
         image_urls: [frames.start, frames.end],
         duration,
         aspect_ratio: '16:9',
-        webhookUrl: resolveWebhookUrl(),
+        // 접수 번호 기록을 놓쳐도 웹훅이 이 예약 행을 되찾게 주소에 작업 번호를 심는다(C05).
+        webhookUrl: resolveWebhookUrl(job.id),
       }, moderation), submitFalKey))
     } catch (submitError) {
       const message = submitError instanceof Error ? submitError.message : String(submitError)

@@ -31,11 +31,12 @@ import {
 import { claimAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
-import { isQuotaExceeded, notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
+import { isContentPolicyBlocked, isQuotaExceeded, notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/generation-slots'
+import { characterRefusalKey } from '@/lib/artist/failure-badge'
 import { DRAW_CONTINUE_MAX_ROUNDS, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, missingDrawTargets, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import type { ArtistFilter } from '@/lib/artist/card-filter'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
@@ -105,6 +106,24 @@ function quotaScopeOf(status: number, body: unknown): 'user' | 'global' | null {
   return scope === 'user' || scope === 'global' ? scope : null
 }
 
+/** 제출 전 내용 검사 400 본문의 대상 이름 — 라우트가 이름을 알 때만 온다(target?: { kind, name }). */
+function contentRefusalName(body: unknown): string | null {
+  if (!body || typeof body !== 'object') return null
+  const name = (body as { target?: { name?: unknown } }).target?.name
+  return typeof name === 'string' && name.trim() ? name : null
+}
+
+/** 그 칸의 거절 기억을 지운다 — 바뀐 것이 없으면 같은 객체를 돌려줘 쓸데없는 다시 그리기를 만들지 않는다. */
+function withoutContentRefusal(
+  refusals: Record<string, { name: string | null }>,
+  key: string,
+): Record<string, { name: string | null }> {
+  if (!(key in refusals)) return refusals
+  const { [key]: _drop, ...rest } = refusals
+  void _drop
+  return rest
+}
+
 export function requireDefaultAppearanceKey(character: CharacterAsset): string {
   const defaults = character.appearances.filter((appearance) => appearance.isDefault)
   if (defaults.length !== 1) {
@@ -160,6 +179,11 @@ export type GenerationRequestOptions = {
   onJob?: GenerationJobObserver
   /** 내 한도에 막혀 기다리는 동안 다시 보는 요청 — 처음 막힐 때 이미 알렸다, 같은 한도 안내를 다시 띄우지 않는다(2026-10-27 검토). */
   quietQuota?: boolean
+  /**
+   * 제출 전 내용 검사(Creem)에 걸렸다 — 작업 기록이 생기기 전에 끝나므로 화면이 그 칸을 기억해야
+   * 카드·상세가 어느 인물·배경인지 알릴 수 있다(2026-11-25 오너). name 은 라우트가 이름을 알 때만.
+   */
+  onContentRefusal?: (name: string | null) => void
 }
 export type AppearanceCreationOptions = GenerationRequestOptions & {
   generate?: boolean
@@ -292,6 +316,8 @@ async function generateAndPersistWorldShot(
         error: body.error ?? `HTTP ${res.status}`,
         quotaScope: quotaScopeOf(res.status, body),
     })
+      // 제출 전 내용 검사에 걸렸다 — 작업 기록이 없어 화면이 직접 기억해야 카드·상세가 어떤 배경인지 알릴 수 있다.
+      if (isContentPolicyBlocked(res.status, body)) options?.onContentRefusal?.(contentRefusalName(body))
       // 내 한도 기다림 중에는 내 한도 안내만 다시 띄우지 않는다 — 모두의 자리가 찬 것은 알린다(이어 그리기가 거기서 멈춘다).
       if (options?.quietQuota && isQuotaExceeded(res.status, body) && body.scope !== 'global') return null
       if (notifyIfQuotaExceeded(res.status, body)) return null
@@ -607,6 +633,14 @@ interface ArtistState {
   characterAssets: CharacterAsset[]
   /** per-character/per-view 생성 실패(콘텐츠정책/일반). G001은 채우기만 — 소비는 G002(배지·우회)·G003(온보딩). */
   viewFailures: ViewFailures
+  /**
+   * 제출 전 내용 검사(Creem)에 걸려 자리가 만들어지지도 않은 칸 — 인물은 characterRefusalKey,
+   * 배경은 worldFailureKey. 값은 라우트가 알려준 대상 이름(모를 때 null).
+   *
+   * 새로고침하면 사라진다 — 서버 작업 기록이 없어 다시 읽을 것이 없기 때문이다(viewFailures 와 다른 점).
+   *   그 칸이 다시 제출되거나 그려지면 지우고, 프로젝트를 옮기면(reset) 모두 사라진다.
+   */
+  contentRefusals: Record<string, { name: string | null }>
   /** 최종 룩 요약(art_style + color_meaning) — 온보딩 버블 카피용. 룩 미반영이면 null. */
   lookSummary: ArtistLookSummary | null
   worldAssets: WorldAsset[]
@@ -781,6 +815,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   characterAssets: [],
   viewFailures: {},
   worldFailures: {},
+  contentRefusals: {},
   lookSummary: null,
   worldAssets: [],
   selectedCharacterId: null,
@@ -1263,6 +1298,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     }
     const slot = { characterId, appearanceKey, view }
     const key = `${characterId}:${appearanceKey}:${view}`
+    // 제출 전 내용 검사 거절을 기억하는 칸 — 카드 배지·상세 안내가 이 키로 찾는다.
+    const refusalKey = characterRefusalKey(characterId, appearanceKey, view)
     if (get().generatingViews.some((active) => sameCharacterAppearanceSlot(active, characterId, appearanceKey, view))) {
       options?.onJob?.({ jobId: null, status: 'deduped' })
       return { jobId: null, status: 'deduped' }
@@ -1291,6 +1328,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     let lastReceipt: GenerationJobReceipt | null = null
     const onJob: GenerationJobObserver = (receipt) => {
       lastReceipt = receipt
+      // 이 칸의 새 제출이 정식 접수됐다(작업 번호가 붙었다) — 이번엔 내용 검사를 지나왔다는 뜻이니 지난 거절 기억을 지운다.
+      if (receipt.jobId && receipt.status === 'queued') {
+        set((state) => ({ contentRefusals: withoutContentRefusal(state.contentRefusals, refusalKey) }))
+      }
       options?.onJob?.(receipt)
     }
     alog(`[autogen] char ${key} → submitting…`)
@@ -1314,6 +1355,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         const body = await res.json().catch(() => ({}))
         const error = body.error ?? `HTTP ${res.status}`
         onJob({ jobId: null, status: 'failed', httpStatus: res.status, error, quotaScope: quotaScopeOf(res.status, body) })
+        // 제출 전 내용 검사에 걸렸다 — 작업 기록이 생기기 전에 끝나 카드에 실패 배지가 남지 않는다 — 화면이 그 칸을 기억한다.
+        if (isContentPolicyBlocked(res.status, body)) {
+          const name = contentRefusalName(body)
+          set((state) => ({ contentRefusals: { ...state.contentRefusals, [refusalKey]: { name } } }))
+        }
         if ((options?.quietQuota && isQuotaExceeded(res.status, body) && body.scope !== 'global') || notifyIfQuotaExceeded(res.status, body)) {
           return { jobId: null, status: 'failed', httpStatus: res.status, error }
         }
@@ -1375,6 +1421,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               : a,
           ),
           viewFailures,
+          // 그려졌으니 제출 전 거절 기억도 지운다 — "내용 검사에 걸림" 배지가 그린 칸에 남지 않게.
+          contentRefusals: withoutContentRefusal(state.contentRefusals, refusalKey),
         }
       })
       // 새 그림의 기록을 다시 읽는다 — 상세의 기록(시계) · "바뀜" 표시가 새 그림 기준이 되게(2026-10-20 팝업 e2e). 못 읽어도 그림은 그대로.
@@ -1686,6 +1734,10 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     let lastReceipt: GenerationJobReceipt | null = null
     const onJob: GenerationJobObserver = (receipt) => {
       lastReceipt = receipt
+      // 이 칸의 새 제출이 정식 접수됐다 — 인물 경로와 같은 이유로 지난 제출 전 거절 기억을 지운다.
+      if (receipt.jobId && receipt.status === 'queued') {
+        set((state) => ({ contentRefusals: withoutContentRefusal(state.contentRefusals, slotKey) }))
+      }
       extra?.onJob?.(receipt)
     }
     alog(`[autogen] world ${locationId}:${shot} → submitting…`)
@@ -1725,7 +1777,14 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         prompt,
         imageProvider,
         actor,
-        { traceId: extra?.traceId, onJob, quietQuota: extra?.quietQuota },
+        {
+          traceId: extra?.traceId,
+          onJob,
+          quietQuota: extra?.quietQuota,
+          // 제출 전 내용 검사에 걸렸다 — 어떤 배경 모습이 걸렸는지 그 칸(slotKey) 에 이름과 함께 적어 둔다.
+          onContentRefusal: (name) =>
+            set((state) => ({ contentRefusals: { ...state.contentRefusals, [slotKey]: { name } } })),
+        },
         {
           model,
           safeMode: extra?.safeMode,
@@ -1755,6 +1814,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
               ? { ...w, appearances: (w.appearances ?? []).map((a) => (a.appearanceKey === variantKey ? { ...a, wideShot: url } : a)) }
               : { ...w, [shot]: url },
         ),
+        // 그려졌으니 제출 전 거절 기억도 지운다(인물 경로와 같은 사상).
+        contentRefusals: withoutContentRefusal(state.contentRefusals, slotKey),
       }))
       if (pid) await refreshLocationCandidates(pid, locationId, set)
       notifyGenerationComplete('artist', translate(useLocaleStore.getState().locale, 'Background image')) // 다른 stage에 있을 때만 알림(store가 판단)
@@ -2527,6 +2588,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       sceneManifest: null,
       characterAssets: [],
       viewFailures: {},
+      contentRefusals: {},
       lookSummary: null,
       worldAssets: [],
       selectedCharacterId: null,

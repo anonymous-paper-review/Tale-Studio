@@ -6,7 +6,6 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { usePathname, useRouter } from 'next/navigation'
 import {
   AlertTriangle,
-  Activity,
   ArrowUp,
   Check,
   CheckCircle2,
@@ -49,6 +48,7 @@ import { roughRedrawOfferHere } from '@/lib/writer/chat-rough-redraw'
 import { boardShotLabels } from '@/lib/writer/board-summary'
 import { MentionTextarea, type MentionItem } from '@/components/layout/mention-textarea'
 import { ChatProgressPin } from '@/components/layout/chat-progress-pin'
+import { ChatSlotLine } from '@/components/layout/chat-slot-line'
 import { ChatModelControls } from '@/components/layout/chat-model-controls'
 import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
@@ -106,7 +106,6 @@ import {
 } from '@/lib/stage-transition'
 import { useT } from '@/lib/i18n'
 import { pickContentLocale } from '@/lib/locale'
-import { totalInputTokens, type ChatTrace } from '@/lib/chat-trace'
 import type { StageId } from '@/types'
 import { boardNodeNames, directorMentionTargets } from '@/features/director/node-label'
 
@@ -329,139 +328,6 @@ function CopyButton({ text }: { text: string }) {
   )
 }
 
-function formatTraceNumber(value: number | null | undefined): string {
-  if (value == null || !Number.isFinite(value)) return '—'
-  if (value < 1000) return String(Math.round(value))
-  return `${(value / 1000).toFixed(value >= 10_000 ? 0 : 1)}k`
-}
-
-function ChatTraceFooter({
-  trace,
-  currentStage,
-}: {
-  trace: ChatTrace | null
-  currentStage: StageId
-}) {
-  const t = useT()
-  if (!trace) return null
-
-  const inputTotal = totalInputTokens(trace)
-  const stageLabel = STAGE_LABEL[trace.stage as StageId] ?? trace.stage
-  const traceStage = trace.stage as StageId
-  const traceColor = STAGE_FACE_COLOR[traceStage] ?? STAGE_FACE_COLOR[currentStage]
-  const actionSummary =
-    trace.rawUpdateCount != null || trace.validUpdateCount != null
-      ? t('Actions {raw} → {valid} → {applied}', {
-          raw: trace.rawUpdateCount ?? '—',
-          valid: trace.validUpdateCount ?? '—',
-          applied: trace.appliedCount ?? '—',
-        })
-      : null
-  const generationJobs = Array.isArray(trace.generationJobs) ? trace.generationJobs : []
-  const generationJobCount = generationJobs.length
-  const completedJobCount = generationJobs.filter((job) => job.status === 'completed').length
-  const failedJobCount = generationJobs.filter((job) => job.status === 'failed').length
-  const queuedJobCount = generationJobs.filter((job) => job.status === 'queued').length
-  const approvalPending =
-    trace.pendingProposal === true ||
-    (trace.generationStatus === 'awaiting_approval' && trace.pendingProposal !== false)
-  const displayGenerationStatus = (() => {
-    if (approvalPending) return 'awaiting_approval'
-    // Job receipts are the freshest source of truth. A queued job takes precedence
-    // over completed/failed jobs so a batch never looks finished while work remains.
-    if (generationJobCount > 0) {
-      if (queuedJobCount > 0) return 'queued'
-      if (completedJobCount === generationJobCount) return 'completed'
-      if (failedJobCount === generationJobCount) return 'failed'
-      if (completedJobCount > 0 && failedJobCount > 0) return 'partial'
-    }
-    // Approval clears before the first job receipt arrives. Keep that short gap
-    // understandable instead of continuing to show the approval state.
-    if (trace.generationStatus === 'awaiting_approval') return 'queued'
-    if (trace.generationStatus === 'deduped') return 'skipped'
-    if (trace.generationStatus === 'timed_out') return 'failed'
-    return trace.generationStatus
-  })()
-  const generationSummary = (() => {
-    switch (displayGenerationStatus) {
-      case 'queued':
-        return generationJobCount > 0
-          ? t('Generation queued · {count} jobs', { count: generationJobCount })
-          : t('Generation queued')
-      case 'completed':
-        return generationJobCount > 0
-          ? t('Generation completed · {count} jobs', { count: generationJobCount })
-          : t('Generation completed')
-      case 'partial':
-        return generationJobCount > 0
-          ? t('Generation partially completed · {completed} completed · {failed} failed', {
-              completed: completedJobCount,
-              failed: failedJobCount,
-            })
-          : t('Generation partially completed')
-      case 'failed':
-        return generationJobCount > 0
-          ? t('Generation failed · {count} jobs', { count: generationJobCount })
-          : t('Generation failed')
-      case 'skipped':
-        return generationJobCount > 0
-          ? t('Generation skipped · {count} jobs', { count: generationJobCount })
-          : t('Generation skipped')
-      default:
-        return null
-    }
-  })()
-
-  return (
-    <details className="shrink-0 border-t border-border-subtle px-5 py-1.5 font-num text-[10px] text-subtle-foreground">
-      <summary className="flex cursor-pointer list-none items-center gap-1.5 outline-none [&::-webkit-details-marker]:hidden">
-        <Activity
-          className="size-3 shrink-0"
-          style={{ color: traceColor }}
-          aria-hidden
-        />
-        <span className="truncate">
-          {stageLabel} · {t('Context {tokens}', { tokens: formatTraceNumber(inputTotal) })} ·{' '}
-          {t('Output {tokens}', { tokens: formatTraceNumber(trace.outputTokens) })}
-        </span>
-      </summary>
-      <div className="mt-1.5 space-y-0.5 pl-[18px] leading-4">
-        <p>{trace.model}{trace.effort ? ` · ${trace.effort}` : ''}{trace.thinking ? ` · ${t('Model thinking')}: ${t(trace.thinking === 'adaptive' ? 'Automatic' : 'Off')}` : ''}</p>
-        {trace.requestUsage && <p>{t('Request total: {calls} model calls · {input} input · {output} output · {ms} ms', { calls: trace.requestUsage.modelCalls, input: formatTraceNumber(trace.requestUsage.inputTokens + trace.requestUsage.cacheReadInputTokens + trace.requestUsage.cacheCreationInputTokens), output: formatTraceNumber(trace.requestUsage.outputTokens), ms: trace.requestUsage.durationMs.toLocaleString() })}</p>}
-        <p>
-          {t('History {count} · {chars} chars', {
-            count: trace.historyCount,
-            chars: trace.historyChars.toLocaleString(),
-          })}{' '}
-          · {t('Request {chars} chars', { chars: trace.contextChars.toLocaleString() })} ·{' '}
-          {t('Prompt {chars} chars', { chars: trace.promptChars.toLocaleString() })}
-        </p>
-        <p>
-          {t('Input {tokens}', { tokens: formatTraceNumber(trace.inputTokens) })} ·{' '}
-          {t('Cache read {tokens} · cache write {created}', {
-            tokens: formatTraceNumber(trace.cacheReadInputTokens),
-            created: formatTraceNumber(trace.cacheCreationInputTokens),
-          })}{' '}
-          · {t('Response {ms} ms', { ms: Math.round(trace.durationMs) })}
-        </p>
-        {actionSummary && <p>{actionSummary}</p>}
-        {trace.choicesMarkerFound && (
-          <p>{t('Choices {count}', { count: trace.choicesCount ?? 0 })}</p>
-        )}
-        {approvalPending ? (
-          <p>{t('Waiting for approval')}</p>
-        ) : (
-          generationSummary && <p>{generationSummary}</p>
-        )}
-        {trace.requestStatus != null && trace.requestStatus >= 400 && (
-          <p>{t('Request status {status}', { status: trace.requestStatus })}</p>
-        )}
-        {trace.stopReason && <p>{t('Stop reason: {reason}', { reason: trace.stopReason })}</p>}
-      </div>
-    </details>
-  )
-}
-
 export function GlobalChat() {
   const messages = useGlobalChatStore((s) => s.messages)
   const loading = useGlobalChatStore((s) => s.loading)
@@ -469,7 +335,6 @@ export function GlobalChat() {
   const sceneStoryRefresh = useGlobalChatStore((s) => s.sceneStoryRefresh)
   const sceneStoryProposalPending = useGlobalChatStore((s) => s.sceneStoryProposalPending)
   const error = useGlobalChatStore((s) => s.error)
-  const lastTrace = useGlobalChatStore((s) => s.lastTrace)
   const sendMessage = useGlobalChatStore((s) => s.sendMessage)
   const stopGeneration = useGlobalChatStore((s) => s.stopGeneration)
   const clearError = useGlobalChatStore((s) => s.clearError)
@@ -1772,7 +1637,8 @@ export function GlobalChat() {
           </button>
         )}
 
-        <ChatTraceFooter trace={lastTrace} currentStage={currentStage} />
+        {/* 입력창 바로 위 "내 자리" 줄 — 예전 개발용 토큰 줄 자리. 진행 알림바는 무엇을 그리는지, 이 줄은 자리가 몇 개 남았는지. */}
+        <ChatSlotLine projectId={projectId} />
 
         {/* Input footer (#oiioii-chat) — 둥근(r24) 입력 컨테이너 안에 편집기 + 하단 툴바.
             Textarea 는 입력 길이 따라 자동 확장 (max-h = 10줄 + padding). 내부 스크롤은

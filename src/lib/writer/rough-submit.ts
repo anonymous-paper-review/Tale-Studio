@@ -2,6 +2,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { falImageSubmit, type FalImageOptions } from '@/lib/writer/llm/fal'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
+import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { getGenerationJobById } from '@/lib/generation-jobs'
 import { syncFalKeyLimits } from '@/lib/generation-quota'
 import { moderatedSubmitInput, type ModerationReceipt } from '@/lib/moderation/creem'
@@ -70,8 +71,10 @@ export async function submitRoughStoryboardGrid(input: {
     let confirmationPending = false
     try {
       // 외부 접수는 한 번뿐이다. 응답을 잃은 호출을 SDK 재시도로 복제하지 않는다.
+      //   완료 알림 주소는 예약 번호를 알게 된 여기서 만든다 — 접수 번호 기록을 놓쳐도 웹훅이
+      //   그 번호로 이 예약 행을 되찾는다(C05). 묶음이면 시트마다 번호가 다르다.
       const receipt = await falImageSubmit(
-        moderatedSubmitInput(input.options, input.moderation),
+        moderatedSubmitInput({ ...input.options, webhookUrl: resolveWebhookUrl(jobId) }, input.moderation),
         { retry: false, falKeyId },
       )
       await recordWriterObservabilityEvent(input.projectId, 'fal_submit_accepted', {

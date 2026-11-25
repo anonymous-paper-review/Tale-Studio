@@ -1165,6 +1165,15 @@ export const KO: Record<string, string> = {
   'Content rules': '내용 규칙',
   'The content check is unavailable right now, so nothing was generated. Please try again in a moment.':
     '지금은 내용 검사를 할 수 없어서 아무것도 만들지 않았어요. 잠시 후 다시 시도해 주세요.',
+  // 2026-11-25 오너: 내용 검사에 걸린 그림은 자동으로 다시 그리지 않는다 — 어느 인물·배경인지와 할 일(설명 고치기)만 쉬운 말로 알린다.
+  //   제출 전(Creem) 거절은 순화 재시도 자격이 없고, 제출 뒤(fal) 거절은 순화 단추가 있다 — 두 안내를 가른다.
+  'The description for "{name}" did not pass the content check, so it was not drawn. Edit the description and try again.':
+    '"{name}" 설명이 내용 검사에 걸려 그리지 못했어요. 설명을 고쳐 다시 시도해 주세요.',
+  'Content check': '내용 검사에 걸림',
+  'This description did not pass the content check, so it was not drawn. Press "Retry with a softer prompt" below, or edit the description and draw again.':
+    '이 설명은 내용 검사에 걸려 그리지 못했어요. 아래 "문구를 완화해 다시 만들기"를 누르거나, 설명을 고쳐 다시 그려 주세요.',
+  'This description did not pass the content check, so it was not drawn. Edit the description and draw again.':
+    '이 설명은 내용 검사에 걸려 그리지 못했어요. 설명을 고쳐 다시 그려 주세요.',
   'History': '히스토리',
   'Candidate image': '후보 이미지',
   'Pre-look': '룩 이전',
@@ -1317,6 +1326,11 @@ export const KO: Record<string, string> = {
   'All generation slots are busy right now. Please try again in a moment.': '지금 생성 자리가 모두 사용 중이에요. 잠시 뒤에 다시 시도해 주세요.',
   'You can run up to {limit} video generations at once. Please retry after the current ones finish.': '영상은 동시에 {limit}개까지 생성할 수 있어요. 진행 중인 생성이 끝나면 다시 시도해 주세요.',
   'You can run up to {limit} image generations at once. Please retry after the current ones finish.': '이미지는 동시에 {limit}개까지 생성할 수 있어요. 진행 중인 생성이 끝나면 다시 시도해 주세요.',
+  // ── 채팅 입력창 위 내 자리 줄(chat-slot-line, 2026-11-25) — 위 안내와 같은 집계의 수를 미리 보여 준다 ──
+  'Images {used} / {limit}': '그림 {used} / {limit}',
+  'Videos {used} / {limit}': '영상 {used} / {limit}',
+  'Images {used} · no limit': '그림 {used} · 상한 없음',
+  'Videos {used} · no limit': '영상 {used} · 상한 없음',
   // ── misc: #payments-phase-2 슬라이스 2 — Take 소모량 표시 + hold 부족 안내 ──
   '{count} Take': 'Take {count}개',
   'Not enough Takes for this generation: you need {required}, you have {balance}.': '이 생성에 필요한 Take가 부족해요. {required}개 필요, 현재 {balance}개 보유.',

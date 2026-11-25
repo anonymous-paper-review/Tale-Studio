@@ -227,6 +227,39 @@ export async function checkGenerationCapacity(
   }
 }
 
+/** 화면에 보이는 "내 자리" — 그림 · 영상 각각 지금 쓰는 수와 상한. 상한 없음(관리자)은 limit: null. */
+export interface UserSlotUsage {
+  image: { used: number; limit: number | null }
+  video: { used: number; limit: number | null }
+}
+
+/**
+ * 지금 내가 쓰고 있는 동시 생성 자리 — 채팅 입력창 위 자리 줄(chat-slot-line)의 숫자.
+ *
+ * 게이트 · DB 트리거와 **같은 집계**를 쓴다: countQueuedJobsByUser(최근 30분 queued) + 같은 종류군
+ *   (영상 = VIDEO_JOB_KINDS, 그 밖 전부 그림) + 같은 상한(syncPersonalCapacity 의 예외표 판정).
+ *   화면이 다른 수를 세면 "자리가 남았는데 429" 또는 "꽉 찼는데 눌러도 된다"로 엇갈린다.
+ *
+ * 보여 주기만 하는 줄이라 실패에 막지 않는다(checkGenerationCapacity 와 같은 fail-open 규약):
+ *   집계가 실패하면 used: 0, 예외표 기록이 실패하면 기본 상한으로 보여 준다. 제출 경로는 그대로
+ *   기록 실패를 올려 막는다 — 이 줄 때문에 active 응답 전체가 500 이 되면 진행 표시까지 멈춘다.
+ */
+export async function userSlotUsage(userId: string): Promise<UserSlotUsage> {
+  const personal = await syncPersonalCapacity(userId).catch(() => null)
+  const unlimited = personal === 'unlimited'
+  const imageLimit = unlimited ? null : limitOf('image', personal)
+  const videoLimit = unlimited ? null : limitOf('video', personal)
+  try {
+    const [image, video] = await Promise.all([
+      countQueuedJobsByUser(userId, kindsOf('image')),
+      countQueuedJobsByUser(userId, kindsOf('video')),
+    ])
+    return { image: { used: image, limit: imageLimit }, video: { used: video, limit: videoLimit } }
+  } catch {
+    return { image: { used: 0, limit: imageLimit }, video: { used: 0, limit: videoLimit } }
+  }
+}
+
 /**
  * 429 응답 본문 표준 형태. 클라(generation-quota-toast)가 code/scope/category 로 안내 문구를 고른다.
  *

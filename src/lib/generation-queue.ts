@@ -46,8 +46,16 @@ export interface VideoUsage {
   limit: number
 }
 
+/** 내가 지금 쓰는 동시 생성 자리(2026-11-25) — 제출 게이트·DB 트리거와 같은 집계가 같은 폴링 응답에 실려 온다.
+ *  상한 없음(관리자)은 limit: null. */
+export interface SlotUsage {
+  image: { used: number; limit: number | null }
+  video: { used: number; limit: number | null }
+}
+
 let jobs: ActiveJob[] = EMPTY
 let videoUsage: VideoUsage | null = null
+let slots: SlotUsage | null = null
 // 약속 D: 서버가 파생한 배치(n/N)와 완료 기록 — 같은 폴러가 받아 모든 구독자가 같은 숫자를 본다.
 const EMPTY_BATCHES: GenerationBatch[] = []
 const EMPTY_COMPLETIONS: GenerationCompletion[] = []
@@ -93,12 +101,13 @@ async function fetchOnce(): Promise<void> {
     )
     if (!res.ok) throw new Error(`HTTP ${res.status}`)
     const body = (await res.json()) as {
-      data?: { jobs?: ActiveJob[]; videoUsage?: VideoUsage; batches?: GenerationBatch[]; completions?: GenerationCompletion[] }
+      data?: { jobs?: ActiveJob[]; videoUsage?: VideoUsage; slots?: SlotUsage; batches?: GenerationBatch[]; completions?: GenerationCompletion[] }
     }
     // 이전 프로젝트의 요청은 취소가 늦게 적용돼도 새 프로젝트 스냅샷에 반영하지 않는다.
     if (version !== requestVersion || requestedProjectId !== projectId || listeners.size === 0) return
     const next = body.data?.jobs ?? []
     const usage = body.data?.videoUsage ?? null
+    const nextSlots = body.data?.slots ?? null
     const nextBatches = body.data?.batches ?? []
     const nextCompletions = body.data?.completions ?? []
     // 사용량·배치·완료 기록 변화도 emit 대상 — 시그니처에 함께 태운다(잡 목록이 그대로여도 카운트는 오른다).
@@ -106,7 +115,11 @@ async function fetchOnce(): Promise<void> {
     // 개수·최신 시각만 같아도 이전 완료가 새 완료로 교체되거나 샷 수가 달라질 수 있다.
     // 전체 집계 입력을 비교하되 응답 순서만 바뀐 것은 같은 스냅샷으로 유지한다.
     const completionSig = nextCompletions.map((c) => `${c.stage}:${c.lane}:${c.at}:${c.units}`).sort().join(',')
-    const sig = `${signatureOf(next)}|v:${usage ? `${usage.used}/${usage.limit}` : '-'}|b:${batchSig}|c:${completionSig}`
+    // 자리 수도 시그니처에 태운다 — 도는 작업 목록이 그대로여도(다른 프로젝트에서 쓰는 자리) 내 자리는 바뀐다.
+    const slotSig = nextSlots
+      ? `${nextSlots.image.used}/${nextSlots.image.limit ?? '-'}+${nextSlots.video.used}/${nextSlots.video.limit ?? '-'}`
+      : '-'
+    const sig = `${signatureOf(next)}|v:${usage ? `${usage.used}/${usage.limit}` : '-'}|s:${slotSig}|b:${batchSig}|c:${completionSig}`
     const statusChanged = queueStatus !== 'ready'
     queueStatus = 'ready'
     if (sig === signature) {
@@ -116,6 +129,7 @@ async function fetchOnce(): Promise<void> {
     signature = sig
     jobs = next.length === 0 ? EMPTY : next
     videoUsage = usage
+    slots = nextSlots
     batches = nextBatches.length === 0 ? EMPTY_BATCHES : nextBatches
     completions = nextCompletions.length === 0 ? EMPTY_COMPLETIONS : nextCompletions
     emit()
@@ -153,6 +167,7 @@ function start(id: string) {
     projectId = id
     jobs = EMPTY
     videoUsage = null
+    slots = null
     batches = EMPTY_BATCHES
     completions = EMPTY_COMPLETIONS
     signature = ''
@@ -213,6 +228,10 @@ function getVideoUsageSnapshot(id: string | null): VideoUsage | null {
   return id && id === projectId ? videoUsage : null
 }
 
+function getSlotsSnapshot(id: string | null): SlotUsage | null {
+  return id && id === projectId ? slots : null
+}
+
 function getServerSnapshot(): ActiveJob[] {
   return EMPTY
 }
@@ -252,6 +271,18 @@ export function useVideoUsage(projectId: string | null): VideoUsage | null {
     [projectId],
   )
   return useSyncExternalStore(subscribe, () => getVideoUsageSnapshot(projectId), () => null)
+}
+
+/** 내가 지금 쓰는 동시 생성 자리 — 같은 단일 폴러를 공유한다. 없으면 null(첫 응답 전)이고 그럴 땐 자리 줄은 그리지 않는다. */
+export function useGenerationSlots(projectId: string | null): SlotUsage | null {
+  const subscribe = useCallback(
+    (onChange: () => void) => {
+      if (!projectId) return () => {}
+      return subscribeToProject(projectId, onChange)
+    },
+    [projectId],
+  )
+  return useSyncExternalStore(subscribe, () => getSlotsSnapshot(projectId), () => null)
 }
 
 // ── 순수 셀렉터 (테스트 대상) ────────────────────────────────────────────────

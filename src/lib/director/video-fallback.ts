@@ -228,7 +228,8 @@ export async function failDirectorVideoAttemptOrFallback(job: GenerationJob, evi
       storedSnapshot = snapshot
       let submission: Awaited<ReturnType<typeof submitFalReferenceToVideo>>
       try {
-        submission = await submitFalReferenceToVideo(request, resolveWebhookUrl(), job.fal_key_id, plan.moderation)
+        // 접수 번호 기록을 놓쳐도 웹훅이 이 예약 행을 되찾게 주소에 작업 번호를 심는다(C05).
+        submission = await submitFalReferenceToVideo(request, resolveWebhookUrl(job.id), job.fal_key_id, plan.moderation)
       } catch (error) {
         // 요청 자체가 바로 거절됐다 — 결과를 기다릴 것 없이 그다음 모델로 넘어간다.
         reason = `[fallback:${next}] ${describeSubmitError(error)}`

@@ -152,6 +152,8 @@ export function notifyInsufficientTakes(body: InsufficientTakesBody | null | und
 export interface ContentPolicyBlockedBody {
   code?: string
   policyUrl?: string
+  /** 걸린 그림의 대상(2026-11-25 오너) — 서버가 이름을 알 때만 오고, 있으면 안내가 그 이름을 말한다. */
+  target?: { kind: 'character' | 'world'; name: string }
 }
 
 export function isContentPolicyBlocked(status: number, body: unknown): body is ContentPolicyBlockedBody {
@@ -169,13 +171,24 @@ export function isContentPolicyBlocked(status: number, body: unknown): body is C
  */
 export function notifyContentPolicyBlocked(body: ContentPolicyBlockedBody | null | undefined): void {
   const locale = useLocaleStore.getState().locale
+  // 서버가 이름을 알 때는 그 이름을 말한다 — 거절은 작업 행이 없어 카드에 배지가 남지 않으니,
+  //   하나만 걸려도 어느 그림의 설정을 고쳐야 하는지는 이 안내만 알려 준다.
+  const name = typeof body?.target?.name === 'string' ? body.target.name.trim() : ''
   toast.error(
-    translate(
-      locale,
-      'This request breaks the content rules, so nothing was generated. Edit the description and try again.',
-    ),
+    name
+      ? translate(
+          locale,
+          'The description for "{name}" did not pass the content check, so it was not drawn. Edit the description and try again.',
+          { name },
+        )
+      : translate(
+          locale,
+          'This request breaks the content rules, so nothing was generated. Edit the description and try again.',
+        ),
     {
-      id: 'generation-content-policy',
+      // 이름을 id 에 붙여 걸린 그림마다 안내가 따로 보이게 한다 — 이어 그리기처럼 여러 장을 한번에 그릴 때
+      //   id 가 같으면 나중 안내가 앞 안내를 덮어 둘이 걸렸는데 하나만 보였다.
+      id: name ? `generation-content-policy:${name}` : 'generation-content-policy',
       action: {
         label: translate(locale, 'Content rules'),
         onClick: () => {

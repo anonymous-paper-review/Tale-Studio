@@ -385,7 +385,6 @@ export async function POST(req: NextRequest) {
     //   앞 화 끝 장면을 인물 · 배경 뒤(화풍 참고 앞)에 한 장 더 붙이고 그 칸을 가리키는 연속성 한 줄을 더한다.
     const continuity = await loadSeriesFirstShotContinuity(projectId, project)
 
-    const webhookUrl = resolveWebhookUrl()
     const submitted: Array<{ jobId: string; shotIds: string[] }> = []
     // #generation-capacity-trigger(2026-09-14): 자리가 없어 이번에 못 낸 시트의 샷 수 — 잔량(remaining)으로
     //   되돌려 다음 라운드가 다시 잡게 한다. 이미 낸 시트는 그대로 진행한다.
@@ -604,7 +603,8 @@ export async function POST(req: NextRequest) {
             // 포맷 파생 캔버스 — finalize 방향 가드가 snapshot.image_size 로 같은 계약을 검사한다.
             //   (ed5bd4a 전까지 이 필드는 타입에 없어 버려지고 'auto'가 전송되고 있었다 — #fal-canvas)
             image_size: sheetCanvas,
-            webhookUrl,
+            // 접수 번호 기록을 놓쳐도 웹훅이 이 예약 행을 되찾게 주소에 작업 번호를 심는다(C05) — 시트마다 다르다.
+            webhookUrl: resolveWebhookUrl(job.id),
           }, moderation),
           // 트리거가 여유 있는 계정으로 바꿔 넣었을 수 있어 반드시 예약 행의 키로 제출한다.
           { retry: false, falKeyId: job.fal_key_id },

@@ -14,6 +14,7 @@ import { CharacterDeleteButton } from '@/features/artist/character-delete-button
 import { TurnaroundRegionCycle } from '@/features/artist/turnaround-region-cycle'
 import { UploadedSheet } from '@/features/artist/uploaded-sheet'
 import { appearanceLabel } from '@/lib/artist/look-label'
+import { failureBadge, hasCharacterContentRefusal } from '@/lib/artist/failure-badge'
 import { isBreakdownUpload } from '@/lib/artist/style-versions'
 import { uploadedSheetAlt } from '@/lib/artist/uploaded-sheet'
 import { RegenCardMark, VersionBadge, lookChipClass, useCardVersion, useRegenCardMarks } from '@/features/artist/card-parts'
@@ -62,6 +63,7 @@ export function CharacterPanel({
     selectedCharacterId,
     generatingViews,
     viewFailures,
+    contentRefusals,
     selectCharacter,
   } = useArtistStore()
 
@@ -133,6 +135,15 @@ export function CharacterPanel({
         : false
     const isObject = char.entityType === 'object'
     const bgScenes = getBackgroundScenes(char.characterId)
+    // 실패 배지 — 내용 검사에 걸린 칸이 하나라도 있으면 그것이 이긴다(학생이 고칠 것이 있는 쪽).
+    //   제출 전(Creem) 거절은 contentRefusals, 제출 뒤(fal) 거절은 viewFailures 의 moderation 에서 온다.
+    const viewFailureList = Object.values(viewFailures[char.characterId] ?? {}).flatMap((byView) => Object.values(byView))
+    const badge = failureBadge({
+      contentRefused:
+        hasCharacterContentRefusal(contentRefusals, char.characterId) ||
+        viewFailureList.some((failure) => failure?.moderation === true),
+      failed: viewFailureList.length > 0,
+    })
     // 작품 스타일을 다시 그리는 동안 이 카드가 보이는 모습 칸의 표시(11/5 시안 AR) — 사물은 다시 그리지 않는다.
     const regenMark = appearance && !isObject ? regenMarkOf({ kind: 'character', id: char.characterId, appearanceKey: appearance.appearanceKey }) : null
 
@@ -252,12 +263,11 @@ export function CharacterPanel({
                 {t('Carried over from the previous episode')}
               </Badge>
             ) : null}
-            {viewFailures[char.characterId] &&
-              Object.keys(viewFailures[char.characterId]).length > 0 && (
-                <Badge variant="destructive" className="text-[10px]">
-                  {t('Image failed')}
-                </Badge>
-              )}
+            {badge && (
+              <Badge variant="destructive" className="text-[10px]">
+                {badge === 'content-check' ? t('Content check') : t('Image failed')}
+              </Badge>
+            )}
             {/* 산문 밖에서(예전 채팅) 만들어진 인물만 지우기 단추가 있다(2026-10-27 디자이너 QA 1차 #04). */}
             <CharacterDeleteButton character={char} />
             {/* 모습 수(v3 A5 "모습 2") — 사물은 모습이 없다. */}

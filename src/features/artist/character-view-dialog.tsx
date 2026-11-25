@@ -26,6 +26,7 @@ import {
 } from '@/lib/image-models'
 import { classifyLookImageStale } from '@/lib/image-provenance'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
+import { characterRefusalKey, failureNotice } from '@/lib/artist/failure-badge'
 import { boardShotLabels } from '@/lib/writer/board-summary'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
 import { cn } from '@/lib/utils'
@@ -66,6 +67,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const setDefaultAppearance = useArtistStore((s) => s.setDefaultAppearance)
   const deleteAppearance = useArtistStore((s) => s.deleteAppearance)
   const viewFailures = useArtistStore((s) => s.viewFailures)
+  const contentRefusals = useArtistStore((s) => s.contentRefusals)
   const retryCharacterViewSafe = useArtistStore((s) => s.retryCharacterViewSafe)
   const shots = useWriterStore((s) => s.shots)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
@@ -197,6 +199,11 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   // 생성 실패(reload-survivable) — moderation(콘텐츠정책) 이면 우회(safe) 재시도 버튼, cap 도달 시 비활성.
   const failure = charId && appearanceKey ? viewFailures[charId]?.[appearanceKey]?.[view] : undefined
   const capReached = (failure?.safeFailCount ?? 0) >= SAFE_RETRY_CAP
+  // 제출 전 내용 검사(Creem) 거절 — 작업 기록이 없어 failure 가 없다. 순화 재시도 자격도 없으므로 설명 고치기만 알린다.
+  const notice = failureNotice({
+    failure,
+    contentRefused: !!(charId && appearanceKey && contentRefusals[characterRefusalKey(charId, appearanceKey, view)]),
+  })
 
   const usedIn = shots.filter((shot) => shot.characters.includes(char.characterId))
   // 샷 이름은 보드 카드와 같은 전체 번호("씬 2 · 샷 8") — 오너 2026-11-02 "전체 번호로 통일", 말은 화면 언어(2026-11-14 답 7).
@@ -354,17 +361,19 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
         </div>
       ) : null}
 
-      {failure ? (
+      {notice ? (
         <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
           <AlertTriangle className="size-3.5 shrink-0" />
           <span>
-            {failure.moderation
-              ? t('Generation was declined by content policy. You can retry below with "Retry with a softer prompt."')
-              : t('Generation failed. Please try again.')}
+            {notice === 'content-check-softer'
+              ? t('This description did not pass the content check, so it was not drawn. Press "Retry with a softer prompt" below, or edit the description and draw again.')
+              : notice === 'content-check-edit'
+                ? t('This description did not pass the content check, so it was not drawn. Edit the description and draw again.')
+                : t('Generation failed. Please try again.')}
           </span>
         </div>
       ) : null}
-      {failure?.moderation ? (
+      {notice === 'content-check-softer' ? (
         <Button variant="outline" disabled={safeRetry.locked || capReached} onClick={safeRetry.run}>
           {safeRetry.locked ? <Loader2 className="size-4 animate-spin" /> : <RefreshCw className="size-4" />}
           {capReached ? t('Softer prompt retry limit reached') : t('Retry with a softer prompt')}

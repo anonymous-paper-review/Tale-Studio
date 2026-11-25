@@ -7,6 +7,7 @@ import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { RegenCardMark, VersionBadge, lookChipClass, useCardVersion, useRegenCardMarks } from '@/features/artist/card-parts'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
 import { LocationAppearanceCreateDialog } from '@/features/artist/location-appearance-create-dialog'
+import { failureBadge } from '@/lib/artist/failure-badge'
 import { useArtistStore, worldFailureKey, type WorldShotKey } from '@/stores/artist-store'
 import { DEFAULT_LOCATION_APPEARANCE_KEY, type WorldAsset } from '@/types/asset'
 import { groupSeriesAssets } from '@/features/series/artist-series'
@@ -43,6 +44,7 @@ export function WorldPanel({
     selectedLocationId,
     generatingLocations,
     worldFailures,
+    contentRefusals,
     selectLocation,
     selectedLocationAppearances,
     selectLocationAppearance,
@@ -108,7 +110,14 @@ export function WorldPanel({
     const candidates = variant ? variant.candidates : (world.candidates ?? [])
     const selectedCandidate = candidates.find((c) => c.isSelected)
     const descriptionChanged = classifyWorldImageStale(variant ? variant.visualDescription : world.visualDescription, selectedCandidate) !== 'fresh'
-    const failed = !!worldFailures[worldFailureKey(world.locationId, variantKey)]
+    // 실패 배지 — 인물 카드와 같은 사상: 내용 검사에 걸렸으면 그것이 이긴다(학생이 고칠 것이 있는 쪽).
+    //   제출 전(Creem) 거절은 contentRefusals, 제출 뒤(fal) 거절은 worldFailures 의 moderation 에서 온다.
+    const failed = worldFailures[worldFailureKey(world.locationId, variantKey)]
+    const contentRefused = !!contentRefusals[worldFailureKey(world.locationId, variantKey)]
+    const badge = failureBadge({
+      contentRefused: contentRefused || failed?.moderation === true,
+      failed: !!failed || contentRefused,
+    })
 
     return (
       <div
@@ -167,9 +176,9 @@ export function WorldPanel({
               {t('Carried over from the previous episode')}
             </Badge>
           ) : null}
-          {failed && (
+          {badge && (
             <Badge variant="destructive" className="text-[10px]">
-              {t('Image failed')}
+              {badge === 'content-check' ? t('Content check') : t('Image failed')}
             </Badge>
           )}
           {descriptionChanged && !isGenerating && (

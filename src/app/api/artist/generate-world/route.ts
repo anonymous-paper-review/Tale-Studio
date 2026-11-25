@@ -19,7 +19,7 @@ import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { applyWorldSafeMode, ensureNoPeopleClause } from '@/lib/artist/world-prompt'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/quota'
-import { assertUserTextAllowed } from '@/lib/moderation/creem'
+import { assertUserTextAllowed, ModerationBlockedError } from '@/lib/moderation/creem'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
@@ -52,6 +52,29 @@ async function currentWideShot(projectId: string, locationId: string): Promise<s
     .eq('location_id', locationId)
     .maybeSingle()
   return typeof data?.wide_shot === 'string' ? data.wide_shot : ''
+}
+
+/**
+ * 거절 안내에 실을 배경 이름(2026-11-25 오너) — 내용 검사에 걸렸을 때만 한 번 읽는다.
+ *   여기에서만 읽는 이유: 정상 생성 경로에는 이름이 필요 없어 조회를 하나 늘리지 않았다
+ *   (locations 조회는 자동 빈칸 확인·변형 참조·시리즈 참조에서만 조건부로 돌아서 거절 시점에 이름이 없는 경로가 있다).
+ *   변형(모습)이어도 배경 이름 하나로 말한다 — 학생이 카드에서 보는 이름이다.
+ *   읽기가 실패하거나 행이 없으면 null — 이름 없는 안내로 가고, 이 읽기가 생성 경로를 막지 않는다.
+ */
+async function blockedLocationName(projectId: string, locationId: string): Promise<string | null> {
+  try {
+    const { data, error } = await supabaseAdmin
+      .from('locations')
+      .select('name')
+      .eq('project_id', projectId)
+      .eq('location_id', locationId)
+      .maybeSingle()
+    if (error) return null
+    const name = (data as { name?: unknown } | null)?.name
+    return typeof name === 'string' && name.trim() ? name : null
+  } catch {
+    return null
+  }
 }
 
 export async function POST(req: Request) {
@@ -221,7 +244,13 @@ export async function POST(req: Request) {
     try {
       moderation = await assertUserTextAllowed([prompt], { projectId, kind: 'world_shot', userId: access.userId })
     } catch (e) {
-      const rejected = moderationRejectionResponse(e, { projectId, kind: 'world_shot', userId: access.userId })
+      const name = e instanceof ModerationBlockedError ? await blockedLocationName(projectId, locationId) : null
+      const rejected = moderationRejectionResponse(e, {
+        projectId,
+        kind: 'world_shot',
+        userId: access.userId,
+        ...(name ? { target: { kind: 'world' as const, name } } : {}),
+      })
       if (rejected) return rejected
       throw e
     }

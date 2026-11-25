@@ -21,7 +21,6 @@ import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/
 import { RoughReservationError } from '@/lib/writer/rough-reservation-error'
 import { assertUserTextAllowed } from '@/lib/moderation/creem'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
-import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { isRichStaticSpec, type RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
 // L4(shotDesign) state 로더 — 공용 lib(#motion-contract): 비디오 라우트와 공유.
@@ -547,7 +546,6 @@ export async function POST(req: Request) {
     )
     const sheetGeom = sheetGeometry(gridVariant, projectFormat)
     const templateUrl = await templateAssetUrl(sheetGeom.templatePath.replace(/^\//, ''))
-    const webhookUrl = resolveWebhookUrl()
 
     // #creem-moderation(2026-10-11): 예약 RPC(rough-submit.ts) 전에 이번 호출이 쓸 사용자 글을 한 번에 검사한다 —
     //   샷 설명(EN 파생본)·연속성 제약·방향 칩만 보낸다. 그리드 템플릿(GRID_STYLE 의 'No clothing'·'no face' 등)은
@@ -688,12 +686,12 @@ export async function POST(req: Request) {
             ...(blockoutUrl ? { blockoutUrl } : {}),
             sheet_format: sheetGeom.roughImageSize ? projectFormat : null,
           },
+          // 완료 알림 주소는 여기서 만들지 않는다 — 예약 번호를 심어야 해서 예약을 하는 rough-submit 이 만든다.
           options: templateUrl
             ? {
                 model: DEFAULT_EDIT_IMAGE_MODEL, prompt,
                 reference_image_urls: blockoutUrl ? [templateUrl, blockoutUrl] : [templateUrl],
                 ...(sheetGeom.roughImageSize ? { image_size: sheetGeom.roughImageSize } : {}),
-                webhookUrl,
               }
             : {
                 model: DEFAULT_IMAGE_MODEL, prompt,
@@ -701,7 +699,6 @@ export async function POST(req: Request) {
                   const [w, h] = sheetGeom.repaintCanvas.split('x').map(Number)
                   return w > h ? '16:9' : w < h ? '9:16' : '1:1'
                 })(),
-                webhookUrl,
               },
           moderation,
         })

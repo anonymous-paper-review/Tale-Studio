@@ -373,7 +373,15 @@ export async function POST(req: Request) {
         { projectId, kind: 'character_view', userId: access.userId },
       )
     } catch (e) {
-      const rejected = moderationRejectionResponse(e, { projectId, kind: 'character_view', userId: access.userId })
+      // 걸린 그림의 인물 이름을 거절 응답에 싣는다(2026-11-25 오너) — 거절은 작업 행을 남기지 않아
+      //   카드에 배지가 없다. 이름은 위에서 이미 읽은 character 행에 있어 조회가 늘지 않는다.
+      const name = typeof character.name === 'string' ? character.name : ''
+      const rejected = moderationRejectionResponse(e, {
+        projectId,
+        kind: 'character_view',
+        userId: access.userId,
+        ...(name.trim() ? { target: { kind: 'character' as const, name } } : {}),
+      })
       if (rejected) return rejected
       throw e
     }

@@ -18,6 +18,12 @@ export interface ModerationRejectionContext {
   /** 잡 종류 — generation_jobs.kind 와 같은 어휘를 쓴다. */
   kind: string
   userId?: string | null
+  /**
+   * 걸린 그림의 대상(2026-11-25 오너) — 거절은 generation_jobs 행이 없어 카드에 실패 배지가 남지 않고,
+   * 화면은 이 자리에 실린 이름으로만 "어느 인물·배경의 설정을 고쳐야 하나"를 말해 줄 수 있다.
+   * 라우트가 거절 시점에 이름을 알 때만 싣는다 — 모를 때는 없으며, 화면은 이름 없는 예전 안내로 돌아간다.
+   */
+  target?: { kind: 'character' | 'world'; name: string }
 }
 
 /** 막힘 — 클라이언트가 "설명을 고쳐 다시" 안내를 띄우는 코드. */
@@ -63,11 +69,16 @@ export function moderationRejectionResponse(
   ctx: ModerationRejectionContext,
 ): NextResponse | null {
   if (error instanceof ModerationBlockedError) {
+    // 이름이 빈 값이거나 공백만 있으면 싣지 않는다 — 화면에 보여 줄 이름이 없는 것과 같다.
+    const target = ctx.target && ctx.target.name.trim() ? ctx.target : null
     void recordWriterObservabilityEvent(ctx.projectId, 'generation_submit_rejected_content_policy', {
       kind: ctx.kind,
       decision: error.decision,
       moderationId: error.moderationId,
       userId: ctx.userId ?? null,
+      // 어떤 대상이 자주 걸리는지 나중에 세기 위해 — 거절은 작업 행이 없어 이 이벤트가 유일한 흔적이다.
+      targetKind: target?.kind ?? null,
+      targetName: target?.name ?? null,
     })
     return NextResponse.json(
       {
@@ -76,6 +87,7 @@ export function moderationRejectionResponse(
         error: 'This request breaks the content rules, so it was not generated. Edit the description and try again.',
         code: CONTENT_POLICY_BLOCKED,
         policyUrl: '/acceptable-use',
+        ...(target ? { target } : {}),
       },
       { status: 400 },
     )
