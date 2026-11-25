@@ -1,0 +1,128 @@
+/* 두 페이지 공통: 움직이는 배경 + Lumi 챗봇 */
+
+/* ---------- 배경 오로라 ---------- */
+.ambient { position: fixed; inset: 0; z-index: -1; pointer-events: none; overflow: hidden; }
+.ambient i { position: absolute; width: 60vmax; height: 60vmax; border-radius: 50%; opacity: var(--amb-o, 0.16); will-change: transform; }
+.ambient i:nth-child(1) { left: -20vmax; top: -20vmax; background: radial-gradient(closest-side, #E8606F, transparent); animation: amb1 26s ease-in-out infinite alternate; }
+.ambient i:nth-child(2) { right: -25vmax; top: 10vh; background: radial-gradient(closest-side, #8B63E8, transparent); animation: amb2 32s ease-in-out infinite alternate; }
+.ambient i:nth-child(3) { left: 15vw; bottom: -30vmax; background: radial-gradient(closest-side, #3E9BE0, transparent); animation: amb3 28s ease-in-out infinite alternate; }
+.ambient i:nth-child(4) { right: 10vw; bottom: -20vmax; width: 40vmax; height: 40vmax; background: radial-gradient(closest-side, #F2A33A, transparent); animation: amb1 36s ease-in-out infinite alternate-reverse; }
+@keyframes amb1 { to { transform: translate(18vw, 22vh) scale(1.15); } }
+@keyframes amb2 { to { transform: translate(-22vw, 30vh) scale(0.9); } }
+@keyframes amb3 { to { transform: translate(20vw, -26vh) scale(1.2); } }
+:root[data-theme='light'] .ambient i { display: none; }
+.ambient__spark { position: absolute; width: var(--sz, 3px); height: var(--sz, 3px); border-radius: 50%; background: var(--sc); box-shadow: 0 0 10px var(--sc); color: var(--sc); animation: spark var(--d, 9s) linear infinite; animation-delay: var(--dl, 0s); opacity: 0; }
+
+@keyframes spark { 0% { opacity: 0; transform: translate(0, 0); } 15% { opacity: var(--so, 0.55); } 50% { transform: translate(2vw, -20vh); } 85% { opacity: var(--so, 0.55); } 100% { opacity: 0; transform: translate(-1vw, -40vh); } }
+:root[data-theme='light'] .ambient__spark { --so: 0.5; box-shadow: 0 0 16px 5px color-mix(in srgb, var(--sc) 55%, transparent); animation-name: bloom; }
+@keyframes bloom { 0% { opacity: 0; transform: translate(0, 0) scale(0.3); } 30% { opacity: var(--so); transform: translate(1vw, -6vh) scale(1.7); } 60% { opacity: calc(var(--so) * 0.8); transform: translate(2vw, -12vh) scale(1); } 100% { opacity: 0; transform: translate(1vw, -18vh) scale(0); } }
+/* 섹션 바탕이 배경 빛을 덮지 않게 */
+body { background-color: var(--bg); }
+main, .foot { position: relative; }
+
+/* ---------- Lumi 런처 ---------- */
+.lumi-fab { position: fixed; right: max(20px, env(safe-area-inset-right, 0px)); bottom: max(20px, env(safe-area-inset-bottom, 0px)); z-index: 80;
+  width: 92px; height: 76px; padding: 0; border: 0; background: none; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+.lumi-fab__img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; transition: opacity 0.6s ease, transform 0.8s cubic-bezier(0.3, 1.4, 0.4, 1), filter 0.6s; }
+.lumi-fab__float { position: absolute; inset: 0; animation: fabBob 3.4s ease-in-out infinite; }
+@keyframes fabBob { 0%, 100% { transform: translateY(0) rotate(-3deg); } 50% { transform: translateY(-8px) rotate(3deg); } }
+.lumi-fab__img--color { opacity: 0; transform: scale(0.6) rotate(-30deg); filter: saturate(1.4); }
+.lumi-fab::before { content: ''; position: absolute; inset: 6px 4px 0 14px; border-radius: 50%; background: radial-gradient(closest-side, rgba(180, 210, 255, 0.55), transparent); filter: blur(6px); transition: background 0.6s; animation: fabGlow 3.4s ease-in-out infinite; }
+@keyframes fabGlow { 50% { transform: scale(1.12); opacity: 0.7; } }
+.lumi-fab:hover .lumi-fab__float { animation: fabWiggle 0.6s ease-in-out; }
+@keyframes fabWiggle { 25% { transform: rotate(-10deg) scale(1.05); } 75% { transform: rotate(8deg) scale(1.05); } }
+/* 열리면: 화이트 진주 → 컬러 Lumi */
+.lumi-open .lumi-fab__img--white { opacity: 0; transform: scale(1.4) rotate(40deg); filter: hue-rotate(160deg) blur(2px); }
+.lumi-open .lumi-fab__img--color { opacity: 1; transform: none; }
+.lumi-open .lumi-fab::before { background: radial-gradient(closest-side, rgba(232, 96, 111, 0.6), rgba(139, 99, 232, 0.35) 60%, transparent); }
+
+.lumi-hint { position: fixed; right: calc(max(20px, env(safe-area-inset-right, 0px)) + 96px); bottom: calc(max(20px, env(safe-area-inset-bottom, 0px)) + 38px); z-index: 80;
+  padding: 10px 14px; border-radius: 16px 16px 4px 16px; background: var(--lc-panel); color: var(--lc-fg); font: 600 14px/1.4 var(--font, system-ui); white-space: nowrap;
+  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.25), 0 0 0 1px var(--lc-line); opacity: 0; transform: translateY(8px) scale(0.96); transition: opacity 0.4s, transform 0.4s; pointer-events: none; }
+.lumi-hint.on { opacity: 1; transform: none; }
+.lumi-open .lumi-hint { opacity: 0; }
+
+/* 진짜 Lumi 컴포넌트를 쓸 때 (3:2) */
+.lumi-fab--persona { width: 100px; height: 67px; }
+.lumi-fab--persona::before { display: none; }
+.lumi-fab__persona { display: block; width: 100px; }
+.lumi-fab--persona + .lumi-hint, .lumi-hint { }
+
+/* ---------- 챗봇 창 ---------- */
+:root { --lc-panel: #18171C; --lc-panel-2: #232129; --lc-fg: #F5F4EE; --lc-fg-2: #B9B6AD; --lc-line: rgba(255, 255, 255, 0.09); --lc-me: #2C2A33; --lc-btn: #EDEAE0; --lc-btn-fg: #141312; }
+:root[data-theme='light'] { --lc-panel: #FFFFFF; --lc-panel-2: #F3F2EE; --lc-fg: #141312; --lc-fg-2: #5C5A55; --lc-line: rgba(20, 19, 18, 0.1); --lc-me: #141312; --lc-btn: #141312; --lc-btn-fg: #FFFFFF; }
+.lumi-chat { position: fixed; right: max(20px, env(safe-area-inset-right, 0px)); bottom: calc(max(20px, env(safe-area-inset-bottom, 0px)) + 80px); z-index: 79;
+  display: grid; grid-template-rows: auto minmax(0, 1fr) auto auto; width: min(340px, calc(100vw - 32px)); height: min(470px, calc(100vh - 130px));
+  border-radius: 24px; background: var(--lc-panel); color: var(--lc-fg); font-family: var(--font, system-ui); overflow: hidden;
+  box-shadow: 0 30px 80px -10px rgba(0, 0, 0, 0.45), 0 0 0 1px var(--lc-line);
+  transform-origin: calc(100% - 46px) calc(100% + 50px); transform: scale(0.2); opacity: 0; pointer-events: none;
+  transition: transform 0.55s cubic-bezier(0.25, 1.3, 0.4, 1), opacity 0.3s ease; }
+.lumi-open .lumi-chat { transform: none; opacity: 1; pointer-events: auto; }
+.lumi-chat::before { content: ''; position: absolute; left: 0; right: 0; top: 0; height: 3px; background: linear-gradient(90deg, #F2A33A, #E8606F, #8B63E8, #5A6AE6, #3E9BE0, #2DB39A); background-size: 200% 100%; animation: gradflow 4s linear infinite alternate; }
+@keyframes gradflow { to { background-position: 100% 0; } }
+.lc-head { display: flex; align-items: center; gap: 10px; padding: 16px 16px 12px; }
+.lc-head img { width: 34px; height: auto; }
+.lc-head b { display: block; font-size: 15px; }
+.lc-head small { color: var(--lc-fg-2); font-size: 12px; }
+.lc-close { margin-left: auto; width: 32px; height: 32px; border: 0; border-radius: 50%; background: var(--lc-panel-2); color: var(--lc-fg-2); font-size: 16px; cursor: pointer; }
+.lc-log { display: flex; flex-direction: column; gap: 10px; padding: 4px 16px 12px; overflow-y: auto; overscroll-behavior: contain; }
+.lc-msg { max-width: 86%; padding: 10px 14px; font-size: 14.5px; line-height: 1.55; border-radius: 18px; animation: lcIn 0.35s cubic-bezier(0.2, 0.8, 0.2, 1) both; word-break: keep-all; }
+@keyframes lcIn { from { opacity: 0; transform: translateY(8px) scale(0.97); } }
+.lc-msg--lumi { align-self: flex-start; background: var(--lc-panel-2); border-bottom-left-radius: 6px; }
+.lc-msg--me { align-self: flex-end; background: var(--lc-me); color: #fff; border-bottom-right-radius: 6px; }
+.lc-msg a { color: inherit; font-weight: 700; }
+.lc-typing { display: inline-flex; gap: 4px; padding: 14px 16px; }
+.lc-typing i { width: 6px; height: 6px; border-radius: 50%; background: var(--lc-fg-2); animation: dot 1s ease-in-out infinite; }
+.lc-typing i:nth-child(2) { animation-delay: 0.15s; } .lc-typing i:nth-child(3) { animation-delay: 0.3s; }
+@keyframes dot { 50% { transform: translateY(-4px); opacity: 0.4; } }
+.lc-chips { display: flex; gap: 6px; padding: 0 16px 10px; overflow-x: auto; scrollbar-width: none; }
+.lc-chips::-webkit-scrollbar { display: none; }
+.lc-chip { flex: none; height: 32px; padding: 0 12px; border: 0; border-radius: 999px; background: var(--lc-panel-2); color: var(--lc-fg); font: 600 13px var(--font, system-ui); cursor: pointer; transition: transform 0.2s; }
+.lc-chip:hover { transform: translateY(-2px); }
+.lc-form { display: flex; gap: 8px; padding: 10px 12px 12px; border-top: 1px solid var(--lc-line); }
+.lc-form input { flex: 1; min-width: 0; height: 42px; padding: 0 14px; border: 0; border-radius: 999px; background: var(--lc-panel-2); color: var(--lc-fg); font: 500 14.5px var(--font, system-ui); outline: none; }
+.lc-form input:focus-visible { box-shadow: 0 0 0 2px #8EB2FF; }
+.lc-form button { width: 42px; height: 42px; border: 0; border-radius: 50%; background: var(--lc-btn); color: var(--lc-btn-fg); font-size: 18px; font-weight: 800; cursor: pointer; }
+
+@media (prefers-reduced-motion: reduce) {
+  .ambient i, .ambient__spark, .lumi-fab__float, .lumi-fab::before { animation: none !important; }
+  .lumi-chat, .lumi-fab__img { transition: opacity 0.2s !important; }
+}
+@media (max-width: 560px) {
+  .lumi-fab { width: 76px; height: 62px; }
+  .lumi-fab--persona { width: 84px; height: 56px; }
+  .lumi-fab__persona { width: 84px; }
+  .lumi-hint { display: none; }
+  .lumi-chat { bottom: calc(max(16px, env(safe-area-inset-bottom, 0px)) + 72px); right: 16px; height: min(520px, calc(100vh - 120px)); }
+}
+:root[data-theme='light'] .ambient__spark:nth-of-type(n+15) { display: none; }
+
+/* ===== 챗봇 v2: Figma Chat Panel 구성 + 유리 ===== */
+.lumi-chat { --lc-panel: rgba(31, 30, 29, .66); --lc-panel-2: rgba(255, 255, 255, .08); --lc-me: rgba(255, 255, 255, .14); --lc-line: rgba(255, 255, 255, .12);
+  background: var(--lc-panel); -webkit-backdrop-filter: blur(26px) saturate(1.5); backdrop-filter: blur(26px) saturate(1.5);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, .14), 0 0 0 1px var(--lc-line), 0 30px 80px -14px rgba(0, 0, 0, .55); }
+:root[data-theme='light'] .lumi-chat { --lc-panel: rgba(255, 255, 255, .62); --lc-panel-2: rgba(20, 19, 18, .06); --lc-me: #141312; --lc-line: rgba(255, 255, 255, .7);
+  box-shadow: inset 0 1px 0 #fff, 0 0 0 1px rgba(20, 19, 18, .08), 0 30px 80px -18px rgba(20, 19, 18, .3); }
+.lumi-chat::before { display: none; }
+.lc-head { display: flex; align-items: center; gap: 8px; padding: 16px 14px 12px 20px; }
+.lc-head__lumi { width: 30px !important; height: auto; flex: none; }
+.lc-head b { font: 600 13.5px/1.4 var(--font, system-ui); }
+.lc-close { margin-left: auto; display: grid; place-items: center; width: 28px; height: 28px; border-radius: 8px; background: var(--lc-panel-2); padding: 0; font-size: 0; }
+.lc-close i, .lc-form button i { width: 16px; height: 16px; background: currentColor; -webkit-mask: var(--ico) center / contain no-repeat; mask: var(--ico) center / contain no-repeat; }
+.lc-close i { transform: rotate(90deg); color: var(--lc-fg-2); }
+.lc-log { gap: 14px; padding: 8px 20px 12px; }
+.lc-row { display: grid; grid-template-columns: 28px minmax(0, 1fr); gap: 10px; align-items: start; animation: lcIn .35s cubic-bezier(.2, .8, .2, 1) both; }
+.lc-av { width: 28px; height: 28px; object-fit: contain; }
+.lc-row .lc-msg { max-width: 100%; animation: none; }
+.lc-msg--lumi { border-radius: 6px 16px 16px 16px; padding: 14px 16px; }
+.lc-name { margin: 0 0 4px; font: 600 11.5px/1.4 var(--font, system-ui); color: #E8606F; }
+.lc-msg--me { border-radius: 16px 6px 16px 16px; }
+:root[data-theme='light'] .lc-msg--me { color: #fff; }
+.lc-form { border-top: 0; padding: 6px 14px 16px; }
+.lc-form input { height: 52px; padding: 0 56px 0 18px; border-radius: 999px; }
+.lc-form { position: relative; }
+.lc-form button { position: absolute; right: 22px; top: 50%; margin-top: -23px; width: 36px; height: 36px; display: grid; place-items: center; background: #EDEAE0; color: #1f1e1d; }
+.lc-form button i { transform: rotate(-90deg); }
+.lc-chips { padding: 0 20px 8px; }
+.lumi-chat { grid-template-columns: minmax(0, 1fr); }
+.lc-row, .lc-row .lc-msg { min-width: 0; }

@@ -67,3 +67,4 @@ export const useLocaleStore = create<LocaleState>()(
     { name: 'tale-locale', partialize: (s) => ({ locale: s.locale }) },
   ),
 )
+

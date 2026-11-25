@@ -25,6 +25,46 @@ export function pricingSelectionFromSearch(search: Pick<URLSearchParams, 'getAll
   return null
 }
 
+/**
+ * 요금 화면 표시 규칙 (오너 2026-11-24 시안 v2, 11-25 보강): 한국어 화면은 늘 원화, 국내 카드가 준비됐으면 국내 카드 결제.
+ * 영어 화면은 종전대로 달러·Paddle(닫혀 있으면 준비 중 안내). 약속: tests/billing/pricing-surface.test.ts
+ */
+export type PricingSurface = {
+  currency: 'krw' | 'usd'
+  banner: 'korean-card' | 'preparing' | null
+  switchToKorean: boolean
+  checkoutEnabled: boolean
+  koreanCardReady: boolean
+  koreanSubscriptionReady: boolean
+}
+
+export function pricingSurface(input: {
+  locale: 'ko' | 'en'
+  checkoutEnabled: boolean
+  koreanCardReady: boolean
+  koreanSubscriptionReady: boolean
+}): PricingSurface {
+  // 오너 2026-11-25: 한국어면 국내 카드 준비와 상관없이 원화로 보인다.
+  const korean = input.locale === 'ko' && input.koreanCardReady
+  return {
+    currency: input.locale === 'ko' ? 'krw' : 'usd',
+    banner: korean ? 'korean-card' : input.locale === 'en' && input.checkoutEnabled ? null : 'preparing',
+    switchToKorean: input.locale === 'en' && input.koreanCardReady,
+    checkoutEnabled: input.checkoutEnabled,
+    koreanCardReady: input.koreanCardReady,
+    koreanSubscriptionReady: input.koreanSubscriptionReady,
+  }
+}
+
+/** 구매 버튼을 눌렀을 때 할 일. */
+export function purchaseAction(surface: PricingSurface, kind: PricingOption['kind']): 'korean-card' | 'subscription-soon' | 'paddle' | 'notice' {
+  if (surface.currency === 'krw') {
+    if (!surface.koreanCardReady) return 'notice'
+    return kind === 'plan' && !surface.koreanSubscriptionReady ? 'subscription-soon' : 'korean-card'
+  }
+  return surface.checkoutEnabled ? 'paddle' : 'notice'
+}
+
 export function pricingReturnPath(option: PricingOption): string {
   return `/pricing?${option.kind}=${encodeURIComponent(option.item.id)}`
 }

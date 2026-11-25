@@ -65,12 +65,33 @@ describe('요금표를 숨겨 둔 동안의 메뉴', () => {
   })
 
   // 왜: Playground·Docs·정책 페이지가 함께 쓰는 머리글과 바닥글도 요금표로 가는 길이다.
-  it('요금표를 숨겨 두면 공개 페이지 머리글과 바닥글에 Pricing이 없고 Playground와 Docs는 그대로다', async () => {
-    for (const html of await publicHeaderAndFooter()) {
-      expect(html).not.toContain('href="/pricing"')
-      expect(html).toContain('href="/playground"')
-      expect(html).toContain('href="/docs"')
-    }
+  //   2026-11-25 오너 "문서 탭은 바닥글로 내려야", 같은 날 "첫 화면 메뉴로 통일" — Docs·Playground 는 바닥글에만 있다.
+  it('요금표를 숨겨 두면 공개 페이지 머리글과 바닥글에 Pricing이 없고, Playground와 Docs는 바닥글에 있다', async () => {
+    const [header, footer] = await publicHeaderAndFooter()
+    for (const html of [header, footer]) expect(html).not.toContain('href="/pricing"')
+    expect(footer).toContain('href="/playground"')
+    expect(footer).toContain('href="/docs"')
+  })
+
+  // 왜: 2026-11-25 오너. 첫 화면에서 "요금"을 누르면 머리글 메뉴·로고가 바뀌어 다른 사이트처럼 보였다. 첫 화면 메뉴로 통일한다.
+  it('공개 페이지 머리글은 첫 화면과 같은 메뉴(Tale 서비스 · 작품 · 요금 · 언어 · 시작하기)를 보이고 Playground는 머리글에 없다', async () => {
+    visibility.open = true
+    const [header] = await publicHeaderAndFooter()
+    const nav = navOf(header)
+    expect(nav).toMatch(/href="\/landing\/index\.html#service"[^>]*>\s*Product\s*</)
+    expect(nav).toMatch(/href="\/landing\/index\.html#works"[^>]*>\s*Showcase\s*</)
+    expect(nav).toMatch(PRICING_LINK)
+    expect(header).not.toContain('href="/playground"')
+    expect(header).toContain('href="/login"')
+    const { translate } = await import('@/lib/i18n/translate')
+    expect(['Product', 'Showcase', 'Pricing'].map((k) => translate('ko', k))).toEqual(['Tale 서비스', '작품', '요금']) // i18n-ok
+  })
+
+  // 왜: 2026-11-25 오너. 문서(이용 가이드)는 머리글 탭으로 둘 만큼 자주 가는 곳이 아니다.
+  it('공개 페이지 머리글에는 문서 탭이 없고 바닥글에서 문서로 간다', async () => {
+    const [header, footer] = await publicHeaderAndFooter()
+    expect(header).not.toContain('href="/docs"')
+    expect(footer).toContain('href="/docs"')
   })
 
   // 왜: 정책 페이지의 돌아가기 링크가 숨긴 요금표를 가리키면 누른 사람이 엉뚱한 곳에 떨어진다.
