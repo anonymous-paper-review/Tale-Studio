@@ -1,5 +1,6 @@
 {
   "regions": ["sin1"],
+  "ignoreCommand": "git diff --quiet HEAD^ HEAD -- . ':!.claude' ':!specs' ':!AGENTS.md' ':!CLAUDE.md'; [ $? -eq 0 ] && exit 0 || exit 1",
   "crons": [
     {
       "path": "/api/writer/watchdog",

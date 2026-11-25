@@ -227,8 +227,9 @@ async function run() {
     try {
       const r = await doFetch()
       const body = await r.text()
-      // 4xx · 5xx 는 본문 앞부분과 Vercel 요청 id 를 남긴다 — 어느 층이 거절했는지 나중에 가린다.
-      note(u, name, r.status, performance.now() - start, r.status >= 400 ? { ...(extra ?? {}), body: body.slice(0, 200), vid: r.headers.get('x-vercel-id') } : extra)
+      // Vercel 요청 id 는 모든 답에 남긴다 — 안의 시각(엣지 도착 ms)으로 "보낸 뒤 엣지까지" 와 "엣지 뒤 답까지" 를 가른다(요약의 edge 칸).
+      // 4xx · 5xx 는 본문 앞부분도 남긴다 — 어느 층이 거절했는지 나중에 가린다.
+      note(u, name, r.status, performance.now() - start, { ...(extra ?? {}), vid: r.headers.get('x-vercel-id'), ...(r.status >= 400 ? { body: body.slice(0, 200) } : {}) })
       let json = null
       try { json = JSON.parse(body) } catch { /* HTML 등 */ }
       return { status: r.status, json, body }
@@ -343,6 +344,18 @@ async function run() {
   clearInterval(guard)
 
   // 요약
+  // 엣지 가르기: x-vercel-id 의 13자리 ms 는 Vercel 입구(엣지) 도착 시각이다(2026-11-25 실측: keep-alive 연결에서 보낸 뒤 6~15ms).
+  // 보낸 시각 = t0 + t - ms, 받은 시각 = t0 + t. 이 맥의 시계가 몇 초 어긋날 수 있어(11-25 실측 4초) 전체 최솟값을 시계 차로 보고 뺀다.
+  const edgeRows = log.filter((r) => r.vid && /-(\d{13})-/.test(r.vid)).map((r) => { const e = Number(r.vid.match(/-(\d{13})-/)[1]); return { ...r, before: e - (t0 + r.t - r.ms), after: (t0 + r.t) - e } })
+  const skew = edgeRows.length ? Math.min(...edgeRows.map((r) => r.before)) : 0
+  const edgeSplit = (rows) => {
+    const er = rows.filter((r) => r.vid && /-(\d{13})-/.test(r.vid)).map((r) => { const e = Number(r.vid.match(/-(\d{13})-/)[1]); return { before: e - (t0 + r.t - r.ms) - skew, after: (t0 + r.t) - e + skew } })
+    if (!er.length) return {}
+    return {
+      before_edge_median_s: +(quantile(er.map((r) => r.before), 0.5) / 1000).toFixed(3), before_edge_p95_s: +(quantile(er.map((r) => r.before), 0.95) / 1000).toFixed(3),
+      vercel_median_s: +(quantile(er.map((r) => r.after), 0.5) / 1000).toFixed(3), vercel_p95_s: +(quantile(er.map((r) => r.after), 0.95) / 1000).toFixed(3),
+    }
+  }
   const byName = {}
   for (const r of log) (byName[r.name] ??= []).push(r)
   const summary = Object.entries(byName).map(([name, rows]) => ({
@@ -350,6 +363,7 @@ async function run() {
     median_s: +(quantile(rows.map((r) => r.ms), 0.5) / 1000).toFixed(3),
     p95_s: +(quantile(rows.map((r) => r.ms), 0.95) / 1000).toFixed(3),
     max_s: +(Math.max(...rows.map((r) => r.ms)) / 1000).toFixed(3),
+    ...edgeSplit(rows),
     ok: rows.filter((r) => r.status >= 200 && r.status < 300).length,
     s429: rows.filter((r) => r.status === 429).length,
     s4xx: rows.filter((r) => r.status >= 400 && r.status < 500 && r.status !== 429).length,
@@ -372,7 +386,7 @@ async function run() {
   const out = {
     run: runLabel, target, base, at: new Date(t0).toISOString(), users: userCount, duration_s: durationMs / 1000, ramp_s: rampMs / 1000, writerPoll,
     elapsed_s: Math.round((Date.now() - t0) / 1000), aborted: abort.on ? abort.why : null,
-    requests: log.length, summary, buckets, jobs: jobTotals, images: { sheets: sheets.length, wides: wides.length, wanted: pids.length * (manifest.users[0].characters.length + manifest.users[0].locations.length) },
+    requests: log.length, clock_skew_ms: skew, summary, buckets, jobs: jobTotals, images: { sheets: sheets.length, wides: wides.length, wanted: pids.length * (manifest.users[0].characters.length + manifest.users[0].locations.length) },
     userErrors: results.filter((r) => r.error).map((r) => ({ u: r.u, error: r.error })),
   }
   const stamp = new Date(t0).toISOString().replace(/[:.]/g, '-').slice(0, 19)
@@ -380,7 +394,8 @@ async function run() {
   writeFileSync(resultPath, JSON.stringify(out, null, 2))
   writeFileSync(resolve(outDir, `run-${stamp}-u${userCount}${writerPoll ? '-wp' : ''}.log.json`), JSON.stringify(log))
   console.error(`\n[${runLabel}] 요청 ${log.length}건 · ${out.elapsed_s}초 · 그림 ${sheets.length + wides.length}/${out.images.wanted}${abort.on ? ` · ⚠ 중단 ${abort.why}` : ''}`)
-  for (const s of summary) console.error(`  ${s.name.padEnd(30)} n ${String(s.n).padStart(5)}  중앙값 ${s.median_s}s  p95 ${s.p95_s}s  최대 ${s.max_s}s  ok ${s.ok}  429 ${s.s429}  4xx ${s.s4xx}  5xx ${s.s5xx}  끊김 ${s.dropped}`)
+  for (const s of summary) console.error(`  ${s.name.padEnd(30)} n ${String(s.n).padStart(5)}  중앙값 ${s.median_s}s  p95 ${s.p95_s}s  최대 ${s.max_s}s  ok ${s.ok}  429 ${s.s429}  4xx ${s.s4xx}  5xx ${s.s5xx}  끊김 ${s.dropped}${s.vercel_median_s != null ? `  | 엣지 전 ${s.before_edge_median_s}/${s.before_edge_p95_s}s · Vercel 안 ${s.vercel_median_s}/${s.vercel_p95_s}s` : ''}`)
+  if (edgeRows.length) console.error(`  (엣지 전 = 보낸 뒤 Vercel 서울 입구 도착까지(이 기계 · 망) · Vercel 안 = 입구 도착 뒤 답 받기까지. 시계 차 ${skew}ms 뺌)`)
   console.error(`결과 → ${resultPath}`)
   console.log(JSON.stringify(out))
 }
