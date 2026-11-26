@@ -33,11 +33,13 @@ export function planPropImageSubmit(input: {
   textRule?: PropTextRule
   /** 스토리지에 올린 소품 양식 주소(templateAssetUrl(PROP_SHEET_FILE)) — 없으면 양식 없이 그린다. */
   templateUrl?: string | null
+  /** 실사 그림체(기준 그림 없는 실사)의 사진 글(resolvePhotoLook, 리드 R2) — 그림체 기준 그림이 있으면 쓰지 않는다. */
+  photoLook?: { key?: string; clause: string | null } | null
 }): PropImagePlan {
   const modelKey = input.model ?? DEFAULT_WORLD_IMAGE_MODEL
   const textRule = input.textRule ?? PROP_TEXT_RULE
   const templateUrl = input.templateUrl?.trim() || null
-  const prompt = buildPropImagePrompt({ ...input, textRule, sheet: !!templateUrl })
+  const prompt = buildPropImagePrompt({ ...input, textRule, sheet: !!templateUrl, photoLook: input.anchor ? null : (input.photoLook ?? null) })
   const withoutReference = !input.anchor && input.styleWithoutReference
   const base: AnchorableSubmit = {
     prompt: withoutReference && textRule === 'none' && !templateUrl ? `${prompt}\n${FACET_NO_TEXT}` : prompt,

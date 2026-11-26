@@ -13,6 +13,7 @@ const mocks = vi.hoisted(() => ({
   styleAnalysisPending: vi.fn(),
   assertUserTextAllowed: vi.fn(),
   templateAssetUrl: vi.fn(),
+  resolvePhotoLook: vi.fn(),
 }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/api/guard', () => ({ requireProjectAccess: async (_req: Request, projectId: string) => ({ ok: true, projectId, userId: 'user-1', viaShare: false }) }))
@@ -21,7 +22,7 @@ vi.mock('@/lib/generation-quota', () => ({ checkGenerationCapacity: mocks.checkG
 vi.mock('@/lib/api/quota', () => ({ quotaRejectionResponse: () => new Response('quota', { status: 429 }), capacityReservationRejection: () => null }))
 vi.mock('@/lib/api/moderation', () => ({ moderationRejectionResponse: () => null }))
 vi.mock('@/lib/moderation/creem', () => ({ assertUserTextAllowed: mocks.assertUserTextAllowed }))
-vi.mock('@/lib/style-anchor', () => ({ resolveStyleAnchor: mocks.resolveStyleAnchor }))
+vi.mock('@/lib/style-anchor', async (importOriginal) => ({ ...(await importOriginal<typeof import('@/lib/style-anchor')>()), resolveStyleAnchor: mocks.resolveStyleAnchor }))
 vi.mock('@/lib/style-facets/reference-image', () => ({ styleDrawsWithoutReference: mocks.styleDrawsWithoutReference }))
 vi.mock('@/lib/style-facets/analysis-wait', () => ({ styleAnalysisPending: mocks.styleAnalysisPending }))
 vi.mock('@/lib/artist/prop-jobs', () => ({
@@ -33,6 +34,8 @@ vi.mock('@/lib/artist/prop-jobs', () => ({
 vi.mock('@/lib/generation-jobs', () => ({ countFailedJobsForTarget: mocks.countFailedJobsForTarget, AUTO_GENERATION_GIVE_UP_THRESHOLD: 2 }))
 // 소품 양식(m1126 A2) — 스토리지에 올린 양식 주소. 못 올리면 null.
 vi.mock('@/lib/storage/template-asset', () => ({ templateAssetUrl: mocks.templateAssetUrl }))
+// 실사 그림체의 사진 글(리드 R2) — 기준 그림 없는 실사만 값이 있다.
+vi.mock('@/lib/style-facets/photo-look', () => ({ resolvePhotoLook: mocks.resolvePhotoLook }))
 
 import { POST as generateProp } from '@/app/api/artist/generate-prop/route'
 
@@ -53,6 +56,7 @@ beforeEach(() => {
   mocks.assertUserTextAllowed.mockResolvedValue({ id: 'moderation-1' })
   mocks.submitPropImageJob.mockResolvedValue({ id: 'job-1' })
   mocks.templateAssetUrl.mockResolvedValue('https://media.test/templates/prop-template-0123456789ab.png')
+  mocks.resolvePhotoLook.mockResolvedValue(null)
 })
 
 describe('소품 그림 그리기 창구', () => {
@@ -115,6 +119,22 @@ describe('소품 그림 그리기 창구', () => {
     expect(input.plan.submit.reference_image_urls).toEqual(['https://media.test/templates/prop-template-0123456789ab.png'])
     expect(input.plan.submit.aspect_ratio).toBe('16:9')
     expect(input.plan.model).toBe('openai/gpt-image-2/edit')
+  })
+
+  // 왜: 리드 R2 — 실사 그림체(기준 그림 없는 실사)일 때만 소품 양식에 사진 문장 · 색감 문장을 싣는다. 그림체 기준 그림이 있는 그림체(일본 멜로 등)는 사진 글을 묻지도 않는다.
+  it('소품 그림 창구는 기준 그림 없는 실사 그림체일 때만 사진 글을 싣는다', async () => {
+    mocks.styleDrawsWithoutReference.mockResolvedValue(true)
+    mocks.resolvePhotoLook.mockResolvedValue({ key: 'real', clause: 'Natural film grade with soft contrast.' })
+    await post({ actor: 'ui' })
+    expect(mocks.submitPropImageJob.mock.calls[0][0].plan.submit.prompt).toContain('real studio product photograph')
+    expect(mocks.submitPropImageJob.mock.calls[0][0].plan.submit.prompt).toContain('Natural film grade with soft contrast.')
+    mocks.submitPropImageJob.mockClear()
+    mocks.resolvePhotoLook.mockClear()
+    mocks.resolveStyleAnchor.mockResolvedValue({ key: 'real_jp_melo', imageUrl: 'https://anchor.test/melo.png', previewUrl: null, usePreviewRef: false, styleClause: null, anchorKind: 'media' })
+    const res = await post({ actor: 'ui' })
+    expect(await res.json()).toMatchObject({ ok: true, jobId: 'job-1' })
+    expect(mocks.resolvePhotoLook).not.toHaveBeenCalled()
+    expect(mocks.submitPropImageJob.mock.calls[0][0].plan.submit.prompt).not.toContain('photograph')
   })
 
   // 왜: 그림체 분석이 도는 동안은 그리지 않는다(2026-10-10 오너) — 분석보다 먼저 그리면 그림체 설명 없이 그린다. 인물 · 배경과 같다.

@@ -13,6 +13,7 @@ import { assertUserTextAllowed, ModerationBlockedError } from '@/lib/moderation/
 import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { styleDrawsWithoutReference } from '@/lib/style-facets/reference-image'
+import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { isImageModelKey } from '@/lib/image-models'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
@@ -105,7 +106,9 @@ export async function POST(req: Request) {
     const appearance = prop.appearance ?? ''
     // 소품 양식(m1126 A2) — 인물 시트 양식처럼 스토리지에 올린 주소를 첫 참고 그림으로(template-asset.ts). 못 올리면 양식 없이 그린다.
     const templateUrl = await templateAssetUrl(PROP_SHEET_FILE)
-    const plan = planPropImageSubmit({ name: prop.name, appearance, instruction, safeMode, anchor, styleWithoutReference, model, templateUrl })
+    // 실사 그림체(기준 그림 없는 실사)만 사진 글(리드 R2) — 인물 시트 · 배경과 같은 길. 그림체 기준 그림이 있으면 묻지 않는다.
+    const photoLook = anchor ? null : await resolvePhotoLook(project as Parameters<typeof resolvePhotoLook>[0])
+    const plan = planPropImageSubmit({ name: prop.name, appearance, instruction, safeMode, anchor, styleWithoutReference, model, templateUrl, photoLook })
 
     // 사용자가 쓴 칸(이름 · 생김새 · 바꿀 점)만 검사한다 — 우리 고정 문구 · 그림체 절은 보내지 않는다.
     let moderation

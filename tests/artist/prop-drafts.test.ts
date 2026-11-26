@@ -28,6 +28,8 @@ vi.mock('@/lib/moderation/creem', () => ({ assertUserTextAllowed: async () => ({
 vi.mock('@/lib/writer/debug-events', () => ({ recordWriterObservabilityEvent: async (_p: string, kind: string, detail: Record<string, unknown>) => { mocks.events.push([kind, detail]) } }))
 // 소품 양식(m1126 A2) — 스토리지에 올린 양식 주소.
 vi.mock('@/lib/storage/template-asset', () => ({ templateAssetUrl: async (file: string) => `https://media.test/templates/${file}` }))
+// 실사 그림체의 사진 글(리드 R2) — 이 시험의 그림체(jp_anime)는 사진 글이 없다.
+vi.mock('@/lib/style-facets/photo-look', () => ({ resolvePhotoLook: async () => null }))
 
 import { triggerPropDrafts } from '@/lib/artist/prop-drafts'
 import { propsAutoDrawOpen, propsToAutoDraw } from '@/lib/artist/props'

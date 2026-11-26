@@ -41,6 +41,7 @@ import { planPropImageSubmit } from '@/lib/artist/prop-image-plan'
 import { IMAGE_JOB_KINDS, VIDEO_JOB_KINDS } from '@/lib/generation-quota'
 import { LANE_OF_KIND } from '@/lib/generation-batches'
 import { FACET_NO_TEXT } from '@/lib/style-facets/no-text'
+import { PHOTO_PROP_SHEET_LINE, PHOTO_TEXTURE_PLACE } from '@/lib/style-facets/photo-sheet-line'
 import { PropPanel } from '@/features/artist/prop-panel'
 import { PropDetailPanels } from '@/features/artist/prop-view-dialog'
 import { useProjectStore } from '@/stores/project-store'
@@ -198,6 +199,45 @@ describe('소품 그림 지시문', () => {
   // 왜: 정책 거절 뒤 사람이 "안전하게 다시"를 누르면 배경과 같은 순화 문구를 붙인다(약속 B9 와 같은 규칙).
   it('정책 거절 뒤 안전하게 다시 그리면 순화 문구를 붙인다', () => {
     expect(buildPropImagePrompt({ ...prop, safeMode: true })).toMatch(/safe-for-work|non-graphic/i)
+  })
+})
+
+describe('실사 그림체의 소품 양식', () => {
+  const photoLook = { key: 'real', clause: 'Natural film grade with soft contrast.' }
+  // 왜: 리드 R2(2026-11-26) — 오너 11/23 실사 "모두 적용"과 같은 결. 인물 시트 지시문에 "사진"이 없어 컨셉아트로 읽혔던 것처럼, 흰 양식 칸의 소품도 그림으로 그려질 수 있다 —
+  //   인물 시트의 사진 문장(PHOTO_SHEET_LINE) 결로 "칸마다 실제 물건을 찍은 사진"과 그 그림체의 색감 문장을 싣는다.
+  it('실사 그림체(기준 그림 없는 실사)의 소품 양식에는 인물 시트처럼 사진 문장과 색감 문장이 붙는다', () => {
+    const plan = planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true, templateUrl: TEMPLATE, photoLook })
+    const text = plan.submit.prompt
+    expect(text).toContain(PHOTO_PROP_SHEET_LINE)
+    expect(text).toContain(PHOTO_TEXTURE_PLACE)
+    expect(text).toContain('Natural film grade with soft contrast.')
+    // 사진 문장은 물건 설명 바로 뒤(인물 시트처럼 앞쪽), 색감 문장은 끝.
+    expect(text.indexOf(PHOTO_PROP_SHEET_LINE)).toBeLessThan(text.indexOf('MAIN tile'))
+    expect(text.trim().endsWith('Natural film grade with soft contrast.')).toBe(true)
+    // 색감 문장에 이미 "실제 사진" 말이 있으면 두 번 싣지 않는다(배경 · 인물 시트와 같다).
+    const already = planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true, templateUrl: TEMPLATE, photoLook: { key: 'real', clause: 'A real photograph, natural grade.' } })
+    expect(already.submit.prompt).not.toContain(PHOTO_TEXTURE_PLACE)
+  })
+
+  // 왜: 리드 R2 "일본 멜로 · 다른 그림체에는 넣지 않는다" — 실사 사진 글은 기준 그림 없는 실사에만. 그림체 기준 그림이 있으면 사진 글이 와도 싣지 않는다(그림체 그림이 정한다).
+  it('실사 그림체가 아니면 소품 지시문에 사진 문장 · 색감 문장이 붙지 않는다', () => {
+    for (const plan of [
+      planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: false, templateUrl: TEMPLATE }),
+      planPropImageSubmit({ ...prop, anchor, styleWithoutReference: false, templateUrl: TEMPLATE, photoLook }),
+      planPropImageSubmit({ ...prop, anchor: null, styleWithoutReference: true, templateUrl: TEMPLATE, photoLook: null }),
+    ]) {
+      expect(plan.submit.prompt).not.toContain(PHOTO_PROP_SHEET_LINE)
+      expect(plan.submit.prompt).not.toContain(PHOTO_TEXTURE_PLACE)
+      expect(plan.submit.prompt).not.toContain('Natural film grade')
+    }
+  })
+
+  // 왜: 순화 문구의 "stylized … depiction"은 사진 글과 다툰다 — 인물 시트(SAFE_TOKENS_PHOTO)처럼 실사 소품은 사진 말로 순화한다.
+  it('실사 그림체의 소품을 순화해 다시 그릴 때는 그림 말 대신 사진 말로 순화한다', () => {
+    const text = planPropImageSubmit({ ...prop, safeMode: true, anchor: null, styleWithoutReference: true, templateUrl: TEMPLATE, photoLook }).submit.prompt
+    expect(text).toContain('non-graphic photograph')
+    expect(text).not.toContain('stylized')
   })
 })
 

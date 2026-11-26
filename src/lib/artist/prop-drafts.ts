@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { countFailedJobsForTarget, AUTO_GENERATION_GIVE_UP_THRESHOLD } from '@/lib/generation-jobs'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { styleDrawsWithoutReference } from '@/lib/style-facets/reference-image'
+import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
 import { assertUserTextAllowed } from '@/lib/moderation/creem'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import { styleIdOf } from '@/lib/series/snapshot'
@@ -36,6 +37,8 @@ export async function triggerPropDrafts(projectId: string): Promise<PropDraftRes
     const workspaceId = (project as { workspace_id: string }).workspace_id
     // 소품 양식(m1126 A2) — 카드 · 창의 그리기와 같은 양식. 못 올리면 양식 없이 그린다.
     const templateUrl = await templateAssetUrl(PROP_SHEET_FILE)
+    // 실사 그림체(기준 그림 없는 실사)만 사진 글(리드 R2) — 카드 · 창의 그리기와 같다.
+    const photoLook = anchor ? null : await resolvePhotoLook(project as Parameters<typeof resolvePhotoLook>[0])
     for (const row of rows) {
       if (await hasQueuedPropImageJob(projectId, row.prop_id)) {
         result.skipped++
@@ -47,7 +50,7 @@ export async function triggerPropDrafts(projectId: string): Promise<PropDraftRes
       }
       try {
         const appearance = row.appearance ?? ''
-        const plan = planPropImageSubmit({ name: row.name, appearance, anchor, styleWithoutReference, templateUrl })
+        const plan = planPropImageSubmit({ name: row.name, appearance, anchor, styleWithoutReference, templateUrl, photoLook })
         const moderation = await assertUserTextAllowed([row.name, appearance], { projectId, kind: 'prop_image', userId: null })
         try {
           const job = await submitPropImageJob({

@@ -8,6 +8,7 @@
 //   지문 = "p1:<생김새 해시>:<그림체>" — 생김새가 바뀌면 "설명 바뀜", 그림체가 바뀌면 "그림체 바뀜"(그림체 재생성은 소품을 함께 다시 그리지 않는다, 리드 결정 3).
 //   서버 전용 의존성 금지(카드가 바뀜 판정을 쓴다). 약속: tests/artist/prop-image.test.ts
 import { computeWorldDescriptionHash } from '@/lib/image-provenance'
+import { hasPhotoTexture, PHOTO_PROP_PICTURE_LINE, PHOTO_PROP_SHEET_LINE, PHOTO_TEXTURE_PLACE } from '@/lib/style-facets/photo-sheet-line'
 
 /** 소품 그림의 글씨 규칙 — 'none' 글자 없음 · 'described' 설명에 적힌 글씨만. */
 export type PropTextRule = 'none' | 'described'
@@ -26,6 +27,8 @@ function sentence(text: string): string {
 
 /** 정책 거절 뒤 안전 재시도 문구 — 인물 시트(turnaround SAFE_TOKENS)와 같은 결. */
 const PROP_SAFE_TOKENS = 'stylized non-graphic depiction, tasteful, safe-for-work'
+/** 실사 그림체의 순화 문구 — "stylized … depiction"이 사진 글과 다투지 않게(인물 시트 SAFE_TOKENS_PHOTO 와 같은 결). */
+const PROP_SAFE_TOKENS_PHOTO = 'tasteful non-graphic photograph, safe-for-work'
 
 /** 소품 양식 칸 문장 — 칸 이름은 prop-sheet-template.ts 와 한 쌍이다(인물 시트의 칸 문장과 같은 결). */
 const SHEET_LINES = [
@@ -39,16 +42,29 @@ const SHEET_LINES = [
 
 /**
  * 소품 그림 지시문. sheet(기본) = 소품 양식 칸을 채우는 시트, false = 양식 없이 물건 하나만 정면으로 그린 한 장(양식을 못 올렸을 때).
+ * photoLook = 실사 그림체(기준 그림 없는 실사)의 사진 글(리드 R2 2026-11-26, 인물 시트와 같은 결) — 물건 설명 바로 뒤에 사진 문장, 끝에 "실제 사진" 질감 문장과
+ *   그 그림체의 색감 문장. 없으면(일본 멜로 · 다른 그림체 · 그림체 없음) 지금 그대로.
  */
-export function buildPropImagePrompt(input: { name: string; appearance: string; instruction?: string | null; safeMode?: boolean; textRule?: PropTextRule; sheet?: boolean }): string {
+export function buildPropImagePrompt(input: {
+  name: string
+  appearance: string
+  instruction?: string | null
+  safeMode?: boolean
+  textRule?: PropTextRule
+  sheet?: boolean
+  photoLook?: { clause: string | null } | null
+}): string {
   const name = input.name.trim()
   const appearance = input.appearance.trim()
   const subject = appearance ? `${name}: ${appearance}` : name
   const instruction = input.instruction?.trim()
   const sheet = input.sheet ?? true
+  const photo = input.photoLook ?? null
+  const photoClause = photo?.clause?.trim() || null
   return [
     sentence(sheet ? `Fill in this prop reference-sheet template with ${subject}` : `Prop reference picture of ${subject}`),
     ...(instruction ? [sentence(`Requested change: ${instruction}`)] : []),
+    ...(photo ? [sheet ? PHOTO_PROP_SHEET_LINE : PHOTO_PROP_PICTURE_LINE] : []),
     ...(sheet
       ? SHEET_LINES
       : [
@@ -56,7 +72,9 @@ export function buildPropImagePrompt(input: { name: string; appearance: string; 
           'on a plain neutral background.',
         ]),
     (input.textRule ?? PROP_TEXT_RULE) === 'described' ? DESCRIBED_TEXT_LINE : NO_TEXT_LINE,
-    ...(input.safeMode ? [PROP_SAFE_TOKENS] : []),
+    ...(input.safeMode ? [photo ? PROP_SAFE_TOKENS_PHOTO : PROP_SAFE_TOKENS] : []),
+    ...(photo && !hasPhotoTexture(photoClause) ? [sentence(PHOTO_TEXTURE_PLACE)] : []),
+    ...(photoClause ? [sentence(photoClause)] : []),
   ].join(' ')
 }
 

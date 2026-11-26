@@ -2,6 +2,12 @@
 /** 모든 칸이 사진. 사람이 아닌 인물(동물 · 기계)도 실제로 찍은 것으로. */
 export const PHOTO_SHEET_LINE =
   'every tile is a real studio photograph of a real actor in costume and make-up (a real animal, or a practical costume or prop, when the character is not human), shot with a real camera in a studio, with real skin, hair and fabric — never a drawing, painting, illustration, 3D render, game character or concept art'
+/** 소품 양식(m1126 A2 · 리드 R2 2026-11-26) — 인물 시트 문장과 같은 결로, 칸마다 실제 물건을 스튜디오에서 찍은 사진. */
+export const PHOTO_PROP_SHEET_LINE =
+  'Every tile is a real studio product photograph of the real object, shot with a real camera, with real materials, surfaces and light — never a drawing, painting, illustration, 3D render, game asset or concept art.'
+/** 소품 양식을 못 올려 한 장으로 그릴 때의 같은 문장. */
+export const PHOTO_PROP_PICTURE_LINE =
+  'This is a real studio product photograph of the real object, shot with a real camera, with real materials, surfaces and light — never a drawing, painting, illustration, 3D render, game asset or concept art.'
 /** 참고 그림(지금 시트 · 기준 얼굴 · 올린 그림 · 앞 화 시트)이 그림이어도 사진으로 — 누구인지와 옷만 가져온다. */
 export const PHOTO_SHEET_FROM_PICTURES =
   'the reference pictures of this character may be drawings or renders: keep only who they are and what they wear, and remake every tile as the real photograph described above — never copy their linework, shading, skin smoothing or render finish'
