@@ -36,7 +36,8 @@ const options = () => ({ projectId: 'p', stage: 'artist', message: '상태 알�
 describe('지시문 · 도구 안내', () => {
   it('Producer · Writer · Storyboard · Artist 채팅이 함께 받는 지시문에 화면 순서가 적히고 Artist 다음은 Storyboard 다', () => {
     // 왜: Artist 채팅이 "다음은 Director"라고 안내하고 "Writer 단계가 아직 시작되지 않았다"고 말했다(11/14 채팅 점검 D · H). 화면 이름과 순서를 모르는 채 옛 이름으로 답했다.
-    expect(CHAT_AGENT_GUIDE).toContain('Producer (the start screen), Writer (the prose), Artist, Storyboard (scenes and shots), Director, Editor')
+    // O1(오너 2026-11-26): Writer 는 산문 뒤에 콘티(rough storyboard)가 있고 그다음이 Artist 다.
+    expect(CHAT_AGENT_GUIDE).toContain('Producer (the start screen), Writer (the prose, then the rough storyboard), Artist, Storyboard (scenes and shots), Director, Editor')
     expect(CHAT_AGENT_GUIDE).toContain('After Artist the next screen is Storyboard, never Director.')
     for (const route of ['produce', 'writer', 'artist']) {
       expect(readFileSync(`src/app/api/${route}/chat/route.ts`, 'utf8')).toContain('CHAT_AGENT_GUIDE')
@@ -104,7 +105,7 @@ describe('현황 스냅샷', () => {
       state: {
         writer: { started: false, savedScenes: 0, savedShots: 0 },
         screens: {
-          order: 'Producer (start) > Writer (prose) > Artist > Storyboard (scenes and shots) > Director > Editor',
+          order: 'Producer (start) > Writer (prose, then rough storyboard) > Artist > Storyboard (scenes and shots) > Director > Editor',
           producer: 'Writer screen (prose)',
           writer: 'Storyboard screen (scenes and shots)',
           artist: 'Artist screen',

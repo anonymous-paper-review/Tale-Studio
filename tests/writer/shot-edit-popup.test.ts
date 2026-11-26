@@ -91,18 +91,18 @@ describe('러프 다시 그리기 요청의 답', () => {
 })
 
 describe('[적용] 뒤', () => {
-  it('저장하고 다 그렸으면 팝업을 닫는다', () => {
-    // 왜: 정상 경로 고정.
-    expect(nextApplyStep({ saved: true, drawn: true })).toBe('close')
+  it('저장하고 그리기를 맡겼으면 팝업을 닫는다', () => {
+    // 왜: 정상 경로 고정 — W5(오너 2026-11-26): 다 그릴 때까지 창 위에서 기다리지 않는다. 그리는 동안은 그 카드에 기다림이 보인다.
+    expect(nextApplyStep({ saved: true, handedOff: true })).toBe('close')
   })
 
-  it('저장은 됐는데 그리기만 실패하면 [다시 그리기]로 그리기만 다시 한다', () => {
-    // 왜: 고친 내용은 이미 저장됐다 — 다시 저장할 것 없이 그리기만 다시 하면 된다.
-    expect(nextApplyStep({ saved: true, drawn: false })).toBe('redraw')
+  it('저장은 됐는데 그리기를 맡기지 못하면 [다시 그리기]로 그리기만 다시 한다', () => {
+    // 왜: 고친 내용은 이미 저장됐다 — 다시 저장할 것 없이 그리기만 다시 맡기면 된다.
+    expect(nextApplyStep({ saved: true, handedOff: false })).toBe('redraw')
   })
 
   it('저장이 실패하면 [적용]을 남겨 고친 내용을 다시 저장한다', () => {
     // 왜: 저장이 안 됐는데 [다시 그리기]만 남으면 옛 내용으로 그리고 "고친 내용으로 다시 그렸어요"라고 알렸다(검토 지적).
-    expect(nextApplyStep({ saved: false, drawn: false })).toBe('resave')
+    expect(nextApplyStep({ saved: false, handedOff: false })).toBe('resave')
   })
 })

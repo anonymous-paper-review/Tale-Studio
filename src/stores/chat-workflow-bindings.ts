@@ -14,9 +14,11 @@ import type { StageId } from '@/types'
 const stages = ['producer', 'writer', 'artist', 'director', 'editor']
 
 /** 현황 스냅샷의 화면 이름 표 — 순서 · 도구 대상 이름 ↔ 사용자가 보는 화면 이름. */
+//   O1(오너 2026-11-26): Writer 는 산문 뒤에 콘티(rough storyboard, 저장 단계 conti)가 있고 그다음이 Artist 다.
 const SCREEN_NAMES = {
-  order: 'Producer (start) > Writer (prose) > Artist > Storyboard (scenes and shots) > Director > Editor',
+  order: 'Producer (start) > Writer (prose, then rough storyboard) > Artist > Storyboard (scenes and shots) > Director > Editor',
   producer: 'Writer screen (prose)',
+  conti: 'Writer screen (rough storyboard: scenes, shots and rough sketches)',
   writer: 'Storyboard screen (scenes and shots)',
   artist: 'Artist screen',
 }

@@ -18,6 +18,7 @@ import { useProjectStore } from '@/stores/project-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { resetActionGuard } from '@/lib/action-guard'
+import { parseHandoffMarker } from '@/lib/chat-blocks'
 import type { Shot } from '@/types'
 
 const shot = { shotId: 'sh_01_01', sceneId: 'sc_01', shotType: 'MS', actionDescription: '여자가 앉는다', characters: [], durationSeconds: 3, generationMethod: 'T2V', dialogueLines: [], camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }, lighting: { position: 'front', brightness: 50, colorTemp: 5600 } } as unknown as Shot
@@ -47,6 +48,13 @@ describe('콘티 → Artist', () => {
     expect(nav.handoffToStage).toHaveBeenCalledWith('artist', { verify: true })
     // 넘김 초대 연출(⇄)이 보인 뒤 화면을 옮긴다 — 다른 단계 넘김과 같은 시간.
     await vi.waitFor(() => expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/artist'), { timeout: 4000 })
+  })
+
+  // 왜(혼자 정한 것): 다른 단계 넘김처럼 두 에이전트가 만나는 넘김 표시(⇄)가 채팅에 남아야 한다 — 콘티를 모르는 표시는 글 한 줄로 깨져 보였다.
+  it('콘티에서 Artist 로 넘기면 채팅에 콘티 ⇄ Artist 넘김 표시가 남는다', async () => {
+    await useGlobalChatStore.getState().requestNextStep()
+    const markers = useGlobalChatStore.getState().messages.map((m) => parseHandoffMarker(m.content)).filter(Boolean)
+    expect(markers).toEqual([{ from: 'conti', to: 'artist' }])
   })
 
   // 왜: 정상 경로 고정 — 채팅에 말로 부탁해도 단추와 같은 길로 넘긴다.

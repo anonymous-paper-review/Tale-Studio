@@ -76,11 +76,18 @@ export async function applyStartEdit(deps: { save: () => Promise<void>; redrawSh
   return deps.redrawShot()
 }
 
-/** [적용] 뒤 — 다 됐으면 닫고, 저장만 됐으면 [다시 그리기](그리기만 다시), 저장이 안 됐으면 [적용]을 남긴다(고친 내용을 다시 저장).
+/** [적용] 뒤 — 저장하고 그리기를 맡겼으면 닫고(W5 오너 2026-11-26: 다 그릴 때까지 창 위에서 기다리지 않는다 — 그 카드에 기다림),
+ *  저장만 됐으면 [다시 그리기](그리기만 다시 맡김), 저장이 안 됐으면 [적용]을 남긴다(고친 내용을 다시 저장).
  *  저장이 실패했는데 [다시 그리기]를 남기면 옛 내용으로 그리고 "고친 내용으로 다시 그렸어요"라고 알렸다(검토 지적). */
-export function nextApplyStep(result: { saved: boolean; drawn: boolean }): 'close' | 'redraw' | 'resave' {
+export function nextApplyStep(result: { saved: boolean; handedOff: boolean }): 'close' | 'redraw' | 'resave' {
   if (!result.saved) return 'resave'
-  return result.drawn ? 'close' : 'redraw'
+  return result.handedOff ? 'close' : 'redraw'
+}
+
+/** 그 샷을 그리는 중이면 다시 그리는 [적용] · [연출만 다시 만들기]를 끈다(W5 — 같은 샷을 두 번 맡기면 서버가 둘째를 거절하는데
+ *  고친 글은 이미 저장돼 글과 그림이 어긋난다). 대사만 고친 [적용](저장만)은 그림을 건드리지 않아 그리는 중에도 된다. */
+export function redrawBlockedWhileDrawing(drawing: boolean, applyKind: ApplyKind): boolean {
+  return drawing && applyKind === 'redraw'
 }
 
 /** 러프 다시 그리기 요청(/api/writer/rough-storyboard · force)의 답 — 무엇을 기다리고 무엇을 알릴지. 보드 카드와 같은 구분.

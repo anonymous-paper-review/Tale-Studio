@@ -152,6 +152,8 @@ export function parseAttachmentMarker(content: string): { text: string; urls: st
 
 const STAGE_IDS: ReadonlySet<string> = new Set([
   'producer',
+  // 콘티(O1 2026-11-26) — 씬 스토리 → 콘티 · 콘티 → Artist 넘김 표시.
+  'conti',
   'writer',
   'artist',
   'director',
