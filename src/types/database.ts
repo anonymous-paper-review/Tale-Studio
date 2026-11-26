@@ -2015,6 +2015,7 @@ export type Database = {
           created_at: string | null
           design_ref: string | null
           dialogue_lines: Json | null
+          director_prompt: string | null
           director_refs: Json | null
           duration_seconds: number | null
           dynamic_spec: Json | null
@@ -2060,6 +2061,7 @@ export type Database = {
           created_at?: string | null
           design_ref?: string | null
           dialogue_lines?: Json | null
+          director_prompt?: string | null
           director_refs?: Json | null
           duration_seconds?: number | null
           dynamic_spec?: Json | null
@@ -2105,6 +2107,7 @@ export type Database = {
           created_at?: string | null
           design_ref?: string | null
           dialogue_lines?: Json | null
+          director_prompt?: string | null
           director_refs?: Json | null
           duration_seconds?: number | null
           dynamic_spec?: Json | null

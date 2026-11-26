@@ -956,6 +956,51 @@ export function directorRefsOf(data: ShotNodeData): { characters: string[]; loca
   return { characters: [...data.characterAssetIds], locations: [...data.worldAssetIds] }
 }
 
+// Director 고친 샷 프롬프트(오너 2026-11-26 O5 · 리드 승인) — 채팅 [적용] · 샷 상세 프롬프트 칸이 고친 글(promptOverride)을
+//   shots.director_prompt 에 0.5초 뒤 쓴다. null = Writer 글 그대로(고친 글이 없거나 Writer 글과 같음). 들어올 때 hydrateFromDb 가 읽어 맞춘다(DB 가 진실).
+//   Writer 가 샷 글을 다시 쓰면 DB 방아쇠가 이 칸을 비운다(20261126220000). 약속: tests/director/director-prompt-persist.test.ts
+const pendingDirectorPromptSaves = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** 저장 전(0.5초 안)인 고친 글이 있는가 — 재수화가 막 고친 글을 DB 의 옛 값으로 덮지 않게 본다. */
+function hasPendingDirectorPromptSave(writerShotId: string): boolean {
+  return pendingDirectorPromptSaves.has(writerShotId)
+}
+
+/** DB 에 쓸 값 — 고친 글이 없거나 Writer 글과 같으면 null. */
+export function directorPromptToSave(data: Pick<ShotNodeData, 'promptOverride' | 'derivedPrompt'>): string | null {
+  const override = data.promptOverride
+  if (override === undefined || override === null) return null
+  return override === (data.derivedPrompt ?? undefined) ? null : override
+}
+
+function debouncedDirectorPromptSaveToDb(
+  projectId: string,
+  writerShotId: string,
+  getData: () => ShotNodeData | undefined,
+) {
+  const existing = pendingDirectorPromptSaves.get(writerShotId)
+  if (existing) clearTimeout(existing)
+  pendingDirectorPromptSaves.set(
+    writerShotId,
+    setTimeout(async () => {
+      pendingDirectorPromptSaves.delete(writerShotId)
+      const data = getData()
+      if (!projectId || !data) return
+      try {
+        const { error } = await createClient()
+          .from('shots')
+          .update({ director_prompt: directorPromptToSave(data) })
+          .eq('project_id', projectId)
+          .eq('shot_id', writerShotId)
+        if (error) throw error
+        void invalidateShots(projectId) // 사물함 표시 — 다음 읽기가 새 값을 받게
+      } catch (err) {
+        console.error('[director-store] director prompt DB save failed:', err)
+      }
+    }, 500),
+  )
+}
+
 const pendingVideoClipSaves = new Map<string, ReturnType<typeof setTimeout>>()
 const inFlightVideoClipSaves = new Map<string, Promise<void>>()
 const pendingVideoFinalWrites = new Map<string, Promise<void>>()
@@ -1995,6 +2040,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               )
             }
           }
+          // Director 고친 샷 프롬프트(shots.director_prompt, 오너 2026-11-26 O5) — DB 가 진실. null = Writer 글 그대로.
+          const directorPromptByShotId = new Map<string, string | null>()
+          for (const r of shotsRes.data ?? []) {
+            if (r.shot_id) directorPromptByShotId.set(r.shot_id, typeof r.director_prompt === 'string' ? r.director_prompt : null)
+          }
           // #wiring-persistence: DB에 저장된 안정 참조 연결. 노드 재구성 후 resolve 해 복원한다.
           const stableImageInputsByShotId = new Map<string, StableWiringRef[]>()
           // 약속 F·G: 사람이 손댄 참조 목록(shots.director_refs) — 있으면 그것이 진실이다.
@@ -2068,6 +2118,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     data: {
                       ...n.data,
                       imageInputs: normalizeImageInputs(n.data.imageInputs),
+                      // 고친 프롬프트는 DB 값으로 — 저장 전(0.5초 안)인 고친 글이 있으면 그대로 둔다(곧 저장된다).
+                      ...(directorPromptByShotId.has(n.data.writerShotId) && !hasPendingDirectorPromptSave(n.data.writerShotId)
+                        ? { promptOverride: directorPromptByShotId.get(n.data.writerShotId) ?? undefined }
+                        : {}),
                       storyboardImage: shotStoryboardMatchesHydrationSnapshot(
                         n,
                         localSnapshot.get(n.id),
@@ -3062,6 +3116,16 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           if (node && isShotData(node.data) && node.data.writerShotId) {
             const writerShotId = node.data.writerShotId
             debouncedShotSaveToDb(get().projectId, writerShotId, () => {
+              const n = get().nodes.find((x) => x.id === id)
+              return n && isShotData(n.data) ? n.data : undefined
+            })
+          }
+        }
+        // 고친 샷 프롬프트(채팅 [적용] · 프롬프트 칸)는 shots.director_prompt 에 남긴다(오너 2026-11-26 O5). Writer 와 이어진 샷만.
+        if (isShotData(prev.data) && 'promptOverride' in patch) {
+          const node = get().nodes.find((n) => n.id === id)
+          if (node && isShotData(node.data) && node.data.writerShotId) {
+            debouncedDirectorPromptSaveToDb(get().projectId, node.data.writerShotId, () => {
               const n = get().nodes.find((x) => x.id === id)
               return n && isShotData(n.data) ? n.data : undefined
             })
