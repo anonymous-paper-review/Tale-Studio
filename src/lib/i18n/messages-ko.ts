@@ -1372,7 +1372,7 @@ export const KO: Record<string, string> = {
   'Drag onto a node to apply the camera/lighting/lens setup': '노드 위로 드래그해 카메라/조명/렌즈 셋업 적용',
   'Delete preset': '프리셋 삭제',
   Presets: '프리셋',
-  'Generate the rough storyboard into a real shooting-image storyboard in one go': '러프 스토리보드를 실제 촬영 이미지 스토리보드로 한번에 생성할 수 있어요',
+  'Generate the rough storyboard into a real shooting-image storyboard in one go': '콘티를 실제 촬영 이미지 스토리보드로 한번에 생성할 수 있어요',
   'Stopping': '중단하는 중',
   'Stop after current videos finish.': '지금 만들고 있는 영상까지만 마치고 멈춥니다.',
   'Generate videos': '영상 생성',
@@ -1429,7 +1429,7 @@ export const KO: Record<string, string> = {
   'Prompt node': '프롬프트 노드',
   'Scenes come in automatically once you create them in Writer.': 'Writer에서 씬을 먼저 만들면 자동으로 들어와요.',
   'Or double-click the canvas to create a Scene directly.': '또는 캔버스를 더블클릭해서 직접 씬을 만들 수 있어요.',
-  'Start shooting real images/videos based on the rough storyboard, characters, and world.': '러프 스토리보드와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요.',
+  'Start shooting real images/videos based on the rough storyboard, characters, and world.': '콘티와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요.',
   // v3 D1 Director 노드 캔버스(2026-11-03) — 툴바 제목 숫자 · 확대 알약 · 입력 구멍 라벨
   '{nodes} nodes · {shots} shots': '노드 {nodes} · 샷 {shots}',
   'Canvas zoom': '캔버스 배율',

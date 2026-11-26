@@ -1996,7 +1996,7 @@ function handoffBlockers(spec: HandoffSpec, opts?: { acceptIncomplete?: boolean 
     }
   }
   if (spec.from === 'conti') {
-    // 콘티 → Artist(O1 2026-11-26): 씬 · 샷을 나눠야 넘긴다(나누는 중 · 실패면 넘길 콘티가 없다). 러프는 다 그리지 않아도 된다 — 빠진 러프는 Storyboard 가 그린다.
+    // 콘티 → Artist(O1 2026-11-26): 씬 · 샷을 나눠야 넘긴다(나누는 중 · 실패면 넘길 콘티가 없다). 러프는 다 그리지 않아도 된다 — 빠진 러프는 콘티로 돌아오면 다시 그린다 — Storyboard 는 러프를 그리지 않는다(m-storyboard).
     return useWriterStore.getState().shots.length > 0
       ? { hard: [], soft: [] }
       : { hard: [translate(locale, 'Scenes and shots are not split yet. You can move on once the split finishes.')], soft: [] }
