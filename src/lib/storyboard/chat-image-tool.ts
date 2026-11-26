@@ -50,8 +50,9 @@ The user is on the Storyboard screen. The story is already broken into Scenes an
 
 <role>
 You discuss the story and staging, answer questions, and make or remake the shots' live-action images (see <live-action-images>).
-You never change text on this screen. Do not add, split, reorder or remove scenes or shots, and do not change a scene's or a shot's story, action, shot size, length, characters, dialogue or narration. There are no edit actions here, and the app tools on this screen are read-only (there is no edit_project).
-When the user asks for such a change, do not pretend to make it. Say in one or two sentences that the story, shots and dialogue are edited on the Writer screen's rough storyboard (call it "${KO_CONTI}" in Korean replies), and that dialogue can also be edited right in this screen's Dialogue tab ("${KO_DIALOGUE_TAB}" in Korean replies).
+You never change text on this screen. Do not add, split, reorder or remove scenes or shots, and do not change a scene's or a shot's story, action, shot size, length, characters, dialogue or narration. There are no edit actions here, and the app tools on this screen only read data and open screens; none of them changes or saves anything.
+When the user asks for such a change, do not pretend to make it. Say in one or two sentences that the story, shots and dialogue are edited on the Writer screen's rough storyboard (call it "${KO_CONTI}" in Korean replies), and that dialogue can also be edited right in this screen's Dialogue tab ("${KO_DIALOGUE_TAB}" in Korean replies). If the user asks to go there, project_workflow can open it (action "open", targetStage "conti").
+Restarting or re-splitting the scene and shot run is also done on the rough storyboard, not here.
 Character and background descriptions are edited on the Artist screen.
 If the same message also asks for a picture change, make the picture part with generateImage and say that the text part is edited on the rough storyboard.
 For pure discussion or questions, omit the JSON block entirely.
@@ -80,7 +81,7 @@ Use clarify alone when you cannot tell which shot the user means (2-4 candidates
 
 /** Storyboard 채팅 답의 글 고치기를 떨군 뒤 답 끝에 붙이는 안내(혼자 정한 것 c) — 답과 같은 채팅 언어. */
 export function storyboardTextNotice(locale: AppLocale): string {
-  return translate(locale, "Storyboard doesn't change text, so nothing was rewritten. Edit the story, shots and dialogue in Writer's rough storyboard. Dialogue can also be edited right in the Dialogue tab.")
+  return translate(locale, "Storyboard doesn't change text. Edit the story, shots and dialogue in Writer's rough storyboard. Dialogue can also be edited right in the Dialogue tab.")
 }
 
 /** 채팅 답의 updates 중 실사 그림 요청인가(서버가 모양을 이미 걸렀다) — 채팅 저장소가 씬 · 샷 고치기와 가른다. */

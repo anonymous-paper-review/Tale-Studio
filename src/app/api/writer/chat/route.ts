@@ -13,7 +13,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { llmChat } from '@/lib/llm'
-import { prepareChatTools } from '@/lib/chat-tools/protocol'
+import { prepareChatTools, rejectedToolCallIds } from '@/lib/chat-tools/protocol'
 import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, resolveChatLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { parseDialogueLanguage, type DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
@@ -313,7 +313,8 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       : ''
 
     if (toolsEnabled === true && (typeof projectId !== 'string' || !projectId)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
-    const appTools = prepareChatTools('writer', toolsEnabled, toolMessages, chatWorkflow, chatDomain, { edit: !imageTool })
+    // Storyboard 요청은 고치기 도구 · Writer 실행 다시 돌리기 없이(오너 N3, 검토 rev-flow 리드 2 · 7).
+    const appTools = prepareChatTools('writer', toolsEnabled, toolMessages, chatWorkflow, chatDomain, { edit: !imageTool, resume: !imageTool })
 
     const normalizedHistory = normalizeHistory(history)
     const contextSections = [
@@ -358,7 +359,11 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
         },
       },
     )
-    if (appTools?.turn) return NextResponse.json({ toolTurn: appTools.turn, toolSupport: true, toolUsage: llmUsage, contentLocale: projectLocale, localeSwitched })
+    if (appTools?.turn) {
+      // 그 요청에 주지 않은 이름의 도구 호출은 거절한다 — 화면은 거절 목록의 호출을 실행하지 않고 쓸 수 없다는 결과를 모델에 돌려준다(리드 2 · architecture §3).
+      const rejected = rejectedToolCallIds(appTools.turn, appTools.tools)
+      return NextResponse.json({ toolTurn: appTools.turn, ...(rejected.length ? { rejectedToolCalls: rejected } : {}), toolSupport: true, toolUsage: llmUsage, contentLocale: projectLocale, localeSwitched })
+    }
 
     // 답 끝에 붙는 안내(못 읽음 · 일부만 · 빠진 인물 · 배경에 없는 장소)는 답과 같은 채팅 언어로 — 프로젝트가 없으면 화면 언어(2026-11-10 오너).
     const replyLocale: AppLocale = projectLocale ?? parseAppLocale(uiLocale) ?? 'en'

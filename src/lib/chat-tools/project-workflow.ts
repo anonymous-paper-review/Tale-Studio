@@ -45,7 +45,7 @@ export function createProjectWorkflow(deps: {
     if (!input || typeof input !== 'object' || Array.isArray(input) ||
       Object.keys(input).some(key => !['action', 'targetStage'].includes(key)) ||
       !['status', 'refresh', 'open', 'handoff', 'resume'].includes(String(input.action)) ||
-      (input.targetStage !== undefined && !['producer', 'writer', 'artist'].includes(String(input.targetStage)))) {
+      (input.targetStage !== undefined && !['producer', 'conti', 'writer', 'artist'].includes(String(input.targetStage)))) {
       return { status: 'invalid_input', message: 'Use a supported action and Producer, Writer or Artist target.' }
     }
     const action = String(input.action)

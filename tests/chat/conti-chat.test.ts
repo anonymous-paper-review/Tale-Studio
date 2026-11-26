@@ -86,11 +86,13 @@ describe('콘티 채팅', () => {
     expect(suggestion?.action).toEqual({ kind: 'roughRedraw', projectId: 'p-conti', shotIds: ['sh_01_01'], label: '러프 다시 그리기' })
   })
 
-  // 왜: 정상 경로 고정 — Storyboard 채팅은 지금 그대로 Storyboard 채팅에 [러프 다시 그리기]를 띄운다.
-  it('Storyboard 채팅의 [러프 다시 그리기]는 지금처럼 Storyboard 채팅에 뜬다', async () => {
+  // 왜(오너 2026-11-27 N3 "Storyboard 채팅은 실사 고치기만, 글은 콘티로 안내"): Storyboard 채팅은 고치기 도구 호출을 실행하지 않는다 —
+  //   글이 바뀌지 않았으니 [러프 다시 그리기]도 묻지 않는다(러프 다시 그리기 제안은 콘티 채팅의 일 — 위 시험).
+  it('Storyboard 채팅은 샷 타입을 바꿔 달라는 말에 고치기를 실행하지 않아 [러프 다시 그리기]를 띄우지 않는다 — 글은 콘티에서 고친다', async () => {
     project.setState({ currentStage: 'writer', reachedStage: 'writer' })
     modelEditsShot('sh_01_01', { shotType: 'CU' })
     await chat.getState().sendMessage('씬1 샷1을 클로즈업으로 바꿔줘')
-    expect(chat.getState().suggestion?.stage).toBe('writer')
+    expect(mocks.execute).not.toHaveBeenCalled()
+    expect(chat.getState().suggestion?.action?.kind).not.toBe('roughRedraw')
   })
 })

@@ -3,7 +3,7 @@ import { logTiming } from './timing'
 import { CHAT_COMPACTION_TRIGGER_TOKENS } from './constants'
 import type { ChatLlmUsage } from './chat-trace'
 import { parseChatModelSettings, type ChatModelSettings } from './chat-model-settings'
-import { CHAT_TOOL_GUIDE, type ChatToolContext } from './chat-tools/protocol'
+import { chatToolGuide, type ChatToolContext } from './chat-tools/protocol'
 import { CHAT_OUTPUT_BUDGET, CHAT_RECOVERY_ATTEMPTS, ChatOutputRecoveryError, type ChatOutputRecoveryOptions } from './chat-output-recovery'
 import type { BetaMessage, BetaMessageParam, MessageCreateParamsNonStreaming } from '@anthropic-ai/sdk/resources/beta/messages/messages'
 
@@ -115,7 +115,8 @@ export async function claudeChat(
     model: modelSettings.model,
     // 사고 토큰도 출력 한도를 쓰므로 사고와 답변을 위한 여유를 둔다. 실제 생성한 토큰만 청구된다.
     max_tokens: MAX_OUTPUT_TOKENS,
-    system: system + (opts?.appTools ? CHAT_TOOL_GUIDE : ''),
+    // 도구 안내는 그 요청에 준 도구만 말한다 — 고치기 도구가 없으면 고치기 문장도 없다(검토 rev-flow 리드 2).
+    system: system + (opts?.appTools ? chatToolGuide(opts.appTools.tools) : ''),
     messages,
     output_config: { effort: modelSettings.effort },
     thinking: CHAT_THINKING,

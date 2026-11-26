@@ -23,9 +23,10 @@ describe('AI가 일하는 동안 사이드바 전체 잠금', () => {
     expect(sidebar).toMatch(/data-testid="sidebar-footer"[\s\S]{0,200}inert=\{footerBlocked/)
   })
 
-  it('Artist 단계 단추는 AI 가 일하는 동안이든 아니든 다시 그리기를 보내지 않고, 누르면 Artist 화면으로 간다', () => {
+  it('Artist 단계 단추는 AI 가 일하는 동안에도 다시 그리기를 보내지 않고, 막히지 않았을 때 누르면 Artist 화면으로 간다', () => {
     // 왜(오너 2026-11-27 N7 "추천대로" — 누르면 Artist 로 가고 다시 시도는 Artist 화면에서): 그림이 실패했거나 오래 걸리면 Artist 칸을 눌러도
     //   Artist 로 가지 않고 다시 그리기만 보냈다(그리는 중에 또 보낼 수도 있었다). 다시 시도는 Artist 화면의 단추가 맡는다.
+    //   AI 가 일하는 동안 다른 단계 칸은 지금처럼 막힌다(위 시험) — 이름을 검사하는 동작대로 바로잡음(검토 rev-flow 리드 5).
     expect(sidebar).not.toMatch(/retryArtistDrafts/)
     expect(sidebar).toMatch(/else if \(!isLocked && !isCommitted\) goToRailItem\(stage\.id\)/)
   })

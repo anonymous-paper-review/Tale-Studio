@@ -40,6 +40,9 @@ function breakdownCounts(projectId: string, cast: Parameters<typeof breakdownRow
   return { characters, backgrounds: shown.length - characters }
 }
 
+/** Storyboard 채팅이 Writer 실행 다시 돌리기를 부탁받았을 때 모델에 돌려줄 결과 글(모델이 화면 언어로 전한다). */
+const STORYBOARD_RESUME_REFUSAL = 'Storyboard does not restart or re-split the scene and shot run, and nothing was resumed. Restart it from the rough storyboard on the Writer screen.'
+
 /** A conservative authorization check: tool selection alone does not grant permission. */
 export function workflowPermission(message: string, action: string, target?: string): boolean {
   if (action === 'status') return true
@@ -49,7 +52,7 @@ export function workflowPermission(message: string, action: string, target?: str
   if (action === 'refresh') return /(새로|갱신|다시.*(?:불러|조회|확인)|refresh|reload)/i.test(message) // i18n-ok: 사용자 요청 의도 인식.
   if (action === 'resume') return /(재개해|이어서.*(?:실행해|생성해|진행해)|실행.*재시도해|^(?:please\s+)?resume\b|^(?:please\s+)?retry.*(?:run|generation))/i.test(message.replace(/"[^"]*"|“[^”]*”|`[^`]*`/g, '')) // i18n-ok: 사용자 요청 의도 인식.
   // 화면 이름(리뉴얼 1차 · 오너 2026-11-14): 도구 대상 producer 는 Writer 산문 화면, writer 는 Storyboard 화면이다 — 옛 낱말(producer · writer · 작가)은 그대로 두고 화면 이름을 더한다.
-  const targetWords: Record<string, RegExp> = { producer: /(producer|프로듀서|writer|라이터|작가|prose|산문)/i, writer: /(writer|라이터|작가|storyboard|스토리보드)/i, artist: /(artist|아티스트)/i } // i18n-ok: 단계 이름 인식.
+  const targetWords: Record<string, RegExp> = { producer: /(producer|프로듀서|writer|라이터|작가|prose|산문)/i, conti: /(콘티|conti|rough\s*storyboard|러프\s*스토리보드)/i, writer: /(writer|라이터|작가|storyboard|스토리보드)/i, artist: /(artist|아티스트)/i } // i18n-ok: 단계 이름 인식.
   return !!target && !!targetWords[target]?.test(message) && /(열어|열기|가자|가줘|이동|넘겨|넘기|보여|호출|불러|핸드오프|open|go|move|hand.?over|take me|invite)/i.test(message) // i18n-ok: 사용자 요청 의도 인식.
 }
 
@@ -96,7 +99,10 @@ export function createStudioWorkflow(options: {
     const allowed = ['producer']
     // Storyboard 는 Artist [완료하기]로 저장 단계가 Storyboard 이상일 때 연다(O1) — 실행이 이어졌다는 것만으로 열지 않는다.
     if (legacyStuck || at(reached) >= at('writer')) allowed.push('writer')
-    if (at(reached) >= at('artist') && status.assets.images_ready) allowed.push('artist')
+    // 콘티(Writer 의 둘째 칸)는 저장 단계가 콘티 이상이면 연다 — Storyboard 채팅이 "콘티에서 고쳐요"라고 안내한다(검토 rev-flow 리드 6 · 오너 N3).
+    if (at(reached) >= at('conti')) allowed.push('conti')
+    // Artist 는 레일과 같은 기준(연 단계)으로 연다 — 새 흐름은 그림을 Artist 에서 만들어, 그림이 다 있어야 열면 그림 전에는 채팅으로 못 연다(리드 9 · 오너 N7 · O1).
+    if (at(reached) >= at('artist')) allowed.push('artist')
     last = {
       projectId: options.projectId, currentStage: useProjectStore.getState().currentStage, reachedStage: reached, allowedStages: allowed,
       // 키 이름은 시험이 못 박아 그대로 둔다 — blockers · softWarnings 는 지금 화면 흐름에 막힌 점이 없어 비어 있다(옛 관문 항목은 note 가 막힌 점이 아니라고 적는다).
@@ -151,7 +157,8 @@ export function createStudioWorkflow(options: {
       return options.navigate(target as StageId)
     },
     handoff: options.handoff,
-    resume: () => {
+    // Storyboard 채팅은 Writer 실행(씬 · 샷 나누기)을 다시 돌리지 않는다 — 콘티의 일이다(검토 rev-flow 리드 7 · 오너 N3 "실사 고치기만").
+    resume: options.stage === 'writer' ? async (): Promise<ToolResult> => ({ status: 'unsupported', message: STORYBOARD_RESUME_REFUSAL }) : () => {
       // An uncertain submission is never replayed within the same request.
       resumeResult ??= (async (): Promise<ToolResult> => {
         try {

@@ -57,14 +57,15 @@ An approval card is already the user's next action for that target; do not add c
 Consultation is allowed without tools. Never claim an edit succeeded from a text-only answer.
 When project_workflow is available, use status for fresh saved stage/run/entry requirements, refresh to reload readiness without generation, and open to view an existing stage. handoff to the Storyboard run (targetStage "writer") uses the existing start approval when no run exists. resume restarts only an existing execution and requires the user's explicit request to resume generation.
 In the Artist readiness from project_workflow, queued_count is images still being made (under 10 minutes old), stale_count is images stuck for over 10 minutes (stalled jobs: neither running nor failed), and failed_count is failed jobs only. Say stale_count as "N stalled jobs" in the conversation language. Never call a stalled job failed, queued or running.
-Screen names: targetStage "producer" is the Writer screen (the prose), "writer" is the Storyboard screen (scenes and shots), "artist" is the Artist screen. The next screen after Artist is Storyboard, not Director. Use the screen names in your replies. A "writer" run in a status result belongs to the Storyboard screen, not to the prose Writer screen.
+Screen names: targetStage "producer" is the Writer screen (the prose), "conti" is the rough storyboard (the second part of the Writer screen: scenes, shots and dialogue), "writer" is the Storyboard screen (scenes and shots), "artist" is the Artist screen. The next screen after Artist is Storyboard, not Director. Use the screen names in your replies. A "writer" run in a status result belongs to the Storyboard screen, not to the prose Writer screen.
 No Storyboard run record (targetStage "writer") is not proof of missing script: imported/restored projects may have saved scenes and shots without run history. Use savedScenes/savedShots and read_project to answer about actual content.
 For a compound edit-then-move request, finish and verify ALL edits before opening the next stage. Approval or uncertain results keep that move pending. A navigation_requested result is only a request to open a screen; do not claim arrival. queued means execution accepted, not completed.
 Keep using the existing approval/JSON paths for operations these tools do not support (creation, deletion, generation, Director handoff).
 </app-tools>`
 
-/** options.edit === false: 고치기 도구(edit_project)를 빼고 읽기 도구만 준다 — Storyboard 채팅은 글을 고치지 않는다(오너 2026-11-27 N3). */
-export function prepareChatTools(stage: string, enabled: unknown, history: unknown, workflow: unknown = false, domain: unknown = false, options: { edit?: boolean } = {}): ChatToolContext | undefined {
+/** options.edit === false: 고치기 도구(edit_project)를 뺀다 · options.resume === false: 화면 도구에서 Writer 실행 다시 돌리기(resume)를 뺀다 —
+ *  Storyboard 채팅은 글을 고치지 않고 씬 · 샷을 다시 나누지 않는다(오너 2026-11-27 N3, 검토 rev-flow 리드 2 · 7). 화면 열기 대상에는 Writer 콘티(conti)가 있다(리드 6). */
+export function prepareChatTools(stage: string, enabled: unknown, history: unknown, workflow: unknown = false, domain: unknown = false, options: { edit?: boolean; resume?: boolean } = {}): ChatToolContext | undefined {
   const resources = toolResourcesForStage(stage)
   if (enabled !== true || resources.length === 0) return undefined
   const messages = history ?? []
@@ -93,9 +94,53 @@ export function prepareChatTools(stage: string, enabled: unknown, history: unkno
           } : {}),
         }, required: ['target', 'id'], additionalProperties: false,
       } }] : []),
-      ...(workflow === true ? [{ name: 'project_workflow', description: 'Read fresh project/run/entry state; refresh visible readiness; open an existing screen (targetStage producer = the Writer prose screen, writer = the Storyboard screen, artist = the Artist screen); propose the initial scene and shot run; or explicitly resume the existing run. Never bypass approval or trigger generation from a status question.', input_schema: {
-        type: 'object' as const, properties: { action: { type: 'string' as const, enum: ['status', 'refresh', 'open', 'handoff', 'resume'] }, targetStage: { type: 'string' as const, enum: ['producer', 'writer', 'artist'] } }, required: ['action'], additionalProperties: false,
+      ...(workflow === true ? [{ name: 'project_workflow', description: `Read fresh project/run/entry state; refresh visible readiness; open an existing screen (targetStage producer = the Writer prose screen, conti = the Writer rough storyboard, writer = the Storyboard screen, artist = the Artist screen); propose the initial scene and shot run${options.resume === false ? '' : '; or explicitly resume the existing run'}. Never bypass approval or trigger generation from a status question.`, input_schema: {
+        type: 'object' as const, properties: { action: { type: 'string' as const, enum: ['status', 'refresh', 'open', 'handoff', ...(options.resume === false ? [] : ['resume'])] }, targetStage: { type: 'string' as const, enum: ['producer', 'conti', 'writer', 'artist'] } }, required: ['action'], additionalProperties: false,
       } }] : []),
     ],
   }
 }
+
+// 고치기 도구가 없는 채팅의 도구 안내(검토 rev-flow 리드 2) — 고치기 절차 줄을 빼고 읽기 전용이라는 줄을 넣는다. 고치기 도구를 주면 CHAT_TOOL_GUIDE 그대로.
+const EDIT_ONLY_LINES = [
+  'Use read_project and edit_project for their supported queries and edits.',
+  'Before editing, read the target',
+  'Supported edits must use tools instead of',
+  'The results tell you what was actually saved.',
+  'For invalid_input fix the arguments',
+  'For unknown_result/unverified, query the current target',
+  'For approval_required, explain the pending approval',
+  'For a compound edit-then-move request',
+]
+const READ_ONLY_LINE = 'Use read_project to look up saved project data. The app tools here are read-only: none of them changes or saves anything, so never say something was changed or saved because of a tool.'
+const RESUME_SENTENCE = " resume restarts only an existing execution and requires the user's explicit request to resume generation."
+
+/** 그 요청에 준 도구에 맞는 도구 안내 — 고치기 도구(edit_project)가 없으면 고치기 문장을, 실행 다시 돌리기(resume)가 없으면 그 문장을 뺀다(리드 2 · 7). */
+export function chatToolGuide(tools: ReadonlyArray<{ name: string; input_schema?: unknown }>): string {
+  const workflow = tools.find((tool) => tool.name === 'project_workflow')
+  const actions = (workflow?.input_schema as { properties?: { action?: { enum?: unknown } } } | undefined)?.properties?.action?.enum
+  const canEdit = tools.some((tool) => tool.name === 'edit_project')
+  const canResume = !workflow || (Array.isArray(actions) && actions.includes('resume'))
+  if (canEdit && canResume) return CHAT_TOOL_GUIDE
+  let lines = CHAT_TOOL_GUIDE.split('\n')
+  if (!canEdit) {
+    lines = lines.filter((line) => !EDIT_ONLY_LINES.some((prefix) => line.startsWith(prefix)))
+    lines.splice(lines.indexOf('<app-tools>') + 1, 0, READ_ONLY_LINE)
+  }
+  if (!canResume) lines = lines.map((line) => line.replace(RESUME_SENTENCE, ''))
+  return lines.join('\n')
+}
+
+/** 모델이 그 요청에 주지 않은 이름으로 부른 도구 호출(id) — 서버가 거절 목록으로 넘기고 화면은 실행하지 않는다(리드 2 · architecture §3). */
+export function rejectedToolCallIds(turn: ToolTurn, tools: ReadonlyArray<{ name: string }>): string[] {
+  const given = new Set(tools.map((tool) => tool.name))
+  return turn.content.filter((block): block is ToolCall => block.type === 'tool_use' && !given.has(String(block.name))).map((call) => call.id)
+}
+
+/** 그 화면이 도구 호출을 실행해도 되는가 — Storyboard(writer)는 글을 고치지 않는다(오너 N3, 리드 2). 콘티 · 다른 화면은 그대로. */
+export function toolCallAllowedOnStage(stage: string, name: string): boolean {
+  return !(stage === 'writer' && name === 'edit_project')
+}
+
+/** Storyboard 에서 고치기 도구를 부르면 모델에 돌려줄 결과 글(모델이 읽는다 — 사람에게는 모델이 화면 언어로 전한다). */
+export const STORYBOARD_EDIT_REFUSAL = 'Storyboard does not change text and nothing was executed. The story, shots and dialogue are edited on the rough storyboard of the Writer screen; dialogue can also be edited in the Dialogue tab.'
