@@ -127,6 +127,21 @@ export interface WorldAsset {
   appearances?: LocationAppearance[]
 }
 
+/** 소품(D7, 오너 2026-11-22 "소품도 한 장이고 중요하게 생각되는 소품만") — props 행 하나 = 카드 하나 = 그림 한 장.
+ *  중요한 소품 = Producer 에서 사물로 정한 카드(props 행). 그림은 props.image_url 한 칸, 지문은 props.source_hash. */
+export interface PropAsset {
+  propId: string
+  name: string
+  /** 생김새(영어 base) — 그림 지시문 입력. */
+  appearance: string
+  /** 화면 말 생김새 — 카드 · 팝업 표시. 없으면 appearance. */
+  appearanceNative: string
+  imageUrl: string | null
+  /** 이 그림을 그린 입력의 지문(생김새 + 그림체). 지금 입력과 다르면 "설명 바뀜" · "그림체 바뀜". */
+  sourceHash: string | null
+  origin: 'producer' | 'writer' | 'user'
+}
+
 /** 배경 모습 변형(location_appearances 행). 기본 모습(키 'default')은 WorldAsset 자체가 담당한다. */
 export interface LocationAppearance {
   appearanceKey: string

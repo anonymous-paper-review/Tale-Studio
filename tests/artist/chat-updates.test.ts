@@ -14,8 +14,10 @@ describe('validateUpdates — F6 허용된 작업만 자동 처리하고 원천 
   //   기존 외형을 바꾸지 않으므로(F6의 보호 대상은 원천 교체) 자동 허용이 맞다.
   it('파생 이미지 다시 그리기만 자동으로 받고 새 인물은 만들지 않으며 원천 외형은 C3 승인 뒤 바꾼다 (C3)', () => {
     // 왜: 채팅이 만든 인물 카드가 산문과 어긋났다(디자이너 QA 1차 #04 · 오너 "채팅 추가 막고 안내") — 새 인물은 허용 목록에서 뺐다.
+    // D7(2026-11-22, 리드 결정 2): 소품 그림 다시 그리기(regenerateProp)도 파생 이미지 다시 그리기다 — 인물 · 배경과 같이 승인 카드로 뜬다.
     expect([...AUTO_APPLY_UPDATE_TYPES].sort()).toEqual([
       'regenerateCharacter',
+      'regenerateProp',
       'regenerateWorldAsset',
     ])
   })

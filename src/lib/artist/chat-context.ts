@@ -36,6 +36,7 @@ function describeTarget(job: GenerationJob): string {
   if (job.kind === 'world_shot' && t.locationId) {
     return `장소 ${t.locationId} ${t.column ?? ''}`.trim()
   }
+  if (job.kind === 'prop_image' && t.propId) return `소품 ${t.propId}` // i18n-ok: 모델에게 주는 활동 기록(화면에 보이지 않음), 위 인물 · 장소 줄과 같은 말
   if (t.shotId || t.writerShotId) return `샷 ${t.shotId ?? t.writerShotId}`
   return job.kind
 }

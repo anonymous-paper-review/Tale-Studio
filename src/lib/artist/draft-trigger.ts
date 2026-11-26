@@ -59,6 +59,7 @@ import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
 import { recordModerationPass } from '@/lib/api/moderation'
+import { triggerPropDrafts } from '@/lib/artist/prop-drafts'
 
 interface DraftCharacterRow {
   character_id: string
@@ -115,6 +116,8 @@ export interface AssetDraftTriggerResult {
   deferred_style_analysis?: true
   characters: DraftTriggerResult
   worlds: DraftTriggerResult
+  /** 소품 그림 첫 그림(D7 2026-11-22) — 인물 · 배경 다음. 앞에서 멈춘 경우(그림체 없음 · 분석 중 · 자리 없음)에는 없다. */
+  props?: DraftTriggerResult
 }
 
 /**
@@ -687,14 +690,23 @@ export async function triggerAssetDrafts(
       return zero()
     }),
   ])
+  // 소품 그림(D7 · 리드 결정 2, 2026-11-22) — 인물 · 배경을 먼저 낸 뒤 빈칸만 그린다. 자리가 없으면 건너뛰고 화면이 이어 그린다.
+  const props = await triggerPropDrafts(projectId).catch((e) => {
+    console.error(
+      `[v2design-trigger] ${projectId} prop drafts failed:`,
+      e instanceof Error ? e.message : e,
+    )
+    return zero()
+  })
 
   console.log(
-    `[v2design-trigger] ${projectId} — chars ${characters.submitted}/${characters.skipped}/${characters.failed}, worlds ${worlds.submitted}/${worlds.skipped}/${worlds.failed}`,
+    `[v2design-trigger] ${projectId} — chars ${characters.submitted}/${characters.skipped}/${characters.failed}, worlds ${worlds.submitted}/${worlds.skipped}/${worlds.failed}, props ${props.submitted}/${props.skipped}/${props.failed}`,
   )
   await recordWriterObservabilityEvent(projectId, 'asset_trigger_completed', {
     source,
     characters,
     worlds,
+    props,
   })
-  return { characters, worlds }
+  return { characters, worlds, props }
 }

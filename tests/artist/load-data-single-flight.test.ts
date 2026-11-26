@@ -32,10 +32,11 @@ describe('그림 데이터 읽기 겹침 막기', () => {
     const first = useArtistStore.getState().loadData()
     const second = useArtistStore.getState().loadData()
     expect(second).toBe(first)
-    expect(mocks.from).toHaveBeenCalledTimes(8)
+    // 한 번 읽을 때 질문 10개 — 소품(props)과 샷의 소품 칸을 함께 읽는다(m1126 A1, dev D7 이식 전에는 8개).
+    expect(mocks.from).toHaveBeenCalledTimes(10)
     mocks.gate.release()
     await Promise.all([first, second])
-    expect(mocks.from).toHaveBeenCalledTimes(8)
+    expect(mocks.from).toHaveBeenCalledTimes(10)
   })
 
   it('읽기가 끝난 뒤 요청하면 새로 질문한다', async () => {
@@ -44,7 +45,7 @@ describe('그림 데이터 읽기 겹침 막기', () => {
     mocks.gate.release()
     await first
     await useArtistStore.getState().loadData()
-    expect(mocks.from).toHaveBeenCalledTimes(16)
+    expect(mocks.from).toHaveBeenCalledTimes(20)
   })
 
   it('다른 프로젝트의 읽기는 겹쳐도 각각 질문한다', async () => {
@@ -53,7 +54,7 @@ describe('그림 데이터 읽기 겹침 막기', () => {
     useProjectStore.setState({ projectId: 'p2' })
     const second = useArtistStore.getState().loadData()
     expect(second).not.toBe(first)
-    expect(mocks.from).toHaveBeenCalledTimes(16)
+    expect(mocks.from).toHaveBeenCalledTimes(20)
     mocks.gate.release()
     await Promise.all([first, second])
   })
