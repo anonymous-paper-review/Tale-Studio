@@ -98,16 +98,12 @@ export function nodeContextMenuItems(
  */
 export function connectRouteForTargetHandle(
   targetHandle: string | null | undefined,
-): 'prompt-wire' | 'image-wire' | 'frame-wire' | 'video-chain' | 'relation' {
+): 'prompt-wire' | 'image-wire' | 'frame-wire' | 'video-chain' | 'relation' | 'ignore' {
   if (targetHandle === 'prompt') return 'prompt-wire'
   if (targetHandle === 'image-reference') return 'image-wire'
-  if (
-    targetHandle === 'frame-start' ||
-    targetHandle === 'frame-end' ||
-    targetHandle === 'frame-ref'
-  ) {
-    return 'frame-wire'
-  }
+  if (targetHandle === 'frame-start' || targetHandle === 'frame-ref') return 'frame-wire'
+  // 옛 끝(END) 칸은 없앴다(오너 dev 때 "Start, End 프레임 생성 방식은 일단 폐기" · 2026-11-27 N4a) — 그 칸으로 들어오는 연결은 아무 일도 하지 않는다.
+  if (targetHandle === 'frame-end') return 'ignore'
   if (targetHandle === 'video-chain') return 'video-chain'
   return 'relation'
 }

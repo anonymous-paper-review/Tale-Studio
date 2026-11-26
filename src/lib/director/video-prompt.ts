@@ -5,6 +5,7 @@ import type { ContractSubject, GearDesign } from '@/lib/director/video-design'
 import { findCameraBrand, findCameraMovement } from '@/lib/knowledge'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import type { VideoModelKey } from '@/lib/video-models'
+import type { VideoMode } from '@/lib/director/video-modes'
 import { DEFAULT_CAMERA_PRESET, type CameraConfig, type CameraPreset, type GenerationMethod } from '@/types'
 
 export type VideoPromptParts = {
@@ -25,9 +26,12 @@ export type VideoPromptParts = {
   change?: string
   /** 콘티에서 고친 연출 장을 읽은 줄(오너 2026-11-22 Q4) — 있으면 맨 앞에 실리고 움직임은 이 줄이 정한다. 없으면 미설정. */
   directionRead?: string
+  /** 영상 만드는 방식 문장(오너 2026-11-27 N4a) — 방식 없이 만든 요청(손 배선 · 옛 요청)이면 미설정. */
+  videoMode?: string
 }
 
-export type VideoReferenceImageRole = 'start' | 'end' | 'ref'
+/** 'direction' = 시작+미들의 미들(실사 가운데 장 — 장면이 아니라 연출 · 의도, 오너 N4a ③ · V2). */
+export type VideoReferenceImageRole = 'start' | 'end' | 'ref' | 'direction'
 
 export type BuildVideoPromptInput = {
   prompt: string
@@ -81,6 +85,13 @@ export type BuildVideoPromptInput = {
    *   장면 글 · 대사 · 카메라 · 그림 역할은 그대로. 없거나 빈 글이면 지금과 글자까지 같다(dev e45d538e 와 같은 규칙, main 구조 위).
    */
   directionLine?: string | null
+  /**
+   * 영상 만드는 방식(오너 2026-11-27 N4a — dev fb1120-video 문장) — 있으면 그림 역할 · 방식 · "무엇이 진실인가" 세 조각을 맨 뒤에 싣고,
+   *   글 상한이 있는 모델(Kling · Happy Horse)은 앞 글부터 줄여 방식 문장을 지킨다. 없으면(손 배선 · 옛 요청) 지금 글 그대로.
+   */
+  videoMode?: VideoMode | null
+  /** ② 레퍼런스 그림의 이름(그림 순서와 같다) — "image 2 = character sheet: Mina". */
+  referenceLabels?: string[] | null
 }
 
 /** 실사 그림체 영상 지시문의 앞부분 상한 — 글 상한이 없는 모델(Seedance · Veo …)도 이만큼까지만(옛 1,400 · 1,650자는 문장 중간에서 잘렸다). */
@@ -165,6 +176,47 @@ function referenceRolesClause(roles: VideoReferenceImageRole[]): string {
           ? ' The END image is the completed composition.'
           : ''
   return `Reference image order: ${order}.${refs}${temporal}`
+}
+
+/**
+ * 방식 문장(오너 2026-11-27 N4a · dev fb1120-video 와 같은 글) — 그림 역할 · 방식 · "무엇이 진실인가" 세 조각.
+ *   그림 번호는 참고 그림 목록 순서다(H3 Max 의 첫 장면 칸도 목록 1번을 함께 싣는다 — fal-video-request).
+ */
+function videoModeTail(input: {
+  mode: VideoMode
+  roles: VideoReferenceImageRole[]
+  labels: string[] | null
+  defaultAuthority: string
+}): { roles: string; mode: string; authority: string } {
+  const { mode, roles, labels, defaultAuthority } = input
+  switch (mode) {
+    case 'continue':
+      return {
+        roles: referenceRolesClause(roles),
+        mode: "Image 1 is the last frame of the previous shot's video: begin exactly on it so the cut between the two shots is seamless — same positions, poses, lighting and framing in the first frame.",
+        authority: defaultAuthority,
+      }
+    case 'start_prompt':
+      return {
+        roles: referenceRolesClause(roles),
+        mode: 'There is no end frame: after starting exactly on image 1, let this text decide how the shot moves and how it ends.',
+        authority: defaultAuthority,
+      }
+    case 'start_middle':
+      return {
+        roles: referenceRolesClause(roles),
+        mode: 'Image 2 is the START frame overlaid with drawn DIRECTION arrows and labels, not a frame of the video: its arrows, dashed paths and handwritten labels only show the intended camera and subject movement. Perform that movement starting from image 1. Never draw arrows, lines, labels, text, pencil texture or wooden mannequins from image 2 in the video. If this text and the sketch disagree about the movement, follow the sketch.',
+        authority: 'Image 1 is the visual ground truth — match its lighting, color temperature, wardrobe, set dressing and framing exactly; wherever this text description differs from image 1, follow image 1.',
+      }
+    case 'reference': {
+      const named = roles.map((_, index) => `image ${index + 1} = ${labels?.[index] ?? 'REF'}`).join(', ')
+      return {
+        roles: `Reference images (references only — not frames of this video): ${named}.`,
+        mode: "Keep each person's face, hair and outfit, the location and the props consistent with these references, but compose the shot from this text: no reference image is the first or last frame, and never reproduce a character sheet's white background, multiple poses or layout.",
+        authority: '',
+      }
+    }
+  }
 }
 
 /** 대사 화자(characters 테이블에서 해석). appearance 는 시각 앵커 재료로 일부만 쓰인다. */
@@ -252,7 +304,8 @@ export function fitPromptForModel(fullPrompt: string, modelKey: VideoModelKey, p
   // Veo 의 검은 화면 지시(길이 맞추기)는 다른 모델에 필요 없고, 맨 끝이라 아래 그림 순서 문장을 가린다 — 먼저 뗀다.
   if (typeof p.black === 'string' && p.black && fullPrompt.endsWith(p.black)) fullPrompt = fullPrompt.slice(0, -p.black.length).trimEnd()
   if (fullPrompt.length <= limit) return fullPrompt
-  const tail = [p.referenceRoles, p.startEnd, p.referenceAuthority].filter((x): x is string => typeof x === 'string' && !!x).join(' ')
+  // 방식 문장(N4a)은 그림 순서 문장 바로 뒤에 붙는다 — 같은 순서로 떼어 남긴다.
+  const tail = [p.referenceRoles, p.videoMode, p.startEnd, p.referenceAuthority].filter((x): x is string => typeof x === 'string' && !!x).join(' ')
   if (tail && tail.length + 1 < limit && fullPrompt.endsWith(tail)) {
     const head = fullPrompt.slice(0, fullPrompt.length - tail.length).trimEnd()
     return `${clipSentences(head, limit - tail.length - 1)} ${tail}`
@@ -324,7 +377,18 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   //   "이 그림을 다시 그려라"(레퍼런스 권위)인데 영상만 텍스트 권위였던 배선 비대칭의 교정.
   const referenceAuthority = `The reference images are the visual ground truth — match their lighting, color temperature, wardrobe, set dressing and framing exactly; wherever this text description differs from the reference images, follow the references.`
 
-  if (referenceImageRoles?.length && generationMethod === 'I2V') {
+  if (referenceImageRoles?.length && generationMethod === 'I2V' && parts.videoMode) {
+    // 방식 문장(오너 2026-11-27 N4a): 역할 · 방식 · 진실 세 조각을 뒤에 붙인다. 글 상한이 있는 모델(Kling · Happy Horse 2,500자)은
+    //   넘치면 앞 글(샷 글)부터 줄여 방식 문장이 잘려 사라지지 않게 한다(dev fb1120-video 와 같은 규칙, main 의 실사 그림체 길은 문장 경계에서 줄인다).
+    const tail = videoModeTail({ mode: parts.videoMode, roles: referenceImageRoles, labels: parts.referenceLabels ?? null, defaultAuthority: referenceAuthority })
+    prompt_parts.referenceRoles = tail.roles
+    prompt_parts.videoMode = tail.mode
+    if (tail.authority) prompt_parts.referenceAuthority = tail.authority
+    const tailText = [tail.roles, tail.mode, tail.authority].filter(Boolean).join(' ')
+    fullPrompt = designed
+      ? withTail(fullPrompt, tailText, 0)
+      : `${limit === null ? fullPrompt : fullPrompt.slice(0, Math.max(0, limit - tailText.length - 1))} ${tailText}`
+  } else if (referenceImageRoles?.length && generationMethod === 'I2V') {
     const roleInstruction = referenceRolesClause(referenceImageRoles)
     prompt_parts.referenceRoles = roleInstruction
     prompt_parts.referenceAuthority = referenceAuthority

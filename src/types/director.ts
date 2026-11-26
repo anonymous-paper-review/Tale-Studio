@@ -6,6 +6,7 @@ import type {
   GenerationMethod,
 } from '@/types/shot'
 import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
+import type { ContinueFrom, VideoMode } from '@/lib/director/video-modes'
 
 // ============================================================================
 // Director Canvas Types
@@ -182,6 +183,10 @@ export type VideoOverride = Partial<{
   /** 샷 상세 영상 고치기의 바꿀 점(디자이너 11/13 D7 · 리드 검토 c ③) — 이 Take 를 만들 때 지금 샷 프롬프트 끝에 한 번 붙인다.
    *  기록으로 남아 다음 Take 의 칸에 미리 채워질 뿐 쌓이지 않는다. 빈 글 = 바꿀 점 없음. */
   changeNote: string
+  /** 영상 만드는 방식(오너 2026-11-27 N4a) — 없으면 기본(시작+프롬프트). 영상 요청에 실리고 [다시 만들기]가 이어받는다. */
+  videoMode: VideoMode
+  /** ① 이어서의 출처 — 앞 샷 Take · 그 영상을 낸 작업 · 잡은 장면. 다시 만들어도 같은 장면에서 잇는다(앞 샷 영상이 그대로인지는 서버가 본다). */
+  continueFrom: ContinueFrom
 }>
 
 /** 부모 Shot 없이 독립 생성한 Video가 직접 소유하는 완전한 생성 설정. */

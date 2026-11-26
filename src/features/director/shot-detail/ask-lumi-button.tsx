@@ -16,7 +16,7 @@ export function imageFixBusy(generation: { generating: boolean; batchBusy: boole
   return generation.generating || generation.batchBusy || data.storyboardImage?.status === 'pending'
 }
 
-export function AskLumiButton({ shotNodeId, kind, change, closeDetail, onSent, take, data, busy: busyProp }: {
+export function AskLumiButton({ shotNodeId, kind, change, closeDetail, onSent, take, data, busy: busyProp, blocked, prepareTake }: {
   shotNodeId: string
   kind: FixKind
   change: string
@@ -24,8 +24,12 @@ export function AskLumiButton({ shotNodeId, kind, change, closeDetail, onSent, t
   data?: ShotNodeData
   /** 꺼짐을 직접 정할 때(없으면 data 로 판정). */
   busy?: boolean
-  /** 영상 고치기: 고른 모델 · 해상도 · 보던 Take — 채팅 부탁에 맡긴다(검토 rev-director 2번). */
+  /** 영상 고치기: 고른 모델 · 해상도 · 방식 · 보던 Take — 채팅 부탁에 맡긴다(검토 rev-director 2번 · 오너 2026-11-27 N4a). */
   take?: AskLumiVideoTake
+  /** 단추만 끈다(아래 안내 글은 그대로) — 영상 고치기에서 고른 방식을 지금 쓸 수 없을 때(N4a). 까닭은 부른 쪽이 보인다. */
+  blocked?: boolean
+  /** 보내기 직전에 맡길 설정을 더 채운다 — 이어서면 앞 영상 마지막 장면을 잡아 출처로(N4a). null 이면 보내지 않는다(까닭은 부른 쪽이 보인다). */
+  prepareTake?: () => Promise<Partial<AskLumiVideoTake> | null>
   /** 스토리보드 보기 팝업이면 보낸 뒤 닫는다(채팅의 [적용]이 보이게). */
   closeDetail: boolean
   /** 보냈으면 칸을 비운다. */
@@ -37,10 +41,12 @@ export function AskLumiButton({ shotNodeId, kind, change, closeDetail, onSent, t
   const busy = busyProp ?? (kind === 'image' && !!data && imageFixBusy(generation, data))
   return (
     <div className="space-y-1">
-      <Button type="button" size="sm" className="gap-1.5" disabled={busy} onClick={async () => {
+      <Button type="button" size="sm" className="gap-1.5" disabled={busy || blocked} onClick={async () => {
         // 채팅 상점은 누를 때 불러온다 — 상세 화면을 불러오는 것만으로 채팅 상점 전체를 끌어오지 않게.
         const { askLumiToFix } = await import('./ask-lumi-fix')
-        const result = askLumiToFix({ shotNodeId, kind, change, closeDetail, ...(take ? { take } : {}) })
+        const extra = take && prepareTake ? await prepareTake() : {}
+        if (extra === null) return
+        const result = askLumiToFix({ shotNodeId, kind, change, closeDetail, ...(take ? { take: { ...take, ...extra } } : {}) })
         if (result === 'busy') {
           setNotice(t('Lumi is busy with another request. Try again when it is done.'))
           return

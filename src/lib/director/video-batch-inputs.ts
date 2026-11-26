@@ -19,6 +19,7 @@ import {
   usableFrameImageUrl,
 } from '@/lib/director/video-frame-inputs'
 import { pickActiveTake, videoBatchShotSettings } from '@/lib/director/video-batch-take'
+import { takeOverrideForRequest } from '@/lib/director/video-modes'
 
 export type VideoBatchInputItem = {
   shotId: string
@@ -78,18 +79,18 @@ export function buildVideoBatchInputs(
     }
 
     const frameInputs = normalizeFrameInputs(take?.data.frameInputs)
-    const hasManualFrameInputs =
-      !!frameInputs.start || !!frameInputs.end || frameInputs.refs.length > 0
+    // 끝 그림은 영상에 보내지 않는다(오너 dev 때 "Start, End 프레임 생성 방식은 일단 폐기" · 2026-11-27 N4a) — 끝 칸만 이은 Take 는 손 배선으로 치지 않고,
+    //   끝 칸 배선은 풀 수 없어도 그 샷을 빼지 않는다(쓰지 않으니까).
+    const hasManualFrameInputs = !!frameInputs.start || frameInputs.refs.length > 0
     const storyboard = mother.storyboardImage
     const sbFrames = storyboard?.status === 'completed' ? storyboard.frames : undefined
     const automaticStart = resolveShotFrameImageUrl(mother, 'start')
-    const automaticEnd = sbFrames ? resolveShotFrameImageUrl(mother, 'end') : null
     const automaticReferenceImageUrl =
       (storyboard?.status === 'completed' ? usableFrameImageUrl(storyboard.url) : null) ??
       resolveShotFrameImageUrl(mother, 'ref')
 
     let referenceImageUrls: string[] | undefined
-    let referenceImageRoles: Array<'start' | 'end' | 'ref'> | undefined
+    let referenceImageRoles: Array<'start' | 'ref'> | undefined
 
     if (chainFrameUrl || hasManualFrameInputs || sbFrames) {
       let start: string | null = null
@@ -113,22 +114,13 @@ export function buildVideoBatchInputs(
         refs.push(resolved)
       }
 
-      let end: string | null = null
-      if (frameInputs.end) {
-        const resolved = resolveFrameInputImageUrl(nodes as DirectorNode[], frameInputs.end, 'end')
-        if (!resolved) manualUnresolved = true
-        end = resolved
-      } else {
-        end = automaticEnd
-      }
-
       if (manualUnresolved) {
         skipped.push({ shotId: writerShotId, reason: 'unresolvable_manual_wiring' })
         continue
       }
 
       const urls: string[] = []
-      const roles: Array<'start' | 'end' | 'ref'> = []
+      const roles: Array<'start' | 'ref'> = []
       if (start) {
         urls.push(start)
         roles.push('start')
@@ -136,10 +128,6 @@ export function buildVideoBatchInputs(
       for (const url of refs) {
         urls.push(url)
         roles.push('ref')
-      }
-      if (end) {
-        urls.push(end)
-        roles.push('end')
       }
       if (urls.length > 0) {
         referenceImageUrls = urls
@@ -179,7 +167,8 @@ export function buildVideoBatchInputs(
       // 해상도(오너 2026-10-31): 서버가 모델이 낼 수 있는지 다시 정하고 그 값으로 Take 를 잡는다.
       resolution: settings.resolution,
       // 새 테이크에 남길 설정 — 배선한 테이크의 설정(모델 · 해상도 등). 없으면 빈 설정(마더 그대로).
-      override: settings.override,
+      //   일괄은 늘 기본 방식(시작+프롬프트)으로 만든다(dev 리드 "일괄 = 기본만") — 배선한 테이크에 적힌 방식 · 이어서 출처는 새 테이크 기록에 남기지 않는다.
+      override: takeOverrideForRequest(settings.override, undefined),
       // 제공자는 fal 하나다(2026-10-11 자체 호스팅 경로 제거). store 의 요청 조립과 동일 계약.
       provider: 'fal',
       durationSeconds: mother.durationSeconds,

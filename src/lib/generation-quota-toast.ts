@@ -249,6 +249,32 @@ export function notifyReferenceImageTooSmall(): void {
 }
 
 /**
+ * 고른 영상 방식(오너 2026-11-27 N4a) 때문에 서버가 Take 전에 막은 code → 사용자 언어 안내(영어 원문 = i18n 키).
+ *   화면이 대부분 미리 끄지만, 누른 사이 앞 샷을 다시 만들었거나 노드 · Lumi 가 옛 이어서 출처로 다시 만들 때 서버가 막는다.
+ *   서버 문구는 영어라(사용자 언어를 모른다) code 를 보고 여기서 띄운다 — 새 Take 줄은 남기지 않는다(작은 그림 막힘과 같은 길).
+ */
+const VIDEO_MODE_REFUSALS: Readonly<Record<string, string>> = {
+  continue_first_shot: 'This is the first shot of its scene, so there is no video to continue from.',
+  continue_previous_not_ready: 'The previous shot has no finished video yet.',
+  continue_source_changed: "The previous shot's video has changed. Choose Continuation again to use its new last frame.",
+  invalid_continue_frame: "The last frame of the previous shot's video can't be used. Choose Continuation again.",
+  missing_middle_frame: "This shot's images have no middle frame yet. Remake images first.",
+  middle_outdated: 'Remake the images after editing the rough to use Start + middle.',
+  rough_image_not_allowed: "Rough (mannequin) images can't be used to make a video. Use the live-action images.",
+}
+
+export function isVideoModeRefused(status: number, body: unknown): boolean {
+  if ((status !== 400 && status !== 409) || typeof body !== 'object' || body === null) return false
+  const code = (body as { code?: unknown }).code
+  return typeof code === 'string' && Object.hasOwn(VIDEO_MODE_REFUSALS, code)
+}
+
+export function notifyVideoModeRefused(body: unknown): void {
+  const code = (body as { code?: unknown }).code as string
+  toast.error(translate(useLocaleStore.getState().locale, VIDEO_MODE_REFUSALS[code]!), { id: 'video-mode-refused' })
+}
+
+/**
  * 429/402/내용 규칙 거절이면 안내하고 true. 호출부 관용구: `if (await notifyIfQuotaExceeded(res, body)) return`.
  * 안내 대상이 아니면 아무 것도 하지 않고 false — 나머지 오류 처리는 호출부 몫이다.
  * 동시성 한도와 프로젝트 영상 예산(#f4)에 이어 Take 부족(#payments-phase-2)도 여기서 갈라 안내한다 —
@@ -267,6 +293,10 @@ export function notifyIfQuotaExceeded(status: number, body: unknown): boolean {
   }
   if (isReferenceImageTooSmall(status, body)) {
     notifyReferenceImageTooSmall()
+    return true
+  }
+  if (isVideoModeRefused(status, body)) {
+    notifyVideoModeRefused(body)
     return true
   }
   if (isVideoBudgetExceeded(status, body)) {

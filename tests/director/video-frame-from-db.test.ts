@@ -25,7 +25,8 @@ const SB = {
 }
 
 describe('승인된 스토리보드 화면을 영상에 쓰는 약속 (Director 배선 5)', () => {
-  it('그림 없이 요청해도 승인된 스토리보드가 있으면 시작과 끝 화면을 채워 영상으로 만든다', () => {
+  // 왜: 오너 dev 때(2026-11-22) "기존에 있던 Start, End 프레임 생성 방식은 일단 폐기" · main 2026-11-27 N4a — 승인된 스토리보드의 끝 화면은 영상에 보내지 않는다.
+  it('그림 없이 요청해도 승인된 스토리보드가 있으면 시작 화면을 채워 영상으로 만들고 끝 화면은 보내지 않는다', () => {
     const r = resolveVideoReferenceFrames({
       frameSource: 'auto',
       referenceImageUrl: undefined,
@@ -36,8 +37,8 @@ describe('승인된 스토리보드 화면을 영상에 쓰는 약속 (Director 
     expect(r).toEqual({
       generationMethod: 'I2V',
       referenceImageUrl: SB.frames.start,
-      referenceImageUrls: [SB.frames.start, SB.frames.end],
-      referenceImageRoles: ['start', 'end'],
+      referenceImageUrls: [SB.frames.start],
+      referenceImageRoles: ['start'],
       source: 'db',
     })
   })
@@ -50,12 +51,14 @@ describe('승인된 스토리보드 화면을 영상에 쓰는 약속 (Director 
       referenceImageRoles: ['start'],
       storyboardImage: SB,
     })
-    expect(r.referenceImageUrls).toEqual([SB.frames.start, SB.frames.end])
+    // 끝 화면은 오너 시작+끝 폐기(2026-11-22)로 보내지 않는다.
+    expect(r.referenceImageUrls).toEqual([SB.frames.start])
     expect(r.referenceImageUrl).toBe(SB.frames.start)
     expect(r.source).toBe('db')
   })
 
-  it('직접 연결한 그림은 그대로 쓰고 시작 그림이 없을 때만 승인된 시작 화면을 앞에 더한다', () => {
+  // 왜: 사람이 이은 시작 · 참고 그림은 지킨다. 끝 칸에 이은 그림은 오너 시작+끝 폐기(2026-11-22)로 보내지 않는다 — 거절하지는 않는다.
+  it('직접 연결한 그림은 끝 칸 그림만 빼고 그대로 쓰고, 시작 그림이 없을 때만 승인된 시작 화면을 앞에 더한다', () => {
     const r = resolveVideoReferenceFrames({
       frameSource: 'manual',
       referenceImageUrl: 'https://s/asset.png',
@@ -75,7 +78,8 @@ describe('승인된 스토리보드 화면을 영상에 쓰는 약속 (Director 
       referenceImageRoles: ['start', 'end'],
       storyboardImage: SB,
     })
-    expect(manualStart.referenceImageUrls).toEqual(['https://s/mine.png', 'https://s/end.png'])
+    expect(manualStart.referenceImageUrls).toEqual(['https://s/mine.png'])
+    expect(manualStart.referenceImageRoles).toEqual(['start'])
   })
 
   it('승인된 스토리보드가 없으면 독립 영상은 입력한 그림을 그대로 사용한다', () => {
