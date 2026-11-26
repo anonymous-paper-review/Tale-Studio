@@ -3,6 +3,7 @@
 // Storyboard 머리 오른쪽 단추(오너 2026-11-26 m1126 S2) — [시작] 또는 일괄이 도는 동안 [멈추기], 그리고 [다음: Director로 →].
 //   크림은 화면에 하나(design §1 규칙 2): 실사로 바꿀 콘티가 있으면 [시작]이 크림이고 [다음]은 보조, 그 밖에는 [다음]이 크림(혼자 정한 것 b · c).
 //   [시작] = 화면이 센 샷(실사 없음 · 콘티 있음)만 Director [이미지 만들기]와 같은 일괄로(lib/storyboard/start-real). 콘티 그림 없는 샷은 빼고 먼저 알린다(f).
+//   콘티 그림을 그리는 중인 샷(Storyboard 이어 그리기 · 다른 곳의 러프 작업)도 빼고 이름을 먼저 알린다 — 다 그리면 다음 [시작]이 넣는다(리드 2026-11-26).
 //   두 칸(스토리보드 · 대사) 머리에 같이 단다 — 무엇을 보일지는 lib/storyboard/real-board storyboardStartView. 약속: tests/writer/real-header.test.ts
 import { ArrowRight, Square } from 'lucide-react'
 import { toast } from 'sonner'
@@ -12,8 +13,9 @@ import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { shotName } from '@/lib/board-names'
 import { useActiveGenerationJobs } from '@/lib/generation-queue'
 import { useLocale, useT } from '@/lib/i18n'
-import { noContiNotice, realDrawingShotIds, storyboardStartView } from '@/lib/storyboard/real-board'
+import { noContiNotice, realDrawingShotIds, roughDrawingNotice, roughDrawingShotIds, storyboardStartView } from '@/lib/storyboard/real-board'
 import { useStoryboardRealImages } from '@/lib/storyboard/real-images-store'
+import { useRoughFillPending } from '@/lib/storyboard/rough-fill-store'
 import { boardShots } from '@/lib/writer/board-summary'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -30,6 +32,7 @@ export function StoryboardHeaderActions() {
   const shots = useWriterStore((state) => state.shots)
   const images = useStoryboardRealImages((state) => (state.projectId === projectId ? state.images : NO_IMAGES))
   const activeJobs = useActiveGenerationJobs(projectId)
+  const roughPending = useRoughFillPending(projectId)
   const batch = useDirectorCanvasStore(
     useShallow((state) => ({ busy: state.realBatchBusy, cancelled: state.realBatchCancelled, shotIds: state.realBatchShotIds })),
   )
@@ -45,12 +48,15 @@ export function StoryboardHeaderActions() {
     realOf: (shotId) => images[shotId],
     drawing: realDrawingShotIds(activeJobs),
     batch,
+    roughDrawing: roughDrawingShotIds(activeJobs, Object.keys(roughPending)),
   })
   const noByShot = new Map(board.map((entry) => [entry.shot.shotId, entry.shotNo]))
   const nameOf = (shotId: string) => shotName(locale, noByShot.get(shotId) ?? shotId)
   // 일괄 러너는 누를 때 불러온다 — 머리(대사 탭 · 콘티와 같이 쓰는 WriterHeader 가 부른다)를 그리는 것만으로 러너 · Director 알림 상점을 끌어오지 않게.
   const start = () => {
     if (!projectId) return
+    const drawingNotice = roughDrawingNotice(locale, view.roughDrawing.map(nameOf))
+    if (drawingNotice) toast.info(drawingNotice)
     const notice = noContiNotice(locale, view.noConti.map(nameOf))
     if (notice) toast.info(notice)
     const targets = view.targets
