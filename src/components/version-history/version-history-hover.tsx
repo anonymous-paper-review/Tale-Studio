@@ -12,7 +12,7 @@ import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/h
 import { ThumbImage } from '@/components/thumb-image'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
-import { HISTORY_STRIP_SIZE } from '@/lib/version-history'
+import { HISTORY_STRIP_SIZE, type PastImageVersion } from '@/lib/version-history'
 
 /** 작은 카드 하나 — label 은 화면 글(v3 · Take 2), note 는 마우스를 올리면 보이는 덧말. */
 export interface VersionStripCard {
@@ -178,6 +178,16 @@ export function VersionHistoryHover({ cards, more, aspect, onOpen, onMore, child
       ) : null}
     </HoverCard>
   )
+}
+
+/** 실사 이미지 판(Director · Storyboard 가 같은 판 기록)의 작은 카드 — 이름 v{n}, 올린 그림 · 멈춘 뒤 끝난 그림은 덧말. */
+export function imageVersionCards(versions: readonly PastImageVersion[], t: ReturnType<typeof useT>): VersionStripCard[] {
+  return versions.map((version) => ({
+    id: version.id,
+    label: `v${version.n}`,
+    thumbUrl: version.thumbUrl,
+    note: version.upload ? t('Uploaded image') : version.stopped ? t('Finished after it was stopped') : null,
+  }))
 }
 
 /** 프로젝트 화면비("16:9")를 작은 칸 비율("16 / 9")로. 모르면 16:9. */

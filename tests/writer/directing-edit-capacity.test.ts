@@ -100,9 +100,11 @@ afterEach(() => {
 })
 
 describe('연출 편집 이미지 생성 예약', () => {
-  it('두 재생성 경로가 레거시 호출 대신 공통 helper에 프로젝트 context를 정확히 전달한다', async () => {
+  // 2026-11-22 문장 바꿈(D10 ② · 오너 Q1 · Q3): 끝 장 다시 그리기는 이제 작업 길(tests/writer/end-frame-read-draw.test.ts)이라 이 helper 를 쓰지 않는다.
+  //   예전 '두 재생성 경로가 레거시 호출 대신 공통 helper에 프로젝트 context를 정확히 전달한다'(분리 + 끝 장).
+  it('레이어 분리와 시작 장 한 장 다시 그리기는 레거시 호출 대신 공통 helper에 프로젝트 context를 정확히 전달한다', async () => {
     await separateArrowLayer(PROJECT, SHOT)
-    await regenerateRoughFrame(PROJECT, SHOT, 'end')
+    await regenerateRoughFrame(PROJECT, SHOT, 'start')
 
     expect(mocks.legacyGenerate).not.toHaveBeenCalled()
     expect(mocks.generateReservedImage).toHaveBeenCalledTimes(2)

@@ -13,7 +13,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
-import { UnsavedArrowsConfirm, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
+import { EndRedrawAsk, UnsavedArrowsConfirm, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { StoryboardShotDialog } from '@/features/writer/storyboard-shot-dialog'
 import { useWriterStore } from '@/stores/writer-store'
@@ -100,6 +100,9 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
                 onSaved={() => void loadProject()}
                 ref={guard.editorRef}
                 onDirtyChange={guard.setDirty}
+                // 가운데 장 화살표를 저장하면 끝 장도 이 화살표대로 다시 그릴지 묻고, [끝 장 다시 그리기]도 같은 물음으로(D10 · W3 2026-11-26).
+                onArrowsSaved={() => guard.askEnd({ projectId, shotId: shot.shotId, onRedrawn: () => loadProject() })}
+                onRedrawEnd={() => guard.askEnd({ projectId, shotId: shot.shotId, onRedrawn: () => loadProject() })}
               />
           </>
         ) : (
@@ -110,6 +113,7 @@ function DirectingEditDialog({ shotId, panel, onOpenChange }: Omit<ShotDetailDia
       </DialogContent>
     </Dialog>
     <UnsavedArrowsConfirm {...guard.confirm} />
+    <EndRedrawAsk {...guard.endAsk} />
     </>
   )
 }

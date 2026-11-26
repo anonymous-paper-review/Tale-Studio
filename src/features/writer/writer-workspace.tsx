@@ -9,6 +9,7 @@ import { WriterGenerationView } from '@/features/writer/writer-generation-view'
 import { WriterV2Preview } from '@/features/writer/writer-v2-preview'
 import { StageWaitCard } from '@/components/feedback/stage-wait'
 import { useStoryboardWait } from '@/hooks/use-stage-wait'
+import { boardStageOf } from '@/lib/writer/board-stage'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
@@ -58,6 +59,8 @@ export function WriterWorkspace() {
   const { status } = useWriterStatus(projectId)
   // 샷을 아직 다 읽기 전에는 "아직 생성된 씬·샷이 없어요" 대신 Storyboard 기다리는 카드(오너 2026-11-26 m1126 G1, hooks/use-stage-wait).
   const storyboardWait = useStoryboardWait()
+  // 같은 보드를 콘티(/studio/conti)와 Storyboard 가 쓴다 — 기다리는 카드도 지금 단계 것(콘티는 Writer 옷 "콘티를 불러오는 중…", O1 · G1 2026-11-26).
+  const boardStage = useProjectStore((state) => boardStageOf(state.currentStage))
   const debugGeneration = useGenerationDebug()
 
   // V2 프로젝트 진입 동선 (#v2-tab 2026-08-17): 이전엔 engine=v2 면 프리뷰가 워크스페이스를
@@ -119,7 +122,7 @@ export function WriterWorkspace() {
     return <WriterV2Preview projectId={projectId} />
   }
 
-  if (storyboardWait) return <StageWaitCard stage="writer" />
+  if (storyboardWait) return <StageWaitCard stage={boardStage} />
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">

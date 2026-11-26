@@ -12,7 +12,7 @@ vi.mock('@/lib/storage/media', () => ({
 }))
 vi.mock('@/lib/storage-thumb', () => ({ uploadThumbnail: mocks.thumb }))
 
-import { fitFrameToSize, regenerateRoughFrame } from '@/lib/writer/directing-edit'
+import { endFramePlan, fitFrameToSize, regenerateRoughFrame } from '@/lib/writer/directing-edit'
 
 // 이 시험을 위해 지은 러프 — 시트에서 자른 세 장은 255×447, Grok 은 720×1280 으로 돌려준다(2026-11-14 개발 실측과 같은 크기).
 const ROUGH = {
@@ -53,10 +53,16 @@ describe('러프 한 장 다시 그리기', () => {
   // 왜: 한 장 다시 그리기 프롬프트에는 시트의 인물 · 글자 규칙이 없어, 연출 칸을 다시 만들면 얼굴 있는 만화 소녀 · 말풍선 "YOU'RE WASTING TIME!" ·
   //   "DIRECTING" · "DIR. FRAME 1" 상자가 그려졌다(2026-11-14 개발 실측 914165c8). 시작 · 끝 다시 그리기도 같은 규칙을 지킨다.
   it('러프 한 장을 다시 그려도, 인물은 얼굴 없는 같은 목각 인형이고 말풍선 · 대사 · 장면/샷 번호 · 프레임 이름 글씨를 넣지 않는다', async () => {
+    // 2026-11-22(D10 ② · 오너 Q1 · Q3): 끝 장은 이제 작업 길(읽은 한 줄 + 시작 장, GPT Image 2)로 그린다 — 같은 규칙을 끝 장 계획의 문장으로 본다.
+    const endPrompt = endFramePlan(
+      { start: 'https://media.test/r/start.png', direction: 'https://media.test/r/direction.png', end: 'https://media.test/r/end.png' },
+      'read-then-draw',
+      { line: 'The figure on the left walks out of frame to the right.', seconds: 5 },
+    ).prompt
     for (const frame of ['start', 'direction', 'end'] as const) {
       mocks.generateReservedImage.mockClear()
-      await regenerateRoughFrame('p1', 'sh_1', frame)
-      const prompt = promptOf()
+      if (frame !== 'end') await regenerateRoughFrame('p1', 'sh_1', frame)
+      const prompt = frame === 'end' ? endPrompt : promptOf()
       expect(prompt).toMatch(/same classic wooden artist's drawing mannequin/)
       expect(prompt).toMatch(/absolutely no face/)
       expect(prompt).toMatch(/No speech bubbles/)

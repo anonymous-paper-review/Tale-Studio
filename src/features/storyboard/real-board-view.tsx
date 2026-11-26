@@ -15,6 +15,11 @@ import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { StoryboardDirectorDialog } from '@/features/writer/storyboard-director-dialog'
 import { handOverToDirector } from '@/features/writer/storyboard-director'
 import { RealShotCard } from '@/features/storyboard/real-shot-card'
+import { VersionHistoryHover, imageVersionCards, stripAspect } from '@/components/version-history/version-history-hover'
+import { historyStrip, pastImageVersions } from '@/lib/version-history'
+import { useProjectFormatStore } from '@/stores/project-format-store'
+import { aspectRatioFromFormat } from '@/types/project'
+import type { StoryboardImage } from '@/types/director'
 import { RealShotDialog } from '@/features/storyboard/real-shot-dialog'
 import { StoryboardHeader } from '@/features/storyboard/storyboard-header'
 import { useStoryboardRoughFill } from '@/features/storyboard/use-rough-fill'
@@ -72,6 +77,8 @@ export function RealBoardView() {
   const cardDrawing = useBoardUiStore((s) => s.cardDrawing)
   const detailShotId = useBoardUiStore((s) => s.shotEditId)
   const setDetailShotId = useBoardUiStore((s) => s.setShotEditId)
+  // 지난 판 줄(오너 2026-11-26 S3) — 작은 칸 비율은 프로젝트 화면비.
+  const projectFormat = useProjectFormatStore((s) => s.format)
   const directorConfirmOpen = useBoardUiStore((s) => s.directorConfirmOpen)
   const setDirectorConfirmOpen = useBoardUiStore((s) => s.setDirectorConfirmOpen)
   const mentionedRefs = useChatUiStore((s) => s.mentionedRefs)
@@ -197,6 +204,8 @@ export function RealBoardView() {
     if (draggedRef.current) return
     setDetailShotId(shotId)
   }
+  // 지난 판 줄에서 누른 판으로 상세를 연다(S3) — 상세가 그 판을 먼저 보이고 [채택]을 단다.
+  const openDetailVersion = (shotId: string, versionId: string) => useBoardUiStore.getState().openShotVersion(shotId, versionId)
   const toggleScene = (sceneId: string) =>
     setCollapsedScenes((prev) => {
       const next = new Set(prev)
@@ -338,12 +347,24 @@ export function RealBoardView() {
                       {sceneShots.map((shot, shotIdx) => {
                         const label = sceneShotName(locale, sceneIdx + 1, shotNoById.get(shot.shotId) ?? shotIdx + 1)
                         const wait = waitOf(shot.shotId)
+                        const picture = storyboardCardPicture(shot.roughStoryboard, images[shot.shotId])
+                        // 지난 판 줄(S3) — 실사가 있는 카드만(Director 와 같은 판 기록). 콘티(러프)는 판 기록이 없다.
+                        const history = picture.kind === 'real' ? historyStrip(pastImageVersions(images[shot.shotId] as StoryboardImage | null)) : null
                         return (
-                          <RealShotCard
+                          // 줄은 DOM 칸 하나를 기준으로 뜬다 — 카드 부품을 grid 칸으로 감싸 카드 높이는 지금처럼 줄 높이에 맞는다.
+                          <VersionHistoryHover
                             key={shot.shotId}
+                            cards={history ? imageVersionCards(history.shown, t) : []}
+                            more={history?.more ?? 0}
+                            aspect={stripAspect(aspectRatioFromFormat(projectFormat ?? 'horizontal_16:9'))}
+                            onOpen={(versionId) => openDetailVersion(shot.shotId, versionId)}
+                            onMore={() => openDetail(shot.shotId)}
+                          >
+                          <div className="grid">
+                          <RealShotCard
                             shot={shot}
                             label={label}
-                            picture={storyboardCardPicture(shot.roughStoryboard, images[shot.shotId])}
+                            picture={picture}
                             wait={wait}
                             compact={cols >= 5}
                             announceWait={shot.shotId === announcedShotId}
@@ -357,6 +378,8 @@ export function RealBoardView() {
                             armed={armed}
                             onOpen={() => openDetail(shot.shotId)}
                           />
+                          </div>
+                          </VersionHistoryHover>
                         )
                       })}
                     </div>

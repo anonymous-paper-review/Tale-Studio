@@ -7,8 +7,8 @@
 //   위층 = 원본 DIRECTING 프레임을 올린 캔버스
 // 지우개(destination-out)로 위층을 긁으면 밑층이 드러난다 = 기존 화살표 삭제.
 // 펜으로 위층에 새 화살표를 그리고, 저장 시 두 층을 평탄화해 direction 프레임에 upsert.
-import { useEffect, useImperativeHandle, useRef, useState } from 'react'
-import { Eraser, Layers, Loader2, Pen, RotateCcw, Save, Trash2, Undo2, Wand2 } from 'lucide-react'
+import { useEffect, useImperativeHandle, useRef, useState, type CSSProperties } from 'react'
+import { Eraser, Layers, Loader2, Pen, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Slider } from '@/components/ui/slider'
@@ -17,6 +17,8 @@ import { cn } from '@/lib/utils'
 import type { RoughStoryboardImage } from '@/types'
 import { translate, useT } from '@/lib/i18n'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
+import { askLineText, endAskAfterSave } from '@/lib/writer/end-frame-ask'
+import { freshDirectionRead } from '@/lib/writer/direction-read'
 import { warnBeforeLeaving } from '@/features/writer/unsaved-arrows-confirm'
 import { useLocaleStore } from '@/stores/locale-store'
 
@@ -76,6 +78,32 @@ export function reloadsTopLayer(loaded: string | null, direction: string | null 
   return !!direction && direction !== loaded
 }
 
+/** 세로 · 정사각 그림 칸의 높이 상한 — 화면 높이에서 창 머리 · 도구 줄 · 저장 줄 · 창 아래 단추 몫(26rem)을 뺀다.
+ *  1440×900 · 1280×720 · 400 폭에서 잰 값(리드 2026-11-23 QA 본 것 b). 아주 낮은 화면에서도 그릴 수 있게 12rem 아래로는 줄이지 않는다. */
+const EDITOR_FRAME_MAX_HEIGHT = 'max(12rem, 100dvh - 26rem)'
+
+/** 편집기 그림 칸 — 원본 프레임 비율로 고정해 좌표가 어긋나지 않게 한다. 세로 · 정사각 그림은 높이가 화면 안에 들어오게 폭을 줄인다
+ *  (세로 9:16 이 칸 폭을 다 써 984px 높이가 되어 저장 줄이 그림 아래를 덮었다). 가로 그림은 지금처럼 칸 폭을 다 쓴다. 순수 함수 — 테스트 대상. */
+export function editorFrameStyle(dims: { w: number; h: number } | null): CSSProperties {
+  if (!dims) return { aspectRatio: '16 / 9' }
+  const aspectRatio = `${dims.w} / ${dims.h}`
+  if (dims.h < dims.w) return { aspectRatio }
+  return { aspectRatio, width: `min(100%, calc(${EDITOR_FRAME_MAX_HEIGHT} * ${dims.w} / ${dims.h}))` }
+}
+
+/** 화면 좌표 → 위층 캔버스(원래 그림 해상도) 좌표 — 그림 칸이 줄어 보여도 비율로 옮기므로, 저장하면(위층 크기 그대로 합침)
+ *  원래 그림의 같은 자리에 남는다(리드 2026-11-23). 순수 함수 — 테스트 대상. */
+export function displayToCanvasPoint(
+  client: { x: number; y: number },
+  rect: { left: number; top: number; width: number; height: number },
+  canvas: { width: number; height: number },
+): { x: number; y: number } {
+  return {
+    x: ((client.x - rect.left) / rect.width) * canvas.width,
+    y: ((client.y - rect.top) / rect.height) * canvas.height,
+  }
+}
+
 /** 분리 답 읽기 — 409(stale_direction)면 화면이 서버보다 낡았다: 알리고 지금 그림을 다시 읽는다(위층도 맞춘다). 테스트 대상. */
 export async function readSeparateResponse(
   res: Response,
@@ -103,6 +131,8 @@ export function DirectingArrowEditor({
   panel,
   onSaved,
   onDirtyChange,
+  onArrowsSaved,
+  onRedrawEnd,
   ref,
 }: {
   projectId: string
@@ -111,9 +141,18 @@ export function DirectingArrowEditor({
   onSaved: () => void
   /** 저장하지 않은 화살표(되돌리기 칸)가 생기거나 없어질 때 — 창이 [적용]을 켜고 닫기 전에 묻는다. */
   onDirtyChange?: (dirty: boolean) => void
+  /** 그린 화살표를 저장한 뒤 — 창이 끝 장도 다시 그릴지 묻는다(D10). 고를 때까지 저장이 끝나지 않는다([적용] · [저장하고 닫기]는 고른 뒤 닫힌다). */
+  onArrowsSaved?: () => Promise<void> | void
+  /** 편집기 아래 "AI 가 읽은 움직임" 줄의 [고쳐서 끝 장 다시 그리기] — 창이 끝 장 물음을 연다(D10 ② · 리드 Q-b). */
+  onRedrawEnd?: () => void
   ref?: React.Ref<DirectingArrowEditorHandle>
 }) {
   const t = useT()
+  const locale = useLocaleStore((s) => s.locale)
+  // 지금 연출 장을 읽은 줄(낡은 줄은 안 보인다). 영상은 이 줄을 바로 쓴다(리드 D2 2026-11-23). 그 줄로 그린 끝 장이 지금 끝 장이 아니면
+  //   끝 장 · 실사에는 아직 안 쓴 줄이다 — 실사는 끝 장을 그 줄로 그린 뒤에만 줄을 싣는다(리드 Q-a · 오너 R1).
+  const directionRead = freshDirectionRead(panel)
+  const readUnused = !!directionRead && directionRead.endDrawn !== (panel.frames?.end ?? null)
   const directionUrl = panel.frames?.direction
     ? withCacheBust(panel.frames.direction, panel.generatedAt)
     : null
@@ -201,11 +240,7 @@ export function DirectingArrowEditor({
 
   const toCanvasPoint = (e: React.PointerEvent<HTMLCanvasElement>): Pt => {
     const canvas = e.currentTarget
-    const rect = canvas.getBoundingClientRect()
-    return {
-      x: ((e.clientX - rect.left) / rect.width) * canvas.width,
-      y: ((e.clientY - rect.top) / rect.height) * canvas.height,
-    }
+    return displayToCanvasPoint({ x: e.clientX, y: e.clientY }, canvas.getBoundingClientRect(), canvas)
   }
 
   const drawSegment = (ctx: CanvasRenderingContext2D, from: Pt, to: Pt) => {
@@ -311,7 +346,7 @@ export function DirectingArrowEditor({
       // 낡은 화면 위에 새 그림의 밑층을 섞지 않는다 — 409 면 알리고 화면을 다시 읽어 위층도 지금 그림으로 맞춘다.
       const separatedPlate = await readSeparateResponse(res, {
         notify: () => toast.info(t('The directing frame changed in the meantime, so we loaded it again. Separate the layer again.')),
-        // 감싼 까닭: 출시 시험 rough-frame-edit-refresh 가 두 저장 길의 다시 읽기 줄을 글자 그대로 세어 2개여야 한다 — 이 길은 그 셈 밖에 둔다.
+        // 감싼 까닭: 출시 시험 rough-frame-edit-refresh 가 저장 길의 다시 읽기 줄을 글자 그대로 세어 1개여야 한다 — 이 길은 그 셈 밖에 둔다.
         reload: () => reloadAfterRoughFrameEdit(projectId, () => onSaved()),
       })
       if (!separatedPlate) return
@@ -330,14 +365,15 @@ export function DirectingArrowEditor({
   }
 
   /**
-   * 저장 (+ 선택적으로 END 재생성).
-   * regenerateEnd: 화살표를 고쳤으면 "그 화살표가 끝난 뒤의 그림"인 END 도 따라가야 한다 —
-   *   안 그러면 편집이 DIRECTING 한 장에만 남고 3프레임 세트가 서로 다른 이야기를 한다.
-   *   과금이 걸리므로 기본 [저장]과 갈라 놓고, 누른 사람만 i2i 를 태운다.
+   * 저장 — 편집기 [저장] · 창 [적용] · 물음 창 [저장하고 닫기] 셋 다 여기로 온다.
+   * 화살표를 고쳤으면 "그 화살표가 끝난 뒤의 그림"인 끝 장도 따라가야 한다 — 안 그러면 세 장이 서로 다른 이야기를 한다.
+   *   저절로 다시 그리지 않고(약속 I) 저장한 뒤 창이 묻는다(D10 · 2026-11-22 리드 Q2). 예전 [저장 후 END 재생성] 단추는 이 물음으로 합쳤다.
    */
-  const handleSave = async (regenerateEnd = false): Promise<boolean> => {
+  const handleSave = async (): Promise<boolean> => {
     const top = topCanvasRef.current
     if (!top || !ready) return false
+    // 저장 전에 그린 것(되돌리기 칸)이 있었을 때만 끝 장을 묻는다 — 그린 것 없는 [저장]은 끝 장과 상관없다.
+    const hadStrokes = undoStackRef.current.length > 0
     setSaving(true)
     try {
       // 평탄화: 밑층(클린 플레이트) → 위층 순서로 합성. 분리 전이면 위층 단독(원본+펜, 전면 불투명).
@@ -366,22 +402,11 @@ export function DirectingArrowEditor({
       // 저장했으면 저장하지 않은 화살표는 없다 — 다시 불러오기(새 주소)를 기다리지 않고 바로 비운다(닫을 때 묻지 않게).
       undoStackRef.current = []
       setUndoCount(0)
-      if (!regenerateEnd) {
-        toast.success(t('Saved the DIRECTING frame'))
-        await reloadAfterRoughFrameEdit(projectId, onSaved)
-        return true
-      }
-      // 저장이 끝난 뒤(= 서버가 새 DIRECTING 을 갖고 있는 상태) END 를 그 그림 기준으로 다시 그린다.
-      toast.info(t('Redrawing the END frame, about 30 seconds'))
-      const endRes = await fetch('/api/writer/rough-directing-edit', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ action: 'regenerate-end', projectId, shotId }),
-      })
-      const endJson = await endRes.json().catch(() => null)
-      if (!endRes.ok) throw new Error(endJson?.error ?? `HTTP ${endRes.status}`)
-      toast.success(t('Saved DIRECTING and regenerated the END frame'))
+      toast.success(t('Saved the DIRECTING frame'))
       await reloadAfterRoughFrameEdit(projectId, onSaved)
+      // 저장은 끝났다 — 물음이 열려 있는 동안 편집기 단추가 돌지 않게 먼저 푼다.
+      setSaving(false)
+      if (endAskAfterSave(hadStrokes) === 'ask') await onArrowsSaved?.()
       return true
     } catch (e) {
       toast.error(e instanceof Error ? e.message : t('Save failed'))
@@ -508,10 +533,11 @@ export function DirectingArrowEditor({
       </div>
 
       {/* 캔버스 — 밑층(클린 플레이트 img) 위에 위층 캔버스. 두 층 모두 컨테이너를 가득 채우고,
-          컨테이너 비율을 원본 프레임 비율로 고정해 좌표가 어긋나지 않게 한다. */}
+          컨테이너 비율을 원본 프레임 비율로 고정해 좌표가 어긋나지 않게 한다. 세로 · 정사각 그림은 화면 높이 안에 들어오게
+          폭을 줄여 가운데 둔다 — 저장 줄이 그림을 덮지 않게(editorFrameStyle, 리드 2026-11-23). */}
       <div
-        className="relative w-full overflow-hidden rounded-lg border bg-muted"
-        style={{ aspectRatio: dims ? `${dims.w} / ${dims.h}` : '16 / 9' }}
+        className="relative mx-auto w-full overflow-hidden rounded-lg border bg-muted"
+        style={editorFrameStyle(dims)}
       >
         {effectiveClean ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -571,6 +597,7 @@ export function DirectingArrowEditor({
               )
             : t('The pen works right away. To erase existing arrows, separate the layers first.')}
         </p>
+        {/* 끝 장 다시 그리기는 저장한 뒤 창이 묻는다(D10) — 따로 있던 [저장 후 END 재생성] 단추를 합쳤다. */}
         <Button
           size="sm"
           variant="outline"
@@ -580,22 +607,25 @@ export function DirectingArrowEditor({
           {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}
           {t('Save')}
         </Button>
-        {/* 화살표를 고쳤으면 END 도 그 화살표를 따라가야 한다(#end-from-direction). 이미지 생성이
-            한 번 걸리므로 기본 저장과 갈라 두고, 누른 사람만 과금을 태운다. */}
-        <Button
-          size="sm"
-          disabled={busy || !ready}
-          onClick={() => void handleSave(true)}
-          title={t('Redraw the END frame based on the saved DIRECTING frame (1 image generation)')}
-        >
-          {saving ? (
-            <Loader2 className="size-3.5 animate-spin" />
-          ) : (
-            <Wand2 className="size-3.5" />
-          )}
-          {t('Save, then regenerate END')}
-        </Button>
       </div>
+
+      {/* AI 가 읽은 움직임(D10 ② · 리드 Q-b) — 물음 창을 닫은 뒤에도 보고 고친다. 끝 장에 아직 안 쓴 줄이면 영상에는 들어가고
+          끝 장 · 실사는 이 줄로 다시 그려야 맞는다고 알린다(리드 D2 2026-11-23 — 끝 장을 먼저 그려야 실사에 줄이 실린다). */}
+      {directionRead ? (
+        <div className="flex flex-col gap-1.5 rounded-lg bg-card px-3 py-2.5" data-testid="directing-read-line">
+          {/* 사람이 고친 줄이면 "고친 움직임"(리드 2026-11-23) — [그대로]에서도 고친 줄이 남아 누가 쓴 줄인지 보이게. */}
+          <span className="text-caption font-semibold text-subtle-foreground">{directionRead.source === 'user' ? t('Edited movement') : t('Motion the AI read')}</span>
+          <p className="break-keep text-caption text-foreground">{askLineText(directionRead, locale)}</p>
+          {readUnused ? (
+            <p className="break-keep text-caption text-muted-foreground">{t('This line is not used for the end frame yet.')}</p>
+          ) : null}
+          {onRedrawEnd ? (
+            <Button size="sm" variant="outline" className="self-start" disabled={busy} onClick={onRedrawEnd} data-testid="directing-read-line-redraw">
+              {t('Edit and redraw the end frame')}
+            </Button>
+          ) : null}
+        </div>
+      ) : null}
     </div>
   )
 }

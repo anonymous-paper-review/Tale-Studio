@@ -58,6 +58,9 @@ export interface GenerationJobTarget {
   batchRunRemaining?: number
   /** editor_music: 결과를 넣을 곡 행(editor_music.id) — 보관함 파일 이름도 이 id 다(2026-11-26). */
   musicId?: string
+  /** D10 ②(2026-11-22): 러프 끝 장 작업(종류 image_generation) — 완료 처리가 끝 장을 바꿔 끼운다(writer/directing-edit.ts finalizeRoughEndFrameJob).
+   *  generatedAt · direction = 낼 때의 러프 시각 · 연출 장 주소(그사이 바뀌면 끼우지 않는다), line = 그린 영어 줄. */
+  roughEnd?: { generatedAt: number; direction: string; line: string }
 }
 
 export interface GenerationJob {

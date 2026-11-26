@@ -29,6 +29,12 @@ describe('콘티 이름', () => {
     expect(translate('ko', 'the rough storyboard of {shot}', { shot: '샷 2' })).toBe('샷 2의 콘티')
   })
 
+  // 왜: W2 · 리드 결정(2026-11-26) — Director 의 실사 만들기 안내도 같은 그림을 말한다. 화면마다 다른 이름이면 다른 그림으로 읽힌다.
+  it('한국어 Director 화면의 실사 만들기 안내도 러프 스토리보드를 "콘티"라고 부른다', () => {
+    expect(translate('ko', 'Start shooting real images/videos based on the rough storyboard, characters, and world.')).toBe('콘티와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요.')
+    expect(translate('ko', 'Generate the rough storyboard into a real shooting-image storyboard in one go')).toBe('콘티를 실제 촬영 이미지 스토리보드로 한번에 생성할 수 있어요')
+  })
+
   // 왜: 정상 경로 고정 — 영어 화면은 지금 이름 그대로다(영어에는 실사 단계 이름 Storyboard 가 따로 있다).
   it('영어 화면은 지금처럼 Rough storyboard 라고 부른다', () => {
     expect(translate('en', 'Rough storyboard')).toBe('Rough storyboard')
