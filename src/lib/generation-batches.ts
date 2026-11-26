@@ -26,7 +26,8 @@ export const LANE_OF_KIND: Record<GenerationJobKind, GenerationLane | null> = {
 
 export const LANE_STAGE: Record<GenerationLane, StageId> = {
   artist: 'artist',
-  'writer-rough': 'writer',
+  // 러프는 Writer 콘티에서 그린다(O1 2026-11-26, 리드 승인) — 완료 숫자는 레일의 Writer 칸(씬 스토리 · 콘티)에 붙는다.
+  'writer-rough': 'conti',
   'director-storyboard': 'director',
   'director-video': 'director',
   'director-previz': 'director',
