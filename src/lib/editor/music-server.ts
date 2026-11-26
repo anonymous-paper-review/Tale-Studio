@@ -1,6 +1,7 @@
 // Editor 음악 만들기 서버 쪽(2026-11-26 m1126 E1) — 만든 곡 표(editor_music) 읽기 · 행을 화면 한 줄로 · 보관함 경로.
 //   표는 서버(service role)만 읽고 쓴다(마이그레이션 20261126120000). 만드는 중인 곡의 끝 · 실패는 작업 장부(generation_jobs)가 진실이다 —
-//   웹훅 · 폴링 · 유령 청소 어느 길로 실패해도 목록이 같도록, 목록을 읽을 때 작업 상태를 보고 실패를 곡 행에 옮겨 적는다.
+//   웹훅 · 폴링 · 유령 청소 어느 길로 실패해도 목록이 같도록, 목록을 읽을 때 작업 상태를 보고 실패를 곡 행에 옮겨 적는다
+//   (작업이 지워졌으면 '멈춤', 30분이 지나도 안 끝났으면 '너무 오래' — 곡 행만, 작업 · Take 는 그대로).
 //   약속: tests/job/editor-music-job.test.ts
 import { supabaseAdmin } from '@/lib/supabase/admin'
 import { getGenerationJobsByIds } from '@/lib/generation-jobs'
@@ -105,7 +106,12 @@ export async function listEditorMusic(projectId: string, now = Date.now()): Prom
     }
     let code: MusicFailureCode | null = null
     if (job?.status === 'failed') code = musicFailureCode(job.error)
-    else if (!job && now - Date.parse(row.created_at) > STALE_QUEUED_VIDEO_MS) code = 'timed_out'
+    // 작업 행이 없으면 큐에서 지운 것이다(곡 행은 작업을 만든 뒤에 넣는다) — 지우기는 Take 를 돌려주고 다시 끝나지 않는다.
+    else if (row.job_id && !job) code = 'cancelled'
+    // 30분이 지나도 끝나지 않은 곡 — 접수 여부를 모르는 작업은 Take 를 묶은 채 기다리는 정책이라(영상과 같음) 영영 만드는 중이 된다.
+    //   곡 행만 실패로 적어 [빼기] · [다시 만들기]를 열고, 작업 · Take 는 건드리지 않는다. 나중에 끝나면 마무리가 곡을 다시 끝으로 적는다.
+    //   DB 자리 트리거도 30분 지난 작업은 세지 않는다(검토 rev-billing 2026-11-26).
+    else if (now - Date.parse(row.created_at) > STALE_QUEUED_VIDEO_MS) code = 'timed_out'
     if (!code) continue
     row.status = 'failed'
     row.error = code
