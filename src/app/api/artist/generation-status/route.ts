@@ -14,6 +14,7 @@ import {
   userOwnsProject,
 } from '@/lib/generation-jobs'
 import { listFailedPropImageJobs, listQueuedPropImageJobs } from '@/lib/artist/prop-jobs'
+import { artistImagesStarted } from '@/lib/artist/images-started'
 
 export const runtime = 'nodejs'
 
@@ -30,7 +31,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
-  const [failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps] = await Promise.all([
+  const [failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps, imagesStarted] = await Promise.all([
     listFailedCharacterViewJobs(projectId),
     listQueuedMainJobs(projectId),
     listFailedWorldShotJobs(projectId), // 약속 B8(2026-09-04): 배경 실패 표시·우회 재시도의 근거
@@ -42,6 +43,8 @@ export async function GET(req: Request) {
     //   소품 기록을 못 읽어도 인물 · 배경 상태 조회는 막지 않는다(빈 값 = 실패 · 대기 없음으로 본다).
     listFailedPropImageJobs(projectId).catch(() => []),
     listQueuedPropImageJobs(projectId).catch(() => []),
+    // Artist 새 흐름(m1126 O1): 그림을 그리기 시작했는가 — 아니면 화면이 그림체와 [만들기]를 보인다. 모르면 null.
+    artistImagesStarted(projectId),
   ])
-  return NextResponse.json({ failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps })
+  return NextResponse.json({ failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps, imagesStarted })
 }

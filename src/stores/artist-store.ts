@@ -789,6 +789,13 @@ interface ArtistState {
   continueMissingProps: () => Promise<void>
   /** 소품 생김새(원천) 고치기 — 그림은 그대로 둔다(다시 그리기 전까지 "설명 바뀜"). */
   updatePropAppearance: (propId: string, appearance: string) => Promise<void>
+  /** Artist 새 흐름(m1126 O1): 인물 · 배경 · 소품 그림 작업이 한 번이라도 있었나(생성 상태 창구 imagesStarted) — null 은 아직 모름. */
+  imagesStarted: boolean | null
+  /** 이 프로젝트의 샷 수(loadData) — 0 보다 크면 씬 · 샷이 이미 나뉘었다(새 흐름 판정). */
+  shotCount: number
+  /** Artist 새 흐름의 [이미지 만들기] — 고른 그림체(바꿨으면 서버가 저장)로 인물 · 배경 · 소품 그림만 그린다(/api/artist/make-images).
+   *  씬 · 샷 · 산문은 건드리지 않는다. ok = 그리기 시작했거나 이미 그리는 중, style = 서버가 바꿔 저장한 작품 그림체(안 바꿨으면 null). */
+  makeImages: (styleAnchorKey?: string | null) => Promise<{ ok: boolean; style: string | null }>
   /** 카드에서 고른 소품 모습(m1126 A3) — 키 = propId, 값 = 모습 열쇠(기본 'default'). */
   selectedPropAppearances: Record<string, string>
   selectPropAppearance: (propId: string, appearanceKey: string) => void
@@ -974,6 +981,12 @@ function dedupeLoadData(projectId: string | null, run: () => Promise<void>): Pro
   return started
 }
 
+/** [이미지 만들기](m1126 O1) 거절 까닭 — 영어 원문 = 사전 키. 없는 코드는 "시작하지 못했어요"로 알린다. */
+const MAKE_IMAGES_ERROR_TEXT: Record<string, string> = {
+  images_started: 'The images have already been started. To change the style, use Regenerate everything.',
+  completed: 'The style cannot be changed after Storyboard opens.',
+}
+
 export const useArtistStore = create<ArtistState>((set, get) => ({
   sceneManifest: null,
   characterAssets: [],
@@ -989,6 +1002,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   propFailures: {},
   propContentRefusals: {},
   selectedPropAppearances: {},
+  imagesStarted: null,
+  shotCount: 0,
   selectedCharacterId: null,
   chatSelection: null,
   setChatSelection: selection => {
@@ -1282,6 +1297,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             worldAssets,
             propAssets,
             propUsage: usage,
+            shotCount: (dbShotProps ?? []).length,
             selectedPropId: keepSelection(get().selectedPropId, propAssets.map((p) => p.propId)),
             // 고른 소품 모습이 지워졌으면 기본으로(배경 모습과 같다).
             selectedPropAppearances: Object.fromEntries(
@@ -1578,6 +1594,36 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       return 'failed'
     } finally {
       set((state) => ({ generatingProps: state.generatingProps.filter((id) => id !== slot) }))
+    }
+  },
+
+  makeImages: async (styleAnchorKey) => {
+    const failed = { ok: false, style: null }
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId || isDemoSession()) return failed
+    const locale = useLocaleStore.getState().locale
+    try {
+      const res = await fetch('/api/artist/make-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, styleAnchorKey: styleAnchorKey ?? null }),
+      })
+      const body = (await res.json().catch(() => ({}))) as { code?: string; error?: string; style?: string | null }
+      // 다른 창에서 이미 [이미지 만들기]를 눌러 그리는 중 — 또 보내지 않고 그 그림을 기다린다.
+      const alreadyDrawing = res.status === 409 && body.code === 'drafts_already_queued'
+      if (!res.ok && !alreadyDrawing) {
+        if (!notifyIfQuotaExceeded(res.status, body)) toast.error(translate(locale, MAKE_IMAGES_ERROR_TEXT[body.code ?? ''] ?? 'Could not start making the images. Please try again.'))
+        return failed
+      }
+      const style = res.ok && typeof body.style === 'string' ? body.style : null
+      if (useProjectStore.getState().projectId !== projectId) return { ok: true, style }
+      set({ imagesStarted: true })
+      // 서버가 그리는 그림을 그리는 중으로 세고 카드에 넣는다(생성 상태의 대기 작업) — 화면은 카드 · 진행 단계로 넘어간다.
+      void get().syncGenerationStatus(projectId)
+      return { ok: true, style }
+    } catch {
+      toast.error(translate(locale, 'Could not start making the images. Please try again.'))
+      return failed
     }
   },
 
@@ -1926,7 +1972,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         `/api/artist/generation-status?projectId=${encodeURIComponent(projectId)}`,
       )
       if (!res.ok) return
-      const { failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps } = (await res.json()) as {
+      const { failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps, imagesStarted } = (await res.json()) as {
+        imagesStarted?: boolean | null
         capacitySkips?: Record<string, 'user' | 'global'>
         propFailures?: Parameters<typeof propFailuresFromStatus>[0]
         queuedProps?: Array<{ propId: string; appearanceKey?: string | null; jobId: string }>
@@ -1961,7 +2008,18 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           safeFailCount: f.safeFailCount,
         }
       }
-      set({ worldFailures: worldFailuresFromStatus(worldFailures), viewFailures: vf, capacitySkips: capacitySkips ?? {}, propFailures: propFailuresFromStatus(propFailures) })
+      set({
+        worldFailures: worldFailuresFromStatus(worldFailures),
+        viewFailures: vf,
+        capacitySkips: capacitySkips ?? {},
+        propFailures: propFailuresFromStatus(propFailures),
+        // 새 흐름 판정(m1126 O1) — 한 번 참이면 이 화면에서는 다시 거짓으로 돌리지 않는다(창구가 모르면 null 이 와도 있던 값을 둔다).
+        //   읽는 사이 다른 프로젝트로 옮겼으면 그 프로젝트 값을 건드리지 않는다.
+        imagesStarted:
+          useProjectStore.getState().projectId !== projectId || get().imagesStarted === true
+            ? get().imagesStarted
+            : typeof imagesStarted === 'boolean' ? imagesStarted : get().imagesStarted,
+      })
       // 서버가 그리는 중인 소품(D7) — 그리는 중으로 세고 작업 확인(reconcile)으로 마무리해 카드에 바로 넣는다(배경과 같다).
       for (const { propId, appearanceKey, jobId } of queuedProps ?? []) {
         // 칸(소품 × 모습)마다 — 모습 그림이면 그 모습 행을 다시 읽는다(m1126 A3).
@@ -3058,6 +3116,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       propFailures: {},
       propContentRefusals: {},
       selectedPropAppearances: {},
+      imagesStarted: null,
+      shotCount: 0,
       selectedCharacterId: null,
       selectedLocationId: null,
       selectedLocationAppearances: {},

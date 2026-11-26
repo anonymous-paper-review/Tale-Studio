@@ -34,7 +34,16 @@ export function mentionPropCard(name: string, clientX: number, clientY: number):
   launchMentionFlight({ label: name, clickX: clientX, clickY: clientY, toChat: !removing })
 }
 
-export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoomStep?: (dir: 1 | -1) => void }) {
+export function PropPanel({
+  columns = 1,
+  onZoomStep,
+  drawLocked = false,
+}: {
+  columns?: number
+  onZoomStep?: (dir: 1 | -1) => void
+  /** Artist 새 흐름(m1126 O1)의 [만들기] 전 — 카드 [그리기]를 숨긴다. 그림은 [이미지 만들기]로 시작한다(하나만 그리면 이어 그리기가 나머지를 다 그린다). */
+  drawLocked?: boolean
+}) {
   const t = useT()
   const projectId = useProjectStore((s) => s.projectId)
   const propAssets = useArtistStore((s) => s.propAssets)
@@ -194,7 +203,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
 
         {/* 그리기 · 다시 그리기(무료) — 실패했거나 바뀌었으면 다시 그리기, 그림이 없으면 그리기. 그리는 중에는 숨긴다(두 번 그리지 않게).
             데모(보기 전용 공유)는 그리지 않으므로 단추를 보이지 않는다. */}
-        {generating || demo ? null : failure || contentRefused || (shownImage && stale !== 'fresh') ? (
+        {generating || demo || drawLocked ? null : failure || contentRefused || (shownImage && stale !== 'fresh') ? (
           <Button size="sm" variant="outline" className="mt-2.5" onClick={draw} data-testid="artist-prop-redraw">
             <RefreshCw className="size-3.5" />{t('Redraw')}
           </Button>
