@@ -3681,27 +3681,42 @@ export const KO: Record<string, string> = {
   'Some shots have no video yet. Check the list in the window, then hand over the shots with video or make the rest again first.': '아직 영상이 없는 샷이 있어요. 창에서 목록을 보고 영상 있는 샷만 넘기거나, 나머지를 먼저 다시 만들어 주세요.',
   // Storyboard → Director 넘기기 창(D0, 2026-11-14 디자이너 1110 확정 · 페이지 추천)
   'Move on to Director?': 'Director로 넘어갈까요?',
-  'We start by turning the {count} roughs into real images.': '러프 {count}장을 실사 이미지로 바꾸는 것부터 시작해요.',
   'Shots {shots} · {seconds}s · Characters {characters} · Backgrounds {backgrounds} · Roughs {roughs}': '샷 {shots} · {seconds}초 · 인물 {characters} · 배경 {backgrounds} · 러프 {roughs}장',
-  'Rough → {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 {count}장 · 약\u00a0{minutes}분 · Takes 안 써요',
   'The real images are already made': '실사 이미지는 이미 다 있어요',
   'After that': '그다음',
   // 값은 앱의 Take 표기("5 Take")로 — D8 단추와 같게(리드 2026-11-14)
   'Check the images and make the videos · {takes} Takes per shot': '이미지를 확인하고 영상을 만들어요 · 샷마다 {takes} Take',
   'Check the images and make the videos · 1 Take per shot': '이미지를 확인하고 영상을 만들어요 · 샷마다 1 Take',
-  // 저장된 실사를 읽는 중 · 읽기 실패(검토 b 낮음 7), Take 과금이 꺼져 있을 때(낮음 5)
-  'Rough → real images · counting': '러프 → 실사 이미지 · 세는 중',
-  'Rough → up to {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 최대 {count}장 · 약\u00a0{minutes}분 · Takes 안 써요',
-  'Rough → up to {count} real images · about {minutes} min': '러프 → 실사 이미지 최대 {count}장 · 약\u00a0{minutes}분',
-  'Rough → {count} real images · about {minutes} min': '러프 → 실사 이미지 {count}장 · 약\u00a0{minutes}분',
-  'Make images while moving over': '넘어가면서 이미지 만들기',
-  'Make up to {count} images while moving over': '넘어가면서 이미지 최대 {count}장 만들기',
   'Check the images and make the videos': '이미지를 확인하고 영상을 만들어요',
-  'Make {count} images while moving over': '넘어가면서 이미지 {count}장 만들기',
-  'You can look at other screens while you wait. We show the first ones as soon as they are ready and tell you when they are all done.': '기다리는 동안 다른 화면을 봐도 돼요. 첫 장이 나오면 먼저 보여드리고, 다 되면 알려드려요.',
-  'Move over and pick yourself': '넘어가서 직접 고르기',
-  'Choose the shots to make and make them one by one.': '만들 샷을 골라 하나씩 만들어요.',
   'Move over': '넘어가기',
+  // 넘기기 창 다음 줄 — 실사는 Storyboard [시작]이 만든다(오너 2026-11-26 m1126 S2), 남은 것은 Director 에서도.
+  'Real images · counting': '실사 그림 · 세는 중',
+  '1 shot still needs a real image · you can make it in Director too': '실사 그림이 없는 샷 1개 · Director에서도 만들 수 있어요',
+  '{count} shots still need a real image · you can make them in Director too': '실사 그림이 없는 샷 {count}개 · Director에서도 만들 수 있어요',
+  'Up to {count} shots still need a real image · you can make them in Director too': '실사 그림이 없는 샷 최대 {count}개 · Director에서도 만들 수 있어요',
+  // Storyboard 실사 보기(오너 2026-11-26 m1126 S2 · O7) — 처음엔 Writer 콘티 그림, [시작] → 실사. 카드 꼬리표 · 콘티 그림 없음 안내.
+  'Rough sketch': '콘티',
+  'No rough storyboard yet': '콘티 그림이 없어요',
+  'Draw it in Writer, then press Start.': 'Writer 콘티에서 그린 뒤 [시작]을 눌러 주세요.',
+  // [시작] 때 콘티 그림이 없어 빠지는 샷 알림 — 영어는 하나 · 여럿 · 넘침 셋, 한국어는 하나 · 여럿이 같은 꼴.
+  '{shots} has no rough storyboard, so it is left out. Draw it in Writer, then press Start again.': '콘티 그림이 없는 {shots}은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  '{shots} have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots}은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  '{shots} and {count} more have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots} 외 {count}컷은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
+  // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
+  'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
+  'Fix the story, arrows, and dialogue in Writer.': '이야기 · 화살표 · 대사는 Writer 콘티에서 고쳐요.',
+  // 채팅이 실사를 다시 그리라고 했는데 맡기지 못했을 때(채팅 한 줄).
+  "Couldn't find the shot to draw. Ask again with the shot name.": '그릴 샷을 찾지 못했어요. 샷 이름으로 다시 부탁해 주세요.',
+  '{shot} is being drawn right now. Ask again when it is done.': '{shot}은(는) 지금 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',
+  '{shot} has no rough storyboard. Draw it in Writer, then ask again.': '{shot}은(는) 콘티 그림이 없어요. Writer 콘티에서 그린 뒤 다시 부탁해 주세요.',
+  "Couldn't redraw {shot}. Please ask again.": '{shot}을(를) 다시 그리지 못했어요. 다시 부탁해 주세요.',
+  // 보드 진행 줄 · 화면 설명 · 첫 진입 안내.
+  'Storyboard progress': '스토리보드 진행 현황',
+  'Not real yet': '실사 없음',
+  'Storyboard: press Start to turn the rough sketches into real images. To change a card, tell the chat.': '스토리보드: [시작]을 누르면 콘티 그림을 실사 그림으로 바꿔요. 카드를 고치려면 채팅에 말해 주세요.',
+  'The rough sketches are ready. Press Start to turn them into real images.\n\nTo change a card, tell me in the chat (e.g. "@Shot 2 make her look back").':
+    '콘티 그림이 준비됐어요. [시작]을 누르면 실사 그림으로 바꿔요.\n\n카드를 고치려면 채팅에 말해 주세요(예: "@샷 2 뒤를 돌아보게").',
 
   // 2단계 ① 새 배치(시안 E1, 2026-11-14): 효과 컨트롤 · 프로젝트 판 · 소스 탭 · 모니터 단추 · 둘째 줄 · 내보내기 탭 · 단축키 창.
   'Effect controls': '효과 컨트롤',

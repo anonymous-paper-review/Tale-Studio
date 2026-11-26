@@ -16,6 +16,7 @@ import { useLocaleStore } from '@/stores/locale-store'
 import type { GenerationJobObserver } from '@/lib/generation-jobs-client'
 import { notifyBatchSummary } from '@/lib/generation-notify'
 import { useLumiNoticeStore } from '@/stores/lumi-notice-store'
+import type { StageId } from '@/types/project'
 
 export interface RealBatchResult {
   generated: number
@@ -43,7 +44,7 @@ export function cancelRealBatchResume(projectId: string): void {
 function scheduleRealBatchResume(
   projectId: string,
   skipped: BatchSkipped[],
-  opts: { traceId?: string; onJob?: GenerationJobObserver; shotIds?: readonly string[]; force?: boolean },
+  opts: { traceId?: string; onJob?: GenerationJobObserver; shotIds?: readonly string[]; force?: boolean; stage?: StageId },
 ) {
   const store = useDirectorCanvasStore
   const depth = resumeDepthByProject.get(projectId) ?? 0
@@ -92,6 +93,8 @@ function scheduleRealBatchResume(
       // 고른 샷이었으면 건너뛴(아직 못 그린) 샷만, 아니면 지금처럼 빈 샷 전부.
       ...(opts.shotIds ? { shotIds: skippedShotIds } : {}),
       ...(opts.force ? { force: true } : {}),
+      // 다시 도는 판도 처음 판의 끝 알림 자리(Storyboard · Director)를 그대로 쓴다.
+      ...(opts.stage ? { stage: opts.stage } : {}),
     })
   })
 }
@@ -114,6 +117,9 @@ type RealBatchOptions = {
   onJob?: GenerationJobObserver
   /** 고른 샷만(시안 D2, 오너 2026-11-14) — Writer 샷 id. 없으면 지금처럼 빈 샷 전부. */
   shotIds?: readonly string[]
+  /** 끝 알림 한 줄을 남길 채팅 단계 — 기본 Director. Storyboard [시작](m1126 S2)은 'writer' 로 불러 Storyboard 채팅에 남긴다.
+   *  러너 · 서버 요청 · 진행 깃발은 단계와 상관없이 하나다(한 탭에 일괄 하나). 약속: tests/writer/real-start-runner.test.ts */
+  stage?: StageId
 }
 
 /** 지금 도는 판 — 멈춘 판이 서버 답을 기다려 보낸 장을 멈추는 동안 새 판이 그 정리를 기다리게 한다. */
@@ -414,6 +420,7 @@ async function runRealBatchOnce(projectId: string, opts?: RealBatchOptions): Pro
         onJob: opts?.onJob,
         shotIds: opts?.shotIds,
         force: opts?.force,
+        stage: opts?.stage,
       })
     } else {
       resumeDepthByProject.delete(projectId)
@@ -443,7 +450,7 @@ async function runRealBatchOnce(projectId: string, opts?: RealBatchOptions): Pro
     //   그새 다른 프로젝트로 갔으면 남기지 않는다(그 프로젝트 채팅에 엉뚱한 줄이 남는다).
     if (imagesDone + imagesFailed > 0 && store.getState().projectId === projectId) {
       const line = translate(useLocaleStore.getState().locale, '{done} images done, {failed} failed', { done: imagesDone, failed: imagesFailed })
-      notifyBatchSummary('director', `${imagesDone > 0 ? '✓' : '⚠'} ${line}`)
+      notifyBatchSummary(opts?.stage ?? 'director', `${imagesDone > 0 ? '✓' : '⚠'} ${line}`)
       useLumiNoticeStore.getState().batchEnded({ projectId, kind: 'image', done: imagesDone, failed: imagesFailed })
     }
   } catch (e) {

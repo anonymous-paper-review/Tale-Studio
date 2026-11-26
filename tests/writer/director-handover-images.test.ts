@@ -1,4 +1,5 @@
-// Storyboard → Director 넘기기 창(D0): "넘어가면서 이미지 만들기(추천)"가 미리 골라져 있고, 고른 채 넘어가면 Director 가 열린 뒤 일괄 이미지를 한 번 시작한다
+// Storyboard → Director 넘기기 창(D0): 실사는 Storyboard [시작]이 만들어(오너 2026-11-26 m1126 S2 · 리드 결정) 창에 "넘어가면서 이미지 만들기" 고르기가 없고, 실사가 없는 샷 수를 알린다.
+//   아래 "넘어간 뒤 Director 에서 일괄 이미지 시작" 묶음은 창에서 더는 고를 수 없는 예전 길(handOverToDirector makeImages · entry-images-intent)을 지키는 시험이다 — 지울지는 오너 결정(보고 ④-5).
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
@@ -26,32 +27,31 @@ afterEach(() => {
   takeImagesOnDirectorEntry('__clear__')
 })
 
-describe('Director 넘기기 창 — 넘어가면서 이미지 만들기', () => {
-  // 왜: 시안 D0 — 넘어가자마자 할 일(러프를 실사로)을 추천으로 미리 골라 둔다. 사람이 [넘어가기] 를 눌러야 시작하므로 8/27 "들어가기만 해도 만들지 않는다"와 안 부딪힌다(페이지 추천).
-  it('넘기기 창을 열면 "넘어가면서 이미지 N장 만들기(추천)"가 미리 골라져 있다', () => {
+describe('Director 넘기기 창 — 실사는 Storyboard 에서', () => {
+  // 왜(오너 2026-11-26 S2 · 리드 결정): 실사는 Storyboard [시작]이 만든다 — 넘기는 창에서 또 만들기를 고르게 하면 같은 일을 두 곳에서 고른다.
+  it('넘기기 창에는 "넘어가면서 이미지 만들기" 고르기가 없다 — 실사는 Storyboard [시작]이 만든다', () => {
     const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', extra)
-    expect(view.defaultChoice).toBe('makeImages')
-    expect(view.makeImages).toMatchObject({ label: '넘어가면서 이미지 3장 만들기', disabled: false })
-    expect(view.pickYourself.label).toBe('넘어가서 직접 고르기')
+    expect(view).not.toHaveProperty('makeImages')
+    expect(view).not.toHaveProperty('pickYourself')
+    expect(view).not.toHaveProperty('defaultChoice')
+    expect(view.description).toBeNull()
   })
 
-  // 왜: 시안 D0 · 오너 답 11번(Take 값은 지금 계산 그대로) — 무엇이 넘어가고, 다음에 무엇을 얼마나 걸려 만들고, 그다음에 Take 가 얼마 드는지 넘기기 전에 본다.
-  it('넘기기 창은 넘어가는 것 · 다음 · 그다음 세 줄에 샷 · 초 · 인물 · 배경 · 러프 수, 실사 이미지 수 · 예상 분 · Takes 안 씀, 샷마다 Takes 를 보인다', () => {
+  // 왜: 시안 D0 · 오너 답 11번(Take 값은 지금 계산 그대로) — 무엇이 넘어가고, 실사가 아직 없는 샷이 몇 개인지, 그다음에 Take 가 얼마 드는지 넘기기 전에 본다.
+  //   실사가 없는 샷은 Director 에서도 만들 수 있다(오너 2026-11-26 S2 — 실사는 Storyboard [시작]이 만들고, 남은 것은 Director 의 [이미지 만들기]).
+  it('넘기기 창은 넘어가는 것 · 다음 · 그다음 세 줄에 샷 · 초 · 인물 · 배경 · 러프 수, 실사 그림이 없는 샷 수, 샷마다 Takes 를 보인다', () => {
     const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', extra)
     expect(view.title).toBe('Director로 넘어갈까요?')
-    expect(view.description).toBe('러프 3장을 실사 이미지로 바꾸는 것부터 시작해요.')
     expect(view.rows).toEqual([
       { label: '넘어가는 것', value: '샷 3 · 10초 · 인물 2 · 배경 1 · 러프 3장' },
-      { label: '다음', value: '러프 → 실사 이미지 3장 · 약\u00a02분 · Takes 안 써요' },
+      { label: '다음', value: '실사 그림이 없는 샷 3개 · Director에서도 만들 수 있어요' },
       { label: '그다음', value: '이미지를 확인하고 영상을 만들어요 · 샷마다 5 Take' },
     ])
   })
 
-  // 왜(리드 2026-11-14, 시안 없음): 실사가 이미 다 있으면 넘어가며 만들 것이 없다 — 꺼진 "0장 만들기"에 "추천"을 달아 두지 않고 칸째 숨긴다.
-  it('만들 실사 이미지가 없으면 넘어가면서 만들기 칸과 추천을 숨기고 직접 고르기만 둔다', () => {
+  // 왜(정상 경로 고정): 실사가 다 있으면 넘어가서 바로 영상 차례다.
+  it('실사 그림이 다 있으면 넘기기 창의 다음 줄은 "실사 이미지는 이미 다 있어요"다', () => {
     const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, imagesToMake: 0 })
-    expect(view.makeImages).toBeNull()
-    expect(view.defaultChoice).toBe('pickYourself')
     expect(view.rows[1].value).toBe('실사 이미지는 이미 다 있어요')
   })
 
@@ -59,21 +59,18 @@ describe('Director 넘기기 창 — 넘어가면서 이미지 만들기', () =>
   it('Take 과금이 꺼져 있으면 Director 넘기기 창에 Take 값을 보이지 않는다', () => {
     const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, takesPerShot: null })
     expect(view.rows.slice(1)).toEqual([
-      { label: '다음', value: '러프 → 실사 이미지 3장 · 약\u00a02분' },
+      { label: '다음', value: '실사 그림이 없는 샷 3개 · Director에서도 만들 수 있어요' },
       { label: '그다음', value: '이미지를 확인하고 영상을 만들어요' },
     ])
   })
 
-  // 왜(검토 b 낮음 7): 저장된 실사를 다 읽기 전이나 읽기에 실패했을 때 샷 전부를 만들 수로 보였다 — 모르는 것은 모른다고, 아는 만큼만 보인다.
-  it('Director 넘기기 창은 저장된 실사 그림을 다 읽기 전엔 만들 그림 수를 "세는 중"으로, 읽기에 실패하면 "최대 N장"으로 보인다', () => {
+  // 왜(검토 b 낮음 7): 저장된 실사를 다 읽기 전이나 읽기에 실패했을 때 샷 전부를 실사 없는 수로 보였다 — 모르는 것은 모른다고, 아는 만큼만 보인다.
+  it('Director 넘기기 창은 저장된 실사 그림을 다 읽기 전엔 실사 그림이 없는 샷 수를 "세는 중"으로, 읽기에 실패하면 "최대 N개"로 보인다', () => {
     const counting = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, imagesToMake: 'counting' })
-    expect(counting.rows[1].value).toBe('러프 → 실사 이미지 · 세는 중')
-    expect(counting.makeImages).toMatchObject({ label: '넘어가면서 이미지 만들기', disabled: false })
+    expect(counting.rows[1].value).toBe('실사 그림 · 세는 중')
     expect(counting.description).toBeNull()
     const unknown = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', { ...extra, imagesToMake: { atMost: 3 } })
-    expect(unknown.rows[1].value).toBe('러프 → 실사 이미지 최대 3장 · 약\u00a02분 · Takes 안 써요')
-    expect(unknown.makeImages?.label).toBe('넘어가면서 이미지 최대 3장 만들기')
-    expect(unknown.defaultChoice).toBe('makeImages')
+    expect(unknown.rows[1].value).toBe('실사 그림이 없는 샷 최대 3개 · Director에서도 만들 수 있어요')
   })
 
   // 왜(혼자 정한 것): 예상은 실제 걸린 시간에서 — 일괄은 4샷 시트를 두 장씩 함께 그리고 시트 하나가 약 92초다(개발 DB p50). Director 툴바 예상과 같은 셈.
