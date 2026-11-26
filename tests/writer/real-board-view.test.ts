@@ -33,6 +33,8 @@ const data = vi.hoisted(() => ({
   chatUi: { mentionedRefs: [] as string[] },
   chat: { offerSuggestion: () => {}, messages: [], messagesLoadedProjectId: null },
   roughFill: { projectId: null as string | null, pending: {} as Record<string, true>, running: false },
+  status: null as Record<string, unknown> | null,
+  restart: () => {},
 }))
 vi.mock('@/stores/project-store', () => ({ useProjectStore: (select: (s: unknown) => unknown) => select(data.project) }))
 vi.mock('@/stores/writer-store', () => ({ useWriterStore: (select: (s: unknown) => unknown) => select(data.writer) }))
@@ -60,6 +62,23 @@ vi.mock('@/lib/i18n', async () => {
 vi.mock('@/stores/locale-store', () => ({ useLocaleStore: (select: (s: unknown) => unknown) => select({ locale: 'ko' }) }))
 // 이어 그리기(서버 요청 · 효과)는 tests/writer/real-rough-fill 이 본다 — 여기서는 보드가 그리는 중을 어떻게 보이는지만.
 vi.mock('@/features/storyboard/use-rough-fill', () => ({ useStoryboardRoughFill: () => {} }))
+// Writer 실행 상태(씬 · 샷 나누기)는 값으로 꾸민다. 잠금 덮개 · [이어서 다시 시도] · 기다리는 카드는 브라우저에서만 그려지니 받은 값을 표시로 남긴다.
+vi.mock('@/lib/writer/use-writer-status', () => ({ useWriterStatus: () => ({ status: data.status, error: null, restart: data.restart }) }))
+vi.mock('@/components/ai-busy-overlay', async () => {
+  const { createElement } = await import('react')
+  return {
+    AiBusyOverlay: (props: { open: boolean; title: string; progressLabel?: string; lumi?: unknown }) =>
+      props.open ? createElement('div', { 'data-busy-overlay': props.title, 'data-progress': props.progressLabel ?? '', 'data-lumi': props.lumi ? 'yes' : 'no' }) : null,
+  }
+})
+vi.mock('@/components/layout/writer-resume-button', async () => {
+  const { createElement } = await import('react')
+  return { WriterResumeButton: (props: { projectId: string | null }) => createElement('button', { 'data-resume': props.projectId }, '이어서 다시 시도') }
+})
+vi.mock('@/components/feedback/stage-wait', async () => {
+  const { createElement } = await import('react')
+  return { StageWaitCard: (props: { stage: string }) => createElement('div', { 'data-stage-wait': props.stage }) }
+})
 // 이어 그리기 상태는 다른 상점처럼 값으로 꾸민다(프로젝트 거르기는 진짜 roughFillPendingOf).
 vi.mock('@/lib/storyboard/rough-fill-store', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/lib/storyboard/rough-fill-store')>()
@@ -79,6 +98,7 @@ beforeEach(() => {
   data.director = { realBatchBusy: false, realBatchCancelled: false, realBatchShotIds: null }
   data.board.cardDrawing = {}
   data.roughFill = { projectId: null, pending: {}, running: false }
+  data.status = null
 })
 
 describe('Storyboard 실사 보기 보드', () => {
@@ -142,6 +162,46 @@ describe('Storyboard 실사 보기 보드', () => {
     expect(html).toContain('실사 1')
     expect(html).toContain('만드는 중 1')
     expect(html).toContain('실사 없음 1')
+  })
+
+  // 왜(검토 2026-11-26 rev-flow): 예전 흐름 프로젝트에서 나누기 중에 Artist [완료하기]를 누르면 Storyboard 가 빈 보드에서 멈췄다 —
+  //   나누는 동안은 예전 Storyboard 처럼 단계 · 진행이 보이는 잠금 표시(큰 Lumi)를 띄우고 빈 보드 안내는 보이지 않는다.
+  it('씬 · 샷을 나누는 중에 Storyboard 를 열면 빈 보드 안내 대신 예전 Storyboard 와 같은 잠금 표시가 뜬다', () => {
+    data.writer.shots = []
+    data.status = { started: true, current_status: 'running', current_stage: 'decoupage', pipeline_completed: false, pipeline_failed: false, error: null }
+    const html = board()
+    expect(html).toContain('data-busy-overlay="Storyboard로 넘어가는 중이에요"')
+    expect(html).toContain('data-progress="3/4 단계 · 50%"')
+    expect(html).toContain('data-lumi="yes"')
+    expect(html).not.toContain('아직 생성된 씬·샷이 없어요')
+  })
+
+  // 왜(검토 rev-flow · 예전 보드의 실패 안내): 나누기가 멈추면 까닭을 알리고 멈춘 자리부터 다시 하게 한다.
+  it('나누기가 멈췄으면 빈 보드에 까닭과 [이어서 다시 시도]를 보인다', () => {
+    data.writer.shots = []
+    data.status = { started: true, current_status: 'failed', current_stage: 'decoupage', pipeline_completed: false, pipeline_failed: true, error: '연출 단계 응답이 비었어요' }
+    const html = board()
+    expect(html).toContain('생성이 중단됐어요: 연출 단계 응답이 비었어요')
+    expect(html).toContain('data-resume="p1"')
+    expect(html).not.toContain('data-busy-overlay')
+  })
+
+  // 왜(예전 보드와 같은 규칙): 나누기가 끝난 순간에는 저장된 샷이 아직 화면에 없다 — 다시 읽을 때까지 빈 보드 안내 대신 기다림.
+  it('나누기가 끝나 씬 · 샷을 다시 읽는 동안에는 빈 보드 안내 대신 기다리는 카드를 보인다', () => {
+    data.writer.shots = []
+    data.status = { started: true, current_status: 'completed', current_stage: 'persistShots', pipeline_completed: true, pipeline_failed: false, error: null }
+    const html = board()
+    expect(html).toContain('data-stage-wait="writer"')
+    expect(html).not.toContain('아직 생성된 씬·샷이 없어요')
+  })
+
+  // 왜(검토 rev-flow "나누기가 끝나도 다시 읽지 않아 비어 있다"): 이 화면을 보는 중에 나누기가 끝나면 씬 · 샷과 실사 그림을 다시 읽는다
+  //   (30초 사물함은 낡음으로 표시 — 새 샷 행을 받게). 다시 나누기가 시작되면 다음 끝남에 또 읽는다.
+  it('이 화면을 보는 중에 나누기가 끝나면 씬 · 샷과 실사 그림을 다시 읽는다', () => {
+    const view = readFileSync('src/features/storyboard/real-board-view.tsx', 'utf8')
+    expect(view).toMatch(/if \(!projectId \|\| !status\?\.pipeline_completed \|\| reloadedAfterSplitRef\.current\) return\s*reloadedAfterSplitRef\.current = true\s*void invalidateShots\(projectId\)/)
+    expect(view).toMatch(/Promise\.allSettled\(\[loadProject\(\), useStoryboardRealImages\.getState\(\)\.load\(projectId, \{ fresh: true \}\)\]\)/)
+    expect(view).toMatch(/if \(!splitRunning\) return\s*reloadedAfterSplitRef\.current = false/)
   })
 
   // 왜(정상 경로 고정): 씬 · 샷이 아직 없으면 빈 보드 안내.
