@@ -924,6 +924,82 @@ export async function finalizeWorldShotJob(
   return publicUrl
 }
 
+/**
+ * 착지한 소품 그림을 prop_image_candidates 의 그 칸(소품 × 모습) 새 선택본으로 기록(m1126 A4 기록, 리드 R3 — 배경 recordLocationImageCandidate 와 같은 규칙).
+ *   칸마다 선택본 하나 + 안 고른 것 최근 CANDIDATE_RETENTION(5)장. 표가 없는 환경(마이그레이션 전)에선 오류를 흡수한다 — 소품 행 그림만으로 돈다. best-effort.
+ */
+async function recordPropImageCandidate(job: GenerationJob, propId: string, appearanceKey: string, url: string): Promise<void> {
+  const snapshot = job.input_snapshot as { source_hash?: string | null } | null | undefined
+  const slot = { project_id: job.project_id, prop_id: propId, appearance_key: appearanceKey }
+  const clear = await supabaseAdmin.from('prop_image_candidates').update({ is_selected: false }).match(slot).eq('is_selected', true)
+  if (clear.error) return // 표가 없다(마이그레이션 전) → 기록 없이 진행
+  const ins = await supabaseAdmin.from('prop_image_candidates').insert({
+    ...slot,
+    url,
+    source_hash: snapshot?.source_hash ?? null,
+    job_id: job.id,
+    is_selected: true,
+  })
+  if (ins.error) return
+  const { data: unselected } = await supabaseAdmin
+    .from('prop_image_candidates')
+    .select('id, generated_at, url')
+    .match(slot)
+    .eq('is_selected', false)
+  const staleIds = selectCandidatesToEvict(
+    (unselected ?? []).map((r) => ({ id: r.id as string, isSelected: false, pinned: false, generatedAt: r.generated_at as string })),
+  )
+  if (staleIds.length) {
+    await supabaseAdmin.from('prop_image_candidates').delete().in('id', staleIds)
+    await removeEvictedImageFiles(job.project_id, job.target.workspaceId, (unselected ?? []).filter((r) => staleIds.includes(r.id as string)).map((r) => r.url as string))
+  }
+}
+
+/**
+ * 소품 그림 영속화(D7 2026-11-22) → props.image_url · source_hash 갱신. 그릴 때마다 새 파일(작업 번호가 이름) — 인물 · 배경과 같다.
+ *   지문(source_hash)은 제출 때 스냅샷에 남긴 "생김새 + 그림체" — 카드가 "설명 바뀜" · "그림체 바뀜"을 가린다(lib/artist/prop-image).
+ *   소품 모습(m1126 A3): target.appearanceKey 가 있으면 그 모습 행(prop_appearances)의 그림만 바꾸고 기본 그림은 그대로 둔다.
+ *   지난 그림 기록(m1126 A4): 그 칸(소품 × 모습)의 새 선택본으로 prop_image_candidates 에 남긴다(best-effort).
+ */
+export async function finalizePropImageJob(
+  job: GenerationJob,
+  falImageUrl: string,
+  falPayload?: unknown,
+): Promise<string> {
+  const { workspaceId, propId } = job.target
+  if (!workspaceId || !propId) {
+    throw new Error('prop_image job target missing workspaceId/propId')
+  }
+  await recordFalResponseSnapshot(job, falPayload)
+  const appearanceKey = job.target.appearanceKey && job.target.appearanceKey !== 'default' ? job.target.appearanceKey : null
+  const path = generationFilePath(
+    appearanceKey
+      ? `${workspaceId}/${job.project_id}/props/${storageKeySegment(propId)}_${storageKeySegment(appearanceKey)}_image`
+      : `${workspaceId}/${job.project_id}/props/${storageKeySegment(propId)}_image`,
+    job.id,
+  )
+  const publicUrl = await uploadImageFromUrl(falImageUrl, path)
+  const snapshot = job.input_snapshot as { source_hash?: string | null } | null | undefined
+  const { error } = appearanceKey
+    ? await supabaseAdmin
+        .from('prop_appearances')
+        .update({ image_url: publicUrl, source_hash: snapshot?.source_hash ?? null })
+        .eq('project_id', job.project_id)
+        .eq('prop_id', propId)
+        .eq('appearance_key', appearanceKey)
+    : await supabaseAdmin
+        .from('props')
+        .update({ image_url: publicUrl, source_hash: snapshot?.source_hash ?? null })
+        .eq('project_id', job.project_id)
+        .eq('prop_id', propId)
+  if (error) throw error
+  await recordPropImageCandidate(job, propId, appearanceKey ?? 'default', publicUrl).catch((e) => {
+    console.warn('[finalize] prop candidate record skipped:', job.id, e instanceof Error ? e.message : e)
+  })
+  await completeGenerationJob(job.id, publicUrl)
+  return publicUrl
+}
+
 // ── 리페인트 레퍼런스 시트 정리 (#ref-sheet-ttl, 2026-08-19 오너 결정 B안) ──
 //   합성 레퍼런스 시트(real_grid_ref_*/_storyboard_ref_strip)는 fal 이 가져간 뒤 역할이 끝나는
 //   일회용인데 삭제 로직이 없어 무한 누적됐다(실측 267장 — storage 쿼터 초과 기여).
@@ -1475,6 +1551,9 @@ async function finalizeGenerationJobByKind(job: GenerationJob, result: FinalizeP
     case 'world_shot':
       if (result.media !== 'image') throw new Error('world_shot requires an image result')
       return finalizeWorldShotJob(job, result.url, result.payload)
+    case 'prop_image':
+      if (result.media !== 'image') throw new Error('prop_image requires an image result')
+      return finalizePropImageJob(job, result.url, result.payload)
     case 'shot_storyboard':
       if (result.media !== 'image') throw new Error('shot_storyboard requires an image result')
       return finalizeShotStoryboardJob(job, result.url, result.payload)

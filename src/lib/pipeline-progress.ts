@@ -436,6 +436,11 @@ const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; st
     agent: STAGE_AGENT_NAME.artist,
     stage: 'artist',
   },
+  prop_image: {
+    labelKey: '{agent} is generating prop images',
+    agent: STAGE_AGENT_NAME.artist,
+    stage: 'artist',
+  },
   shot_rough_storyboard: {
     labelKey: '{agent} is drawing the rough storyboard',
     agent: STAGE_AGENT_NAME.writer,

@@ -49,6 +49,7 @@ export const IMAGE_JOB_KINDS: readonly GenerationJobKind[] = [
   'image_generation',
   'storyboard_real_grid',
   'shot_rough_storyboard',
+  'prop_image',
   // Editor [생성] 음악(2026-11-26 m1126 E1 · 리드 답) — 곡당 1 Take 지만 자리는 그림 축. DB 자리 트리거와 같은 나눔이라
   //   서버 사전 검사 · 채팅 "내 자리" 줄 · 트리거가 같은 수를 센다.
   'editor_music',
