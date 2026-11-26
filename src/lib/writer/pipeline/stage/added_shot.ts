@@ -25,6 +25,7 @@ import { postureFromPoseText } from '@/lib/writer/pipeline/stage/posture_text'
 import { isDefaultLighting } from '@/lib/writer/shot-config-from-design'
 import { angleOfCamera } from '@/lib/writer/shot-edit'
 import { ADDED_FILL_VERSION, isAddedFillSpec } from '@/lib/writer/pipeline/stage/added_fill_mark'
+import { ADD_SHOT_START_LIGHTING } from '@/lib/writer/add-shot-defaults'
 
 export { ADDED_FILL_VERSION, isAddedFillSpec }
 
@@ -97,6 +98,14 @@ function keyOf(row: AddedShotRow | undefined, characterId: string): string | nul
 }
 
 type Lighting = ShotStaticSpec['lighting']
+
+/** 사람이 빛을 고르지 않은 샷인가 — 비어 있거나 DB 처음 값(front/50/5000), 또는 [+ 샷 추가] 창의 처음 값(5600K) 그대로. */
+function lightingUntouched(value: unknown): boolean {
+  if (!isRecord(value)) return true
+  if (isDefaultLighting(value as Parameters<typeof isDefaultLighting>[0])) return true
+  const start = ADD_SHOT_START_LIGHTING
+  return (value.position ?? start.position) === start.position && (value.brightness ?? start.brightness) === start.brightness && (value.colorTemp ?? start.colorTemp) === start.colorTemp
+}
 
 function lightingOf(row: AddedShotRow): Lighting | null {
   const spec = isRecord(row.static_spec) ? row.static_spec : null
@@ -299,9 +308,7 @@ export function fillAddedShot(input: AddedShotFillInput): AddedShotFill | null {
     characters.map((id) => [id, [...before, ...after].map((s) => keyOf(s, id)).find((k): k is string => !!k) ?? keyOf(shot, id) ?? 'current']),
   )
 
-  const lightingSource = isDefaultLighting(isRecord(shot.lighting_config) ? (shot.lighting_config as Parameters<typeof isDefaultLighting>[0]) : null)
-    ? [...before, ...after].find((s) => lightingOf(s))
-    : undefined
+  const lightingSource = lightingUntouched(shot.lighting_config) ? [...before, ...after].find((s) => lightingOf(s)) : undefined
   const lighting = lightingSource ? lightingOf(lightingSource) : null
   const placement = stagePlacement(shot, characters, before, after, scene, input.stage, input.format)
 

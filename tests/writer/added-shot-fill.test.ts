@@ -43,6 +43,7 @@ import { fillAddedShot, isAddedFillSpec, isFillableAddedShot, type AddedShotRow 
 import { refillAddedShots } from '@/lib/writer/pipeline/util/added_shot_persist'
 import { roughIsStaticHold, poseOf } from '@/lib/director/still-prompt'
 import { shotStageDesign } from '@/lib/writer/board-card'
+import { ADD_SHOT_START_LIGHTING } from '@/lib/writer/add-shot-defaults'
 
 const read = (rel: string) => readFileSync(rel, 'utf8')
 
@@ -272,6 +273,14 @@ describe('혼자 정한 채우기 규칙', () => {
     expect(fill(first, [first, P3]).spec?.lighting).toMatchObject({ color_temp_kelvin: 5200 })
     const chosen = addedShot('sh_01_18', ['mina'], { lighting_config: { position: 'left', brightness: 70, colorTemp: 3200 } })
     expect(fill(chosen, [P1, chosen]).spec?.lighting).toBeUndefined()
+  })
+
+  // 왜: [+ 샷 추가] 창은 빛을 처음부터 5600K 로 보여 주고 그 값을 그대로 저장한다 — 손대지 않은 그 값을 "사람이 고른 빛"으로 읽어
+  //   보드로 더한 샷만 빛을 못 이었다(2026-11-27 dev 계정 화면 확인, 씬 4 끝에 더한 샷).
+  it('[+ 샷 추가] 창의 빛을 처음 값 그대로 두었으면 고른 것이 아니라 앞뒤 샷의 빛을 잇는다', () => {
+    const untouched = addedShot('sh_01_28', ['mina'], { lighting_config: { ...ADD_SHOT_START_LIGHTING } })
+    expect(fill(untouched, [P1, untouched]).spec?.lighting).toEqual(LIGHT)
+    expect(read('src/features/writer/add-item-dialog.tsx')).toMatch(/useState<LightingConfig\['position'\]>\(ADD_SHOT_START_LIGHTING\.position\)/)
   })
 
   // 왜: 앞 샷과 같은 쪽에서 봐야 두 사람의 좌우가 이어진다. 렌즈는 같은 씬에서 같은 크기 샷이 쓴 것, 높이는 사람이 고른 앵글이 우선이다.
