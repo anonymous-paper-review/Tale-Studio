@@ -538,6 +538,7 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 ```
 
 - **레일** `src/components/layout/sidebar.tsx`: 맨 위 Tale 로고(30×26, 누르면 프로젝트 목록) · 단계 칸(v3 채움 아이콘 · 라벨 · 끝낸 단계 체크 · 지금 단계 밝은 바탕과 단계 색 아이콘) · 아래 [메뉴](Take · 공유 · 내보내기 · Help) · 프로필. 칸 모습 판정은 `src/lib/stage-rail.ts` `railStageState`(약속 tests/project/rail-done-mark.test.ts).
+  Artist 그림이 실패했거나 오래 걸리면 Artist 칸 아이콘 모서리(끝낸 단계 체크 자리)에 점을 단다 — 실패 `bg-destructive` 느낌표 · 오래 걸림 `bg-warning` 시계 바늘, 늘 툴팁 · 읽기 이름 글과 함께(§2.5 색 + 아이콘 + 글). 칸 글자 색은 칠하지 않는다(칸 모습 색에 덮인다). 칸을 누르면 그래도 Artist 로 가고, 다시 시도는 Artist 화면의 단추가 한다(오너 2026-11-27 N7, 판정 `railArtistAttention` · 약속 tests/project/rail-artist-attention.test.ts).
   11/5 색: 지금 단계 아이콘 = 그 단계 색(`text-stage`) · 이름 #F5F4EE, 다른 단계 아이콘 #C2C0B6(`text-muted-foreground`) · 이름은 끝냄 #C2C0B6 · 안 연 #8E8B82, 끝낸 단계 체크 크림 #F5F4EE. 아래 단추는 아이콘 · 글 사이 4(`FooterIconItem`).
   화면이 낮아져도 단계 칸 크기는 유지하고 단계 목록에는 스크롤바를 만들지 않는다. Take · 공유 · 내보내기 · Help 는 화면 높이와 상관없이 늘 햄버거 [메뉴] 하나에 모은다(오너 2026-11-26 — 11/24 에는 낮은 화면만) — 누르면 레일 오른쪽 판(2칸 격자)에 펼치고, 닫아도 Help 입력 · 내보내기 진행은 남는다(`sidebar-actions.tsx`). 프로필은 메뉴 밖, 레일에 남는다(약속 tests/project/rail-menu.test.ts).
 - **위 막대** `src/components/layout/studio-top-bar.tsx` `StudioTopBar`: 단계 칩(`StageChip`) · 프로젝트 제목 + 연필(`ProjectTitleField`, 이름 바꾸기) · 오른쪽 자리. 스튜디오 레이아웃이 모든 단계 화면 위에 놓고(위에 붙는 sticky), Producer 시작 화면은 탭이 든 자기 막대를 같은 컴포넌트로 그린다. 화면이 오른쪽 자리에 단추를 놓을 때는 `<TopBarActions>`(포털).
