@@ -41,6 +41,7 @@ import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardStageOf } from '@/lib/writer/board-stage'
+import { ContiSplitStart } from '@/features/writer/conti-split-start'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { handOverToDirector } from '@/features/writer/storyboard-director'
@@ -1131,6 +1132,9 @@ export function RoughStoryboardView() {
   if (!hasShots) {
     const waiting = status?.current_status === 'awaiting_artist' || status?.current_status === 'awaiting_confirmation'
     const progress = writerProgressView(status, locale)
+    // 산문은 확정했는데(저장 단계 conti) 씬 · 샷 나누기가 걸리지 않은 콘티 — 다시 거는 단추를 둔다(O1 2026-11-26).
+    //   예전 흐름으로 Artist 까지 간 프로젝트(저장 단계 artist)는 지금처럼 Artist [만들기]로 나눈다.
+    const contiSplitPending = boardStage === 'conti' && reachedStage === 'conti' && status?.current_status === 'awaiting_confirmation'
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <WriterHeader description={headerDescription} />
@@ -1139,8 +1143,10 @@ export function RoughStoryboardView() {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
             <ImageIcon className="size-10 text-subtle-foreground" />
-            <p className="text-body font-semibold text-foreground">{waiting ? progress.label : t('No scenes or shots generated yet')}</p>
-            {status?.pipeline_failed ? (
+            <p className="text-body font-semibold text-foreground">{contiSplitPending ? t('The prose is confirmed. Start splitting it into scenes and shots.') : waiting ? progress.label : t('No scenes or shots generated yet')}</p>
+            {contiSplitPending ? (
+              <ContiSplitStart />
+            ) : status?.pipeline_failed ? (
               <>
                 <p className="text-caption text-muted-foreground">
                   {t('Generation stopped')}

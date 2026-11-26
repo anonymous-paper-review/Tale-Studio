@@ -84,6 +84,15 @@ describe('콘티 보드의 단계', () => {
     expect(board).not.toMatch(/stage: 'writer'/)
   })
 
+  // 왜(혼자 정한 것): 산문은 확정했는데 나누기가 걸리지 않은 콘티(저장 단계 conti · 실행은 확정 대기)에는 다시 거는 단추가 있어야 한다.
+  //   예전 흐름으로 Artist 까지 간 프로젝트(저장 단계 artist)는 지금처럼 Artist [만들기]로 나누므로 단추를 보이지 않는다.
+  it('산문은 확정했는데 씬 · 샷 나누기가 아직 시작되지 않은 콘티 화면에는 [씬 · 샷 나누기 시작] 단추가 있다', () => {
+    const board = read('src/features/writer/rough-storyboard-view.tsx')
+    expect(board).toMatch(/const contiSplitPending = boardStage === 'conti' && reachedStage === 'conti' && status\?\.current_status === 'awaiting_confirmation'/)
+    expect(board).toMatch(/contiSplitPending \? \(?[\s\S]{0,200}<ContiSplitStart/)
+    expect(read('src/features/writer/conti-split-start.tsx')).toMatch(/continueContiSplit\(/)
+  })
+
   // 왜(혼자 정한 것): O1 — 산문을 확정하면 콘티에서 씬 · 샷을 나눈다. 잠금 제목이 "Storyboard로 넘어가는 중"이면 다른 단계로 가는 것처럼 읽히고,
   //   큰 Lumi 도 콘티(Writer 칸)의 옷이어야 한다.
   it('콘티에서 씬 · 샷을 나누는 동안 잠금 표시는 "콘티로 넘어가는 중이에요"이고 Storyboard 에서는 지금처럼 "Storyboard로 넘어가는 중이에요"다', () => {

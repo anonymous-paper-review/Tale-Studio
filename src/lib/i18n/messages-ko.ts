@@ -2866,7 +2866,11 @@ export const KO: Record<string, string> = {
   'Apply or discard the AI proposal first, then confirm the prose.': 'AI 수정안을 먼저 적용하거나 버린 뒤 산문을 확정해 주세요.',
   'The prose is not ready yet. Wait until it is written, then confirm it.': '산문을 아직 다 쓰지 않았어요. 다 쓴 뒤 확정해 주세요.',
   'Could not confirm the prose. Please try again.': '산문을 확정하지 못했어요. 다시 시도해 주세요.',
-  'Prose confirmed. Artist is opening.': '산문을 확정했어요. Artist로 가요.',
+  // O1(오너 2026-11-26 "콘티를 Artist 앞에"): 산문을 확정하면 씬 · 샷 나누기가 이어지고 콘티가 열린다.
+  'Prose confirmed. Opening the rough storyboard.': '산문을 확정했어요. 콘티를 열어요.',
+  'Could not start splitting into scenes and shots. Please press it again.': '씬 · 샷 나누기를 시작하지 못했어요. 다시 눌러 주세요.',
+  'The prose is confirmed. Start splitting it into scenes and shots.': '산문을 확정했어요. 씬 · 샷 나누기를 시작해 주세요.',
+  'Split into scenes and shots': '씬 · 샷 나누기 시작',
   'No, I want to edit more': '아니요, 더 고칠래요',
   // 11/5 단계 확인 단추(Control/Stage Confirm) — 다음 단계에서 하는 일
   'Yes, write the prose': '좋아요, 산문 쓰기로',
@@ -2882,7 +2886,9 @@ export const KO: Record<string, string> = {
   'I will say it in the chat': '채팅으로 말할게요',
   'AI rewrite': 'AI 다시 쓰기',
   'Apply this version': '이 안 적용',
-  'Artist picks the characters and backgrounds from the prose.': 'Artist가 산문에서 인물·배경을 뽑아요.',
+  'Splits the prose into scenes and shots and draws the rough storyboard.': '씬 · 샷으로 나누고 콘티를 그려요.',
+  // O6(오너 2026-11-26): 그림체가 아직 없으면 산문 확정 창에서 한 번 고른다 — Artist 에서는 계속 바꿀 수 있다.
+  'Pick the art style for this work. You can change it in Artist anytime.': '이 작품의 그림체를 골라 주세요. Artist에서 언제든 바꿀 수 있어요.',
   'Check what happens when you confirm the prose.': '산문을 확정하면 어떻게 되는지 확인해 주세요.',
   'Confirm the prose?': '산문을 확정할까요?',
   'Confirmed': '확정됨',

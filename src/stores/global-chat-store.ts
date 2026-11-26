@@ -2828,9 +2828,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       // 그림체 질문에 답하지 않고 확정했다 — 확정한 뒤에는 묻지 않으니 거둔다. 그림체는 지금처럼 Artist 에서 고른다.
       if (get().startComicStyleGate?.projectId === projectId) set({ startComicStyleGate: null })
       if (current?.id === `start-comic-style:${projectId}`) get().dismissSuggestion({ implicit: true })
-      // 산문만 잠근다 — 실행은 아직 산문 초안이라(Artist [만들기] 전) 브레이크다운 목록 · 스타일은 Artist 에서 고친다.
+      // 산문을 잠그고 콘티를 연다(O1 2026-11-26) — 씬 · 샷 나누기는 확정 창 · 채팅 카드가 이어 건다(features/prose/confirm-prose-flow).
       useProjectStore.setState({ producerLocked: true })
-      useProjectStore.getState().unlockThrough('artist')
+      useProjectStore.getState().unlockThrough('conti')
       return { ok: true }
     } catch {
       return { ok: false }
