@@ -36,7 +36,7 @@ import { handoffFrom } from '@/lib/handoff-intent'
 import { shouldOfferHandoffNudge } from '@/lib/handoff-nudge'
 import { AiBusyOverlay } from '@/components/ai-busy-overlay'
 import { NodeWaitCard } from '@/components/feedback/node-wait'
-import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
+import { StoryboardShotDialog } from '@/features/writer/storyboard-shot-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
@@ -74,6 +74,8 @@ import {
   advanceBoardLock,
   dismissBoardFailure,
   isBoardRunActive,
+  lockingShots,
+  redrawLocksBoard,
   storyboardBusyView,
   type BoardLockFacts,
   type BoardLockState,
@@ -242,6 +244,8 @@ export function RoughStoryboardView() {
   const draggedRef = useRef(false)
   // 잠금 표시(리뉴얼 1차) — 화면의 그리기가 도는 중인가 · 끝난 횟수 · 실행이 끝난 뒤 샷을 다시 읽었는가 · 순간 사이에 이어지는 잠금 상태.
   const [pumpActive, setPumpActive] = useState(false)
+  // 그림이 있는 카드만 다시 그리는 그리기(W5 오너 2026-11-26) — 보드를 잠그지 않고 카드마다 기다림을 보인다. 다른 그리기와 겹치지 않게만 센다.
+  const [quietPump, setQuietPump] = useState(false)
   const [pumpRuns, setPumpRuns] = useState(0)
   const [reloadSettled, setReloadSettled] = useState(false)
   const [lock, setLock] = useState<BoardLockState>(INITIAL_BOARD_LOCK)
@@ -737,11 +741,14 @@ export function RoughStoryboardView() {
   // [남은 컷 (다시) 그리기](리뉴얼 1차 — 잠금 표시의 실패 안내 · Director 넘김 창) — 사람이 누른 다시 그리기라 force 로 보낸다
   //   (카드의 다시 시도와 같다: 반복 실패로 자동 생성이 멈춘 컷도 다시 그린다). 서버 그리드 한 장 = 한 씬 넉 장이라
   //   그 크기로 나눠 차례로 보낸다(고른 컷이 요청에서 빠지지 않게). 같은 컷을 이 안에서 두 번 보내지 않는다.
+  //   그림이 있는 카드만 다시 그리면(채팅 [러프 다시 그리기] · 고치기 창 [적용 · 러프 다시 그리기]) 보드를 잠그지 않는다 — 카드마다 기다림(W5).
   const drawShots = useCallback(
     async (shotIds: readonly string[]) => {
       if (pumpRunningRef.current || shotIds.length === 0) return
       pumpRunningRef.current = true
-      setPumpActive(true)
+      const locks = redrawLocksBoard(shotIds, useWriterStore.getState().shots)
+      if (locks) setPumpActive(true)
+      else setQuietPump(true)
       try {
         const sceneOf = new Map(useWriterStore.getState().shots.map((s) => [s.shotId, s.sceneId]))
         const batches = roughRedrawBatches(shotIds.map((shotId) => ({ shotId, sceneId: sceneOf.get(shotId) ?? '' })))
@@ -754,6 +761,7 @@ export function RoughStoryboardView() {
       } finally {
         pumpRunningRef.current = false
         setPumpActive(false)
+        setQuietPump(false)
         setPumpRuns((n) => n + 1)
       }
     },
@@ -769,14 +777,15 @@ export function RoughStoryboardView() {
     return () => useBoardUiStore.getState().closeBoard(projectId)
   }, [projectId])
   const roughRedrawRequest = useBoardUiStore((s) => s.roughRedrawRequest)
+  const cardDrawing = useBoardUiStore((s) => s.cardDrawing)
   useEffect(() => {
-    if (!roughRedrawRequest || pumpActive || !projectId) return
+    if (!roughRedrawRequest || pumpActive || quietPump || !projectId) return
     const shotIds = useBoardUiStore.getState().takeRoughRedraw(projectId)
     if (!shotIds) return
     // 실제로 그리기 시작할 때 채팅 카드를 내린다(2026-11-02 리뷰 L7) — 그 전에 보드를 떠나면 카드는 남아 다시 누를 수 있다.
     useGlobalChatStore.getState().settleRoughRedraw(projectId, shotIds)
     void drawShots(shotIds)
-  }, [roughRedrawRequest, pumpActive, projectId, drawShots])
+  }, [roughRedrawRequest, pumpActive, quietPump, projectId, drawShots])
 
   const running = !!(
     status?.started &&
@@ -792,19 +801,21 @@ export function RoughStoryboardView() {
   //   (탭 왕복으로 panelJobs 를 잃었거나, 옛 'failed' 표기가 남아 있어도 큐가 맞다.)
   //   더한 샷 바로 그리기의 보내기 전 상태(그리는 중 · 자리 기다림 · 멈춤)는 그 밑에 깐다 — 보낸 뒤로는 panelJobs · 큐가 이긴다.
   const localJobs = { ...addedDrawJobs(shots, addedViews, (shot) => isRoughDrawn(panelOf(shot)), locale), ...panelJobs }
+  // 고치기 창이 맡기고 닫힌 그리기(연출만 다시 만들기)도 그 카드에 기다림을 보인다(W5).
   const jobOf = (shotId: string): PanelJob | undefined =>
-    queuedRoughIds.has(shotId) ? { status: 'generating' } : localJobs[shotId]
+    queuedRoughIds.has(shotId) || cardDrawing[shotId] === projectId ? { status: 'generating' } : localJobs[shotId]
   // #5: 정보(액션)가 없는 샷은 자동 생성 대상에서 제외 — 근거 없는 빈 패널 생성 방지.
   //   더한 샷 그리기가 맡고 있는 샷도 빠진 러프로 세지 않는다(리뷰 R2 — 세면 진입 자동 그리기가 보드 · 채팅을 잠근다).
   const missingIds = boardMissingRoughIds(shots, { hasPanel: (s) => !!panelOf(s), hasJob: (shotId) => !!jobOf(shotId) }, addedViews)
   const roughProgress = summarizeRoughProgress(shots, overrides, localJobs, queuedRoughIds)
   const generatingCount = roughProgress.generating
   // 잠금이 세는 그리기 — 이 화면에서 더한 샷은 뺀다(오너 "잠금 없이 카드에서 '그리는 중'으로").
-  const lockProgress = summarizeRoughProgress(withoutAddedShots(shots, addedViews), overrides, localJobs, queuedRoughIds)
+  //   그림이 있는 카드를 다시 그리는 것도 뺀다(W5 오너 2026-11-26 — 카드에만 기다림). 잠금은 그림이 없는 컷의 첫 그리기만 센다.
+  const lockProgress = summarizeRoughProgress(lockingShots(withoutAddedShots(shots, addedViews)), overrides, localJobs, queuedRoughIds)
 
   // ── 잠금 표시(리뉴얼 1차, 프로토타입 S0) ── 이번 순간의 사실을 모아 잠금 상태를 한 걸음 옮기고, 보일 내용을 정한다(lib/writer/board-busy).
   //   진입 자동 그리기 직전(그리기가 아직 한 번도 안 돌았고 빠진 패널이 있다)도 그리기로 본다 — 잠금이 한 프레임 풀렸다 닫히지 않게.
-  const autoDrawPending = hasShots && !running && missingIds.length > 0 && pumpRuns === 0 && !pumpActive
+  const autoDrawPending = hasShots && !running && missingIds.length > 0 && pumpRuns === 0 && !pumpActive && !quietPump
   const lockFacts: BoardLockFacts = {
     runActive: isBoardRunActive(status),
     reloading: !!status?.pipeline_completed && !reloadSettled,
@@ -1532,10 +1543,11 @@ export function RoughStoryboardView() {
       </ScrollArea>
 
       {/* #arrow-layer 실험(2026-08-09): 팝업 = 화살표 레이어 편집기 — panel 객체를 통째로 넘긴다. */}
-      <ShotDetailDialog
-        variant="storyboard"
+      <StoryboardShotDialog
         shotId={detailShotId}
         panel={detailPanel}
+        // 그리는 중인 카드 — 창은 열리지만 다시 그리는 단추가 꺼진다(W5).
+        drawing={!!detailShotId && jobOf(detailShotId)?.status === 'generating'}
         onOpenChange={(open) => {
           if (!open) setDetailShotId(null)
         }}

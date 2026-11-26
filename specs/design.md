@@ -585,7 +585,9 @@ Storyboard 나누기 · 첫 러프. 설명은 부르는 쪽이 준다 — 안 �
 같은 단계 안에서 기다릴 때(11/5 WL 문단 다시 쓰기 · AR 다시 그리기)도 카드에 그 단계 옷 Lumi 를 보인다(오너 2026-11-09). `scrim="clear"` 는 바탕을 칠하지 않고 카드만 가운데 — 잠금(단계 화면 · 채팅 inert, 레일 붙잡기)은 그대로고,
 덮개가 받은 휠 · 손가락 끌기를 포인터 아래 `[data-ai-busy-scroll]` 칸으로 넘겨 보기 · 스크롤만 된다(`src/lib/ai-busy-scroll.ts`, 칸이 겹치면 안쪽 칸).
 `card="loading"` 은 Lumi 없이 같은 새 카드(그림만 없음, 색은 놓인 화면의 지금 단계). 약속 tests/project/busy-overlay-clear.test.ts. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
-Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
+Editor 클립 준비. `lumi` 를 안 주는 잠금(그림이 없는 컷을 보드에서 그리기 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
+그림이 이미 있는 카드를 다시 그릴 때(콘티 · Storyboard 보드의 고치기 창 [적용 · 러프 다시 그리기] · [연출만 다시 만들기] · 채팅 [러프 다시 그리기] · 카드 [다시 시도])는
+잠그지 않는다 — 창은 그리기를 맡기고 닫히고 그 카드에만 아래 "노드 · 카드 위 기다림"을 보인다(W5 오너 2026-11-26, 약속 tests/writer/card-redraw-wait.test.ts).
 실패 안내의 오류 모습 큰 Lumi 도 단계를 넘어가는 기다림의 실패에만 둔다 — Storyboard 보드에서 컷을 다시 그리다 난 실패는 작은 카드(약속 tests/writer/board-wait-lumi.test.ts).
 
 **노드 · 카드 위에서 기다릴 때**(SYS, DG 기준) — `src/components/feedback/node-wait.tsx` `<NodeWaitCard lumi title description? progress? note? announce? />`(화면 읽기 알림 `announce` 는 여럿 중 하나만 — 보드 · Director 는 첫 카드):

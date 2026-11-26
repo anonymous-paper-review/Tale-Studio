@@ -181,7 +181,8 @@ describe('러프를 그리는 동안의 잠금', () => {
   })
 
   // 왜(혼자 정한 것): 보드에서 컷을 다시 그리는 것도 AI 가 일하는 시간이다(프로토타입 S3) — 같은 잠금 표시를 띄우되 씬 · 샷 나누기 단계 목록은 다시 보여 주지 않는다.
-  it('보드에서 컷을 다시 그리면 같은 잠금 표시를 띄우고 다 그리면 푼다', () => {
+  //   W5(오너 2026-11-26): 그림이 있는 카드를 다시 그리는 것은 잠그지 않는다(카드에만 기다림) — 보드는 그림이 없는 컷만 잠금에 센다(tests/writer/card-redraw-wait.test.ts).
+  it('보드에서 그림이 없는 컷을 그리면 같은 잠금 표시를 띄우고 다 그리면 푼다', () => {
     const idle = facts({ hasShots: true })
     const redraw = facts({ hasShots: true, generating: 1 })
     const during = storyboardBusyView({ status: completedStatus, facts: redraw, lock: walk(idle, redraw), rough: rough({ completed: 7, generating: 1, waiting: 0 }), sceneCount: 3 }, 'ko')

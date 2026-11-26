@@ -8,6 +8,8 @@
 //   저장할 곳이 아직 없는 카메라 무브먼트 · 방향 · 액션 · 샷별 모습, 새 러프 비교(S3c)는 2차. 등장인물은 보기만(바꾸려면 모습 표까지 함께 — 2차).
 //   Director 그리드는 예전 연출 편집 팝업을 그대로 쓴다(ShotDetailDialog 기본).
 //   v3(2026-11-03 오너 "v3로 적용"): 테두리 대신 면 색 · 둥근 그림 칸 · 묶음 고르기는 선택 카드(OptionCard) · [시작 | 연출]은 눌린 칸 탭. 동작 · 글은 그대로.
+//   W5(오너 2026-11-26 "화면 막는 창 대신 카드에 기다림"): [적용 · 러프 다시 그리기] · [연출만 다시 만들기]는 저장하고 그리기를 맡긴 뒤 창을 닫는다 —
+//   그리는 동안은 그 카드에만 기다림이 보이고 화면 · 채팅 · 레일은 잠그지 않는다. 그리는 중인 카드는 다시 그리는 단추가 꺼진다(대사만 저장은 된다).
 import { useState } from 'react'
 import { ArrowRight, Minus, Plus, RefreshCw, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,14 +21,12 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea'
 import { ThumbImage } from '@/components/thumb-image'
 import { withCacheBust } from '@/components/rough-frame-cycle'
-import { AiBusyOverlay, type AiBusyStep } from '@/components/ai-busy-overlay'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
 import { UnsavedArrowsConfirm, applyDirectionTab, directionApplyEnabled, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
-import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, readRedrawReply, redrawDirectionOnly, sceneShotLabel, startApplyKind, startChanges, type ApplyKind, type RoughFrame } from '@/lib/writer/shot-edit'
-import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
-import { pollGenerationJob } from '@/lib/generation-jobs-client'
+import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, redrawBlockedWhileDrawing, redrawDirectionOnly, sceneShotLabel, startApplyKind, startChanges, type ApplyKind, type RoughFrame } from '@/lib/writer/shot-edit'
+import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { invalidateShots } from '@/lib/shots-cache'
 import { flushShotSave, useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -51,7 +51,13 @@ function draftOf(shot: Shot): Draft {
   }
 }
 
-export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: string | null; panel: RoughStoryboardImage | null; onOpenChange: (open: boolean) => void }) {
+export function StoryboardShotDialog({ shotId, panel, onOpenChange, drawing = false }: {
+  shotId: string | null
+  panel: RoughStoryboardImage | null
+  onOpenChange: (open: boolean) => void
+  /** 그 샷을 지금 그리는 중(보드가 안다) — 다시 그리는 단추를 끈다(W5). */
+  drawing?: boolean
+}) {
   const t = useT()
   // 창 머리의 샷 이름은 화면 언어("씬 2 · 샷 8" · "Scene 2 · Shot 8", 오너 2026-11-14 답 7).
   const locale = useLocaleStore((s) => s.locale)
@@ -64,13 +70,14 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   const [tab, setTab] = useState<'start' | 'direction'>('start')
   // 고치는 중인 값 — 팝업을 열 때마다 저장된 샷에서 새로 시작한다(닫으면 버린다 · 채팅이 바꾼 값을 되돌리지 않게, 검토 지적).
   const [draft, setDraft] = useState<{ shotId: string | null; value: Draft | null }>({ shotId: null, value: null })
-  const [busy, setBusy] = useState<{ title: string; steps: AiBusyStep[] } | null>(null)
+  // 고친 내용을 저장하는 동안만 단추를 막는다 — 그리기는 맡기고 창을 닫는다(W5).
+  const [saving, setSaving] = useState(false)
   // [적용] 뒤 남은 일(nextApplyStep) — 'redraw' = 저장은 됐고 그리기만 다시, 'resave' = 저장부터 다시.
   const [retryStep, setRetryStep] = useState<'redraw' | 'resave' | null>(null)
   // 저장이 실패한 [적용]이 하려던 일 — 다시 저장할 때 화면에는 이미 고친 값이 있어 무엇을 고쳤는지 다시 셀 수 없다.
   const [resaveKind, setResaveKind] = useState<ApplyKind>('redraw')
   const [applying, setApplying] = useState(false)
-  const close = () => { if (!busy) onOpenChange(false) }
+  const close = () => { if (!saving) onOpenChange(false) }
   // 연출 탭에 저장하지 않은 화살표가 있으면 [적용]이 켜지고, 닫기 전에 묻는다(2026-11-14 오너 고장 · 리드 ①②).
   const guard = useUnsavedArrowsGuard(close)
 
@@ -106,45 +113,6 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
     await invalidateShots(projectId)
     await loadProject()
   }
-  /** 그 샷의 러프를 저장한 내용(스토리 · 샷 타입)으로 새로 그린다 — 보드 카드의 [다시 시도]와 같은 길(force). 다 그릴 때까지 기다린다.
-   *  안내는 보드와 같은 구분(readRedrawReply) — 접수 확인 중이면 기다리지 않는다(10분 잠김, 검토 지적). */
-  const redrawShot = async (): Promise<boolean> => {
-    let res: Response
-    try {
-      res = await fetch('/api/writer/rough-storyboard', {
-        method: 'POST',
-        headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({ projectId, shotIds: [shot.shotId], force: true }),
-      })
-    } catch {
-      toast.error(t('Regeneration failed'))
-      return false
-    }
-    const body: unknown = await res.json().catch(() => null)
-    // 자리 부족 · 콘텐츠 정책 — 보드와 같은 공용 안내.
-    if (notifyIfQuotaExceeded(res.status, body)) return false
-    const reply = readRedrawReply(res.status, body)
-    if (reply.kind === 'confirming') {
-      toast.info(t('Confirming the previous rough request. It will not be submitted again.'))
-      return false
-    }
-    if (reply.kind === 'busy') {
-      toast.info(t('This shot is still being drawn. Try again in a moment.'))
-      return false
-    }
-    if (reply.kind === 'nothing') {
-      toast.error(t('There is nothing to draw yet. Write the story of this shot first.'))
-      return false
-    }
-    if (reply.kind === 'failed') {
-      toast.error(t('Regeneration failed'))
-      return false
-    }
-    const results = await Promise.allSettled(reply.jobIds.map((jobId) => pollGenerationJob(jobId)))
-    if (results.every((result) => result.status === 'fulfilled')) return true
-    toast.error(t('Regeneration failed'))
-    return false
-  }
   const regenerate = async (frame: RoughFrame): Promise<boolean> => {
     try {
       const res = await fetch('/api/writer/rough-directing-edit', {
@@ -163,13 +131,6 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
       return false
     }
   }
-  const steps = (current: 'save' | 'draw' | 'done', drawLabel: string): AiBusyStep[] => {
-    const order: Array<'save' | 'draw'> = ['save', 'draw']
-    const at = current === 'done' ? order.length : order.indexOf(current)
-    const labels = { save: t('Saving the changes'), draw: drawLabel }
-    return order.map((key, index) => ({ label: labels[key], state: index < at ? 'done' : index === at ? 'current' : 'todo' }))
-  }
-
   const applyStart = async () => {
     // 저장이 실패했던 고침은 화면에 이미 고친 값이 있어 바뀐 것이 없어 보여도 다시 저장한다(저장은 그 샷의 지금 값을 통째로 쓴다).
     if (startDirty || retryStep === 'resave') updateShot(shot.shotId, changes)
@@ -186,54 +147,52 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
       }
       return
     }
-    const drawLabel = t('Redrawing the rough of this shot')
-    setBusy({ title: t('Drawing the rough'), steps: steps('save', drawLabel) })
+    // 저장하고 그리기를 보드에 맡긴 뒤 창을 닫는다(W5) — 보드가 채팅 [러프 다시 그리기]와 같은 길로 그 샷만 다시 그리고,
+    //   그림이 있는 카드라 보드를 잠그지 않고 그 카드에 기다림을 보인다. 다 그리면 카드가 바뀌고, 실패하면 카드에 [다시 시도]가 남는다.
+    setSaving(true)
     let saved = false
-    let drawn = false
+    let handedOff = false
     try {
-      drawn = await applyStartEdit({
+      handedOff = await applyStartEdit({
         save: async () => {
           await flushShotSave(shot.shotId)
           saved = true
         },
         redrawShot: async () => {
-          setBusy({ title: t('Drawing the rough'), steps: steps('draw', drawLabel) })
-          return redrawShot()
+          useBoardUiStore.getState().requestRoughRedraw(projectId, [shot.shotId])
+          return true
         },
       })
     } catch {
       toast.error(t('Could not save the changes. Please try again.'))
     } finally {
-      // 새 그림을 다시 읽은 뒤에 잠금을 푼다 — 풀자마자 옛 그림이 잠깐 보이지 않게.
-      await refresh().catch(() => undefined)
-      setBusy(null)
+      setSaving(false)
     }
-    const next = nextApplyStep({ saved, drawn })
+    const next = nextApplyStep({ saved, handedOff })
     setRetryStep(next === 'close' ? null : next)
     if (next === 'close') {
-      toast.success(t('Redrew the rough of this shot with your changes.'))
+      toast.success(t('Redrawing the rough of this shot. The card updates when it is done.'))
       onOpenChange(false)
     }
   }
   const redrawDirection = async () => {
     if (durationDirty) updateShot(shot.shotId, { durationSeconds: value.durationSeconds })
-    const drawLabel = t('Redrawing the directing frame')
-    setBusy({ title: t('Drawing the rough'), steps: steps('save', drawLabel) })
+    const shotId = shot.shotId
+    // 창을 닫고 그 카드에 기다림을 보인다(W5) — 연출 그림은 몇십 초 걸리는 한 번의 요청이라 끝날 때까지(실패해도) 카드에 표시를 남긴다.
+    useBoardUiStore.getState().markCardDrawing(projectId, shotId)
+    onOpenChange(false)
     let ok = false
     try {
       ok = await redrawDirectionOnly({
-        save: () => flushShotSave(shot.shotId),
-        regenerate: async (frame) => {
-          setBusy({ title: t('Drawing the rough'), steps: steps('draw', drawLabel) })
-          return regenerate(frame)
-        },
+        save: () => flushShotSave(shotId),
+        regenerate: (frame) => regenerate(frame),
       })
     } catch {
       toast.error(t('Could not save the changes. Please try again.'))
     } finally {
-      // 새 그림을 다시 읽은 뒤에 잠금을 푼다 — 풀자마자 옛 그림이 잠깐 보이지 않게.
+      // 새 그림을 다시 읽은 뒤에 표시를 지운다 — 지우자마자 옛 그림이 잠깐 보이지 않게.
       await refresh().catch(() => undefined)
-      setBusy(null)
+      useBoardUiStore.getState().clearCardDrawing(projectId, shotId)
     }
     if (ok) toast.success(t('Redrew the directing frame. The other two are unchanged.'))
   }
@@ -285,7 +244,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
   return (
     <>
       <Dialog open={!!shotId} onOpenChange={(open) => { if (!open) guard.requestClose() }}>
-        <DialogContent frame="work" className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[1080px]" showCloseButton={!busy} data-testid="shot-edit">
+        <DialogContent frame="work" className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[1080px]" showCloseButton={!saving} data-testid="shot-edit">
           <DialogHeader className="shrink-0 border-b border-border-subtle px-6 py-4">
             <DialogTitle>{t('{label} · edit', { label })}</DialogTitle>
             <DialogDescription>{t('Edit in two groups. Changing the story or shot type redraws the rough of this shot, and changing only the dialogue just saves it. Editing the directing frame changes only that frame.')}</DialogDescription>
@@ -392,25 +351,29 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
                   </Field>
                   <p className="text-caption text-muted-foreground">{completed ? t('Draw or erase arrows on the directing frame on the left, then save. The card updates right away.') : t('This shot has no rough yet.')}</p>
                   {completed ? (
-                    <Button variant="secondary" className="self-start rounded-full" disabled={!!busy} onClick={() => guard.requestRedraw('direction', () => void redrawDirection())} data-testid="shot-edit-redraw-direction">
+                    <Button variant="secondary" className="self-start rounded-full" disabled={saving || drawing} onClick={() => guard.requestRedraw('direction', () => void redrawDirection())} data-testid="shot-edit-redraw-direction">
                       <RefreshCw className="size-4" />{t('Remake only the directing frame')}
                     </Button>
                   ) : null}
                 </>
               )}
+              {drawing ? (
+                // 그리는 중인 카드(W5) — 다시 그리는 단추가 왜 꺼졌는지 알린다. 대사만 고친 [적용]은 된다.
+                <p className="rounded-xl bg-card px-3.5 py-2.5 text-caption text-foreground" role="status" data-testid="shot-edit-drawing">{t('This shot is being drawn. You can redraw it once it is done.')}</p>
+              ) : null}
               <p className="rounded-xl bg-card px-3.5 py-2.5 text-caption text-muted-foreground">{t('✦ You can also just say it: tell the agent "close-up on this shot" and it changes it for you.')}</p>
             </div>
           </div>
           <DialogFooter className="shrink-0 border-t border-border-subtle px-6 py-3">
-            <Button variant="ghost" onClick={guard.requestClose} disabled={!!busy || applying}>{t('Cancel')}</Button>
+            <Button variant="ghost" onClick={guard.requestClose} disabled={saving || applying}>{t('Cancel')}</Button>
             {tab === 'start' ? (
-              <Button onClick={() => void applyStart()} disabled={!!busy || (!startDirty && !retryStep)} data-testid="shot-edit-apply-start">
+              <Button onClick={() => void applyStart()} disabled={saving || (!startDirty && !retryStep) || redrawBlockedWhileDrawing(drawing, applyKind)} data-testid="shot-edit-apply-start">
                 {retryStep === 'redraw' && !startDirty ? t('Redraw') : completed && !saveOnly ? t('Apply · redraw the rough') : t('Apply')}<ArrowRight className="size-4" />
               </Button>
             ) : (
               <Button
                 onClick={() => void applyDirection()}
-                disabled={!!busy || applying || !directionApplyEnabled({ arrowsDirty: guard.dirty, durationDirty })}
+                disabled={saving || applying || !directionApplyEnabled({ arrowsDirty: guard.dirty, durationDirty })}
                 data-testid="shot-edit-apply-direction"
               >
                 {t('Apply')}<ArrowRight className="size-4" />
@@ -419,7 +382,6 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange }: { shotId: 
           </DialogFooter>
         </DialogContent>
       </Dialog>
-      <AiBusyOverlay open={!!busy} layer="dialog" title={busy?.title ?? ''} steps={busy?.steps} />
       <UnsavedArrowsConfirm {...guard.confirm} />
     </>
   )

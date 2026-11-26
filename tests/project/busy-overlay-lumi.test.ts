@@ -34,7 +34,7 @@ describe('잠금 화면의 큰 Lumi', () => {
   })
 
   it('Lumi를 주지 않으면 지금처럼 일하는 동안 도는 원, 멈추면 경고 표시가 보인다', () => {
-    // 왜: 정상 경로 고정 — Lumi 를 넣지 않은 잠금 화면(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 예전 모습 그대로다.
+    // 왜: 정상 경로 고정 — Lumi 를 넣지 않은 잠금 화면(그림이 없는 컷을 보드에서 그리기 등)은 예전 모습 그대로다. 그림이 있는 카드를 다시 그릴 때는 잠그지 않는다(W5).
     const working = card({ busy: true })
     expect(working).toContain('lucide-loader-circle')
     expect(working).not.toContain('/lumi/')
