@@ -3684,26 +3684,13 @@ export const KO: Record<string, string> = {
   'Some shots have no video yet. Check the list in the window, then hand over the shots with video or make the rest again first.': '아직 영상이 없는 샷이 있어요. 창에서 목록을 보고 영상 있는 샷만 넘기거나, 나머지를 먼저 다시 만들어 주세요.',
   // Storyboard → Director 넘기기 창(D0, 2026-11-14 디자이너 1110 확정 · 페이지 추천)
   'Move on to Director?': 'Director로 넘어갈까요?',
-  'We start by turning the {count} roughs into real images.': '러프 {count}장을 실사 이미지로 바꾸는 것부터 시작해요.',
   'Shots {shots} · {seconds}s · Characters {characters} · Backgrounds {backgrounds} · Roughs {roughs}': '샷 {shots} · {seconds}초 · 인물 {characters} · 배경 {backgrounds} · 러프 {roughs}장',
-  'Rough → {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 {count}장 · 약\u00a0{minutes}분 · Takes 안 써요',
   'The real images are already made': '실사 이미지는 이미 다 있어요',
   'After that': '그다음',
   // 값은 앱의 Take 표기("5 Take")로 — D8 단추와 같게(리드 2026-11-14)
   'Check the images and make the videos · {takes} Takes per shot': '이미지를 확인하고 영상을 만들어요 · 샷마다 {takes} Take',
   'Check the images and make the videos · 1 Take per shot': '이미지를 확인하고 영상을 만들어요 · 샷마다 1 Take',
-  // 저장된 실사를 읽는 중 · 읽기 실패(검토 b 낮음 7), Take 과금이 꺼져 있을 때(낮음 5)
-  'Rough → real images · counting': '러프 → 실사 이미지 · 세는 중',
-  'Rough → up to {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 최대 {count}장 · 약\u00a0{minutes}분 · Takes 안 써요',
-  'Rough → up to {count} real images · about {minutes} min': '러프 → 실사 이미지 최대 {count}장 · 약\u00a0{minutes}분',
-  'Rough → {count} real images · about {minutes} min': '러프 → 실사 이미지 {count}장 · 약\u00a0{minutes}분',
-  'Make images while moving over': '넘어가면서 이미지 만들기',
-  'Make up to {count} images while moving over': '넘어가면서 이미지 최대 {count}장 만들기',
   'Check the images and make the videos': '이미지를 확인하고 영상을 만들어요',
-  'Make {count} images while moving over': '넘어가면서 이미지 {count}장 만들기',
-  'You can look at other screens while you wait. We show the first ones as soon as they are ready and tell you when they are all done.': '기다리는 동안 다른 화면을 봐도 돼요. 첫 장이 나오면 먼저 보여드리고, 다 되면 알려드려요.',
-  'Move over and pick yourself': '넘어가서 직접 고르기',
-  'Choose the shots to make and make them one by one.': '만들 샷을 골라 하나씩 만들어요.',
   'Move over': '넘어가기',
   // 넘기기 창 다음 줄 — 실사는 Storyboard [시작]이 만든다(오너 2026-11-26 m1126 S2), 남은 것은 Director 에서도.
   'Real images · counting': '실사 그림 · 세는 중',
