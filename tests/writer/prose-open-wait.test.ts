@@ -1,4 +1,5 @@
 // Writer 산문 화면이 산문을 읽는 동안(프로젝트를 여는 중 포함) 빈 산문 안내 · 확정 전 단추 대신 Writer 기다리는 카드를 보이는지 검사한다 (오너 2026-11-26 m1126 G1)
+import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -22,6 +23,8 @@ import { useLocaleStore } from '@/stores/locale-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
+import { noteWriterGateChecked } from '@/lib/writer/gate-check'
+import { proseRead } from '@/lib/stage-wait'
 
 // 이 시험을 위해 새로 지은 글 — 실제 작품이 아니다.
 const P1 = '회사 복도, 오후 세 시. 민호가 자판기 버튼을 누르지만 아무것도 나오지 않는다.'
@@ -40,6 +43,7 @@ beforeEach(() => {
   useWriterRoomStore.setState({ paragraph: null, confirmOpen: false, rewriteOpen: false, manualRequest: 0 })
   writer.status = { started: true, pipeline_completed: true, current_status: 'completed', current_stage: 'done', draft: false }
   writer.preview = lockedPreview
+  noteWriterGateChecked(null)
 })
 afterEach(() => {
   useProjectStore.setState({ initLoading: false })
@@ -72,5 +76,35 @@ describe('산문을 읽는 동안', () => {
     const ready = screen()
     expect(ready).not.toContain('data-testid="stage-wait"')
     expect(ready).toContain(P1)
+  })
+
+  // 왜: m-qa 통합 확인(2026-11-27) — 산문 초안(브레이크다운 전) 프로젝트를 목록에서 열거나 새로 고치면 "아직 산문이 없어요"가 0.7~1초 보였다가 카드가 다시 떴다.
+  //   초안인지는 프로젝트를 연 뒤 Writer 실행 확인(project-store verifyWriterGate)이 끝나야 안다(그때 초안 표시를 켠다) — 그 전의 "넘기기 전" 화면은 틀린 안내다.
+  it('Writer 는 산문 초안 프로젝트를 새로 열 때 Writer 실행 확인이 끝나기 전에는 "아직 산문이 없어요" 대신 기다리는 카드를 보인다', () => {
+    // 프로젝트는 열렸지만 초안 표시는 아직 꺼져 있다(확인 전).
+    useProjectStore.setState({ projectId: 'prose-project', initLoading: false, producerLocked: false, treatmentDraft: false })
+    writer.preview = null
+    const before = screen()
+    expect(before).toContain('data-stage-wait="producer"')
+    expect(before).not.toContain('data-testid="prose-empty"')
+    expect(before).not.toContain('아직 산문이 없어요')
+
+    // 다른 프로젝트의 확인은 이 프로젝트를 다 읽은 것으로 치지 않는다.
+    noteWriterGateChecked('other-project')
+    expect(screen()).toContain('data-stage-wait="producer"')
+
+    // 확인이 끝나고 정말 넘기기 전 프로젝트면 지금 빈 산문 안내를 그대로 보인다(정상 경로 고정).
+    noteWriterGateChecked('prose-project')
+    const after = screen()
+    expect(after).not.toContain('data-testid="stage-wait"')
+    expect(after).toContain('data-testid="prose-empty"')
+
+    expect(proseRead({ viewKind: 'empty', gateChecked: false })).toBe(false)
+    expect(proseRead({ viewKind: 'loading', gateChecked: true })).toBe(false)
+    expect(proseRead({ viewKind: 'scenes', gateChecked: false })).toBe(true)
+    // 프로젝트를 열 때 확인을 부르고 끝나면(실패해도) 적는다 · 프로젝트를 비우면(바꾸는 중) 지운다.
+    const layout = readFileSync('src/app/studio/layout.tsx', 'utf8')
+    expect(layout).toMatch(/verifyWriterGate\(projectId\)\.finally\(\(\) => \{\s*if \(alive\) noteWriterGateChecked\(projectId\)/)
+    expect(layout).toMatch(/if \(!projectId\) \{\s*noteWriterGateChecked\(null\)/)
   })
 })
