@@ -142,6 +142,16 @@ describe('Director 고친 프롬프트 저장', () => {
     expect(sql).toMatch(/if new\.prompt is distinct from old\.prompt and new\.director_prompt is not distinct from old\.director_prompt then\s+new\.director_prompt := null;/)
     expect(sql).toMatch(/before update of prompt on public\.shots/)
   })
+
+  it('Writer 콘티 · 채팅에서 샷 이야기(action_description)를 고쳐도 DB 가 Director 고친 글을 비운다 — 번역 칸(_native)만 바뀌면 남긴다', () => {
+    // 왜: 콘티 · 채팅의 샷 이야기 고침은 action_description 만 쓰고 prompt 는 쓰지 않는다 — prompt 만 보던 방아쇠는 콘티 고침에 한 번도 걸리지 않아
+    //   옛 고친 글이 새 이야기를 덮었다(리드 2026-11-26 확인 요청으로 찾음). 번역 채우기(derive-en)는 _native 만 바꾸므로 비우지 않는다
+    //   (개발 DB 실측: _native 만 → 남음, action_description → null).
+    const sql = readFileSync('supabase/migrations/20261126230000_shots_director_prompt_story_edit.sql', 'utf8')
+    expect(sql).toMatch(/if \(new\.prompt is distinct from old\.prompt or new\.action_description is distinct from old\.action_description\)\s+and new\.director_prompt is not distinct from old\.director_prompt then\s+new\.director_prompt := null;/)
+    expect(sql).toMatch(/before update of prompt, action_description on public\.shots/)
+    expect(sql).not.toMatch(/before update of[^;]*action_description_native/)
+  })
 })
 
 describe('Director 화면이 보내는 그림 · 영상 요청', () => {

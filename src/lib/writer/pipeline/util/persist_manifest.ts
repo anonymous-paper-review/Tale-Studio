@@ -455,7 +455,7 @@ const SHOT_USER_CARRY_FORWARD_COLUMNS = [
   'trim_start',
   'trim_end',
   'location_ids',
-  // TODO(P4): prompt_override / manual prompt edit provenance columns land here once migrated.
+  // Director 고친 샷 글(director_prompt)은 아래 applyShotCarryForward 가 조건부로 잇는다(글 · 이야기가 그대로일 때만).
 ] as const
 
 type ShotUserCarryForwardColumn = (typeof SHOT_USER_CARRY_FORWARD_COLUMNS)[number]
@@ -463,6 +463,8 @@ type ExistingShotCarryForward = Record<string, unknown> & {
   shot_id?: unknown
   prompt?: unknown
   prompt_source_hash?: unknown
+  action_description?: unknown
+  director_prompt?: unknown
 }
 type PersistShotDraft = {
   sceneMainId: string
@@ -710,11 +712,21 @@ export function applyShotCarryForward<T extends Record<string, unknown>>(
   existing?: ExistingShotCarryForward,
 ): T {
   if (!existing) return row
-  const carry: Partial<Record<ShotUserCarryForwardColumn, unknown>> = {}
+  const carry: Partial<Record<ShotUserCarryForwardColumn | 'director_prompt', unknown>> = {}
   for (const column of SHOT_USER_CARRY_FORWARD_COLUMNS) {
     if (Object.prototype.hasOwnProperty.call(existing, column) && existing[column] !== undefined) {
       carry[column] = existing[column]
     }
+  }
+  // Director 에서 고친 샷 글(shots.director_prompt, 리드 2026-11-26) — 다시 돌려도 샷 글과 샷 이야기가 그대로면 남기고, 바뀌었으면 넣지 않는다(비움).
+  //   DB 방아쇠(shots_clear_director_prompt)와 같은 규칙이다. 다시 돌리기는 행을 지우고 새로 넣어 방아쇠를 거치지 않는다 — 여기서 같은 판정을 한다.
+  //   약속: tests/writer/director-prompt-rerun.test.ts
+  const directorPrompt = existing.director_prompt
+  if (
+    typeof directorPrompt === 'string' && directorPrompt.trim() &&
+    existing.prompt === row.prompt && existing.action_description === row.action_description
+  ) {
+    carry.director_prompt = directorPrompt
   }
   return Object.keys(carry).length ? ({ ...row, ...carry } as T) : row
 }
