@@ -24,6 +24,7 @@ vi.mock('@/stores/director-store', () => ({ useDirectorCanvasStore: { getState: 
 vi.mock('@/lib/generation-queue', async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), activeJobsSnapshot: () => state.jobs }))
 
 import { runStoryboardImageUpdates } from '@/lib/storyboard/chat-images'
+import { useRoughFillStore } from '@/lib/storyboard/rough-fill-store'
 
 const conti = { url: 'https://x/r.png', status: 'completed', errorMessage: null, generatedAt: 1, frames: { start: 'a', direction: 'b', end: 'c' } }
 const real = { url: 'https://x/real.png', status: 'completed', generatedAt: 2, frames: { start: 'r1', direction: 'r2', end: 'r3' } }
@@ -39,6 +40,7 @@ beforeEach(() => {
   ]
   state.images = { projectId: 'p1', images: { sh_01_01: real } }
   state.jobs = []
+  useRoughFillStore.setState({ projectId: null, pending: {}, running: false })
 })
 
 const run = (updates: Array<{ type: 'generateImage'; id?: string; change?: string }>) =>
@@ -70,6 +72,24 @@ describe('Storyboard 채팅의 실사 그림 요청 맡기기', () => {
     await run([{ type: 'generateImage', id: 'sh_01_02', change: 'darker' }])
     expect(calls.redraw).not.toHaveBeenCalled()
     expect(calls.notify).toHaveBeenCalledWith('⚠ 샷 2은(는) 지금 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.')
+  })
+
+  // 왜(리드 2026-11-26 — [시작]과 같은 샷 · 같은 알림): 채팅으로 부탁해도 콘티 그림을 그리는 중인 샷은 빼고, 빠진 샷과 까닭을 채팅에 남긴다.
+  it('채팅이 샷 없이 실사를 만들라고 하면 콘티 그림을 그리는 중인 샷은 빼고 만들고, 빠진 샷 이름을 채팅에 알린다', async () => {
+    state.writer.shots = [...state.writer.shots, { shotId: 'sh_01_04', sceneId: 's1', actionDescription: '우산', roughStoryboard: conti }]
+    state.jobs = [{ id: 'r1', kind: 'shot_rough_storyboard', target: { writerShotIds: ['sh_01_02'] } }]
+    await run([{ type: 'generateImage' }])
+    expect(calls.start).toHaveBeenCalledWith('p1', ['sh_01_04'])
+    expect(calls.notify).toHaveBeenCalledWith('⚠ 콘티 그림을 그리는 중인 샷 2은(는) 빼고 만들어요. 다 그리면 [시작]을 다시 눌러 주세요.')
+    expect(calls.notify).toHaveBeenCalledWith('⚠ 콘티 그림이 없는 샷 3은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.')
+  })
+
+  // 왜: 실사가 없는 샷은 콘티 그림으로 실사를 만든다 — 콘티가 아직 그려지는 중이면 맡기지 않고 다 그린 뒤 다시 부탁하라고 알린다(이어 그리기가 보낸 샷도 같다).
+  it('콘티 그림을 그리는 중이고 실사가 없는 샷을 그리라고 하면 맡기지 않고 콘티 그림을 다 그린 뒤 다시 부탁하라고 알린다', async () => {
+    useRoughFillStore.setState({ projectId: 'p1', pending: { sh_01_03: true }, running: true })
+    await run([{ type: 'generateImage', id: 'sh_01_03' }])
+    expect(calls.redraw).not.toHaveBeenCalled()
+    expect(calls.notify).toHaveBeenCalledWith('⚠ 샷 3은(는) 콘티 그림을 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.')
   })
 
   // 왜(혼자 정한 것 f): 콘티 그림이 없는 샷은 실사를 못 만든다 — 어디서 그리는지 알린다.

@@ -106,6 +106,13 @@ describe('Storyboard 실사 카드', () => {
     expect(card({ wait: 'queued' })).toContain('이미지 생성 대기 중')
   })
 
+  // 왜(리드 2026-11-26 — Storyboard 가 빠진 콘티 그림을 이어 그린다): 그리는 동안 "콘티 그림이 없어요"가 보이면 고장으로 읽힌다 — 그 카드만 덮어 지금 그린다고 보인다.
+  it('콘티 그림을 그리는 중인 카드는 카드를 덮는 기다림 카드로 "콘티 그림을 그리고 있어요"를 보인다', () => {
+    const html = card({ picture: storyboardCardPicture(null, null), wait: 'rough' })
+    expect(html).toContain('콘티 그림을 그리고 있어요')
+    expect(html).toContain('data-wait="rough"')
+  })
+
   // 왜(11/9 실측): 축척 5 · 6열 카드에는 설명까지 들어가지 않는다 — 제목만 남긴다(지금 보드와 같은 규칙).
   it('좁은 카드의 기다림에는 설명 없이 제목만 보인다', () => {
     const html = card({ wait: 'drawing', compact: true })

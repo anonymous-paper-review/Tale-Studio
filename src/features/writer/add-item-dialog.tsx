@@ -38,6 +38,8 @@ import {
 import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import { useWriterStore } from '@/stores/writer-store'
+import { NEW_PLACE, isKnownPlace, scenePlaceOf, type PlaceRow } from '@/lib/writer/scene-place'
+import { toast } from 'sonner'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { boardShots } from '@/lib/writer/board-summary'
 import type { GenerationMethod, LightingConfig, ShotType } from '@/types'
@@ -179,6 +181,9 @@ interface AddItemDialogProps {
   onOpenChange: (open: boolean) => void
 }
 
+// 배경이 없을 때 고르기 목록이 늘 같은 빈 목록이게(store 선택값이 렌더마다 새 배열이면 다시 그리기가 돈다).
+const NO_PLACES: readonly PlaceRow[] = []
+
 export function AddItemDialog({
   open,
   mode,
@@ -192,6 +197,8 @@ export function AddItemDialog({
   const shots = useWriterStore((s) => s.shots)
   const addShot = useWriterStore((s) => s.addShot)
   const addScene = useWriterStore((s) => s.addScene)
+  // 씬 장소는 Artist 배경 목록에서 고른다(W6 · 리드 승인 ⑥) — 목록이 없으면 지금처럼 글로 적는다.
+  const sceneLocations = useWriterStore((s) => s.sceneManifest?.locations ?? NO_PLACES)
 
   const scenes = useMemo(() => sceneManifest?.scenes ?? [], [sceneManifest])
   const characters = useMemo(() => sceneManifest?.characters ?? [], [sceneManifest])
@@ -216,6 +223,8 @@ export function AddItemDialog({
   // 우 패널 폼 — scene
   const [summaryText, setSummaryText] = useState('')
   const [locationText, setLocationText] = useState('')
+  // 고른 배경 id · "새 장소"(NEW_PLACE) · 아직 안 고름('').
+  const [placeChoice, setPlaceChoice] = useState('')
   const [timeText, setTimeText] = useState('')
   const [moodText, setMoodText] = useState('')
 
@@ -237,6 +246,7 @@ export function AddItemDialog({
     setGenMethod('T2V')
     setSummaryText('')
     setLocationText('')
+    setPlaceChoice('')
     setTimeText('')
     setMoodText('')
   }, [open, mode])
@@ -285,15 +295,20 @@ export function AddItemDialog({
           },
         })
       } else {
+        const location = scenePlaceOf(placeChoice, locationText, sceneLocations)
         await addScene({
           afterSceneId: locked.afterSceneId,
           fields: {
             narrativeSummary: summaryText.trim(),
-            location: locationText.trim(),
+            location,
             timeOfDay: timeText.trim() || 'day',
             mood: moodText.trim(),
           },
         })
+        // 목록에 없는 새 장소 — 배경 카드는 만들지 않고, 그 씬은 배경 그림 없이 그린다고 알리기만 한다(⑦, 채팅 W6 과 같은 말).
+        if (sceneLocations.length > 0 && location && !isKnownPlace(location, sceneLocations)) {
+          toast.info(t('Not in the Artist backgrounds: {places}. Scenes set there are drawn without a background image.', { places: location }))
+        }
       }
       onOpenChange(false)
     } finally {
@@ -632,13 +647,40 @@ export function AddItemDialog({
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-1.5">
                         <label className="text-sm font-medium">{t('Location')}</label>
-                        <HoverBeam>
-                          <Input
-                            value={locationText}
-                            onChange={(e) => setLocationText(e.target.value)}
-                            placeholder={t('E.g. a desolate rocky mountain')}
-                          />
-                        </HoverBeam>
+                        {sceneLocations.length > 0 ? (
+                          <>
+                            <Select value={placeChoice} onValueChange={setPlaceChoice}>
+                              <SelectTrigger className="w-full" data-testid="add-scene-place">
+                                <SelectValue placeholder={t('Pick an Artist background')} />
+                              </SelectTrigger>
+                              <SelectContent>
+                                {sceneLocations.map((place) => (
+                                  <SelectItem key={place.locationId} value={place.locationId}>
+                                    {place.name || place.locationId}
+                                  </SelectItem>
+                                ))}
+                                <SelectItem value={NEW_PLACE}>{t('New place')}</SelectItem>
+                              </SelectContent>
+                            </Select>
+                            {placeChoice === NEW_PLACE ? (
+                              <HoverBeam>
+                                <Input
+                                  value={locationText}
+                                  onChange={(e) => setLocationText(e.target.value)}
+                                  placeholder={t('E.g. a desolate rocky mountain')}
+                                />
+                              </HoverBeam>
+                            ) : null}
+                          </>
+                        ) : (
+                          <HoverBeam>
+                            <Input
+                              value={locationText}
+                              onChange={(e) => setLocationText(e.target.value)}
+                              placeholder={t('E.g. a desolate rocky mountain')}
+                            />
+                          </HoverBeam>
+                        )}
                       </div>
                       <div className="space-y-1.5">
                         <label className="text-sm font-medium">{t('Time of day')}</label>

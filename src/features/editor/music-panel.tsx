@@ -48,6 +48,8 @@ function failureText(code: string | null, t: ReturnType<typeof useT>): string {
       return t('There were not enough Takes.')
     case 'timed_out':
       return t('It took too long and stopped.')
+    case 'cancelled':
+      return t('Making was stopped.')
     default:
       return t('Something went wrong while making it. Make it again.')
   }
@@ -197,6 +199,10 @@ export function MusicPanel() {
                 <>
                   <p className="text-meta font-medium text-destructive">{t('Could not make this music')}</p>
                   <p className="text-meta text-subtle-foreground">{failureText(item.error, t)}</p>
+                  {item.error === 'timed_out' ? (
+                    // 접수 여부를 모르는 작업은 Take 를 묶은 채 기다린다(영상과 같은 정책) — Editor 만으로는 풀 수 없어 [대기열]에서 지우는 길을 알린다.
+                    <p className="text-meta text-subtle-foreground">{t('If a Take is held, delete this job in [Queue] at the top of the projects page to get it back.')}</p>
+                  ) : null}
                   <Button size="sm" variant="secondary" className="h-7 self-start rounded-full px-3" onClick={() => retry(item.id)}>
                     {t('Make again')}
                   </Button>

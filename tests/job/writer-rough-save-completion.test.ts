@@ -25,7 +25,7 @@ const row = (): GenerationBatchRow => ({
   target: { workspaceId: 'workspace', writerShotIds: ['shot-a', 'shot-b'], gridVariant: 'grid4' },
   created_at: new Date(1000).toISOString(),
 })
-const badge = (job: GenerationBatchRow) => deriveStageBadges(completionsOf([job]), { writer: 1000 }, 'artist')
+const badge = (job: GenerationBatchRow) => deriveStageBadges(completionsOf([job]), { conti: 1000 }, 'artist')
 const providerResult = { media: 'image' as const, url: 'https://fal.media/rough.png' }
 function installShotSave(save: (shotId: string) => Promise<{ error: Error | null }>) {
   mocks.from.mockImplementation((table: string) => {
@@ -73,7 +73,7 @@ it('러프 두 샷 중 마지막 저장을 기다리는 동안에는 0이고 모
   await saving
   expect(mocks.upload).toHaveBeenCalledTimes(6)
   expect(mocks.complete).toHaveBeenCalledTimes(1)
-  expect(badge(job)).toEqual({ writer: 2 })
+  expect(badge(job)).toEqual({ conti: 2 })
 })
 
 it('러프 그리드 저장이 실패하면 완료 숫자를 올리거나 완료 처리하지 않는다.', async () => {

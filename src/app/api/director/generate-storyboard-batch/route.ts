@@ -27,6 +27,7 @@ import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
 import { englishTimeOfDay, extraCharactersInShot, isReflectionShot, promptName, roughIsStaticHold, stillCharacterLabel, subjectAnchor } from '@/lib/director/still-prompt'
 import { buildPhotoGridPrompt, type PhotoCharacterLabel } from '@/lib/director/photo-strip'
 import { realCineLine } from '@/lib/director/real-cine-line'
+import { freshDirectionLine } from '@/lib/writer/direction-read'
 import { styleFromUserAnalysis } from '@/lib/artist/sheet-prompt-input'
 import { resolveImageEndpoint, resolveSheetImageModel } from '@/lib/image-models'
 import {
@@ -81,6 +82,8 @@ interface EligibleShot {
   photo: { staticSpec: unknown; cineLine: string | null; reflection: boolean; staticHold: boolean; noPeople: boolean } | null
   /** 소품 참고(D7 2단계 · m1126 리드 R1): 칸마다 소품 칸(static_spec.prop_placement)을 읽는다 — 모든 그림체. */
   staticSpec: unknown
+  /** 콘티에서 고친 화살표를 읽고 그 줄로 끝 장을 다시 그린 샷의 줄(오너 2026-11-22 R1, freshDirectionLine) — 없으면 null(그 칸은 지금 그대로). 모든 그림체. */
+  directionLine: string | null
 }
 
 class CharacterAppearanceContractError extends Error {}
@@ -262,6 +265,7 @@ export async function POST(req: NextRequest) {
         frames: { start: f.start, direction: f.direction, end: f.end },
         blocking: readCharacterBlocking(s.static_spec),
         staticSpec: s.static_spec,
+        directionLine: freshDirectionLine(s.rough_storyboard),
         photo: photoLook
           ? {
               staticSpec: s.static_spec,
@@ -487,6 +491,7 @@ export async function POST(req: NextRequest) {
             characterRefCount: groupRefs.length,
             worldRefCount: worldRef ? 1 : 0,
             cineLines: group.map((s) => s.photo?.cineLine ?? null),
+            directionLines: group.map((s) => s.directionLine),
             characterRefs: groupRefs.map((r) => ({ name: r.name, look: r.look })),
             columnCharacters,
             sceneLighting,
@@ -506,6 +511,7 @@ export async function POST(req: NextRequest) {
         styleRefCount: anchorTwoRef ? 2 : 1,
         styleAnchors: userStyleFacets?.probeAnchors ?? null,
         styleAvoid: userStyleFacets?.negative ?? null,
+        directionLines: group.map((s) => s.directionLine),
       })) + (seriesFrameUrl ? `\n- ${seriesContinuityPromptLine(seriesFrameColumn + 1)}` : '') + (propLines.length ? `\n${propLines.join('\n')}` : '')
       const referenceImageUrls = [
         refUrl,
@@ -525,6 +531,8 @@ export async function POST(req: NextRequest) {
       try {
         moderation = await assertUserTextAllowed(
           [
+            // 콘티에서 고친 화살표를 읽은 줄(오너 R1) — 사람이 연출 장에 쓴 손글씨 · 고친 글이 옮겨진다. 줄 있는 칸만(없는 시트는 검사 목록도 지금과 같다).
+            ...group.flatMap((s) => (s.directionLine ? [s.directionLine] : [])),
             ...columnCharacters.flatMap((column) => column.flatMap((c) => [c.name, c.pose, c.position])),
             ...(photoLook ? [...groupRefs.map((r) => r.look), ...group.map((s) => s.photo?.cineLine ?? null)] : []),
             sceneLighting,

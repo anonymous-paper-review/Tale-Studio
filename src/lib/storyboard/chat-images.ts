@@ -11,8 +11,9 @@ import { activeJobsSnapshot } from '@/lib/generation-queue'
 import { translate } from '@/lib/i18n/translate'
 import type { AppLocale } from '@/lib/locale'
 import type { StoryboardImageUpdate } from '@/lib/storyboard/chat-image-tool'
-import { realDrawingShotIds, realPanelOf, storyboardStartView } from '@/lib/storyboard/real-board'
+import { noContiNotice, realDrawingShotIds, realPanelOf, roughDrawingNotice, roughDrawingShotIds, storyboardStartView } from '@/lib/storyboard/real-board'
 import { useStoryboardRealImages } from '@/lib/storyboard/real-images-store'
+import { roughFillPendingOf, useRoughFillStore } from '@/lib/storyboard/rough-fill-store'
 import { redrawStoryboardImage } from '@/lib/storyboard/redraw-image'
 import { startStoryboardReal } from '@/lib/storyboard/start-real'
 import { boardShots } from '@/lib/writer/board-summary'
@@ -32,8 +33,12 @@ export async function runStoryboardImageUpdates(
   const board = boardShots(writer.sceneManifest, writer.shots)
   const stored = useStoryboardRealImages.getState()
   const images: Readonly<Record<string, unknown>> = stored.projectId === projectId ? stored.images : {}
-  const drawing = realDrawingShotIds(activeJobsSnapshot(projectId))
+  const jobs = activeJobsSnapshot(projectId)
+  const drawing = realDrawingShotIds(jobs)
+  // 콘티 그림을 그리는 샷(큐 + Storyboard 이어 그리기가 보낸 샷) — [시작]과 같이 빼고 알린다(리드 2026-11-26).
+  const roughDrawing = roughDrawingShotIds(jobs, Object.keys(roughFillPendingOf(useRoughFillStore.getState(), projectId)))
   const director = useDirectorCanvasStore.getState()
+  const nameOf = (shotId: string) => shotName(locale, board.find((entry) => entry.shot.shotId === shotId)?.shotNo ?? shotId)
   for (const update of updates) {
     if (!update.id) {
       // [시작]과 같은 샷 — 실사 없음 · 콘티 있음 · 그리는 중 아님, 보드 순서.
@@ -42,7 +47,12 @@ export async function runStoryboardImageUpdates(
         realOf: (shotId) => images[shotId],
         drawing,
         batch: { busy: director.realBatchBusy, cancelled: director.realBatchCancelled, shotIds: director.realBatchShotIds },
+        roughDrawing,
       })
+      // [시작]과 같은 알림 — 빠진 샷과 까닭을 채팅에 남긴다.
+      for (const notice of [roughDrawingNotice(locale, view.roughDrawing.map(nameOf)), noContiNotice(locale, view.noConti.map(nameOf))]) {
+        if (notice) notify(`⚠ ${notice}`)
+      }
       if (view.targets.length > 0) await startStoryboardReal(projectId, view.targets)
       continue
     }
@@ -54,6 +64,11 @@ export async function runStoryboardImageUpdates(
     const name = shotName(locale, entry.shotNo)
     if (drawing.has(entry.shot.shotId)) {
       notify(`⚠ ${translate(locale, '{shot} is being drawn right now. Ask again when it is done.', { shot: name })}`)
+      continue
+    }
+    // 실사가 없으면 콘티 그림으로 실사를 만든다 — 콘티가 아직 그려지는 중이면 맡기지 않는다(바뀌는 중인 콘티로 만들면 다시 만들어야 한다).
+    if (!realPanelOf(images[entry.shot.shotId]) && roughDrawing.has(entry.shot.shotId)) {
+      notify(`⚠ ${translate(locale, '{shot} is still getting its rough storyboard. Ask again when it is drawn.', { shot: name })}`)
       continue
     }
     if (!realPanelOf(images[entry.shot.shotId]) && !(entry.shot.roughStoryboard && isRoughDrawn(entry.shot.roughStoryboard))) {

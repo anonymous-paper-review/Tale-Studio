@@ -65,7 +65,7 @@ describe('콘티 화면 머리', () => {
     expect(read('src/features/writer/writer-header.tsx')).toMatch(/onClick=\{\(\) => void useGlobalChatStore\.getState\(\)\.requestNextStep\(\)\}[\s\S]{0,200}data-testid="conti-next-artist"/)
   })
 
-  // 왜(혼자 정한 것): 씬 · 샷이 아직 없으면(나누는 중 · 실패) Artist 로 넘길 콘티가 없다 — 러프를 다 그리지 않아도 씬 · 샷이 있으면 켠다(빠진 러프는 Storyboard 가 그린다).
+  // 왜(혼자 정한 것): 씬 · 샷이 아직 없으면(나누는 중 · 실패) Artist 로 넘길 콘티가 없다 — 러프를 다 그리지 않아도 씬 · 샷이 있으면 켠다(빠진 러프는 콘티로 돌아오면 다시 그린다 — Storyboard 는 러프를 그리지 않는다(m-storyboard)).
   it('[Artist로 가기]는 씬 · 샷이 생기기 전에는 꺼져 있고, 러프를 다 그리지 않아도 씬 · 샷이 있으면 켜진다', () => {
     expect(button(renderToStaticMarkup(createElement(WriterHeader)), 'conti-next-artist')).not.toMatch(/\bdisabled=""/)
     data.writer.shots = []

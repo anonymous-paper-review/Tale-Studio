@@ -28,6 +28,7 @@ const mocks = vi.hoisted(() => ({
   inserted: [] as Array<{ table: string; row: Record<string, unknown> }>,
   updated: [] as Array<{ table: string; patch: Record<string, unknown>; filters: Array<[string, unknown]> }>,
   rows: {} as Record<string, unknown[]>,
+  failUpdate: new Set<string>(),
 }))
 
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
@@ -88,7 +89,8 @@ import { DELETE } from '@/app/api/editor/music/[id]/route'
 import { finalizeGenerationJob, DirectorVideoCompletionPersistenceError, DirectorVideoTerminalError } from '@/lib/fal/finalize'
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { extractAudioUrl } from '@/lib/fal/music'
-import { editorMusicPath } from '@/lib/editor/music-server'
+import { editorMusicPath, listEditorMusic } from '@/lib/editor/music-server'
+import { GenerationJobTerminalTransitionError } from '@/lib/generation-jobs'
 import { ModerationBlockedError } from '@/lib/moderation/creem'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { IMAGE_JOB_KINDS, VIDEO_JOB_KINDS } from '@/lib/generation-quota'
@@ -124,7 +126,11 @@ function table(name: string) {
   q.maybeSingle = vi.fn(async () => ({ data: rows()[0] ?? null, error: null }))
   q.single = vi.fn(async () => ({ data: mocks.inserted.filter((x) => x.table === name).at(-1)?.row ?? rows()[0] ?? null, error: null }))
   ;(q as { then: unknown }).then = (resolve: (v: unknown) => unknown) => {
-    if (patch) mocks.updated.push({ table: name, patch, filters: [...filters] })
+    if (patch) {
+      mocks.updated.push({ table: name, patch, filters: [...filters] })
+      mocks.order.push(`update:${name}`)
+      if (mocks.failUpdate.has(name)) return Promise.resolve({ data: null, error: { message: 'connection reset', code: '08006' } }).then(resolve)
+    }
     return Promise.resolve({ data: patch ? rows().map((r) => ({ id: r.id })) : rows(), error: null }).then(resolve)
   }
   return q
@@ -160,6 +166,7 @@ beforeEach(() => {
   mocks.inserted = []
   mocks.updated = []
   mocks.rows = { projects: [{ id: PROJECT, workspace_id: 'ws-1' }] }
+  mocks.failUpdate = new Set()
   mocks.requireProjectAccess.mockResolvedValue({ ok: true, projectId: PROJECT, userId: 'user-1', viaShare: false })
   mocks.checkGenerationCapacity.mockResolvedValue({ ok: true })
   mocks.assertUserTextAllowed.mockResolvedValue(RECEIPT)
@@ -348,3 +355,82 @@ describe('혼자 정한 것', () => {
   })
 })
 
+describe('마무리 순서 · 멈춘 곡 (검토 rev-billing 2026-11-26)', () => {
+  const audioOk = () => vi.stubGlobal('fetch', vi.fn(async () => new Response(Buffer.from('ID3 music bytes'), { status: 200, headers: { 'content-type': 'audio/mpeg' } })))
+
+  it('음악 마무리는 작업을 먼저 끝으로 바꾼 뒤 곡 행을 끝으로 적고, 작업을 끝으로 못 바꾸면(그사이 지워져 Take 를 돌려받았으면) 곡 행을 끝으로 적지 않는다', async () => {
+    // 왜: 곡 행을 먼저 끝으로 적으면, 마무리 도중 큐에서 그 작업을 지워 Take 를 돌려받거나 완료 전이가 실패해 Take 를 돌려줘도 곡은 완성으로 남았다(공짜 곡).
+    audioOk()
+    mocks.completeGenerationJob.mockImplementationOnce(async () => {
+      mocks.order.push('complete-job')
+    })
+    await finalizeGenerationJob(musicJob(), { media: 'audio', url: 'https://v3b.fal.media/files/b/music.mp3' })
+    expect(mocks.order.filter((x) => x === 'complete-job' || x === 'update:editor_music')).toEqual(['complete-job', 'update:editor_music'])
+
+    mocks.order = []
+    mocks.updated = []
+    mocks.completeGenerationJob.mockRejectedValueOnce(new GenerationJobTerminalTransitionError('job-1', 'failed'))
+    await expect(finalizeGenerationJob(musicJob(), { media: 'audio', url: 'https://v3b.fal.media/files/b/music.mp3' })).rejects.toBeInstanceOf(GenerationJobTerminalTransitionError)
+    expect(mocks.updated.filter((x) => x.table === 'editor_music')).toEqual([])
+  })
+
+  it('작업을 끝으로 바꾸다 DB 가 잠깐 실패하면 다시 할 수 있는 실패로 남겨, 웹훅이 작업을 실패로 닫거나 Take 를 돌려주지 않고 다음 웹훅 · 폴링이 마무리한다', async () => {
+    // 왜: 곡은 이미 만들어져 보관함에 올라갔다 — 잠깐의 DB 오류로 실패 처리하면 만든 곡을 잃고 Take 만 돌려준다. 다시 하면 같은 파일로 끝난다(바뀌지 않는 파일).
+    audioOk()
+    mocks.completeGenerationJob.mockRejectedValueOnce(Object.assign(new Error('connection failure'), { code: '08006' }))
+    await expect(finalizeGenerationJob(musicJob(), { media: 'audio', url: 'https://v3b.fal.media/files/b/music.mp3' })).rejects.toBeInstanceOf(DirectorVideoCompletionPersistenceError)
+    expect(mocks.updated.filter((x) => x.table === 'editor_music')).toEqual([])
+
+    mocks.completeGenerationJob.mockRejectedValueOnce(Object.assign(new Error('connection failure'), { code: '08006' }))
+    mocks.getGenerationJobByRequestId.mockResolvedValueOnce(musicJob())
+    const res = await webhookPOST(new Request('http://localhost/api/fal/webhook', { method: 'POST', body: JSON.stringify({ request_id: 'fal-req-1', status: 'OK', payload: { audio: { url: 'https://v3b.fal.media/files/b/music.mp3' } } }) }))
+    expect(res.status).toBe(200)
+    expect(mocks.failGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.releaseTakesForJob).not.toHaveBeenCalled()
+  })
+
+  it('작업을 끝으로 바꾼 뒤 곡 행을 적지 못해도 마무리는 성공이고, 목록이 작업의 결과 주소로 곡을 끝으로 고쳐 적는다', async () => {
+    // 왜: 작업이 끝났으면 Take 는 쓰인 것이 맞다 — 곡 행 쓰기만 잠깐 실패해도 다음에 목록을 읽을 때 곡이 보여야 한다.
+    audioOk()
+    mocks.failUpdate.add('editor_music')
+    const url = await finalizeGenerationJob(musicJob(), { media: 'audio', url: 'https://v3b.fal.media/files/b/music.mp3' })
+    expect(mocks.completeGenerationJob).toHaveBeenCalledWith('job-1', url)
+    mocks.failUpdate.clear()
+    mocks.rows.editor_music = [
+      { id: 'music-1', project_id: PROJECT, job_id: 'job-1', model: 'elevenlabs-music', prompt: '잔잔한 피아노', lyrics: null, instrumental: true, requested_duration_sec: 20, url: null, status: 'queued', error: null, created_at: new Date().toISOString(), deleted_at: null },
+    ]
+    mocks.getGenerationJobsByIds.mockResolvedValueOnce([{ id: 'job-1', status: 'completed', result_url: url, error: null, request_id: 'fal-req-1', kind: 'editor_music' }])
+    const items = await listEditorMusic(PROJECT)
+    expect(items.map((x) => [x.id, x.status, x.url])).toEqual([['music-1', 'completed', url]])
+  })
+
+  it('만드는 중인 곡의 작업이 큐에서 지워졌으면 목록에서 바로 "만들기를 멈췄어요"(실패)로 보이고 뺄 수 있다', async () => {
+    // 왜: 큐에서 지운 작업은 Take 를 돌려받고 다시 끝나지 않는다 — 곡 행만 만드는 중으로 남으면 30분 동안 뺄 수도 없었다.
+    mocks.rows.editor_music = [
+      { id: 'music-2', project_id: PROJECT, job_id: 'job-gone', model: 'elevenlabs-music', prompt: '잔잔한 피아노', lyrics: null, instrumental: true, requested_duration_sec: 20, url: null, status: 'queued', error: null, created_at: new Date().toISOString(), deleted_at: null },
+    ]
+    mocks.getGenerationJobsByIds.mockResolvedValueOnce([])
+    const items = await listEditorMusic(PROJECT)
+    expect(items.map((x) => [x.id, x.status, x.error])).toEqual([['music-2', 'failed', 'cancelled']])
+    expect(mocks.updated.find((x) => x.table === 'editor_music')?.patch).toMatchObject({ status: 'failed', error: 'cancelled' })
+  })
+
+  it('30분이 지나도 끝나지 않은 곡(접수 여부를 모르는 채 남은 작업 포함)은 목록에서 "너무 오래 걸려 멈췄어요"로 보여 뺄 수 있고, 작업 · Take 는 건드리지 않는다', async () => {
+    // 왜: 접수 여부를 모르는 작업은 이중 과금을 막으려고 Take 를 묶은 채 기다린다(영상과 같은 정책) — 그래서 곡이 영영 "만드는 중"이라 Editor 에서 뺄 수 없었다.
+    //   DB 자리 트리거도 30분 지난 작업은 세지 않는다. 나중에 끝나면 마무리가 곡을 다시 끝으로 적는다.
+    const old = new Date(Date.now() - 31 * 60_000).toISOString()
+    mocks.rows.editor_music = [
+      { id: 'music-3', project_id: PROJECT, job_id: 'job-3', model: 'elevenlabs-music', prompt: '잔잔한 피아노', lyrics: null, instrumental: true, requested_duration_sec: 20, url: null, status: 'queued', error: null, created_at: old, deleted_at: null },
+      { id: 'music-4', project_id: PROJECT, job_id: 'job-4', model: 'elevenlabs-music', prompt: '새벽 바다', lyrics: null, instrumental: true, requested_duration_sec: 20, url: null, status: 'queued', error: null, created_at: new Date().toISOString(), deleted_at: null },
+    ]
+    mocks.getGenerationJobsByIds.mockResolvedValueOnce([
+      { id: 'job-3', status: 'queued', result_url: null, error: null, request_id: 'reserved:job-3', kind: 'editor_music' },
+      { id: 'job-4', status: 'queued', result_url: null, error: null, request_id: 'reserved:job-4', kind: 'editor_music' },
+    ])
+    const items = await listEditorMusic(PROJECT)
+    expect(items.map((x) => [x.id, x.status, x.error])).toEqual([['music-3', 'failed', 'timed_out'], ['music-4', 'queued', null]])
+    expect(mocks.failGenerationJob).not.toHaveBeenCalled()
+    expect(mocks.rejectGenerationJobReservation).not.toHaveBeenCalled()
+    expect(mocks.releaseTakesForJob).not.toHaveBeenCalled()
+  })
+})

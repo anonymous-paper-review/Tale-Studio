@@ -48,11 +48,14 @@ describe('러프 한 장 고치기 뒤 다시 읽기', () => {
     expect((seen[0].rough_storyboard as { generatedAt: number }).generatedAt).toBe(200)
   })
 
-  // 왜: 팝업의 세 단추(한 장 다시 · 연출 [저장] · [저장 후 END 재생성])가 모두 같은 길로 다시 읽어야 한다 — Storyboard 팝업과 Director 팝업이 같은 부품을 쓴다.
-  it('[이 장만 다시 만들기] · 연출 [저장] · [저장 후 END 재생성]은 끝나면 샷 목록을 새로 읽게 한다', () => {
+  // 왜: 팝업의 세 길(한 장 다시 · 연출 [저장] · 저장 뒤 끝 장 물음의 [다시 그리기])이 모두 같은 길로 다시 읽어야 한다 — Storyboard 팝업과 Director 팝업이 같은 부품을 쓴다.
+  //   2026-11-22 문장 바꿈(D10 · 리드 Q2 "저장할 때마다 묻기"): 따로 있던 [저장 후 END 재생성] 단추를 저장 뒤 물음으로 합쳤다.
+  it('[이 장만 다시 만들기] · 연출 [저장] · 끝 장 물음의 [다시 그리기]는 끝나면 샷 목록을 새로 읽게 한다', () => {
     const still = readFileSync('src/features/writer/rough-frames-still.tsx', 'utf8')
     const editor = readFileSync('src/features/writer/directing-arrow-editor.tsx', 'utf8')
+    const confirm = readFileSync('src/features/writer/unsaved-arrows-confirm.tsx', 'utf8')
     expect(still).toMatch(/reloadAfterRoughFrameEdit\(projectId, onRegenerated\)/)
-    expect(editor.match(/reloadAfterRoughFrameEdit\(projectId, onSaved\)/g)?.length).toBe(2)
+    expect(editor.match(/reloadAfterRoughFrameEdit\(projectId, onSaved\)/g)?.length).toBe(1)
+    expect(confirm).toMatch(/reload: \(\) => reloadAfterRoughFrameEdit\(target\.projectId, target\.onRedrawn\)/)
   })
 })

@@ -142,4 +142,47 @@ describe('Director 고친 프롬프트 저장', () => {
     expect(sql).toMatch(/if new\.prompt is distinct from old\.prompt and new\.director_prompt is not distinct from old\.director_prompt then\s+new\.director_prompt := null;/)
     expect(sql).toMatch(/before update of prompt on public\.shots/)
   })
+
+  it('Writer 콘티 · 채팅에서 샷 이야기(action_description)를 고쳐도 DB 가 Director 고친 글을 비운다 — 번역 칸(_native)만 바뀌면 남긴다', () => {
+    // 왜: 콘티 · 채팅의 샷 이야기 고침은 action_description 만 쓰고 prompt 는 쓰지 않는다 — prompt 만 보던 방아쇠는 콘티 고침에 한 번도 걸리지 않아
+    //   옛 고친 글이 새 이야기를 덮었다(리드 2026-11-26 확인 요청으로 찾음). 번역 채우기(derive-en)는 _native 만 바꾸므로 비우지 않는다
+    //   (개발 DB 실측: _native 만 → 남음, action_description → null).
+    const sql = readFileSync('supabase/migrations/20261126230000_shots_director_prompt_story_edit.sql', 'utf8')
+    expect(sql).toMatch(/if \(new\.prompt is distinct from old\.prompt or new\.action_description is distinct from old\.action_description\)\s+and new\.director_prompt is not distinct from old\.director_prompt then\s+new\.director_prompt := null;/)
+    expect(sql).toMatch(/before update of prompt, action_description on public\.shots/)
+    expect(sql).not.toMatch(/before update of[^;]*action_description_native/)
+  })
+})
+
+describe('Director 화면이 보내는 그림 · 영상 요청', () => {
+  // 화면이 보낸 요청 몸을 모은다 — 생성처는 바로 거절해 다음 단계(기다림 · 판정)를 부르지 않는다.
+  const bodiesTo = (fetcher: ReturnType<typeof vi.fn>, url: string) => fetcher.mock.calls
+    .filter(([input]) => String(input) === url)
+    .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>)
+  const stubFetch = () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.startsWith('/api/director/video-takes?')) return new Response(JSON.stringify({ takes: [] }), { status: 200 })
+      return new Response(JSON.stringify({ error: 'stop here' }), { status: 400 })
+    })
+    vi.stubGlobal('fetch', fetcher)
+    return fetcher
+  }
+
+  it('Director 화면에서 그림을 만들면 지금 보이는 글(0.5초 안에 막 고친 글 포함)을 보내고 Director 화면의 글이라고 알린다 — 서버가 DB 의 옛 고친 글로 바꾸지 않게', async () => {
+    // 왜: 서버는 Storyboard · 다른 기기 요청에는 DB 의 고친 글을 먼저 쓴다(리드 2026-11-26). 채팅 [적용] 바로 뒤처럼 저장 전에 요청하면
+    //   DB 는 아직 옛 글이라, Director 화면 요청까지 DB 글로 바꾸면 방금 고친 글이 아닌 옛 글로 그린다.
+    const fetcher = stubFetch()
+    api().updateNodeData<'shot'>(shotId, { promptOverride: 'Applied from chat just now.' })
+    await api().generateStoryboardImage(shotId)
+    expect(bodiesTo(fetcher, '/api/director/generate-storyboard')[0]).toMatchObject({ prompt: 'Applied from chat just now.', promptSource: 'director' })
+  })
+
+  it('Director 화면에서 영상을 만들면 지금 보이는 글을 보내고 Director 화면의 글이라고 알린다', async () => {
+    // 왜: 영상 서버도 같은 규칙이다 — 저장 전(0.5초 안) 요청이 옛 고친 글로 Take 를 쓰지 않게.
+    const fetcher = stubFetch()
+    api().updateNodeData<'shot'>(shotId, { promptOverride: 'Applied from chat for the video.' })
+    await api().generateVideoForShot(shotId)
+    expect(bodiesTo(fetcher, '/api/director/generate-video')[0]).toMatchObject({ prompt: 'Applied from chat for the video.', promptSource: 'director' })
+  })
 })

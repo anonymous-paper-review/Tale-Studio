@@ -3,6 +3,7 @@
 //   원칙: 연필 러프는 구도 · 사람 수 · 자리 · 자세의 도면이고 생김새는 아니다. 결과는 실제 카메라로 찍은 사진이다.
 //   참고 그림 순서(storyboard-strip 과 같다): [러프 띠 · 시트, ...인물 시트, 배경, 추가 입력].
 //   약속: tests/director/still-consistency.test.ts
+import { gridMovementLines, stripMovementLines } from '@/lib/director/direction-line-prompt'
 import { STILL_NO_MARKS_LINE, STILL_PANEL_RULE, clipWords, leftToRight, type StillLabel } from '@/lib/director/still-prompt'
 import { assetAuthorityClause, type CharacterRefLabel } from '@/lib/director/storyboard-strip'
 import { hasPhotoTexture, PHOTO_TEXTURE_PEOPLE, PHOTO_TEXTURE_PLACE } from '@/lib/style-facets/photo-sheet-line'
@@ -129,6 +130,8 @@ export function buildPhotoStripPrompt(
     characterRefs?: PhotoCharacterLabel[]
     /** 샷 설계의 빛 · 초점 · 렌즈 · 색(real-cine-line) — 러프 손글씨를 옮기지 않는 대신 글로 싣는다. */
     cineLine?: string | null
+    /** 콘티에서 고친 화살표를 읽고 그 줄로 끝 장을 다시 그린 샷의 줄(오너 R1, freshDirectionLine). 없으면 지시문 그대로. */
+    directionLine?: string | null
     /** 씬 시간대(영어). */
     sceneLighting?: string | null
     /** 거울 · 창에 비친 모습을 그리는 샷. */
@@ -186,6 +189,7 @@ export function buildPhotoStripPrompt(
       ? [`- Scene lighting — time of day: ${sceneLine}. Render that time of day's light${clause ? '' : ' and color grade'} consistently in all three panels.`]
       : []),
     `- Shot description: ${shotPrompt}`,
+    ...stripMovementLines(opts.directionLine),
     ...(cineLine && cineLine.trim()
       ? [`- Cinematography — realize these lighting, focus, lens and color intents the pencil cannot show; apply them WITHOUT changing framing, composition or poses: ${cineLine.trim()}`]
       : []),
@@ -211,6 +215,8 @@ export function buildPhotoGridPrompt(
     characterRefCount: number
     worldRefCount?: number
     cineLines?: (string | null | undefined)[]
+    /** 콘티에서 고친 화살표를 읽고 그 줄로 끝 장을 다시 그린 칸의 줄(오너 R1, freshDirectionLine) — 칸(=샷) 순서대로, 줄 있는 칸만 싣는다. */
+    directionLines?: (string | null | undefined)[]
     /** 참조 순서대로의 이름 · 짧은 겉모습. */
     characterRefs?: { name: string; look?: string | null }[]
     /** 칸(샷) 순서대로 그 칸의 인물. */
@@ -277,6 +283,7 @@ export function buildPhotoGridPrompt(
         ]
       : []),
     ...gridCineBlock(opts.cineLines),
+    ...gridMovementLines(opts.directionLines),
     noTextLine('grid'),
   ].join('\n')
 }

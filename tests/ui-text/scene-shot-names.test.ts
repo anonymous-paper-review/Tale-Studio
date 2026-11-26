@@ -109,7 +109,7 @@ describe('같이 정한 것 — 씬 · 샷 이름은 화면 언어를 따른다 
   // 왜: 답 7 — 두 넘기기 창(Storyboard → Director 의 러프 없는 샷 경고, Director → Editor 의 영상 없는 샷 줄)과 Director 준비 창이 한국어 화면에도 "Scene 1 · Shot 2"를 보였다.
   it('한국어 화면이면 두 넘기기 창과 Director 준비 창이 샷 이름을 한국어로 보인다', () => {
     const board = [boardShot('sh_01_01', 'sc_01', true), boardShot('sh_01_04', 'sc_01', false), boardShot('sh_03_05', 'sc_03', true), boardShot('sh_02_02', 'sc_02', true)]
-    expect(directorConfirmView(directorHandoffSummary(manifest, board), 'ko', extra).warning).toBe('러프가 없는 씬 1 · 샷 2은(는) 이번에 빠져요.')
+    expect(directorConfirmView(directorHandoffSummary(manifest, board), 'ko', extra).warning).toBe('콘티 그림이 없는 씬 1 · 샷 2은(는) 이번에 빠져요.')
     expect(directorConfirmView(directorHandoffSummary(manifest, board), 'en', extra).warning).toBe('These shots have no rough and are left out this time: Scene 1 · Shot 2.')
     const nodes = writerShots.map((s) => shotNode(s.shotId))
     expect(editorHandoverView(nodes, boardNodeNames(manifest, writerShots, 'ko')).missing.map((row) => row.label)).toEqual(['씬 1 · 샷 1', '씬 1 · 샷 2', '씬 2 · 샷 3', '씬 3 · 샷 4'])

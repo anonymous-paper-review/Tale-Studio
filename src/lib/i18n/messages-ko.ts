@@ -1374,7 +1374,7 @@ export const KO: Record<string, string> = {
   'Drag onto a node to apply the camera/lighting/lens setup': '노드 위로 드래그해 카메라/조명/렌즈 셋업 적용',
   'Delete preset': '프리셋 삭제',
   Presets: '프리셋',
-  'Generate the rough storyboard into a real shooting-image storyboard in one go': '러프 스토리보드를 실제 촬영 이미지 스토리보드로 한번에 생성할 수 있어요',
+  'Generate the rough storyboard into a real shooting-image storyboard in one go': '콘티를 실제 촬영 이미지 스토리보드로 한번에 생성할 수 있어요',
   'Stopping': '중단하는 중',
   'Stop after current videos finish.': '지금 만들고 있는 영상까지만 마치고 멈춥니다.',
   'Generate videos': '영상 생성',
@@ -1431,7 +1431,7 @@ export const KO: Record<string, string> = {
   'Prompt node': '프롬프트 노드',
   'Scenes come in automatically once you create them in Writer.': 'Writer에서 씬을 먼저 만들면 자동으로 들어와요.',
   'Or double-click the canvas to create a Scene directly.': '또는 캔버스를 더블클릭해서 직접 씬을 만들 수 있어요.',
-  'Start shooting real images/videos based on the rough storyboard, characters, and world.': '러프 스토리보드와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요.',
+  'Start shooting real images/videos based on the rough storyboard, characters, and world.': '콘티와 등장인물, 월드를 바탕으로 실제 이미지/영상으로 촬영을 시작하세요.',
   // v3 D1 Director 노드 캔버스(2026-11-03) — 툴바 제목 숫자 · 확대 알약 · 입력 구멍 라벨
   '{nodes} nodes · {shots} shots': '노드 {nodes} · 샷 {shots}',
   'Canvas zoom': '캔버스 배율',
@@ -1651,6 +1651,8 @@ export const KO: Record<string, string> = {
   '{agent} is generating character and background images': '{agent}가 캐릭터·배경 이미지를 생성하고 있습니다',
   '{agent} is generating images': '{agent}가 이미지를 생성하고 있습니다',
   '{agent} is generating shooting-ready images': '{agent}가 촬영용 이미지를 생성하고 있습니다',
+  // Storyboard 화면의 실사 그림 묶음(2026-11-26 m1126 S2 · O7) — Storyboard [시작] · 채팅 다시 그리기.
+  '{agent} is making real images': '{agent}가 실사 그림을 만들고 있습니다',
   '{agent} is generating video': '{agent}가 영상을 생성하고 있습니다',
   '{agent} is generating character images': '{agent}가 캐릭터 이미지를 생성하고 있습니다',
   '{agent} is generating background images': '{agent}가 배경 이미지를 생성하고 있습니다',
@@ -3142,6 +3144,29 @@ export const KO: Record<string, string> = {
   'Redraw': '다시 그리기',
   'Could not save the changes. Please try again.': '고친 내용을 저장하지 못했어요. 다시 시도해 주세요.',
   'Drawing the rough': '러프를 그리고 있어요',
+  // W3 · D10(오너 2026-11-22 Q1 · Q2 · Q3, dev fb1120-end 를 옮김 2026-11-26): 가운데 장 저장 뒤 끝 장 물음 · 읽은 한 줄.
+  'Redraw the end frame to match these arrows?': '끝 장도 이 화살표대로 다시 그릴까요?',
+  'The start and directing frames stay as they are. Only the end frame is redrawn, which takes over a minute.': '시작 · 연출 장은 그대로 두고 끝 장만 다시 그려요. 1분 넘게 걸려요.',
+  'Could not redraw the end frame. It stays as it was.': '끝 장을 다시 그리지 못했어요. 끝 장은 그대로예요.',
+  'Motion the AI read': 'AI 가 읽은 움직임',
+  'Edited movement': '고친 움직임',
+  'Reading the arrows…': '화살표를 읽는 중…',
+  'The AI could not read the arrows. Write the motion yourself.': 'AI 가 화살표를 읽지 못했어요. 움직임을 직접 적어 주세요.',
+  // 실사 · 영상 지시문에 싣기(R1 · Q4)는 m-director 몫이라 그 전까지 중립 문장(리드 2026-11-26) — 들어오면 dev 문장으로 바꾼다.
+  'You can edit the line. The end frame is drawn from it, and videos use it even if you choose Keep as is.': '줄을 고칠 수 있어요. 끝 장은 이 줄대로 그리고, [그대로]를 골라도 영상에는 이 줄이 들어가요.',
+  'Videos use this line. To match, redraw the end frame with it, then the live-action images.': '영상에는 이 줄이 들어가요. 끝 장을 이 줄로 다시 그린 뒤 실사도 다시 그려야 맞아요.',
+  'Kept your line. The end frame stays as it is.': '고친 줄을 남겼어요. 끝 장은 그대로예요.',
+  'Could not translate your line, so it was not kept. The previous line stays. Try again.': '고친 줄을 영어로 옮기지 못해 남기지 못했어요. 전에 있던 줄은 그대로예요. 다시 시도해 주세요.',
+  'The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.': '그사이 연출 장이 바뀌어 고친 줄을 남기지 않았어요. 연출 탭을 다시 열어 주세요.',
+  'Could not keep your line. The previous line stays.': '고친 줄을 남기지 못했어요. 전에 있던 줄은 그대로예요.',
+  'Describe how the shot ends, for example: the figure on the left walks out to the right.': '샷이 어떻게 끝나는지 적어 주세요. 예: 왼쪽 인물이 오른쪽 밖으로 걸어 나간다.',
+  'Redrawing the end frame, which takes over a minute': '끝 장을 다시 그리는 중이에요. 1분 넘게 걸려요.',
+  'The AI could not read the arrows, so the end frame was not redrawn. Write the motion in the directing tab.': 'AI 가 화살표를 읽지 못해 끝 장을 다시 그리지 않았어요. 연출 탭에서 움직임을 직접 적어 주세요.',
+  'Could not translate the motion line. Try again.': '움직임 줄을 영어로 옮기지 못했어요. 다시 시도해 주세요.',
+  'Edit and redraw the end frame': '고쳐서 끝 장 다시 그리기',
+  // W6 · 리드 승인 ⑥(2026-11-26): 보드 [+ 씬 추가]의 장소는 Artist 배경 목록에서 고르거나 새 장소를 적는다.
+  'Pick an Artist background': 'Artist 배경 고르기',
+  'New place': '새 장소',
   // W5(오너 2026-11-26): 고치기 창은 그리기를 맡기고 닫힌다 — 그리는 동안은 그 카드에만 기다림.
   'Redrawing the rough of this shot. The card updates when it is done.': '이 샷의 러프를 다시 그려요. 다 그리면 카드가 바뀌어요.',
   'This shot is being drawn. You can redraw it once it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 다시 그릴 수 있어요.',
@@ -3277,8 +3302,8 @@ export const KO: Record<string, string> = {
   'Running time': '러닝타임',
   '{seconds}s': '{seconds}초',
   'Director makes the cuts from the roughs and the Artist images': 'Director가 러프와 Artist 그림을 참조해 컷을 만들어요',
-  'These shots have no rough and are left out this time: {shots}.': '러프가 없는 {shots}은(는) 이번에 빠져요.',
-  'These shots have no rough and are left out this time: {shots} and {count} more.': '러프가 없는 {shots} 외 {count}컷은(는) 이번에 빠져요.',
+  'These shots have no rough and are left out this time: {shots}.': '콘티 그림이 없는 {shots}은(는) 이번에 빠져요.',
+  'These shots have no rough and are left out this time: {shots} and {count} more.': '콘티 그림이 없는 {shots} 외 {count}컷은(는) 이번에 빠져요.',
   'Draw the remaining cuts': '남은 컷 그리기',
   'Yes, hand over': '예, 넘기기',
   // ── 시리즈(2026-10-26) · 프로젝트 목록 · 다음 화 만들기 ──
@@ -3683,7 +3708,7 @@ export const KO: Record<string, string> = {
   'Some shots have no video yet. Check the list in the window, then hand over the shots with video or make the rest again first.': '아직 영상이 없는 샷이 있어요. 창에서 목록을 보고 영상 있는 샷만 넘기거나, 나머지를 먼저 다시 만들어 주세요.',
   // Storyboard → Director 넘기기 창(D0, 2026-11-14 디자이너 1110 확정 · 페이지 추천)
   'Move on to Director?': 'Director로 넘어갈까요?',
-  'Shots {shots} · {seconds}s · Characters {characters} · Backgrounds {backgrounds} · Roughs {roughs}': '샷 {shots} · {seconds}초 · 인물 {characters} · 배경 {backgrounds} · 러프 {roughs}장',
+  'Shots {shots} · {seconds}s · Characters {characters} · Backgrounds {backgrounds} · Roughs {roughs}': '샷 {shots} · {seconds}초 · 인물 {characters} · 배경 {backgrounds} · 콘티 {roughs}장',
   'The real images are already made': '실사 이미지는 이미 다 있어요',
   'After that': '그다음',
   // 값은 앱의 Take 표기("5 Take")로 — D8 단추와 같게(리드 2026-11-14)
@@ -3704,6 +3729,12 @@ export const KO: Record<string, string> = {
   '{shots} has no rough storyboard, so it is left out. Draw it in Writer, then press Start again.': '콘티 그림이 없는 {shots}은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
   '{shots} have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots}은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
   '{shots} and {count} more have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots} 외 {count}컷은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  // Storyboard 가 빠진 콘티 그림을 이어 그린다(리드 2026-11-26 m1126) — 그리는 중인 샷은 [시작] · 채팅 고치기에서 빼고 알린다.
+  '{shots} is still getting its rough storyboard, so it is left out. Press Start again when it is drawn.': '콘티 그림을 그리는 중인 {shots}은(는) 빼고 만들어요. 다 그리면 [시작]을 다시 눌러 주세요.',
+  '{shots} are still getting their rough storyboards, so they are left out. Press Start again when they are drawn.': '콘티 그림을 그리는 중인 {shots}은(는) 빼고 만들어요. 다 그리면 [시작]을 다시 눌러 주세요.',
+  '{shots} and {count} more are still getting their rough storyboards, so they are left out. Press Start again when they are drawn.': '콘티 그림을 그리는 중인 {shots} 외 {count}컷은(는) 빼고 만들어요. 다 그리면 [시작]을 다시 눌러 주세요.',
+  '{shot} is still getting its rough storyboard. Ask again when it is drawn.': '{shot}은(는) 콘티 그림을 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',
+  'Drawing the rough sketch': '콘티 그림을 그리고 있어요',
   'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
   // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
   'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
@@ -3838,6 +3869,8 @@ export const KO: Record<string, string> = {
   'The music service did not accept this text. Change the mood and make it again.': '음악 서비스가 이 글을 받지 않았어요. 분위기 글을 고쳐 다시 만들어 주세요.',
   'There were not enough Takes.': 'Take 가 모자랐어요.',
   'It took too long and stopped.': '너무 오래 걸려 멈췄어요.',
+  'Making was stopped.': '만들기를 멈췄어요.',
+  'If a Take is held, delete this job in [Queue] at the top of the projects page to get it back.': 'Take 가 묶여 있으면 프로젝트 목록 위 [대기열]에서 이 작업을 지우면 돌아와요.',
   'Something went wrong while making it. Make it again.': '만드는 중에 문제가 생겼어요. 다시 만들어 주세요.',
   'Remove from list': '빼기',
   '(Drag: add to audio track)': '(끌기: 오디오 줄에 놓기)',

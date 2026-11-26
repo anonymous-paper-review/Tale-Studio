@@ -307,6 +307,14 @@ describe('혼자 정한 것', () => {
     expect(music().draft).toMatchObject({ model: 'minimax-music-2.6', prompt: '어두운 신스웨이브 노래', instrumental: false, lyrics: '[verse] 밤' })
   })
 
+  it('너무 오래 걸려 멈춘 곡에는 묶인 Take 를 돌려받는 길(프로젝트 목록 위 [대기열]에서 그 작업 지우기)을 한 줄로 알린다', () => {
+    // 왜: 접수 여부를 모르는 작업은 Take 를 묶은 채 기다리는 정책이라(영상과 같음) Editor 만으로는 그 Take 를 풀 수 없다 — [대기열]에서 지우면 돌려받는다(검토 rev-billing 2026-11-26).
+    useEditorMusicStore.setState({ items: [item({ id: 'm5', status: 'failed', url: null, error: 'timed_out' })] })
+    const markup = text(html(createElement(MusicPanel)))
+    expect(markup).toContain('너무 오래 걸려 멈췄어요.')
+    expect(markup).toContain('Take 가 묶여 있으면 프로젝트 목록 위 [대기열]에서 이 작업을 지우면 돌아와요.')
+  })
+
   it('[타임라인 추가]는 만든 곡을 플레이헤드 자리에 놓고, 그 자리가 빈 첫 오디오 줄을 고르며 빈 줄이 없으면 새 줄을 만든다', () => {
     // 왜: 끌기 없이 한 번에 넣는다. 같은 줄의 소리끼리 겹치지 않게(조언 목록 "같은 줄에서 클립 겹치기 없음").
     const taken = (id: string, trackId: string, startSec: number, durationSec: number) => ({ id, name: id, url: `https://a.test/${id}.mp3`, startSec, durationSec, volume: 1, muted: false, trackId, linkedShotId: null })

@@ -14,6 +14,7 @@ import {
   claimGenerationJobFinalize,
   completeGenerationJob,
   GenerationJobFinalizeInProgressError,
+  GenerationJobTerminalTransitionError,
   patchGenerationJobResponseSnapshotByRequestId,
   releaseGenerationJobFinalizeClaim,
   type GenerationJob,
@@ -44,6 +45,7 @@ import {
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { updateStoryboardImage } from '@/lib/director/storyboard-image-store'
 import { isJobCancelled } from '@/lib/director/job-cancellations'
+import { finalizeRoughEndFrameJob } from '@/lib/writer/directing-edit'
 import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { editorMusicPath } from '@/lib/editor/music-path'
@@ -819,6 +821,8 @@ export async function finalizeImageGenerationJob(
   falPayload?: unknown,
 ): Promise<string> {
   await recordFalResponseSnapshot(job, falPayload)
+  // D10 ②(2026-11-22): 러프 끝 장 작업이면 끝 장을 바꿔 끼운다 — 작업 번호를 기다리던 화면이 그 뒤 샷 목록을 다시 읽는다.
+  if (job.target.roughEnd) return finalizeRoughEndFrameJob(job, falImageUrl)
   await completeGenerationJob(job.id, falImageUrl)
   return falImageUrl
 }
@@ -1487,7 +1491,11 @@ export type FinalizeProviderResult =
 
 /**
  * Editor [생성] 음악 한 곡 마무리(2026-11-26 m1126 E1) — fal 결과 mp3 를 보관함 {ws}/{project}/editor/music/{곡}.mp3 에 바뀌지 않는 파일로
- *   올리고, 곡 행(editor_music)을 끝 상태와 그 주소로 바꾼 뒤 작업을 끝낸다(곡 행이 먼저 — 작업만 끝난 행이 남지 않게).
+ *   올리고, **작업을 먼저 끝으로 바꾼 뒤** 곡 행(editor_music)을 끝 상태와 그 주소로 적는다(검토 rev-billing 2026-11-26).
+ *   곡 행이 먼저면, 마무리 도중 큐에서 작업을 지워 Take 를 돌려받거나 완료 전이가 실패해 Take 를 돌려줘도 곡이 완성으로 남았다(공짜 곡).
+ *   작업을 끝으로 못 바꾸면(이미 실패 · 지워짐) 곡 행은 만드는 중 그대로 두고 목록이 작업 상태로 실패를 적는다. 완료 전이의 잠깐 DB 오류는
+ *   다시 할 수 있는 실패로 남겨 다음 웹훅 · 폴링이 같은 파일로 마무리한다. 작업이 끝난 뒤 곡 행 쓰기가 실패하면 던지지 않는다 — 목록이 작업의
+ *   결과 주소로 곡을 끝으로 고쳐 적는다(music-server.ts listEditorMusic).
  *   내려받기는 영상과 같은 길(downloadProviderVideo): fal.media 도메인만 · 크기 · 시간 제한 · 일시/영구 실패 구분. 일시 실패는 queued 로 남겨
  *   다음 웹훅 · 폴링이 다시 한다(fal 이 이미 만들었으니 공짜다). 약속: tests/job/editor-music-job.test.ts
  */
@@ -1512,13 +1520,19 @@ export async function finalizeEditorMusicJob(
   }
   const publicUrl = mediaPublicUrl(path)
   if (!publicUrl) throw new DirectorVideoTerminalError('database_state', `music public URL derivation failed: ${path}`)
+  try {
+    await completeGenerationJob(job.id, publicUrl)
+  } catch (error) {
+    // 이미 실패 · 지워진 작업(큐에서 지워 Take 를 돌려받음 등)은 그대로 올린다 — 곡 행을 끝으로 적지 않는다.
+    if (error instanceof GenerationJobTerminalTransitionError) throw error
+    throw classifyMediaPersistenceFailure(error, 'database')
+  }
   const { error } = await supabaseAdmin
     .from('editor_music')
     .update({ status: 'completed', url: publicUrl, error: null, completed_at: new Date().toISOString() })
     .eq('id', musicId)
     .eq('project_id', job.project_id)
-  if (error) throw classifyMediaPersistenceFailure(error, 'database')
-  await completeGenerationJob(job.id, publicUrl)
+  if (error) console.error('[finalize] editor_music row update failed; list will heal from the job result:', musicId, error.message)
   return publicUrl
 }
 

@@ -185,8 +185,9 @@ export function writerRoughWork(
     const failed = eligible.filter((s) => s.roughStoryboard?.status === 'failed').length
     return {
       key: 'writer-rough',
+      // 러프는 Writer 안의 콘티가 그린다(오너 2026-11-26 O1) — 말하는 이도 Writer(STAGE_AGENT_NAME.conti).
       label: translate(locale, '{agent} is drawing the rough storyboard', {
-        agent: STAGE_AGENT_NAME.writer,
+        agent: STAGE_AGENT_NAME.conti,
       }),
       done,
       total: eligible.length,
@@ -222,7 +223,7 @@ export function writerRoughWork(
   return {
     key: 'writer-rough',
     label: translate(locale, '{agent} is drawing the rough storyboard', {
-      agent: STAGE_AGENT_NAME.writer,
+      agent: STAGE_AGENT_NAME.conti,
     }),
     done,
     total: batch.members.size,
@@ -443,7 +444,7 @@ const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; st
   },
   shot_rough_storyboard: {
     labelKey: '{agent} is drawing the rough storyboard',
-    agent: STAGE_AGENT_NAME.writer,
+    agent: STAGE_AGENT_NAME.conti,
     stage: 'writer',
   },
   shot_storyboard: {
@@ -495,7 +496,7 @@ export function queueWorks(
 /** 레인별 배치 라벨 — KIND_WORK 와 같은 어휘(에이전트 이름 + 무엇을 만드는지). */
 const LANE_WORK: Record<GenerationLane, { labelKey: string; agent: string }> = {
   artist: { labelKey: '{agent} is generating images', agent: STAGE_AGENT_NAME.artist },
-  'writer-rough': { labelKey: '{agent} is drawing the rough storyboard', agent: STAGE_AGENT_NAME.writer },
+  'writer-rough': { labelKey: '{agent} is drawing the rough storyboard', agent: STAGE_AGENT_NAME.conti },
   'director-storyboard': { labelKey: '{agent} is generating shooting-ready images', agent: STAGE_AGENT_NAME.director },
   'director-video': { labelKey: '{agent} is generating videos', agent: STAGE_AGENT_NAME.director },
   'director-previz': { labelKey: '{agent} is generating previz videos', agent: STAGE_AGENT_NAME.director },
@@ -517,4 +518,22 @@ export function batchWorks(batches: readonly GenerationBatch[], locale: AppLocal
       stage: b.stage,
     }
   })
+}
+
+/** Storyboard 화면(id writer)에서 본 실사 그림 묶음 — Storyboard [시작] · 채팅 다시 그리기도 실사를 만든다(오너 2026-11-26 m1126 S2 · O7, 리드 지시). */
+//   말은 채팅 폭에서 잘리지 않는 길이로(처음 쓴 "콘티 그림을 실사 그림으로 바꾸고 있습니다"는 1440 화면에서 잘렸다).
+const STORYBOARD_REAL_WORK = { labelKey: '{agent} is making real images', agent: STAGE_AGENT_NAME.writer }
+
+/**
+ * 핀이 놓인 화면에 맞춘 줄 — Storyboard 화면이면 실사 그림 묶음(director-storyboard)을 Storyboard 의 말 · 색으로 바꾼다.
+ *   "Director 가 …"라고 하면 다른 화면에서 도는 일로 읽힌다. 숫자(done/total/실패)는 그대로 서버 배치 것 — 다른 화면 · 다른 묶음은 손대지 않는다.
+ *   약속: tests/writer/real-progress-pill.test.ts
+ */
+export function screenBatchLabels(works: readonly PipelineWork[], screenStage: StageId | undefined, locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK): PipelineWork[] {
+  if (screenStage !== 'writer') return [...works]
+  return works.map((work) =>
+    work.key === 'batch-director-storyboard'
+      ? { ...work, label: translate(locale, STORYBOARD_REAL_WORK.labelKey, { agent: STORYBOARD_REAL_WORK.agent }), stage: 'writer' }
+      : work,
+  )
 }
