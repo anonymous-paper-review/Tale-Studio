@@ -1,12 +1,12 @@
 'use client'
 
 // Storyboard 실사 카드 한 장 다시 그리기(오너 2026-11-26 m1126 O7 "채팅으로") — 채팅이 고른 샷 하나의 실사를 바꿀 점과 함께 다시 그린다.
-//   Director 샷 상세 [이미지 고치기]와 같은 서버 요청(POST /api/director/generate-storyboard) · 같은 글(promptWithChange) —
-//   지시문 글자는 바뀌지 않는다(리드 "그림 지시문을 바꾸는 고침은 리드에게"). 참고 그림(콘티 시트 · 인물 시트 · 배경)은 서버가 DB 로 다시 짠다.
+//   Director 샷 상세 [이미지 고치기]와 같은 서버 요청(POST /api/director/generate-storyboard) · 같은 꼴(m-director 와 맞춘 계약 2026-11-26):
+//   그림 글(prompt)은 그대로, 바꿀 점은 따로(changeNote). 서버가 지금 실사 세 장을 1번 참고로 "바꿀 점만 바꾸기" 지시문으로 그리고,
+//   지금 그림이 없으면 예전처럼 러프 시트에서 + 바꿀 점으로 그린다(지시문은 m-director 몫). 참고 그림(인물 시트 · 배경)은 서버가 DB 로 다시 짠다.
 //   샷 그림 글은 Director 가 Writer 샷에서 받는 것과 같다(use-writer-director-sync writerDirectorPromptSource — 같은지는 시험이 본다).
 //   모델은 [시작] 일괄처럼 서버 기본(시트 되는 모델). 카드 기다림은 작업 큐가 맡는다 — 맡기자마자 큐를 다시 읽는다.
 //   약속: tests/writer/real-redraw.test.ts
-import { promptWithChange } from '@/lib/director/shot-detail'
 import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
 import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
@@ -23,13 +23,15 @@ export type RedrawOutcome =
   | { ok: false; reason: 'busy' | 'quota' }
   | { ok: false; reason: 'missing_sheets' | 'error'; message: string }
 
-/** 서버에 보낼 몸통 — Director 상세와 같은 글. 참고 그림 · 모델은 싣지 않는다(서버가 DB 로 짓는다 · 서버 기본 모델). */
+/** 서버에 보낼 몸통 — Director 상세와 같은 꼴: 그림 글은 그대로, 바꿀 점은 따로(빈 바꿀 점은 싣지 않는다 = 샷 글대로 다시 그리기).
+ *  참고 그림 · 모델은 싣지 않는다(서버가 DB 로 짓는다 · 서버 기본 모델). */
 export function redrawRequestBody(projectId: string, shot: RedrawShot, change: string, traceId?: string) {
-  const base = shot.prompt || shot.actionDescription || ''
+  const changeNote = change.trim()
   return {
     projectId,
     writerShotId: shot.shotId,
-    prompt: promptWithChange(base, change),
+    prompt: shot.prompt || shot.actionDescription || '',
+    ...(changeNote ? { changeNote } : {}),
     ...(traceId ? { traceId } : {}),
   }
 }

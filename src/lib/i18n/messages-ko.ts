@@ -965,6 +965,8 @@ export const KO: Record<string, string> = {
   '…and {count} more': '…외 {count}건',
   'This is a shared preview, so chat is turned off. In the real Producer stage, you shape the story, characters and tone together here.':
     '지금은 공유 미리보기라 실제 대화는 비활성이에요. 실제 프로듀서 단계에선 여기서 스토리·캐릭터·톤을 함께 정리해요.',
+  'This is a shared preview. In the real project, you turn the rough sketches into real images with Start here, and fix each real card through the chat.':
+    '공유 미리보기 모드예요. 실제로는 여기서 [시작]으로 콘티 그림을 실사 그림으로 바꾸고, 실사 카드는 채팅으로 고쳐요.',
   'This is a shared preview. In the real project, you review and edit the scene structure and rough storyboard here.':
     '공유 미리보기 모드예요. 실제로는 여기서 씬 구조와 러프 스토리보드를 검토·수정해요.',
   'This is a shared preview. In the real project, you create and refine character and world cards here.':

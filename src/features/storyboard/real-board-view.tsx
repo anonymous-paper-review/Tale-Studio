@@ -64,6 +64,8 @@ export function RealBoardView() {
   const batch = useDirectorCanvasStore(
     useShallow((s) => ({ busy: s.realBatchBusy, cancelled: s.realBatchCancelled, shotIds: s.realBatchShotIds })),
   )
+  // 채팅이 맡긴 다시 그리기가 큐에 오르기 전 틈 — W5 공유 표시(콘티 보드와 같은 칸).
+  const cardDrawing = useBoardUiStore((s) => s.cardDrawing)
   const detailShotId = useBoardUiStore((s) => s.shotEditId)
   const setDetailShotId = useBoardUiStore((s) => s.setShotEditId)
   const directorConfirmOpen = useBoardUiStore((s) => s.directorConfirmOpen)
@@ -116,6 +118,7 @@ export function RealBoardView() {
   const board = boardShots(sceneManifest, shots)
   const hasShots = board.length > 0
   const drawing = realDrawingShotIds(activeJobs)
+  for (const [shotId, owner] of Object.entries(cardDrawing)) if (owner === projectId) drawing.add(shotId)
   const progress = storyboardRealProgress({ shots: board.map((e) => e.shot), realOf: (id) => images[id], drawing, batch })
 
   // 첫 진입 안내(혼자 정한 것) — 실사가 아직 하나도 없고 Storyboard 채팅 기록이 없으면 [시작]과 채팅으로 고치는 법을 먼저 알린다.
