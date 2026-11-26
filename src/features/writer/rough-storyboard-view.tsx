@@ -316,23 +316,26 @@ export function RoughStoryboardView() {
     })()
   }, [projectId, roughAllReady, boardStage])
   useEffect(() => {
-    if (!projectId || !roughAllReady) return
+    if (!projectId || !roughAllReady || !chatHistoryLoaded) return
     // 콘티의 러프가 다 그려지면 Artist 로 넘어가자고 권한다(O1 — 콘티 다음은 Artist). Storyboard 는 넘김 표에 없어 권하지 않는다.
     if (!shouldOfferHandoffNudge(boardStage, reachedStage)) return
     if (artistNudgeRef.current === projectId) return
-    artistNudgeRef.current = projectId
     const spec = handoffFrom(boardStage)
     if (!spec) return
+    const content = translate(
+      locale,
+      'The rough storyboard is all ready. Ready to move to Artist and work out character and background concepts?',
+    )
+    // 권유에는 단추가 붙어 "이미 한 말" 거르기를 지나지 않는다 — 기록에 같은 권유가 있으면 다시 남기지 않는다(보드를 열 때마다 쌓였다).
+    artistNudgeRef.current = projectId
+    if (chatMessages.some((m) => m.role === 'model' && m.stage === boardStage && m.content === content)) return
     offerSuggestion({
       id: `handoff:${boardStage}:${projectId}`,
       stage: boardStage,
-      content: translate(
-        locale,
-        'The rough storyboard is all ready. Ready to move to Artist and work out character and background concepts?',
-      ),
+      content,
       action: { kind: 'handoff', utterance: translate(locale, spec.utterance), label: translate(locale, spec.label) },
     })
-  }, [projectId, roughAllReady, offerSuggestion, reachedStage, locale, boardStage])
+  }, [projectId, roughAllReady, chatHistoryLoaded, chatMessages, offerSuggestion, reachedStage, locale, boardStage])
 
   // 파이프라인이 이 화면을 보는 중에 완료되면 씬/샷을 1회 재로드.
   useEffect(() => {
