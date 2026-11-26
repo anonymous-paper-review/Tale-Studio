@@ -209,7 +209,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
       {generationError ? <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-caption text-destructive">{generationError}</p> : null}
       <div className="flex flex-wrap items-center gap-2" data-testid="shot-detail-image-actions">
         {/* 바꾸고 싶은 점이 있으면 바로 다시 그리지 않고 Lumi(채팅)에게 보낸다(오너 2026-11-26 D6) — 비우면 지금처럼 같은 설정으로 다시 만든다. */}
-        {change.trim() ? <AskLumiButton shotNodeId={nodeId} kind="image" change={change} closeDetail={layout === 'popup'} onSent={() => setChange('')} />
+        {change.trim() ? <AskLumiButton shotNodeId={nodeId} kind="image" data={data} change={change} closeDetail={layout === 'popup'} onSent={() => setChange('')} />
           : <StoryboardImageButton nodeId={nodeId} data={data} idleLabel={t(hasImage ? 'Remake start and end images · Takes 0' : 'Make start and end images · Takes 0')} />}
         {hasImage && makeVideo ? (
           <Button type="button" size="sm" variant="outline" disabled={makeVideo.disabled} onClick={makeVideo.run}>{makeVideo.label}</Button>

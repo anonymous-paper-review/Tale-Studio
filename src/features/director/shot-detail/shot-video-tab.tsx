@@ -229,7 +229,7 @@ function FixImage({ nodeId, data, layout }: { nodeId: string; data: ShotNodeData
         <div className="min-w-[180px] flex-1 space-y-2">
           <Textarea value={change} onChange={(e) => setChange(e.target.value)} rows={2}
             placeholder={t('Write only what you want to change in the start and end images (e.g. show the umbrella handle)')} />
-          {change.trim() ? <AskLumiButton shotNodeId={nodeId} kind="image" change={change} closeDetail={layout === 'popup'} onSent={() => setChange('')} />
+          {change.trim() ? <AskLumiButton shotNodeId={nodeId} kind="image" data={data} change={change} closeDetail={layout === 'popup'} onSent={() => setChange('')} />
             : <StoryboardImageButton nodeId={nodeId} data={data}
               idleLabel={t(frames.start ? 'Remake start and end images · Takes 0' : 'Make start and end images · Takes 0')} />}
         </div>

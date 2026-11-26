@@ -1625,6 +1625,12 @@ interface HeldDirectorWork {
   videoFixes?: Record<string, DirectorVideoFix>
 }
 
+/** 그 샷의 그림을 지금 그리는 중인가 — 스토어가 같은 샷의 진행 중 작업에 새 부탁을 조용히 버린다(generateStoryboardImage 의 deduped). */
+function shotImageDrawing(nodes: readonly DirectorNode[], shotNodeId: string): boolean {
+  const node = nodes.find((n) => n.id === shotNodeId)
+  return !!node && isShotData(node.data) && node.data.storyboardImage?.status === 'generating'
+}
+
 /** 영상 다시 만들기의 고치기 한 샷 몫 — 바꿀 점(Lumi 가 담은 글)과, 샷 상세 영상 고치기에서 고른 모델 · 해상도 · 보던 Take. */
 export interface DirectorVideoFix {
   change?: string
@@ -1708,11 +1714,18 @@ async function runHeldDirectorWork(held: HeldDirectorWork, ctx: {
       ctx.say(t('Started making live-action images for {count} shots · No Takes used. Progress shows on the line above the cards.', { count }))
     } else {
       const names = directorBoardNames(locale)
+      const label = (ids: readonly string[]) => shotListLabel(locale, ids.map((id) => shotLabelOf(canvas.nodes.find((node) => node.id === id), names)))
+      // 그사이 그리기가 시작된 샷은 보내지 않고 그렇다고 말한다(검토 rev-director 3번 — 스토어가 조용히 버린다).
+      const drawing = held.images.filter((id) => shotImageDrawing(canvas.nodes, id))
+      const toMake = held.images.filter((id) => !drawing.includes(id))
       // 그림 고치기의 바꿀 점(오너 O8 (a))이 있으면 실어 지금 그림을 바탕으로 고친다.
-      for (const id of held.images) void canvas.generateStoryboardImage(id, held.imageChanges?.[id] ? { ...options, changeNote: held.imageChanges[id] } : options)
-      ctx.say(t('Started making live-action images for {shots} · No Takes used. Progress shows on the line above the cards.', {
-        shots: shotListLabel(locale, held.images.map((id) => shotLabelOf(canvas.nodes.find((node) => node.id === id), names))),
-      }))
+      for (const id of toMake) void canvas.generateStoryboardImage(id, held.imageChanges?.[id] ? { ...options, changeNote: held.imageChanges[id] } : options)
+      if (toMake.length > 0) {
+        ctx.say(t('Started making live-action images for {shots} · No Takes used. Progress shows on the line above the cards.', { shots: label(toMake) }))
+      }
+      if (drawing.length > 0) {
+        ctx.say(shotsLine(locale, drawing.length, 'The image for {shots} is being made right now. Ask again when it is done.', 'The images for {shots} are being made right now. Ask again when they are done.', { shots: label(drawing) }))
+      }
     }
   }
   if (held.videos.length > 0) await startVideosFor({ shotIds: held.videos, say: ctx.say, onJob: ctx.onJob, isCurrent: ctx.isCurrent, named: held.named })
@@ -4630,11 +4643,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             work.images.push(id)
             if (change) work.imageChanges = { ...work.imageChanges, [id]: change }
           }
+          // 그리는 중 · 실사 일괄 중인 샷의 그림 부탁은 보내지 않고 그렇다고 말한다(검토 rev-director 3번) — 스토어가 조용히 버려 "만들기 시작"이 거짓이 됐다.
+          const busyImages: string[] = []
           const immediate = split.immediate.filter((update) => {
             if (update.type !== 'generateImage') return true
             if (update.id) {
               if (bound.has(update.id)) holdImage(held, update.id, update.change)
               else if (waitingCard?.bound.has(update.id)) holdImage(toWaitingCard, update.id, update.change)
+              else if (before.realBatchBusy || shotImageDrawing(before.nodes, update.id)) busyImages.push(update.id)
               else return true
               return false
             }
@@ -4659,6 +4675,13 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
                   : translate(locale, 'Started making live-action images for {count} shots · No Takes used. Progress shows on the line above the cards.', { count: missingImages })
                 : translate(locale, 'Started making live-action images for {shots} · No Takes used. Progress shows on the line above the cards.', { shots: shotListLabel(locale, labels) }),
             )
+          }
+          if (busyImages.length > 0) {
+            lumiSays(before.realBatchBusy
+              ? translate(locale, 'Batch live-action generation is running. Try again after it finishes.')
+              : shotsLine(locale, busyImages.length, 'The image for {shots} is being made right now. Ask again when it is done.', 'The images for {shots} are being made right now. Ask again when they are done.', {
+                shots: shotListLabel(locale, busyImages.map((id) => shotLabelOf(before.nodes.find((node) => node.id === id), names))),
+              }))
           }
           if (waitingCard && (toWaitingCard.images.length > 0 || toWaitingCard.allBlankImages)) await holdOnTextCard(waitingCard, toWaitingCard, lumiSays)
           // 영상 막이 — 아주 분명한 꼴만 바로 하고, 그 밖은 화면이 센 목록으로 되묻고, 만들지 말라면 만들지 않는다(재검토 b 보통 A).

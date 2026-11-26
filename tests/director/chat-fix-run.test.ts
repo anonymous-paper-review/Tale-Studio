@@ -28,6 +28,7 @@ function doneTake(id: string, parent: string, takeNumber = 1, override: Record<s
 const NODES = () => [shot('s1'), shot('s2'), doneTake('v2', 's2')]
 const reply = (updates: unknown[], text = 'Okay.') => vi.stubGlobal('fetch', vi.fn(async () => Response.json({ reply: text, updates })))
 const lastModel = () => chat.getState().messages.filter((m) => m.role === 'model').at(-1)?.content ?? ''
+const saidAll = () => chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content).join('\n')
 const acceptingRemake = () =>
   vi.fn(async (id: string, opts?: { onAccepted?: (jobId: string) => void }) => {
     opts?.onAccepted?.(`job-${id}`)
@@ -152,5 +153,43 @@ describe('팝업에서 고른 영상 설정', () => {
     await director.getState().remakeShotVideo('s2', { changeNote: 'Slower.', fromTakeId: 'v2a', videoOverride: { provider: 'h3-max', resolution: '1080p' } })
     expect(generate).toHaveBeenCalledWith('s2', expect.objectContaining({ inheritFromVideoNodeId: 'v2a', videoOverride: { provider: 'h3-max', resolution: '1080p', changeNote: 'Slower.' } }))
     director.setState({ generateVideoForShot: originalVideo })
+  })
+})
+
+describe('그리는 중 · 일괄 중인 샷의 그림 고치기', () => {
+  const drawing = (id: string) => ({ ...shot(id), data: { ...shot(id).data, storyboardImage: { status: 'generating', url: '', jobId: 'job-x' } } }) as unknown as DirectorNode
+
+  it('그리는 중인 샷의 그림 고치기 부탁은 보내지 않고 지금 만드는 중이라고 답한다 — "만들기 시작"이라고 하지 않는다', async () => {
+    // 왜(검토 rev-director 3번): 스토어가 같은 샷의 진행 중 작업을 조용히 버려(deduped) 바꿀 점이 사라졌는데 Lumi 는 "만들기 시작"이라고 했다.
+    const generate = vi.fn().mockResolvedValue(null)
+    director.setState({ nodes: [drawing('s1'), shot('s2')], generateStoryboardImage: generate })
+    reply([{ type: 'generateImage', id: 's1', change: 'Add rain.' }])
+    await chat.getState().sendMessage('@Real Shot 1 Fix the image and make it again: add rain')
+    expect(generate).not.toHaveBeenCalled()
+    expect(saidAll()).toContain('The image for Shot 1 is being made right now. Ask again when it is done.')
+    expect(saidAll()).not.toContain('Started making live-action images')
+  })
+
+  it('실사 일괄 중에는 그림 고치기 부탁을 보내지 않고 일괄이 끝난 뒤 다시 하라고 답한다', async () => {
+    // 왜: 일괄 중에는 스토어가 낱장 요청을 막는다(같은 샷이 시트와 낱장에서 동시에 그려지지 않게) — 막힌 것을 "시작"이라고 말하면 안 된다.
+    const generate = vi.fn().mockResolvedValue(null)
+    director.setState({ realBatchBusy: true, generateStoryboardImage: generate })
+    reply([{ type: 'generateImage', id: 's1', change: 'Add rain.' }])
+    await chat.getState().sendMessage('@Real Shot 1 Fix the image and make it again: add rain')
+    expect(generate).not.toHaveBeenCalled()
+    expect(saidAll()).toContain('Batch live-action generation is running. Try again after it finishes.')
+    expect(saidAll()).not.toContain('Started making live-action images')
+  })
+
+  it('[적용]을 기다린 그림도 그사이 그리기가 시작됐으면 보내지 않고 그렇다고 말한다', async () => {
+    // 왜: 글 카드에 묶인 그림은 [적용] 때 만든다 — 그때 이미 그리는 중이면 같은 고장(조용히 버림)이 난다.
+    const generate = vi.fn().mockResolvedValue(null)
+    director.setState({ generateStoryboardImage: generate })
+    reply([{ type: 'updateShot', id: 's1', patch: { prompt: 'A rainy night street.' } }, { type: 'generateImage', id: 's1', change: 'Make it night.' }])
+    await chat.getState().sendMessage('Make shot 1 a rainy night and fix its image: make it night')
+    director.setState({ nodes: [drawing('s1'), shot('s2'), doneTake('v2', 's2')] })
+    await expect(chat.getState().approvePendingProposal()).resolves.toBe(true)
+    expect(generate).not.toHaveBeenCalled()
+    expect(saidAll()).toContain('The image for Shot 1 is being made right now. Ask again when it is done.')
   })
 })

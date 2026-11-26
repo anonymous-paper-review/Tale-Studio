@@ -8,6 +8,10 @@ import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { resetActionGuard } from '@/lib/action-guard'
 import { asksRemake } from '@/lib/director/chat-video-targets'
+import { createElement } from 'react'
+import { renderToStaticMarkup } from 'react-dom/server'
+import { AskLumiButton, imageFixBusy } from '@/features/director/shot-detail/ask-lumi-button'
+import { KO as messagesKo } from '@/lib/i18n/messages-ko'
 
 const FULL_PROMPT = 'A tired woman in a grey blouse sits alone in a night subway car under cold fluorescent light, her head resting on the window, rain streaks outside'
 const api = () => useDirectorCanvasStore.getState()
@@ -107,5 +111,32 @@ describe('고치기 칸 → Director 채팅', () => {
     expect(videoTab).toMatch(/change\.trim\(\)\s*\?\s*<AskLumiButton[^>]*kind="video"/)
     expect(imageTab).not.toMatch(/changeNote=\{change\}/)
     expect(videoTab).not.toMatch(/changeNote=\{change\}/)
+  })
+})
+
+describe('[Lumi 에게 고쳐 달라고 하기] 단추', () => {
+  it('단추 밑 안내는 새 흐름을 말한다 — 그림은 지금 그림을 바탕으로 이것만 바꿔 바로 다시 그리고, 영상은 채팅에서 "응"이라고 하면 새 Take 를 만든다', () => {
+    // 왜(검토 rev-director 6번): 옛 안내 "샷 프롬프트에 넣어 고쳐요 · [적용]하면 다시 만들어요"는 O8 뒤 흐름(바꿀 점을 따로 · 글 카드 없음)과 다르다.
+    const image = renderToStaticMarkup(createElement(AskLumiButton, { shotNodeId: 's', kind: 'image', change: 'x', closeDetail: false }))
+    const video = renderToStaticMarkup(createElement(AskLumiButton, { shotNodeId: 's', kind: 'video', change: 'x', closeDetail: false }))
+    expect(image).toContain('Lumi remakes the image from the current one, changing only this. No Takes used.')
+    expect(video).toContain('Lumi makes a new Take with this change. Say yes in the chat to start.')
+    expect(image).not.toContain('Apply it in the chat')
+    expect(messagesKo['Lumi remakes the image from the current one, changing only this. No Takes used.']).toBe('Lumi 가 지금 그림을 바탕으로 이것만 바꿔 다시 그려요. Take 는 쓰지 않아요.')
+    expect(messagesKo['Lumi makes a new Take with this change. Say yes in the chat to start.']).toBe('Lumi 가 이것을 바꾼 새 Take 를 만들어요. 채팅에서 "응"이라고 하면 시작해요.')
+  })
+
+  it('그 샷을 그리는 중이거나 일괄 중이면 단추가 꺼지고 까닭을 보인다', () => {
+    // 왜(검토 rev-director 3번): 그리는 중에 보낸 그림 고치기는 맡겨지지 않는다 — 누를 수 없게 하고 다 그린 뒤 하라고 알린다(Storyboard 다시 그리기와 같은 말).
+    const html = renderToStaticMarkup(createElement(AskLumiButton, { shotNodeId: 's', kind: 'image', change: 'x', closeDetail: false, busy: true }))
+    expect(html).toMatch(/<button[^>]*disabled=""/)
+    expect(html).toContain('This shot is being drawn. You can change it when it is done.')
+    expect(imageFixBusy({ generating: true, batchBusy: false }, { storyboardImage: null })).toBe(true)
+    expect(imageFixBusy({ generating: false, batchBusy: true }, { storyboardImage: null })).toBe(true)
+    expect(imageFixBusy({ generating: false, batchBusy: false }, { storyboardImage: null })).toBe(false)
+    // 이미지 탭 · 영상 탭의 이미지 고치기 칸이 모두 그 샷(data)을 넘겨 그리는 중 · 일괄 중이면 꺼진다.
+    for (const rel of ['src/features/director/shot-detail/shot-image-tab.tsx', 'src/features/director/shot-detail/shot-video-tab.tsx']) {
+      expect(readFileSync(rel, 'utf8'), rel).toMatch(/<AskLumiButton shotNodeId=\{nodeId\} kind="image" data=\{data\}/)
+    }
   })
 })
