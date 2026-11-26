@@ -717,6 +717,68 @@ export type Database = {
           },
         ]
       }
+      editor_music: {
+        Row: {
+          completed_at: string | null
+          created_at: string
+          created_by: string | null
+          deleted_at: string | null
+          error: string | null
+          id: string
+          instrumental: boolean
+          job_id: string | null
+          lyrics: string | null
+          model: string
+          project_id: string
+          prompt: string
+          requested_duration_sec: number | null
+          status: string
+          url: string | null
+        }
+        Insert: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          error?: string | null
+          id?: string
+          instrumental?: boolean
+          job_id?: string | null
+          lyrics?: string | null
+          model: string
+          project_id: string
+          prompt: string
+          requested_duration_sec?: number | null
+          status?: string
+          url?: string | null
+        }
+        Update: {
+          completed_at?: string | null
+          created_at?: string
+          created_by?: string | null
+          deleted_at?: string | null
+          error?: string | null
+          id?: string
+          instrumental?: boolean
+          job_id?: string | null
+          lyrics?: string | null
+          model?: string
+          project_id?: string
+          prompt?: string
+          requested_duration_sec?: number | null
+          status?: string
+          url?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "editor_music_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       editor_states: {
         Row: {
           project_id: string
@@ -1610,6 +1672,136 @@ export type Database = {
           },
         ]
       }
+      prop_appearances: {
+        Row: {
+          appearance: string | null
+          appearance_key: string
+          appearance_native: string | null
+          created_at: string
+          i18n_provenance: Json
+          id: string
+          image_url: string | null
+          label: string
+          narrative_time: string | null
+          project_id: string
+          prop_id: string
+          source_hash: string | null
+          updated_at: string
+        }
+        Insert: {
+          appearance?: string | null
+          appearance_key: string
+          appearance_native?: string | null
+          created_at?: string
+          i18n_provenance?: Json
+          id?: string
+          image_url?: string | null
+          label: string
+          narrative_time?: string | null
+          project_id: string
+          prop_id: string
+          source_hash?: string | null
+          updated_at?: string
+        }
+        Update: {
+          appearance?: string | null
+          appearance_key?: string
+          appearance_native?: string | null
+          created_at?: string
+          i18n_provenance?: Json
+          id?: string
+          image_url?: string | null
+          label?: string
+          narrative_time?: string | null
+          project_id?: string
+          prop_id?: string
+          source_hash?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prop_appearances_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prop_appearances_prop_fk"
+            columns: ["project_id", "prop_id"]
+            isOneToOne: false
+            referencedRelation: "props"
+            referencedColumns: ["project_id", "prop_id"]
+          },
+        ]
+      }
+      prop_image_candidates: {
+        Row: {
+          appearance_hash: string | null
+          appearance_key: string
+          created_at: string
+          generated_at: string
+          id: string
+          is_selected: boolean
+          job_id: string | null
+          pinned: boolean
+          project_id: string
+          prop_id: string
+          source_hash: string | null
+          url: string
+        }
+        Insert: {
+          appearance_hash?: string | null
+          appearance_key?: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          is_selected?: boolean
+          job_id?: string | null
+          pinned?: boolean
+          project_id: string
+          prop_id: string
+          source_hash?: string | null
+          url: string
+        }
+        Update: {
+          appearance_hash?: string | null
+          appearance_key?: string
+          created_at?: string
+          generated_at?: string
+          id?: string
+          is_selected?: boolean
+          job_id?: string | null
+          pinned?: boolean
+          project_id?: string
+          prop_id?: string
+          source_hash?: string | null
+          url?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "prop_image_candidates_job_id_fkey"
+            columns: ["job_id"]
+            isOneToOne: false
+            referencedRelation: "generation_jobs"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prop_image_candidates_project_id_fkey"
+            columns: ["project_id"]
+            isOneToOne: false
+            referencedRelation: "projects"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "prop_image_candidates_prop_fk"
+            columns: ["project_id", "prop_id"]
+            isOneToOne: false
+            referencedRelation: "props"
+            referencedColumns: ["project_id", "prop_id"]
+          },
+        ]
+      }
       props: {
         Row: {
           appearance: string | null
@@ -2304,6 +2496,57 @@ export type Database = {
         }
         Relationships: []
       }
+      vton_admin: {
+        Row: {
+          note: string | null
+          token_hash: string
+        }
+        Insert: {
+          note?: string | null
+          token_hash: string
+        }
+        Update: {
+          note?: string | null
+          token_hash?: string
+        }
+        Relationships: []
+      }
+      vton_events: {
+        Row: {
+          at: string
+          data: Json | null
+          device: string | null
+          env: string | null
+          ev: string
+          id: number
+          lang: string | null
+          src: string | null
+          video: string | null
+        }
+        Insert: {
+          at?: string
+          data?: Json | null
+          device?: string | null
+          env?: string | null
+          ev: string
+          id?: never
+          lang?: string | null
+          src?: string | null
+          video?: string | null
+        }
+        Update: {
+          at?: string
+          data?: Json | null
+          device?: string | null
+          env?: string | null
+          ev?: string
+          id?: never
+          lang?: string | null
+          src?: string | null
+          video?: string | null
+        }
+        Relationships: []
+      }
       workspaces: {
         Row: {
           created_at: string | null
@@ -2696,6 +2939,11 @@ export type Database = {
         Returns: Json
       }
       voucher_plan_expire_due: { Args: never; Returns: Json }
+      vton_log: { Args: { p: Json }; Returns: undefined }
+      vton_stats: {
+        Args: { p_from: string; p_to: string; p_token: string }
+        Returns: Json
+      }
     }
     Enums: {
       [_ in never]: never

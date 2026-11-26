@@ -22,6 +22,7 @@ export type GenerationJobKind =
   | 'shot_rough_storyboard'
   | 'shot_video'
   | 'shot_previz_video'
+  | 'editor_music' // Editor [생성] 음악 한 곡(2026-11-26 m1126 E1) — 결과는 editor_music 행 + 보관함 editor/music/{id}.mp3, 1 Take
 export type GenerationJobStatus = 'queued' | 'completed' | 'failed'
 /** 잡 트리거 주체 — ui(직접 조작) | chat(글로벌 채팅 updates) | writer(핸드오프 파이프라인) */
 export type GenerationJobActor = 'ui' | 'chat' | 'writer'
@@ -52,6 +53,8 @@ export interface GenerationJobTarget {
   batchRunId?: string
   /** 실사 일괄: 이 시트를 낸 뒤 그 판에서 아직 낼 샷 수 — 진행 표시가 판 전체 수를 서버 기록만으로 센다(2026-10-10). */
   batchRunRemaining?: number
+  /** editor_music: 결과를 넣을 곡 행(editor_music.id) — 보관함 파일 이름도 이 id 다(2026-11-26). */
+  musicId?: string
 }
 
 export interface GenerationJob {

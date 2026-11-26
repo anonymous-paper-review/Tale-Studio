@@ -45,6 +45,7 @@ import { updateStoryboardImage } from '@/lib/director/storyboard-image-store'
 import { isJobCancelled } from '@/lib/director/job-cancellations'
 import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
+import { editorMusicPath } from '@/lib/editor/music-path'
 
 // Natural IDs stay in the database; new storage objects use the shared versioned,
 // collision-resistant segment so every writer resolves the same namespace.
@@ -1400,6 +1401,44 @@ export async function finalizeShotVideoJob(
 export type FinalizeProviderResult =
   | { media: 'image'; url: string; payload?: unknown }
   | { media: 'video'; url: string; payload?: unknown }
+  | { media: 'audio'; url: string; payload?: unknown }
+
+/**
+ * Editor [생성] 음악 한 곡 마무리(2026-11-26 m1126 E1) — fal 결과 mp3 를 보관함 {ws}/{project}/editor/music/{곡}.mp3 에 바뀌지 않는 파일로
+ *   올리고, 곡 행(editor_music)을 끝 상태와 그 주소로 바꾼 뒤 작업을 끝낸다(곡 행이 먼저 — 작업만 끝난 행이 남지 않게).
+ *   내려받기는 영상과 같은 길(downloadProviderVideo): fal.media 도메인만 · 크기 · 시간 제한 · 일시/영구 실패 구분. 일시 실패는 queued 로 남겨
+ *   다음 웹훅 · 폴링이 다시 한다(fal 이 이미 만들었으니 공짜다). 약속: tests/job/editor-music-job.test.ts
+ */
+export async function finalizeEditorMusicJob(
+  job: GenerationJob,
+  audioUrl: string,
+  falPayload?: unknown,
+): Promise<string> {
+  const { workspaceId, musicId } = job.target
+  if (!workspaceId || !musicId) {
+    throw new DirectorVideoTerminalError('database_state', 'editor_music job target missing workspaceId/musicId')
+  }
+  await recordFalResponseSnapshot(job, falPayload)
+  const { bytes } = await downloadProviderVideo(audioUrl, job.provider)
+  if (bytes.byteLength === 0) throw new DirectorVideoTerminalError('invalid_provider_result', 'empty audio in provider result')
+  const path = editorMusicPath(workspaceId, job.project_id, musicId)
+  try {
+    await uploadImmutableObject(path, bytes, 'audio/mpeg')
+  } catch (error) {
+    if (error instanceof ImmutableObjectMismatchError) throw new DirectorVideoTerminalError('storage_conflict', error.message)
+    throw classifyMediaPersistenceFailure(error, 'storage')
+  }
+  const publicUrl = mediaPublicUrl(path)
+  if (!publicUrl) throw new DirectorVideoTerminalError('database_state', `music public URL derivation failed: ${path}`)
+  const { error } = await supabaseAdmin
+    .from('editor_music')
+    .update({ status: 'completed', url: publicUrl, error: null, completed_at: new Date().toISOString() })
+    .eq('id', musicId)
+    .eq('project_id', job.project_id)
+  if (error) throw classifyMediaPersistenceFailure(error, 'database')
+  await completeGenerationJob(job.id, publicUrl)
+  return publicUrl
+}
 
 function assertNever(value: never): never {
   throw new Error(`unsupported generation job kind: ${String(value)}`)
@@ -1451,6 +1490,9 @@ async function finalizeGenerationJobByKind(job: GenerationJob, result: FinalizeP
     case 'shot_previz_video':
       if (result.media !== 'video') throw new Error('shot_previz_video requires a video result')
       return finalizeShotPrevizVideoJob(job, result.url, result.payload)
+    case 'editor_music':
+      if (result.media !== 'audio') throw new Error('editor_music requires an audio result')
+      return finalizeEditorMusicJob(job, result.url, result.payload)
     default:
       return assertNever(job.kind)
   }

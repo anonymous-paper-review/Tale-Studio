@@ -306,6 +306,13 @@ interface EditorState {
   addAudioSource: (source: AudioSource) => void
   removeAudioSource: (id: string) => void
   addAudioClipFromSource: (sourceId: string, startSec: number, trackId?: string) => string | null
+  /**
+   * [생성]에서 만든 곡을 소리 조각으로 놓는다(2026-11-26 m1126 E1) — 보관함 주소(blob 아님)라 다른 브라우저에서도 소리가 난다.
+   *   놓은 뒤는 보통 소리 조각(자르기 · 옮기기 · 볼륨 · 페이드 · 내보내기). 사람이 놓은 소리라 영상에 잇지 않는다(linkedShotId null).
+   */
+  addAudioClipFromMusic: (music: MusicClipSource, startSec: number, trackId?: string) => string | null
+  /** [타임라인에 넣기] — 플레이헤드 자리에, 그 자리가 빈 첫 오디오 줄(잠기지 않은)에 놓는다. 빈 줄이 없으면 새 줄을 만든다. */
+  placeMusicAtPlayhead: (music: MusicClipSource) => string | null
 
   // 오디오 멀티 트랙
   addAudioTrack: () => void
@@ -406,6 +413,8 @@ export function zoomStep(px: number, dir: 'in' | 'out'): number {
 export interface VideoTrackState { id: string; locked?: boolean; hidden?: boolean }
 /** 소리 줄 — 음소거(M) · 그 줄만(S) · 자물쇠. */
 export interface AudioTrackState { id: string; muted?: boolean; solo?: boolean; locked?: boolean }
+/** 타임라인에 놓을 만든 곡(editor-music-store 의 PlaceableMusic 과 같은 모양 — 스토어끼리 가져오지 않게 여기 따로 적는다). */
+export interface MusicClipSource { id: string; title: string; url: string; durationSec: number; peaks: number[] }
 /** V1 밖 줄에 놓인 클립 — 줄과 시작 초(자유 배치). */
 export type OverlayPlacements = Record<string, { trackId: string; startSec: number }>
 /** 처음 줄 — V1 · V2 · V3(시안 E1). */
@@ -1642,6 +1651,55 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
       future: [],
     }))
+    return id
+  },
+
+  addAudioClipFromMusic: (music, startSec, trackId) => {
+    const lane = trackId ?? get().audioTracks[0]?.id ?? 'atrack_1'
+    if (!(music.durationSec > 0) || !music.url || trackLocked(get(), lane)) return null
+    const id = `audio_${uid()}`
+    set((state) => ({
+      audioClips: [
+        ...state.audioClips,
+        {
+          id,
+          name: music.title,
+          url: music.url,
+          startSec: Math.max(0, startSec),
+          durationSec: music.durationSec,
+          volume: 1,
+          muted: false,
+          peaks: music.peaks,
+          sourceOffsetSec: 0,
+          sourceDurationSec: music.durationSec,
+          sourceId: `music:${music.id}`,
+          trackId: lane,
+          linkedShotId: null,
+        },
+      ],
+      selectedAudioId: id,
+      selectedAudioIds: [id],
+      past: [...state.past, snapshotOf(state)].slice(-HISTORY_LIMIT),
+      future: [],
+    }))
+    return id
+  },
+
+  placeMusicAtPlayhead: (music) => {
+    const st = get()
+    const at = Math.max(0, st.currentTime)
+    const end = at + music.durationSec
+    const firstLane = st.audioTracks[0]?.id
+    const busy = (trackId: string) =>
+      st.audioClips.some((a) => (a.trackId ?? firstLane) === trackId && a.startSec < end - 1e-6 && a.startSec + a.durationSec > at + 1e-6)
+    const free = st.audioTracks.find((track) => !track.locked && !busy(track.id))
+    if (free) return get().addAudioClipFromMusic(music, at, free.id)
+    // 빈 줄이 없으면 새 줄을 만들어 놓는다 — 줄 더하기와 놓기를 되돌리기 한 칸으로 묶는다.
+    const past = [...st.past, snapshotOf(st)].slice(-HISTORY_LIMIT)
+    const lane = `atrack_${uid()}`
+    set((state) => ({ audioTracks: [...state.audioTracks, { id: lane }] }))
+    const id = get().addAudioClipFromMusic(music, at, lane)
+    set({ past, future: [] })
     return id
   },
 

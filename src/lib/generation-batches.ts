@@ -19,6 +19,8 @@ export const LANE_OF_KIND: Record<GenerationJobKind, GenerationLane | null> = {
   storyboard_real_grid: 'director-storyboard',
   shot_video: 'director-video',
   shot_previz_video: 'director-previz',
+  // Editor [생성] 음악(2026-11-26) — 진행은 [생성] 목록이 보인다. 채팅 핀 · 왼쪽 탭 숫자 · Director 단추 숫자에는 세지 않는다.
+  editor_music: null,
 }
 
 export const LANE_STAGE: Record<GenerationLane, StageId> = {

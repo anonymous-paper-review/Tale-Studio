@@ -12,6 +12,8 @@
 //   다 먹어 이미지 한 장도 못 뽑았다. 과금 축과도 정합 — 요금제(tale_pricing v4)에서 Take 는
 //   **영상 전용**이고 이미지는 무과금·다량(샷당 6장)이다. 영상은 작게 잡아 Take 소진 속도를
 //   통제하고, 이미지는 처리량을 유지한다.
+//   2026-11-26(m1126 E1 · 리드 O3 · 리드 답): Editor [생성] 음악(editor_music)도 곡당 1 Take 를 쓰지만 자리는 이미지 축이다 —
+//   DB 자리 트리거가 영상 두 종류 밖을 모두 이미지 축으로 세므로(마이그레이션 없음) 아래 IMAGE_JOB_KINDS 에도 넣어 같은 수를 센다.
 //
 // admin 면제 (2026-08-26 오너 결정): 관리자 계정(운영·QA)은 유저당 상한을 받지 않는다.
 //   전역 세마포어는 admin 도 받는다 — fal 키 풀 슬롯은 물리 한도라 면제 대상이 아니다.
@@ -36,7 +38,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { PROJECT_VIDEO_GENERATION_LIMIT } from '@/lib/plan-limits'
 import { isQuotaExemptUserId, isUnlimitedCapacityUserId } from '@/lib/quota-exempt-server'
 
-/** 쿼터 카테고리 — Take 과금 축과 동일한 경계. 영상 kind 만 video, 나머지 전부 image. */
+/** 쿼터 카테고리 — 영상 kind 만 video, 나머지 전부 image(음악도 DB 자리 트리거에서는 image 축, 2026-11-26). */
 export type QuotaCategory = 'video' | 'image'
 
 export const VIDEO_JOB_KINDS: readonly GenerationJobKind[] = ['shot_video', 'shot_previz_video']
@@ -47,6 +49,9 @@ export const IMAGE_JOB_KINDS: readonly GenerationJobKind[] = [
   'image_generation',
   'storyboard_real_grid',
   'shot_rough_storyboard',
+  // Editor [생성] 음악(2026-11-26 m1126 E1 · 리드 답) — 곡당 1 Take 지만 자리는 그림 축. DB 자리 트리거와 같은 나눔이라
+  //   서버 사전 검사 · 채팅 "내 자리" 줄 · 트리거가 같은 수를 센다.
+  'editor_music',
 ]
 
 // 유저 1명이 동시에 큐에 올릴 수 있는 최대 생성 작업 수 (레벨 0) — 카테고리별.
