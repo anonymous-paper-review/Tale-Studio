@@ -28,14 +28,13 @@ import {
 import { reconcileJobFromFal } from '@/lib/fal/reconcile'
 import { describeFinalizeError } from '@/lib/fal/error-evidence'
 import { releaseTakesForJob } from '@/lib/billing/take-hold'
+import { isTakeBilledJobKind } from '@/lib/billing/take-cost'
+import { extractAudioUrl } from '@/lib/fal/music'
 import { continueVideoBatch } from '@/lib/director/batch-continue'
 
-// #payments-phase-2 #gen-quota-atomic-gate: 영상 잍(shot_video 레거시 unlinked 포함/shot_previz_video)이
-//   failGenerationJob 경로로 종결될 때만 hold 반환을 함께 부른다. markDirectorVideoAttemptFailed 는 자체적으로
-//   반환을 물고 있어 이족이 필요 없다.
-function isTakeBilledVideoKind(kind: string): boolean {
-  return kind === 'shot_video' || kind === 'shot_previz_video'
-}
+// #payments-phase-2 #gen-quota-atomic-gate: Take 를 묶는 잡(영상 — shot_video 레거시 unlinked 포함 · shot_previz_video, 2026-11-26 부터
+//   음악 editor_music 도)이 failGenerationJob 경로로 종결될 때만 hold 반환을 함께 부른다. 종류 목록은 take-cost.ts 한 곳에 있다.
+//   markDirectorVideoAttemptFailed 는 자체적으로 반환을 물고 있어 이중 반환이 필요 없다.
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -143,7 +142,7 @@ export async function POST(req: Request) {
         await failDirectorVideoAttemptOrFallback(job, `[moderation] ${raw}`)
       } else {
         await failGenerationJob(job.id, `[moderation] ${raw}`)
-        if (isTakeBilledVideoKind(job.kind)) {
+        if (isTakeBilledJobKind(job.kind)) {
           try {
             await releaseTakesForJob(job.id)
           } catch (releaseError) {
@@ -172,7 +171,9 @@ export async function POST(req: Request) {
   //   받아 재전송하지 않고, 실패해도 잡은 queued 로 남아 폴링·유령 청소부가 회수한다.
   const result = job.kind === 'shot_video' || job.kind === 'shot_previz_video'
     ? { media: 'video' as const, url: extractVideoUrl(body.payload), payload: body.payload }
-    : { media: 'image' as const, url: extractImageUrl(body.payload), payload: body.payload }
+    : job.kind === 'editor_music'
+      ? { media: 'audio' as const, url: extractAudioUrl(body.payload), payload: body.payload }
+      : { media: 'image' as const, url: extractImageUrl(body.payload), payload: body.payload }
   if (!result.url) {
     const msg = `no ${result.media} url in webhook payload`
     console.error('[fal/webhook]', msg, job.id)
@@ -181,7 +182,7 @@ export async function POST(req: Request) {
       await markDirectorVideoAttemptFailed(job.project_id, job.id, msg)
     } else {
       await failGenerationJob(job.id, msg)
-      if (isTakeBilledVideoKind(job.kind)) {
+      if (isTakeBilledJobKind(job.kind)) {
         try {
           await releaseTakesForJob(job.id)
         } catch (releaseError) {
@@ -224,7 +225,7 @@ export async function POST(req: Request) {
       await markDirectorVideoAttemptFailed(job.project_id, job.id, msg)
     } else {
       await failGenerationJob(job.id, msg)
-      if (isTakeBilledVideoKind(job.kind)) {
+      if (isTakeBilledJobKind(job.kind)) {
         try {
           await releaseTakesForJob(job.id)
         } catch (releaseError) {

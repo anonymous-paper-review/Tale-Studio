@@ -26,24 +26,11 @@ import { useLocaleStore } from '@/stores/locale-store'
 import { PADDLE_PLANS, PADDLE_TAKE_PACKS, isPurchasable } from '@/lib/billing/catalog'
 import { getPlanEntitlements } from '@/lib/plan-limits'
 import { showVoucherCard } from '@/lib/billing/voucher'
-import type { LedgerKind } from '@/lib/billing/account-summary'
+import { activityLabelKey } from '@/lib/billing/account-summary'
 import { refetchBillingAccount, useBillingAccount } from '@/lib/billing/use-billing-account'
 import { PRICING_PAGE_VISIBLE } from '@/lib/billing/pricing-visibility'
 import { cn } from '@/lib/utils'
 
-// 라벨은 영어 원문 = i18n 사전 키 (#i18n-s5).
-const ACTIVITY_LABEL: Record<LedgerKind, string> = {
-  grant_free: 'Free Takes',
-  grant_plan: 'Plan Takes',
-  grant_purchase: 'Take pack',
-  grant_bonus: 'Bonus Takes',
-  hold: 'Video generation',
-  hold_release: 'Returned (generation failed)',
-  consume: 'Video generation',
-  expire: 'Expired',
-  refund_revoke: 'Refund',
-  manual_adjust: 'Adjustment',
-}
 
 function useDateFormat() {
   const locale = useLocaleStore((s) => s.locale)
@@ -312,7 +299,7 @@ export default function AccountPage() {
               {data.recent.map((item, i) => (
                 <li key={`${item.kind}-${item.refId ?? i}-${item.at}`} className="flex items-center justify-between py-2.5">
                   <span className="flex flex-col">
-                    <span>{t(ACTIVITY_LABEL[item.kind])}</span>
+                    <span>{t(activityLabelKey(item))}</span>
                     <span className="text-xs text-gray-500">{fmt(item.at)}</span>
                   </span>
                   <span className={cn('tabular-nums', item.delta > 0 ? 'text-success' : 'text-gray-300')}>

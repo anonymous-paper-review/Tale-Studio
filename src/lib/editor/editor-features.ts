@@ -6,6 +6,7 @@
 import type { AppLocale } from '@/lib/locale'
 import { translate } from '@/lib/i18n/translate'
 import { TRANSITION_CHOICES } from '@/lib/editor/transition'
+import { MUSIC_MODELS } from '@/lib/editor/music-models'
 
 /** 있는 기능 — 단추 · 메뉴 이름은 화면 글 그대로 따옴표에 넣는다. */
 export function editorFeatureLines(locale: AppLocale = 'en'): string[] {
@@ -62,6 +63,11 @@ export function editorFeatureLines(locale: AppLocale = 'en'): string[] {
     t("Audio: {import} uploads audio files into {myFiles} in the {project} tab (dropping files there works too); drag one onto an audio track, or right-click it and choose {delete} to remove it from the list. Audio clips: drag to move in time or to another audio track, drag the edges to trim, drag the volume line, and click the speaker icon to mute. Right-click an audio clip: {volume}, {mute} or {unmute}, {deleteAudio}. Each shot's own sound is the audio clip under it, and it moves with the video until you drag it away.", {
       import: q('Import…'), myFiles: `"${t('My files · {count}', { count: 'N' })}"`, project: q('Project'), delete: q('Delete'), volume: q('Volume (applies to draft)'),
       mute: q('Mute'), unmute: q('Unmute'), deleteAudio: q('Delete audio'),
+    }),
+    // [생성] 음악 만들기(2026-11-26 m1126 E1 · 리드 O2) — 만들기는 사람이 [생성]에서 한다. Lumi 는 음악을 만들지 않는다.
+    t("The {generate} tab next to {controls}: write the mood, pick {eleven} (instrumental or with vocals, 3 seconds to 3 minutes) or {minimax} (songs with lyrics; leave the lyrics empty and it writes them; the model picks the length), and press {make}. Finished music appears in {made} in the {project} tab; drag it onto an audio track or press {add}, then trim, move, change its volume and fade it like any audio clip. Lumi does not make music.", {
+      generate: q('Generate'), controls: q('Effect controls'), eleven: `"${MUSIC_MODELS['elevenlabs-music'].label}"`, minimax: `"${MUSIC_MODELS['minimax-music-2.6'].label}"`,
+      make: q('Make music'), made: `"${t('Made music · {count}', { count: 'N' })}"`, project: q('Project'), add: q('Add to timeline'),
     }),
     t('Output, in the {exportTab} tab: {draftRender} records the timeline in real time into one video file with everything the monitor shows (all tracks, motion, opacity, transitions, effects, titles, subtitles and audio fades; keep the tab open and visible, it takes as long as the film). {shotZip} downloads the original shot videos in timeline order, without any edits.', {
       exportTab: q('Export'), draftRender: q('Draft Render'), shotZip: q('Shot ZIP'),

@@ -33,10 +33,11 @@ export interface HoldResult {
 }
 
 /**
- * 영상 생성 잡 제출 직전에 부르는 원자 hold 관문. mode=off 는 RPC 를 아예 타지 않고
- * 무제한 통과로 취급(ok:true, insufficient:false) — 배포해도 기존 동작이 그대로다.
+ * Take 를 쓰는 생성 잡(영상 · 미리보기 영상 · 음악 — take-cost.ts TAKE_BILLED_JOB_KINDS) 제출 직전에 부르는 원자 hold 관문.
+ * mode=off 는 RPC 를 아예 타지 않고 무제한 통과로 취급(ok:true, insufficient:false) — 배포해도 기존 동작이 그대로다.
+ * take_hold RPC 는 작업 종류를 보지 않는다 — 작업 행 · 작업 공간만 맞으면 묶는다(2026-11-26 음악도 같은 길, 리드 O3).
  */
-export async function holdTakesForVideoJob(input: {
+export async function holdTakesForJob(input: {
   workspaceId: string
   userId: string
   jobId: string
@@ -70,6 +71,9 @@ export async function holdTakesForVideoJob(input: {
   }
   return { ok: result.ok, insufficient: result.insufficient, held: result.held, balance: result.balance, skipped: null }
 }
+
+/** 예전 이름(영상 길이 부른다) — holdTakesForJob 과 같은 함수다. */
+export const holdTakesForVideoJob = holdTakesForJob
 
 /**
  * 영상 잡이 터미널 실패(failed/cancelled)로 마킹된 뒤 부르는 반환. mode=off 여도 실행한다 —
