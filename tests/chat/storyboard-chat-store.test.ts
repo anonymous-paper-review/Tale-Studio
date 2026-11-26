@@ -91,4 +91,28 @@ describe('Storyboard 채팅의 실사 그림 요청', () => {
     await new Promise((resolve) => setTimeout(resolve, 20))
     expect(mocks.images).not.toHaveBeenCalled()
   })
+
+  // 왜(검토 2026-11-26 rev-director): 글 고치기가 섞인 부탁에 그림 요청만으로 답하면 대사는 그대로인데 "바꿀게요"로 끝났다 —
+  //   이제 예전처럼 실행을 다시 확인하고, 끝내 글을 안 고치면 그림도 맡기지 않고 못 했다고 말한다.
+  it("대사를 바꾸고 다시 그려 달라는 부탁에 그림 요청만으로 답하면 실행을 다시 확인하고, 끝내 글을 안 고치면 그림도 맡기지 않고 못 했다고 말한다", async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === '/api/writer/chat' ? Response.json({ toolSupport: true, reply: '대사를 바꾸고 다시 그릴게요.', updates: [IMAGE] }) : Response.json({}),
+    )
+    await chat.getState().sendMessage("@샷 2 대사를 '잘 가'로 바꾸고 다시 그려 줘")
+    await vi.waitFor(() => expect(chat.getState().loading).toBe(false))
+    expect(chatRequests()).toHaveLength(2)
+    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(mocks.images).not.toHaveBeenCalled()
+    expect(chat.getState().messages.at(-1)?.content).toContain('요청한 변경의 실행을 확인하지 못했습니다')
+  })
+
+  // 왜(오너 O7 · 2026-11-26 개발 서버 실측): 그림만 고쳐 달라는 부탁은 그림 요청만으로 다 한 것이다 — 실행 확인 없이 그 그림을 맡긴다.
+  it('그림만 고쳐 달라는 부탁에 그림 요청만으로 답하면 실행 확인 없이 그 그림을 맡긴다', async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === '/api/writer/chat' ? Response.json({ toolSupport: true, reply: '샷 2를 더 슬픈 표정으로 다시 그릴게요.', updates: [IMAGE] }) : Response.json({}),
+    )
+    await chat.getState().sendMessage('@샷 2 이미지를 고쳐서 다시 만들어 줘: 표정을 더 슬프게')
+    await vi.waitFor(() => expect(mocks.images).toHaveBeenCalledTimes(1))
+    expect(chatRequests()).toHaveLength(1)
+  })
 })

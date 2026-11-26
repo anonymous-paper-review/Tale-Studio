@@ -5,11 +5,16 @@
 //   들어오기만 해서는 실사를 만들지 않는다(8/27 오너). 빠진 콘티 그림(러프)은 화면이 열려 있는 동안 예전 Storyboard 와 같은 규칙으로 이어 그린다
 //   (리드 2026-11-26, features/storyboard/use-rough-fill) — 보드 잠금 · 더한 샷 그리기 · 연출 점검 · 러프 다시 그리기는 Writer 콘티(/studio/conti)가 한다.
 //   실사 · 콘티를 그리거나 다시 그리는 동안 화면 · 채팅은 그대로고 그 카드에만 기다림이 뜬다(S5 · O7) — 기다림의 진실은 작업 큐(lib/storyboard/real-board).
+//   씬 · 샷을 나누는 동안(예전 흐름 프로젝트는 나누기 중에도 Artist [완료하기]로 넘어온다)은 예전 Storyboard 와 같은 잠금 표시를 띄우고,
+//   끝나면 씬 · 샷을 다시 읽고, 멈췄으면 까닭과 [이어서 다시 시도]를 보인다(검토 2026-11-26 rev-flow, lib/storyboard/split-wait).
 //   실사 작업이 큐에서 빠지면 실사 그림을 다시 읽어 카드가 새 그림을 보인다. 카드를 누르면 샷 상세(RealShotDialog), ⌘/Ctrl+클릭은 채팅 멘션(G3).
 //   약속: tests/writer/real-board-view.test.ts
 import { useEffect, useRef, useState } from 'react'
 import { ChevronDown, ImageIcon, Loader2 } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { AiBusyOverlay } from '@/components/ai-busy-overlay'
+import { StageWaitCard } from '@/components/feedback/stage-wait'
+import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { StoryboardZoomControls, storyboardColumns, useStoryboardZoom } from '@/components/generating-frame'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { StoryboardDirectorDialog } from '@/features/writer/storyboard-director-dialog'
@@ -42,6 +47,11 @@ import {
 } from '@/lib/storyboard/real-board'
 import { useStoryboardRealImages } from '@/lib/storyboard/real-images-store'
 import { useRoughFillPending } from '@/lib/storyboard/rough-fill-store'
+import { storyboardSplitState } from '@/lib/storyboard/split-wait'
+import { STAGE_PERSONA } from '@/lib/lumi'
+import { invalidateShots } from '@/lib/shots-cache'
+import { isBoardRunActive } from '@/lib/writer/board-busy'
+import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { cn } from '@/lib/utils'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
 import { boardShots, boardTotalText, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel } from '@/lib/writer/board-summary'
@@ -105,6 +115,31 @@ export function RealBoardView() {
     void useStoryboardRealImages.getState().load(projectId)
   }, [projectId, loadProject])
 
+  // 씬 · 샷 나누기(검토 2026-11-26 rev-flow) — Writer 실행 상태. 다시 나누기가 시작되면 다음 끝남에 또 읽는다.
+  const { status, restart } = useWriterStatus(projectId)
+  const splitRunning = isBoardRunActive(status)
+  const [reloadSettled, setReloadSettled] = useState(false)
+  const reloadedAfterSplitRef = useRef(false)
+  useEffect(() => {
+    if (!splitRunning) return
+    reloadedAfterSplitRef.current = false
+    setReloadSettled(false)
+  }, [splitRunning])
+  // 이 화면을 보는 중에 나누기가 끝나면 씬 · 샷과 실사 그림을 다시 읽는다(예전 보드와 같다) — 30초 사물함을 낡음으로 표시해 새 샷 행을 받고,
+  //   같은 샷 id 에 남은 옛 실사가 새 샷 카드에 붙지 않게 실사 그림도 새로 읽는다. 다 읽을 때까지 빈 보드 안내 대신 기다림을 보인다.
+  useEffect(() => {
+    if (!projectId || !status?.pipeline_completed || reloadedAfterSplitRef.current) return
+    reloadedAfterSplitRef.current = true
+    void invalidateShots(projectId)
+    void Promise.allSettled([loadProject(), useStoryboardRealImages.getState().load(projectId, { fresh: true })]).then(() => setReloadSettled(true))
+  }, [projectId, status?.pipeline_completed, loadProject])
+  // 다시 읽기가 멈춰도(네트워크 등) 기다림이 영영 남지 않게 — 15초 뒤에는 끝낸다(예전 보드와 같다).
+  useEffect(() => {
+    if (!status?.pipeline_completed || reloadSettled) return
+    const timer = setTimeout(() => setReloadSettled(true), 15_000)
+    return () => clearTimeout(timer)
+  }, [status?.pipeline_completed, reloadSettled])
+
   // 실사 작업(일괄 시트 · 한 샷 다시 그리기)이 큐에서 빠지면(끝남 · 실패 · 멈춤) 실사 그림을 새로 읽는다 — finalize 는 그림을 먼저 쓰고 작업을 끝내므로
   //   빠진 뒤 첫 읽기가 새 그림이다. 사물함(30초)은 낡음으로 표시하고 받는다. deps 는 작업 id 서명(원시값)만 — 배열은 ref 로 나른다.
   const realJobs = activeJobs.filter((job) => REAL_IMAGE_JOB_KINDS.includes(job.kind))
@@ -136,6 +171,9 @@ export function RealBoardView() {
   const boardShotList = board.map((e) => e.shot)
   useStoryboardRoughFill({ projectId, shots: boardShotList, roughDrawing, activeJobs, locale })
   const progress = storyboardRealProgress({ shots: boardShotList, realOf: (id) => images[id], drawing, batch, roughDrawing })
+  // 나누는 중 · 다시 읽는 틈 · 멈춤 · 빈 보드 중 무엇을 보일지(lib/storyboard/split-wait).
+  const split = storyboardSplitState({ status, hasShots, reloadSettled, sceneCount: sceneManifest?.scenes.length ?? 0 }, locale)
+  const splitBusy = split.kind === 'split' ? split.busy : null
 
   // 첫 진입 안내(혼자 정한 것) — 실사가 아직 하나도 없고 Storyboard 채팅 기록이 없으면 [시작]과 채팅으로 고치는 법을 먼저 알린다.
   //   채팅 기록을 다 읽은 뒤에만(기록이 비어 있는 동안 같은 안내를 또 남기지 않게 — 지금 보드와 같은 규칙).
@@ -242,6 +280,16 @@ export function RealBoardView() {
   )
   const overlays = (
     <>
+      {/* 씬 · 샷을 나누는 동안의 잠금 표시 — 예전 Storyboard 와 같은 덮개(단계 · 진행 · 큰 Lumi Storyboard 옷). 덮개는 스스로 document.body 로 뜬다. */}
+      <AiBusyOverlay
+        open={!!splitBusy}
+        title={splitBusy?.title ?? ''}
+        description={splitBusy?.description}
+        steps={splitBusy?.steps}
+        progress={splitBusy?.progress ?? null}
+        progressLabel={splitBusy?.progressLabel}
+        lumi={splitBusy?.lumi ? STAGE_PERSONA.writer : undefined}
+      />
       <RealShotDialog shotId={detailShotId} onOpenChange={(open) => (open ? null : setDetailShotId(null))} />
       <StoryboardDirectorDialog
         open={directorConfirmOpen}
@@ -260,10 +308,28 @@ export function RealBoardView() {
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         {header}
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
-          <ImageIcon className="size-10 text-subtle-foreground" />
-          <p className="text-body font-semibold text-foreground">{t('No scenes or shots generated yet')}</p>
-        </div>
+        {split.kind === 'split' ? (
+          // 잠금 표시가 덮는다 — 뒤는 비워 둔다(예전 보드와 같다).
+          <div className="flex-1" aria-hidden />
+        ) : split.kind === 'reloading' ? (
+          <StageWaitCard stage="writer" />
+        ) : (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
+            <ImageIcon className="size-10 text-subtle-foreground" />
+            <p className="text-body font-semibold text-foreground">{split.kind === 'waiting' ? split.label : t('No scenes or shots generated yet')}</p>
+            {split.kind === 'failed' ? (
+              <>
+                <p className="text-caption text-muted-foreground">
+                  {t('Generation stopped')}
+                  {split.error ? `: ${split.error}` : ''}
+                </p>
+                <WriterResumeButton projectId={projectId} onResumed={restart} />
+              </>
+            ) : split.kind === 'waiting' && split.detail ? (
+              <p className="text-caption text-muted-foreground">{split.detail}</p>
+            ) : null}
+          </div>
+        )}
         {overlays}
       </div>
     )
