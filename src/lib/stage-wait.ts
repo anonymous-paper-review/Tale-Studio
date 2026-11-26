@@ -36,6 +36,13 @@ export function stageWaiting(input: { projectId: string | null; initLoading: boo
   return !input.read
 }
 
+/** Writer 산문을 다 읽었나 — 실행 기록(산문 본문)을 읽었고, "넘기기 전(아직 산문이 없어요)"으로 보이면 그 프로젝트의 Writer 실행 확인까지 끝났을 때.
+ *  산문 초안 프로젝트는 그 확인이 끝나야 초안 표시가 켜진다 — 그 전의 "넘기기 전"은 틀린 안내다(m-qa 2026-11-27). viewKind = lib/producer/scene-story 의 kind. */
+export function proseRead(input: { viewKind: string; gateChecked: boolean }): boolean {
+  if (input.viewKind === 'loading') return false
+  return input.viewKind !== 'empty' || input.gateChecked
+}
+
 /** Artist 를 다 읽었나 — 인물 · 배경(받아 둔 것이 있거나 처음 읽기가 끝남)과 진행 상태(산문 목록 · 만드는 중 · 카드를 고르는 근거) 둘 다. */
 export function artistRead(input: { hasAssets: boolean; firstRead: boolean; statusRead: boolean }): boolean {
   return (input.hasAssets || input.firstRead) && input.statusRead

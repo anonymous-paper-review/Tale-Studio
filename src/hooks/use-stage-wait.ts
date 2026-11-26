@@ -5,7 +5,8 @@
 //   Artist 는 같은 프로젝트 읽기를 합치고(artist-store dedupe), 샷 목록은 30초 캐시라(lib/shots-cache) 한 번 더 부르면 씬 · 인물 · 배경 질의만 더 간다.
 import { useEffect, useState } from 'react'
 import { useFirstRead } from '@/hooks/use-first-read'
-import { DIRECTOR_WAIT_MAX_MS, artistRead, directorRead, stageWaiting, storyboardRead } from '@/lib/stage-wait'
+import { DIRECTOR_WAIT_MAX_MS, artistRead, directorRead, proseRead, stageWaiting, storyboardRead } from '@/lib/stage-wait'
+import { useWriterGateChecked } from '@/lib/writer/gate-check'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { useArtistStore } from '@/stores/artist-store'
 import { useDirectorCanvasStore } from '@/stores/director-store'
@@ -21,6 +22,13 @@ export function useStageWait(read: boolean): boolean {
   const projectId = useProjectStore((s) => s.projectId)
   const initLoading = useProjectStore((s) => s.initLoading)
   return stageWaiting({ projectId, initLoading, read })
+}
+
+/** Writer 산문 화면 — 산문 본문을 읽었고, "넘기기 전"으로 보이면 Writer 실행 확인까지 끝났을 때 다 읽은 것(lib/stage-wait proseRead). */
+export function useProseWait(viewKind: string): boolean {
+  const projectId = useProjectStore((s) => s.projectId)
+  const gateChecked = useWriterGateChecked(projectId)
+  return useStageWait(proseRead({ viewKind, gateChecked }))
 }
 
 /** Writer 진행 상태를 한 번이라도 읽었나 — 읽다 실패한 것도 읽은 것(계속 기다려 갇히지 않게, use-prose 와 같은 규칙). */

@@ -73,6 +73,19 @@ describe('기다리는 카드', () => {
     expect(code).not.toMatch(/AiBusyOverlay|holdAiBusy|useAiBusyHold|\binert\b/)
   })
 
+  // 왜: m-qa 통합 확인(2026-11-27) — 새로 열 때 첫 0.1~0.2초 기다리는 카드 글이 영어("Loading the prose…")였다. 서버는 그 사람 화면 언어를 모른다
+  //   (언어는 브라우저 저장소 · 계정에만 있다) — 앱이 붙기 전 첫 그림에서는 제목 줄 자리만 두고 글은 보이지 않게, 붙은 뒤 그 사람 언어로 보인다.
+  it('새로 열 때 앱이 붙기 전 첫 그림에서는 기다리는 카드 제목을 보이지 않고 Lumi 만 보인다', () => {
+    // 정적 그림 = 서버 · 하이드레이션 첫 그림. 제목 줄은 자리만 지킨다(보이지 않음) — 붙은 뒤 카드가 흔들리지 않게.
+    const html = card('producer')
+    expect(html).toMatch(/<div[^>]*class="[^"]*\[&amp;_h2\]:invisible[^"]*"[^>]*data-testid="stage-wait"/)
+    expect(html).toContain('/lumi/full/writer-loading')
+    // 붙은 뒤(브라우저)에는 보인다 — 서버 · 하이드레이션 첫 그림만 false 인 값으로 가린다.
+    const source = read('src/components/feedback/stage-wait.tsx')
+    expect(source).toMatch(/const inBrowser = useSyncExternalStore\(subscribeNothing, \(\) => true, \(\) => false\)/)
+    expect(source).toMatch(/!inBrowser && '\[&_h2\]:invisible'/)
+  })
+
   // 왜: 오너 O1(2026-11-26 "콘티를 Artist 앞에") — 산문 확정 뒤 · Artist 앞에 Writer 칸 안 콘티 화면(/studio/conti)이 생긴다.
   //   리드 지시: 단계 등록이 합쳐지기 전에도 그 경로의 기다리는 카드는 Writer 옷으로 미리 둔다(레일에서 Writer 칸에 묶인다).
   it('콘티 화면을 여는 동안에도 Writer 옷 기다리는 카드에 "콘티를 불러오는 중…"을 보인다', () => {

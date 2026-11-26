@@ -19,7 +19,7 @@ import { proseRevisedMessage, reviseAnnouncement } from '@/lib/prose/revise-chat
 import { contentLocale } from '@/lib/i18n/content'
 import { proseWaitDescription, proseWaitFrame, proseWaitingLumi, variantsPickerOpen } from '@/lib/prose/screen'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
-import { useStageWait } from '@/hooks/use-stage-wait'
+import { useProseWait } from '@/hooks/use-stage-wait'
 import { StageWaitCard } from '@/components/feedback/stage-wait'
 import { WriterResumeButton } from '@/components/layout/writer-resume-button'
 import { useT } from '@/lib/i18n'
@@ -43,8 +43,8 @@ export function ProseWorkspace() {
   const prose = useProse()
   // 산문 일이 도는 동안은 잠금 화면이 아직 안 떴어도(진행 상태를 읽는 1~2초 · 수정안을 기다리는 사이) 왼쪽 사이드바를 막는다(2026-10-27).
   useAiBusyHold(!!prose.busy)
-  // 산문을 다 읽기 전(프로젝트를 여는 중 포함)에는 빈 산문 · 확정 전 단추 대신 Writer 기다리는 카드(오너 2026-11-26 m1126 G1, hooks/use-stage-wait).
-  const proseWait = useStageWait(prose.view.kind !== 'loading')
+  // 산문을 다 읽기 전(프로젝트를 여는 중 · 초안인지 확인하기 전 포함)에는 빈 산문 · 확정 전 단추 대신 Writer 기다리는 카드(오너 2026-11-26 m1126 G1, hooks/use-stage-wait).
+  const proseWait = useProseWait(prose.view.kind)
   const projectId = useProjectStore((s) => s.projectId)
   const loadProject = useProducerStore((s) => s.loadProject)
   const messagesLoaded = useGlobalChatStore((s) => s.messagesLoadedProjectId === projectId)
