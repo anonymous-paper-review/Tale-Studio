@@ -22,13 +22,14 @@ afterEach(() => {
 })
 
 describe('Writer 다음 단계 묻기', () => {
-  it('고친 것을 적용한 뒤 다음 단계를 물을 때 「좋아요, 그림 그리기로」 · 「아니요, 더 고칠래요」 단계 확인 단추를 보인다', () => {
-    // 왜: 11/5 시안 단계 확인 단추 — "다음 단계로" 대신 다음 단계에서 하는 일(그림 그리기)을 말한다. 누르면 하는 일은 그대로(산문 확정 · 할 일 보기).
+  it('고친 것을 적용한 뒤 다음 단계를 물을 때 「좋아요, 콘티 짜기로」 · 「아니요, 더 고칠래요」 단계 확인 단추를 보인다', () => {
+    // 왜: 11/5 시안 단계 확인 단추 — "다음 단계로" 대신 다음 단계에서 하는 일을 말한다. O1(오너 2026-11-26): 씬 스토리 다음은 콘티(씬 · 샷 나누기).
+    //   누르면 하는 일은 그대로(산문 확정 · 할 일 보기).
     const out = render()
     expect(out).toContain('data-testid="writer-next-ask"')
-    expect(out).toContain('좋아요, 그림 그리기로')
+    expect(out).toContain('좋아요, 콘티 짜기로')
     expect(out).toContain('아니요, 더 고칠래요')
-    expect(out).toContain('data-next="artist"')
+    expect(out).toContain('data-next="storyboard"')
   })
 
   it('단계 확인 단추를 눌러도 하는 일은 지금과 같다 — 왼쪽은 산문 확정, 오른쪽은 할 일 보기', () => {
@@ -50,7 +51,7 @@ describe('Writer 다음 단계 묻기', () => {
     expect(confirm).toMatch(/\bdisabled=""/)
     expect(confirm).toMatch(/aria-busy="true"/)
     expect(revise).toMatch(/\bdisabled=""/)
-    expect(busy).toMatch(/<button[^>]*data-next="artist"[^>]*>(?:(?!<\/button>)[\s\S])*lucide-loader-circle/)
+    expect(busy).toMatch(/<button[^>]*data-next="storyboard"[^>]*>(?:(?!<\/button>)[\s\S])*lucide-loader-circle/)
     const idle = renderToStaticMarkup(createElement(StageConfirm, { stage: 'producer', tone: 'chat', onConfirm: () => {}, onRevise: () => {} }))
     expect(idle).not.toContain('lucide-loader-circle')
     expect(idle).not.toMatch(/\bdisabled=""/)

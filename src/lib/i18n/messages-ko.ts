@@ -496,7 +496,8 @@ export const KO: Record<string, string> = {
 
   // ── writer 스테이지: writer-tabs ──
   'V2 units': 'V2 유닛',
-  'Rough storyboard': '러프 스토리보드',
+  // O1 · W2(오너 2026-11-26 "러프 스토리보드 > 콘티"): 한국어 화면의 러프 스토리보드 = 콘티(Writer 의 두 번째 칸 · 콘티 보드 칸 이름). 영어는 Rough storyboard 그대로.
+  'Rough storyboard': '콘티',
   Treatment: '트리트먼트',
   Dialogue: '대사',
   // ── writer 스테이지: writer-engine-picker ──
@@ -949,6 +950,9 @@ export const KO: Record<string, string> = {
     '응답이 중간에 잘려서 {count}건만 적용했어요. 나머지는 범위를 나눠 다시 요청해 주세요.',
   'Characters not in the cast list were left out: {ids}. To add a new character, add them in the Producer stage.':
     '등장인물 목록에 없는 인물 {ids} 은(는) 반영하지 않았어요. 새 인물이 필요하면 Producer 단계에서 추가해 주세요.',
+  // W6(오너 2026-11-26): 채팅이 Artist 배경 목록에 없는 장소로 씬을 만들거나 고쳤을 때 답 끝 안내.
+  'Not in the Artist backgrounds: {places}. Scenes set there are drawn without a background image.':
+    'Artist 배경에 없는 장소예요: {places}. 이 장소의 씬은 배경 그림 없이 그려요.',
   'The source check needed for approval is missing. Read it again and ask for the change again.':
     '승인에 필요한 원천 확인 정보가 없습니다. 다시 읽어 변경을 요청해 주세요.',
   'The target changed after the approval request. Read it again and ask for the change again.':
@@ -1693,6 +1697,11 @@ export const KO: Record<string, string> = {
   'Please hand over to Writer': 'Writer로 넘겨주세요',
   'Hand over to Artist': 'Artist로 넘기기',
   'Please hand over to Artist': 'Artist로 넘겨주세요',
+  // O1(오너 2026-11-26): 씬 스토리 → 콘티 넘김 말 · 산문을 확정한 뒤 씬 스토리의 [콘티로 가기] · 꺼진 [콘티]의 까닭.
+  'Hand over to the rough storyboard': '콘티로 넘기기',
+  'Please hand over to the rough storyboard': '콘티로 넘겨주세요',
+  'Go to the rough storyboard': '콘티로 가기',
+  'Opens when you confirm the prose': '산문을 확정하면 열려요',
   'Hand over to Director': 'Director로 넘기기',
   'Please hand over to Director': 'Director로 넘겨주세요',
   'Hand over to Editor': 'Editor로 넘기기',
@@ -2877,7 +2886,11 @@ export const KO: Record<string, string> = {
   'Apply or discard the AI proposal first, then confirm the prose.': 'AI 수정안을 먼저 적용하거나 버린 뒤 산문을 확정해 주세요.',
   'The prose is not ready yet. Wait until it is written, then confirm it.': '산문을 아직 다 쓰지 않았어요. 다 쓴 뒤 확정해 주세요.',
   'Could not confirm the prose. Please try again.': '산문을 확정하지 못했어요. 다시 시도해 주세요.',
-  'Prose confirmed. Artist is opening.': '산문을 확정했어요. Artist로 가요.',
+  // O1(오너 2026-11-26 "콘티를 Artist 앞에"): 산문을 확정하면 씬 · 샷 나누기가 이어지고 콘티가 열린다.
+  'Prose confirmed. Opening the rough storyboard.': '산문을 확정했어요. 콘티를 열어요.',
+  'Could not start splitting into scenes and shots. Please press it again.': '씬 · 샷 나누기를 시작하지 못했어요. 다시 눌러 주세요.',
+  'The prose is confirmed. Start splitting it into scenes and shots.': '산문을 확정했어요. 씬 · 샷 나누기를 시작해 주세요.',
+  'Split into scenes and shots': '씬 · 샷 나누기 시작',
   'No, I want to edit more': '아니요, 더 고칠래요',
   // 11/5 단계 확인 단추(Control/Stage Confirm) — 다음 단계에서 하는 일
   'Yes, write the prose': '좋아요, 산문 쓰기로',
@@ -2893,7 +2906,9 @@ export const KO: Record<string, string> = {
   'I will say it in the chat': '채팅으로 말할게요',
   'AI rewrite': 'AI 다시 쓰기',
   'Apply this version': '이 안 적용',
-  'Artist picks the characters and backgrounds from the prose.': 'Artist가 산문에서 인물·배경을 뽑아요.',
+  'Splits the prose into scenes and shots and draws the rough storyboard.': '씬 · 샷으로 나누고 콘티를 그려요.',
+  // O6(오너 2026-11-26): 그림체가 아직 없으면 산문 확정 창에서 한 번 고른다 — Artist 에서는 계속 바꿀 수 있다.
+  'Pick the art style for this work. You can change it in Artist anytime.': '이 작품의 그림체를 골라 주세요. Artist에서 언제든 바꿀 수 있어요.',
   'Check what happens when you confirm the prose.': '산문을 확정하면 어떻게 되는지 확인해 주세요.',
   'Confirm the prose?': '산문을 확정할까요?',
   'Confirmed': '확정됨',
@@ -3234,6 +3249,10 @@ export const KO: Record<string, string> = {
   'Scenes and shots are made when you press Complete in Artist.': 'Artist에서 [완료하기]를 누르면 씬 · 샷을 나눠요.',
   'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
   'Moving to Storyboard': 'Storyboard로 넘어가는 중이에요',
+  // O1(오너 2026-11-26): 산문을 확정하면 콘티에서 씬 · 샷을 나눈다 — 그동안의 잠금 제목.
+  'Moving to the rough storyboard': '콘티로 넘어가는 중이에요',
+  // 콘티 → Artist 넘김 막힘(혼자 정한 것): 씬 · 샷을 아직 나누지 않았으면 넘길 콘티가 없다.
+  'Scenes and shots are not split yet. You can move on once the split finishes.': '씬 · 샷을 아직 나누지 않았어요. 나누기가 끝나면 넘어갈 수 있어요.',
   'Splitting into scenes and shots, then drawing the roughs. This can take a few minutes. The screen and chat stay locked until it is done.': '씬 · 샷을 나누고 러프를 그려요. 몇 분 걸릴 수 있어요. 끝날 때까지 화면과 채팅은 잠겨요.',
   'Reading the prose': '산문 읽기',
   'Splitting into scenes': '씬 나누기',

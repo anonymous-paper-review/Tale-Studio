@@ -119,6 +119,7 @@ import {
   CHAT_HISTORY_WINDOW,
   CHAT_HISTORY_CHAR_BUDGET,
   HANDOFF_INVITE_NAVIGATE_MS,
+  isBoardStage,
 } from '@/lib/constants'
 
 export interface GlobalChatMessage {
@@ -1994,6 +1995,12 @@ function handoffBlockers(spec: HandoffSpec, opts?: { acceptIncomplete?: boolean 
       soft: gate.softMissing.map((i) => (i.detail ? `${i.label} (${i.detail})` : i.label)),
     }
   }
+  if (spec.from === 'conti') {
+    // 콘티 → Artist(O1 2026-11-26): 씬 · 샷을 나눠야 넘긴다(나누는 중 · 실패면 넘길 콘티가 없다). 러프는 다 그리지 않아도 된다 — 빠진 러프는 Storyboard 가 그린다.
+    return useWriterStore.getState().shots.length > 0
+      ? { hard: [], soft: [] }
+      : { hard: [translate(locale, 'Scenes and shots are not split yet. You can move on once the split finishes.')], soft: [] }
+  }
   if (spec.from === 'writer') {
     // writer → artist: 씨 매니페스트/샷이 비어 있으면(0개) artist 도 그릴 거리가 없다 — 하드는 아니고(오너 확정) 경고로만.
     const w = useWriterStore.getState()
@@ -2086,7 +2093,8 @@ async function runHandoff(spec: HandoffSpec): Promise<{ ok: boolean; path: strin
     const path = ok ? await handoffToStage(spec.to, { verify: true }) : null
     return { ok: ok && !!path, path }
   }
-  if (spec.from === 'writer' && spec.to === 'artist') {
+  // 콘티 → Artist(O1 2026-11-26)도 저장된 단계를 올린 뒤 그 단계가 확인되면 연다.
+  if ((spec.from === 'writer' || spec.from === 'conti') && spec.to === 'artist') {
     const path = await handoffToStage(spec.to, { verify: true })
     return { ok: !!path, path, ...(!path ? { error: translate(contentLocale(), 'Could not save the stage change. Please try again.') } : {}) }
   }
@@ -2821,9 +2829,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       // 그림체 질문에 답하지 않고 확정했다 — 확정한 뒤에는 묻지 않으니 거둔다. 그림체는 지금처럼 Artist 에서 고른다.
       if (get().startComicStyleGate?.projectId === projectId) set({ startComicStyleGate: null })
       if (current?.id === `start-comic-style:${projectId}`) get().dismissSuggestion({ implicit: true })
-      // 산문만 잠근다 — 실행은 아직 산문 초안이라(Artist [만들기] 전) 브레이크다운 목록 · 스타일은 Artist 에서 고친다.
+      // 산문을 잠그고 콘티를 연다(O1 2026-11-26) — 씬 · 샷 나누기는 확정 창 · 채팅 카드가 이어 건다(features/prose/confirm-prose-flow).
       useProjectStore.setState({ producerLocked: true })
-      useProjectStore.getState().unlockThrough('artist')
+      useProjectStore.getState().unlockThrough('conti')
       return { ok: true }
     } catch {
       return { ok: false }
@@ -3802,6 +3810,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         }
         break
       }
+      // 콘티(O1 2026-11-26)는 Storyboard 와 같은 보드 채팅이다 — 씬 · 샷 고치기(api/writer/chat).
+      case 'conti':
       case 'writer': {
         // Writers' Room agentic 모드 — 스크립트 라인 스냅샷을 컨텍스트와 L번호 해석표에 함께 사용.
         const writerState = useWriterStore.getState()
@@ -3848,7 +3858,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
     const traceId = createChatTraceId()
     body.traceId = traceId
-    if (['producer', 'writer', 'artist'].includes(stage)) {
+    if (['producer', 'conti', 'writer', 'artist'].includes(stage)) {
       body.modelSettings = { ...useChatUiStore.getState().modelSettings }
       body.taskContext = { pending: get().pendingProposal ? [get().pendingProposal] : [], deferred: get().deferredProposals }
     }
@@ -3891,7 +3901,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const modelUsages: ChatLlmUsage[] = []
     let pendingReplyId: string | null = null
     try {
-      const toolsEnabled = !!projectId && ['producer', 'writer', 'artist'].includes(stage) && !dialogueTarget
+      const toolsEnabled = !!projectId && ['producer', 'conti', 'writer', 'artist'].includes(stage) && !dialogueTarget
       const requestSession = createChatRequestSession({
         signal: controller.signal,
         onStatus: status => { responseStatus = status },
@@ -3900,7 +3910,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       })
       const request = async (toolMessages: ToolMessage[]) => {
         try {
-          return await requestSession(endpoint, { ...body, ...(stage === 'producer' ? producerChatContext() : {}), ...(toolsEnabled ? { chatTools: true, chatWorkflow: true, chatDomain: stage === 'writer' || stage === 'artist', toolMessages } : {}) })
+          return await requestSession(endpoint, { ...body, ...(stage === 'producer' ? producerChatContext() : {}), ...(toolsEnabled ? { chatTools: true, chatWorkflow: true, chatDomain: isBoardStage(stage) || stage === 'artist', toolMessages } : {}) })
         } catch (error) {
           if (error instanceof ChatResponseError) {
             const partial = error.partialReply ? `${translate(contentLocale(), 'Unfinished reply:')}\n${error.partialReply}` : ''
@@ -4164,7 +4174,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         : null
       if (styleLockedReply) reply = styleLockedReply
       const replyBeforeReceipt = reply
-      const waitForLegacy = !dialogueTarget && toolsEnabled && ((requestedHandoff && requestsSupportedChatEdit(stage, trimmed)) || (stage === 'writer' && data.updates?.length) || (stage === 'artist' && (data.proposals?.length || data.locationProposals?.length)))
+      const waitForLegacy = !dialogueTarget && toolsEnabled && ((requestedHandoff && requestsSupportedChatEdit(stage, trimmed)) || (isBoardStage(stage) && data.updates?.length) || (stage === 'artist' && (data.proposals?.length || data.locationProposals?.length)))
       // 답을 실행 결과로 바꿀 때 실제로 지우고 더한 것을 함께 알리는 한 줄("적용: 샷 2개 지움 · 샷 1개 더함", 리뷰 4차 후속 L2).
       let appliedStructureLine = ''
       reply = guardChatToolReply(reply, toolOutcomes, contentLocale() === 'ko')
@@ -4782,7 +4792,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         set({ loading: false, ...(path ? { pendingNavigatePath: path } : {}) })
         return
       }
-      if (stage === 'writer' && Array.isArray(data.updates)) {
+      if (isBoardStage(stage) && Array.isArray(data.updates)) {
         // #p4-understand B2: clarify(되묻기)는 CRUD 가 아님 — 후보 버튼 제안으로 분리.
         const rawUpdates = data.updates as WriterChatUpdate[]
         const clarify = rawUpdates.find(
@@ -4791,7 +4801,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         if (clarify) {
           get().offerSuggestion({
             id: `clarify:${makeId()}`,
-            stage: 'writer',
+            stage,
             dismissible: true,
             content: clarify.question,
             action: {
@@ -4867,7 +4877,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         for (const shrink of result.pendingDialogueShrinks) {
           const proposal = createPendingProposal({
             traceId,
-            stage: 'writer',
+            // 보드 채팅(콘티 · Storyboard)에서만 오는 갈래다 — 그 단계 채팅에 승인 카드를 띄운다(O1 2026-11-26).
+            stage: stage === 'conti' ? 'conti' : 'writer',
             kind: 'writerShrinkDialogue',
             target: shrink.shotId,
             action: translate(locale, 'Cut dialogue from {from} lines down to {to}', {
@@ -4924,7 +4935,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       //   이 턴에 실제로 바뀌었으면 그림은 예전 그대로라고 알리고 [러프 다시 그리기]를 준다 — 누르면 보드가 그 샷들만 다시 그린다(2026-10-31 QA:
       //   "더 어둡게 바꿔 저장했어요"라는 답 뒤에도 보드 그림이 그대로라 고치기가 죽은 것처럼 보였다. 오너 2026-11-02 "단추로 묻기").
       //   그 프로젝트의 Storyboard 보드가 열려 있을 때만 묻는다 — 다른 화면에서 눌린 요청이 다음 보드로 새지 않게(리뷰 B1).
-      if (stage === 'writer' && projectId && roughBefore && isCurrentSession() && useBoardUiStore.getState().boardProjectId === projectId) {
+      if (isBoardStage(stage) && projectId && roughBefore && isCurrentSession() && useBoardUiStore.getState().boardProjectId === projectId) {
         const writerAfter = useWriterStore.getState()
         const roughAfter = roughVisibleState(writerAfter.sceneManifest, writerAfter.shots)
         const fresh = roughRedrawCandidates(completedTools, roughBefore, roughAfter)
@@ -4938,7 +4949,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           const fromScene = roughRedrawChangedScenes(completedTools, roughBefore, roughAfter).length > 0
           get().offerSuggestion({
             id: `rough-redraw:${traceId}`,
-            stage: 'writer',
+            stage,
             content: fromScene
               ? translate(locale, 'The scene changed, so its rough sketches still show the old version. Redraw them with the changes? Shots to redraw: {count}. Each shot is one new picture.', { count: redraw.length })
               : translate(locale, 'The rough sketches of the shots you changed still show the old version. Redraw them with the changes? Shots to redraw: {count}. Each shot is one new picture.', { count: redraw.length }),

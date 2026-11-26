@@ -61,6 +61,12 @@ function characterRef(manifest: SceneManifest | null, characterId: string | null
   return name === characterId ? characterId : `${characterId}(${name})`
 }
 
+/** 씬 장소 표기 — Artist 배경 id 에 이름이 있으면 "id(이름)", 이름이 곧 id 이거나 목록에 없으면 적힌 그대로(W6 2026-11-26). */
+function locationRef(manifest: SceneManifest | null, location: string): string {
+  const name = manifest?.locations?.find((item) => item.locationId === location)?.name?.trim()
+  return name && name !== location ? `${location}(${name})` : location
+}
+
 function dialogueLinesOf(shot: Shot): DialogueLine[] {
   return Array.isArray(shot.dialogueLines) ? shot.dialogueLines : []
 }
@@ -255,6 +261,14 @@ export function serializeWriterScriptContext(
       ...roster.map((c) => `- ${c.characterId} — ${c.name}`),
     )
   }
+  // Artist 배경 목록(W6 2026-11-26) — 씬 장소는 이 id 로만 배경 그림과 이어진다. AI 가 id 를 모르면 이름을 장소 칸에 적었다(개발 DB 재현).
+  const places = manifest?.locations ?? []
+  if (places.length > 0) {
+    lines.push(
+      '\n## Locations (Artist backgrounds — a scene location must be one of these location IDs; write a short place name only for a new place not listed here)',
+      ...places.map((place) => `- ${place.locationId} — ${place.name}`),
+    )
+  }
 
   for (const [sceneIdx, scene] of scenes.entries()) {
     const present =
@@ -262,7 +276,7 @@ export function serializeWriterScriptContext(
     const heading = byRef.get(`${scene.sceneId}.heading`)
     lines.push(
       // 씬 머리 이름도 대화 언어 · 화면과 같은 띄어쓰기("씬 2" · "Scene 2") — 모델은 적힌 이름 그대로 답한다(리드 검토 1).
-      `\n### ${lineLabel(heading)}${scene.sceneId} (${sceneName(locale, boardSceneNo(scene.sceneId, sceneIdx + 1))}) — 장소:${scene.location || '?'} / ${scene.timeOfDay || '?'} / 분위기:${scene.mood || '?'} (등장: ${present})`,
+      `\n### ${lineLabel(heading)}${scene.sceneId} (${sceneName(locale, boardSceneNo(scene.sceneId, sceneIdx + 1))}) — 장소:${scene.location ? locationRef(manifest, scene.location) : '?'} / ${scene.timeOfDay || '?'} / 분위기:${scene.mood || '?'} (등장: ${present})`,
     )
     if (scene.narrativeSummary) lines.push(`  요약: ${scene.narrativeSummary}`)
 

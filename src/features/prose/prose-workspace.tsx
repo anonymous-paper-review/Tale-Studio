@@ -122,9 +122,10 @@ export function ProseWorkspace() {
   const variantsOpen = variantsPickerOpen({ proposal: prose.proposal, locked: prose.locked })
   const currentScenes = (prose.preview?.scenes ?? []).filter((scene) => scene.beats.length > 0).map((scene) => ({ sceneId: scene.sceneId, text: prose.sceneText(scene.beats) }))
 
+  // 확정한 씬 스토리의 다음은 콘티다(O1 오너 2026-11-26 — [Artist로 가기]는 콘티 머리 단추).
   const actions = prose.locked ? (
-    <Button onClick={() => router.push(withDemoShare('/studio/artist'))} data-testid="prose-go-artist">
-      {t('Go to Artist')}<ArrowRight className="size-4" />
+    <Button onClick={() => router.push(withDemoShare('/studio/conti'))} data-testid="prose-go-conti">
+      {t('Go to the rough storyboard')}<ArrowRight className="size-4" />
     </Button>
   ) : (
     <>

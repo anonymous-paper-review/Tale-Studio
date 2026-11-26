@@ -1,4 +1,4 @@
-// 리뉴얼 1차: Writer [브레이크다운하기]는 산문을 잠그고 Artist 를 연다 — 확정한 산문은 서버도 고치지 않는다 (2026-10-19)
+// Writer [브레이크다운하기]는 산문을 잠그고 콘티를 연다 — 확정한 산문은 서버도 고치지 않는다 (리뉴얼 1차 2026-10-19 → O1 오너 2026-11-26 "콘티를 Artist 앞에")
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -66,8 +66,8 @@ beforeEach(() => {
 })
 
 describe('산문 확정', () => {
-  // 왜: 프로토타입 W6 "예, 확정하기" — 확정하면 산문이 잠기고 Artist 가 열린다. 인물 · 배경 디자인은 Artist [만들기]에서 시작한다.
-  it('산문을 확정하면 산문이 잠기고 Artist 단계가 열린다', async () => {
+  // 왜: 프로토타입 W6 "예, 확정하기" + O1 — 확정하면 산문이 잠기고 콘티가 열린다. 씬 · 샷 나누기는 확정 뒤 화면이 이어 건다(writer/start).
+  it('산문을 확정하면 산문이 잠기고 콘티 단계가 열린다', async () => {
     const response = await post()
 
     expect(response.status).toBe(200)
@@ -75,8 +75,8 @@ describe('산문 확정', () => {
       status: 'awaiting_confirmation',
       state: expect.objectContaining({ _proseLocked: true, scenes }),
     }))
-    expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'artist' }, ['entry', 'producer'])
-    // 확정은 잠그기만 한다 — 실행을 이어 가지 않는다(이어 가는 건 Artist [만들기]).
+    expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'conti' }, ['entry', 'producer'])
+    // 확정은 잠그기만 한다 — 실행을 이어 가지 않는다(이어 가는 건 확정 뒤 화면이 부르는 writer/start — 인물 · 배경 목록 · 그림체를 실어 보낸다).
     expect(mocks.trigger).not.toHaveBeenCalled()
     expect(mocks.after).not.toHaveBeenCalled()
   })
@@ -104,15 +104,15 @@ describe('산문 확정', () => {
     expect(mocks.projectUpdate).not.toHaveBeenCalled()
   })
 
-  // 왜: 두 번 누르거나 다른 탭에서 이미 확정했어도 오류 없이 Artist 로 간다.
-  it('이미 확정한 산문을 다시 확정하면 잠금을 그대로 두고 Artist 를 연다', async () => {
+  // 왜: 두 번 누르거나 다른 탭에서 이미 확정했어도 오류 없이 콘티로 간다(나누기를 다시 거는 길이기도 하다).
+  it('이미 확정한 산문을 다시 확정하면 잠금을 그대로 두고 콘티를 연다', async () => {
     mocks.run.mockResolvedValue(draftRun({ _proseLocked: true }))
 
     const response = await post()
 
     expect(response.status).toBe(200)
     expect(mocks.runUpdate).not.toHaveBeenCalled()
-    expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'artist' }, ['entry', 'producer'])
+    expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'conti' }, ['entry', 'producer'])
   })
 
   // 왜: 프로토타입 "브레이크다운하면 잠겨요" — 화면 버튼이 꺼져 있어도 서버가 한 번 더 막는다.

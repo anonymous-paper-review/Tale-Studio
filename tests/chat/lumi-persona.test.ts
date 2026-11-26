@@ -140,6 +140,8 @@ describe('채팅 아바타 · Lumi 그림', () => {
     expect(STAGE_PERSONA).toEqual({
       entry: 'producer',
       producer: 'writer',
+      // 콘티(O1 2026-11-26)는 Writer 칸 안이라 Writer 옷.
+      conti: 'writer',
       artist: 'artist',
       writer: 'storyboard',
       director: 'director',

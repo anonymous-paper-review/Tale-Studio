@@ -17,8 +17,8 @@ import { prepareChatTools } from '@/lib/chat-tools/protocol'
 import { CHAT_OUTPUT_FORMAT_GUIDE, CHAT_UPDATES_BATCH_GUIDE, resolveChatLocale, responseLanguageDirective } from '@/lib/chat-format'
 import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { parseDialogueLanguage, type DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
-import { sanitizeLineRefs, validateWriterUpdates } from '@/lib/writer-chat-updates'
-import { droppedCharactersNotice, parseFencedUpdates } from '@/lib/agentic-reply-guard'
+import { resolveSceneLocations, sanitizeLineRefs, validateWriterUpdates, type LocationRosterRow } from '@/lib/writer-chat-updates'
+import { droppedCharactersNotice, parseFencedUpdates, unknownPlacesNotice } from '@/lib/agentic-reply-guard'
 import {
   buildChatTrace,
   createChatTraceId,
@@ -61,6 +61,7 @@ For pure discussion or questions, omit the JSON block entirely.
 - Dialogue line (대사): {characterId, text}. characterId must be one of the character IDs shown in context, or null for narration (V.O.). Keep null when editing or retaining narration; never replace it with a character ID.
 - shotType ∈ ECU,CU,MCU,MS,MFS,FS,WS,EWS,OTS,POV,TRACK,2S (촬영 사이즈, 클로즈업→와이드)
 - characters / charactersPresent / dialogueLines[].characterId use the character IDs from the "## 등장인물" roster. In context speakers appear as characterId(name) — always emit the characterId (the part before the parenthesis), never the name. Never invent new IDs.
+- Scene location uses the location ID from the "## Locations" roster (the part before " — "), never the place's name, whenever the place is in the roster. Write a short place name only for a place that is not in the roster; such a scene has no background image yet.
 </model>
 
 <actions>
@@ -240,6 +241,8 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     //   끊겼다(architecture §3 "모델 출력의 무검증 실행 금지" 위반). projectId 미전달(구 클라)이면
     //   무필터로 종전 동작.
     let allowedCharacterIds: ReadonlySet<string> | undefined
+    // 씬 장소를 이을 Artist 배경 목록(W6 2026-11-26) — 인물 목록처럼 DB 가 진실. 못 읽으면 undefined(장소를 바꾸지 않는다).
+    let locationRoster: LocationRosterRow[] | undefined
     let projectLocale: AppLocale | null = null
     let localeSwitched: AppLocale | null = null
     let dialogueLanguage: DialogueLanguage | undefined
@@ -248,7 +251,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
         return NextResponse.json({ error: 'forbidden' }, { status: 403 })
       }
       // 로스터(#F-003 R1)·응답 언어(#i18n-s5-batch6-chat)·대사 언어(#dialogue-language-chat) 병렬 조회.
-      const [{ data: roster }, locale, { data: projRow }] = await Promise.all([
+      const [{ data: roster }, locale, { data: projRow }, { data: locationRows, error: locationError }] = await Promise.all([
         supabaseAdmin.from('characters').select('character_id').eq('project_id', projectId),
         // 채팅 언어 규칙 v2(#chat-locale-follow v2): 웹페이지 언어 상속 + 다른 언어 3회 연속·명시 요청 시 전환.
         resolveChatLocale({
@@ -258,7 +261,9 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
           uiLocale: parseAppLocale(uiLocale) ?? parseAppLocale(user.user_metadata?.locale),
         }),
         supabaseAdmin.from('projects').select('settings').eq('id', projectId).maybeSingle(),
+        supabaseAdmin.from('locations').select('location_id, name').eq('project_id', projectId),
       ])
+      locationRoster = locationError ? undefined : (locationRows ?? []).filter((row): row is LocationRosterRow => typeof row.location_id === 'string' && row.location_id.length > 0)
       allowedCharacterIds = new Set(
         (roster ?? []).map((r) => r.character_id as string).filter(Boolean),
       )
@@ -309,7 +314,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     )
     if (appTools?.turn) return NextResponse.json({ toolTurn: appTools.turn, toolSupport: true, toolUsage: llmUsage, contentLocale: projectLocale, localeSwitched })
 
-    // 답 끝에 붙는 안내(못 읽음 · 일부만 · 빠진 인물)는 답과 같은 채팅 언어로 — 프로젝트가 없으면 화면 언어(2026-11-10 오너).
+    // 답 끝에 붙는 안내(못 읽음 · 일부만 · 빠진 인물 · 배경에 없는 장소)는 답과 같은 채팅 언어로 — 프로젝트가 없으면 화면 언어(2026-11-10 오너).
     const replyLocale: AppLocale = projectLocale ?? parseAppLocale(uiLocale) ?? 'en'
     const {
       reply,
@@ -321,7 +326,13 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     } = parseAgenticResponse(text, allowedCharacterIds, replyLocale)
     // 드롭 표면화 — 침묵 드롭은 이 사고(무검증 저장)와 같은 함정을 반대 방향으로 판다.
     const dropped = [...new Set(droppedCharacterIds)]
-    const replyOut = dropped.length ? `${reply}\n\n${droppedCharactersNotice(dropped, replyLocale)}` : reply
+    // 씬 장소를 배경 id 로 잇고(배경 이름으로 적었어도), 배경 목록에 없는 새 장소면 답 끝에 알린다(W6 2026-11-26).
+    const placed = resolveSceneLocations(updates, locationRoster)
+    const notices = [
+      dropped.length ? droppedCharactersNotice(dropped, replyLocale) : null,
+      placed.unknownPlaces.length ? unknownPlacesNotice(placed.unknownPlaces, replyLocale) : null,
+    ].filter((notice): notice is string => !!notice)
+    const replyOut = notices.length ? `${reply}\n\n${notices.join('\n\n')}` : reply
     const trace = buildChatTrace({
       traceId,
       stage: 'writer',
@@ -341,7 +352,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       contentLocale: projectLocale,
       localeSwitched,
       reply: replyOut,
-      updates,
+      updates: placed.updates,
       trace,
     })
   } catch (err) {

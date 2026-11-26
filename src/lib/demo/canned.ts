@@ -12,6 +12,8 @@ export const CANNED_CHAT: Record<StageId, string> = {
   // Producer 시작 화면(entry)은 채팅이 없어 공유 미리보기에서도 Producer 문구를 함께 쓴다.
   entry: PRODUCER_REPLY,
   producer: PRODUCER_REPLY,
+  // 콘티(O1 2026-11-26)는 지금 Storyboard 보드(씬 · 샷 · 러프)를 쓴다 — 같은 안내.
+  conti: 'This is a shared preview. In the real project, you review and edit the scene structure and rough storyboard here.',
   writer: 'This is a shared preview. In the real project, you review and edit the scene structure and rough storyboard here.',
   artist: 'This is a shared preview. In the real project, you create and refine character and world cards here.',
   director: 'This is a shared preview. In the real project, you direct shots, camera and video on the canvas here.',

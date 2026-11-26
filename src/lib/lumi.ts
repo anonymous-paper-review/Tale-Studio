@@ -35,6 +35,8 @@ export function lumiBox(size: LumiSize | number, variant: LumiVariant = 'full'):
 export const STAGE_PERSONA: Record<StageId, LumiStagePersona> = {
   entry: 'producer',
   producer: 'writer',
+  // 콘티(O1 2026-11-26)는 Writer 칸 안이라 Writer 옷이다.
+  conti: 'writer',
   artist: 'artist',
   writer: 'storyboard',
   director: 'director',

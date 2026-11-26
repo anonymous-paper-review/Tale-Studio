@@ -99,6 +99,7 @@ import {
   DIRECTOR_QUICK_CHIPS,
   STAGE_THINKING_PHRASES,
   CHAT_SUPPORTED_STAGES,
+  isBoardStage,
 } from '@/lib/constants'
 import { buildChatSections } from '@/lib/chat-sections'
 import { buildChatBlocks, groupStatusStacks, parseAttachmentMarker, parseHandoffMarker } from '@/lib/chat-blocks'
@@ -443,7 +444,8 @@ export function GlobalChat() {
         { character: characterHint, location: locationHint, prop: propHint },
       )
     }
-    if (currentStage === 'writer') {
+    // 보드 단계(콘티 · Storyboard, O1 2026-11-26) — 씬 · 샷 · 스크립트 줄을 @로 고른다.
+    if (isBoardStage(currentStage)) {
       return [
         ...writerSceneShotMentions(writerManifest, writerShots, locale),
         ...scriptLineMentions(buildScriptLines(writerManifest, writerShots), locale),
@@ -764,10 +766,10 @@ export function GlobalChat() {
   //   씬·샷이 아직 없어서 수정 요청을 실행할 수 없고, 실측 사고로 "초안 만들어줘" 발화가
   //   빈 컨텍스트 위에서 헛돌았다. LLM 을 태우지 않고 즉답으로 안내한다.
   const { status: writerRunStatus } = useWriterStatus(
-    currentStage === 'writer' ? projectId : null,
+    isBoardStage(currentStage) ? projectId : null,
   )
   const writerRunning = !!(
-    currentStage === 'writer' &&
+    isBoardStage(currentStage) &&
     writerRunStatus?.started &&
     !writerRunStatus.pipeline_completed &&
     !writerRunStatus.pipeline_failed &&
@@ -775,7 +777,7 @@ export function GlobalChat() {
     writerRunStatus.current_status !== 'awaiting_artist'
   )
   // 씬 스토리 확정은 Producer 메인에서 기다린다(2026-10-01) — Writer 채팅의 수정 요청은 거기로 안내한다.
-  const writerGateElsewhere = currentStage === 'writer' && writerRunStatus?.current_status === 'awaiting_confirmation'
+  const writerGateElsewhere = isBoardStage(currentStage) && writerRunStatus?.current_status === 'awaiting_confirmation'
 
   const handleSend = async () => {
     if (sendDisabled || uploading) return
@@ -822,7 +824,7 @@ export function GlobalChat() {
     }
     if (inputRoute === 'elsewhere') {
       useGlobalChatStore.getState().appendLocalExchange(
-        'writer',
+        currentStage,
         msg,
         t('The scene story draft is waiting on the Producer screen. Ask for changes or confirm it there.'),
       )
@@ -831,7 +833,7 @@ export function GlobalChat() {
     // 실행 중 가드(#run-chat-gate) — 유저 발화는 남기고, 로컬 즉답으로 상황을 알린다.
     if (inputRoute === 'blocked') {
       useGlobalChatStore.getState().appendLocalExchange(
-        'writer',
+        currentStage,
         msg,
         t(
           "I'm still building scenes and shots right now, so I can't take revision requests. Once the draft is ready, let me know and I'll apply it right away.",
@@ -2067,7 +2069,7 @@ export function GlobalChat() {
                     </Popover>
                     )}
               <div className="flex-1" />
-              {['producer', 'writer', 'artist'].includes(currentStage) && <ChatModelControls disabled={loading} />}
+              {['producer', 'conti', 'writer', 'artist'].includes(currentStage) && <ChatModelControls disabled={loading} />}
             </div>
             {fileDragActive && (
               <div

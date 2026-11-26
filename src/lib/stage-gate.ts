@@ -1,9 +1,10 @@
 // 단계 열림 규칙 (리뉴얼 1차 2026-10-19, 프로토타입 20261013).
 //
-//   화면 이름 Producer → Writer → Artist → Storyboard → Director → Editor 순서로 하나씩 열린다.
-//   id 는 옛 이름이다(types/project.ts): entry=Producer, producer=Writer, artist=Artist, writer=Storyboard.
+//   화면 이름 Producer → Writer(씬 스토리 → 콘티) → Artist → Storyboard → Director → Editor 순서로 하나씩 열린다.
+//   id 는 옛 이름이다(types/project.ts): entry=Producer, producer=Writer 씬 스토리, conti=Writer 콘티, artist=Artist, writer=Storyboard.
 //   - 시작(산문 초안)을 하면 Writer
-//   - 산문을 확정하면 Artist (DB current_stage = artist, 산문은 이때 잠긴다)
+//   - 산문을 확정하면 콘티 (DB current_stage = conti, 산문은 이때 잠긴다 — O1 오너 2026-11-26 "콘티를 Artist 앞에")
+//   - 콘티에서 [Artist로 가기]를 하면 Artist (DB current_stage = artist)
 //   - Artist 에서 완료하기를 하면 Storyboard (DB current_stage = writer)
 //   - Director · Editor 는 지금처럼 넘기기로 연다
 //   열린 단계는 닫히지 않는다(단조). 넘어간 Producer · Writer 는 잠금이 아니라 "완료" — 다시 볼 수 있다.
@@ -43,7 +44,9 @@ function further(a: StageId, b: StageId): StageId {
 export function reachedStageFromFacts(f: StageFacts): StageId {
   let reached: StageId = isStageId(f.storedStage) && f.storedStage !== 'producer' ? f.storedStage : 'entry'
   if (f.treatmentStarted) reached = further(reached, 'producer')
-  if (f.runContinued) reached = further(reached, 'artist')
+  // 산문을 확정한 실행은 저장된 단계가 진실이다(O1 2026-11-26) — 확정 뒤 실행이 디자인 · 씬 · 샷까지 이어 돌아도
+  //   Artist · Storyboard 를 미리 열지 않는다(콘티의 [Artist로 가기] · Artist [완료하기]가 연다). 예전 흐름 실행만 산출물로 본다.
+  if (f.runContinued && !f.proseConfirmed) reached = further(reached, 'artist')
   if (f.hasShots && !f.proseConfirmed) reached = further(reached, 'writer')
   return reached
 }
@@ -52,7 +55,7 @@ export function canEnterStage(stage: StageId, f: StageFacts): boolean {
   return stageIndex(stage) <= stageIndex(reachedStageFromFacts(f))
 }
 
-/** 산문이 잠겼나 — Artist 이후가 열렸으면 Writer 산문은 고칠 수 없다(롤백은 2차). */
+/** 산문이 잠겼나 — 콘티 이후가 열렸으면(산문을 확정했으면) Writer 산문은 고칠 수 없다(롤백은 2차, O1 2026-11-26). */
 export function proseLockedFromFacts(f: StageFacts): boolean {
-  return stageIndex(reachedStageFromFacts(f)) >= stageIndex('artist')
+  return stageIndex(reachedStageFromFacts(f)) >= stageIndex('conti')
 }

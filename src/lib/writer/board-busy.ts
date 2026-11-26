@@ -135,6 +135,8 @@ export function storyboardBusyView(
     rough: RoughProgress
     /** 씬 수(인물 · 배경 디자인 때 저장된 씬) — 0 이면 줄에 적지 않는다. */
     sceneCount: number
+    /** 이 보드가 붙은 단계 — 콘티(O1 2026-11-26, 산문 확정 뒤 씬 · 샷을 나누는 곳)면 잠금 제목이 콘티로 넘어간다고 말한다. 기본은 Storyboard. */
+    boardStage?: 'conti' | 'writer'
   },
   locale: AppLocale,
 ): StoryboardBusyView {
@@ -152,7 +154,7 @@ export function storyboardBusyView(
     return {
       open: true,
       phase: 'split',
-      title: translate(locale, 'Moving to Storyboard'),
+      title: translate(locale, input.boardStage === 'conti' ? 'Moving to the rough storyboard' : 'Moving to Storyboard'),
       description: translate(locale, 'Splitting into scenes and shots, then drawing the roughs. This can take a few minutes. The screen and chat stay locked until it is done.'),
       steps: steps(step, sceneCount, null, locale),
       progress: percent,

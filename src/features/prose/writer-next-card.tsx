@@ -14,32 +14,19 @@ import { withDemoShare } from '@/lib/demo/context'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useWriterRoomStore } from '@/stores/writer-room-store'
+import { confirmProseToConti } from '@/features/prose/confirm-prose-flow'
 
-/** 산문 확정 결과 → 안내. 실패 까닭마다 다음에 할 일을 알려 준다. */
-export function proseConfirmError(code: string | undefined): string {
-  if (code === 'scene_story_proposal_pending') return 'Apply or discard the AI proposal first, then confirm the prose.'
-  if (code === 'prose_missing') return 'The prose is not ready yet. Wait until it is written, then confirm it.'
-  if (code === 'comic_rewrite_running') return 'The prose is being rewritten from the comic. Confirm it after the new draft is ready.'
-  return 'Could not confirm the prose. Please try again.'
-}
-
+/** 산문 확정 → 콘티(O1 · O6 2026-11-26). 하는 일은 confirm-prose-flow 가 정한다 — 여기는 화면 이동 · 알림 · 누르는 중 표시만. */
 export function useConfirmProse() {
   const router = useRouter()
   const t = useT()
   const [busy, setBusy] = useState(false)
-  const run = async () => {
+  /** pickedStyle — 확정 창에서 고른 그림체(그림체가 없을 때만 창이 묻는다). */
+  const run = async (pickedStyle: string | null = null) => {
     if (busy) return false
     setBusy(true)
     try {
-      const result = await useGlobalChatStore.getState().confirmProse()
-      if (!result.ok) {
-        if (result.code !== 'busy') toast.error(t(proseConfirmError(result.code)))
-        return false
-      }
-      useWriterRoomStore.getState().closeConfirm()
-      toast.success(t('Prose confirmed. Artist is opening.'))
-      router.push(withDemoShare('/studio/artist'))
-      return true
+      return await confirmProseToConti({ navigate: (path) => router.push(withDemoShare(path)), notify: toast, t }, pickedStyle)
     } finally {
       setBusy(false)
     }

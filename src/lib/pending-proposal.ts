@@ -2,7 +2,8 @@ import type { StageId } from '@/types'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 
-export type PendingProposalStage = Extract<StageId, 'producer' | 'writer' | 'artist' | 'director'>
+// 콘티(O1 2026-11-26)는 Storyboard 와 같은 보드 채팅이라 씬 · 샷 · 대사 승인 카드를 받는다.
+export type PendingProposalStage = Extract<StageId, 'producer' | 'conti' | 'writer' | 'artist' | 'director'>
 
 export type PendingProposalKind =
   | 'producerSourcePatch'
