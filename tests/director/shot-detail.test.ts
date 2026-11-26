@@ -97,8 +97,10 @@ describe('Director 샷 상세', () => {
     expect(shotDetailTakes(nodes, 'shot-1').final).toEqual({ id: 'v1', auto: false })
   })
 
-  it('바꿀 점을 적고 다시 만들면 이번 생성 프롬프트 끝에 바꿀 점을 붙이고, 비워 두면 프롬프트 그대로다', () => {
+  it('지금 그림이 없는 샷(캔버스 샷 · 아직 실사가 없는 Writer 샷)은 바꿀 점을 적고 다시 만들면 이번 생성 프롬프트 끝에 바꿀 점을 붙이고, 비워 두면 프롬프트 그대로다', () => {
     // 왜: D6 "비워 두면 아래 설정 그대로 다시 만들어요" — 바꿀 점은 이번 생성에만 붙고 샷 프롬프트는 바꾸지 않는다(혼자 정한 것).
+    //   오너 2026-11-26 O8 (a) — 지금 실사 그림이 있는 Writer 샷은 글 끝에 붙이지 않고 그 그림을 바탕으로 바꿀 점만 고친다(tests/director/image-fix.test.ts).
+    //   (옛 이름: "바꿀 점을 적고 다시 만들면 이번 생성 프롬프트 끝에 바꿀 점을 붙이고, 비워 두면 프롬프트 그대로다")
     expect(promptWithChange('A girl under the eaves.', '  show the umbrella handle ')).toBe('A girl under the eaves.\n\nChange from the previous image: show the umbrella handle')
     expect(promptWithChange('A girl under the eaves.', '   ')).toBe('A girl under the eaves.')
     // 상점은 다시 만들기 요청에 실린 바꿀 점을 이 규칙으로 붙여 보낸다.

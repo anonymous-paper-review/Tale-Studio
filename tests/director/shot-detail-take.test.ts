@@ -60,9 +60,11 @@ afterEach(async () => {
 })
 
 describe('샷 상세의 새 Take', () => {
-  it('영상 고치기에서 고친 모델 · 해상도 · 바꿀 점은 새 Take 에만 실리고, 바꿀 점은 지금 샷 프롬프트 끝에 그 한 번만 붙어 Take 에 기록으로 남는다', async () => {
+  it('영상 고치기에서 고친 모델 · 해상도 · 바꿀 점은 새 Take 에만 실리고, 바꿀 점은 지금 샷 프롬프트에 붙이지 않고 따로 보내 그 한 번만 쓰이며 Take 에 기록으로 남는다', async () => {
     // 왜: D7 — Take 는 덮어쓰지 않고 쌓인다. 리드 검토 c ③ — 새 Take 의 바탕은 늘 지금 샷 프롬프트다(앞 Take 의 프롬프트 줄기를 잇지 않는다).
-    //   (옛 이름: "… 새 Take 의 생성 요청과 설정에 실리고, 보고 있던 Take 의 설정은 그대로다")
+    //   오너 2026-11-26 O5 · (e)(f) — 바꿀 점을 프롬프트 끝에 붙이면 저장된 샷 글과 달라져 작가의 움직임 글이 빠지고 길이 상한에 먼저 잘렸다 → 따로 보낸다
+    //   (서버가 움직임 약속 바로 뒤에 싣는다 — tests/director/video-fix.test.ts).
+    //   (옛 이름: "… 바꿀 점은 지금 샷 프롬프트 끝에 그 한 번만 붙어 Take 에 기록으로 남는다", 그 앞: "… 새 Take 의 생성 요청과 설정에 실리고, 보고 있던 Take 의 설정은 그대로다")
     api().updateNodeData<'video'>(sourceId, { override: { prompt: 'An old prompt.\n\nChange from the previous video: faster' } })
     const newTakeId = await api().generateVideoForShot(shotId, {
       inheritFromVideoNodeId: sourceId,
@@ -74,7 +76,8 @@ describe('샷 상세의 새 Take', () => {
     const [body] = generationBodies()
     expect(body).toMatchObject({
       model: 'veo', resolution: '1080p', videoClipId: null,
-      prompt: 'A girl shivers under the eaves.\n\nChange from the previous video: slow push in',
+      prompt: 'A girl shivers under the eaves.',
+      changeNote: 'slow push in',
       override: { provider: 'veo', resolution: '1080p', changeNote: 'slow push in' },
     })
     const created = api().nodes.find((node) => node.id === newTakeId)!.data

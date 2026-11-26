@@ -956,6 +956,51 @@ export function directorRefsOf(data: ShotNodeData): { characters: string[]; loca
   return { characters: [...data.characterAssetIds], locations: [...data.worldAssetIds] }
 }
 
+// Director 고친 샷 프롬프트(오너 2026-11-26 O5 · 리드 승인) — 채팅 [적용] · 샷 상세 프롬프트 칸이 고친 글(promptOverride)을
+//   shots.director_prompt 에 0.5초 뒤 쓴다. null = Writer 글 그대로(고친 글이 없거나 Writer 글과 같음). 들어올 때 hydrateFromDb 가 읽어 맞춘다(DB 가 진실).
+//   Writer 가 샷 글을 다시 쓰면 DB 방아쇠가 이 칸을 비운다(20261126220000). 약속: tests/director/director-prompt-persist.test.ts
+const pendingDirectorPromptSaves = new Map<string, ReturnType<typeof setTimeout>>()
+
+/** 저장 전(0.5초 안)인 고친 글이 있는가 — 재수화가 막 고친 글을 DB 의 옛 값으로 덮지 않게 본다. */
+function hasPendingDirectorPromptSave(writerShotId: string): boolean {
+  return pendingDirectorPromptSaves.has(writerShotId)
+}
+
+/** DB 에 쓸 값 — 고친 글이 없거나 Writer 글과 같으면 null. */
+export function directorPromptToSave(data: Pick<ShotNodeData, 'promptOverride' | 'derivedPrompt'>): string | null {
+  const override = data.promptOverride
+  if (override === undefined || override === null) return null
+  return override === (data.derivedPrompt ?? undefined) ? null : override
+}
+
+function debouncedDirectorPromptSaveToDb(
+  projectId: string,
+  writerShotId: string,
+  getData: () => ShotNodeData | undefined,
+) {
+  const existing = pendingDirectorPromptSaves.get(writerShotId)
+  if (existing) clearTimeout(existing)
+  pendingDirectorPromptSaves.set(
+    writerShotId,
+    setTimeout(async () => {
+      pendingDirectorPromptSaves.delete(writerShotId)
+      const data = getData()
+      if (!projectId || !data) return
+      try {
+        const { error } = await createClient()
+          .from('shots')
+          .update({ director_prompt: directorPromptToSave(data) })
+          .eq('project_id', projectId)
+          .eq('shot_id', writerShotId)
+        if (error) throw error
+        void invalidateShots(projectId) // 사물함 표시 — 다음 읽기가 새 값을 받게
+      } catch (err) {
+        console.error('[director-store] director prompt DB save failed:', err)
+      }
+    }, 500),
+  )
+}
+
 const pendingVideoClipSaves = new Map<string, ReturnType<typeof setTimeout>>()
 const inFlightVideoClipSaves = new Map<string, Promise<void>>()
 const pendingVideoFinalWrites = new Map<string, Promise<void>>()
@@ -1314,7 +1359,7 @@ interface DirectorCanvasState {
    *  opts.onAccepted — 접수 알림: 서버가 2xx 로 받아 jobId 를 준 때 한 번. 2xx 가 아니면(몸에 jobId · queued 가 실려 와도 — 4xx · 503 결과 모름)
    *  · 500 · 연결 끊김 · 실패 알림은 아니다(리드 결정 — 결과를 모르는 것은 부른 쪽이 새 Take 가 만드는 중으로 남았는지로 따로 말한다).
    *  Lumi 는 이것으로 다음 샷을 보낸다(board 검토 b · entry D8 이 같이 쓴다). opts.onJob — 진행 알림 그대로. 둘 다 없으면 지금 그대로. */
-  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void }) => Promise<string | null>
+  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void; changeNote?: string }) => Promise<string | null>
   generateVideoForShot: (
     shotNodeId: string,
     options?: DirectorGenerationRequestOptions,
@@ -1446,10 +1491,12 @@ export type DirectorCanvasUpdate =
   | { type: 'generateVideo'; id: string }
   // #c5 (2026-08-27): 진입 자동 실사 생성을 끄면서 채팅 경로를 열었다. id 를 주면 그 샷만,
   //   생략하면 미생성 전체를 일괄로 — 버튼과 같은 경로(generateStoryboardImage / runRealBatch)를 탄다.
-  | { type: 'generateImage'; id?: string }
+  //   change(오너 2026-11-26 O5 · O8 (a)) = 그 샷 그림 고치기의 바꿀 점 — 서버가 지금 그림을 바탕으로 바꿀 점만 고친다. id 가 있을 때만.
+  | { type: 'generateImage'; id?: string; change?: string }
   // 영상 일괄 — shotIds 가 있으면 그 샷만, 없으면 남은 샷 전부. 채팅은 확인 카드 없이 바로 시작한다(오너 2026-11-14 9번 —
   //   global-chat-store 의 startChatVideos 가 막이 · Take 셈 뒤 runVideoBatch 를 부른다. 이 스토어의 applyUpdates 는 돌리지 않는다).
-  | { type: 'generateVideos'; shotIds?: string[] }
+  //   change(오너 O8 (e)(f)) = 영상 다시 만들기(새 Take)의 바꿀 점 — 샷 글에 붙이지 않고 따로 보내 작가의 움직임 글을 지킨다.
+  | { type: 'generateVideos'; shotIds?: string[]; change?: string }
   | {
       type: 'connect'
       sourceId: string
@@ -1995,6 +2042,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               )
             }
           }
+          // Director 고친 샷 프롬프트(shots.director_prompt, 오너 2026-11-26 O5) — DB 가 진실. null = Writer 글 그대로.
+          const directorPromptByShotId = new Map<string, string | null>()
+          for (const r of shotsRes.data ?? []) {
+            if (r.shot_id) directorPromptByShotId.set(r.shot_id, typeof r.director_prompt === 'string' ? r.director_prompt : null)
+          }
           // #wiring-persistence: DB에 저장된 안정 참조 연결. 노드 재구성 후 resolve 해 복원한다.
           const stableImageInputsByShotId = new Map<string, StableWiringRef[]>()
           // 약속 F·G: 사람이 손댄 참조 목록(shots.director_refs) — 있으면 그것이 진실이다.
@@ -2068,6 +2120,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     data: {
                       ...n.data,
                       imageInputs: normalizeImageInputs(n.data.imageInputs),
+                      // 고친 프롬프트는 DB 값으로 — 저장 전(0.5초 안)인 고친 글이 있으면 그대로 둔다(곧 저장된다).
+                      ...(directorPromptByShotId.has(n.data.writerShotId) && !hasPendingDirectorPromptSave(n.data.writerShotId)
+                        ? { promptOverride: directorPromptByShotId.get(n.data.writerShotId) ?? undefined }
+                        : {}),
                       storyboardImage: shotStoryboardMatchesHydrationSnapshot(
                         n,
                         localSnapshot.get(n.id),
@@ -3062,6 +3118,16 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           if (node && isShotData(node.data) && node.data.writerShotId) {
             const writerShotId = node.data.writerShotId
             debouncedShotSaveToDb(get().projectId, writerShotId, () => {
+              const n = get().nodes.find((x) => x.id === id)
+              return n && isShotData(n.data) ? n.data : undefined
+            })
+          }
+        }
+        // 고친 샷 프롬프트(채팅 [적용] · 프롬프트 칸)는 shots.director_prompt 에 남긴다(오너 2026-11-26 O5). Writer 와 이어진 샷만.
+        if (isShotData(prev.data) && 'promptOverride' in patch) {
+          const node = get().nodes.find((n) => n.id === id)
+          if (node && isShotData(node.data) && node.data.writerShotId) {
+            debouncedDirectorPromptSaveToDb(get().projectId, node.data.writerShotId, () => {
               const n = get().nodes.find((x) => x.id === id)
               return n && isShotData(n.data) ? n.data : undefined
             })
@@ -4180,6 +4246,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const prevUrl = data.storyboardImage?.url ?? ''
         // 만드는 중 · 실패 · 기다림 표시에도 지금 그림의 프레임 · 버전은 그대로(디자이너 11/13 D6 — 버전 줄 · 끝 그림이 사라지지 않게).
         const kept = keptStoryboardImage(data.storyboardImage)
+        // 바꿀 점: Writer 샷은 글에 붙이지 않고 따로 보낸다 — 서버가 지금 실사 그림을 바탕으로 바꿀 점만 고친다(오너 2026-11-26 O5 · (a)),
+        //   지금 그림이 없으면 서버가 예전처럼 글 끝에 붙인다. 캔버스 샷(아래 직접 생성 길)은 이번 프롬프트 끝에 붙인다.
+        const basePrompt = effectivePrompt(data) || data.label
+        const changeNote = options?.changeNote?.trim() ?? ''
         const prompt = promptWithChange(effectivePrompt(data) || data.label, options?.changeNote ?? '')
 
         const storyboardAlreadyGenerating = api.nodes.some(
@@ -4236,7 +4306,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               body: JSON.stringify({
                 projectId,
                 writerShotId,
-                prompt,
+                prompt: basePrompt,
+                ...(changeNote ? { changeNote } : {}),
                 referenceImageUrls,
                 characterRefCount: assetRefs.characterRefCount,
                 worldRefCount: assetRefs.worldRefCount,
@@ -4592,8 +4663,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               }
             }
           : undefined
-        const options = latest || onJob
-          ? { ...(latest ? { inheritFromVideoNodeId: latest.id } : {}), ...(onJob ? { onJob } : {}) }
+        // 채팅 고치기의 바꿀 점(오너 O8 (e)(f)) — 이어받은 설정 위에 이번 새 Take 의 바꿀 점으로 얹는다(샷 상세 영상 고치기와 같은 칸).
+        const changeNote = opts?.changeNote?.trim()
+        const options = latest || onJob || changeNote
+          ? { ...(latest ? { inheritFromVideoNodeId: latest.id } : {}), ...(onJob ? { onJob } : {}), ...(changeNote ? { videoOverride: { changeNote } } : {}) }
           : undefined
         return get().generateVideoForShot(shotNodeId, options)
       },
@@ -4896,8 +4969,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           takeLabel: videoNode.data.label,
           canvasPosition: videoNode.position,
           idempotencyKey,
-          // 샷의 Take 는 바꿀 점(상세 영상 고치기 · 리드 검토 c ③)을 지금 프롬프트 끝에 이번 한 번만 붙인다.
-          prompt: shotNode ? promptWithChange(eff.prompt, (videoNode.data.override as VideoOverride).changeNote ?? '', 'video') : eff.prompt,
+          // 샷의 Take 의 바꿀 점(상세 영상 고치기 · 채팅 고치기)은 프롬프트에 붙이지 않고 따로 보낸다 — 서버가 움직임 약속 바로 뒤에 싣고,
+          //   프롬프트가 저장된 샷 글 그대로라 작가의 움직임 글도 남는다(오너 2026-11-26 O5 · (e)(f)). 이번 한 번만 쓰이고 Take 설정에 기록으로 남는다.
+          prompt: eff.prompt,
+          ...(shotNode && (videoNode.data.override as VideoOverride).changeNote?.trim()
+            ? { changeNote: (videoNode.data.override as VideoOverride).changeNote!.trim() }
+            : {}),
           camera: eff.camera,
           cameraPreset: eff.cameraPreset,
           // 화면비는 서버가 프로젝트 포맷에서 정한다(2026-09-30) — 여기서 16:9 를 박지 않는다.
@@ -5662,9 +5739,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   })
                   break
                 }
-                const imageGeneration = options
-                  ? get().generateStoryboardImage(imgId, options)
-                  : get().generateStoryboardImage(imgId)
+                // 채팅 고치기(오너 O8 (a)) — Lumi 가 담은 바꿀 점을 실어 지금 그림을 바탕으로 고친다.
+                const imageGeneration = u.change
+                  ? get().generateStoryboardImage(imgId, { ...options, changeNote: u.change })
+                  : options
+                    ? get().generateStoryboardImage(imgId, options)
+                    : get().generateStoryboardImage(imgId)
                 void imageGeneration
                 result.applied += 1
                 break

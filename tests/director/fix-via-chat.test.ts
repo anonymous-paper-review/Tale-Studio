@@ -7,6 +7,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { resetActionGuard } from '@/lib/action-guard'
+import { asksRemake } from '@/lib/director/chat-video-targets'
 
 const FULL_PROMPT = 'A tired woman in a grey blouse sits alone in a night subway car under cold fluorescent light, her head resting on the window, rain streaks outside'
 const api = () => useDirectorCanvasStore.getState()
@@ -45,13 +46,15 @@ describe('고치기 칸 → Director 채팅', () => {
 
   it('영상 고치기 칸의 글은 "새 Take 로 다시 만들어 줘"로 보내고, 한국어 화면에서는 한국어로 보낸다', () => {
     // 왜: 영상은 덮어쓰지 않고 새 Take 로 만든다(D7) — 채팅이 그 샷을 다시 만들기(새 Take)로 받게 말로 분명히 한다. 채팅 @목록과 같은 화면 말 이름.
+    //   2026-11-26 고침: 영어 말("make a new Take")에 다시 만들기 낱말(remake · again …)이 없어 채팅이 다시 만들기로 읽지 않았다 — 영상이 있는 샷은 "이미 영상이 있어요"로 빠졌다.
     expect(askLumiToFix({ shotNodeId: shotId, kind: 'video', change: 'slow push in', closeDetail: false })).toBe('sent')
     setLocale('ko')
     askLumiToFix({ shotNodeId: shotId, kind: 'video', change: '천천히 다가간다', closeDetail: false })
     expect(sent).toEqual([
-      '@Real Shot 1 Fix the video and make a new Take: slow push in',
+      '@Real Shot 1 Fix the video and remake it as a new Take: slow push in',
       '@실사 샷 1 영상을 고쳐서 새 Take 로 다시 만들어 줘: 천천히 다가간다',
     ])
+    for (const message of sent) expect(asksRemake(message), message).toBe(true)
   })
 
   it('보낼 때 그 샷을 골라 채팅 맥락에 그 샷의 프롬프트 전체가 실린다', () => {

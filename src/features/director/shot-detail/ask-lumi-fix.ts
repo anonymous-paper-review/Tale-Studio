@@ -41,7 +41,7 @@ export function askLumiToFix(input: { shotNodeId: string; kind: FixKind; change:
   if (input.closeDetail) director.closeShotDetail()
   director.selectNode(input.shotNodeId)
   useChatUiStore.getState().setCollapsed(false)
-  const key = input.kind === 'image' ? '@{shot} Fix the image and make it again: {change}' : '@{shot} Fix the video and make a new Take: {change}'
+  const key = input.kind === 'image' ? '@{shot} Fix the image and make it again: {change}' : '@{shot} Fix the video and remake it as a new Take: {change}'
   void chat.sendMessage(translate(useLocaleStore.getState().locale, key, { shot: label, change }))
   return 'sent'
 }
