@@ -7,7 +7,7 @@
 //   버전 칩은 지금처럼 누르면 바로 그 판으로 돌아간다(11/14 답 5).
 //   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts · version-history.test.ts
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Trash2, Upload, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ThumbImage } from '@/components/thumb-image'
@@ -241,14 +241,15 @@ function ViewingBar({ data, viewingN, currentN, onAdopt, onBack }: {
   const generation = useStoryboardImageGeneration(data)
   const busy = generation.generating || data.storyboardImage?.status === 'pending'
   return (
-    <div className="flex flex-wrap items-center gap-2 rounded-[10px] bg-card px-3 py-2" data-testid="shot-detail-viewing">
+    // 보는 판 칩과 같은 점선 테두리(시안 없음) — 메인(크림) 단추는 화면에 하나라 [채택]은 테두리 단추.
+    <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-dashed border-foreground/40 px-3 py-2" data-testid="shot-detail-viewing">
       <p className="min-w-0 flex-1 text-caption text-foreground">
         {currentN !== null ? t('Viewing v{n} · Current v{current}', { n: viewingN, current: currentN }) : t('Viewing v{n}', { n: viewingN })}
       </p>
-      <Button type="button" size="sm" variant="secondary" disabled={busy}
+      <Button type="button" size="sm" variant="outline" disabled={busy}
         title={busy ? t('You can adopt it after the image is remade.') : undefined}
         onClick={onAdopt} data-testid="shot-detail-adopt">
-        {t('Adopt')}
+        <Check className="size-3.5" aria-hidden />{t('Adopt')}
       </Button>
       <Button type="button" size="sm" variant="ghost" onClick={onBack}>{t('Back to current')}</Button>
     </div>

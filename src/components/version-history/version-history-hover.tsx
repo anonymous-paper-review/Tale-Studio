@@ -6,7 +6,7 @@
 //   지난 판이 없으면 뜨지 않는다. 마우스로만 열린다(터치 · 키보드는 상세의 버전 줄 · Take 목록이 같은 일을 한다).
 //   작은 영상 칸은 저절로 틀지 않는다(design §10.3 마우스 올림 자동 재생 금지) — 썸네일, 없으면 첫 장면만.
 //   약속: tests/director/version-history.test.ts
-import { useState, type ReactNode, type SyntheticEvent } from 'react'
+import { useRef, useState, type ReactNode, type SyntheticEvent } from 'react'
 import { ImageOff } from 'lucide-react'
 import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card'
 import { ThumbImage } from '@/components/thumb-image'
@@ -26,6 +26,39 @@ export interface VersionStripCard {
 }
 
 const stop = (event: SyntheticEvent) => event.stopPropagation()
+
+/** 줄 폭 — 카드 폭을 따르되 작은 카드 5개가 보이게 256 ~ 416(아래 min-w-64 · max-w-[26rem]). */
+const STRIP_MIN_W = 256
+const STRIP_MAX_W = 416
+const GAP = 6
+const EDGE = 8
+
+/** 줄 높이 어림 — 그리기 전에 자리를 정해야 해서 칸 폭 · 그림 비율로 센다(안쪽 8 · 테두리 1 · 칸 사이 6 · 이름 줄 17). */
+function stripHeight(width: number, aspect: string, more: boolean): number {
+  const cell = (width - 18 - (more ? 36 : 0) - 4 * GAP) / 5
+  const [w, h] = aspect.split('/').map((value) => Number(value.trim()))
+  const ratio = w && h ? h / w : 9 / 16
+  return Math.ceil(18 + 2 + (cell - 4) * ratio + 4 + 17 + 2)
+}
+
+/** 줄을 놓을 자리(카드 기준 위아래 · 옆 어긋남) — 카드 바로 아래가 화면 안이면 아래(오너 "아래에 뜨기").
+ *  화면 끝이라 아래에 자리가 없으면 위로 뒤집지 않고 카드 안 아래쪽에 겹쳐 둔다 — 위로 뒤집으면 윗줄 카드에 붙어 그 카드 것으로 보였다.
+ *  카드 아래쪽이 화면 밖이면 화면 아래 끝에 맞춘다. 오른쪽 끝을 넘으면 왼쪽으로 민다. */
+export function stripPlace(
+  rect: { top: number; bottom: number; left: number; width: number },
+  aspect: string,
+  more: boolean,
+  viewport: { width: number; height: number },
+): { side: number; align: number } {
+  const width = Math.min(STRIP_MAX_W, Math.max(STRIP_MIN_W, rect.width))
+  const height = stripHeight(width, aspect, more)
+  const below = rect.bottom + GAP
+  const top = below + height <= viewport.height - EDGE
+    ? below
+    : Math.max(rect.top + EDGE, Math.min(rect.bottom - height - EDGE, viewport.height - EDGE - height))
+  const overflowRight = rect.left + width - (viewport.width - EDGE)
+  return { side: Math.round(top - rect.bottom), align: overflowRight > 0 ? -Math.round(overflowRight) : 0 }
+}
 
 /** 줄 자체(작은 카드들 + 넘치는 수). 마우스 올림 판 안에 들고, 시험은 이것만 그려 본다. */
 export function VersionStrip({ cards, more, aspect, onOpen, onMore }: {
@@ -96,26 +129,38 @@ export function VersionHistoryHover({ cards, more, aspect, onOpen, onMore, child
   children: ReactNode
 }) {
   const [open, setOpen] = useState(false)
+  const [place, setPlace] = useState({ side: GAP, align: 0 })
+  const triggerRef = useRef<HTMLElement | null>(null)
   const has = cards.length > 0
+  const changeOpen = (next: boolean) => {
+    // 열 때 카드 자리를 재어 줄 자리를 정한다(stripPlace).
+    const trigger = triggerRef.current
+    if (next && trigger) setPlace(stripPlace(trigger.getBoundingClientRect(), aspect, more > 0, { width: window.innerWidth, height: window.innerHeight }))
+    setOpen(next)
+  }
   return (
-    <HoverCard open={has && open} onOpenChange={setOpen} openDelay={250} closeDelay={120}>
+    <HoverCard open={has && open} onOpenChange={changeOpen} openDelay={250} closeDelay={120}>
       <HoverCardTrigger
         asChild
         onPointerDown={() => setOpen(false)}
         onFocus={(event) => event.preventDefault()}
         // 카드 안에서 연 확인 창 · 편집 창(body 로 나간 창)에 마우스가 들어가도 React 에서는 카드 안이라 열리려 한다 — 카드 자리 밖이면 열지 않는다.
-        onPointerEnter={(event) => { if (!event.currentTarget.contains(event.target as Node)) event.preventDefault() }}
+        onPointerEnter={(event) => {
+          triggerRef.current = event.currentTarget
+          if (!event.currentTarget.contains(event.target as Node)) event.preventDefault()
+        }}
       >
         {children}
       </HoverCardTrigger>
       {has ? (
-        // 줄은 카드 폭을 따른다(좁은 카드 · 축소한 캔버스에서도 작은 카드 5개가 보이게 최소 256). 상세를 열면 닫는다.
+        // 줄은 카드 폭을 따른다(좁은 카드 · 축소한 캔버스에서도 작은 카드 5개가 보이게 최소 256). 자리는 stripPlace. 상세를 열면 닫는다.
         //   줄 안을 누르는 것이 카드(고르기 · 끌기)로 번지지 않게 막는다 — 줄은 body 로 나가 있어도 React 에서는 카드 아래다.
         <HoverCardContent
           side="bottom"
           align="start"
-          sideOffset={6}
-          collisionPadding={12}
+          sideOffset={place.side}
+          alignOffset={place.align}
+          avoidCollisions={false}
           className="w-(--radix-hover-card-trigger-width) min-w-64 max-w-[26rem] p-2"
           onClick={stop}
           onPointerDown={stop}

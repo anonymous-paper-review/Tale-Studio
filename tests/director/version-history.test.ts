@@ -16,7 +16,7 @@ vi.mock('@/lib/shots-cache', () => ({ invalidateShots: () => Promise.resolve() }
 import { DirectorShotDetail } from '@/features/director/shot-detail/director-shot-detail'
 import { DirectorDetailPanel } from '@/features/director/canvas-panels/DirectorDetailPanel'
 import { gridVideoView } from '@/features/director/canvas-views/StoryboardGridView'
-import { VersionStrip } from '@/components/version-history/version-history-hover'
+import { VersionStrip, stripPlace } from '@/components/version-history/version-history-hover'
 import { historyStrip, pastImageVersions, pastTakes } from '@/lib/version-history'
 import { shotDetailTakes } from '@/lib/director/shot-detail'
 import { selectStoryboardVersion, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
@@ -144,6 +144,22 @@ describe('지난 판 줄', () => {
     expect(takes).toContain('src="https://media.test/t2.mp4#t=0.1"')
     expect(takes).not.toContain('autoplay')
     expect(takes).not.toContain('data-testid="version-strip-more"')
+  })
+})
+
+describe('지난 판 줄 자리', () => {
+  it('카드 바로 아래에 자리가 있으면 줄은 카드 아래에 뜨고, 화면 끝이라 자리가 없으면 윗줄 카드를 덮지 않게 카드 안 아래쪽에 뜬다', () => {
+    // 왜: 오너 "아래에 뜨기" — 화면 끝 카드에서 줄이 위로 뒤집혀 윗줄 카드에 붙자 그 카드의 지난 판으로 보였다(브라우저 확인 11/26, 혼자 정한 것 m).
+    const viewport = { width: 1440, height: 900 }
+    expect(stripPlace({ top: 100, bottom: 400, left: 100, width: 400 }, '16 / 9', false, viewport)).toEqual({ side: 6, align: 0 })
+    const low = { top: 470, bottom: 830, left: 100, width: 400 }
+    const place = stripPlace(low, '16 / 9', false, viewport)
+    expect(place.side).toBeLessThan(0)
+    // 줄 위 끝은 그 카드 안(윗줄 카드로 넘어가지 않는다)이고, 줄 아래 끝은 화면 안이다.
+    expect(low.bottom + place.side).toBeGreaterThanOrEqual(low.top)
+    expect(low.bottom + place.side + 80).toBeLessThanOrEqual(viewport.height)
+    // 오른쪽 끝 카드는 줄을 왼쪽으로 민다(좁은 카드도 줄 폭은 256).
+    expect(stripPlace({ top: 100, bottom: 300, left: 1300, width: 120 }, '16 / 9', false, viewport).align).toBe(-124)
   })
 })
 
