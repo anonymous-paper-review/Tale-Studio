@@ -112,10 +112,17 @@ function readFallbackPlan(job: GenerationJob): FallbackPlan | null {
   }
 }
 
+/**
+ * 고를 수 있는 영상 모델 중 대체 모델과 같은 것(오너 2026-11-26 D4) — 사람이 H3 Max 를 골랐다 실패하면 대체 "미니맥스"(같은 H3 Max)는
+ * 이미 해 본 것으로 친다. H3 Max Turbo 는 다른 모델이라 지금처럼 미니맥스부터 간다.
+ */
+const SAME_AS_FALLBACK: Readonly<Record<string, VideoFallbackModel>> = { 'h3-max': 'minimax' }
+
 /** 아직 시도하지 않은 다음 모델. 해피홀스는 참고 그림이 있어야 만들 수 있다. */
 export function nextVideoFallbackModel(triedModels: readonly string[], hasImages: boolean): VideoFallbackModel | null {
+  const tried = new Set(triedModels.flatMap((model) => (SAME_AS_FALLBACK[model] ? [model, SAME_AS_FALLBACK[model]] : [model])))
   for (const model of VIDEO_FALLBACK_CHAIN) {
-    if (triedModels.includes(model)) continue
+    if (tried.has(model)) continue
     if (model === 'happy-horse' && !hasImages) continue
     return model
   }
@@ -158,7 +165,7 @@ function buildFallbackRequest(model: VideoFallbackModel, plan: FallbackPlan): Fa
   if (model === 'minimax') return buildMinimaxRequest(plan, prompt, durationSeconds, aspectRatio)
   const resolution = typeof plan.snapshot.resolution === 'string' ? plan.snapshot.resolution : null
   // Happy Horse 는 2,500자까지만 받는다 — 처음 모델(글 상한 없음)로 만든 긴 지시문은 문장 경계에서 줄인다(2026-11-23).
-  return buildFalReferenceToVideoRequest(model, fitPromptForModel(prompt, model, plan.snapshot.prompt_parts), plan.imageUrls, durationSeconds, aspectRatio, resolution)
+  return buildFalReferenceToVideoRequest(model, fitPromptForModel(prompt, model, plan.snapshot.prompt_parts), plan.imageUrls, durationSeconds, aspectRatio, resolution, plan.roles)
 }
 
 /** 실패한 요청 id 를 아직 들고 있는 queued 작업만 'reserved:' 로 차지한다. 다른 처리가 먼저 가져갔으면 false. */

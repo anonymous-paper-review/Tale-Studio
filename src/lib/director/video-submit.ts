@@ -896,7 +896,8 @@ async function prepareVideoRequest(
       }
     }
     const falSubmitRequest = submitRefUrls
-      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio, resolution)
+      // 그림 역할(start · end · ref)은 첫 · 마지막 장면 칸이 있는 모델(H3 Max)만 쓴다 — 목록과 같은 순서일 때만 넘긴다.
+      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio, resolution, referenceImageUrlsV2?.length ? alignedReferenceImageRoles : undefined)
       : buildFalT2VFallbackRequest(fullPrompt, dur, effectiveAspectRatio)
     const falCapture = buildBestEffortFalRequestCapturePatch(falSubmitRequest.input, falSubmitRequest.model)
     const normalizedNewTakeMetadata = {

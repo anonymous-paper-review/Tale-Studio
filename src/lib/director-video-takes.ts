@@ -3,6 +3,7 @@ import { classifyJobError } from '@/lib/generation-jobs'
 import { cancelledJobsById } from '@/lib/director/job-cancellations'
 import { releaseTakesForJob } from '@/lib/billing/take-hold'
 import type { Json, Tables } from '@/types/database'
+import { VIDEO_MODELS, type VideoModelKey } from '@/lib/video-models'
 export {
   compareDirectorVideoTakeOrder,
   selectHandoffTake,
@@ -168,13 +169,15 @@ type LastAttemptJob = {
   model: string | null
   result_url: string | null
   resolution: string | null
+  /** 사람이 고른 모델(작업 기록의 resolved_model_key) — 고른 모델이 직접 만들었는지 대체 모델이 만들었는지 가른다. */
+  resolved_model_key?: string | null
   reference_image_url?: string | null
   reference_image_urls?: unknown
   reference_image_roles?: unknown
 }
 
 const LIVE_TAKE_WITH_LAST_JOB =
-  '*, last_attempt_job:generation_jobs!video_clips_last_attempt_job_fkey(id, status, model, result_url, resolution:input_snapshot->>resolution, reference_image_url:input_snapshot->>reference_image_url, reference_image_urls:input_snapshot->reference_image_urls, reference_image_roles:input_snapshot->reference_image_roles)'
+  '*, last_attempt_job:generation_jobs!video_clips_last_attempt_job_fkey(id, status, model, result_url, resolution:input_snapshot->>resolution, resolved_model_key:input_snapshot->>resolved_model_key, reference_image_url:input_snapshot->>reference_image_url, reference_image_urls:input_snapshot->reference_image_urls, reference_image_roles:input_snapshot->reference_image_roles)'
 
 /** 지금 영상 파일을 그 작업이 냈는가 — 다시 만드는 중 · 다시 만들기 실패면 지금 영상은 예전 작업 것이다. */
 function madeByJob(take: Pick<DirectorVideoTake, 'url' | 'storage_path'>, job: LastAttemptJob | null | undefined): job is LastAttemptJob {
@@ -202,12 +205,17 @@ export function madeFrames(
 /**
  * 지금 영상 파일이 실제로 1080p 로 만들어졌는가. 근거는 그 파일을 낸 작업뿐이다 — 마지막 시도가 완료되어 같은 파일을
  * 냈을 때만 판단하고(다시 만드는 중 · 다시 만들기 실패면 모른다 = null), 대체 모델 미니맥스는 늘 768P 다.
+ * 사람이 H3 Max · Turbo 를 직접 골라(2026-11-26 D4) 그 모델이 만든 작업은 미니맥스 주소라도 고른 해상도로 만든 것이다.
  */
 export function madeVideoResolution(
   take: Pick<DirectorVideoTake, 'url' | 'storage_path'>,
   job: LastAttemptJob | null | undefined,
 ): '1080p' | null {
-  if (!madeByJob(take, job) || job.model?.startsWith('minimax/')) return null
+  if (!madeByJob(take, job)) return null
+  const chosen = typeof job.resolved_model_key === 'string' && Object.hasOwn(VIDEO_MODELS, job.resolved_model_key)
+    ? VIDEO_MODELS[job.resolved_model_key as VideoModelKey]
+    : null
+  if (job.model?.startsWith('minimax/') && chosen?.endpoint !== job.model) return null
   return job.resolution === '1080p' ? '1080p' : null
 }
 

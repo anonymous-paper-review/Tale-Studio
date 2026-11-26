@@ -1,4 +1,4 @@
-// Director 에 처음 들어갔을 때(DB 에 저장된 자리가 없을 때) 노드 보기는 [자동 정렬]과 같은 간격으로 놓이고, 사람이 놓은 자리는 건드리지 않는다 (오너 2026-11-16)
+// Director 에 처음 들어갔을 때(DB 에 저장된 씬 · 샷 자리가 없을 때 — 영상 Take 가 있어도) 노드 보기는 [자동 정렬]과 같은 간격으로 놓이고, 사람이 놓은 자리는 건드리지 않는다 (오너 2026-11-16 · 2026-11-26 D7)
 import { readFileSync } from 'node:fs'
 import type { XYPosition } from '@xyflow/react'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -97,7 +97,7 @@ describe('처음 들어갔을 때 놓는 자리', () => {
 
   // 왜: 리드 2026-11-16 — 오너가 지금 보는 프로젝트는 이미 한 번 열어 본 것이라 브라우저에 옛 간격 자리가 남아 있다. 새 프로젝트만 고치면 오너가 고쳐진 것을 못 본다.
   //   "처음"은 DB 기준이다: 저장된 자리가 하나도 없으면 사람이 자리를 놓은 적이 없다(끌면 바로 저장된다).
-  it('브라우저에 옛 간격 자리가 남아 있어도 DB 에 저장된 자리 · 테이크 · Director 에서 만든 카드가 없으면 한 번 정렬하고 저장한다', async () => {
+  it('브라우저에 옛 간격 자리가 남아 있어도 DB 에 저장된 씬 · 샷 자리 · Director 에서 만든 카드가 없으면 한 번 정렬하고 저장한다', async () => {
     const { sceneIds, shotIds } = createCards([2, 1])
     measureShots(shotIds)
     const persist = vi.fn()
@@ -169,8 +169,9 @@ describe('처음으로 보는 때와 안 보는 때', () => {
   })
 
   // 왜: 리뷰 s11 낮음 1 — 처음 정렬은 요청한 뒤 화면이 카드를 다 그리기를 기다렸다가 돈다(스토리보드 보기로 열리면 노드 보기가 열릴 때까지 기다린다).
-  //   그 사이 사람이 카드를 끌거나 Take 가 생기면 요청할 때의 점검은 낡았다. 정렬하는 곳에서 한 번 더 보고, 어긋나면 정렬하지 않는다.
-  it('처음 정렬을 기다리는 사이 카드가 옮겨지거나 Take 가 생기면 정렬하지 않는다', async () => {
+  //   그 사이 사람이 카드를 끌면 요청할 때의 점검은 낡았다. 정렬하는 곳에서 한 번 더 보고, 어긋나면 정렬하지 않는다.
+  //   Take 가 생긴 것은 막지 않는다(오너 2026-11-26 D7) — Take 자리는 만들 때 저절로 놓이고 정렬이 샷 옆에 함께 놓는다.
+  it('처음 정렬을 기다리는 사이 카드가 옮겨지면 정렬하지 않고, Take 가 생긴 것은 막지 않는다', async () => {
     const request = async () => {
       api().reset()
       api().setProjectId(PROJECT)
@@ -190,10 +191,10 @@ describe('처음으로 보는 때와 안 보는 때', () => {
     moveCard(moved.shotIds[0]!, { x: 50, y: 60 })
     expect(await confirmFirstEntryArrange(PROJECT)).toBe(false)
 
-    // Take 가 생겼다
+    // Take 가 생겼다 — 그래도 정렬한다
     const withTake = await request()
     api().addVideoTake(withTake.shotIds[0]!)
-    expect(await confirmFirstEntryArrange(PROJECT)).toBe(false)
+    expect(await confirmFirstEntryArrange(PROJECT)).toBe(true)
 
     // 끌고 난 자리가 아직 DB 에 저장되기 전이다
     vi.useFakeTimers()
@@ -276,13 +277,29 @@ describe('처음으로 보는 때와 안 보는 때', () => {
     }
   })
 
-  // 왜: 영상 테이크가 있으면 이미 작업이 진행된 캔버스고, 테이크 자리는 만들 때 저장돼 있다. 다시 놓으면 저장된 자리를 새로 쓴다.
-  it('영상 테이크가 이미 있으면 처음으로 보지 않는다', async () => {
+  // 왜: 오너 2026-11-26 D7 — Take 자리는 만들 때 저절로 저장되는 값이라 사람이 놓은 자리가 아니다. 예전에는 Take 가 있으면 처음으로 보지 않아
+  //   영상을 만든 프로젝트(오너 프로젝트 대부분)는 노드 보기를 처음 열어도 넓은 기본 간격 그대로였다. 정렬은 Take 도 샷 옆에 함께 놓는다.
+  it('영상 Take 가 이미 있어도 Writer 카드와 그 Take 뿐이면 처음으로 보고 Take 도 함께 놓는다', async () => {
     const { shotIds } = createCards([2])
-    api().addVideoTake(shotIds[0]!)
+    measureShots(shotIds)
+    const take = api().addVideoTake(shotIds[0]!)!
+    moveCard(take, { x: 5000, y: 3000 })
 
-    expect(await arrangeIfFirstEntry(PROJECT)).toBe(false)
-    expect(api().arrangePending).toBe(false)
+    expect(isAutoPlacedCandidate(api().nodes as DirectorNode[])).toBe(true)
+    expect(await arrangeIfFirstEntry(PROJECT, checkWith(false))).toBe(true)
+    api().relayoutCanvas()
+    expect(at(take).x).toBeLessThan(at(shotIds[0]!).x + 1000)
+  })
+
+  // 왜: 샷에 매이지 않은 독립 영상은 사람이 Director 에서 직접 만들고 놓은 카드다 — 그 캔버스는 처음 정렬이 다시 놓지 않는다.
+  it('Director 에서 직접 만든 독립 영상이 있으면 처음으로 보지 않는다', async () => {
+    createCards([2])
+    useDirectorCanvasStore.setState((s) => ({
+      nodes: [...s.nodes, { id: 'standalone-1', type: 'video', position: { x: 10, y: 10 }, data: { kind: 'video', label: 'Video', parentShotNodeId: null } } as unknown as DirectorNode],
+    }))
+
+    expect(isAutoPlacedCandidate(api().nodes as DirectorNode[])).toBe(false)
+    expect(await arrangeIfFirstEntry(PROJECT, checkWith(false))).toBe(false)
   })
 
   // 왜: Writer 와 이어지지 않은 카드는 사람이 Director 에서 직접 만들고 놓은 것이다(그 자리는 DB 에 저장되지도 않는다).

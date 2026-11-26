@@ -5,6 +5,8 @@ import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { useSequentialPoll } from '@/hooks/use-sequential-poll'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowRight, Check, Loader2, ZoomIn, ZoomOut } from 'lucide-react'
+import { StageWaitCard } from '@/components/feedback/stage-wait'
+import { useArtistWait } from '@/hooks/use-stage-wait'
 import { Button } from '@/components/ui/button'
 import { ChoiceChip } from '@/components/controls/choice-chip'
 import { PageHeader } from '@/components/layout/page-header'
@@ -77,6 +79,8 @@ export default function VisualPage() {
   } = useArtistStore()
 
   const projectId = useProjectStore((s) => s.projectId)
+  // 인물 · 배경과 진행 상태를 처음 다 읽기 전에는 예전 진행 화면 · 빈 카드 대신 Artist 기다리는 카드(오너 2026-11-26 m1126 G1, hooks/use-stage-wait).
+  const artistWait = useArtistWait()
   const propAssets = useArtistStore((s) => s.propAssets)
   const loadedProjectId = useArtistStore((s) => s.loadedProjectId)
   // D13(오너 2026-11-22 "한 페이지에 다 담아주고 버튼을 누르면 그 섹션으로 바로 이동") — 걸러 보기 칸(v3 A5) 대신 묶음 바로가기.
@@ -567,6 +571,7 @@ export default function VisualPage() {
   const legacyProgressBusy = legacyProgressHolds({ gateOpen, phase, status: writerStatus })
   useAiBusyHold(legacyProgressBusy)
 
+  if (artistWait) return <StageWaitCard stage="artist" />
   if (phase === 'list') {
     return (
       <>

@@ -1,7 +1,7 @@
 // ============================================================================
 // Video model registry — Director 영상 생성 모델 카탈로그.
 //
-// FAL reference-to-video 모델 5종을 단일 레지스트리로 묶는다. generate-video
+// FAL reference-to-video 모델 7종을 단일 레지스트리로 묶는다(2026-11-26 MiniMax H3 Max · H3 Max Turbo 추가). generate-video
 // 라우트가 이 spec으로 input(duration/audio/resolution)을 구성하고, store/popup이
 // model key·label·가격 힌트를 소비한다.
 //
@@ -22,6 +22,8 @@ export type VideoModelKey =
   | 'seedance-2.5'
   | 'kling-o3'
   | 'veo'
+  | 'h3-max'
+  | 'h3-max-turbo'
 
 /** duration 파라미터 처리 방식 */
 export type VideoModelDuration =
@@ -36,8 +38,8 @@ export interface VideoModelSpec {
   endpoint: string
   /** duration 파라미터 처리 (flexible=정수 초, fixed=8s 고정) */
   duration: VideoModelDuration
-  /** reference 이미지 파라미터 이름 (전 모델 image_urls) */
-  refParam: 'image_urls'
+  /** reference 이미지 파라미터 이름 — image_urls, MiniMax H3 는 reference_image_urls */
+  refParam: 'image_urls' | 'reference_image_urls'
   /** 오디오 토글 파라미터 이름. null = 토글 없음(네이티브) */
   audioParam: 'generate_audio' | 'audio' | null
   /**
@@ -53,6 +55,23 @@ export interface VideoModelSpec {
   defaultResolution: string
   /** 오디오 없을 때 초당 대략 가격 (UI 힌트, USD). 0 = 미표기 */
   pricePerSecNoAudio: number
+  /**
+   * 첫 · 마지막 장면 칸(2026-11-26 H3 Max) — 있으면 시작 · 끝 그림을 이 칸에도 싣는다(영상이 정확히 그 그림으로 시작 · 끝남).
+   *   참고 그림 목록(refParam)은 그대로 둔다: H3 참고 입구는 참고 그림 0장이면 거절하고(2026-10-12 실측 422),
+   *   지시문의 "image 1 = START, image 2 = END"가 그 목록 순서를 가리킨다. 가운데 장면 칸(middle_image_url)은 쓰지 않는다 —
+   *   Director 의 가운데 장은 화살표를 그린 설명 그림이다.
+   */
+  frameParams?: { start: 'image_url'; end: 'end_image_url' }
+  /** 고른 해상도 → 모델이 받는 값(이름이 다를 때만 — H3 = 768P · 1080P, 720P 가 없어 720p 는 768P). 없으면 고른 값 그대로. */
+  resolutionValues?: Partial<Record<VideoResolution, string>>
+  /** false = negative_prompt 칸이 없는 모델(Happy Horse · H3) — 보내지 않는다. */
+  negativePrompt?: false
+  /** 받는 화면비 — 있으면 이 목록 밖 값은 보내지 않는다(모델 기본). 없으면 늘 보낸다. */
+  aspectRatios?: readonly string[]
+  /** 참고 그림 목록 상한(fal 스키마) — 넘치면 뒤에서부터 덜어 낸다. 없으면 그대로. */
+  maxRefImages?: number
+  /** 늘 같이 보내는 값 — H3 는 글 다시 쓰기를 끈다(prompt_expansion_mode 는 필수 칸, 대체 미니맥스와 같은 값). */
+  fixedInput?: Readonly<Record<string, string>>
 }
 
 // 2026-08-31 오너 확정: 기본 생성기를 Seedance 2.0 으로 전환 (종전 happy-horse).
@@ -60,14 +79,35 @@ export interface VideoModelSpec {
 //   초과분(죽은 꼬리)을 실측 길이 기준으로 잘라낸다.
 export const DEFAULT_VIDEO_MODEL: VideoModelKey = 'seedance'
 
-/** UI 모델 선택지 순서(#ui-cleanup 2026-08-31) — fal.ai 카탈로그 모델만. */
+/** UI 모델 선택지 순서(#ui-cleanup 2026-08-31) — fal.ai 카탈로그 모델만. H3 Max 계열(2026-11-26)은 지금 다섯 뒤. */
 export const FAL_VIDEO_MODEL_ORDER: VideoModelKey[] = [
   'seedance',
   'seedance-2.5',
   'happy-horse',
   'kling-o3',
   'veo',
+  'h3-max',
+  'h3-max-turbo',
 ]
+
+/** H3 이 받는 화면비 — fal 스키마(2026-11-26 OpenAPI). 'adaptive' 는 보내지 않는다. */
+const H3_ASPECT_RATIOS = ['21:9', '16:9', '4:3', '1:1', '3:4', '9:16'] as const
+/** H3 공통 칸 — 해상도 이름(768P · 1080P) · 글 다시 쓰기 끔 · 참고 그림 9장 · negative_prompt 없음 · 소리는 늘 같이 만든다(칸 없음). */
+const H3_COMMON: Omit<VideoModelSpec, 'key' | 'label' | 'endpoint'> = {
+  duration: { mode: 'flexible', min: 1, max: 15 },
+  refParam: 'reference_image_urls',
+  audioParam: null,
+  audioDefault: true,
+  resolutions: ['720p', '1080p'],
+  defaultResolution: '720p',
+  // fal 가격표(2026-11-26): 768p 초당 $0.08 · 1080p $0.16 — 소리는 늘 같이 만든다.
+  pricePerSecNoAudio: 0.08,
+  resolutionValues: { '720p': '768P', '1080p': '1080P' },
+  negativePrompt: false,
+  aspectRatios: H3_ASPECT_RATIOS,
+  maxRefImages: 9,
+  fixedInput: { prompt_expansion_mode: 'disabled' },
+}
 
 export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
   'happy-horse': {
@@ -81,6 +121,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['720p', '1080p'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.14,
+    negativePrompt: false,
   },
   seedance: {
     key: 'seedance',
@@ -132,6 +173,21 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['720p', '1080p', '4k'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.2,
+  },
+  // 2026-11-26 오너 D4 "영상모델 H3 Max 계열 추가" — fal 의 MiniMax H3 Max(첫 · 마지막 장면 칸 있음)와 H3 Max Turbo(참고 그림만).
+  //   대체 모델 "미니맥스"(video-fallback)도 H3 Max 다 — 그쪽은 늘 768P · 참고 그림이 없으면 image-to-video 입구.
+  'h3-max': {
+    key: 'h3-max',
+    label: 'H3 Max',
+    endpoint: 'minimax/h3-max/reference-to-video',
+    ...H3_COMMON,
+    frameParams: { start: 'image_url', end: 'end_image_url' },
+  },
+  'h3-max-turbo': {
+    key: 'h3-max-turbo',
+    label: 'H3 Max Turbo',
+    endpoint: 'minimax/h3-max-turbo/reference-to-video',
+    ...H3_COMMON,
   },
 }
 

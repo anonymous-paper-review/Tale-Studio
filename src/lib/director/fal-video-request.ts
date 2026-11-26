@@ -10,8 +10,11 @@ export type FalVideoSubmitRequest = {
 
 /* ── FAL.ai reference-to-video (레지스트리 기반, #5) ──
    V2 refs(#real-strip 2026-07-22): imageUrls 가 [START, END] 2장이면 시작·끝 구도 고정 —
-   전 모델 refParam 이 image_urls 배열이라 스키마 변경 없이 원소만 늘어난다.
-   resolution(오너 2026-10-31): 영상 노드가 고른 해상도. 없거나 모델이 못 내는 값이면 모델 기본 해상도. */
+   참고 그림 칸(refParam: image_urls · H3 는 reference_image_urls) 배열에 원소만 늘어난다.
+   resolution(오너 2026-10-31): 영상 노드가 고른 해상도. 없거나 모델이 못 내는 값이면 모델 기본 해상도.
+   H3 Max 계열(오너 2026-11-26 D4): 이름이 다른 칸은 레지스트리가 정한다 — 첫 · 마지막 장면 칸(H3 Max), 768P · 1080P,
+     글 다시 쓰기 끔, negative_prompt 없음, 참고 그림 9장. roles 는 그림마다의 역할(start · end · ref)이고, 모르면(예전 요청)
+     첫 그림 = 시작, 마지막 그림 = 끝(2장 이상)으로 본다 — 지시문의 "첫 그림 = START, 마지막 그림 = END"와 같은 판정. */
 export function buildFalReferenceToVideoRequest(
   modelKey: VideoModelKey,
   prompt: string,
@@ -19,16 +22,23 @@ export function buildFalReferenceToVideoRequest(
   durationSeconds: number,
   aspectRatio: string,
   resolution?: string | null,
+  roles?: readonly string[] | null,
 ): FalVideoSubmitRequest {
   const spec = VIDEO_MODELS[modelKey]
   if (!spec.endpoint) throw new Error('FAL reference-to-video endpoint missing')
   const input: Record<string, unknown> = {
     prompt,
-    [spec.refParam]: imageUrls,
+    [spec.refParam]: spec.maxRefImages ? imageUrls.slice(0, spec.maxRefImages) : imageUrls,
   }
-  // happy-horse는 negative_prompt 미지원(모델 스키마) — 헛송신 제거(#tfix-fal-wiring 2026-08-11).
+  // 첫 · 마지막 장면 칸(H3 Max) — 참고 그림 목록은 그대로 두고 시작 · 끝 그림을 이 칸에도 싣는다(video-models frameParams).
+  if (spec.frameParams) {
+    const frames = startEndFrames(imageUrls, roles)
+    if (frames.start) input[spec.frameParams.start] = frames.start
+    if (frames.end) input[spec.frameParams.end] = frames.end
+  }
+  // happy-horse · H3 는 negative_prompt 미지원(모델 스키마) — 헛송신 제거(#tfix-fal-wiring 2026-08-11).
   //   고정 negative_prompt 계약 자체는 타 모델에서 유지(존폐는 별도 논의 — 카탈로그 B12).
-  if (modelKey !== 'happy-horse') {
+  if (spec.negativePrompt !== false) {
     input.negative_prompt = 'blurry, low quality, distorted, deformed'
   }
 
@@ -45,17 +55,33 @@ export function buildFalReferenceToVideoRequest(
     input[spec.audioParam] = spec.audioDefault
   }
 
-  // resolution: 노출하는 모델만 — 고른 해상도(낼 수 있을 때) 또는 기본 해상도
+  // resolution: 노출하는 모델만 — 고른 해상도(낼 수 있을 때) 또는 기본 해상도. 이름이 다른 모델(H3 = 768P · 1080P)은 그 이름으로.
   if (spec.resolutions.length > 0) {
-    input.resolution = effectiveVideoResolution(modelKey, resolution)
+    const chosen = effectiveVideoResolution(modelKey, resolution)
+    input.resolution = spec.resolutionValues?.[chosen] ?? chosen
   }
 
-  // aspect_ratio: kling-o3는 미노출(확실치 않아 omit), 그 외 전달
-  if (modelKey !== 'kling-o3') {
+  // aspect_ratio: kling-o3는 미노출(확실치 않아 omit). 받는 목록이 있는 모델(H3)은 그 안의 값만, 그 외 전달.
+  if (modelKey !== 'kling-o3' && (!spec.aspectRatios || spec.aspectRatios.includes(aspectRatio))) {
     input.aspect_ratio = aspectRatio
   }
 
+  // 늘 같이 보내는 값(H3: prompt_expansion_mode 'disabled').
+  if (spec.fixedInput) Object.assign(input, spec.fixedInput)
+
   return { model: spec.endpoint, input }
+}
+
+/** 시작 · 끝 그림 — 역할이 있으면 역할로, 없으면(예전 요청) 첫 그림 = 시작 · 마지막 그림 = 끝(2장 이상일 때). */
+function startEndFrames(imageUrls: readonly string[], roles: readonly string[] | null | undefined): { start: string | null; end: string | null } {
+  if (roles && roles.length === imageUrls.length) {
+    const at = (role: string) => {
+      const index = roles.indexOf(role)
+      return index >= 0 ? imageUrls[index] ?? null : null
+    }
+    return { start: at('start'), end: at('end') }
+  }
+  return { start: imageUrls[0] ?? null, end: imageUrls.length >= 2 ? imageUrls[imageUrls.length - 1] ?? null : null }
 }
 
 export async function submitFalReferenceToVideo(
