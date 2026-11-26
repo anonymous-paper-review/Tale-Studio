@@ -1,8 +1,16 @@
 import { translate } from '@/lib/i18n/translate'
 import type { ToolCall, ToolMessage, ToolOutcome, ToolResult, ToolTurn } from './protocol'
 import { toolValueKey } from './executor'
+import { isStoryboardImageUpdate } from '@/lib/storyboard/chat-image-tool'
 
 export interface ChatToolResponse { toolTurn?: ToolTurn; reply?: string; [key: string]: unknown }
+
+/** 실사 그림 요청만 담긴 답(Storyboard 채팅 generateImage, 오너 2026-11-26 m1126 O7) — 글을 고치는 답이 아니라 화면이 그림을 맡기는 답이다.
+ *  "고쳐 줘" 부탁이라도 그림으로 답했으면 글 고치기(edit_project)를 요구하지 않는다. 글 고치기가 섞이면 지금처럼 도구를 요구한다. */
+function onlyImageRequests(data: ChatToolResponse): boolean {
+  const updates = Array.isArray(data.updates) ? data.updates : []
+  return updates.length > 0 && updates.every(isStoryboardImageUpdate)
+}
 
 function failureKeyFor(call: ToolCall): string {
   const input = call.input && typeof call.input === 'object' ? { ...call.input, revision: undefined } : call.input
@@ -78,7 +86,7 @@ export async function runChatToolLoop(options: {
           continue
         }
       }
-      if (options.requireEdit && (data.toolSupport === true || results.length > 0) && !results.some(outcome => outcome.call.name === 'edit_project')) {
+      if (options.requireEdit && !onlyImageRequests(data) && (data.toolSupport === true || results.length > 0) && !results.some(outcome => outcome.call.name === 'edit_project')) {
         if (!checkedMissingEdit) {
           checkedMissingEdit = true
           messages.push({ role: 'assistant', content: [{ type: 'text', text: data.reply || 'No edit was executed.' }] },
