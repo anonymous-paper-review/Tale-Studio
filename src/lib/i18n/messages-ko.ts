@@ -3050,6 +3050,8 @@ export const KO: Record<string, string> = {
   'Back to current': '지금 그림 보기',
   'You can adopt it after the image is remade.': '그림을 다시 만든 뒤에 채택할 수 있어요.',
   'Could not adopt this version. Please try again.': '이 판을 채택하지 못했어요. 다시 해 주세요.',
+  'Viewing an earlier picture · {time}': '지난 그림 보는 중 · {time}',
+  'It is in another style, so it cannot be adopted': '다른 스타일이라 채택할 수 없어요',
   'View only': '보기만 가능',
   'Changed · remake to apply': '바뀜 · 다시 만들어야 반영',
   'After you apply it, you can remake the image on the left.': '적용하면 왼쪽에서 다시 만들 수 있어요.',

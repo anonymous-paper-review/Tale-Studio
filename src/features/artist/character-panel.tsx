@@ -25,6 +25,7 @@ import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { type CharacterAsset, type CharacterViewKey } from '@/types/asset'
 import { groupSeriesAssets } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
+import { ArtistHistoryHover } from '@/features/artist-room/artist-history-hover'
 
 import { cn } from '@/lib/utils'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
@@ -79,10 +80,12 @@ export function CharacterPanel({
     charId: string
     appearanceKey: string
     view: CharacterViewKey
+    /** 지난 그림 줄(오너 2026-11-26 A4)에서 누른 그림 — 상세가 그 그림을 먼저 보이고 [채택]을 단다. */
+    candidateId?: string | null
   } | null>(null)
-  const openImage = (charId: string, appearanceKey: string) => {
+  const openImage = (charId: string, appearanceKey: string, candidateId: string | null = null) => {
     noteSelection(charId, appearanceKey, 'image')
-    setViewDialog({ charId, appearanceKey, view: 'main' })
+    setViewDialog({ charId, appearanceKey, view: 'main', candidateId })
   }
   // "+ 모습 추가"(약속 C1·C2 2026-09-04) — 탭 줄은 모습이 하나뿐이어도 항상 보인다.
   const [createFor, setCreateFor] = useState<string | null>(null)
@@ -198,9 +201,16 @@ export function CharacterPanel({
       </>
     )
 
+    // 지난 그림 줄(오너 2026-11-26 A4) — 카드에 마우스를 올리면 아래에 보이는 모습 시트의 지난 그림이 5개까지. 누르면 상세가 그 그림을 먼저 보인다.
     return (
-      <div
+      <ArtistHistoryHover
         key={char.characterId}
+        candidates={appearance?.viewCandidates?.main}
+        shownUrl={appearance?.sheetUrl ?? null}
+        onOpen={(candidateId) => { if (appearance) openImage(char.characterId, appearance.appearanceKey, candidateId) }}
+        onMore={() => { if (appearance) openImage(char.characterId, appearance.appearanceKey) }}
+      >
+      <div
         role="button"
         tabIndex={0}
         onClick={() => { selectCharacter(char.characterId); if (appearance) noteSelection(char.characterId, appearance.appearanceKey, 'card'); else useArtistStore.getState().setChatSelection(null) }}
@@ -397,6 +407,7 @@ export function CharacterPanel({
         {/* 카드 생성 버튼 제거(2026-08-31 오너) — 생성/재생성은 상세 팝업과 채팅으로만.
             카드에서 실수로 과금 생성이 눌리는 것을 막고, 이미지 모델 선택도 팝업/채팅에 둔다. */}
       </div>
+      </ArtistHistoryHover>
     )
   }
 
@@ -418,6 +429,7 @@ export function CharacterPanel({
         charId={viewDialog?.charId ?? null}
         appearanceKey={viewDialog?.appearanceKey ?? null}
         view={viewDialog?.view ?? null}
+        viewCandidateId={viewDialog?.candidateId ?? null}
         onClose={() => setViewDialog(null)}
         onAddAppearance={(id) => setCreateFor(id)}
       />

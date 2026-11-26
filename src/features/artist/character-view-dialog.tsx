@@ -36,11 +36,15 @@ import { appearanceLabel, labelToSave } from '@/lib/artist/look-label'
 import { isBreakdownUpload } from '@/lib/artist/style-versions'
 import { uploadedSheetAlt } from '@/lib/artist/uploaded-sheet'
 import { useHistoryStyle } from '@/features/artist-room/use-history-style'
+import { VersionViewingBar } from '@/components/version-history/version-viewing-bar'
+import { relativeTime } from '@/lib/i18n/relative-time'
 
 type Props = {
   charId: string | null
   appearanceKey: string | null
   view: CharacterViewKey | null
+  /** 카드의 지난 그림 줄(오너 2026-11-26 A4)에서 누른 그림 — 그 그림을 먼저 보이고 [채택]을 단다. 카드가 연 모습의 시트 후보다. */
+  viewCandidateId?: string | null
   onClose: () => void
   /** "+ 모습 추가하기" — 카드의 모습 추가 창(이름 · 시점 · 외형, 약속 C)을 연다. */
   onAddAppearance?: (charId: string) => void
@@ -53,7 +57,7 @@ type Props = {
  *   [↻ 다시 만들기]는 확인 창(A7r: 설명 · 캐릭터성 추천 · 이미지 생성 도구)을 거쳐 그리고, 그리는 동안 화면 전체를 잠근다.
  *   모습 이름 바꾸기 · 시점 · 실패 안내 · 부드러운 문구 재시도는 우리 기능이라 남긴다(프로토타입에 없음).
  */
-export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, view, onClose, onAddAppearance }: Props) {
+export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, view, viewCandidateId = null, onClose, onAddAppearance }: Props) {
   const t = useT()
   // 기록(시계)은 지금 작품 스타일 그림만 불러온다 — 다른 스타일 버전 그림은 꺼 두고 어느 버전인지 보인다(2026-10-28).
   const historyStyle = useHistoryStyle()
@@ -95,10 +99,13 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   const [regenOpen, setRegenOpen] = useState(false)
   // 이 팝업에서 다시 만들기를 눌렀다 — 그리는 동안 화면 전체를 잠근다(프로토타입 A8).
   const [redrawing, setRedrawing] = useState(false)
+  // 지난 그림 줄에서 연 그림(A4) — [지금 그림 보기]로 닫은 그림 · [채택]을 저장하는 중.
+  const [dismissedCandidate, setDismissedCandidate] = useState<string | null>(null)
+  const [adopting, setAdopting] = useState(false)
 
-  // 카드가 연 대상(인물 × 모습 × 뷰)이 바뀌거나 팝업을 닫으면 팝업 안에서 옮겨 본 모습 · 이름 고치기 · 안내 · 확인 창을 버린다
+  // 카드가 연 대상(인물 × 모습 × 뷰 · 지난 그림)이 바뀌거나 팝업을 닫으면 팝업 안에서 옮겨 본 모습 · 이름 고치기 · 안내 · 확인 창을 버린다
   //   (다른 인물을 열었는데 앞 인물에서 보던 모습 키가 남아 있으면 팝업이 열리지 않거나 다른 모습이 보였다, 검토 지적).
-  const target = charId && appearanceKeyProp && view ? `${charId}:${appearanceKeyProp}:${view}` : null
+  const target = charId && appearanceKeyProp && view ? `${charId}:${appearanceKeyProp}:${view}:${viewCandidateId ?? ''}` : null
   const [seenTarget, setSeenTarget] = useState<string | null>(null)
   if (seenTarget !== target) {
     setSeenTarget(target)
@@ -107,6 +114,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
     setRenameDraft('')
     setManageError(null)
     setRegenOpen(false)
+    setDismissedCandidate(null)
   }
   const requestedKey = viewingKey ?? appearanceKeyProp
   // 지운 모습을 가리키면 기준 모습(없으면 첫 모습)을 보인다 — 팝업이 닫혔다 다시 열리며 깜빡이지 않게.
@@ -191,6 +199,22 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
   // stale 원인 분류(027): look-pending(룩만 도착) vs edited(외형 변경).
   const candidates = appearance.viewCandidates[view] ?? []
   const selectedCandidate = candidates.find((c) => c.isSelected)
+  // 지난 그림 줄에서 연 그림(A4) — 카드가 연 모습을 보는 동안만, 카드 그림이 아닌 그 모습 시트 후보. 채택하면 카드 그림이 되어 저절로 사라진다.
+  const viewingCandidate = viewCandidateId && dismissedCandidate !== viewCandidateId && view === 'main' && appearanceKey === appearanceKeyProp
+    ? candidates.find((c) => c.id === viewCandidateId && c.url !== imageUrl) ?? null
+    : null
+  // 다른 작품 스타일 판에서 그린 그림이면 채택할 수 없다 — 상세 기록(시계)의 [불러오기]와 같은 판정 · 같은 덧말.
+  const viewingState = viewingCandidate ? historyStyle.describe?.(viewingCandidate) ?? null : null
+  // [채택] — 그 그림을 고른다(기록 [불러오기]와 같은 길, 다시 그리지 않는다). 카드 그림이 그 그림이 되면 보는 줄이 사라진다.
+  const adopt = async () => {
+    if (!viewingCandidate || viewingState?.disabled) return
+    setAdopting(true)
+    try {
+      await selectCandidate(char.characterId, appearanceKey, view, viewingCandidate.id)
+    } finally {
+      setAdopting(false)
+    }
+  }
   const staleClass = classifyLookImageStale(appearance.appearance ?? '', [char.lookFingerprint, appearance.lookFingerprint], {
     sourceHash: selectedCandidate?.sourceHash ?? null,
     appearanceHash: selectedCandidate?.appearanceHash ?? null,
@@ -318,7 +342,9 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
       </div>
       {manageError ? <p className="text-xs text-destructive">{manageError}</p> : null}
 
-      {uploaded && !isGenerating ? (
+      {viewingCandidate ? (
+        <ImagePlaceholder label="" aspectRatio={isSheet ? 'video' : 'square'} imageUrl={viewingCandidate.url} generating={false} />
+      ) : uploaded && !isGenerating ? (
         <UploadedSheet key={imageUrl} url={imageUrl} alt={uploadedSheetAlt(char.name || t('Character'), t)} />
       ) : (
         <ImagePlaceholder
@@ -328,6 +354,19 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
           generating={isGenerating}
         />
       )}
+      {viewingCandidate ? (
+        <VersionViewingBar
+          text={t('Viewing an earlier picture · {time}', { time: relativeTime(viewingCandidate.generatedAt, t) })}
+          note={viewingState?.note}
+          adoptDisabled={!!viewingState?.disabled}
+          adoptReason={viewingState?.disabled ? t('It is in another style, so it cannot be adopted') : null}
+          busy={adopting}
+          onAdopt={adopt}
+          onBack={() => setDismissedCandidate(viewingCandidate.id)}
+          testId="artist-detail-viewing"
+          adoptTestId="artist-detail-adopt"
+        />
+      ) : null}
 
       {isSheet && !appearance.isDefault ? (
         <div className="flex flex-wrap gap-2">
@@ -342,7 +381,8 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
         </div>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
+      {/* 밑 글은 지금 그림 이야기라 지난 그림을 보는 동안은 숨긴다(지난 판 줄 A4). */}
+      {viewingCandidate ? null : <p className="text-xs text-muted-foreground">
         {isObject
           ? imageUrl
             ? t('Regenerating creates a new image.')
@@ -352,7 +392,7 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
             : needsMain
               ? t('Directional views are generated from Main. Generate Main first.')
               : t('This view is regenerated based on the Main image.')}
-      </p>
+      </p>}
 
       {staleClass === 'look-pending' ? (
         <div className="flex items-center gap-2 rounded-md border border-border bg-muted/40 px-3 py-2 text-xs">
