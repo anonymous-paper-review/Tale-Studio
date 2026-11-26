@@ -1,4 +1,4 @@
-// Director 처음 정렬은 DB 에 저장된 자리(씬 · 샷 canvas_position)나 영상 테이크가 하나라도 있으면 하지 않고, 읽기가 실패하면 안 하는 쪽으로 간다 (오너 2026-11-16)
+// Director 처음 정렬은 DB 에 저장된 자리(씬 · 샷 canvas_position)가 하나라도 있으면 하지 않고(영상 Take 는 세지 않는다), 읽기가 실패하면 안 하는 쪽으로 간다 (오너 2026-11-16 · 2026-11-26 D7)
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const db = vi.hoisted(() => ({
@@ -42,7 +42,7 @@ afterEach(() => vi.unstubAllGlobals())
 
 describe('DB 에 저장된 자리가 있는가', () => {
   // 왜: 아무것도 저장되지 않은 프로젝트만 처음 정렬을 한다 — 이 답이 false 일 때만 정렬이 일어난다.
-  it('저장된 자리도 영상 테이크도 없으면 없다고 답한다', async () => {
+  it('저장된 씬 · 샷 자리가 없으면 없다고 답한다', async () => {
     expect(await projectHasSavedLayout('p1')).toBe(false)
     // 저장된 자리는 "canvas_position 이 비어 있지 않은 행"으로 읽는다(씬 · 샷 둘 다).
     expect(db.reads).toEqual(['scenes.canvas_position is null', 'shots.canvas_position is null'])
@@ -62,11 +62,13 @@ describe('DB 에 저장된 자리가 있는가', () => {
     expect(await projectHasSavedLayout('p1')).toBe(true)
   })
 
-  // 왜: 영상 테이크가 있으면 영상 작업이 시작된 프로젝트다. 테이크 자리는 만들 때 저장돼 있어 다시 놓으면 저장된 자리를 새로 쓰게 된다.
-  it('영상 테이크가 있으면 있다고 답한다', async () => {
-    db.takes = [{ id: 'clip-1' }]
+  // 왜: 오너 2026-11-26 D7 "자동 정렬이 잘 작동하지 않는데, 첫진입 시 잘 작동하는지 확인" — Take 자리는 사람이 놓은 것이 아니라 만들 때 저절로 저장된다
+  //   (영상 요청이 Take 카드 자리를 함께 보낸다). 예전에는 Take 가 하나라도 있으면 처음으로 보지 않아, 스토리보드 보기 · 채팅으로 영상을 만든 프로젝트는
+  //   노드 보기를 처음 열어도 넓은 기본 간격 그대로였다(개발 DB 실측: 씬 묶음 사이 1780, [자동 정렬] 뒤 776).
+  it('영상 Take 만 있고 저장된 씬 · 샷 자리가 없으면 없다고 답한다', async () => {
+    db.takes = [{ id: 'clip-1', canvas_position: { x: 900, y: 40 } }]
 
-    expect(await projectHasSavedLayout('p1')).toBe(true)
+    expect(await projectHasSavedLayout('p1')).toBe(false)
   })
 
   // 왜: 모르는데 덮는 것보다 안 고치는 편이 안전하다 — 읽기가 실패하면 처음 정렬을 하지 않는다(단추를 누르면 된다).
