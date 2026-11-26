@@ -143,3 +143,36 @@ describe('Director 고친 프롬프트 저장', () => {
     expect(sql).toMatch(/before update of prompt on public\.shots/)
   })
 })
+
+describe('Director 화면이 보내는 그림 · 영상 요청', () => {
+  // 화면이 보낸 요청 몸을 모은다 — 생성처는 바로 거절해 다음 단계(기다림 · 판정)를 부르지 않는다.
+  const bodiesTo = (fetcher: ReturnType<typeof vi.fn>, url: string) => fetcher.mock.calls
+    .filter(([input]) => String(input) === url)
+    .map(([, init]) => JSON.parse(String((init as RequestInit).body)) as Record<string, unknown>)
+  const stubFetch = () => {
+    const fetcher = vi.fn(async (input: RequestInfo | URL) => {
+      const url = typeof input === 'string' ? input : input.toString()
+      if (url.startsWith('/api/director/video-takes?')) return new Response(JSON.stringify({ takes: [] }), { status: 200 })
+      return new Response(JSON.stringify({ error: 'stop here' }), { status: 400 })
+    })
+    vi.stubGlobal('fetch', fetcher)
+    return fetcher
+  }
+
+  it('Director 화면에서 그림을 만들면 지금 보이는 글(0.5초 안에 막 고친 글 포함)을 보내고 Director 화면의 글이라고 알린다 — 서버가 DB 의 옛 고친 글로 바꾸지 않게', async () => {
+    // 왜: 서버는 Storyboard · 다른 기기 요청에는 DB 의 고친 글을 먼저 쓴다(리드 2026-11-26). 채팅 [적용] 바로 뒤처럼 저장 전에 요청하면
+    //   DB 는 아직 옛 글이라, Director 화면 요청까지 DB 글로 바꾸면 방금 고친 글이 아닌 옛 글로 그린다.
+    const fetcher = stubFetch()
+    api().updateNodeData<'shot'>(shotId, { promptOverride: 'Applied from chat just now.' })
+    await api().generateStoryboardImage(shotId)
+    expect(bodiesTo(fetcher, '/api/director/generate-storyboard')[0]).toMatchObject({ prompt: 'Applied from chat just now.', promptSource: 'director' })
+  })
+
+  it('Director 화면에서 영상을 만들면 지금 보이는 글을 보내고 Director 화면의 글이라고 알린다', async () => {
+    // 왜: 영상 서버도 같은 규칙이다 — 저장 전(0.5초 안) 요청이 옛 고친 글로 Take 를 쓰지 않게.
+    const fetcher = stubFetch()
+    api().updateNodeData<'shot'>(shotId, { promptOverride: 'Applied from chat for the video.' })
+    await api().generateVideoForShot(shotId)
+    expect(bodiesTo(fetcher, '/api/director/generate-video')[0]).toMatchObject({ prompt: 'Applied from chat for the video.', promptSource: 'director' })
+  })
+})
