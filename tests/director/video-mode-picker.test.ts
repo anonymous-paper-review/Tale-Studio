@@ -173,6 +173,28 @@ describe('같이 정한 것 — 검토 rev-video 고침', () => {
   })
 })
 
+describe('같이 정한 것 — 검토 rev-video C', () => {
+  // 왜(검토 rev-video C): 실사 화살표를 저장하면 시작 · 끝이 같은 새 판(v2)이 생긴다 — 그 뒤 만든 Take 까지 Take 줄에 "그림 v1"로 적히고
+  //   "바뀌었어요"와 [바뀐 이미지로 새 Take 만들기]가 늘 떴다. 그 Take 가 쓴 판은 v2 이고 시작 그림은 그대로다(판 id 가 없는 옛 Take 는 만든 때의 판).
+  it('실사 화살표를 저장한 뒤 만든 Take 는 Take 줄에 지금 판("그림 v2")으로 적히고 "시작 이미지가 바뀌었어요"도 [바뀐 이미지로 새 Take 만들기]도 보이지 않는다', () => {
+    const at = (iso: string) => Date.parse(iso)
+    const version = (id: string, start: string, direction: string, generatedAt: number) => ({ id, url: `https://media.test/${start}-s.png`, frames: { start: `https://media.test/${start}-s.png`, direction: `https://media.test/${direction}-d.png`, end: `https://media.test/${start}-e.png` }, generatedAt, source: 'generated' as const })
+    const arrows = withStoryboardVersion(withStoryboardVersion(null, version('job-1', 'a', 'a', at('2026-11-27T00:00:00Z')), { select: true }), version('arrows-1', 'a', 'b', at('2026-11-27T02:00:00Z')), { select: true })
+    director.getState().updateNodeData<'shot'>(secondShot, { storyboardImage: arrows })
+    const takeId = doneTake(secondShot, 1, { createdAt: '2026-11-27T03:00:00Z', lastAttemptAt: '2026-11-27T03:00:00Z', madeFrames: { start: 'https://media.test/a-s.png?v=1', end: null, versionId: 'arrows-1' } })
+    const out = render(secondShot)
+    expect(out).toContain('Image v2 · Seedance 2.0 · 720p')
+    expect(out).not.toContain('The start image changed · A new Take will use it')
+    expect(out).not.toContain('Make a new Take with the changed image')
+    expect(out).toContain('Make a new Take · 5 Takes')
+
+    director.getState().updateNodeData<'video'>(takeId, { madeFrames: { start: 'https://media.test/a-s.png', end: null } })
+    expect(render(secondShot)).toContain('Image v2 · Seedance 2.0 · 720p')
+    setLocale('ko')
+    expect(render(secondShot)).toContain('그림 v2 · Seedance 2.0 · 720p')
+  })
+})
+
 describe('혼자 정한 것', () => {
   // 왜: 샷 상세는 보고 있던 Take 의 설정을 이어받는다(11/14 약속) — 방식도 같다. 모르는 값 · 방식 없는 옛 Take 면 기본.
   it('처음 골라 둔 방식은 보고 있는 Take 의 방식이고, 없으면 기본이다', () => {

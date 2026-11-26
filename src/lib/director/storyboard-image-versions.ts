@@ -91,15 +91,27 @@ function bareUrl(url: string | null | undefined): string | null {
   return url ? url.split('?')[0]! : null
 }
 
-/** Take 가 실제로 쓴 시작 · 끝 그림 주소로 그 버전 번호를 찾는다(리드 B — 작업 기록을 읽어서). 하나도 못 찾으면 null. */
+/**
+ * Take 가 실제로 쓴 시작 · 끝 그림 주소로 그 버전 번호를 찾는다(리드 B — 작업 기록을 읽어서). 하나도 못 찾으면 null.
+ *   같은 주소의 판이 여럿일 수 있다(실사 화살표만 고친 판은 시작 · 끝이 앞 판과 같다, N4b) — 작업 기록의 판 id(versionId)가 그 주소의 판이면 그 판,
+ *   없으면 같은 주소의 판 중 그 Take 를 만들 때(at) 이미 있던 가장 새 판, 그때를 모르거나 그때 있던 판이 없으면 가장 새 판(검토 rev-video C).
+ */
 export function versionOfFrames(
   image: StoryboardImage | null | undefined,
-  used: { start?: string | null; end?: string | null } | null | undefined,
+  used: { start?: string | null; end?: string | null; versionId?: string | null; at?: number | null } | null | undefined,
 ): { start: number | null; end: number | null } | null {
   if (!used) return null
   const versions = storyboardImageVersions(image)
-  const find = (url: string | null, pick: (version: StoryboardImageVersion) => string | undefined) =>
-    url ? versions.find((version) => bareUrl(pick(version)) === url)?.n ?? null : null
+  const recorded = used.versionId ? versions.find((version) => version.id === used.versionId) : undefined
+  const madeAt = typeof used.at === 'number' && Number.isFinite(used.at) ? used.at : null
+  const find = (url: string | null, pick: (version: StoryboardImageVersion) => string | undefined) => {
+    if (!url) return null
+    if (recorded && bareUrl(pick(recorded)) === url) return recorded.n
+    const same = versions.filter((version) => bareUrl(pick(version)) === url)
+    const before = madeAt === null ? [] : same.filter((version) => version.generatedAt <= madeAt)
+    const pool = before.length ? before : same
+    return pool.length ? pool.reduce((newest, version) => (version.n > newest.n ? version : newest)).n : null
+  }
   const start = find(bareUrl(used.start), (version) => version.frames?.start ?? version.url)
   const end = find(bareUrl(used.end), (version) => version.frames?.end)
   return start === null && end === null ? null : { start, end }

@@ -136,9 +136,15 @@ export function imageChangedSinceTake(imageGeneratedAt: number | null | undefine
   return typeof imageGeneratedAt === 'number' && Number.isFinite(madeAt) && imageGeneratedAt > madeAt
 }
 
-/** Take 가 쓴 이미지 버전("시작 v1 + 끝 v1", D7 · 리드 B) — 작업 기록의 그림 주소를 샷의 버전 목록과 맞춘다. 모르면 null. */
-export function takeImageVersions(image: StoryboardImage | null | undefined, take: Pick<VideoNodeData, 'madeFrames'>): { start: number | null; end: number | null } | null {
-  return versionOfFrames(image, take.madeFrames ?? null)
+/** Take 가 쓴 이미지 버전("시작 v1 + 끝 v1", D7 · 리드 B) — 작업 기록의 그림 주소를 샷의 버전 목록과 맞춘다. 모르면 null.
+ *  같은 주소의 판이 여럿이면(실사 화살표만 고친 판) 작업 기록의 판 id, 없으면 그 Take 를 만든 때의 판으로 고른다(검토 rev-video C). */
+export function takeImageVersions(
+  image: StoryboardImage | null | undefined,
+  take: Pick<VideoNodeData, 'madeFrames'> & Partial<Pick<VideoNodeData, 'createdAt' | 'lastAttemptAt'>>,
+): { start: number | null; end: number | null } | null {
+  if (!take.madeFrames) return null
+  const madeAt = Date.parse(String(take.lastAttemptAt ?? take.createdAt ?? ''))
+  return versionOfFrames(image, { ...take.madeFrames, at: Number.isFinite(madeAt) ? madeAt : null })
 }
 
 /**
@@ -147,7 +153,7 @@ export function takeImageVersions(image: StoryboardImage | null | undefined, tak
  */
 export function takeImageLabel(
   image: StoryboardImage | null | undefined,
-  take: Pick<VideoNodeData, 'madeFrames'>,
+  take: Pick<VideoNodeData, 'madeFrames'> & Partial<Pick<VideoNodeData, 'createdAt' | 'lastAttemptAt'>>,
 ): { key: string; params: Record<string, number> } | null {
   const used = takeImageVersions(image, take)
   if (!used?.start) return null

@@ -15,7 +15,7 @@ vi.mock('@/lib/supabase/client', () => ({
 vi.mock('@/lib/generation-queue', () => ({ refreshGenerationQueue: vi.fn() }))
 vi.mock('@/lib/shots-cache', () => ({ invalidateShots: () => Promise.resolve() }))
 
-import { useDirectorCanvasStore } from '@/stores/director-store'
+import { parseMadeFrames, useDirectorCanvasStore } from '@/stores/director-store'
 import { isVideoData } from '@/types/director'
 
 const api = () => useDirectorCanvasStore.getState()
@@ -67,6 +67,13 @@ describe('같이 정한 것', () => {
     expect(body).not.toHaveProperty('referenceImageUrls')
     const created = api().nodes.find((node) => !before.has(node.id) && isVideoData(node.data))
     expect(created?.data).toMatchObject({ frameInputs: { start: null, end: null, refs: [] }, videoChainInputId: null, videoChainFrameUrl: null })
+  })
+
+  // 왜(검토 rev-video C): Take 줄이 판 id 로 쓴 판을 찾으려면 Take 목록을 다시 읽을 때 그 id 가 화면의 Take 에 남아야 한다.
+  it('Take 목록이 알려 준 판 id 는 화면의 Take 에도 쓴 그림과 함께 남는다', () => {
+    expect(parseMadeFrames({ start: 'https://media.test/a-s.png', end: null, versionId: 'arrows-1' })).toEqual({ start: 'https://media.test/a-s.png', end: null, versionId: 'arrows-1' })
+    expect(parseMadeFrames({ start: 'https://media.test/a-s.png', end: null })).toEqual({ start: 'https://media.test/a-s.png', end: null })
+    expect(parseMadeFrames({ start: null, end: null, versionId: 'arrows-1' })).toBeNull()
   })
 
   // 왜(리드 결정): 노드 Take 판 [다시 만들기]는 그 Take 를 그대로 다시 만든다 — 노드에서 손으로 이은 그림이 그 자리에서 사람이 한 것이라 손 배선이 이긴다.
