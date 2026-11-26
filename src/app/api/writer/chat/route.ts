@@ -25,6 +25,7 @@ import {
   type ChatLlmUsage,
 } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
+import { STORYBOARD_IMAGE_TOOL_GUIDE, pickStoryboardImageUpdates, storyboardImageStatusSection, withStoryboardImageUpdates } from '@/lib/storyboard/chat-image-tool'
 
 // #dialogue-language-chat(2026-08-27 오너): 챗으로 대사를 새로 쓰거나 고칠 때도 파이프라인과
 //   같은 대사 언어를 따른다 — 단, 사용자가 그 메시지에서 명시적으로 다른 언어를 요구하면 요청이
@@ -175,6 +176,8 @@ function parseAgenticResponse(
   text: string,
   allowedCharacterIds: ReadonlySet<string> | undefined,
   locale: AppLocale,
+  /** Storyboard 단계 채팅(m1126 O7) — 실사 그림 요청(generateImage)도 받는다. */
+  imageTool = false,
 ): {
   reply: string
   updates: unknown[]
@@ -188,7 +191,7 @@ function parseAgenticResponse(
   const { reply, updates, raw, status } = parseFencedUpdates(
     text,
     'writer/chat',
-    (raw) => validateWriterUpdates(raw, allowedCharacterIds, dropped),
+    (raw) => withStoryboardImageUpdates(validateWriterUpdates(raw, allowedCharacterIds, dropped), imageTool ? pickStoryboardImageUpdates(raw) : []),
     locale,
   )
   return {
@@ -228,6 +231,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       chatDomain,
       toolMessages,
       traceId: requestedTraceId,
+      storyboardImages,
     } = await req.json()
     const modelSettings = parseChatModelSettings(rawModelSettings)
     if (!modelSettings) return NextResponse.json({ error: 'Invalid chat model settings' }, { status: 400 })
@@ -269,6 +273,18 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       )
     }
 
+    // Storyboard 실사 그림 도구(오너 2026-11-26 m1126 O7 "채팅으로") — Storyboard 단계 채팅 요청에만 싣는다(콘티 채팅은 Artist 앞이라 실사를 못 그린다).
+    //   샷마다 실사가 있는지 · 지금 판을 문맥에 싣는다. 못 읽으면 그 덩어리 없이 간다(도구는 그대로).
+    const imageTool = storyboardImages === true && typeof projectId === 'string' && !!projectId
+    const imageStatus = imageTool
+      ? await supabaseAdmin
+          .from('shots')
+          .select('shot_id, storyboard_image')
+          .eq('project_id', projectId)
+          .order('sort_order')
+          .then(({ data, error }) => (error || !data ? '' : storyboardImageStatusSection(data as Array<{ shot_id: string; storyboard_image: unknown }>)))
+      : ''
+
     if (toolsEnabled === true && (typeof projectId !== 'string' || !projectId)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
     const appTools = prepareChatTools('writer', toolsEnabled, toolMessages, chatWorkflow, chatDomain)
 
@@ -276,6 +292,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     const contextSections = [
       formatLineRefTable(lineRefs),
       typeof writerContext === 'string' && writerContext.trim() ? writerContext : '',
+      imageStatus,
     ].filter(Boolean)
     const ctx = contextSections.length > 0 ? `${contextSections.join('\n\n')}\n\n---\n\n` : ''
     const traceId = createChatTraceId(requestedTraceId)
@@ -283,6 +300,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       CHAT_AGENT_GUIDE +
       (chatDomain === true ? WRITER_DOMAIN_GUIDE : '') +
       WRITER_CHAT_SYSTEM +
+      (imageTool ? STORYBOARD_IMAGE_TOOL_GUIDE : '') +
       CHAT_OUTPUT_FORMAT_GUIDE +
       CHAT_UPDATES_BATCH_GUIDE +
       responseLanguageDirective(projectLocale) +
@@ -318,7 +336,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       parseStatus,
       rawUpdateCount,
       validUpdateCount,
-    } = parseAgenticResponse(text, allowedCharacterIds, replyLocale)
+    } = parseAgenticResponse(text, allowedCharacterIds, replyLocale, imageTool)
     // 드롭 표면화 — 침묵 드롭은 이 사고(무검증 저장)와 같은 함정을 반대 방향으로 판다.
     const dropped = [...new Set(droppedCharacterIds)]
     const replyOut = dropped.length ? `${reply}\n\n${droppedCharactersNotice(dropped, replyLocale)}` : reply
