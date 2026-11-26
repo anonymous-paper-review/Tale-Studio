@@ -6,6 +6,8 @@
 //     앞 칸으로 돌아가 봐도 체크는 남는다.
 //   칸을 누르면(또는 Alt+숫자) 그 칸의 가장 먼 열린 단계로 간다 — Writer 칸은 콘티가 열렸으면 콘티, 아니면 씬 스토리.
 //   잠금 · AI 가 일하는 동안의 막힘은 사이드바가 따로 정한다(railNavBlocked). 약속: tests/project/rail-done-mark.test.ts · tests/project/writer-rail.test.ts
+//   Artist 칸 표시(오너 2026-11-27 N7): 그림이 실패했거나 오래 걸리면 칸 아이콘 모서리 점으로 알린다 — 칸을 누르면 Artist 화면으로 가고, 다시 시도는 그 화면에서 한다.
+//     약속: tests/project/rail-artist-attention.test.ts
 import { STAGES } from '@/lib/constants'
 import type { StageId } from '@/types'
 
@@ -63,4 +65,21 @@ export function railTarget(stage: StageId, canNavigateTo: (stage: StageId) => bo
 export function railItemBadge(stage: StageId, badges: Partial<Record<StageId, number>>): number {
   const item = railItemOf(stage)
   return (item?.stages ?? [stage]).reduce((sum, id) => sum + (badges[id] ?? 0), 0)
+}
+
+export type RailArtistAttention = 'failed' | 'stalled'
+
+/** Artist 칸에 알릴 그림 상태 — 실패가 오래 걸림보다 먼저다(실패는 실패라고, 오래 걸림은 실패가 아니라고 — #stale-gate).
+ *  Artist 를 열었고(reached 가 Artist 이후) 그림이 다 있지 않을 때만. 판정 값은 그림 준비 확인(use-artist-lock-poll)이 project-store 에 둔 것. */
+export function railArtistAttention(input: {
+  stage: StageId
+  reached: StageId
+  imagesReady: boolean
+  failed: boolean
+  stalled: boolean
+}): RailArtistAttention | null {
+  if (input.stage !== 'artist' || input.imagesReady) return null
+  if (indexOf(input.reached) < indexOf('artist')) return null
+  if (input.failed) return 'failed'
+  return input.stalled ? 'stalled' : null
 }
