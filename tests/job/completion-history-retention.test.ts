@@ -32,7 +32,7 @@ beforeEach(() => { calls.length = 0; vi.clearAllMocks() })
 it('사흘 전에 완료한 러프도 아직 보지 않았다면 Writer 완료 숫자에 남는다.', async () => {
   installRows([done('old-image')])
   const rows = await jobs.listGenerationCompletionRows('project', now)
-  expect(deriveStageBadges(completionsOf(rows), { writer: old - 1 }, 'artist')).toEqual({ writer: 1 })
+  expect(deriveStageBadges(completionsOf(rows), { conti: old - 1 }, 'artist')).toEqual({ conti: 1 })
   expect(calls).toContainEqual({ method: 'eq', args: ['status', 'completed'] })
   expect(calls).toContainEqual({ method: 'or', args: [`completed_at.lte.${new Date(now).toISOString()},completed_at.is.null`] })
 })
@@ -40,7 +40,7 @@ it('사흘 전에 완료한 러프도 아직 보지 않았다면 Writer 완료 �
 it('완료 이력이 500건을 넘으면 남은 페이지까지 읽어 완료 이미지 수를 빠짐없이 표시한다.', async () => {
   installRows(Array.from({ length: 1002 }, (_, i) => done(`image-${i}`)))
   const rows = await jobs.listGenerationCompletionRows('project', now)
-  expect(deriveStageBadges(completionsOf(rows), { writer: old - 1 }, 'artist')).toEqual({ writer: 1002 })
+  expect(deriveStageBadges(completionsOf(rows), { conti: old - 1 }, 'artist')).toEqual({ conti: 1002 })
   expect(calls.filter(call => call.method === 'range')).toEqual([
     { method: 'range', args: [0, 499] }, { method: 'range', args: [500, 999] }, { method: 'range', args: [1000, 1499] },
   ])
