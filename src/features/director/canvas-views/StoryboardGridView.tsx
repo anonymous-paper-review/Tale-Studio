@@ -20,11 +20,14 @@ import {
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import {
   isStoppedTake,
+  selectHandoffTake,
   selectLatestAttempt,
   selectLatestShotAttempt,
-  selectNewestSuccessfulTake,
   type VideoTakeSelectionRecord,
 } from '@/lib/director-video-take-selection'
+import { VersionHistoryHover, stripAspect, type VersionStripCard } from '@/components/version-history/version-history-hover'
+import { historyStrip, pastImageVersions, pastTakes } from '@/lib/version-history'
+import { aspectRatioFromFormat } from '@/types/project'
 import {
   getChildShots,
   effectivePrompt,
@@ -110,13 +113,15 @@ export function selectGridVideoAttemptState(
 }
 
 /** 카드가 트는 영상 · 만드는 중 · 실패 글 — 화면에서 멈춘 Take 는 만드는 중이 아니고, ★ 가 아니면 카드 영상도 아니다
- *  (샷 상태 shot-state.ts 와 같은 규칙, 오너 2026-11-14 7번 · 리드 S4-2 1). 약속: tests/director/stopped-take.test.ts */
+ *  (샷 상태 shot-state.ts 와 같은 규칙, 오너 2026-11-14 7번 · 리드 S4-2 1). 약속: tests/director/stopped-take.test.ts
+ *  카드는 ★ 로 고른(채택한) Take 를 틀고, 고르지 않았으면 가장 새 완성 Take 를 튼다 — Editor 로 가는 것과 같은 규칙(selectHandoffTake).
+ *  채택했는데 카드가 가장 새 Take 그대로면 채택이 안 된 것처럼 보인다(오너 2026-11-26 D2). 약속: tests/director/version-history.test.ts */
 export function gridVideoView<T extends GridVideoTakeRecord>(
   records: readonly T[],
   t: ReturnType<typeof useT> = (text) => text,
 ): { cardTake: T | null; generating: boolean; failure: string | null } {
   // ★ 로 고른 멈춘 Take 는 영상이다 — 카드 영상 고르기에서만 멈춤을 지운다.
-  const cardTake = selectNewestSuccessfulTake(records.map((r) => (r.is_final ? { ...r, cancelled_at: null } : r)))
+  const cardTake = selectHandoffTake(records.map((r) => (r.is_final ? { ...r, cancelled_at: null } : r)))
   const { generating } = selectGridVideoAttemptState(records.filter((r) => r.cancelled_at == null), t)
   // 실패 글은 샷 상태와 같은 가장 새 시도로 — 그것이 멈춘 Take 면 뒤에서 실패했어도 띄우지 않는다(리드 2026-11-14 규칙).
   const latest = selectLatestShotAttempt(records)
@@ -300,7 +305,7 @@ function ShotCell({
     }
   }
   const [previzOpen, setPrevizOpen] = useState(false)
-  // Grid always projects the newest successful take; Final is an editor/export decision.
+  // 카드는 ★ 로 고른 Take, 없으면 가장 새 완성 Take 를 튼다(gridVideoView — Editor 로 가는 것과 같다, 오너 2026-11-26 D2).
   const directorNodes = useDirectorCanvasStore((s) => s.nodes)
   // #real-grid-auto: 일괄 시트 생성 중엔 개별 생성/재생성 잠금 (스토어 가드와 이중 방어).
   //   아래 isShotData early return 보다 위에 있어야 한다 — 훅의 조건부 호출은 렌더 간 훅 순서를
@@ -332,11 +337,11 @@ function ShotCell({
       }),
     [directorNodes, node.id],
   )
-  // Grid always projects the newest successful take; Final is an editor/export decision.
+  // 카드는 ★ 로 고른(채택한) Take, 없으면 가장 새 완성 Take 를 튼다 — Editor 로 가는 것과 같다(오너 2026-11-26 D2).
   //   화면에서 멈춘 Take 는 ★ 가 아니면 카드 영상도 만드는 중도 아니다(오너 7번 — 멈춘 채 도는 Take 가 [영상 만들기]를 잠그지 않게).
-  const { cardTake: newestSuccessful, generating: childVideoGenerating, failure: childVideoFailure } =
+  const { cardTake, generating: childVideoGenerating, failure: childVideoFailure } =
     gridVideoView(takeRecords, t)
-  const completedVideoUrl = newestSuccessful?.url ?? null
+  const completedVideoUrl = cardTake?.url ?? null
 
   // 화면 포맷(2026-09-30) — 훅은 조기 반환보다 앞에 둔다(React 훅 순서 규칙).
   const projectFormat = useProjectFormatStore((s) => s.format)
@@ -504,6 +509,40 @@ function ShotCell({
       ? t('{seconds}s', { seconds: Math.round(data.durationSeconds) })
       : null
 
+  // 지난 판 줄(오너 2026-11-26 D2, 시안 없음) — 카드에 마우스를 올리면 아래에 지난 판이 5개까지: 카드가 영상을 틀면 지난 Take,
+  //   그림이면 지난 이미지 판. 러프 보기는 판 기록이 없다. 누르면 그 판의 상세가 열리고 상세의 [채택]이 그 판을 최종으로.
+  const historyTakes = mediaMode === 'real' && cardTake
+    ? historyStrip(pastTakes(takeRecords.map((r) => ({
+        id: r.node.id,
+        takeNumber: r.take_number,
+        createdAt: r.created_at,
+        status: r.status,
+        videoUrl: r.url,
+        thumbnailUrl: isVideoData(r.node.data) ? r.node.data.thumbnailUrl : null,
+        cancelledAt: r.cancelled_at,
+      })), cardTake.node.id))
+    : null
+  const historyImages = mediaMode === 'real' && !historyTakes ? historyStrip(pastImageVersions(img)) : null
+  const historyCards: VersionStripCard[] = historyTakes
+    ? historyTakes.shown.map((take) => ({
+        id: take.id,
+        label: t('Take {n}', { n: take.takeNumber }),
+        thumbUrl: take.thumbUrl,
+        videoUrl: take.videoUrl,
+        note: take.stopped ? t('Finished after it was stopped') : null,
+      }))
+    : (historyImages?.shown ?? []).map((version) => ({
+        id: version.id,
+        label: `v${version.n}`,
+        thumbUrl: version.thumbUrl,
+        note: version.upload ? t('Uploaded image') : version.stopped ? t('Finished after it was stopped') : null,
+      }))
+  const openHistory = (id: string) => {
+    // 지난 Take 는 그 Take 를 연다(영상 탭이 그 Take 를 먼저 보인다), 지난 이미지 판은 이미지 탭이 그 판을 먼저 보인다.
+    if (historyTakes) openShotDetail(id, 'video')
+    else openShotDetail(node.id, 'image', { versionId: id })
+  }
+
   const mentionCardOnModifierClick = (
     event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
   ): boolean => {
@@ -515,6 +554,13 @@ function ShotCell({
 
   return (
     <>
+    <VersionHistoryHover
+      cards={historyCards}
+      more={(historyTakes ?? historyImages)?.more ?? 0}
+      aspect={stripAspect(aspectRatioFromFormat(projectFormat ?? 'horizontal_16:9'))}
+      onOpen={openHistory}
+      onMore={() => openShotDetail(node.id, historyTakes ? 'video' : 'image')}
+    >
     <div
       // v3(2026-11-03): 노드 캔버스와 같은 판(작업 바탕색 · 모서리 16 · 그림자 하나 · 안쪽 12) — 캔버스 판(--canvas-bg) 위에 뜬다.
       className={cn(
@@ -833,6 +879,7 @@ function ShotCell({
         )}
       </div>
     </div>
+    </VersionHistoryHover>
     </>
   )
 }
