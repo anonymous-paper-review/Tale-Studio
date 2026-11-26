@@ -26,6 +26,8 @@ vi.mock('@/lib/style-anchor', () => ({ resolveStyleAnchor: async () => null }))
 vi.mock('@/lib/style-facets/reference-image', () => ({ styleDrawsWithoutReference: async () => false }))
 vi.mock('@/lib/moderation/creem', () => ({ assertUserTextAllowed: async () => ({ id: 'moderation-1' }) }))
 vi.mock('@/lib/writer/debug-events', () => ({ recordWriterObservabilityEvent: async (_p: string, kind: string, detail: Record<string, unknown>) => { mocks.events.push([kind, detail]) } }))
+// 소품 양식(m1126 A2) — 스토리지에 올린 양식 주소.
+vi.mock('@/lib/storage/template-asset', () => ({ templateAssetUrl: async (file: string) => `https://media.test/templates/${file}` }))
 
 import { triggerPropDrafts } from '@/lib/artist/prop-drafts'
 import { propsAutoDrawOpen, propsToAutoDraw } from '@/lib/artist/props'
@@ -61,6 +63,15 @@ describe('서버 첫 그림', () => {
     expect(mocks.submitPropImageJob.mock.calls[0][0]).toMatchObject({ projectId: 'project-1', propId: 'obj_ring', actor: 'writer', userId: null, workspaceId: 'ws-1' })
     const trigger = readFileSync('src/lib/artist/draft-trigger.ts', 'utf8')
     expect(trigger).toMatch(/const \[characters, worlds\] = await Promise\.all\([\s\S]*?\]\)\s*\/\/[^\n]*\n\s*const props = await triggerPropDrafts\(projectId\)/)
+  })
+
+  // 왜: [만들기] 때 서버가 그리는 첫 그림도 카드 · 창의 그리기와 같은 소품 양식(16:9)이어야 한 프로젝트 안 소품 그림이 같은 모양이다(m1126 A2).
+  it('[만들기] 때 서버가 그리는 소품 그림도 소품 양식에 담아 16:9 로 그린다', async () => {
+    await triggerPropDrafts('project-1')
+    const plan = mocks.submitPropImageJob.mock.calls[0][0].plan
+    expect(plan.submit.reference_image_urls).toEqual(['https://media.test/templates/prop-template.png'])
+    expect(plan.submit.aspect_ratio).toBe('16:9')
+    expect(plan.submit.prompt).toMatch(/^Fill in this prop reference-sheet template/)
   })
 
   // 왜: 빈칸만 채운다 — 이미 그림이 있거나 그리는 중이거나 두 번 실패한 소품을 또 그리지 않는다(배경 초안과 같은 규칙).

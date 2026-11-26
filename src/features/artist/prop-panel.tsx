@@ -1,7 +1,7 @@
 'use client'
 
 // Artist 소품 묶음(D7, 오너 2026-11-22 "소품도 한 장이고 중요하게 생각되는 소품만") — 소품(props 행)마다 그림 한 장짜리 카드.
-//   카드 = 이름 · "소품" 꼬리표 · 그림(정사각 한 장) · 생김새 한 줄 · 나오는 씬 · 샷 수. 배경 카드(world-panel)와 같은 판 모양이다.
+//   카드 = 이름 · "소품" 꼬리표 · 그림(소품 양식 16:9 한 장, m1126 A2) · 생김새 한 줄 · 나오는 씬 · 샷 수. 배경 카드(world-panel)와 같은 판 모양이다.
 //   ⌘/Ctrl+클릭 = 채팅 @멘션 + 비행(D9, 인물 · 배경 카드와 같다). columns · onZoomStep 은 세 묶음 공용 축척(D13).
 //   약속: tests/artist/prop-cards.test.ts
 import { useEffect, useRef, useState } from 'react'
@@ -133,7 +133,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
           {stale === 'style' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Style changed')}</Badge> : null}
         </div>
 
-        {/* 소품 = 그림 한 장(정사각, 물건만). 누르면 그림 창. */}
+        {/* 소품 = 그림 한 장(소품 양식 16:9 — 인물 시트 · 배경 카드와 같은 자리). 누르면 그림 창. */}
         <button
           type="button"
           title={t('Prop: click to view or redraw')}
@@ -144,7 +144,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
           }}
           className="relative block w-full overflow-hidden rounded-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
         >
-          <ImagePlaceholder label={t('Prop')} aspectRatio="square" imageUrl={prop.imageUrl} generating={generating} hideCaption />
+          <ImagePlaceholder label={t('Prop')} aspectRatio="video" imageUrl={prop.imageUrl} generating={generating} hideCaption />
         </button>
 
         {/* 그리기 · 다시 그리기(무료) — 실패했거나 바뀌었으면 다시 그리기, 그림이 없으면 그리기. 그리는 중에는 숨긴다(두 번 그리지 않게).

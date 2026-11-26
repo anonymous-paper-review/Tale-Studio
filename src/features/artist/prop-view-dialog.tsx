@@ -75,7 +75,7 @@ function PropDetailLeft({ propId }: { propId: string }) {
         {stale === 'edited' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Description changed')}</Badge> : null}
         {stale === 'style' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Style changed')}</Badge> : null}
       </div>
-      <ImagePlaceholder label={t('Prop')} aspectRatio="square" imageUrl={prop.imageUrl} generating={generating} />
+      <ImagePlaceholder label={t('Prop')} aspectRatio="video" imageUrl={prop.imageUrl} generating={generating} />
       {demo ? null : (
         <>
           <Textarea

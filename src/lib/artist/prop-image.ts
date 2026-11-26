@@ -1,5 +1,7 @@
 // 소품 그림(D7, 오너 2026-11-22 "소품도 한 장") — 화면과 서버가 함께 쓰는 순수 규칙: 그림 지시문 · 그림 지문 · 바뀜 판정.
-//   그림 = 물건 하나만 · 정면 · 빈 배경 · 사람 · 손 없음 · 정사각 한 장. 실사 샷 이미지가 이 그림을 소품 참고로 쓴다(2단계).
+//   그림 = 소품 양식(m1126 A2 2026-11-26 "탬플릿에 담아서 · 인물, 배경처럼 16:9", 칸 좌표 prop-sheet-template.ts)의 칸마다 같은 물건 하나를
+//   여러 방향으로 · 흰 바탕 · 사람 · 손 없음 — 16:9 한 장(인물 시트와 같은 결). 양식을 못 올리면 예전처럼 물건 하나만 정면으로 그린 한 장(16:9).
+//   실사 샷 이미지가 이 그림을 소품 참고로 쓴다(2단계).
 //   글씨 스위치(PROP_TEXT_RULE): 오너 P1(2026-11-22 "추천대로") = 'described' — 설명에 적힌 글씨(편지의 잉크 글씨 · 간판 · 책 표지)만 남기고
 //     모델이 덧붙이는 이름 · 라벨 · 로고 · 워터마크는 막는다. 'none' 은 예전 (a) — 글자를 하나도 그리지 않는다.
 //     규칙을 바꿔도 이미 그린 그림은 저절로 바뀌지 않는다(지문에 규칙이 없다 — 바뀜 표시도 없다).
@@ -25,16 +27,34 @@ function sentence(text: string): string {
 /** 정책 거절 뒤 안전 재시도 문구 — 인물 시트(turnaround SAFE_TOKENS)와 같은 결. */
 const PROP_SAFE_TOKENS = 'stylized non-graphic depiction, tasteful, safe-for-work'
 
-export function buildPropImagePrompt(input: { name: string; appearance: string; instruction?: string | null; safeMode?: boolean; textRule?: PropTextRule }): string {
+/** 소품 양식 칸 문장 — 칸 이름은 prop-sheet-template.ts 와 한 쌍이다(인물 시트의 칸 문장과 같은 결). */
+const SHEET_LINES = [
+  'Keep the template EXACTLY as-is — every tile border and its small label stays in place; draw only INSIDE the tiles and never add text of your own.',
+  'MAIN tile: the whole object, large and centered, in a three-quarter view at eye level.',
+  'FRONT, SIDE and BACK tiles: the same object seen straight from the front, the side and the back, at the same scale in all three.',
+  'TOP tile: the same object seen from directly above.',
+  'DETAIL tile: a close-up of its most distinctive part — its material, texture or markings.',
+  'The same single object in every tile — identical shape, material, colors and markings — on a plain white background inside every tile.',
+]
+
+/**
+ * 소품 그림 지시문. sheet(기본) = 소품 양식 칸을 채우는 시트, false = 양식 없이 물건 하나만 정면으로 그린 한 장(양식을 못 올렸을 때).
+ */
+export function buildPropImagePrompt(input: { name: string; appearance: string; instruction?: string | null; safeMode?: boolean; textRule?: PropTextRule; sheet?: boolean }): string {
   const name = input.name.trim()
   const appearance = input.appearance.trim()
   const subject = appearance ? `${name}: ${appearance}` : name
   const instruction = input.instruction?.trim()
+  const sheet = input.sheet ?? true
   return [
-    sentence(`Prop reference picture of ${subject}`),
+    sentence(sheet ? `Fill in this prop reference-sheet template with ${subject}` : `Prop reference picture of ${subject}`),
     ...(instruction ? [sentence(`Requested change: ${instruction}`)] : []),
-    'Show this one object alone, whole and centered, seen straight from the front at eye level, filling about two thirds of the frame,',
-    'on a plain neutral background.',
+    ...(sheet
+      ? SHEET_LINES
+      : [
+          'Show this one object alone, whole and centered, seen straight from the front at eye level, filling about two thirds of the frame,',
+          'on a plain neutral background.',
+        ]),
     (input.textRule ?? PROP_TEXT_RULE) === 'described' ? DESCRIBED_TEXT_LINE : NO_TEXT_LINE,
     ...(input.safeMode ? [PROP_SAFE_TOKENS] : []),
   ].join(' ')

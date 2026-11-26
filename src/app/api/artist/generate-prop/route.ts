@@ -21,6 +21,8 @@ import { chatTraceBelongsToProject } from '@/lib/chat-trace-server'
 import { styleIdOf } from '@/lib/series/snapshot'
 import { propImageStamp } from '@/lib/artist/prop-image'
 import { planPropImageSubmit } from '@/lib/artist/prop-image-plan'
+import { PROP_SHEET_FILE } from '@/lib/artist/prop-sheet-template'
+import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { hasQueuedPropImageJob, listFailedPropImageJobs, loadPropDrawingContext, submitPropImageJob } from '@/lib/artist/prop-jobs'
 
 export const runtime = 'nodejs'
@@ -101,7 +103,9 @@ export async function POST(req: Request) {
     const anchor = await resolveStyleAnchor(project as Parameters<typeof resolveStyleAnchor>[0])
     const styleWithoutReference = !anchor && (await styleDrawsWithoutReference(project as Parameters<typeof styleDrawsWithoutReference>[0]))
     const appearance = prop.appearance ?? ''
-    const plan = planPropImageSubmit({ name: prop.name, appearance, instruction, safeMode, anchor, styleWithoutReference, model })
+    // 소품 양식(m1126 A2) — 인물 시트 양식처럼 스토리지에 올린 주소를 첫 참고 그림으로(template-asset.ts). 못 올리면 양식 없이 그린다.
+    const templateUrl = await templateAssetUrl(PROP_SHEET_FILE)
+    const plan = planPropImageSubmit({ name: prop.name, appearance, instruction, safeMode, anchor, styleWithoutReference, model, templateUrl })
 
     // 사용자가 쓴 칸(이름 · 생김새 · 바꿀 점)만 검사한다 — 우리 고정 문구 · 그림체 절은 보내지 않는다.
     let moderation

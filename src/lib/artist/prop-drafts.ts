@@ -11,6 +11,8 @@ import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import { styleIdOf } from '@/lib/series/snapshot'
 import { propImageStamp } from '@/lib/artist/prop-image'
 import { planPropImageSubmit } from '@/lib/artist/prop-image-plan'
+import { PROP_SHEET_FILE } from '@/lib/artist/prop-sheet-template'
+import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { hasQueuedPropImageJob, submitPropImageJob } from '@/lib/artist/prop-jobs'
 
 export interface PropDraftResult {
@@ -32,6 +34,8 @@ export async function triggerPropDrafts(projectId: string): Promise<PropDraftRes
     const styleWithoutReference = !anchor && (await styleDrawsWithoutReference(project as Parameters<typeof styleDrawsWithoutReference>[0]))
     const styleId = styleIdOf(project as { style_anchor_key?: string | null; custom_style_anchor?: unknown })
     const workspaceId = (project as { workspace_id: string }).workspace_id
+    // 소품 양식(m1126 A2) — 카드 · 창의 그리기와 같은 양식. 못 올리면 양식 없이 그린다.
+    const templateUrl = await templateAssetUrl(PROP_SHEET_FILE)
     for (const row of rows) {
       if (await hasQueuedPropImageJob(projectId, row.prop_id)) {
         result.skipped++
@@ -43,7 +47,7 @@ export async function triggerPropDrafts(projectId: string): Promise<PropDraftRes
       }
       try {
         const appearance = row.appearance ?? ''
-        const plan = planPropImageSubmit({ name: row.name, appearance, anchor, styleWithoutReference })
+        const plan = planPropImageSubmit({ name: row.name, appearance, anchor, styleWithoutReference, templateUrl })
         const moderation = await assertUserTextAllowed([row.name, appearance], { projectId, kind: 'prop_image', userId: null })
         try {
           const job = await submitPropImageJob({

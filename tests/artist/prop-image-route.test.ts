@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   styleDrawsWithoutReference: vi.fn(),
   styleAnalysisPending: vi.fn(),
   assertUserTextAllowed: vi.fn(),
+  templateAssetUrl: vi.fn(),
 }))
 vi.mock('@/lib/demo/guard-server', () => ({ demoWriteBlock: () => null }))
 vi.mock('@/lib/api/guard', () => ({ requireProjectAccess: async (_req: Request, projectId: string) => ({ ok: true, projectId, userId: 'user-1', viaShare: false }) }))
@@ -30,6 +31,8 @@ vi.mock('@/lib/artist/prop-jobs', () => ({
   submitPropImageJob: mocks.submitPropImageJob,
 }))
 vi.mock('@/lib/generation-jobs', () => ({ countFailedJobsForTarget: mocks.countFailedJobsForTarget, AUTO_GENERATION_GIVE_UP_THRESHOLD: 2 }))
+// 소품 양식(m1126 A2) — 스토리지에 올린 양식 주소. 못 올리면 null.
+vi.mock('@/lib/storage/template-asset', () => ({ templateAssetUrl: mocks.templateAssetUrl }))
 
 import { POST as generateProp } from '@/app/api/artist/generate-prop/route'
 
@@ -49,6 +52,7 @@ beforeEach(() => {
   mocks.styleAnalysisPending.mockReturnValue(false)
   mocks.assertUserTextAllowed.mockResolvedValue({ id: 'moderation-1' })
   mocks.submitPropImageJob.mockResolvedValue({ id: 'job-1' })
+  mocks.templateAssetUrl.mockResolvedValue('https://media.test/templates/prop-template-0123456789ab.png')
 })
 
 describe('소품 그림 그리기 창구', () => {
@@ -101,6 +105,16 @@ describe('소품 그림 그리기 창구', () => {
   it('없는 소품은 그리지 않는다', async () => {
     mocks.loadPropDrawingContext.mockResolvedValue({ prop: null, project: PROJECT, personClash: false })
     expect((await post({ actor: 'ui' })).status).toBe(404)
+  })
+
+  // 왜: 인물 시트처럼 소품도 양식에 담아 16:9 로 그린다(m1126 A2) — 창구가 public 의 소품 양식을 스토리지에 올려 그 주소를 첫 참고 그림으로 보낸다.
+  it('소품 그림 창구는 소품 양식을 올려 그 주소를 첫 참고 그림으로 보낸다', async () => {
+    await post({ actor: 'ui' })
+    expect(mocks.templateAssetUrl).toHaveBeenCalledWith('prop-template.png')
+    const input = mocks.submitPropImageJob.mock.calls[0][0]
+    expect(input.plan.submit.reference_image_urls).toEqual(['https://media.test/templates/prop-template-0123456789ab.png'])
+    expect(input.plan.submit.aspect_ratio).toBe('16:9')
+    expect(input.plan.model).toBe('openai/gpt-image-2/edit')
   })
 
   // 왜: 그림체 분석이 도는 동안은 그리지 않는다(2026-10-10 오너) — 분석보다 먼저 그리면 그림체 설명 없이 그린다. 인물 · 배경과 같다.
