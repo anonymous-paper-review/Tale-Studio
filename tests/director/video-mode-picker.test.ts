@@ -183,6 +183,22 @@ describe('혼자 정한 것', () => {
     expect(fixVideoOverride({ change: 'slower' })).toBeUndefined()
   })
 
+  // 왜: 어느 Take 를 어떤 방식으로 만들었는지 Take 줄에서 읽혀야 방식끼리 견준다(오너가 고른다) — 기본(시작+프롬프트)과 방식이 적히지 않은 옛 Take 는
+  //   이름을 붙이지 않는다(dev Cinema 이력 판과 같은 규칙, 모든 줄에 붙이면 시끄럽다).
+  it('Take 줄에는 기본이 아닌 방식으로 만든 Take 에만 그 방식 이름이 붙는다', () => {
+    doneTake(secondShot, 1)
+    doneTake(secondShot, 2, { override: { videoMode: 'start_prompt' } })
+    doneTake(secondShot, 3, { override: { videoMode: 'continue' } })
+    const out = render(secondShot)
+    const list = out.slice(out.indexOf('data-testid="shot-detail-takes"'))
+    const row = (n: number) => list.slice(list.indexOf(`Take ${n}<`), list.indexOf('</li>', list.indexOf(`Take ${n}<`)))
+    expect(row(3)).toContain('Continuation · Seedance 2.0')
+    expect(row(2)).not.toContain('Start + prompt')
+    expect(row(1)).not.toMatch(/Continuation|Reference|Start \+/)
+    setLocale('ko')
+    expect(render(secondShot)).toContain('이어서 · Seedance 2.0')
+  })
+
   // 왜: 끝 그림을 쓰지 않는 새 Take 에 "시작 v1 + 끝 v1"이 보이면 틀린 말이다(dev QA B) — 옛 시작+끝 Take 는 그대로 읽힌다.
   it('끝을 쓰지 않은 새 Take 는 샷 상세 Take 줄에 "그림 v{n}"으로 보이고, 끝을 쓴 옛 Take 는 "시작 v1 + 끝 v1" 그대로다', () => {
     const version = { id: 'job-1', url: 'https://media.test/a-s.png', frames: { start: 'https://media.test/a-s.png', direction: 'https://media.test/a-d.png', end: 'https://media.test/a-e.png' }, generatedAt: 1, source: 'generated' as const }

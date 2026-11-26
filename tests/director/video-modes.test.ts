@@ -379,6 +379,14 @@ describe('혼자 정한 것', () => {
     expect(falInput(none).image_urls).toEqual([START, SHEET_2, SHEET, WORLD])
   })
 
+  // 왜: 지시문은 영어다 — 움직임 약속 · 대사가 인물을 저장된 영어 이름("Tired Woman")으로 부르는데 시트 이름만 한국어("지친 여자")면 모델이 둘을 잇지 못한다.
+  //   저장된 영어 이름이 지금 이름에서 정한 것일 때만 쓰고(promptName — 실사 그림체 지시문과 같은 규칙), 없으면 이름 그대로.
+  it('레퍼런스 그림 이름의 인물은 저장된 영어 이름으로 부르고, 없으면 이름 그대로 부른다', async () => {
+    seed({ characters: [[{ character_id: 'joon', name: '준', name_en: 'Joon', name_en_source: '준' }, { character_id: 'mina', name: '미나', name_en: null, name_en_source: null }]] })
+    const prepared = await prepare({ model: 'seedance', videoMode: 'reference' })
+    expect(prepared.inputSnapshot.reference_labels).toEqual([expect.any(String), 'character sheet: Joon', 'character sheet: 미나', 'the location', 'prop: lantern'])
+  })
+
   // 왜: 미들은 실사 시트의 가운데 장이다(오너 V2) — 가운데 장이 없는 옛 실사면 보낼 그림이 없다(화면도 단추를 끈다).
   it('실사 시트에 가운데 장이 없으면 시작+미들을 만들지 않는다', async () => {
     seed({ shots: [{ ...SHOT, storyboard_image: { ...STORYBOARD, frames: { start: START, end: END } } }, SCENE_SHOTS] })
