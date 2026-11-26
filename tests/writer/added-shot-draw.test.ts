@@ -241,7 +241,7 @@ describe('샷을 더하면 바로 그리기', () => {
     draws.add(event('p', 'sh_01_04'))
     await tick()
     expect(draws.view('p').get('sh_01_04')?.phase).toBe('waiting')
-    hang.resolve({ kind: 'failed', reason: '러프 스토리보드 생성 요청 실패' })
+    hang.resolve({ kind: 'failed', reason: '콘티 생성 요청 실패' })
     await tick()
     await vi.advanceTimersByTimeAsync(USER_LIMIT_RECHECK_MS)
     expect(draw.mock.calls.some(([id]) => id === 'sh_01_04')).toBe(true)
@@ -273,7 +273,7 @@ describe('샷을 더하면 바로 그리기', () => {
 
   // 왜: 최종 리뷰 M1 — 기다리던 마지막 샷을 다시 보냈는데 실패 · 건너뜀 · 스토리 없음으로 끝나도 "기다리는 중"이 남아 같은 일이 났다.
   it.each([
-    ['실패로', { kind: 'failed', reason: '러프 스토리보드 생성 요청 실패' }],
+    ['실패로', { kind: 'failed', reason: '콘티 생성 요청 실패' }],
     ['건너뜀으로', { kind: 'skipped' }],
     ['스토리 없음으로', { kind: 'no_story', story: '' }],
   ] as Array<[string, AddedDrawOutcome]>)('내 한도를 기다리던 마지막 샷의 다시 보내기가 %s 끝나도 기다림을 풀어, 나중에 더한 샷은 바로 보낸다', async (_label, end) => {
@@ -329,9 +329,9 @@ describe('샷을 더하면 바로 그리기', () => {
 
   // 왜: 2026-09-11 오너 결정 — 실패한 그림은 저절로 다시 그리지 않는다. 카드에 실패와 [다시 시도]가 남고, 사람이 고른다.
   it('더한 샷 그리기가 실패하면 저절로 다시 그리지 않고 카드에 실패를 남긴다', async () => {
-    expect(addedDrawOutcome(null, 'sh_01_03', '', 'ko')).toEqual({ kind: 'failed', reason: '러프 스토리보드 생성 요청 실패' })
+    expect(addedDrawOutcome(null, 'sh_01_03', '', 'ko')).toEqual({ kind: 'failed', reason: '콘티 생성 요청 실패' })
     const draws = createAddedShotDraws()
-    const draw = vi.fn<DrawAddedShot>(async () => ({ kind: 'failed', reason: '러프 스토리보드 생성 요청 실패' }))
+    const draw = vi.fn<DrawAddedShot>(async () => ({ kind: 'failed', reason: '콘티 생성 요청 실패' }))
     draws.attach('p', draw)
     draws.add(event('p', 'sh_01_03'))
     await tick()
@@ -339,7 +339,7 @@ describe('샷을 더하면 바로 그리기', () => {
     draws.jobsChanged('p', [])
     await vi.advanceTimersByTimeAsync(USER_LIMIT_WAIT_MAX_MS)
     expect(draw).toHaveBeenCalledTimes(1)
-    expect(addedDrawJob(draws.view('p').get('sh_01_03'), 'ko')).toEqual({ status: 'failed', error: '러프 스토리보드 생성 요청 실패' })
+    expect(addedDrawJob(draws.view('p').get('sh_01_03'), 'ko')).toEqual({ status: 'failed', error: '콘티 생성 요청 실패' })
   })
 
   // 왜(혼자 정한 것): 내용 규칙은 그 샷의 글 때문이다 — 다른 더한 샷까지 멈출 까닭이 없다.
