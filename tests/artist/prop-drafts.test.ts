@@ -1,4 +1,4 @@
-// 소품 그림 저절로 그리기 — [만들기] 때 서버가 인물 · 배경 다음에 소품을 그리고, 자리가 없어 못 그린 소품은 화면이 인물 · 배경을 다 그린 뒤 이어 그리며, 완료한 프로젝트는 저절로 그리지 않는다 (D7 · 리드 결정 2, 2026-11-22)
+// 소품 그림 저절로 그리기 — [이미지 만들기] 때 서버가 인물 · 배경 다음에 소품을 그리고, 자리가 없어 못 그린 소품은 화면이 인물 · 배경을 다 그린 뒤 이어 그리며, 완료한 프로젝트는 저절로 그리지 않는다 (D7 · 리드 결정 2, 2026-11-22)
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -57,8 +57,9 @@ afterEach(() => {
 })
 
 describe('서버 첫 그림', () => {
-  // 왜: 리드 결정 2(D7 "1단계 2단계 모두 진행") — 소품도 배경처럼 [만들기] 때 저절로 그린다. 인물 · 배경 그림이 먼저다(자리를 먼저 쓴다).
-  it('[만들기] 때 서버가 인물 · 배경 다음에 소품 그림도 저절로 그린다', async () => {
+  // 왜: 리드 결정 2(D7 "1단계 2단계 모두 진행") — 소품도 배경처럼 서버 첫 그림에서 저절로 그린다. 인물 · 배경 그림이 먼저다(자리를 먼저 쓴다).
+  //   서버 첫 그림을 거는 때는 O1(2026-11-26)로 Artist [이미지 만들기]다(콘티 동안은 그리지 않는다).
+  it('[이미지 만들기] 때 서버가 인물 · 배경 다음에 소품 그림도 저절로 그린다', async () => {
     const result = await triggerPropDrafts('project-1')
     expect(result).toEqual({ submitted: 1, skipped: 0, failed: 0 })
     expect(mocks.submitPropImageJob).toHaveBeenCalledTimes(1)
@@ -67,8 +68,8 @@ describe('서버 첫 그림', () => {
     expect(trigger).toMatch(/const \[characters, worlds\] = await Promise\.all\([\s\S]*?\]\)\s*\/\/[^\n]*\n\s*const props = await triggerPropDrafts\(projectId\)/)
   })
 
-  // 왜: [만들기] 때 서버가 그리는 첫 그림도 카드 · 창의 그리기와 같은 소품 양식(16:9)이어야 한 프로젝트 안 소품 그림이 같은 모양이다(m1126 A2).
-  it('[만들기] 때 서버가 그리는 소품 그림도 소품 양식에 담아 16:9 로 그린다', async () => {
+  // 왜: [이미지 만들기] 때 서버가 그리는 첫 그림도 카드 · 창의 그리기와 같은 소품 양식(16:9)이어야 한 프로젝트 안 소품 그림이 같은 모양이다(m1126 A2).
+  it('[이미지 만들기] 때 서버가 그리는 소품 그림도 소품 양식에 담아 16:9 로 그린다', async () => {
     await triggerPropDrafts('project-1')
     const plan = mocks.submitPropImageJob.mock.calls[0][0].plan
     expect(plan.submit.reference_image_urls).toEqual(['https://media.test/templates/prop-template.png'])
