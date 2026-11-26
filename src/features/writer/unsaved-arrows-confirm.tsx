@@ -34,6 +34,7 @@ import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 import { useLocaleStore } from '@/stores/locale-store'
 import type { DirectingArrowEditorHandle } from '@/features/writer/directing-arrow-editor'
+import { directingEditUrl } from '@/lib/writer/directing-edit-url'
 
 export type UnsavedChoice = 'save' | 'discard' | 'keep'
 
@@ -100,6 +101,13 @@ export interface EndAskTarget {
   projectId: string
   shotId: string
   onRedrawn: () => void | Promise<void>
+  /** 요청을 보낼 곳 — 없으면 콘티(러프) 주소. 실사 가운데 장(N4b)은 directingEditUrl('real'). */
+  endpoint?: string
+}
+
+/** 대상의 요청 주소 — 넘긴 주소가 없으면 콘티(러프)의 지금 주소. */
+function endpointOf(target: Pick<EndAskTarget, 'endpoint'>): string {
+  return target.endpoint ?? directingEditUrl('rough')
 }
 
 /** 끝 장 다시 그리기의 실제 부품 — 요청 · 작업 기다리기 · 알림 · 다시 읽기. 물음의 [다시 그리기]와 [이 장만 다시 만들기](끝)가 같이 쓴다. */
@@ -107,7 +115,7 @@ export function endRedrawDeps(target: EndAskTarget, t: ReturnType<typeof useT>):
   const frame = t('End frame')
   return {
     post: async (body) => {
-      const res = await fetch('/api/writer/rough-directing-edit', {
+      const res = await fetch(endpointOf(target), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
@@ -141,7 +149,7 @@ export function endRedrawDeps(target: EndAskTarget, t: ReturnType<typeof useT>):
 export function keepLineDeps(target: EndAskTarget, t: ReturnType<typeof useT>): KeepLineDeps {
   return {
     post: async (body) => {
-      const res = await fetch('/api/writer/rough-directing-edit', {
+      const res = await fetch(endpointOf(target), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify(body),
@@ -164,9 +172,9 @@ export function keepLineDeps(target: EndAskTarget, t: ReturnType<typeof useT>): 
 }
 
 /** 지금 연출 장을 읽은 줄 — 이미 읽은 줄이 있으면 서버가 다시 읽지 않는다. 못 읽었거나 요청이 안 되면 null. */
-async function fetchDirectionRead(projectId: string, shotId: string): Promise<DirectionRead | null> {
+async function fetchDirectionRead(projectId: string, shotId: string, endpoint: string): Promise<DirectionRead | null> {
   try {
-    const res = await fetch('/api/writer/rough-directing-edit', {
+    const res = await fetch(endpoint, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({ action: 'read-direction', projectId, shotId }),
@@ -219,7 +227,7 @@ export function useUnsavedArrowsGuard(close: () => void) {
   const askEnd = (target: EndAskTarget) =>
     new Promise<void>((done) => {
       setEndAsk({ target, done, reading: true, read: null, text: '' })
-      void fetchDirectionRead(target.projectId, target.shotId).then((read) =>
+      void fetchDirectionRead(target.projectId, target.shotId, endpointOf(target)).then((read) =>
         setEndAsk((current) => (current && current.target === target ? { ...current, reading: false, read, text: askLineText(read, locale) } : current)),
       )
     })

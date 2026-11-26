@@ -5,9 +5,10 @@
 //   1단계 다시 만들기는 지금처럼 시작 · 끝 함께 — 고르기 표시는 둘 다 고른 채 잠가 둔다. 모델 칸은 실제로 도는 것만.
 //   지난 판 줄(오너 2026-11-26 D2)에서 연 상세는 그 지난 판을 먼저 보이고 [채택]을 단다 — 채택하면 그 판이 지금 그림이 된다(Take 0).
 //   버전 칩은 지금처럼 누르면 바로 그 판으로 돌아간다(11/14 답 5).
-//   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts · version-history.test.ts
+//   실사 가운데 장 화살표(오너 2026-11-27 N4b): 시작 · 끝 두 칸 아래 [화살표 고치기] — Storyboard 상세와 같은 실사 편집 칸을 겹창으로 연다(시안 없음).
+//   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts · version-history.test.ts · real-arrow-popup.test.ts
 import { useMemo, useState } from 'react'
-import { Check, ChevronLeft, ChevronRight, Trash2, Upload, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, PenLine, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ThumbImage } from '@/components/thumb-image'
@@ -26,6 +27,8 @@ import { aspectRatioFromFormat } from '@/types/project'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
+import { RealArrowEditDialog } from '@/features/storyboard/real-arrow-edit'
+import { realArrowEntry } from '@/lib/storyboard/real-arrow-edit'
 import { AskLumiButton } from './ask-lumi-button'
 import { LockedFrame } from './locked-frame'
 
@@ -147,6 +150,8 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
           onBack={() => { setAdoptError(null); setDetailVersion(null) }} />
       ) : null}
       {adoptError ? <p className="text-caption text-destructive">{adoptError}</p> : null}
+      {/* 실사 가운데 장 화살표(N4b, 시안 없음) — Writer 샷만(캔버스에서만 만든 샷은 실사 시트가 서버에 없다). */}
+      {data.writerShotId && projectId ? <EditArrowsEntry data={data} writerShotId={data.writerShotId} projectId={projectId} viewingPast={!!viewing} /> : null}
       <p className="text-caption text-subtle-foreground">
         {t('Start and end images are remade together for now.')}
         {versions.length > 1 ? ` ${t('Click v1 or v2 to go back to that version.')}` : null}
@@ -228,6 +233,32 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
       {framesBlock}
       {settings}
     </div>
+  )
+}
+
+/** [화살표 고치기](오너 2026-11-27 N4b) — 지금 그림이 세 장 실사일 때만(지난 판을 보는 동안은 아님), Storyboard 상세와 같은 실사 편집 칸을 겹창으로 연다.
+ *  만드는 중 판정(서버 작업 목록)은 이 단추만 읽는다(ViewingBar 와 같은 까닭) — 그 샷 실사를 그리는 중이면 끈다(혼자 정한 것 g). 다 그리면 캔버스를 다시 읽는다. */
+function EditArrowsEntry({ data, writerShotId, projectId, viewingPast }: { data: ShotNodeData; writerShotId: string; projectId: string; viewingPast: boolean }) {
+  const t = useT()
+  const generation = useStoryboardImageGeneration(data)
+  const [open, setOpen] = useState(false)
+  const arrows = realArrowEntry({ image: data.storyboardImage, viewingPast, drawing: generation.generating })
+  if (!arrows.show) return null
+  return (
+    <>
+      <Button type="button" size="sm" variant="outline" className="gap-1.5" disabled={arrows.locked} onClick={() => setOpen(true)} data-testid="shot-detail-edit-arrows">
+        <PenLine className="size-3.5" aria-hidden />{t('Edit arrows')}
+      </Button>
+      <RealArrowEditDialog
+        open={open}
+        onOpenChange={setOpen}
+        projectId={projectId}
+        shotId={writerShotId}
+        image={data.storyboardImage}
+        drawing={generation.generating}
+        onChanged={() => useDirectorCanvasStore.getState().hydrateFreshFromDb()}
+      />
+    </>
   )
 }
 

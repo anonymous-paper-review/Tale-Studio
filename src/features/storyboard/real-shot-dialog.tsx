@@ -8,9 +8,11 @@
 //   이야기 · 화살표 · 대사는 Writer 콘티에서 고친다(O7) — 여기서는 보기만 한다.
 //   지난 판(오너 2026-11-26 S3): 카드의 지난 판 줄에서 연 판이면 큰 그림 자리에 그 판을 보이고, 그 아래 보는 판 줄의 [채택]이
 //   Director 와 같은 이미지 판 고르기 길로 그 판을 지금 그림으로 만든다(lib/storyboard/adopt-version, 다시 그리지 않음). 그리는 중이면 끈다.
-//   약속: tests/writer/real-dialog.test.ts · real-history.test.ts · real-history-view.test.ts
+//   실사 가운데 장 화살표(오너 2026-11-27 N4b): 큰 그림 아래 [화살표 고치기] — 큰 그림 자리에 콘티와 같은 편집기(실사 길)가 열리고,
+//   저장하면 묻지 않고 끝 장을 다시 그린다(그 카드에만 기다림). 그린 것이 있으면 창을 닫기 전에 묻는다(features/storyboard/real-arrow-edit).
+//   약속: tests/writer/real-dialog.test.ts · real-history.test.ts · real-history-view.test.ts · real-arrow-dialog.test.ts
 import { useState } from 'react'
-import { ImageOff, MessageCircle } from 'lucide-react'
+import { ImageOff, MessageCircle, PenLine } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
@@ -26,6 +28,9 @@ import { adoptStoryboardVersion } from '@/lib/storyboard/adopt-version'
 import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/director/storyboard-image-versions'
 import { VersionViewingBar } from '@/components/version-history/version-viewing-bar'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
+import { EndRedrawAsk, UnsavedArrowsConfirm, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
+import { RealArrowEditPane } from '@/features/storyboard/real-arrow-edit'
+import { realArrowEntry } from '@/lib/storyboard/real-arrow-edit'
 import type { StoryboardImage } from '@/types/director'
 import { boardShots } from '@/lib/writer/board-summary'
 import { manifestEntities, resolveEntityNames } from '@/lib/writer/resolve-entity-names'
@@ -34,15 +39,23 @@ import { useWriterStore } from '@/stores/writer-store'
 
 const NO_IMAGES: Readonly<Record<string, unknown>> = {}
 
+type Guard = ReturnType<typeof useUnsavedArrowsGuard>
+
 export function RealShotDialog({ shotId, onOpenChange }: { shotId: string | null; onOpenChange: (open: boolean) => void }) {
+  // 화살표 편집기에 저장하지 않은 것이 있으면 닫기 전에 묻는다(콘티와 같은 물음) — 끝 장 물음 창(줄 적기 · 고쳐서 다시 그리기)도 여기서 연다.
+  const guard = useUnsavedArrowsGuard(() => onOpenChange(false))
   return (
-    <Dialog open={!!shotId} onOpenChange={onOpenChange}>
-      {shotId ? <RealShotDialogBody key={shotId} shotId={shotId} onClose={() => onOpenChange(false)} /> : null}
-    </Dialog>
+    <>
+      <Dialog open={!!shotId} onOpenChange={(open) => { if (!open) guard.requestClose() }}>
+        {shotId ? <RealShotDialogBody key={shotId} shotId={shotId} onClose={guard.requestClose} guard={guard} /> : null}
+      </Dialog>
+      <UnsavedArrowsConfirm {...guard.confirm} />
+      <EndRedrawAsk {...guard.endAsk} />
+    </>
   )
 }
 
-function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () => void }) {
+function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClose: () => void; guard: Guard }) {
   const t = useT()
   const locale = useLocale()
   const projectId = useProjectStore((state) => state.projectId)
@@ -54,6 +67,8 @@ function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () =
   const [busyNotice, setBusyNotice] = useState(false)
   // 지난 판 줄에서 연 판(S3) — 이 샷 상세를 그 판으로 열었을 때만. [채택]을 저장하는 중 · 저장 실패.
   const viewingId = useBoardUiStore((state) => (state.shotEditId === shotId ? state.shotEditVersionId : null))
+  // 실사 가운데 장 화살표 편집을 연 샷(N4b).
+  const arrowEditing = useBoardUiStore((state) => state.realArrowShotId === shotId)
   const [adopting, setAdopting] = useState(false)
   const [adoptError, setAdoptError] = useState<string | null>(null)
 
@@ -73,6 +88,12 @@ function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () =
   const current = currentStoryboardVersion(raw)
   const viewing = viewingId && viewingId !== current?.id ? storyboardImageVersions(raw).find((version) => version.id === viewingId) ?? null : null
   const backToCurrent = () => useBoardUiStore.getState().openShotVersion(shotId, null)
+  // [화살표 고치기] — 지금 그림이 세 장 실사일 때만(지난 판을 보는 동안은 아님), 그 샷을 그리는 중이면 잠근다(혼자 정한 것 h · g).
+  const arrows = realArrowEntry({ image: images[shotId], viewingPast: !!viewing, drawing })
+  const editingArrows = arrowEditing && arrows.show
+  const reloadReal = async () => {
+    if (projectId) await useStoryboardRealImages.getState().load(projectId, { fresh: true })
+  }
   // [채택] — Director 상세와 같은 판 고르기(다시 그리지 않는다). 카드 그림을 새로 읽은 뒤 보는 판을 닫는다. 못 고르면 보던 판에 남아 까닭을 보인다.
   const adopt = async () => {
     if (!viewing || drawing || !projectId) return
@@ -104,7 +125,18 @@ function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () =
       </DialogHeader>
       <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] md:overflow-hidden">
         <div className="flex min-w-0 flex-col gap-3 p-6 md:overflow-y-auto">
-          {viewing ? (
+          {editingArrows && projectId ? (
+            // 큰 그림 자리를 실사 편집기가 차지한다 — [그림으로 돌아가기]는 그린 것이 있으면 먼저 묻는다.
+            <RealArrowEditPane
+              projectId={projectId}
+              shotId={shotId}
+              image={images[shotId]}
+              drawing={drawing}
+              guard={guard}
+              onChanged={reloadReal}
+              onBack={() => useBoardUiStore.getState().setRealArrowShotId(null)}
+            />
+          ) : viewing ? (
             // 지난 판(S3) — 그 판의 시작 · 연출 · 끝을 같은 순환으로 보인다.
             <div className="relative overflow-hidden rounded-[14px]">
               <RoughFrameCycle
@@ -138,6 +170,19 @@ function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () =
               ) : null}
             </div>
           )}
+          {arrows.show && !editingArrows ? (
+            <Button
+              size="sm"
+              variant="outline"
+              className="self-start"
+              disabled={arrows.locked}
+              onClick={() => useBoardUiStore.getState().setRealArrowShotId(shotId)}
+              data-testid="real-arrow-edit-open"
+            >
+              <PenLine className="size-3.5" aria-hidden />
+              {t('Edit arrows')}
+            </Button>
+          ) : null}
           {viewing ? (
             <VersionViewingBar
               text={current ? t('Viewing v{n} · Current v{current}', { n: viewing.n, current: current.n }) : t('Viewing v{n}', { n: viewing.n })}
@@ -180,7 +225,8 @@ function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () =
             {t('Ask Lumi to fix')}
           </Button>
           {busyNotice ? <p className="text-caption text-destructive">{t('Lumi is busy with another request. Try again when it is done.')}</p> : null}
-          <p className="text-caption text-subtle-foreground">{t('Fix the story, arrows, and dialogue in Writer.')}</p>
+          {/* 실사 그림의 화살표는 이 창의 [화살표 고치기]로 고친다(오너 2026-11-27 N4b) — 이야기 · 대사만 Writer 콘티로 안내한다. */}
+          <p className="text-caption text-subtle-foreground">{t('Fix the story and dialogue in Writer.')}</p>
         </div>
       </div>
     </DialogContent>

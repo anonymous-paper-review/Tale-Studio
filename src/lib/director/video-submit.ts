@@ -22,7 +22,7 @@ import {
 } from '@/lib/director/video-prompt'
 import { directorPromptOf } from '@/lib/director/director-prompt'
 import { ensureMinImageSide, VideoReferenceTooSmallError } from '@/lib/director/video-ref-min-size'
-import { freshDirectionRead } from '@/lib/writer/direction-read'
+import { videoDirectionLine } from '@/lib/writer/direction-read'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDesign, ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, linkGenerationJobToChatTrace, userOwnsProject } from '@/lib/generation-jobs'
@@ -928,10 +928,11 @@ async function prepareVideoRequest(
       !standalone && typeof shot?.prompt === 'string' && shot.prompt.trim() === prompt.trim()
     // 실사 그림체: 카메라는 움직임 약속 한 곳이 정한다 — 작가의 움직임 글에서 카메라 말을 빼고 인물 · 환경의 움직임만 싣는다.
     const motionProse = aligned && writerMotionPrompt && dynamicSpec ? withoutCameraMoves(writerMotionPrompt) : writerMotionPrompt
-    // 콘티에서 고친 연출 장을 AI 가 읽은 줄(오너 2026-11-22 Q4 · 리드 D2 — 끝 장과 상관없이 지금 연출 장을 읽은 줄, freshDirectionRead).
+    // 고친 연출 장을 AI 가 읽은 줄(오너 2026-11-22 Q4 · 리드 D2 — 끝 장과 상관없이 지금 연출 장을 읽은 줄). 실사 가운데 장을 고쳐 읽은 줄이
+    //   지금 실사 가운데 장의 것이면 그 줄, 아니면 콘티 줄(오너 2026-11-27 N4b — videoDirectionLine).
     //   있으면 영상의 움직임은 그 줄이 정한다 — 작가의 옛 움직임 글은 붙이지 않고, 옛 움직임 약속은 buildVideoPrompt 가 뺀다.
     //   없거나 낡았으면(연출 장 주소가 바뀜) null — 지시 · 검사 · 기록이 이 기능 전과 같다.
-    const directionLine = standalone ? null : freshDirectionRead((shot as { rough_storyboard?: unknown } | null)?.rough_storyboard)?.en ?? null
+    const directionLine = standalone ? null : videoDirectionLine(shot as { storyboard_image?: unknown; rough_storyboard?: unknown } | null)
     const promptForVideo =
       motionProse && writerMotionPrompt && promptIsStoredComposition && !promptEn.includes(writerMotionPrompt) && !directionLine
         ? `${motionProse} ${promptEn}`

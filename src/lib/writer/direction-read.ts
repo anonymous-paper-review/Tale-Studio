@@ -43,6 +43,25 @@ export function freshDirectionRead(rough: unknown): DirectionRead | null {
   }
 }
 
+/** 영상 지시에 싣는 읽은 줄과 그 출처(오너 2026-11-27 N4b · 리드) — 실사 가운데 장을 고쳐 읽은 줄(shots.storyboard_image.directionRead)이
+ *  지금 실사 가운데 장의 것이면 그 줄('real'), 아니면 콘티 연출 장을 읽은 줄('conti', 끝 장과 상관없이 — 리드 D2). 둘 다 없거나 낡았으면 null.
+ *  실사 줄이 앞서는 까닭: 실사 가운데 장을 고치면 실사 시트(시작+미들 영상이 보내는 장)가 그 움직임이다. 실사를 다시 그리거나 다른 판을 고르면
+ *  가운데 장 주소가 달라 실사 줄은 저절로 낡고 콘티 줄로 돌아간다. 출처는 시작+미들의 "러프 바뀜" 막기(n-video)가 쓴다.
+ *  약속: tests/director/video-line-pick.test.ts */
+export function pickVideoDirectionRead(
+  shot: { storyboard_image?: unknown; rough_storyboard?: unknown } | null | undefined,
+): { en: string; source: 'real' | 'conti' } | null {
+  const real = freshDirectionRead(shot?.storyboard_image)
+  if (real) return { en: real.en, source: 'real' }
+  const conti = freshDirectionRead(shot?.rough_storyboard)
+  return conti ? { en: conti.en, source: 'conti' } : null
+}
+
+/** 영상 지시에 싣는 영어 줄 — pickVideoDirectionRead 의 줄만. 없으면 null. */
+export function videoDirectionLine(shot: { storyboard_image?: unknown; rough_storyboard?: unknown } | null | undefined): string | null {
+  return pickVideoDirectionRead(shot)?.en ?? null
+}
+
 /** 실사 지시에 실을 영어 줄 — 지금 연출 장을 읽은 줄이고, 그 줄로 그린 끝 장이 지금 끝 장일 때만. 아니면 null.
  *  실사 두 길(한 샷 · 네 샷 시트, 오너 R1)이 부른다. 영상은 리드 D2(2026-11-23)부터 이 함수가 아니라 freshDirectionRead 의 en 을 쓴다. */
 export function freshDirectionLine(rough: unknown): string | null {

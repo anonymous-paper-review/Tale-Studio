@@ -125,7 +125,7 @@ export class ForeignMediaPathError extends Error {
 }
 
 /** 그 경로가 이 프로젝트 폴더("작업 공간/프로젝트/") 안인지 — 아니면 ForeignMediaPathError. */
-async function assertProjectFolder(projectId: string, path: string, locale: AppLocale): Promise<void> {
+export async function assertProjectFolder(projectId: string, path: string, locale: AppLocale): Promise<void> {
   const { data, error } = await supabaseAdmin.from('projects').select('workspace_id').eq('id', projectId).maybeSingle()
   if (error) throw error
   const workspaceId = (data as { workspace_id?: unknown } | null)?.workspace_id
@@ -398,7 +398,7 @@ export async function fitFrameToSize(buf: Buffer, width: number, height: number)
 }
 
 /** 나머지 두 장 중 작은 쪽 크기 — 고치기 전에 다시 그린 큰 장이 섞인 세트도 시트에서 자른 크기로 돌아간다. 둘 다 못 읽으면 null. */
-async function otherFramesSize(
+export async function otherFramesSize(
   frames: NonNullable<RoughJson['frames']>,
   frame: RoughFrameKey,
 ): Promise<{ width: number; height: number } | null> {
@@ -579,7 +579,7 @@ export interface EditedDirectionLine {
 
 /** 사람이 고친 줄 → 러프 기록에 남길 줄 — 한국어면 영어로 옮긴다(못 옮기면 DirectionTranslateError, 아무것도 남기지 않는다).
  *  지시는 영어만이라 한국어를 그대로 싣지 않는다. 화면엔 고친 한국어가 그대로 보인다(ko). 끝 장 표시는 비운다(아직 그 줄로 안 그림). */
-async function userDirectionRead(shotId: string, line: EditedDirectionLine, direction: string, locale: AppLocale): Promise<DirectionRead> {
+export async function userDirectionRead(shotId: string, line: EditedDirectionLine, direction: string, locale: AppLocale): Promise<DirectionRead> {
   const edited = line.text.trim()
   let en = edited
   if (line.lang === 'ko') {
