@@ -1,4 +1,4 @@
-// [만들기] 때 AI 가 이야기에서 중요한 소품을 골라(Producer 사물을 합쳐 많아야 5개) 사물로 더하고 그 소품이 나오는 장면에 잇는지 — 사람 · Producer 사물 · 배경과 겹치지 않고, 실패해도 [만들기]가 멈추지 않는지 검사한다 (D7 오너 E5, 2026-11-22)
+// [브레이크다운하기]로 산문을 확정할 때 AI 가 이야기에서 중요한 소품을 골라(Producer 사물을 합쳐 많아야 5개) 사물로 더하고 그 소품이 나오는 장면에 잇는지 — 사람 · Producer 사물 · 배경과 겹치지 않고, 실패해도 산문 확정 뒤 흐름이 멈추지 않는지 검사한다 (D7 오너 E5 2026-11-22 · 고르는 때 O1 2026-11-26)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -101,9 +101,10 @@ beforeEach(() => {
   mocks.triggerAssetDrafts.mockResolvedValue({ characters: { submitted: 0 }, worlds: { submitted: 0 } })
 })
 
-describe('[만들기] 때 중요한 소품 고르기', () => {
-  // 왜: 오너 E5(2026-11-22 "추천대로" = B) — 소품은 [만들기] 때 AI 가 이야기에서 골라 카드가 되고, 그 소품이 나오는 장면에 이어져야 샷 소품 칸이 그 소품을 가리킨다(실사 참고).
-  it('[만들기] 때 AI 가 이야기에서 고른 중요한 소품을 사물로 더하고, 그 소품이 나오는 장면에 잇는다', () => {
+describe('[브레이크다운하기] 때 중요한 소품 고르기', () => {
+  // 왜: 오너 E5(2026-11-22 "추천대로" = B) — 소품은 AI 가 이야기에서 골라 카드가 되고, 그 소품이 나오는 장면에 이어져야 샷 소품 칸이 그 소품을 가리킨다(실사 참고).
+  //   고르는 때는 O1(2026-11-26)로 [브레이크다운하기]로 산문을 확정할 때다 — 디자인 단계가 산문 확정 뒤로 옮겨 갔고, 바로 뒤 씬 · 샷 나누기가 소품을 잇는다.
+  it('[브레이크다운하기]로 산문을 확정할 때 AI 가 이야기에서 고른 중요한 소품을 사물로 더하고, 그 소품이 나오는 장면에 잇는다', () => {
     const merged = mergeKeyProps({ characters: CHARACTERS, scenes: SCENES, locations: LOCATIONS, picked: [pick('old_letter', '누런 편지', ['sc_02'], '누렇게 바랜 편지')], room: 4 })
     expect(merged.characters.characters.find((c) => c.id === 'old_letter')).toMatchObject({ name: '누런 편지', entity_type: 'object', appearance_description: '누렇게 바랜 편지' })
     expect(merged.scenes.scenes.find((s) => s.scene_id === 'sc_02')?.characters_in_scene).toEqual(['min_ji', 'old_letter'])
@@ -154,8 +155,8 @@ describe('[만들기] 때 중요한 소품 고르기', () => {
     expect(result.outcome).toEqual({ added: [], dropped: [] })
   })
 
-  // 왜: 리드 "실패해도 [만들기]는 멈추지 않음" — 소품은 더하는 것이라, 고르기가 막히면 소품 없이 인물 · 배경 디자인으로 간다. 실패는 관측 기록으로 남긴다.
-  it('소품 고르기가 실패해도 [만들기]는 멈추지 않고 소품 없이 인물 · 배경 디자인으로 이어 간다', async () => {
+  // 왜: 리드 "실패해도 [만들기]는 멈추지 않음"(O1 뒤로는 산문 확정 뒤 흐름) — 소품은 더하는 것이라, 고르기가 막히면 소품 없이 인물 · 배경 디자인으로 간다. 실패는 관측 기록으로 남긴다.
+  it('소품 고르기가 실패해도 산문 확정 뒤 흐름은 멈추지 않고 소품 없이 인물 · 배경 디자인으로 이어 간다', async () => {
     mocks.generateJson.mockRejectedValueOnce(new Error('model timeout'))
     const result = await pickKeyProps(pickArgs())
     expect(result.characters).toBeUndefined()
@@ -213,7 +214,7 @@ describe('[만들기] 때 중요한 소품 고르기', () => {
   })
 
   // 왜: 오너 E5 — 고른 소품이 Producer 사물 카드와 같은 길로 간다: 인물 · 배경 디자인과 저장(소품 카드)에 함께 넘어가고 그 뒤 첫 그림이 그린다. 장면에 이은 것도 실행에 남아 샷 단계가 쓴다.
-  it('[만들기] 디자인 단계는 고른 소품을 인물 · 배경 디자인과 저장에 함께 넘겨, 소품 카드와 첫 그림으로 이어진다', async () => {
+  it('산문 확정 뒤 디자인 단계는 고른 소품을 인물 · 배경 디자인과 저장에 함께 넘겨, 소품 카드와 첫 그림으로 이어진다', async () => {
     mocks.generateJson.mockResolvedValueOnce({ props: [pick('old_letter', '누런 편지', ['sc_02'])] })
     const patch = (await runV2DesignStep()) as { characters?: Characters; scenes?: Scenes; keyProps?: unknown }
     const designed = mocks.runV2Design.mock.calls[0][2] as Characters
