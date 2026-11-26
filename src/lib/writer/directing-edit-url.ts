@@ -8,3 +8,12 @@ export type DirectingSurface = 'rough' | 'real'
 export function directingEditUrl(surface: DirectingSurface = 'rough'): string {
   return surface === 'real' ? '/api/storyboard/real-directing-edit' : '/api/writer/rough-directing-edit'
 }
+
+/** [저장] 요청 몸 — 실사는 고친 가운데 장 주소를 같이 보내 그새 다른 판이 지금 그림이 됐으면 서버가 거절한다. 콘티는 지금 모양 그대로. */
+export function directingSaveBody(
+  surface: DirectingSurface,
+  input: { projectId: string; shotId: string; image: string; direction?: string | null },
+): { action: 'save'; projectId: string; shotId: string; image: string; direction?: string } {
+  const body = { action: 'save' as const, projectId: input.projectId, shotId: input.shotId, image: input.image }
+  return surface === 'real' && input.direction ? { ...body, direction: input.direction } : body
+}

@@ -21,7 +21,7 @@ import { translate, useT } from '@/lib/i18n'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 import { askLineText, endAskAfterSave } from '@/lib/writer/end-frame-ask'
 import { freshDirectionRead } from '@/lib/writer/direction-read'
-import { directingEditUrl, type DirectingSurface } from '@/lib/writer/directing-edit-url'
+import { directingEditUrl, directingSaveBody, type DirectingSurface } from '@/lib/writer/directing-edit-url'
 import { warnBeforeLeaving } from '@/features/writer/unsaved-arrows-confirm'
 import { useLocaleStore } from '@/stores/locale-store'
 
@@ -404,12 +404,7 @@ export function DirectingArrowEditor({
       const res = await fetch(directingEditUrl(surface), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          action: 'save',
-          projectId,
-          shotId,
-          image: out.toDataURL('image/png'),
-        }),
+        body: JSON.stringify(directingSaveBody(surface, { projectId, shotId, image: out.toDataURL('image/png'), direction: panel.frames?.direction })),
       })
       const j = await res.json().catch(() => null)
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)

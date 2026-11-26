@@ -61,6 +61,9 @@ export interface GenerationJobTarget {
   /** D10 ②(2026-11-22): 러프 끝 장 작업(종류 image_generation) — 완료 처리가 끝 장을 바꿔 끼운다(writer/directing-edit.ts finalizeRoughEndFrameJob).
    *  generatedAt · direction = 낼 때의 러프 시각 · 연출 장 주소(그사이 바뀌면 끼우지 않는다), line = 그린 영어 줄. */
   roughEnd?: { generatedAt: number; direction: string; line: string }
+  /** 실사 끝 장 작업(오너 2026-11-27 N4b, 종류 shot_storyboard) — 완료 처리가 그 판(versionId)의 끝 장만 바꿔 끼운다(storyboard/real-directing-edit.ts).
+   *  direction = 낼 때 그 판의 가운데 장 주소(그사이 바뀌면 끼우지 않는다), line = 그린 영어 줄. */
+  realEnd?: { versionId: string; direction: string; line: string }
 }
 
 export interface GenerationJob {

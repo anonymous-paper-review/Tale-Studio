@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: vi.fn() } }))
 
 import { DirectingArrowEditor, directingEditUrl } from '@/features/writer/directing-arrow-editor'
+import { directingSaveBody } from '@/lib/writer/directing-edit-url'
 import { KO as messagesKo } from '@/lib/i18n/messages-ko'
 
 // 이 시험을 위해 지은 실사 가운데 장 — 사람이 고친 화살표를 AI 가 읽은 줄이 있고, 끝 장은 아직 그 줄로 그리지 않았다.
@@ -26,6 +27,13 @@ describe('실사 가운데 장 편집기', () => {
     // 층 나누기 · 저장 두 요청이 모두 이 주소를 쓴다(편집기 안에 박힌 주소가 남지 않는다).
     expect(source.match(/fetch\(directingEditUrl\(surface\), \{/g)?.length).toBe(2)
     expect(source).not.toMatch(/fetch\('\/api\/writer\/rough-directing-edit'/)
+  })
+
+  // 왜: 다른 창에서 다른 판을 [채택]한 사이 저장하면 다른 판의 가운데 장 위에 그린 그림이 지금 판의 시작 · 끝과 짝지어진다 — 서버가 거절하게 고친 장 주소를 같이 보낸다.
+  it('실사 편집기는 저장할 때 고친 가운데 장 주소를 같이 보내고 콘티 편집기는 지금 모양 그대로 보낸다', () => {
+    expect(directingSaveBody('real', { projectId: 'p1', shotId: 'sh_1', image: 'data:x', direction: FRAMES.direction })).toEqual({ action: 'save', projectId: 'p1', shotId: 'sh_1', image: 'data:x', direction: FRAMES.direction })
+    expect(directingSaveBody('rough', { projectId: 'p1', shotId: 'sh_1', image: 'data:x', direction: FRAMES.direction })).toEqual({ action: 'save', projectId: 'p1', shotId: 'sh_1', image: 'data:x' })
+    expect(readFileSync('src/features/writer/directing-arrow-editor.tsx', 'utf8')).toMatch(/body: JSON\.stringify\(directingSaveBody\(surface, \{/)
   })
 
   // 왜: 실사는 저장하면 묻지 않고 끝 장을 다시 그린다(N4b) — 콘티 알림("끝 장을 다시 그린 뒤 실사도 다시 그려야")은 실사에서는 틀린 말이다.
