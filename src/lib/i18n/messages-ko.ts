@@ -3769,6 +3769,7 @@ export const KO: Record<string, string> = {
   'The music service did not accept this text. Change the mood and make it again.': '음악 서비스가 이 글을 받지 않았어요. 분위기 글을 고쳐 다시 만들어 주세요.',
   'There were not enough Takes.': 'Take 가 모자랐어요.',
   'It took too long and stopped.': '너무 오래 걸려 멈췄어요.',
+  'Making was stopped.': '만들기를 멈췄어요.',
   'Something went wrong while making it. Make it again.': '만드는 중에 문제가 생겼어요. 다시 만들어 주세요.',
   'Remove from list': '빼기',
   '(Drag: add to audio track)': '(끌기: 오디오 줄에 놓기)',

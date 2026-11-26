@@ -151,8 +151,8 @@ export function musicTitle(prompt: string): string {
   return chars.length > MUSIC_TITLE_MAX ? `${chars.slice(0, MUSIC_TITLE_MAX).join('')}…` : line
 }
 
-/** 실패 까닭 — 화면은 이 말로 고칠 수 있는 안내를 고른다(내용 규칙 · Take 부족 · 너무 오래 걸림 · 그 밖). */
-export type MusicFailureCode = 'content_policy' | 'insufficient_takes' | 'timed_out' | 'submit_rejected' | 'generation_failed'
+/** 실패 까닭 — 화면은 이 말로 고칠 수 있는 안내를 고른다(내용 규칙 · Take 부족 · 너무 오래 걸림 · 큐에서 멈춤 · 그 밖). */
+export type MusicFailureCode = 'content_policy' | 'insufficient_takes' | 'timed_out' | 'cancelled' | 'submit_rejected' | 'generation_failed'
 
 /** 화면 · 서버가 주고받는 만든 곡 한 줄(editor_music 행 + 작업 상태). */
 export interface EditorMusicItem {

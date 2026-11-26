@@ -48,6 +48,8 @@ function failureText(code: string | null, t: ReturnType<typeof useT>): string {
       return t('There were not enough Takes.')
     case 'timed_out':
       return t('It took too long and stopped.')
+    case 'cancelled':
+      return t('Making was stopped.')
     default:
       return t('Something went wrong while making it. Make it again.')
   }
