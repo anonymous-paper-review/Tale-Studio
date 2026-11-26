@@ -286,8 +286,9 @@ export function RoughStoryboardView() {
   //   있도록. autoGenerateBaseImages 는 원래 artist 진입 시 도는 것과 같은 함수 —
   //   동시성 1(ARTIST_GENERATION_CONCURRENCY)이라 큐를 1슬롯만 점유하고, 나머지 슬롯은
   //   유저가 writer 에서 수정·재생성할 때를 위해 비워 둔다. 멱등: 채워진 칸 skip + 서버 dedupe.
+  //   O1(오너 2026-11-26): 콘티에서는 채우지 않는다 — Artist 그림은 Artist [이미지 만들기]가 그린다(그림체를 보고 고른 뒤).
   useEffect(() => {
-    if (!projectId || !roughAllReady) return
+    if (!projectId || !roughAllReady || boardStage === 'conti') return
     if (artistBackfillTriggered.has(projectId)) return
     artistBackfillTriggered.add(projectId)
     void (async () => {
@@ -313,7 +314,7 @@ export function RoughStoryboardView() {
         })
       })
     })()
-  }, [projectId, roughAllReady])
+  }, [projectId, roughAllReady, boardStage])
   useEffect(() => {
     if (!projectId || !roughAllReady) return
     // 콘티의 러프가 다 그려지면 Artist 로 넘어가자고 권한다(O1 — 콘티 다음은 Artist). Storyboard 는 넘김 표에 없어 권하지 않는다.

@@ -84,6 +84,14 @@ describe('콘티 보드의 단계', () => {
     expect(board).not.toMatch(/stage: 'writer'/)
   })
 
+  // 왜(혼자 정한 것): O1 — Artist 그림은 Artist 의 [이미지 만들기]가 그린다(그림체를 보고 고른 뒤). 콘티의 러프가 다 그려졌다고 보드가 Artist 그림을
+  //   미리 그리면 사용자가 Artist 에 가기도 전에 그림이 생긴다(2026-11-26 개발 서버 확인: 러프 3장 뒤 인물 그림 2장이 저절로 생겼다).
+  //   예전 흐름의 Storyboard(id writer)는 지금처럼 빈 Artist 그림을 채운다.
+  it('콘티의 러프를 다 그려도 Artist 인물 · 배경 그림을 미리 그리지 않고, Storyboard 에서는 지금처럼 채운다', () => {
+    const board = read('src/features/writer/rough-storyboard-view.tsx')
+    expect(board).toMatch(/if \(!projectId \|\| !roughAllReady \|\| boardStage === 'conti'\) return\n    if \(artistBackfillTriggered\.has\(projectId\)\) return/)
+  })
+
   // 왜(혼자 정한 것): 산문은 확정했는데 나누기가 걸리지 않은 콘티(저장 단계 conti · 실행은 확정 대기)에는 다시 거는 단추가 있어야 한다.
   //   예전 흐름으로 Artist 까지 간 프로젝트(저장 단계 artist)는 지금처럼 Artist [만들기]로 나누므로 단추를 보이지 않는다.
   it('산문은 확정했는데 씬 · 샷 나누기가 아직 시작되지 않은 콘티 화면에는 [씬 · 샷 나누기 시작] 단추가 있다', () => {
