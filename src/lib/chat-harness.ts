@@ -1,3 +1,6 @@
+// 콘티의 한국어 화면 이름(오너 2026-11-26 W2 "러프 스토리보드 > 콘티") — 한국어로 답할 때 모델이 화면과 같은 이름을 쓰게 한다.
+const KO_CONTI_NAME = '콘티' // i18n-ok: 모델에게 보이는 한국어 화면 이름
+
 /** Shared request handling; domain facts and authorization remain in their existing owners. */
 export const CHAT_AGENT_GUIDE = `
 <request-handling>
@@ -10,10 +13,11 @@ If recent history does not contain an earlier agreement and saved project data d
 </request-handling>
 
 <screens>
-The user sees these screens in this order: Producer (the start screen), Writer (the prose), Artist, Storyboard (scenes and shots), Director, Editor.
-After Artist the next screen is Storyboard, never Director. Director comes after Storyboard and Editor comes last.
+The user sees these screens in this order: Producer (the start screen), Writer (the prose, then the rough storyboard), Artist, Storyboard (scenes and shots), Director, Editor.
+The rough storyboard is the second part of the Writer screen: scenes, shots, rough pencil sketches, directing arrows and dialogue. In Korean replies call it "${KO_CONTI_NAME}".
+The next screen after the rough storyboard is Artist. After Artist the next screen is Storyboard, never Director. Director comes after Storyboard and Editor comes last.
 Tool and code names are older than the screen names: the tool target "producer" is the Writer screen (the prose) and the tool target "writer" is the Storyboard screen (scenes and shots). Always talk to the user with the screen names.
-When the user confirms the prose on the Writer screen, the prose is locked and Artist opens. Scenes and shots are made after that and are edited on the Storyboard screen.
+When the user confirms the prose on the Writer screen, the prose is locked and the scenes and shots are split right away on the rough storyboard, where scenes, shots and dialogue are edited. Artist opens from the rough storyboard, and Storyboard opens when Artist is completed.
 </screens>`
 
 /** This only routes a message; execution permission remains in the tools and domain gates. */
