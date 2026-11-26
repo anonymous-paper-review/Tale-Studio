@@ -40,8 +40,13 @@ const SHEET_LINES = [
   'The same single object in every tile — identical shape, material, colors and markings — on a plain white background inside every tile.',
 ]
 
+/** 소품 모습 그림(m1126 A3) — 마지막 참고 그림이 같은 물건의 기본 모습이다(배경 모습이 기본 배경을 참조하는 것과 같다). */
+const DEFAULT_LOOK_LINE =
+  'The last reference image shows the default look of this same object — keep it recognisably the same object (its shape, size, design and markings) and change only what the description above says.'
+
 /**
  * 소품 그림 지시문. sheet(기본) = 소품 양식 칸을 채우는 시트, false = 양식 없이 물건 하나만 정면으로 그린 한 장(양식을 못 올렸을 때).
+ * hasDefaultLook = 소품 모습 그림이라 마지막 참고 그림이 기본 모습 그림이다(m1126 A3).
  * photoLook = 실사 그림체(기준 그림 없는 실사)의 사진 글(리드 R2 2026-11-26, 인물 시트와 같은 결) — 물건 설명 바로 뒤에 사진 문장, 끝에 "실제 사진" 질감 문장과
  *   그 그림체의 색감 문장. 없으면(일본 멜로 · 다른 그림체 · 그림체 없음) 지금 그대로.
  */
@@ -53,6 +58,7 @@ export function buildPropImagePrompt(input: {
   textRule?: PropTextRule
   sheet?: boolean
   photoLook?: { clause: string | null } | null
+  hasDefaultLook?: boolean
 }): string {
   const name = input.name.trim()
   const appearance = input.appearance.trim()
@@ -71,6 +77,7 @@ export function buildPropImagePrompt(input: {
           'Show this one object alone, whole and centered, seen straight from the front at eye level, filling about two thirds of the frame,',
           'on a plain neutral background.',
         ]),
+    ...(input.hasDefaultLook ? [DEFAULT_LOOK_LINE] : []),
     (input.textRule ?? PROP_TEXT_RULE) === 'described' ? DESCRIBED_TEXT_LINE : NO_TEXT_LINE,
     ...(input.safeMode ? [photo ? PROP_SAFE_TOKENS_PHOTO : PROP_SAFE_TOKENS] : []),
     ...(photo && !hasPhotoTexture(photoClause) ? [sentence(PHOTO_TEXTURE_PLACE)] : []),

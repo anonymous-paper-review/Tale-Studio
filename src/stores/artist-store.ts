@@ -39,7 +39,7 @@ import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/genera
 import { characterRefusalKey } from '@/lib/artist/failure-badge'
 import { DRAW_CONTINUE_MAX_ROUNDS, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, missingDrawTargets, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import type { ArtistSection } from '@/lib/artist/card-filter'
-import { orderPropsByUsage, propAssetsFromRows, propUsage, propsToAutoDraw, type PropRow, type PropUsage } from '@/lib/artist/props'
+import { DEFAULT_PROP_APPEARANCE_KEY, orderPropsByUsage, propAssetsFromRows, propAppearancesByProp, propSlotKey, propUsage, propsToAutoDraw, type PropAppearanceRow, type PropRow, type PropUsage } from '@/lib/artist/props'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -529,11 +529,40 @@ function worldFailuresFromStatus(
 
 /** 소품 그림 실패(D7) — 생성 상태 창구의 propFailures → propId 별 실패. 배경 worldFailuresFromStatus 와 같은 모양. */
 function propFailuresFromStatus(
-  rows: Array<{ propId: string; error: string | null; failCount: number; safeFailCount: number; moderation: boolean }> | undefined,
+  rows: Array<{ propId: string; appearanceKey?: string | null; error: string | null; failCount: number; safeFailCount: number; moderation: boolean }> | undefined,
 ): Record<string, ViewFailure> {
   const out: Record<string, ViewFailure> = {}
-  for (const f of rows ?? []) out[f.propId] = { error: f.error, moderation: f.moderation, failCount: f.failCount, safeFailCount: f.safeFailCount }
+  // 칸(소품 × 모습)마다 — 기본 모습은 소품 id 그대로(propSlotKey, m1126 A3).
+  for (const f of rows ?? []) out[propSlotKey(f.propId, f.appearanceKey)] = { error: f.error, moderation: f.moderation, failCount: f.failCount, safeFailCount: f.safeFailCount }
   return out
+}
+
+/** 소품 모습 행 하나를 다시 읽는다(m1126 A3) — 다 그린 모습 그림 · 지문을 카드에 넣는다(best-effort). */
+async function refreshPropAppearanceRow(
+  projectId: string,
+  propId: string,
+  appearanceKey: string,
+  set: (fn: (state: ArtistState) => Partial<ArtistState>) => void,
+): Promise<void> {
+  try {
+    const { data } = await createClient()
+      .from('prop_appearances')
+      .select('prop_id, appearance_key, label, narrative_time, appearance, appearance_native, image_url, source_hash')
+      .eq('project_id', projectId)
+      .eq('prop_id', propId)
+      .eq('appearance_key', appearanceKey)
+      .maybeSingle()
+    if (!data || useProjectStore.getState().projectId !== projectId) return
+    const fresh = propAppearancesByProp([data as PropAppearanceRow]).get(propId)?.[0]
+    if (!fresh) return
+    set((state) => ({
+      propAssets: state.propAssets.map((p) =>
+        p.propId === propId ? { ...p, appearances: (p.appearances ?? []).map((a) => (a.appearanceKey === appearanceKey ? fresh : a)) } : p,
+      ),
+    }))
+  } catch {
+    /* best-effort */
+  }
 }
 
 /** 소품 행 하나를 다시 읽는다(D7) — 다 그린 그림 · 그림 지문 · 생김새를 카드에 넣는다(best-effort). */
@@ -552,7 +581,8 @@ async function refreshPropRow(
     if (!data || useProjectStore.getState().projectId !== projectId) return
     const [fresh] = propAssetsFromRows([data as PropRow], new Set())
     if (!fresh) return
-    set((state) => ({ propAssets: state.propAssets.map((p) => (p.propId === propId ? fresh : p)) }))
+    // 모습 목록은 이 행에 없다 — 카드가 들고 있던 모습을 그대로 둔다(m1126 A3).
+    set((state) => ({ propAssets: state.propAssets.map((p) => (p.propId === propId ? { ...fresh, ...(p.appearances ? { appearances: p.appearances } : {}) } : p)) }))
   } catch {
     /* best-effort */
   }
@@ -714,12 +744,27 @@ interface ArtistState {
   generateProp: (
     propId: string,
     actor?: GenerationActor,
-    options?: GenerationRequestOptions & { instruction?: string; model?: ImageModelKey; safeMode?: boolean },
+    options?: GenerationRequestOptions & { instruction?: string; model?: ImageModelKey; safeMode?: boolean; appearanceKey?: string | null },
   ) => Promise<PropDrawOutcome>
   /** 그림 없는 소품 이어 그리기(D7 · 리드 결정 2) — 인물 · 배경을 다 그린 뒤 화면이 부른다. 실패한 소품은 건너뛰고, 자리가 없으면(429) 멈춘다. */
   continueMissingProps: () => Promise<void>
   /** 소품 생김새(원천) 고치기 — 그림은 그대로 둔다(다시 그리기 전까지 "설명 바뀜"). */
   updatePropAppearance: (propId: string, appearance: string) => Promise<void>
+  /** 카드에서 고른 소품 모습(m1126 A3) — 키 = propId, 값 = 모습 열쇠(기본 'default'). */
+  selectedPropAppearances: Record<string, string>
+  selectPropAppearance: (propId: string, appearanceKey: string) => void
+  /** 소품 모습 만들기(m1126 A3, 배경 createLocationAppearance 와 같다) — generate 면 기본 그림을 참고해 바로 그린다. 새 모습 열쇠를 돌려준다. */
+  createPropAppearance: (
+    propId: string,
+    label: string,
+    appearance: string,
+    narrativeTime: NarrativeTime | null,
+    options?: GenerationRequestOptions & { generate?: boolean; actor?: GenerationActor },
+  ) => Promise<string>
+  /** 소품 모습 설명 고치기 — 그림은 그대로(다시 그리기 전까지 "설명 바뀜"). */
+  updatePropAppearanceVariant: (propId: string, appearanceKey: string, appearance: string) => Promise<void>
+  /** 소품 모습 지우기 — 기본 모습은 지울 수 없다. 그 모습을 보고 있었으면 기본으로 돌아간다. */
+  deletePropAppearance: (propId: string, appearanceKey: string) => Promise<void>
   selectedCharacterId: string | null
   selectedLocationId: string | null
   selectedLocationAppearances: Record<string, string>
@@ -904,6 +949,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   generatingProps: [],
   propFailures: {},
   propContentRefusals: {},
+  selectedPropAppearances: {},
   selectedCharacterId: null,
   chatSelection: null,
   setChatSelection: selection => {
@@ -969,6 +1015,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           { data: dbLocAppearances },
           { data: dbProps },
           { data: dbShotProps },
+          { data: dbPropAppearances },
         ] = await Promise.all([
           supabase
             .from('scenes')
@@ -1019,6 +1066,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .from('shots')
             .select('shot_id, scene_id, prop_placement:static_spec->prop_placement')
             .eq('project_id', projectId),
+          // 소품 모습(m1126 A3) — 표가 아직 없는 환경(마이그레이션 전)이면 오류 → 모습 없이 카드만(아래 ?? []).
+          supabase
+            .from('prop_appearances')
+            .select('prop_id, appearance_key, label, narrative_time, appearance, appearance_native, image_url, source_hash')
+            .eq('project_id', projectId)
+            .order('created_at'),
         ])
         if (useProjectStore.getState().projectId !== projectId) return
         dbRead = true
@@ -1164,7 +1217,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           })
 
           // 소품 카드(D7) — 같은 id 의 인물 행이 있으면 빼고, 나오는 샷이 많은 순으로.
-          const props = propAssetsFromRows((dbProps ?? []) as PropRow[], new Set(characterAssets.map((c) => c.characterId)))
+          const props = propAssetsFromRows((dbProps ?? []) as PropRow[], new Set(characterAssets.map((c) => c.characterId)), (dbPropAppearances ?? []) as PropAppearanceRow[])
           const usage = propUsage(props, dbScenes, (dbShotProps ?? []).map((row) => ({ shotId: String(row.shot_id), sceneId: (row as { scene_id?: string | null }).scene_id ?? null, propPlacement: (row as { prop_placement?: unknown }).prop_placement })))
           const propAssets = orderPropsByUsage(props, usage)
 
@@ -1180,6 +1233,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             propAssets,
             propUsage: usage,
             selectedPropId: keepSelection(get().selectedPropId, propAssets.map((p) => p.propId)),
+            // 고른 소품 모습이 지워졌으면 기본으로(배경 모습과 같다).
+            selectedPropAppearances: Object.fromEntries(
+              Object.entries(get().selectedPropAppearances).filter(([propId, key]) =>
+                propAssets.some((p) => p.propId === propId && (p.appearances ?? []).some((a) => a.appearanceKey === key)),
+              ),
+            ),
             lookSummary: dtFull
               ? { artStyle: dtFull.l1?.art_style ?? null, colorMeaning: dtFull.color_meaning ?? null }
               : null,
@@ -1398,13 +1457,18 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
 
   selectLocation: (id) => set({ selectedLocationId: id }),
   selectProp: (id) => set({ selectedPropId: id }),
+  selectPropAppearance: (propId, appearanceKey) =>
+    set((state) => ({ selectedPropAppearances: { ...state.selectedPropAppearances, [propId]: appearanceKey } })),
 
   generateProp: async (propId, actor = 'ui', options) => {
     if (isDemoSession()) return 'skipped'
     const projectId = useProjectStore.getState().projectId
     if (!projectId || !get().propAssets.some((p) => p.propId === propId)) return 'skipped'
-    if (get().generatingProps.includes(propId)) return 'skipped'
-    set((state) => ({ generatingProps: [...state.generatingProps, propId], error: null }))
+    // 칸(소품 × 모습)마다 그리는 중 · 실패 · 내용 검사를 센다 — 기본 모습은 소품 id 그대로(m1126 A3).
+    const appearanceKey = options?.appearanceKey && options.appearanceKey !== DEFAULT_PROP_APPEARANCE_KEY ? options.appearanceKey : null
+    const slot = propSlotKey(propId, appearanceKey)
+    if (get().generatingProps.includes(slot)) return 'skipped'
+    set((state) => ({ generatingProps: [...state.generatingProps, slot], error: null }))
     const locale = useLocaleStore.getState().locale
     try {
       const res = await fetch('/api/artist/generate-prop', {
@@ -1413,6 +1477,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         body: JSON.stringify({
           projectId,
           propId,
+          ...(appearanceKey ? { appearanceKey } : {}),
           actor,
           ...(options?.instruction?.trim() ? { instruction: options.instruction.trim() } : {}),
           ...(options?.model ? { model: options.model } : {}),
@@ -1427,7 +1492,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       //   알림은 소품 이름을 말한다. 순화 재시도 자격은 없으니 그림 실패(propFailures)와 섞지 않는다.
       if (isContentPolicyBlocked(res.status, body)) {
         const name = contentRefusalName(body)
-        set((state) => ({ propContentRefusals: { ...state.propContentRefusals, [propId]: { name } } }))
+        set((state) => ({ propContentRefusals: { ...state.propContentRefusals, [slot]: { name } } }))
         options?.onContentRefusal?.(name)
         options?.onJob?.({ jobId: null, status: 'failed', httpStatus: res.status, error: body.error ?? `HTTP ${res.status}` })
         notifyContentPolicyBlocked(body)
@@ -1436,11 +1501,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
       if (body.jobId) {
         // 다시 보내 접수됐다 — 내용 검사 표시를 지운다(인물 · 배경과 같다).
-        set((state) => (propId in state.propContentRefusals ? { propContentRefusals: withoutContentRefusal(state.propContentRefusals, propId) } : {}))
+        set((state) => (slot in state.propContentRefusals ? { propContentRefusals: withoutContentRefusal(state.propContentRefusals, slot) } : {}))
         options?.onJob?.({ jobId: body.jobId, status: 'queued' })
         await pollGenerationJob(body.jobId, { onStatus: options?.onJob })
         if (useProjectStore.getState().projectId !== projectId) return 'drawn'
-        await refreshPropRow(projectId, propId, set)
+        if (appearanceKey) await refreshPropAppearanceRow(projectId, propId, appearanceKey, set)
+        else await refreshPropRow(projectId, propId, set)
         notifyGenerationComplete('artist', translate(locale, 'Prop image'))
         void refreshPropFailures(projectId, set)
         return 'drawn'
@@ -1455,14 +1521,110 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       if (useProjectStore.getState().projectId !== projectId) return 'failed'
       const raw = err instanceof Error ? err.message : String(err)
       // 그리는 중에서 빼기 전에 실패로 먼저 적는다 — 실패 기록을 다시 읽기 전 사이에 이어 그리기가 다시 요청하지 않게(배경과 같다).
-      set((state) => ({ error: raw || 'Prop image failed', propFailures: { ...state.propFailures, [propId]: state.propFailures[propId] ?? { error: raw, moderation: false, failCount: 1, safeFailCount: 0 } } }))
+      set((state) => ({ error: raw || 'Prop image failed', propFailures: { ...state.propFailures, [slot]: state.propFailures[slot] ?? { error: raw, moderation: false, failCount: 1, safeFailCount: 0 } } }))
       options?.onJob?.({ jobId: null, status: 'failed', error: raw })
       notifyGenerationFailed('artist', translate(locale, 'Prop image'), raw)
       void refreshPropFailures(projectId, set)
       return 'failed'
     } finally {
-      set((state) => ({ generatingProps: state.generatingProps.filter((id) => id !== propId) }))
+      set((state) => ({ generatingProps: state.generatingProps.filter((id) => id !== slot) }))
     }
+  },
+
+  createPropAppearance: async (propId, label, appearance, narrativeTime, options) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to create a prop appearance')
+    const res = await fetch('/api/artist/prop-appearance', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, propId, label, appearance, narrativeTime }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    const created = (await res.json()) as { appearanceKey: string; label: string; narrativeTime: NarrativeTime | null; appearance: string | null; appearanceNative: string | null }
+    if (useProjectStore.getState().projectId !== projectId) return created.appearanceKey
+    const english = created.appearance ?? ''
+    set((state) => ({
+      propAssets: state.propAssets.map((p) =>
+        p.propId === propId
+          ? {
+              ...p,
+              appearances: [
+                ...(p.appearances ?? []),
+                {
+                  appearanceKey: created.appearanceKey,
+                  label: created.label,
+                  narrativeTime: created.narrativeTime,
+                  appearance: english,
+                  appearanceNative: created.appearanceNative?.trim() ? created.appearanceNative : english,
+                  imageUrl: null,
+                  sourceHash: null,
+                },
+              ],
+            }
+          : p,
+      ),
+    }))
+    get().selectPropAppearance(propId, created.appearanceKey)
+    // 만든 직후 바로 그린다 — 기본 그림을 같은 물건의 참고로(서버가 붙인다, 배경 모습과 같다). 그림은 무료(Take 없음).
+    if (options?.generate) {
+      await get().generateProp(propId, options.actor ?? 'ui', {
+        appearanceKey: created.appearanceKey,
+        ...(options.traceId ? { traceId: options.traceId } : {}),
+        ...(options.onJob ? { onJob: options.onJob } : {}),
+      })
+    }
+    return created.appearanceKey
+  },
+
+  updatePropAppearanceVariant: async (propId, appearanceKey, appearance) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to update a prop appearance')
+    const res = await fetch('/api/artist/prop-appearance', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, propId, appearanceKey, appearance }),
+    })
+    const body = (await res.json().catch(() => ({}))) as { appearance?: string | null; appearanceNative?: string | null; error?: string }
+    if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
+    if (useProjectStore.getState().projectId !== projectId) return
+    set((state) => ({
+      propAssets: state.propAssets.map((p) =>
+        p.propId === propId
+          ? {
+              ...p,
+              appearances: (p.appearances ?? []).map((a) =>
+                a.appearanceKey === appearanceKey
+                  ? { ...a, appearance: body.appearance ?? appearance, appearanceNative: body.appearanceNative?.trim() ? body.appearanceNative : appearance }
+                  : a,
+              ),
+            }
+          : p,
+      ),
+    }))
+  },
+
+  deletePropAppearance: async (propId, appearanceKey) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to delete a prop appearance')
+    const res = await fetch('/api/artist/prop-appearance', {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, propId, appearanceKey }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    set((state) => {
+      const { [propId]: picked, ...rest } = state.selectedPropAppearances
+      return {
+        propAssets: state.propAssets.map((p) => (p.propId === propId ? { ...p, appearances: (p.appearances ?? []).filter((a) => a.appearanceKey !== appearanceKey) } : p)),
+        selectedPropAppearances: picked === appearanceKey ? rest : state.selectedPropAppearances,
+      }
+    })
   },
 
   continueMissingProps: async () => {
@@ -1717,7 +1879,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const { failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps } = (await res.json()) as {
         capacitySkips?: Record<string, 'user' | 'global'>
         propFailures?: Parameters<typeof propFailuresFromStatus>[0]
-        queuedProps?: Array<{ propId: string; jobId: string }>
+        queuedProps?: Array<{ propId: string; appearanceKey?: string | null; jobId: string }>
         failures: Array<{
           characterId: string
           appearanceKey: string
@@ -1751,19 +1913,21 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       }
       set({ worldFailures: worldFailuresFromStatus(worldFailures), viewFailures: vf, capacitySkips: capacitySkips ?? {}, propFailures: propFailuresFromStatus(propFailures) })
       // 서버가 그리는 중인 소품(D7) — 그리는 중으로 세고 작업 확인(reconcile)으로 마무리해 카드에 바로 넣는다(배경과 같다).
-      for (const { propId, jobId } of queuedProps ?? []) {
-        if (get().generatingProps.includes(propId)) continue
-        set((state) => ({ generatingProps: [...state.generatingProps, propId] }))
+      for (const { propId, appearanceKey, jobId } of queuedProps ?? []) {
+        // 칸(소품 × 모습)마다 — 모습 그림이면 그 모습 행을 다시 읽는다(m1126 A3).
+        const slot = propSlotKey(propId, appearanceKey)
+        if (get().generatingProps.includes(slot)) continue
+        set((state) => ({ generatingProps: [...state.generatingProps, slot] }))
         void pollGenerationJob(jobId)
-          .then(() => refreshPropRow(projectId, propId, set))
+          .then(() => (appearanceKey ? refreshPropAppearanceRow(projectId, propId, appearanceKey, set) : refreshPropRow(projectId, propId, set)))
           .catch(() => {
             if (useProjectStore.getState().projectId !== projectId) return
-            set((state) => ({ propFailures: { ...state.propFailures, [propId]: state.propFailures[propId] ?? { error: 'failed', moderation: false, failCount: 1, safeFailCount: 0 } } }))
+            set((state) => ({ propFailures: { ...state.propFailures, [slot]: state.propFailures[slot] ?? { error: 'failed', moderation: false, failCount: 1, safeFailCount: 0 } } }))
             void refreshPropFailures(projectId, set)
           })
           .finally(() => {
             if (useProjectStore.getState().projectId !== projectId) return
-            set((state) => ({ generatingProps: state.generatingProps.filter((id) => id !== propId) }))
+            set((state) => ({ generatingProps: state.generatingProps.filter((id) => id !== slot) }))
           })
       }
       for (const { locationId, appearanceKey, jobId } of queuedWorld ?? []) {
@@ -2843,6 +3007,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       generatingProps: [],
       propFailures: {},
       propContentRefusals: {},
+      selectedPropAppearances: {},
       selectedCharacterId: null,
       selectedLocationId: null,
       selectedLocationAppearances: {},

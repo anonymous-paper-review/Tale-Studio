@@ -18,26 +18,46 @@ import { isDefiniteSubmitRejection } from '@/lib/fal/submit-rejection'
 import { moderatedSubmitInput, type ModerationReceipt } from '@/lib/moderation/creem'
 import { recordModerationPass } from '@/lib/api/moderation'
 import type { PropImagePlan } from '@/lib/artist/prop-image-plan'
+import { DEFAULT_PROP_APPEARANCE_KEY, propSlotKey } from '@/lib/artist/props'
+
+/** 작업 대상의 모습 열쇠 — 기본 모습(없거나 'default')은 null. */
+function slotAppearance(key: string | null | undefined): string | null {
+  return key && key !== DEFAULT_PROP_APPEARANCE_KEY ? key : null
+}
 
 export interface PropDrawingContext {
   prop: { prop_id: string; name: string; appearance: string | null; image_url: string | null } | null
   project: { workspace_id: string; style_anchor_key: string | null; custom_style_anchor: unknown; settings?: unknown } | null
   /** 같은 id 의 인물 행이 있다 — 예전 저장 고장. 어느 그림을 고칠지 몰라 그리지 않는다. */
   personClash: boolean
+  /** 그릴 모습(m1126 A3) — 기본 모습이면 null. 열쇠를 줬는데 행이 없으면 null 이고 appearanceMissing. */
+  appearance?: { appearance_key: string; label: string; appearance: string | null; appearance_native: string | null; image_url: string | null } | null
+  appearanceMissing?: boolean
 }
 
-export async function loadPropDrawingContext(projectId: string, propId: string): Promise<PropDrawingContext> {
-  const [prop, project, person] = await Promise.all([
+export async function loadPropDrawingContext(projectId: string, propId: string, appearanceKey?: string | null): Promise<PropDrawingContext> {
+  const key = slotAppearance(appearanceKey)
+  const [prop, project, person, appearance] = await Promise.all([
     supabaseAdmin.from('props').select('prop_id, name, appearance, image_url').eq('project_id', projectId).eq('prop_id', propId).maybeSingle(),
     supabaseAdmin.from('projects').select('workspace_id, style_anchor_key, custom_style_anchor, settings').eq('id', projectId).maybeSingle(),
     supabaseAdmin.from('characters').select('character_id').eq('project_id', projectId).eq('character_id', propId).maybeSingle(),
+    key
+      ? supabaseAdmin
+          .from('prop_appearances')
+          .select('appearance_key, label, appearance, appearance_native, image_url')
+          .eq('project_id', projectId)
+          .eq('prop_id', propId)
+          .eq('appearance_key', key)
+          .maybeSingle()
+      : Promise.resolve({ data: null, error: null }),
   ])
-  const failed = prop.error ?? project.error ?? person.error
+  const failed = prop.error ?? project.error ?? person.error ?? appearance.error
   if (failed) throw failed
   return {
     prop: prop.data ?? null,
     project: (project.data as PropDrawingContext['project']) ?? null,
     personClash: !!person.data,
+    ...(key ? { appearance: (appearance.data as PropDrawingContext['appearance']) ?? null, appearanceMissing: !appearance.data } : {}),
   }
 }
 
@@ -61,18 +81,23 @@ async function queuedPropJobs(projectId: string): Promise<Array<{ id: string; ta
     .map((row) => ({ id: row.id, target: (row.target ?? {}) as GenerationJobTarget, created_at: row.created_at }))
 }
 
-/** 멱등 가드: 이 소품을 그리는 대기 작업이 이미 있는가. */
-export async function hasQueuedPropImageJob(projectId: string, propId: string): Promise<boolean> {
-  return (await queuedPropJobs(projectId)).some((row) => row.target.propId === propId)
+/** 멱등 가드: 이 소품(의 이 모습)을 그리는 대기 작업이 이미 있는가 — 칸(소품 × 모습)마다 따로 본다(m1126 A3). */
+export async function hasQueuedPropImageJob(projectId: string, propId: string, appearanceKey?: string | null): Promise<boolean> {
+  const key = slotAppearance(appearanceKey)
+  return (await queuedPropJobs(projectId)).some((row) => row.target.propId === propId && slotAppearance(row.target.appearanceKey) === key)
 }
 
-/** 새로고침 뒤 같은 소품을 다시 발주하지 않고 확인할 작업 목록. */
-export async function listQueuedPropImageJobs(projectId: string): Promise<Array<{ propId: string; jobId: string }>> {
-  return (await queuedPropJobs(projectId)).flatMap((row) => (row.target.propId ? [{ propId: row.target.propId, jobId: row.id }] : []))
+/** 새로고침 뒤 같은 소품을 다시 발주하지 않고 확인할 작업 목록 — 모습 열쇠(기본은 null)를 함께. */
+export async function listQueuedPropImageJobs(projectId: string): Promise<Array<{ propId: string; appearanceKey: string | null; jobId: string }>> {
+  return (await queuedPropJobs(projectId)).flatMap((row) =>
+    row.target.propId ? [{ propId: row.target.propId, appearanceKey: slotAppearance(row.target.appearanceKey), jobId: row.id }] : [],
+  )
 }
 
 export interface PropImageFailure {
   propId: string
+  /** 모습 열쇠(m1126 A3) — 기본 모습은 null. */
+  appearanceKey: string | null
   error: string | null
   failCount: number
   safeFailCount: number
@@ -95,10 +120,13 @@ export async function listFailedPropImageJobs(projectId: string): Promise<PropIm
   for (const row of (data ?? []) as Row[]) {
     const propId = row.target?.propId
     if (!propId) continue
-    let slot = byProp.get(propId)
+    // 칸(소품 × 모습)마다 따로 센다 — 기본 그림의 실패가 다른 모습 칸에 번지지 않게(m1126 A3).
+    const appearanceKey = slotAppearance(row.target?.appearanceKey)
+    const slotKey = propSlotKey(propId, appearanceKey)
+    let slot = byProp.get(slotKey)
     if (!slot) {
-      slot = { propId, error: row.error, failCount: 0, safeFailCount: 0, moderation: classifyFalFailure(row.error) === 'moderation', latestFailed: row.status === 'failed' }
-      byProp.set(propId, slot)
+      slot = { propId, appearanceKey, error: row.error, failCount: 0, safeFailCount: 0, moderation: classifyFalFailure(row.error) === 'moderation', latestFailed: row.status === 'failed' }
+      byProp.set(slotKey, slot)
     }
     if (row.status === 'failed') {
       slot.failCount++
@@ -114,6 +142,8 @@ export async function listFailedPropImageJobs(projectId: string): Promise<PropIm
 export interface SubmitPropImageJobInput {
   projectId: string
   propId: string
+  /** 그릴 모습(m1126 A3) — 없거나 'default' 면 기본 그림(props 행). */
+  appearanceKey?: string | null
   plan: PropImagePlan
   /** 생김새 + 그림체 지문(lib/artist/prop-image propImageStamp) — 마무리가 props.source_hash 로 적는다. */
   stamp: string
@@ -149,7 +179,11 @@ export async function submitPropImageJob(input: SubmitPropImageJobInput): Promis
       ...(input.safeMode ? { safe_mode: true } : {}),
     },
     chatTraceId: input.chatTraceId,
-    target: { workspaceId: input.workspaceId, propId: input.propId },
+    target: {
+      workspaceId: input.workspaceId,
+      propId: input.propId,
+      ...(slotAppearance(input.appearanceKey) ? { appearanceKey: slotAppearance(input.appearanceKey) as string } : {}),
+    },
   })
   recordModerationPass(input.moderation, { projectId: input.projectId, kind: 'prop_image', userId: input.userId, jobId: job.id })
   try {

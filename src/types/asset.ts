@@ -140,6 +140,21 @@ export interface PropAsset {
   /** 이 그림을 그린 입력의 지문(생김새 + 그림체). 지금 입력과 다르면 "설명 바뀜" · "그림체 바뀜". */
   sourceHash: string | null
   origin: 'producer' | 'writer' | 'user'
+  /** 다른 모습(prop_appearances 행, m1126 A3) — 기본 모습(키 'default')은 이 카드 자체. 모습 표를 읽은 카드에만 있다(만든 순서). */
+  appearances?: PropAppearance[]
+}
+
+/** 소품의 다른 모습(m1126 A3 "소품 모습 추가") — 배경 모습(LocationAppearance)과 같은 축. 그림은 소품 양식 16:9 한 장. */
+export interface PropAppearance {
+  appearanceKey: string
+  label: string
+  narrativeTime: NarrativeTime | null
+  /** 생김새(영어 base) — 그림 지시문 입력. */
+  appearance: string
+  /** 화면 말 생김새. 없으면 appearance. */
+  appearanceNative: string
+  imageUrl: string | null
+  sourceHash: string | null
 }
 
 /** 배경 모습 변형(location_appearances 행). 기본 모습(키 'default')은 WorldAsset 자체가 담당한다. */

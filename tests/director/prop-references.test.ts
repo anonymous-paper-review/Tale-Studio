@@ -165,6 +165,28 @@ describe('소품 참고 규칙', () => {
     expect(propReferenceLines(2, [])).toEqual([])
   })
 
+  // 왜: 소품 모습(m1126 A3)은 배경 모습과 같은 규칙으로 샷에 쓰인다 — 씬의 이야기 속 때(과거 · 현재 · 미래)와 같은 모습 중 그림이 있는 첫 것(만든 순서).
+  //   그 때의 모습이 없거나 그림이 아직 없으면 기본 그림이다. 기본 그림이 없어도 맞는 모습 그림이 있으면 그것을 쓴다.
+  it('씬의 이야기 속 때와 같은 소품 모습 중 그림이 있는 첫 것을 그 샷의 실사 참고로 쓰고, 없으면 기본 그림을 쓴다', () => {
+    const props = [
+      {
+        propId: 'sword', name: '칼', imageUrl: 'https://sword',
+        appearances: [
+          { appearanceKey: 'broken_empty', narrativeTime: 'future' as const, imageUrl: null },
+          { appearanceKey: 'broken', narrativeTime: 'future' as const, imageUrl: 'https://sword-broken' },
+          { appearanceKey: 'new', narrativeTime: 'past' as const, imageUrl: 'https://sword-new' },
+        ],
+      },
+      { propId: 'ring', name: '반지', imageUrl: null, appearances: [{ appearanceKey: 'old', narrativeTime: 'past' as const, imageUrl: 'https://ring-old' }] },
+    ]
+    const spec = placement(['sword', 'center'], ['ring', 'left'])
+    expect(planShotPropRefs(spec, props, 2, 'future').map((ref) => ref.url)).toEqual(['https://sword-broken'])
+    expect(planShotPropRefs(spec, props, 2, 'past').map((ref) => ref.url)).toEqual(['https://sword-new', 'https://ring-old'])
+    expect(planShotPropRefs(spec, props, 2, 'present').map((ref) => ref.url)).toEqual(['https://sword'])
+    expect(planShotPropRefs(spec, props, 2, null).map((ref) => ref.url)).toEqual(['https://sword'])
+    expect(planSheetPropRefs([spec], props, 3, 'past').refs.map((ref) => ref.url)).toEqual(['https://sword-new', 'https://ring-old'])
+  })
+
   // 왜: 소품 그림이 소품 양식(MAIN · FRONT · SIDE · BACK · TOP · DETAIL)을 채운 시트가 됐다(m1126 A2) — 첫 줄에 "물건 하나를 여러 방향에서 보인 시트"라고 적어야
   //   모델이 칸마다 다른 물건으로 읽거나 한 칸에 여러 번 그리지 않는다(리드 R1 승인 문장).
   it('소품 그림이 여러 방향을 담은 시트라 지시문 첫 줄은 시트마다 물건 하나를 여러 방향에서 보인다고 적는다', () => {

@@ -130,6 +130,21 @@ describe('실사 그림체(사진 지시문 길)의 소품 참고', () => {
   })
 })
 
+describe('소품 모습과 씬의 이야기 속 때', () => {
+  // 왜: m1126 A3 — 소품 모습은 배경 모습처럼 씬의 이야기 속 때로 골라진다. 미래 씬의 샷은 "부러진" 모습 그림을 참고해야 한다.
+  it('씬의 이야기 속 때와 같은 소품 모습이 있으면 한 샷 · 네 샷 실사 모두 그 모습 그림을 참고 그림으로 붙인다', async () => {
+    seed('real', null, [withProps(1, 'lamp'), withProps(2, 'lamp')], PROPS)
+    db.scenes = [{ project_id: 'P', scene_id: 'sc1', sort_order: 0, time_of_day: '밤', location: 'l1', narrative_time: 'future' }]
+    db.prop_appearances = [
+      { project_id: 'P', prop_id: 'lamp', appearance_key: 'cracked', narrative_time: 'future', image_url: 'https://media.test/props/lamp-cracked.png' },
+      { project_id: 'P', prop_id: 'lamp', appearance_key: 'new', narrative_time: 'past', image_url: 'https://media.test/props/lamp-new.png' },
+    ]
+    expect((await one(1)).refs).toContain('https://media.test/props/lamp-cracked.png')
+    expect((await one(1)).refs).not.toContain(LAMP)
+    expect((await sheet()).refs).toContain('https://media.test/props/lamp-cracked.png')
+  })
+})
+
 describe('일본 멜로 · 다른 그림체의 소품 참고', () => {
   // 왜: dev 2단계 그대로 — 그림체 길에서도 소품 그림은 인물 · 배경 · 추가 입력 뒤, 화풍 그림 앞에 붙고(화풍은 여전히 마지막), 소품 줄은 지시문 맨 끝이다.
   it.each(OTHER_STYLES)('%s 그림체도 소품이 나오는 샷은 지시문 끝에 소품 줄을 붙이고, 소품 그림을 화풍 그림 앞에 넣는다', async (_label, key, custom) => {

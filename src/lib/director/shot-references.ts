@@ -349,16 +349,25 @@ export async function loadSceneWorldRefs(projectId: string, sceneIds: string[]):
  *   인물 시트로 이미 붙는다). 호출부는 실패하면 소품 없이 그린다(지금과 같다).
  */
 export async function loadPropsForReferences(projectId: string): Promise<PropForRefs[]> {
-  const [props, people] = await Promise.all([
+  const [props, people, appearances] = await Promise.all([
     supabaseAdmin.from('props').select('prop_id, name, image_url').eq('project_id', projectId),
     supabaseAdmin.from('characters').select('character_id').eq('project_id', projectId),
+    // 소품 모습(m1126 A3) — 표가 아직 없는 환경(마이그레이션 전)이면 모습 없이(기본 그림만) 간다.
+    supabaseAdmin.from('prop_appearances').select('prop_id, appearance_key, narrative_time, image_url').eq('project_id', projectId).order('created_at'),
   ])
   if (props.error) throw props.error
   if (people.error) throw people.error
   const personIds = new Set(((people.data ?? []) as Array<{ character_id: string }>).map((row) => row.character_id))
+  const byProp = new Map<string, NonNullable<PropForRefs['appearances']>>()
+  for (const row of (appearances.error ? [] : (appearances.data ?? [])) as Array<{ prop_id: string; appearance_key: string; narrative_time: string | null; image_url: string | null }>) {
+    const list = byProp.get(row.prop_id) ?? []
+    list.push({ appearanceKey: row.appearance_key, narrativeTime: row.narrative_time, imageUrl: row.image_url })
+    byProp.set(row.prop_id, list)
+  }
+  const hasImage = (url: string | null | undefined) => typeof url === 'string' && !!url.trim()
   return ((props.data ?? []) as Array<{ prop_id: string; name: string; image_url: string | null }>)
-    .filter((row) => typeof row.image_url === 'string' && row.image_url.trim() && !personIds.has(row.prop_id))
-    .map((row) => ({ propId: row.prop_id, name: row.name, imageUrl: row.image_url }))
+    .filter((row) => !personIds.has(row.prop_id) && (hasImage(row.image_url) || (byProp.get(row.prop_id) ?? []).some((a) => hasImage(a.imageUrl))))
+    .map((row) => ({ propId: row.prop_id, name: row.name, imageUrl: hasImage(row.image_url) ? row.image_url : null, ...(byProp.has(row.prop_id) ? { appearances: byProp.get(row.prop_id) } : {}) }))
 }
 
 /** URL 비교용 — 캐시버스트(?v=)를 떼고 같은 객체인지 본다. */

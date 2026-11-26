@@ -13,6 +13,17 @@ export interface PropForRefs {
   propId: string
   name: string
   imageUrl: string | null
+  /** 소품 모습(m1126 A3) — 씬의 이야기 속 때와 같은 모습 중 그림이 있는 첫 것(만든 순서)이 기본 그림 대신 쓰인다(배경 모습과 같다). */
+  appearances?: Array<{ appearanceKey: string; narrativeTime: string | null; imageUrl: string | null }>
+}
+
+/** 그 씬(이야기 속 때)에서 이 소품의 그림 — 같은 때의 모습 중 그림이 있는 첫 것, 없으면 기본 그림(m1126 A3). */
+function imageForScene(prop: PropForRefs, narrativeTime: string | null | undefined): string | null {
+  if (narrativeTime) {
+    const variant = (prop.appearances ?? []).find((a) => a.narrativeTime === narrativeTime && typeof a.imageUrl === 'string' && !!a.imageUrl.trim())
+    if (variant) return variant.imageUrl
+  }
+  return prop.imageUrl
 }
 
 export interface ShotPropRef {
@@ -49,20 +60,20 @@ function placementPosition(staticSpec: unknown, prop: PropForRefs): string | nul
   return null
 }
 
-/** 한 샷에 나오는 소품(그림 있는 것) — 소품 칸에 적힌 순서, 같은 소품은 한 번. */
-function propsInShot(staticSpec: unknown, props: readonly PropForRefs[]): ShotPropRef[] {
+/** 한 샷에 나오는 소품(그림 있는 것) — 소품 칸에 적힌 순서, 같은 소품은 한 번. 그림은 씬의 이야기 속 때에 맞는 모습(m1126 A3). */
+function propsInShot(staticSpec: unknown, props: readonly PropForRefs[], narrativeTime?: string | null): ShotPropRef[] {
   const out: ShotPropRef[] = []
   for (const value of placementValues((staticSpec as { prop_placement?: unknown } | null)?.prop_placement)) {
-    const prop = props.find((candidate) => candidate.imageUrl && propPlacementMatches(candidate, value))
+    const prop = props.find((candidate) => imageForScene(candidate, narrativeTime) && propPlacementMatches(candidate, value))
     if (!prop || out.some((ref) => ref.propId === prop.propId)) continue
-    out.push({ propId: prop.propId, name: prop.name, url: prop.imageUrl as string, position: placementPosition(staticSpec, prop) })
+    out.push({ propId: prop.propId, name: prop.name, url: imageForScene(prop, narrativeTime) as string, position: placementPosition(staticSpec, prop) })
   }
   return out
 }
 
-/** 실사 한 장(한 샷)의 소품 참고 — 최대 limit 장. */
-export function planShotPropRefs(staticSpec: unknown, props: readonly PropForRefs[], limit = SHOT_PROP_REF_LIMIT): ShotPropRef[] {
-  return propsInShot(staticSpec, props).slice(0, Math.max(0, limit))
+/** 실사 한 장(한 샷)의 소품 참고 — 최대 limit 장. narrativeTime = 그 샷 씬의 이야기 속 때(소품 모습 고르기). */
+export function planShotPropRefs(staticSpec: unknown, props: readonly PropForRefs[], limit = SHOT_PROP_REF_LIMIT, narrativeTime?: string | null): ShotPropRef[] {
+  return propsInShot(staticSpec, props, narrativeTime).slice(0, Math.max(0, limit))
 }
 
 /**
@@ -73,8 +84,10 @@ export function planSheetPropRefs(
   staticSpecs: readonly unknown[],
   props: readonly PropForRefs[],
   limit = SHEET_PROP_REF_LIMIT,
+  /** 시트 씬의 이야기 속 때(시트 한 장 = 한 씬) — 소품 모습 고르기(m1126 A3). */
+  narrativeTime?: string | null,
 ): { refs: ShotPropRef[]; columnProps: ShotPropRef[][] } {
-  const perColumn = staticSpecs.map((spec) => propsInShot(spec, props))
+  const perColumn = staticSpecs.map((spec) => propsInShot(spec, props, narrativeTime))
   const tally = new Map<string, { ref: ShotPropRef; columns: number; first: number }>()
   perColumn.forEach((column, index) => {
     for (const ref of column) {

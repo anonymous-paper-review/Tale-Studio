@@ -1115,6 +1115,11 @@ export const KO: Record<string, string> = {
   'Background description (what changes from the default)': '배경 설명 (기본 모습과 달라지는 점)',
   'E.g. the same market, but burned out and abandoned under snow': '예: 같은 시장인데 불타 버려진 채 눈에 덮인 모습',
   'Saving creates the tab and generates its image right away, using the default background as the reference.': '저장하면 탭이 생기고 기본 배경을 참조해 이미지를 바로 만들어요.',
+  // 소품 모습 추가(m1126 A3) — 배경 모습 창과 같은 결.
+  'E.g. Broken, Rusty, Opened': '예: 부러진, 녹슨, 열린',
+  'Prop description (what changes from the default)': '소품 설명 (기본 모습과 달라지는 점)',
+  'E.g. the same sword, but snapped in half and rusted': '예: 같은 칼인데 두 동강 나고 녹슨 모습',
+  'Saving creates the tab and draws its image right away, using the default prop image as the reference.': '저장하면 탭이 생기고 기본 소품 그림을 참조해 그림을 바로 그려요.',
   'A new appearance tab is added to the background. The default background stays as it is.': '배경에 새 모습 탭이 생겨요. 기본 배경은 그대로예요.',
   'Its image is generated right away using the default background as the reference (generation cost).': '기본 배경을 참조해 이미지를 바로 만들어요(생성 비용).',
   // 숫자 싱크(약속 D, 2026-09-04)

@@ -35,17 +35,21 @@ export function planPropImageSubmit(input: {
   templateUrl?: string | null
   /** 실사 그림체(기준 그림 없는 실사)의 사진 글(resolvePhotoLook, 리드 R2) — 그림체 기준 그림이 있으면 쓰지 않는다. */
   photoLook?: { key?: string; clause: string | null } | null
+  /** 소품 모습 그림(m1126 A3)일 때 같은 물건의 기본 모습 그림(props.image_url) — 참고 그림 마지막 장. */
+  identityUrl?: string | null
 }): PropImagePlan {
   const modelKey = input.model ?? DEFAULT_WORLD_IMAGE_MODEL
   const textRule = input.textRule ?? PROP_TEXT_RULE
   const templateUrl = input.templateUrl?.trim() || null
-  const prompt = buildPropImagePrompt({ ...input, textRule, sheet: !!templateUrl, photoLook: input.anchor ? null : (input.photoLook ?? null) })
+  const identityUrl = input.identityUrl?.trim() || null
+  const prompt = buildPropImagePrompt({ ...input, textRule, sheet: !!templateUrl, photoLook: input.anchor ? null : (input.photoLook ?? null), hasDefaultLook: !!identityUrl })
+  const references = [...(templateUrl ? [templateUrl] : []), ...(identityUrl ? [identityUrl] : [])]
   const withoutReference = !input.anchor && input.styleWithoutReference
   const base: AnchorableSubmit = {
     prompt: withoutReference && textRule === 'none' && !templateUrl ? `${prompt}\n${FACET_NO_TEXT}` : prompt,
     aspect_ratio: PROP_IMAGE_ASPECT,
     ...(withoutReference ? { image_size: imageSizeForAspect(PROP_IMAGE_ASPECT) } : {}),
-    ...(templateUrl ? { reference_image_urls: [templateUrl] } : {}),
+    ...(references.length ? { reference_image_urls: references } : {}),
   }
   // 양식이 있으면 인물 시트와 같은 그림체 절(turnaround — 기준 그림 뒤 둘째 장이 양식, 전면 글자 금지는 칸 이름 때문에 싣지 않음).
   //   양식이 없으면 예전 그대로 — 글씨 스위치를 켜면 그림체 줄의 전면 글자 금지도 빼야 설명의 글씨가 남는다(첫 시험: 펼친 편지가 빈 종이로 나옴).

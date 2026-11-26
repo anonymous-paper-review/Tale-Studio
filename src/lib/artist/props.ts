@@ -2,7 +2,7 @@
 //   소품 = props 행 — 어디서 왔든(출처는 prop-source.ts, 지금은 [만들기] 때 AI 가 이야기에서 고른 것 + Producer 사물 · 오너 E5) 같은 규칙으로 읽는다. 출처 칸으로 거르지 않는다.
 //   어느 씬 · 샷에 나오는지: 씬 등장 목록(scenes.characters_present)에 그 id, 샷 소품 칸(static_spec.prop_placement[].prop)에 그 id 나 이름.
 //   서버(실사 참고 그림)와 화면(카드)이 같은 규칙을 쓴다 — 서버 전용 의존성 금지. 약속: tests/artist/prop-cards.test.ts
-import type { PropAsset } from '@/types/asset'
+import type { NarrativeTime, PropAppearance, PropAsset } from '@/types/asset'
 
 /** props 표 행(필요한 칸만). */
 export interface PropRow {
@@ -17,8 +17,53 @@ export interface PropRow {
 
 const ORIGINS = new Set<PropAsset['origin']>(['producer', 'writer', 'user'])
 
-/** props 행 → 소품 카드. 같은 id 가 인물 행(characters)에도 있으면 뺀다 — 예전 저장 고장으로 둘 다 있는 프로젝트에서 카드가 둘이 되지 않게. */
-export function propAssetsFromRows(rows: readonly PropRow[], personIds: ReadonlySet<string>): PropAsset[] {
+/** prop_appearances 표 행(필요한 칸만, m1126 A3). */
+export interface PropAppearanceRow {
+  prop_id: string
+  appearance_key: string
+  label: string
+  narrative_time: string | null
+  appearance: string | null
+  appearance_native: string | null
+  image_url: string | null
+  source_hash: string | null
+}
+
+/** 소품 기본 모습의 열쇠 — props 행 자체(배경 DEFAULT_LOCATION_APPEARANCE_KEY 와 같은 값). */
+export const DEFAULT_PROP_APPEARANCE_KEY = 'default'
+
+/** 그리는 중 · 실패 · 내용 검사 표시의 칸 열쇠 — 기본 모습은 소품 id 그대로(예전 표시와 같다), 다른 모습은 id + 모습 열쇠. */
+export function propSlotKey(propId: string, appearanceKey?: string | null): string {
+  return appearanceKey && appearanceKey !== DEFAULT_PROP_APPEARANCE_KEY ? `${propId}\u0000${appearanceKey}` : propId
+}
+
+const NARRATIVE_TIMES = new Set<NarrativeTime>(['past', 'present', 'future'])
+
+/** prop_appearances 행 → 소품마다 모습 목록(들어온 순서 = 만든 순서). 빈 열쇠 · 'default' 열쇠 행은 버린다. */
+export function propAppearancesByProp(rows: readonly PropAppearanceRow[]): Map<string, PropAppearance[]> {
+  const out = new Map<string, PropAppearance[]>()
+  for (const row of rows) {
+    if (!row.prop_id?.trim() || !row.appearance_key?.trim() || row.appearance_key === DEFAULT_PROP_APPEARANCE_KEY) continue
+    const appearance = row.appearance ?? ''
+    const list = out.get(row.prop_id) ?? []
+    list.push({
+      appearanceKey: row.appearance_key,
+      label: row.label,
+      narrativeTime: NARRATIVE_TIMES.has(row.narrative_time as NarrativeTime) ? (row.narrative_time as NarrativeTime) : null,
+      appearance,
+      appearanceNative: row.appearance_native?.trim() ? row.appearance_native : appearance,
+      imageUrl: row.image_url?.trim() ? row.image_url : null,
+      sourceHash: row.source_hash ?? null,
+    })
+    out.set(row.prop_id, list)
+  }
+  return out
+}
+
+/** props 행 → 소품 카드. 같은 id 가 인물 행(characters)에도 있으면 뺀다 — 예전 저장 고장으로 둘 다 있는 프로젝트에서 카드가 둘이 되지 않게.
+ *  appearanceRows 를 주면(모습 표를 읽었으면) 카드마다 모습 목록을 붙인다 — 못 읽었으면 빈 목록(m1126 A3). */
+export function propAssetsFromRows(rows: readonly PropRow[], personIds: ReadonlySet<string>, appearanceRows?: readonly PropAppearanceRow[] | null): PropAsset[] {
+  const byProp = appearanceRows === undefined ? null : propAppearancesByProp(appearanceRows ?? [])
   return rows
     .filter((row) => row.prop_id?.trim() && !personIds.has(row.prop_id))
     .map((row) => {
@@ -31,6 +76,7 @@ export function propAssetsFromRows(rows: readonly PropRow[], personIds: Readonly
         imageUrl: row.image_url?.trim() ? row.image_url : null,
         sourceHash: row.source_hash ?? null,
         origin: ORIGINS.has(row.origin as PropAsset['origin']) ? (row.origin as PropAsset['origin']) : 'writer',
+        ...(byProp ? { appearances: byProp.get(row.prop_id) ?? [] } : {}),
       }
     })
 }

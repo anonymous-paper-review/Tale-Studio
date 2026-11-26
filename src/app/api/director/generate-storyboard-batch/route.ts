@@ -373,11 +373,15 @@ export async function POST(req: NextRequest) {
     const sceneIds = [...new Set(planned.map((g) => g[0].scene_id))]
     const { data: sceneRows } = await supabaseAdmin
       .from('scenes')
-      .select('scene_id, time_of_day')
+      .select('scene_id, time_of_day, narrative_time')
       .eq('project_id', projectId)
       .in('scene_id', sceneIds)
     const todByScene = new Map(
       (sceneRows ?? []).map((s) => [s.scene_id as string, ((s.time_of_day as string) ?? '').trim()]),
+    )
+    // 소품 모습(m1126 A3) — 시트 씬의 이야기 속 때로 그 때의 모습 그림을 고른다(배경 모습과 같다).
+    const narrativeTimeByScene = new Map(
+      (sceneRows ?? []).map((s) => [s.scene_id as string, typeof s.narrative_time === 'string' ? (s.narrative_time as string) : null]),
     )
     // #asset-authority(2026-09-02 오너 실측 bd5da55f: 떨어져 있던 바위가 샷 사이에서 합쳐짐): 그리드는
     //   지금까지 배경 레퍼런스를 아예 안 실었다(감사 W1). 씬 로케이션의 wide_shot 을 시트마다 첨부해
@@ -468,7 +472,7 @@ export async function POST(req: NextRequest) {
       // 소품(D7 2단계 · 리드 R1 — 그림체 길 · 실사 사진 길 모두): 칸마다 그 칸에 나오는 소품 — 한 장에 3장까지, 나오는 칸이 많은 것 먼저.
       //   인물 · 배경 · 앞 화 장면 뒤, 화풍 앞(실사 사진 길은 화풍이 없다). 참고 그림 상한을 넘으면 소품부터 뺀다.
       //   소품 줄은 지시문 맨 끝 — 그 앞 글자는 소품이 없을 때와 같다. 소품이 없는 시트는 한 글자도 바뀌지 않는다.
-      const sheetProps = planSheetPropRefs(group.map((s) => s.staticSpec), projectProps)
+      const sheetProps = planSheetPropRefs(group.map((s) => s.staticSpec), projectProps, undefined, narrativeTimeByScene.get(group[0].scene_id) ?? null)
       const otherRefCount = 1 + groupRefs.length + (worldRef ? 1 : 0) + (seriesFrameUrl ? 1 : 0) + (anchor ? (anchorTwoRef ? 2 : 1) : 0)
       const propRefs = sheetProps.refs.slice(0, propRefRoom(otherRefCount))
       const keptProps = new Set(propRefs.map((ref) => ref.propId))

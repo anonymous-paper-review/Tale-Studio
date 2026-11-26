@@ -25,6 +25,7 @@ import { planPropImageSubmit } from '@/lib/artist/prop-image-plan'
 import { PROP_SHEET_FILE } from '@/lib/artist/prop-sheet-template'
 import { templateAssetUrl } from '@/lib/storage/template-asset'
 import { hasQueuedPropImageJob, listFailedPropImageJobs, loadPropDrawingContext, submitPropImageJob } from '@/lib/artist/prop-jobs'
+import { DEFAULT_PROP_APPEARANCE_KEY } from '@/lib/artist/props'
 
 export const runtime = 'nodejs'
 export const maxDuration = 60
@@ -41,9 +42,13 @@ export async function POST(req: Request) {
       instruction?: unknown
       safeMode?: unknown
       traceId?: unknown
+      appearanceKey?: unknown
     }
     const projectId = typeof body.projectId === 'string' ? body.projectId : ''
     const propId = typeof body.propId === 'string' ? body.propId.trim() : ''
+    // 소품 모습(m1126 A3) — 열쇠가 없거나 'default' 면 기본 그림(props 행).
+    const rawKey = typeof body.appearanceKey === 'string' ? body.appearanceKey.trim() : ''
+    const appearanceKey = rawKey && rawKey !== DEFAULT_PROP_APPEARANCE_KEY ? rawKey : null
     if (!projectId || !propId) {
       return NextResponse.json({ error: 'Invalid request: projectId, propId required' }, { status: 400 })
     }
@@ -63,22 +68,23 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: 'Invalid request: traceId does not belong to project' }, { status: 409 })
     }
 
-    const { prop, project, personClash } = await loadPropDrawingContext(projectId, propId)
+    const { prop, project, personClash, appearance: variant, appearanceMissing } = await loadPropDrawingContext(projectId, propId, appearanceKey)
     if (!prop || !project) return NextResponse.json({ error: 'Prop not found' }, { status: 404 })
     if (personClash) return NextResponse.json({ error: 'Ambiguous character entity' }, { status: 409 })
+    if (appearanceKey && (appearanceMissing || !variant)) return NextResponse.json({ error: 'Prop appearance not found' }, { status: 404 })
 
-    // 겹친 요청 — 같은 소품을 그리는 중이면 그 작업을 기다린다.
-    if (await hasQueuedPropImageJob(projectId, propId)) {
-      return NextResponse.json({ ok: true, status: 'queued', deduped: true, propId })
+    // 겹친 요청 — 같은 소품(의 같은 모습)을 그리는 중이면 그 작업을 기다린다.
+    if (await hasQueuedPropImageJob(projectId, propId, appearanceKey)) {
+      return NextResponse.json({ ok: true, status: 'queued', deduped: true, propId, ...(appearanceKey ? { appearanceKey } : {}) })
     }
     // 저절로 그리기는 빈칸만 채운다 — 화면이 모르는 사이 다 그려진 소품을 또 그리지 않는다.
-    if (auto && prop.image_url) {
+    if (auto && (variant ? variant.image_url : prop.image_url)) {
       return NextResponse.json({ ok: true, skipped: true, reason: 'exists', propId })
     }
     // 순화 재시도(약속 B9 과 같다) — 최근 실패가 정책 거절일 때만 순화 문구를 붙이고, 사람이 누른 우회는 상한을 둔다.
     let safeMode = false
     if (body.safeMode === true) {
-      const slot = (await listFailedPropImageJobs(projectId)).find((failure) => failure.propId === propId)
+      const slot = (await listFailedPropImageJobs(projectId)).find((failure) => failure.propId === propId && (failure.appearanceKey ?? null) === appearanceKey)
       if (slot) {
         if (!auto && slot.safeFailCount >= SAFE_RETRY_CAP) {
           return NextResponse.json({ ok: true, skipped: true, reason: 'capped', safeFailCount: slot.safeFailCount })
@@ -88,7 +94,7 @@ export async function POST(req: Request) {
     }
     // 저절로 그리기는 같은 소품 실패가 상한(배경과 같은 수)에 닿으면 멈춘다 — 끝없는 재시도 · 비용 차단. 사람의 다시 그리기는 통과.
     if (auto) {
-      const failed = await countFailedJobsForTarget(projectId, 'prop_image', { propId })
+      const failed = await countFailedJobsForTarget(projectId, 'prop_image', appearanceKey ? { propId, appearanceKey } : { propId })
       if (failed >= AUTO_GENERATION_GIVE_UP_THRESHOLD) {
         return NextResponse.json({ ok: true, skipped: true, reason: 'gave_up', failed })
       }
@@ -103,17 +109,29 @@ export async function POST(req: Request) {
     }
     const anchor = await resolveStyleAnchor(project as Parameters<typeof resolveStyleAnchor>[0])
     const styleWithoutReference = !anchor && (await styleDrawsWithoutReference(project as Parameters<typeof styleDrawsWithoutReference>[0]))
-    const appearance = prop.appearance ?? ''
+    // 모습 그림은 그 모습의 설명으로 그리고, 기본 그림을 같은 물건의 참고로 붙인다(배경 모습이 기본 배경을 참조하는 것과 같다).
+    const appearance = (variant ? variant.appearance || variant.appearance_native : prop.appearance) ?? ''
     // 소품 양식(m1126 A2) — 인물 시트 양식처럼 스토리지에 올린 주소를 첫 참고 그림으로(template-asset.ts). 못 올리면 양식 없이 그린다.
     const templateUrl = await templateAssetUrl(PROP_SHEET_FILE)
     // 실사 그림체(기준 그림 없는 실사)만 사진 글(리드 R2) — 인물 시트 · 배경과 같은 길. 그림체 기준 그림이 있으면 묻지 않는다.
     const photoLook = anchor ? null : await resolvePhotoLook(project as Parameters<typeof resolvePhotoLook>[0])
-    const plan = planPropImageSubmit({ name: prop.name, appearance, instruction, safeMode, anchor, styleWithoutReference, model, templateUrl, photoLook })
+    const plan = planPropImageSubmit({
+      name: prop.name,
+      appearance,
+      instruction,
+      safeMode,
+      anchor,
+      styleWithoutReference,
+      model,
+      templateUrl,
+      photoLook,
+      identityUrl: variant ? prop.image_url : null,
+    })
 
     // 사용자가 쓴 칸(이름 · 생김새 · 바꿀 점)만 검사한다 — 우리 고정 문구 · 그림체 절은 보내지 않는다.
     let moderation
     try {
-      moderation = await assertUserTextAllowed([prop.name, appearance, instruction], { projectId, kind: 'prop_image', userId: access.userId })
+      moderation = await assertUserTextAllowed(variant ? [prop.name, variant.label, appearance, instruction] : [prop.name, appearance, instruction], { projectId, kind: 'prop_image', userId: access.userId })
     } catch (e) {
       // 걸린 소품의 이름을 싣는다(main 2026-11-25 인물 · 배경과 같다) — 거절은 작업 기록이 없어 화면이 이 이름으로만 어느 소품인지 안다.
       const rejected = moderationRejectionResponse(e, {
@@ -131,6 +149,7 @@ export async function POST(req: Request) {
       job = await submitPropImageJob({
         projectId,
         propId,
+        ...(appearanceKey ? { appearanceKey } : {}),
         plan,
         stamp: propImageStamp(appearance, styleIdOf(project as { style_anchor_key?: string | null; custom_style_anchor?: unknown })),
         actor: jobActor,

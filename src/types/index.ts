@@ -1,7 +1,7 @@
 export type { StageId, StageConfig, Project, ProjectSettings, ProjectFormat } from './project'
 export { aspectRatioFromFormat } from './project'
 export type { Scene, Character, Location, SceneManifest } from './scene'
-export type { CharacterView, CharacterAppearance, CharacterAsset, PropAsset, WorldAsset } from './asset'
+export type { CharacterView, CharacterAppearance, CharacterAsset, PropAppearance, PropAsset, WorldAsset } from './asset'
 export type {
   ShotType,
   GenerationMethod,

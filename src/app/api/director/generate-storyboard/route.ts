@@ -188,9 +188,8 @@ export async function POST(req: Request) {
       : undefined
     // 소품 참고(D7 2단계, 2026-11-22 · m1126 리드 R1 — 그림체 길 · 실사 사진 길 모두) — 그 샷 소품 칸에 나오는 소품의 그림(한 샷 2장까지).
     //   소품 그림을 못 읽으면 소품 없이 그린다(지금과 같다). 소품이 없는 샷은 참고 그림 · 지시문이 한 글자도 바뀌지 않는다.
-    const shotPropPlan: ShotPropRef[] = shot
-      ? planShotPropRefs((shot as { static_spec?: unknown }).static_spec, await loadPropsForReferences(projectId).catch(() => []))
-      : []
+    //   소품 모습(m1126 A3)은 씬의 이야기 속 때로 고른다 — 씬을 읽는 스트립 길에서 계획을 세운다.
+    const projectProps = shot ? await loadPropsForReferences(projectId).catch(() => []) : []
     let propRefs: ShotPropRef[] = []
 
     // #u17-2(2026-08-31 오너 지시): 수동 샷(shots.prompt=NULL)의 한국어 액션 원문 유출 방어 —
@@ -285,15 +284,20 @@ export async function POST(req: Request) {
     if (stripFrames) {
       // #F-006: 씬 시간대를 스트립 리페인트에 배선 — 샷 산문의 시간대 단어는 확률적이라(실측
       //   1e166e55 sc_04: 7샷 중 4샷에만 존재) scenes.time_of_day 진실로 고정한다.
+      let sceneNarrativeTime: string | null = null
       if (shotMeta?.scene_id) {
         const { data: scene } = await supabaseAdmin
           .from('scenes')
-          .select('time_of_day')
+          .select('time_of_day, narrative_time')
           .eq('project_id', projectId)
           .eq('scene_id', shotMeta.scene_id)
           .maybeSingle()
         sceneLighting = photoLook ? englishTimeOfDay(scene?.time_of_day as string | null) : (((scene?.time_of_day as string) ?? '').trim() || null)
+        sceneNarrativeTime = typeof scene?.narrative_time === 'string' ? (scene.narrative_time as string) : null
       }
+      const shotPropPlan: ShotPropRef[] = shot
+        ? planShotPropRefs((shot as { static_spec?: unknown }).static_spec, projectProps, undefined, sceneNarrativeTime)
+        : []
       // 합성 스트립 업로드 — 결정적 경로 upsert (재생성마다 교체, 잔재 누적 없음).
       //   #sheet-formats: 시트는 프레임 AR 로 선택되고(레거시 가로 프레임 → 레거시 적층 시트),
       //   반환 지오메트리가 캔버스·프롬프트 축·finalize 크롭의 공통 진실이 된다.
