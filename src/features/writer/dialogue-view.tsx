@@ -11,6 +11,7 @@
 //   샷마다 붙은 연필 단추가 여는 샷 고치기 팝업에서 한다(팝업은 러프 보드가 그린다 — 연 샷 id 만 board-ui-store 로 넘긴다).
 //   샷 번호는 보드 카드와 같은 전체 번호(boardShots)다.
 //   v3(2026-11-03 오너 "v3로 적용"): 화면 머리 · 알약 탭은 러프 보드와 같고, 인물 칩은 32px 알약, 씬마다 큰 내용 판(panel). 동작은 그대로.
+//   D9(오너 2026-11-22, G3 2026-11-26): 샷 줄(스토리 · 대사 줄)을 ⌘/Ctrl+클릭하면 고치기 대신 채팅에 "@샷 N", 씬 이름은 "@씬 N"(lib/writer/conti-mention, 보드 카드와 같은 이름).
 
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { Loader2, MessageSquareText, Pencil, RefreshCw } from 'lucide-react'
@@ -28,6 +29,7 @@ import { cn } from '@/lib/utils'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { boardShots } from '@/lib/writer/board-summary'
+import { contiMentionLabels, mentionOnModifierClick, stopModifierPointerDown } from '@/lib/writer/conti-mention'
 import { commitLineEdit, revertLineEdit } from '@/lib/writer/dialogue-line-edit'
 import { manifestEntities, resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import type { DialogueLine, Shot } from '@/types'
@@ -167,6 +169,9 @@ export function DialogueView() {
   })
 
   // 보드 카드와 같은 전체 샷 번호(#shot-global-no) — 씬마다 1부터 다시 세지 않는다.
+  // ⌘/Ctrl+클릭 멘션 이름(D9) — 보드 카드 · 채팅 @ 고르기 목록과 같은 이름.
+  const mentionLabels = useMemo(() => contiMentionLabels(sceneManifest, shots, locale), [sceneManifest, shots, locale])
+
   const shotNoById = useMemo(
     () => new Map(boardShots(sceneManifest, shots).map((entry) => [entry.shot.shotId, entry.shotNo])),
     [sceneManifest, shots],
@@ -359,7 +364,11 @@ export function DialogueView() {
               const sceneShots = shotsByScene.get(scene.sceneId) ?? []
               return (
                 <section key={scene.sceneId} className="rounded-xl bg-panel px-5 py-4">
-                  <h3 className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5">
+                  <h3
+                    className="mb-3 flex flex-wrap items-baseline gap-x-2.5 gap-y-0.5"
+                    onPointerDownCapture={stopModifierPointerDown}
+                    onClickCapture={(e) => mentionOnModifierClick(e, mentionLabels.scenes.get(scene.sceneId))}
+                  >
                     <span className="font-num text-micro font-semibold text-foreground">{sceneName(locale, sceneIdx + 1)}</span>
                     <span className="text-body font-semibold text-foreground">
                       {resolveEntityNames(scene.location, entityNames)}
@@ -372,7 +381,14 @@ export function DialogueView() {
                       const shotNo = shotNoById.get(shot.shotId) ?? shotIdx + 1
                       const editShotLabel = t('Open the editor for shot {shot}', { shot: shotNo })
                       return (
-                        <div key={shot.shotId} data-shot-id={shot.shotId} className="group -mx-2 rounded-md px-2 py-1">
+                        <div
+                          key={shot.shotId}
+                          data-shot-id={shot.shotId}
+                          className="group -mx-2 rounded-md px-2 py-1"
+                          // ⌘/Ctrl+클릭은 스토리 · 대사 줄 어디서나 그 샷을 채팅에 붙인다(D9) — 고치기 칸 · 연필 창은 열지 않는다.
+                          onPointerDownCapture={stopModifierPointerDown}
+                          onClickCapture={(e) => mentionOnModifierClick(e, mentionLabels.shots.get(shot.shotId))}
+                        >
                           {/* 글자 크기는 트리트먼트와 통일(#c5), 본문은 흰색(#c2 2026-08-03) —
                               muted 회색은 대본이 부차 정보처럼 읽혔다. 라벨(샷 N · Shot N)만 muted 유지.
                               스토리는 러프에 그려지므로 여기서 고치지 않는다 — 연필 단추가 샷 고치기 창을 연다(프로토타입 대본 보기의 ✎). */}

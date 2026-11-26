@@ -742,23 +742,23 @@ export const KO: Record<string, string> = {
   'A location has been selected.': '추가할 위치가 선택됐어요.',
   'Choose where to add it on the left.': '왼쪽에서 추가할 위치를 골라주세요.',
   // ── writer 스테이지: rough-storyboard-view ──
-  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nLet me know which scene or shot you\'d like to revise or add.\nPress "@" to pick a scene or shot (Ctrl+click a card does the same).': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
-  'The rough storyboard is all ready. Ready to move to Artist and work out character and background concepts?': '러프 스토리보드가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nLet me know which scene or shot you\'d like to revise or add.\nPress "@" to pick a scene or shot (Ctrl+click a card does the same).': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
+  'The rough storyboard is all ready. Ready to move to Artist and work out character and background concepts?': '콘티가 모두 준비됐어요. Artist로 넘어가 캐릭터·배경 컨셉을 잡아볼까요?',
   '{count} panels stopped auto-generating after repeated failures. Use "Retry" on the card to regenerate them.': '패널 {count}개는 반복 실패로 자동 생성을 멈췄어요. 카드의 "다시 시도"로 재생성할 수 있어요.',
   'Generation failed': '생성 실패',
-  'Rough storyboard generation request failed': '러프 스토리보드 생성 요청 실패',
-  'Rough storyboard: click a card to review, edit, or regenerate; click a scene name to collapse it': '러프 스토리보드: 카드를 클릭하면 확인·수정·재생성, 씬 이름을 클릭하면 접을 수 있어요',
+  'Rough storyboard generation request failed': '콘티 생성 요청 실패',
+  'Rough storyboard: click a card to review, edit, or regenerate; click a scene name to collapse it': '콘티: 카드를 클릭하면 확인·수정·재생성, 씬 이름을 클릭하면 접을 수 있어요',
   'Zoom out (more columns)': '축소 (열 늘리기)',
   'Rough board zoom': '러프보드 축척',
   'Storyboard zoom': '스토리보드 축척',
   'Zoom in (fewer columns)': '확대 (열 줄이기)',
   'Back to the default size': '기본 크기로',
   'Storyboard board': '스토리보드 보드',
-  'Rough storyboard board': '러프 스토리보드 보드',
-  'Generating rough storyboard': '러프 스토리보드 생성 중',
+  'Rough storyboard board': '콘티 보드',
+  'Generating rough storyboard': '콘티 생성 중',
   '{count} panels generating': '패널 {count}개 생성 중',
   'Board total: {count} shots': '보드 전체 {count}샷',
-  'Rough storyboard progress': '러프 스토리보드 진행 현황',
+  'Rough storyboard progress': '콘티 진행 현황',
   'Confirming the previous rough request. It will not be submitted again.': '앞선 러프 요청의 접수 여부를 확인 중이에요. 같은 요청을 다시 보내지 않아요.',
   'Unseen completions: {count}': '아직 확인하지 않은 완료 {count}개',
   'Back to Projects': '프로젝트 목록으로',
@@ -965,6 +965,8 @@ export const KO: Record<string, string> = {
   '…and {count} more': '…외 {count}건',
   'This is a shared preview, so chat is turned off. In the real Producer stage, you shape the story, characters and tone together here.':
     '지금은 공유 미리보기라 실제 대화는 비활성이에요. 실제 프로듀서 단계에선 여기서 스토리·캐릭터·톤을 함께 정리해요.',
+  'This is a shared preview. In the real project, you turn the rough sketches into real images with Start here, and fix each real card through the chat.':
+    '공유 미리보기 모드예요. 실제로는 여기서 [시작]으로 콘티 그림을 실사 그림으로 바꾸고, 실사 카드는 채팅으로 고쳐요.',
   'This is a shared preview. In the real project, you review and edit the scene structure and rough storyboard here.':
     '공유 미리보기 모드예요. 실제로는 여기서 씬 구조와 러프 스토리보드를 검토·수정해요.',
   'This is a shared preview. In the real project, you create and refine character and world cards here.':
@@ -1207,9 +1209,9 @@ export const KO: Record<string, string> = {
   'MiniMax · exact sizes, up to 16 references': 'MiniMax · 정확한 크기, 참조 최대 16장',
   // #ref-gate: 생성 선행조건(인물 시트·러프·실사 스토리보드) 대기·자동 재개 안내
   'character sheets for {names}': '{names}의 인물 시트', // copy-ok: fragment
-  'the rough storyboard of {shot}': '{shot}의 러프 스토리보드', // copy-ok: fragment
+  'the rough storyboard of {shot}': '{shot}의 콘티', // copy-ok: fragment
   'the live-action storyboard of {shot}': '{shot}의 실사 스토리보드', // copy-ok: fragment
-  'rough storyboards for {count} shots': '{count}개 샷의 러프 스토리보드', // copy-ok: fragment
+  'rough storyboards for {count} shots': '{count}개 샷의 콘티', // copy-ok: fragment
   'Waiting for {what}. Generation resumes automatically when it is ready.':
     '{what}을(를) 기다리는 중입니다. 준비되면 자동으로 이어서 생성합니다.',
   '{what} ready. Resuming generation.': '{what} 준비됨. 생성을 이어갑니다.',
@@ -1645,7 +1647,7 @@ export const KO: Record<string, string> = {
   'Please try again. If it keeps happening, try tweaking the description a bit.': '다시 시도해 주세요. 반복되면 묘사를 조금 바꿔 보세요.',
   "{label} auto-generation stopped. Repeated failures triggered a cost-protection pause on automatic retries. Click generate again on the card (manual requests aren't limited).": '{label} 자동 생성을 멈췄어요. 연속으로 실패해서 비용 보호를 위해 자동 재시도를 중단했어요. 카드에서 다시 생성을 눌러 주세요 (수동 요청은 이 제한을 받지 않아요).',
   // ── misc: pipeline-progress.ts ──
-  '{agent} is drawing the rough storyboard': '{agent}가 러프 스토리보드를 그리고 있습니다',
+  '{agent} is drawing the rough storyboard': '{agent}가 콘티를 그리고 있습니다',
   '{agent} is generating character and background images': '{agent}가 캐릭터·배경 이미지를 생성하고 있습니다',
   '{agent} is generating images': '{agent}가 이미지를 생성하고 있습니다',
   '{agent} is generating shooting-ready images': '{agent}가 촬영용 이미지를 생성하고 있습니다',
@@ -3140,12 +3142,9 @@ export const KO: Record<string, string> = {
   'Redraw': '다시 그리기',
   'Could not save the changes. Please try again.': '고친 내용을 저장하지 못했어요. 다시 시도해 주세요.',
   'Drawing the rough': '러프를 그리고 있어요',
-  'Saving the changes': '고친 내용 저장',
-  'Redrawing the rough of this shot': '이 샷의 러프 다시 그리기',
-  'Redrawing the directing frame': '연출 그림 다시 그리기',
-  'Redrew the rough of this shot with your changes.': '고친 내용으로 이 샷의 러프를 다시 그렸어요.',
-  'This shot is still being drawn. Try again in a moment.': '이 샷을 아직 그리는 중이에요. 잠시 뒤 다시 눌러 주세요.',
-  'There is nothing to draw yet. Write the story of this shot first.': '아직 그릴 내용이 없어요. 이 샷의 스토리를 먼저 써 주세요.',
+  // W5(오너 2026-11-26): 고치기 창은 그리기를 맡기고 닫힌다 — 그리는 동안은 그 카드에만 기다림.
+  'Redrawing the rough of this shot. The card updates when it is done.': '이 샷의 러프를 다시 그려요. 다 그리면 카드가 바뀌어요.',
+  'This shot is being drawn. You can redraw it once it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 다시 그릴 수 있어요.',
   'Designing the characters and backgrounds stopped. Continue with Resume at the top first.': '인물 · 배경 디자인이 멈췄어요. 먼저 위의 [이어서 재시도]로 이어 가 주세요.',
   'Redrew the directing frame. The other two are unchanged.': '연출 그림을 다시 그렸어요. 나머지 두 장은 그대로예요.',
   'Storyboard opens. Scenes, shots and roughs that are still being made continue there.': 'Storyboard 가 열려요. 아직 만드는 씬 · 샷 · 러프는 거기서 이어서 만들어요.',
@@ -3251,7 +3250,7 @@ export const KO: Record<string, string> = {
   'Rack focus': '랙 포커스',
   'Running time: the sum of the shot lengths': '러닝타임: 샷 길이의 합',
   'Scenes and shots are made when you press Complete in Artist.': 'Artist에서 [완료하기]를 누르면 씬 · 샷을 나눠요.',
-  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
   'Moving to Storyboard': 'Storyboard로 넘어가는 중이에요',
   // O1(오너 2026-11-26): 산문을 확정하면 콘티에서 씬 · 샷을 나눈다 — 그동안의 잠금 제목.
   'Moving to the rough storyboard': '콘티로 넘어가는 중이에요',
@@ -3684,27 +3683,42 @@ export const KO: Record<string, string> = {
   'Some shots have no video yet. Check the list in the window, then hand over the shots with video or make the rest again first.': '아직 영상이 없는 샷이 있어요. 창에서 목록을 보고 영상 있는 샷만 넘기거나, 나머지를 먼저 다시 만들어 주세요.',
   // Storyboard → Director 넘기기 창(D0, 2026-11-14 디자이너 1110 확정 · 페이지 추천)
   'Move on to Director?': 'Director로 넘어갈까요?',
-  'We start by turning the {count} roughs into real images.': '러프 {count}장을 실사 이미지로 바꾸는 것부터 시작해요.',
   'Shots {shots} · {seconds}s · Characters {characters} · Backgrounds {backgrounds} · Roughs {roughs}': '샷 {shots} · {seconds}초 · 인물 {characters} · 배경 {backgrounds} · 러프 {roughs}장',
-  'Rough → {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 {count}장 · 약\u00a0{minutes}분 · Takes 안 써요',
   'The real images are already made': '실사 이미지는 이미 다 있어요',
   'After that': '그다음',
   // 값은 앱의 Take 표기("5 Take")로 — D8 단추와 같게(리드 2026-11-14)
   'Check the images and make the videos · {takes} Takes per shot': '이미지를 확인하고 영상을 만들어요 · 샷마다 {takes} Take',
   'Check the images and make the videos · 1 Take per shot': '이미지를 확인하고 영상을 만들어요 · 샷마다 1 Take',
-  // 저장된 실사를 읽는 중 · 읽기 실패(검토 b 낮음 7), Take 과금이 꺼져 있을 때(낮음 5)
-  'Rough → real images · counting': '러프 → 실사 이미지 · 세는 중',
-  'Rough → up to {count} real images · about {minutes} min · No Takes used': '러프 → 실사 이미지 최대 {count}장 · 약\u00a0{minutes}분 · Takes 안 써요',
-  'Rough → up to {count} real images · about {minutes} min': '러프 → 실사 이미지 최대 {count}장 · 약\u00a0{minutes}분',
-  'Rough → {count} real images · about {minutes} min': '러프 → 실사 이미지 {count}장 · 약\u00a0{minutes}분',
-  'Make images while moving over': '넘어가면서 이미지 만들기',
-  'Make up to {count} images while moving over': '넘어가면서 이미지 최대 {count}장 만들기',
   'Check the images and make the videos': '이미지를 확인하고 영상을 만들어요',
-  'Make {count} images while moving over': '넘어가면서 이미지 {count}장 만들기',
-  'You can look at other screens while you wait. We show the first ones as soon as they are ready and tell you when they are all done.': '기다리는 동안 다른 화면을 봐도 돼요. 첫 장이 나오면 먼저 보여드리고, 다 되면 알려드려요.',
-  'Move over and pick yourself': '넘어가서 직접 고르기',
-  'Choose the shots to make and make them one by one.': '만들 샷을 골라 하나씩 만들어요.',
   'Move over': '넘어가기',
+  // 넘기기 창 다음 줄 — 실사는 Storyboard [시작]이 만든다(오너 2026-11-26 m1126 S2), 남은 것은 Director 에서도.
+  'Real images · counting': '실사 그림 · 세는 중',
+  '1 shot still needs a real image · you can make it in Director too': '실사 그림이 없는 샷 1개 · Director에서도 만들 수 있어요',
+  '{count} shots still need a real image · you can make them in Director too': '실사 그림이 없는 샷 {count}개 · Director에서도 만들 수 있어요',
+  'Up to {count} shots still need a real image · you can make them in Director too': '실사 그림이 없는 샷 최대 {count}개 · Director에서도 만들 수 있어요',
+  // Storyboard 실사 보기(오너 2026-11-26 m1126 S2 · O7) — 처음엔 Writer 콘티 그림, [시작] → 실사. 카드 꼬리표 · 콘티 그림 없음 안내.
+  'Rough sketch': '콘티',
+  'No rough storyboard yet': '콘티 그림이 없어요',
+  'Draw it in Writer, then press Start.': 'Writer 콘티에서 그린 뒤 [시작]을 눌러 주세요.',
+  // [시작] 때 콘티 그림이 없어 빠지는 샷 알림 — 영어는 하나 · 여럿 · 넘침 셋, 한국어는 하나 · 여럿이 같은 꼴.
+  '{shots} has no rough storyboard, so it is left out. Draw it in Writer, then press Start again.': '콘티 그림이 없는 {shots}은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  '{shots} have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots}은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  '{shots} and {count} more have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots} 외 {count}컷은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
+  // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
+  'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
+  'Fix the story, arrows, and dialogue in Writer.': '이야기 · 화살표 · 대사는 Writer 콘티에서 고쳐요.',
+  // 채팅이 실사를 다시 그리라고 했는데 맡기지 못했을 때(채팅 한 줄).
+  "Couldn't find the shot to draw. Ask again with the shot name.": '그릴 샷을 찾지 못했어요. 샷 이름으로 다시 부탁해 주세요.',
+  '{shot} is being drawn right now. Ask again when it is done.': '{shot}은(는) 지금 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',
+  '{shot} has no rough storyboard. Draw it in Writer, then ask again.': '{shot}은(는) 콘티 그림이 없어요. Writer 콘티에서 그린 뒤 다시 부탁해 주세요.',
+  "Couldn't redraw {shot}. Please ask again.": '{shot}을(를) 다시 그리지 못했어요. 다시 부탁해 주세요.',
+  // 보드 진행 줄 · 화면 설명 · 첫 진입 안내.
+  'Storyboard progress': '스토리보드 진행 현황',
+  'Not real yet': '실사 없음',
+  'Storyboard: press Start to turn the rough sketches into real images. To change a card, tell the chat.': '스토리보드: [시작]을 누르면 콘티 그림을 실사 그림으로 바꿔요. 카드를 고치려면 채팅에 말해 주세요.',
+  'The rough sketches are ready. Press Start to turn them into real images.\n\nTo change a card, tell me in the chat (e.g. "@Shot 2 make her look back").':
+    '콘티 그림이 준비됐어요. [시작]을 누르면 실사 그림으로 바꿔요.\n\n카드를 고치려면 채팅에 말해 주세요(예: "@샷 2 뒤를 돌아보게").',
 
   // 2단계 ① 새 배치(시안 E1, 2026-11-14): 효과 컨트롤 · 프로젝트 판 · 소스 탭 · 모니터 단추 · 둘째 줄 · 내보내기 탭 · 단축키 창.
   'Effect controls': '효과 컨트롤',
@@ -3869,9 +3883,9 @@ export const KO: Record<string, string> = {
   'I have concepts ready for the characters and backgrounds: {count} character · {worldCount} backgrounds.\nLet me know which character or background you\'d like to revise.\nPress "@" to pick a character or background (Ctrl+click a card does the same).': '인물과 배경의 컨셉을 준비했어요: 캐릭터 {count}명 · 배경 {worldCount}곳.\n고치고 싶은 인물이나 배경을 알려주세요.\n"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
   'I have concepts ready for the characters and backgrounds: {count} characters · {worldCount} background.\nLet me know which character or background you\'d like to revise.\nPress "@" to pick a character or background (Ctrl+click a card does the same).': '인물과 배경의 컨셉을 준비했어요: 캐릭터 {count}명 · 배경 {worldCount}곳.\n고치고 싶은 인물이나 배경을 알려주세요.\n"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
   'I have concepts ready for the characters and backgrounds: {count} character · {worldCount} background.\nLet me know which character or background you\'d like to revise.\nPress "@" to pick a character or background (Ctrl+click a card does the same).': '인물과 배경의 컨셉을 준비했어요: 캐릭터 {count}명 · 배경 {worldCount}곳.\n고치고 싶은 인물이나 배경을 알려주세요.\n"@"를 누르면 인물·배경을 골라 붙일 수 있어요 (Ctrl+카드 클릭도 같은 동작이에요).',
-  'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
-  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
-  'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
+  'Scene and shot work is done.\n\n· Split into {sceneCount} scene, {shotCount} shot\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 콘티(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
   // ── 2026-11-14 오너: 항목 · 씬이 1개일 때의 단수 문장(한국어는 같은 꼴) ──
   'There is {count} thing worth filling in:\n{summary}': '채워두면 좋을 항목이 {count}건 있어요:\n{summary}',
   'Splitting into {count} scene': '씬 {count}개로 나누기',

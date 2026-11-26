@@ -29,6 +29,7 @@ import {
   SHELL_INSET,
   SHELL_RAIL_WIDTH,
   CHAT_COLLAPSED_RAIL,
+  isBoardStage,
 } from '@/lib/constants'
 import type { StageId } from '@/types'
 import { installDemoFetchGuard } from '@/lib/demo/fetch-guard'
@@ -137,7 +138,8 @@ export default function StudioLayout({
     const t = setTimeout(() => {
       const stage = useProjectStore.getState().currentStage
       if (stage !== 'producer') void useProducerStore.getState().loadProject()
-      if (stage !== 'writer') void useWriterStore.getState().loadProject()
+      // 보드 단계(콘티 · Storyboard)는 보드가 열릴 때 씬 · 샷을 직접 읽는다(O1 2026-11-26 — 콘티도 같은 보드).
+      if (!isBoardStage(stage)) void useWriterStore.getState().loadProject()
       if (stage !== 'artist') void useArtistStore.getState().loadData()
       // Producer 시작 화면(id entry) — 시작한 프로젝트의 완료 화면만 받아 둔다(QA 2026-11-03, tests/producer/entry-prefetch.test.ts).
       if (stage !== 'entry') void useEntryStore.getState().prefetch(projectId)

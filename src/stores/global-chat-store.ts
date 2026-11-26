@@ -68,6 +68,7 @@ import { useWriterRoomStore } from '@/stores/writer-room-store'
 import { restartWriterStatus } from '@/lib/writer/use-writer-status'
 import { completeKoreanDialogue, dialogueHandoffTarget } from '@/lib/writer/dialogue-handoff'
 import { roughRedrawCandidates, roughRedrawChangedScenes, roughRedrawOfferHere, roughVisibleState, type RoughVisibleState } from '@/lib/writer/chat-rough-redraw'
+import { isStoryboardImageUpdate } from '@/lib/storyboard/chat-image-tool'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { boardNodeNames } from '@/features/director/node-label'
 import { currentDirectorText, directorShotRefs, directorTextEditLines, remakeTakeCosts, shotLabelOf, shotListLabel, splitDirectorTextEdits, textBoundShotIds, type DirectorTextEdit } from '@/lib/director/lumi-chat-runs'
@@ -3853,6 +3854,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             scriptLines,
           ),
           ...(lineRefs.length > 0 ? { lineRefs } : {}),
+          // Storyboard 실사 그림 도구(오너 2026-11-26 m1126 O7) — Storyboard 단계 채팅만(콘티는 Artist 앞이라 실사를 못 그린다).
+          ...(stage === 'writer' ? { storyboardImages: true } : {}),
         }
         break
       }
@@ -4841,8 +4844,17 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             },
           })
         }
+        // Storyboard 실사 그림 요청(오너 2026-11-26 m1126 O7 "채팅으로") — 씬 · 샷 고치기와 따로 화면이 맡긴다: 샷 하나 = 그 샷 다시 그리기(Director 상세와 같은 요청),
+        //   샷 없음 = [시작]과 같은 일괄. 못 맡기면 까닭을 Storyboard 채팅 한 줄로(lib/storyboard/chat-images — 누를 때 불러온다). 서버는 Storyboard 요청에만 이 요청을 받는다.
+        const imageUpdates = stage === 'writer' ? (rawUpdates as unknown[]).filter(isStoryboardImageUpdate) : []
+        if (imageUpdates.length > 0 && projectId) {
+          const imageLocale = contentLocale()
+          void import('@/lib/storyboard/chat-images').then(({ runStoryboardImageUpdates }) =>
+            runStoryboardImageUpdates(projectId, imageUpdates, { locale: imageLocale, traceId, notify: (line) => get().notifyIssue('writer', line) }),
+          )
+        }
         // 검증된 씬/샷 CRUD 액션 — writer-store 가 기존 CRUD 로 DB 반영.
-        const applyList = rawUpdates.filter((u) => u.type !== 'clarify')
+        const applyList = rawUpdates.filter((u) => u.type !== 'clarify' && !isStoryboardImageUpdate(u))
         // 저장을 해 본 차례 — 그 저장 결과가 이미 실행 결과에 있으니 건너뜀으로 한 줄 더 적지 않는다(보드 이름 "Shot 4" ≠ 푼 id, 리뷰 4차 후속).
         const savedPositions = new Set<number>()
         const result = await useWriterStore

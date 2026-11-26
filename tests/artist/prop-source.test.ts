@@ -1,4 +1,4 @@
-// 소품을 만드는 출처(지금 Producer 사물 카드 · 오너가 고를 A 샷에서 두 번 이상 · B [만들기] 때 AI 가 고름)를 바꿔도 카드 · 그림 · 실사 참고가 props 행만 읽고 똑같이 도는지 검사한다 (D7 결정 1, 리드 2026-11-22)
+// 소품을 만드는 출처(지금 Producer 사물 카드 · 오너가 고를 A 샷에서 두 번 이상 · B [브레이크다운하기]로 산문을 확정할 때 AI 가 고름)를 바꿔도 카드 · 그림 · 실사 참고가 props 행만 읽고 똑같이 도는지 검사한다 (D7 결정 1, 리드 2026-11-22)
 import { readFileSync } from 'node:fs'
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
@@ -32,7 +32,7 @@ afterEach(() => {
 })
 
 describe('소품 출처 바꾸기', () => {
-  // 왜: 오너가 소품 출처를 정하기 전이다(지금 Producer 사물 카드 / A 샷 소품 칸에서 두 샷 이상 / B [만들기] 때 AI 가 이야기에서 3~5개).
+  // 왜: 오너가 소품 출처를 정하기 전이다(지금 Producer 사물 카드 / A 샷 소품 칸에서 두 샷 이상 / B [브레이크다운하기]로 산문을 확정할 때 AI 가 이야기에서 3~5개 — O1 2026-11-26 로 디자인과 함께 옮겨 감).
   //   어느 출처든 props 행만 넣으면 카드 · 저절로 그리기 · 실사 참고가 지금 그대로 돌아야 출처만 갈아 끼울 수 있다.
   it('소품 행이 어디서 왔든 카드 · 저절로 그리기 · 실사 참고가 똑같이 돈다', () => {
     const scenes = [{ sceneId: 'sc_01', charactersPresent: ['min_ji'] }]
@@ -71,10 +71,11 @@ describe('소품 출처 바꾸기', () => {
     }
   })
 
-  // 왜: 출처는 한 곳(prop-source.ts)에서 고른다 — 오너 E5(2026-11-22 "추천대로" = B)로 [만들기] 때 AI 가 이야기에서 고른다(Producer 사물은 늘 함께). 출처가 바뀌면 화면 말 중 바뀌는 것은
+  // 왜: 출처는 한 곳(prop-source.ts)에서 고른다 — 오너 E5(2026-11-22 "추천대로" = B)로 AI 가 이야기에서 고른다(Producer 사물은 늘 함께).
+  //   고르는 때는 O1(2026-11-26 "콘티를 Artist 앞에")로 [만들기]가 아니라 [브레이크다운하기]로 산문을 확정할 때다(디자인 단계와 함께 옮겨 감). 출처가 바뀌면 화면 말 중 바뀌는 것은
   //   소품 묶음이 비었을 때 한 줄뿐이라 그 줄도 출처를 따른다(출처를 바꾸면서 그 줄을 안 넣으면 여기서 막힌다).
   //   A · B 는 Writer 가 만든 것이라 DB 출처 칸은 writer — 지금 DB 가 받는 값(producer · writer · user)이라 마이그레이션이 없다.
-  it('소품 출처는 한 곳에서 고르고 지금은 [만들기] 때 AI 가 이야기에서 고르는 것이며, 소품이 없을 때 안내도 그 출처의 말이다', () => {
+  it('소품 출처는 한 곳에서 고르고 지금은 [브레이크다운하기]로 산문을 확정할 때 AI 가 이야기에서 고르는 것이며, 소품이 없을 때 안내도 그 출처의 말이다', () => {
     expect(ACTIVE_PROP_SOURCE).toBe('story_pick')
     expect(Object.keys(PROP_SOURCE_ORIGIN).sort()).toEqual(['producer_cards', 'repeated_in_shots', 'story_pick'])
     for (const origin of Object.values(PROP_SOURCE_ORIGIN)) expect(['producer', 'writer', 'user']).toContain(origin)
