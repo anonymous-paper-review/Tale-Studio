@@ -39,7 +39,7 @@ import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/genera
 import { characterRefusalKey } from '@/lib/artist/failure-badge'
 import { DRAW_CONTINUE_MAX_ROUNDS, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, missingDrawTargets, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import type { ArtistSection } from '@/lib/artist/card-filter'
-import { DEFAULT_PROP_APPEARANCE_KEY, orderPropsByUsage, propAssetsFromRows, propAppearancesByProp, propSlotKey, propUsage, propsToAutoDraw, type PropAppearanceRow, type PropRow, type PropUsage } from '@/lib/artist/props'
+import { DEFAULT_PROP_APPEARANCE_KEY, orderPropsByUsage, propAssetsFromRows, propAppearancesByProp, propCandidatesBySlot, propSlotKey, propUsage, propsToAutoDraw, type PropAppearanceRow, type PropCandidateRow, type PropRow, type PropUsage } from '@/lib/artist/props'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -545,19 +545,29 @@ async function refreshPropAppearanceRow(
   set: (fn: (state: ArtistState) => Partial<ArtistState>) => void,
 ): Promise<void> {
   try {
-    const { data } = await createClient()
-      .from('prop_appearances')
-      .select('prop_id, appearance_key, label, narrative_time, appearance, appearance_native, image_url, source_hash')
-      .eq('project_id', projectId)
-      .eq('prop_id', propId)
-      .eq('appearance_key', appearanceKey)
-      .maybeSingle()
+    const [{ data }, candidates] = await Promise.all([
+      createClient()
+        .from('prop_appearances')
+        .select('prop_id, appearance_key, label, narrative_time, appearance, appearance_native, image_url, source_hash')
+        .eq('project_id', projectId)
+        .eq('prop_id', propId)
+        .eq('appearance_key', appearanceKey)
+        .maybeSingle(),
+      readPropSlotCandidates(projectId, propId, appearanceKey),
+    ])
     if (!data || useProjectStore.getState().projectId !== projectId) return
     const fresh = propAppearancesByProp([data as PropAppearanceRow]).get(propId)?.[0]
     if (!fresh) return
     set((state) => ({
       propAssets: state.propAssets.map((p) =>
-        p.propId === propId ? { ...p, appearances: (p.appearances ?? []).map((a) => (a.appearanceKey === appearanceKey ? fresh : a)) } : p,
+        p.propId === propId
+          ? {
+              ...p,
+              appearances: (p.appearances ?? []).map((a) =>
+                a.appearanceKey === appearanceKey ? { ...fresh, ...(candidates ? { candidates } : a.candidates ? { candidates: a.candidates } : {}) } : a,
+              ),
+            }
+          : p,
       ),
     }))
   } catch {
@@ -566,23 +576,52 @@ async function refreshPropAppearanceRow(
 }
 
 /** 소품 행 하나를 다시 읽는다(D7) — 다 그린 그림 · 그림 지문 · 생김새를 카드에 넣는다(best-effort). */
+/** 그 칸(소품 × 모습)의 지난 그림을 다시 읽는다(m1126 A4) — 새로 그린 그림이 선택본이 되고 앞 그림이 지난 그림이 된다. 못 읽으면 null(있던 것 그대로). */
+async function readPropSlotCandidates(projectId: string, propId: string, appearanceKey: string): Promise<CandidateImage[] | null> {
+  try {
+    const { data, error } = await createClient()
+      .from('prop_image_candidates')
+      .select('id, prop_id, appearance_key, url, source_hash, is_selected, generated_at')
+      .eq('project_id', projectId)
+      .eq('prop_id', propId)
+      .eq('appearance_key', appearanceKey)
+    if (error || !data) return null
+    return propCandidatesBySlot(data as PropCandidateRow[]).get(propSlotKey(propId, appearanceKey)) ?? []
+  } catch {
+    return null
+  }
+}
+
 async function refreshPropRow(
   projectId: string,
   propId: string,
   set: (fn: (state: ArtistState) => Partial<ArtistState>) => void,
 ): Promise<void> {
   try {
-    const { data } = await createClient()
-      .from('props')
-      .select('prop_id, name, appearance, appearance_native, image_url, source_hash, origin')
-      .eq('project_id', projectId)
-      .eq('prop_id', propId)
-      .maybeSingle()
+    const [{ data }, candidates] = await Promise.all([
+      createClient()
+        .from('props')
+        .select('prop_id, name, appearance, appearance_native, image_url, source_hash, origin')
+        .eq('project_id', projectId)
+        .eq('prop_id', propId)
+        .maybeSingle(),
+      readPropSlotCandidates(projectId, propId, DEFAULT_PROP_APPEARANCE_KEY),
+    ])
     if (!data || useProjectStore.getState().projectId !== projectId) return
     const [fresh] = propAssetsFromRows([data as PropRow], new Set())
     if (!fresh) return
-    // 모습 목록은 이 행에 없다 — 카드가 들고 있던 모습을 그대로 둔다(m1126 A3).
-    set((state) => ({ propAssets: state.propAssets.map((p) => (p.propId === propId ? { ...fresh, ...(p.appearances ? { appearances: p.appearances } : {}) } : p)) }))
+    // 모습 목록은 이 행에 없다 — 카드가 들고 있던 모습을 그대로 둔다(m1126 A3). 지난 그림은 새로 읽은 것(못 읽었으면 있던 것).
+    set((state) => ({
+      propAssets: state.propAssets.map((p) =>
+        p.propId === propId
+          ? {
+              ...fresh,
+              ...(p.appearances ? { appearances: p.appearances } : {}),
+              ...(candidates ? { candidates } : p.candidates ? { candidates: p.candidates } : {}),
+            }
+          : p,
+      ),
+    }))
   } catch {
     /* best-effort */
   }
@@ -1016,6 +1055,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           { data: dbProps },
           { data: dbShotProps },
           { data: dbPropAppearances },
+          { data: dbPropCandidates },
         ] = await Promise.all([
           supabase
             .from('scenes')
@@ -1072,6 +1112,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .select('prop_id, appearance_key, label, narrative_time, appearance, appearance_native, image_url, source_hash')
             .eq('project_id', projectId)
             .order('created_at'),
+          // 소품 지난 그림(m1126 A4 — m-history 의 줄 · [채택]) — 인물 · 배경 후보와 같은 소유자 읽기 정책. 못 읽으면 기록만 빈 목록.
+          supabase
+            .from('prop_image_candidates')
+            .select('id, prop_id, appearance_key, url, source_hash, is_selected, generated_at')
+            .eq('project_id', projectId),
         ])
         if (useProjectStore.getState().projectId !== projectId) return
         dbRead = true
@@ -1217,7 +1262,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           })
 
           // 소품 카드(D7) — 같은 id 의 인물 행이 있으면 빼고, 나오는 샷이 많은 순으로.
-          const props = propAssetsFromRows((dbProps ?? []) as PropRow[], new Set(characterAssets.map((c) => c.characterId)), (dbPropAppearances ?? []) as PropAppearanceRow[])
+          const props = propAssetsFromRows(
+            (dbProps ?? []) as PropRow[],
+            new Set(characterAssets.map((c) => c.characterId)),
+            (dbPropAppearances ?? []) as PropAppearanceRow[],
+            (dbPropCandidates ?? []) as PropCandidateRow[],
+          )
           const usage = propUsage(props, dbScenes, (dbShotProps ?? []).map((row) => ({ shotId: String(row.shot_id), sceneId: (row as { scene_id?: string | null }).scene_id ?? null, propPlacement: (row as { prop_placement?: unknown }).prop_placement })))
           const propAssets = orderPropsByUsage(props, usage)
 

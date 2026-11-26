@@ -3,7 +3,8 @@
 //   출처를 모른다. 출처가 바뀌면 바뀌는 것은 둘뿐이다: ① props 행을 넣는 자리 ② 소품 묶음이 비었을 때 안내 한 줄(PROP_EMPTY_LINE).
 //   - producer_cards(1단계 리드 결정 1): Producer 사물 카드 → 넘길 때(writer/start) · 디자인 저장(v2 persist · persist_manifest)이 행을 넣는다.
 //     Writer 단계에는 사물 캐스트로 들어가 샷 소품 칸이 그 id 를 쓴다(2026-11-22 실측 8/8).
-//   - story_pick(지금, 오너 E5 2026-11-22 = 안 B): [만들기] 때 v2Design 바로 앞에서 AI 가 이야기에서 중요한 소품을 골라 같은 사물 캐스트 길로 넣는다
+//   - story_pick(지금, 오너 E5 2026-11-22 = 안 B): v2Design 바로 앞에서 AI 가 이야기에서 중요한 소품을 골라 같은 사물 캐스트 길로 넣는다
+//     (m1126 O1 "콘티를 Artist 앞에" — 디자인이 [만들기]가 아니라 [브레이크다운하기]로 산문을 확정할 때 돌므로 소품도 그때 고른다, 리드 2026-11-26)
 //     (Producer 사물은 늘 함께, 합쳐 많아야 5개 — src/lib/writer/pipeline/stages/key_props.ts). 그 뒤는 Producer 사물과 같은 코드 그대로.
 //   - repeated_in_shots(안 A): 샷이 다 나온 뒤(persistShots 뒤) 샷 소품 칸에서 두 샷 이상 나오는 물건을 행으로 — 생김새 글이 없어 이름으로만 그린다.
 //   DB 출처 칸은 producer · writer · user 만 받는다 — A · B 는 Writer 가 만든 것이라 writer(마이그레이션 없음).
@@ -24,7 +25,7 @@ export const PROP_SOURCE_ORIGIN: Record<PropSourceId, 'producer' | 'writer'> = {
 export const PROP_EMPTY_LINE: Record<PropSourceId, string | null> = {
   producer_cards: 'No props yet. Objects you set in Producer become props.',
   repeated_in_shots: null,
-  story_pick: 'No props. Props are the important objects picked from the story when you press Make, plus objects you set in Producer.',
+  story_pick: 'No props. Props are the important objects picked from the story when you run the breakdown, plus objects you set in Producer.',
 }
 
 /** 지금 출처의 "소품이 없을 때" 한 줄. */

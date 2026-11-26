@@ -3,6 +3,7 @@
 //   어느 씬 · 샷에 나오는지: 씬 등장 목록(scenes.characters_present)에 그 id, 샷 소품 칸(static_spec.prop_placement[].prop)에 그 id 나 이름.
 //   서버(실사 참고 그림)와 화면(카드)이 같은 규칙을 쓴다 — 서버 전용 의존성 금지. 약속: tests/artist/prop-cards.test.ts
 import type { NarrativeTime, PropAppearance, PropAsset } from '@/types/asset'
+import type { CandidateImage } from '@/lib/image-provenance'
 
 /** props 표 행(필요한 칸만). */
 export interface PropRow {
@@ -27,6 +28,17 @@ export interface PropAppearanceRow {
   appearance_native: string | null
   image_url: string | null
   source_hash: string | null
+}
+
+/** prop_image_candidates 표 행(필요한 칸만, m1126 A4). */
+export interface PropCandidateRow {
+  id: string
+  prop_id: string
+  appearance_key: string
+  url: string
+  source_hash: string | null
+  is_selected: boolean | null
+  generated_at: string
 }
 
 /** 소품 기본 모습의 열쇠 — props 행 자체(배경 DEFAULT_LOCATION_APPEARANCE_KEY 와 같은 값). */
@@ -60,10 +72,31 @@ export function propAppearancesByProp(rows: readonly PropAppearanceRow[]): Map<s
   return out
 }
 
+/** prop_image_candidates 행 → 칸(propSlotKey)마다 지난 그림 목록, 가장 새 것 먼저(배경 groupLocationCandidates 와 같은 꼴). */
+export function propCandidatesBySlot(rows: readonly PropCandidateRow[]): Map<string, CandidateImage[]> {
+  const out = new Map<string, CandidateImage[]>()
+  for (const row of rows) {
+    if (!row.prop_id?.trim() || !row.url) continue
+    const slot = propSlotKey(row.prop_id, row.appearance_key)
+    const list = out.get(slot) ?? []
+    list.push({ id: row.id, url: row.url, sourceHash: row.source_hash ?? null, isSelected: row.is_selected ?? false, generatedAt: row.generated_at })
+    out.set(slot, list)
+  }
+  for (const list of out.values()) list.sort((a, b) => b.generatedAt.localeCompare(a.generatedAt))
+  return out
+}
+
 /** props 행 → 소품 카드. 같은 id 가 인물 행(characters)에도 있으면 뺀다 — 예전 저장 고장으로 둘 다 있는 프로젝트에서 카드가 둘이 되지 않게.
- *  appearanceRows 를 주면(모습 표를 읽었으면) 카드마다 모습 목록을 붙인다 — 못 읽었으면 빈 목록(m1126 A3). */
-export function propAssetsFromRows(rows: readonly PropRow[], personIds: ReadonlySet<string>, appearanceRows?: readonly PropAppearanceRow[] | null): PropAsset[] {
+ *  appearanceRows 를 주면(모습 표를 읽었으면) 카드마다 모습 목록을 붙인다 — 못 읽었으면 빈 목록(m1126 A3).
+ *  candidateRows 를 주면(지난 그림 표를 읽었으면) 카드 · 모습마다 지난 그림을 붙인다 — 못 읽었으면 빈 목록(m1126 A4). */
+export function propAssetsFromRows(
+  rows: readonly PropRow[],
+  personIds: ReadonlySet<string>,
+  appearanceRows?: readonly PropAppearanceRow[] | null,
+  candidateRows?: readonly PropCandidateRow[] | null,
+): PropAsset[] {
   const byProp = appearanceRows === undefined ? null : propAppearancesByProp(appearanceRows ?? [])
+  const bySlot = candidateRows === undefined ? null : propCandidatesBySlot(candidateRows ?? [])
   return rows
     .filter((row) => row.prop_id?.trim() && !personIds.has(row.prop_id))
     .map((row) => {
@@ -76,7 +109,14 @@ export function propAssetsFromRows(rows: readonly PropRow[], personIds: Readonly
         imageUrl: row.image_url?.trim() ? row.image_url : null,
         sourceHash: row.source_hash ?? null,
         origin: ORIGINS.has(row.origin as PropAsset['origin']) ? (row.origin as PropAsset['origin']) : 'writer',
-        ...(byProp ? { appearances: byProp.get(row.prop_id) ?? [] } : {}),
+        ...(byProp
+          ? {
+              appearances: (byProp.get(row.prop_id) ?? []).map((appearance) =>
+                bySlot ? { ...appearance, candidates: bySlot.get(propSlotKey(row.prop_id, appearance.appearanceKey)) ?? [] } : appearance,
+              ),
+            }
+          : {}),
+        ...(bySlot ? { candidates: bySlot.get(propSlotKey(row.prop_id)) ?? [] } : {}),
       }
     })
 }
