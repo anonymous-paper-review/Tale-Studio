@@ -91,6 +91,8 @@ import { extractAudioUrl } from '@/lib/fal/music'
 import { editorMusicPath } from '@/lib/editor/music-server'
 import { ModerationBlockedError } from '@/lib/moderation/creem'
 import { storageKeySegment } from '@/lib/storage/key-segment'
+import { IMAGE_JOB_KINDS, VIDEO_JOB_KINDS } from '@/lib/generation-quota'
+import { LANE_OF_KIND } from '@/lib/generation-batches'
 import type { GenerationJob } from '@/lib/generation-jobs'
 
 const PROJECT = '11111111-2222-4333-8444-555555555555'
@@ -249,6 +251,19 @@ describe('혼자 정한 것', () => {
     expect(mocks.checkGenerationCapacity).toHaveBeenCalledWith('user-1', 'image')
     expect(res.status).toBe(429)
     expect(mocks.reserveGenerationJob).not.toHaveBeenCalled()
+  })
+
+  it('생성 작업 종류는 모두 영상 자리나 그림 자리 하나에만 들고 영상 자리는 영상 · 미리보기 영상뿐이라, 음악은 서버 사전 검사 · 채팅 "내 자리" 줄 · DB 자리 트리거 모두에서 그림 자리로 센다', () => {
+    // 왜: 리드 답(2026-11-26, 근거 E1) — 트리거는 영상 두 종류 밖을 모두 그림 축으로 센다. 서버 목록이 음악을 빼면 "내 자리"가 남아 보이는데 트리거가 막는다.
+    const allKinds = Object.keys(LANE_OF_KIND)
+    expect(allKinds).toContain('editor_music')
+    expect([...VIDEO_JOB_KINDS].sort()).toEqual(['shot_previz_video', 'shot_video'])
+    for (const kind of allKinds) {
+      const inVideo = (VIDEO_JOB_KINDS as readonly string[]).includes(kind)
+      const inImage = (IMAGE_JOB_KINDS as readonly string[]).includes(kind)
+      expect([kind, inVideo !== inImage]).toEqual([kind, true])
+    }
+    expect(IMAGE_JOB_KINDS).toContain('editor_music')
   })
 
   it('남의 프로젝트에는 음악을 만들 수 없고 목록도 읽을 수 없다', async () => {
