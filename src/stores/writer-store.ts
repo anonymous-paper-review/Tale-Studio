@@ -22,6 +22,7 @@ import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { isDemoSession } from '@/lib/demo/context'
 import { notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import type { AddedShotEvent, AddedShotOrigin } from '@/lib/writer/added-shot-draws'
+import { requestAddedShotFill } from '@/lib/writer/added-shot-fill-client'
 // store 액션은 훅을 못 쓴다 — translate() + 현재 locale 직접 조회로 useT() 없이 번역(#i18n-s5-batch3).
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -482,6 +483,12 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       markSaved(true)
       void invalidateShots(projectId)
       get().recomputeSceneDuration(sceneId)
+      // 빈 칸 채우기(오너 2026-11-27 N2): 저장이 끝나면 서버가 같은 씬 앞뒤 샷 · 씬 무대로 인물 자리 · 자세 · 모습 · 빛을 채운다.
+      //   기다리지 않는다 — 더한 샷 러프는 바로 그리고, 러프 길이 그리기 직전에 같은 계산을 다시 한다. 돌아온 칩(앵글 · 색온도)만 카드에 싣는다.
+      void requestAddedShotFill(projectId, shotId).then((stageDesign) => {
+        if (stageDesign === undefined || useProjectStore.getState().projectId !== projectId) return
+        set((state) => ({ shots: state.shots.map((s) => (s.shotId === shotId ? { ...s, stageDesign } : s)) }))
+      })
       return shotId
     } finally {
       // 저장하지 못했다(되돌림 · 예외) — 먼저 풀린 성공은 그대로다.
@@ -1083,7 +1090,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         roughStoryboard: (s.rough_storyboard as RoughStoryboardImage | null) ?? null,
         // 목각 previz 영상 (director storyboard 뷰, #previz-video)
         previzVideo: (s.previz_video as RoughStoryboardImage | null) ?? null,
-        // 러프가 따르는 무대 설계(카드 칩, v3 2026-11-03) — 읽기만 한다. 직접 더한 샷 · 옛 프로젝트는 null.
+        // 러프가 따르는 무대 설계(카드 칩, v3 2026-11-03) — 읽기만 한다. 옛 프로젝트는 null, 직접 더한 샷은 앞뒤 샷으로 채운 칸에서(N2 2026-11-27).
         stageDesign: shotStageDesign(s.static_spec, s.dynamic_spec),
       }))
 

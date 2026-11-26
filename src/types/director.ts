@@ -6,6 +6,7 @@ import type {
   GenerationMethod,
 } from '@/types/shot'
 import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
+import type { DirectionRead } from '@/lib/writer/direction-read'
 import type { ContinueFrom, VideoMode } from '@/lib/director/video-modes'
 
 // ============================================================================
@@ -89,6 +90,11 @@ export type StoryboardImage = {
   versionId?: string | null
   /** 쓰기 차례 — 두 쓰기가 겹치면 뒤 쓰기가 다시 읽고 쓴다(버전을 잃지 않게). */
   rev?: number
+  /** 실사 가운데 장에서 고친 화살표를 읽은 줄(오너 2026-11-27 N4b · 리드 D2 A) — 모양은 콘티 rough_storyboard.directionRead 와 같다.
+   *  direction 이 지금 frames.direction 일 때만 산다(판을 바꾸면 저절로 낡는다). 마지막으로 고친 판 하나 것만 남는다. 영상 지시가 콘티 줄보다 먼저 쓴다. */
+  directionRead?: DirectionRead
+  /** 실사 가운데 장의 화살표 층 나누기 밑층 캐시(N4b) — direction = 밑층을 만든 가운데 장 주소. 지금 frames.direction 과 같을 때만 쓴다. */
+  cleanDirection?: { url: string; direction: string }
 }
 
 /** 실사 이미지 버전 하나 — 그림 파일은 작업마다 새 이름이라 덮어쓰지 않는다. */

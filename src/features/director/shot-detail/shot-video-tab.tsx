@@ -42,7 +42,7 @@ import { aspectRatioFromFormat } from '@/types/project'
 import type { ShotNodeData, VideoOverride } from '@/types/director'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { useWriterStore } from '@/stores/writer-store'
-import { videoModeAvailability, type VideoMode } from '@/lib/director/video-modes'
+import { DEFAULT_VIDEO_MODE, isVideoMode, videoModeAvailability, type VideoMode } from '@/lib/director/video-modes'
 import { prepareContinueFrom } from '@/lib/director/video-frame-capture'
 import { SHOT_VIDEO_MODES, VIDEO_MODE_HINT, VIDEO_MODE_LABEL, defaultVideoMode, shotVideoModeFacts, videoModeBlockText } from './video-mode'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
@@ -86,6 +86,12 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
     return named ? t(named.key, named.params) : null
   }
 
+  // 그 Take 를 만든 방식(오너 2026-11-27 N4a) — 기본(시작+프롬프트)이 아닌 방식만 이름을 붙인다(방식이 적히지 않은 옛 Take 도 안 붙인다).
+  const takeModeName = (take: ShotDetailTake): string | null => {
+    const mode = (take.data.override as VideoOverride | undefined)?.videoMode
+    return isVideoMode(mode) && mode !== DEFAULT_VIDEO_MODE ? t(VIDEO_MODE_LABEL[mode]) : null
+  }
+
   const markFinal = async (take: ShotDetailTake, next: boolean) => {
     setFinalError(null)
     try {
@@ -123,7 +129,7 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                     <p className="text-caption text-subtle-foreground">{t("Stopped. Takes for videos that had already started aren't refunded. If this one finishes later, it stays in this list.")}</p>
                   ) : phase === 'done' ? (
                     <p className="text-caption text-subtle-foreground">
-                      {[madeWith(take), VIDEO_MODELS[setup.model].label, resolution].filter(Boolean).join(' · ')}
+                      {[takeModeName(take), madeWith(take), VIDEO_MODELS[setup.model].label, resolution].filter(Boolean).join(' · ')}
                       {take.data.cancelledAt ? <span className="ml-1.5 rounded-full border border-border px-1.5 text-micro">{t('Finished after it was stopped')}</span> : null}
                     </p>
                   ) : phase === 'failed' ? (

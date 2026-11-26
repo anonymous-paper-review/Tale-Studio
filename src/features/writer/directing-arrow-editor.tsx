@@ -7,6 +7,8 @@
 //   위층 = 원본 DIRECTING 프레임을 올린 캔버스
 // 지우개(destination-out)로 위층을 긁으면 밑층이 드러난다 = 기존 화살표 삭제.
 // 펜으로 위층에 새 화살표를 그리고, 저장 시 두 층을 평탄화해 direction 프레임에 upsert.
+// 실사 가운데 장(오너 2026-11-27 N4b)도 같은 부품을 쓴다(surface 'real') — 요청은 실사 주소로 가고, 읽은 줄 알림 · 잠금만 다르다.
+//   약속(실사): tests/writer/real-arrow-editor.test.ts
 import { useEffect, useImperativeHandle, useRef, useState, type CSSProperties } from 'react'
 import { Eraser, Layers, Loader2, Pen, RotateCcw, Save, Trash2, Undo2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -19,6 +21,7 @@ import { translate, useT } from '@/lib/i18n'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 import { askLineText, endAskAfterSave } from '@/lib/writer/end-frame-ask'
 import { freshDirectionRead } from '@/lib/writer/direction-read'
+import { directingEditUrl, directingSaveBody, type DirectingSurface } from '@/lib/writer/directing-edit-url'
 import { warnBeforeLeaving } from '@/features/writer/unsaved-arrows-confirm'
 import { useLocaleStore } from '@/stores/locale-store'
 
@@ -49,6 +52,9 @@ function loadImage(src: string): Promise<HTMLImageElement> {
     img.src = src
   })
 }
+
+// 층 나누기 · 저장 요청을 보낼 곳(콘티 · 실사) — 물음 창도 같이 쓰는 순수 파일에 둔다.
+export { directingEditUrl, type DirectingSurface } from '@/lib/writer/directing-edit-url'
 
 /** 이 편집기에서 분리한 밑층 — 서버가 화살표를 지운 연출 그림 주소(?v= 포함)와 함께 둔다. */
 export type SeparatedPlate = { url: string; direction: string }
@@ -133,11 +139,17 @@ export function DirectingArrowEditor({
   onDirtyChange,
   onArrowsSaved,
   onRedrawEnd,
+  surface = 'rough',
+  lockedReason = null,
   ref,
 }: {
   projectId: string
   shotId: string
   panel: RoughStoryboardImage
+  /** 고치는 그림 — 기본 콘티. 'real' 이면 요청이 실사 주소로 가고 읽은 줄 알림이 실사 말이다. */
+  surface?: DirectingSurface
+  /** 지금 고칠 수 없는 까닭(그 샷을 그리는 중 — 실사 N4b 혼자 정한 것 g). 있으면 그리기 · 층 나누기 · 저장을 끄고 까닭을 보인다. */
+  lockedReason?: string | null
   onSaved: () => void
   /** 저장하지 않은 화살표(되돌리기 칸)가 생기거나 없어질 때 — 창이 [적용]을 켜고 닫기 전에 묻는다. */
   onDirtyChange?: (dirty: boolean) => void
@@ -224,7 +236,9 @@ export function DirectingArrowEditor({
   // 그린 채 페이지를 떠나거나 새로 고치면 브라우저가 묻는다 — 저장하면(되돌리기 칸이 비면) 푼다(검토 a 54016e65).
   useEffect(() => warnBeforeLeaving(window, dirty), [dirty])
 
-  const busy = separating || saving
+  // 잠금(그 샷을 그리는 중)은 일하는 중(busy)과 같이 모든 단추를 끈다 — 커서만 다르다(기다림이 아니라 못 함).
+  const locked = !!lockedReason
+  const busy = separating || saving || locked
   const ready = !!dims
   // 지우개는 밑층이 있어야 의미가 있다 — 못 그리는 상태에선 원도 띄우지 않는다(거짓 신호 금지).
   const canDraw = ready && !busy && !(tool === 'eraser' && !effectiveClean)
@@ -338,7 +352,7 @@ export function DirectingArrowEditor({
     try {
       // 화면이 보고 있는 연출 그림(주소)을 같이 보낸다 — 서버 그림이 그사이 바뀌었으면 서버가 그림 값을 쓰기 전에 거절한다(검토 낮음 2 ②).
       const direction = panel.frames?.direction ?? ''
-      const res = await fetch('/api/writer/rough-directing-edit', {
+      const res = await fetch(directingEditUrl(surface), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ action: 'separate', projectId, shotId, direction }),
@@ -387,15 +401,10 @@ export function DirectingArrowEditor({
         ctx.drawImage(base, 0, 0, out.width, out.height)
       }
       ctx.drawImage(top, 0, 0)
-      const res = await fetch('/api/writer/rough-directing-edit', {
+      const res = await fetch(directingEditUrl(surface), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify({
-          action: 'save',
-          projectId,
-          shotId,
-          image: out.toDataURL('image/png'),
-        }),
+        body: JSON.stringify(directingSaveBody(surface, { projectId, shotId, image: out.toDataURL('image/png'), direction: panel.frames?.direction })),
       })
       const j = await res.json().catch(() => null)
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
@@ -554,7 +563,7 @@ export function DirectingArrowEditor({
           className={cn(
             'absolute inset-0 size-full touch-none',
             // 그릴 수 있을 땐 네이티브 커서를 감춘다 — 아래 원이 커서 역할을 대신한다.
-            !ready || busy ? 'cursor-wait' : canDraw ? 'cursor-none' : 'cursor-not-allowed',
+            locked ? 'cursor-not-allowed' : !ready || busy ? 'cursor-wait' : canDraw ? 'cursor-none' : 'cursor-not-allowed',
           )}
           onPointerDown={handlePointerDown}
           onPointerMove={(e) => {
@@ -588,10 +597,11 @@ export function DirectingArrowEditor({
       </div>
 
       {/* 저장 줄 · 안내 줄은 그림 크기와 상관없이 늘 보인다 — 세로 그림이면 그림 아래 화면 밖이라 저장을 못 찾았다(리드 ③). */}
-      <div className="sticky bottom-0 z-20 flex items-center gap-3 bg-side py-2" data-testid="directing-editor-save-row">
+      <div className="sticky bottom-0 z-20 flex items-center gap-3 bg-side py-2" data-testid="directing-editor-save-row" data-locked={locked ? 'true' : undefined}>
         {/* 한국어 안내가 낱말 가운데서 끊기지 않게 낱말 단위로 줄을 바꾼다("…새 화살표 / 를 그려요" — 2026-11-14 다시 돌리기). */}
-        <p className="min-w-0 flex-1 break-keep text-xs text-muted-foreground">
-          {effectiveClean
+        {/* 잠겨 있으면(그 샷을 그리는 중) 쓰는 법 대신 고칠 수 없는 까닭을 보인다. */}
+        <p className="min-w-0 flex-1 break-keep text-xs text-muted-foreground" role={locked ? 'status' : undefined}>
+          {lockedReason ? lockedReason : effectiveClean
             ? t(
                 'Scrape the top layer with the eraser to reveal the arrow-free layer underneath. Draw new arrows with the pen.',
               )
@@ -616,8 +626,12 @@ export function DirectingArrowEditor({
           {/* 사람이 고친 줄이면 "고친 움직임"(리드 2026-11-23) — [그대로]에서도 고친 줄이 남아 누가 쓴 줄인지 보이게. */}
           <span className="text-caption font-semibold text-subtle-foreground">{directionRead.source === 'user' ? t('Edited movement') : t('Motion the AI read')}</span>
           <p className="break-keep text-caption text-foreground">{askLineText(directionRead, locale)}</p>
-          {readUnused ? (
+          {readUnused && surface === 'rough' ? (
             <p className="break-keep text-caption text-muted-foreground">{t('Videos use this line. To match, redraw the end frame with it, then the live-action images.')}</p>
+          ) : null}
+          {/* 실사(N4b)는 저장하면 끝 장을 저절로 다시 그린다 — 아직 그 줄로 안 그렸으면(그리는 중 · 실패) 그렇다고만 알린다. 잠겨 있으면 까닭 줄이 대신한다. */}
+          {readUnused && surface === 'real' && !locked ? (
+            <p className="break-keep text-caption text-muted-foreground">{t('The end frame is not drawn from this line yet. Videos use this line.')}</p>
           ) : null}
           {onRedrawEnd ? (
             <Button size="sm" variant="outline" className="self-start" disabled={busy} onClick={onRedrawEnd} data-testid="directing-read-line-redraw">

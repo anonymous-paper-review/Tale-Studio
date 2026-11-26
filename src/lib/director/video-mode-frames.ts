@@ -10,6 +10,7 @@ import { storyboardImageStartFrame } from '@/lib/director/storyboard-image'
 import { classifyRoughChanged } from '@/lib/image-provenance'
 import type { VideoReferenceRole } from '@/lib/director/video-reference-frames'
 import { REFERENCE_INCLUDES_SHOT_IMAGE, type VideoMode } from '@/lib/director/video-modes'
+import { pickVideoDirectionRead } from '@/lib/writer/direction-read'
 
 export interface LabeledImage {
   url: string
@@ -44,8 +45,11 @@ export function realMiddleFrame(raw: unknown): string | null {
 /**
  * ③ 의 실사 미들이 낡았나 — 실사를 그린 뒤 콘티 러프(화살표 편집 · 끝 장 다시 그리기 포함)가 바뀌었으면("러프 바뀜", classifyRoughChanged)
  *   실사 가운데 장은 고치기 전 움직임이고 영상 지시의 읽은 줄은 고친 뒤 움직임이다(dev 리드 D1). 기록이 없는 옛 실사는 낡았다고 보지 않는다.
+ *   예외(오너 2026-11-27 N4b · 리드): 실사 가운데 장을 고쳐 그 장을 읽은 줄이 영상 줄이면(pickVideoDirectionRead 의 출처 'real') 미들과 줄이
+ *   같은 장에서 나와 어긋나지 않으므로 낡지 않았다. 약속: tests/director/video-line-pick.test.ts
  */
 export function realMiddleOutdated(storyboardImage: unknown, roughStoryboard: unknown): boolean {
+  if (pickVideoDirectionRead({ storyboard_image: storyboardImage, rough_storyboard: roughStoryboard })?.source === 'real') return false
   const record = (value: unknown) => (value && typeof value === 'object' && !Array.isArray(value) ? (value as Record<string, unknown>) : null)
   const image = record(storyboardImage)
   const rough = record(roughStoryboard)

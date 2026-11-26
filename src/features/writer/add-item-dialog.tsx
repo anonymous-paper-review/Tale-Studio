@@ -39,6 +39,7 @@ import { Slider } from '@/components/ui/slider'
 import { cn } from '@/lib/utils'
 import { useWriterStore } from '@/stores/writer-store'
 import { NEW_PLACE, isKnownPlace, scenePlaceOf, type PlaceRow } from '@/lib/writer/scene-place'
+import { ADD_SHOT_START_LIGHTING } from '@/lib/writer/add-shot-defaults'
 import { toast } from 'sonner'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { boardShots } from '@/lib/writer/board-summary'
@@ -216,9 +217,10 @@ export function AddItemDialog({
   const [durationSeconds, setDurationSeconds] = useState(5)
   const [actionText, setActionText] = useState('')
   const [cameraAngle, setCameraAngle] = useState<CameraAngle>('eye')
-  const [lightPosition, setLightPosition] = useState<LightingConfig['position']>('front')
-  const [colorTemp, setColorTemp] = useState(5600)
-  const [brightness, setBrightness] = useState(50)
+  // 빛 처음 값은 더한 샷 채우기와 같이 쓴다 — 그대로 두면 사람이 고른 빛이 아니라 앞뒤 샷의 빛을 잇는다(N2 2026-11-27).
+  const [lightPosition, setLightPosition] = useState<LightingConfig['position']>(ADD_SHOT_START_LIGHTING.position)
+  const [colorTemp, setColorTemp] = useState(ADD_SHOT_START_LIGHTING.colorTemp)
+  const [brightness, setBrightness] = useState(ADD_SHOT_START_LIGHTING.brightness)
   const [genMethod, setGenMethod] = useState<GenerationMethod>('T2V')
   // 우 패널 폼 — scene
   const [summaryText, setSummaryText] = useState('')
@@ -240,9 +242,9 @@ export function AddItemDialog({
     setDurationSeconds(5)
     setActionText('')
     setCameraAngle('eye')
-    setLightPosition('front')
-    setColorTemp(5600)
-    setBrightness(50)
+    setLightPosition(ADD_SHOT_START_LIGHTING.position)
+    setColorTemp(ADD_SHOT_START_LIGHTING.colorTemp)
+    setBrightness(ADD_SHOT_START_LIGHTING.brightness)
     setGenMethod('T2V')
     setSummaryText('')
     setLocationText('')

@@ -242,7 +242,7 @@ export function notifyReferenceImageTooSmall(): void {
   toast.error(
     translate(
       locale,
-      'The start or end image is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.',
+      'The start image is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.',
     ),
     { id: 'video-reference-too-small' },
   )

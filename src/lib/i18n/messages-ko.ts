@@ -1190,8 +1190,9 @@ export const KO: Record<string, string> = {
   'The content check is unavailable right now, so nothing was generated. Please try again in a moment.':
     '지금은 내용 검사를 할 수 없어서 아무것도 만들지 않았어요. 잠시 후 다시 시도해 주세요.',
   // m-qa 2026-11-27: H3 로 보낼 작은 그림(한 변 256 미만)을 키우지 못해 Take 전에 막음(generation-quota-toast.ts).
-  'The start or end image is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.':
-    '시작 · 끝 그림이 이 영상 모델이 받는 크기보다 작은데 키우지 못해서 아무것도 만들지 않았어요. 다른 영상 모델을 고르거나 그림을 다시 만들어 주세요.',
+  //   끝 그림은 오너 2026-11-27 N4a(dev 때 시작+끝 폐기)로 영상에 보내지 않는다 — "시작 그림"이라고만 말한다.
+  'The start image is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.':
+    '시작 그림이 이 영상 모델이 받는 크기보다 작은데 키우지 못해서 아무것도 만들지 않았어요. 다른 영상 모델을 고르거나 그림을 다시 만들어 주세요.',
   // 2026-11-25 오너: 내용 검사에 걸린 그림은 자동으로 다시 그리지 않는다 — 어느 인물·배경인지와 할 일(설명 고치기)만 쉬운 말로 알린다.
   //   제출 전(Creem) 거절은 순화 재시도 자격이 없고, 제출 뒤(fal) 거절은 순화 단추가 있다 — 두 안내를 가른다.
   'The description for "{name}" did not pass the content check, so it was not drawn. Edit the description and try again.':
@@ -3165,6 +3166,13 @@ export const KO: Record<string, string> = {
   // 실사 · 영상 지시문에 싣기(R1 · Q4)는 m-director 몫이라 그 전까지 중립 문장(리드 2026-11-26) — 들어오면 dev 문장으로 바꾼다.
   'You can edit the line. The end frame is drawn from it, and videos use it even if you choose Keep as is.': '줄을 고칠 수 있어요. 끝 장은 이 줄대로 그리고, [그대로]를 골라도 영상에는 이 줄이 들어가요.',
   'Videos use this line. To match, redraw the end frame with it, then the live-action images.': '영상에는 이 줄이 들어가요. 끝 장을 이 줄로 다시 그린 뒤 실사도 다시 그려야 맞아요.',
+  // 실사 가운데 장 화살표 고치기(오너 2026-11-27 N4b) — 저장하면 끝 장을 저절로 다시 그린다.
+  'The end frame is not drawn from this line yet. Videos use this line.': '끝 장은 아직 이 줄로 그리지 않았어요. 영상에는 이 줄이 들어가요.',
+  'This shot has no three-frame image to edit. Make the image first.': '고칠 세 장 그림이 없는 샷이에요. 먼저 그림을 만들어 주세요.',
+  'Edit arrows': '화살표 고치기',
+  'Edit the arrows on the middle frame': '가운데 장 화살표 고치기',
+  'When you save, the end frame is redrawn to match your arrows. It takes over a minute.': '저장하면 고친 화살표대로 끝 장을 다시 그려요. 1분 넘게 걸려요.',
+  'Back to the picture': '그림으로 돌아가기',
   'Kept your line. The end frame stays as it is.': '고친 줄을 남겼어요. 끝 장은 그대로예요.',
   'Could not translate your line, so it was not kept. The previous line stays. Try again.': '고친 줄을 영어로 옮기지 못해 남기지 못했어요. 전에 있던 줄은 그대로예요. 다시 시도해 주세요.',
   'The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.': '그사이 연출 장이 바뀌어 고친 줄을 남기지 않았어요. 연출 탭을 다시 열어 주세요.',
@@ -3749,9 +3757,9 @@ export const KO: Record<string, string> = {
   'Splitting into scenes and shots. This can take a few minutes. The screen and chat stay locked until the split is done, then each card draws its rough sketch.': '씬 · 샷을 나누고 있어요. 몇 분 걸릴 수 있어요. 나누기가 끝날 때까지 화면과 채팅은 잠기고, 그 뒤 카드마다 콘티 그림을 그려요.',
   'Draw the rough sketches': '콘티 그림 그리기',
   'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
-  // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
+  // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 대사는 Writer 콘티에서(실사 화살표는 상세의 [화살표 고치기] — 오너 2026-11-27 N4b).
   'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
-  'Fix the story, arrows, and dialogue in Writer.': '이야기 · 화살표 · 대사는 Writer 콘티에서 고쳐요.',
+  'Fix the story and dialogue in Writer.': '이야기 · 대사는 Writer 콘티에서 고쳐요.',
   // 채팅이 실사를 다시 그리라고 했는데 맡기지 못했을 때(채팅 한 줄).
   "Couldn't find the shot to draw. Ask again with the shot name.": '그릴 샷을 찾지 못했어요. 샷 이름으로 다시 부탁해 주세요.',
   '{shot} is being drawn right now. Ask again when it is done.': '{shot}은(는) 지금 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',
