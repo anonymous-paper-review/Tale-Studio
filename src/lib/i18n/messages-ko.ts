@@ -3644,6 +3644,11 @@ export const KO: Record<string, string> = {
   'Fix in chat': '채팅으로 고치기',
   'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
   'Fix the story, arrows, and dialogue in Writer.': '이야기 · 화살표 · 대사는 Writer 콘티에서 고쳐요.',
+  // 채팅이 실사를 다시 그리라고 했는데 맡기지 못했을 때(채팅 한 줄).
+  "Couldn't find the shot to draw. Ask again with the shot name.": '그릴 샷을 찾지 못했어요. 샷 이름으로 다시 부탁해 주세요.',
+  '{shot} is being drawn right now. Ask again when it is done.': '{shot}은(는) 지금 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',
+  '{shot} has no rough storyboard. Draw it in Writer, then ask again.': '{shot}은(는) 콘티 그림이 없어요. Writer 콘티에서 그린 뒤 다시 부탁해 주세요.',
+  "Couldn't redraw {shot}. Please ask again.": '{shot}을(를) 다시 그리지 못했어요. 다시 부탁해 주세요.',
   // 보드 진행 줄 · 화면 설명 · 첫 진입 안내.
   'Storyboard progress': '스토리보드 진행 현황',
   'Not real yet': '실사 없음',
