@@ -8,6 +8,7 @@
 //   모델의 해석에 맡길 자리가 아니다 — 모델은 제안까지(architecture §3). 실제 가부는 각 stage 의
 //   결정적 게이트가 판정하고, 여기는 "넘어가자고 말했는가"만 본다.
 
+import { stageIndex } from '@/lib/stage-gate'
 import type { StageId } from '@/types'
 
 export interface HandoffSpec {
@@ -72,9 +73,12 @@ export type NextStepAction =
   | ({ kind: 'handoff' } & HandoffSpec)
   | { kind: 'open'; stage: StageId; label: string }
 
-export function nextStepAction(stage: StageId, opts: { producerLocked: boolean }): NextStepAction | null {
+export function nextStepAction(stage: StageId, opts: { producerLocked: boolean; reachedStage?: StageId }): NextStepAction | null {
   // 산문을 확정한 Writer 씬 스토리(id producer)는 다시 넘기지 않고 콘티 화면으로 가기만 한다(O1 2026-11-26).
   if (stage === 'producer' && opts.producerLocked) return { kind: 'open', stage: 'conti', label: 'Go to the rough storyboard' }
+  // Artist 가 이미 열린 콘티(넘긴 뒤 돌아온 콘티 · 예전 흐름으로 Artist 까지 연 프로젝트)는 다시 넘기지 않고 Artist 로 가기만 한다
+  //   (검토 rev-flow 2026-11-26 3번 — 예전 흐름은 씬 · 샷을 Artist [만들기]가 나눠 콘티가 비어 있고, 넘김 조건(씬 · 샷)에 막힌다).
+  if (stage === 'conti' && opts.reachedStage && stageIndex(opts.reachedStage) >= stageIndex('artist')) return { kind: 'open', stage: 'artist', label: 'Go to Artist' }
   const spec = handoffFrom(stage)
   return spec ? { kind: 'handoff', ...spec } : null
 }

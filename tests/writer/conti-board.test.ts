@@ -71,6 +71,14 @@ describe('콘티 화면 머리', () => {
     data.writer.shots = []
     expect(button(renderToStaticMarkup(createElement(WriterHeader)), 'conti-next-artist')).toMatch(/\bdisabled=""/)
   })
+
+  // 왜(혼자 정한 것): 예전 흐름으로 Artist 까지 연 프로젝트는 씬 · 샷을 Artist [만들기]가 나눠 콘티가 비어 있다 — 꺼진 단추만 있으면 갈 길이 없다(검토 rev-flow 3번).
+  //   Artist 가 이미 열렸으면 넘김 없이 Artist 로 가기만 하므로 씬 · 샷이 없어도 켠다.
+  it('Artist 가 이미 열린 콘티에서는 씬 · 샷이 없어도 [Artist로 가기]가 켜진다', () => {
+    data.project = { ...data.project, reachedStage: 'artist' } as typeof data.project
+    data.writer.shots = []
+    expect(button(renderToStaticMarkup(createElement(WriterHeader)), 'conti-next-artist')).not.toMatch(/\bdisabled=""/)
+  })
 })
 
 describe('콘티 보드의 단계', () => {
@@ -78,7 +86,9 @@ describe('콘티 보드의 단계', () => {
   //   콘티에서 생긴 말이 Storyboard 채팅에 섞이지 않는다.
   it('콘티 보드의 첫 안내 · 넘김 권유 · 러프 알림은 지금 보는 보드 단계 채팅에 남는다', () => {
     const board = read('src/features/writer/rough-storyboard-view.tsx')
-    expect(board).toMatch(/const boardStage = useProjectStore\(\(s\) => boardStageOf\(s\.currentStage\)\)/)
+    // 보드 단계는 작업 공간이 화면 주소로 정해 넘긴다(리드 2026-11-26 검토 rev-flow 1번 — 지금 단계 값은 첫 순간 앞 화면이다; 동작은 conti-first-mount.test.ts).
+    expect(read('src/features/writer/writer-workspace.tsx')).toMatch(/<RoughStoryboardView stage=\{boardStage\} artistFill=\{artistFill\} \/>/)
+    expect(board).toMatch(/const boardStage = stage \?\? storeBoardStage/)
     expect(board).toMatch(/handoffFrom\(boardStage\)/)
     expect(board).toMatch(/if \(boardStage === 'conti'\) announceRoughModerationFailures\('conti', moderationShots\)/)
     expect(board).not.toMatch(/stage: 'writer'/)
@@ -97,7 +107,9 @@ describe('콘티 보드의 단계', () => {
   //   예전 흐름의 Storyboard(id writer)는 지금처럼 빈 Artist 그림을 채운다.
   it('콘티의 러프를 다 그려도 Artist 인물 · 배경 그림을 미리 그리지 않고, Storyboard 에서는 지금처럼 채운다', () => {
     const board = read('src/features/writer/rough-storyboard-view.tsx')
-    expect(board).toMatch(/if \(!projectId \|\| !roughAllReady \|\| boardStage === 'conti'\) return\n    if \(artistBackfillTriggered\.has\(projectId\)\) return/)
+    // 채우기는 Storyboard 주소에 붙은 보드만(리드 2026-11-26 — 지금 단계 값으로 정하면 붙는 첫 순간 · [Artist로 가기]로 떠나는 순간에 채웠다; 동작은 conti-board-mount.test.ts).
+    expect(read('src/features/writer/writer-workspace.tsx')).toMatch(/const artistFill = boardStageOfPath\(pathname\) === 'writer'/)
+    expect(board).toMatch(/if \(!projectId \|\| !roughAllReady \|\| !artistFill\) return\n    if \(artistBackfillTriggered\.has\(projectId\)\) return/)
   })
 
   // 왜(혼자 정한 것): 산문은 확정했는데 나누기가 걸리지 않은 콘티(저장 단계 conti · 실행은 확정 대기)에는 다시 거는 단추가 있어야 한다.

@@ -9,9 +9,14 @@ import { contentLocale } from '@/lib/i18n/content'
 import { hasNonRequestContext, withoutMediaGenerationProhibition } from '@/lib/handoff-intent'
 import { parseProducerDraft, useProducerStore } from './producer-store'
 import { useProjectStore, type WriterStatusAssets } from './project-store'
+import { STAGES } from '@/lib/constants'
 import type { StageId } from '@/types'
 
-const stages = ['producer', 'writer', 'artist', 'director', 'editor']
+// 단계 순서 — 화면 흐름 그대로(Producer 시작 → Writer 씬 스토리 → 콘티 → Artist → Storyboard → Director → Editor, constants STAGES).
+//   예전 표는 콘티가 없고 Storyboard(writer)가 Artist 앞이라, 저장 단계가 콘티인데 Storyboard 를 열 수 있다고 보고 화면에서만 열었다 —
+//   그 뒤 넘김이 "이미 열렸다"며 단계를 저장하지 않았다(검토 rev-flow 2026-11-26 2번). 모르는 단계는 -1.
+const stages: readonly string[] = STAGES.map((stage) => stage.id)
+const at = (stage: string) => stages.indexOf(stage)
 
 /** 현황 스냅샷의 화면 이름 표 — 순서 · 도구 대상 이름 ↔ 사용자가 보는 화면 이름. */
 //   O1(오너 2026-11-26): Writer 는 산문 뒤에 콘티(rough storyboard, 저장 단계 conti)가 있고 그다음이 Artist 다.
@@ -84,9 +89,14 @@ export function createStudioWorkflow(options: {
     const reached = String(project.data.current_stage ?? 'producer')
     // 새 프로젝트의 트리트먼트 초안(2026-10-02 시안 v04)은 아직 넘기지 않은 실행이다 — 넘긴 Writer 로 치지 않는다.
     const handedOff = status.started === true && status.draft !== true
+    // 예전 흐름 실행 — 산문 확정 전에 넘겨(Invite Writer) 실행은 이어졌는데 저장 단계가 산문 화면(producer)까지에 멈춘 프로젝트.
+    //   산문 확정(O1)은 저장 단계를 콘티로 먼저 올린 뒤 실행을 이어 가므로, 이어진 실행이 콘티 앞에 멈춰 있으면 예전 흐름이다.
+    //   이 프로젝트만 지금처럼 Storyboard 를 열고 아래 navigate 가 단계 표시를 고친다.
+    const legacyStuck = handedOff && at(reached) < at('conti')
     const allowed = ['producer']
-    if (handedOff || stages.indexOf(reached) >= stages.indexOf('writer')) allowed.push('writer')
-    if (stages.indexOf(reached) >= stages.indexOf('artist') && status.assets.images_ready) allowed.push('artist')
+    // Storyboard 는 Artist [완료하기]로 저장 단계가 Storyboard 이상일 때 연다(O1) — 실행이 이어졌다는 것만으로 열지 않는다.
+    if (legacyStuck || at(reached) >= at('writer')) allowed.push('writer')
+    if (at(reached) >= at('artist') && status.assets.images_ready) allowed.push('artist')
     last = {
       projectId: options.projectId, currentStage: useProjectStore.getState().currentStage, reachedStage: reached, allowedStages: allowed,
       // 키 이름은 시험이 못 박아 그대로 둔다 — blockers · softWarnings 는 지금 화면 흐름에 막힌 점이 없어 비어 있다(옛 관문 항목은 note 가 막힌 점이 아니라고 적는다).
@@ -114,10 +124,12 @@ export function createStudioWorkflow(options: {
     check()
     // Refresh readiness only. Never overwrite an unsaved card or start a pipeline.
     useProjectStore.getState().setArtistAssetGate(state.artist as unknown as WriterStatusAssets)
-    if (stages.includes(state.reachedStage)) useProjectStore.getState().unlockThrough(state.reachedStage as StageId)
-    if (state.writer.started) useProjectStore.getState().unlockThrough('writer')
+    // 화면은 저장 단계까지 연다(콘티 포함 순서 그대로) — 화면만 앞서 열면 넘김이 단계를 저장하지 않았다(검토 rev-flow 2번).
+    if (at(state.reachedStage) >= 0) useProjectStore.getState().unlockThrough(state.reachedStage as StageId)
+    // 예전 흐름 실행(저장 단계가 콘티 앞에 멈춤)만 지금처럼 Storyboard 까지 연다. 산문을 확정한 실행은 위 줄이 저장 단계(콘티 이후)까지 연다.
+    if (state.writer.started && at(state.reachedStage) < at('conti')) useProjectStore.getState().unlockThrough('writer')
     // Writer 가 시작됐거나 DB 단계가 producer 를 넘었으면 Producer 는 잠긴다(2026-10-01).
-    if (state.writer.started || stages.indexOf(state.reachedStage) > stages.indexOf('producer')) useProjectStore.getState().lockProducer()
+    if (state.writer.started || at(state.reachedStage) > at('producer')) useProjectStore.getState().lockProducer()
   }
   return createProjectWorkflow({
     read, refresh, isCurrent: () => options.isCurrent() && !options.signal.aborted,
@@ -131,7 +143,7 @@ export function createStudioWorkflow(options: {
         if (saved.error) return { status: 'failed', message: `Writer exists, but its stage could not be saved: ${saved.error.message}` }
         const current = saved.data ?? (await createClient().from('projects').select('current_stage').eq('id', options.projectId).maybeSingle()).data
         check()
-        if (!current || stages.indexOf(current.current_stage) < stages.indexOf('writer')) return { status: 'unverified', message: 'Writer exists, but its saved stage could not be confirmed. Query again before opening.' }
+        if (!current || at(current.current_stage) < at('writer')) return { status: 'unverified', message: 'Writer exists, but its saved stage could not be confirmed. Query again before opening.' }
         last = { ...last, reachedStage: current.current_stage }
       }
       if (last) await refresh(last)

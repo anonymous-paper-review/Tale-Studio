@@ -19,7 +19,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertCircle, AlertTriangle, ChevronDown, Clock, ImageIcon, Loader2, MoreHorizontal, Plus, RefreshCw } from 'lucide-react'
+import { AlertCircle, AlertTriangle, ArrowRight, ChevronDown, Clock, ImageIcon, Loader2, MoreHorizontal, Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -40,9 +40,10 @@ import { StoryboardShotDialog } from '@/features/writer/storyboard-shot-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
-import { boardStageOf } from '@/lib/writer/board-stage'
+import { boardStageOf, type BoardStage } from '@/lib/writer/board-stage'
 import { ContiSplitStart } from '@/features/writer/conti-split-start'
 import { STAGE_PERSONA } from '@/lib/lumi'
+import { stageIndex } from '@/lib/stage-gate'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { handOverToDirector } from '@/features/writer/storyboard-director'
 import { StoryboardDirectorDialog } from '@/features/writer/storyboard-director-dialog'
@@ -168,15 +169,18 @@ export function applyRoughStoryboardZoomShortcut(
   return applyStoryboardZoomShortcut(zoomLevel, event)
 }
 
-export function RoughStoryboardView() {
+export function RoughStoryboardView({ stage, artistFill = false }: { stage?: BoardStage; artistFill?: boolean } = {}) {
   const t = useT()
   // useCallback/useEffect 본문 안에서는 t() 대신 translate()+locale 을 쓴다(#i18n-s5-batch3) —
   //   useT() 의 반환 함수는 매 렌더 새 참조라 deps 에 넣으면 메모이제이션이 무너진다. locale 은
   //   원시값이라 실제로 로케일이 바뀔 때만 재계산을 트리거한다.
   const locale = useLocaleStore((s) => s.locale)
   const projectId = useProjectStore((s) => s.projectId)
-  // 이 보드가 붙은 단계(콘티 · Storyboard, O1 2026-11-26) — 첫 안내 · 넘김 권유 · 알림 · 잠금 Lumi 가 이 단계를 따른다.
-  const boardStage = useProjectStore((s) => boardStageOf(s.currentStage))
+  // 이 보드가 붙은 단계(콘티 · Storyboard, O1 2026-11-26) — 첫 안내 · 넘김 권유 · 알림 · 잠금 Lumi · Artist 그림 채우기가 이 단계를 따른다.
+  //   작업 공간이 화면 주소로 정해 넘긴다 — 지금 단계 값은 이 보드가 처음 붙는 순간 아직 앞 화면이라, 그 값을 보면 첫 효과에서 콘티 보드가
+  //   자기를 Storyboard 로 알아 Artist 그림을 그렸다(검토 rev-flow 2026-11-26 1번). 주소 없이 그린 때(시험)만 지금 단계 값을 본다.
+  const storeBoardStage = useProjectStore((s) => boardStageOf(s.currentStage))
+  const boardStage = stage ?? storeBoardStage
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
@@ -287,8 +291,10 @@ export function RoughStoryboardView() {
   //   동시성 1(ARTIST_GENERATION_CONCURRENCY)이라 큐를 1슬롯만 점유하고, 나머지 슬롯은
   //   유저가 writer 에서 수정·재생성할 때를 위해 비워 둔다. 멱등: 채워진 칸 skip + 서버 dedupe.
   //   O1(오너 2026-11-26): 콘티에서는 채우지 않는다 — Artist 그림은 Artist [이미지 만들기]가 그린다(그림체를 보고 고른 뒤).
+  //   채우기는 Storyboard 주소에 붙은 보드만 한다(작업 공간이 주소로 정해 넘긴 artistFill, 넘기지 않으면 하지 않음) — 지금 단계 값으로 정하면
+  //   콘티 보드가 붙는 첫 순간과 [Artist로 가기]로 값이 artist 가 된 떠나는 순간에 자기를 Storyboard 로 보고 채웠다(검토 rev-flow 1번 · m-artist 재현).
   useEffect(() => {
-    if (!projectId || !roughAllReady || boardStage === 'conti') return
+    if (!projectId || !roughAllReady || !artistFill) return
     if (artistBackfillTriggered.has(projectId)) return
     artistBackfillTriggered.add(projectId)
     void (async () => {
@@ -314,7 +320,7 @@ export function RoughStoryboardView() {
         })
       })
     })()
-  }, [projectId, roughAllReady, boardStage])
+  }, [projectId, roughAllReady, artistFill])
   useEffect(() => {
     if (!projectId || !roughAllReady || !chatHistoryLoaded) return
     // 콘티의 러프가 다 그려지면 Artist 로 넘어가자고 권한다(O1 — 콘티 다음은 Artist). Storyboard 는 넘김 표에 없어 권하지 않는다.
@@ -1157,6 +1163,10 @@ export function RoughStoryboardView() {
     // 산문은 확정했는데(저장 단계 conti) 씬 · 샷 나누기가 걸리지 않은 콘티 — 다시 거는 단추를 둔다(O1 2026-11-26).
     //   예전 흐름으로 Artist 까지 간 프로젝트(저장 단계 artist)는 지금처럼 Artist [만들기]로 나눈다.
     const contiSplitPending = boardStage === 'conti' && reachedStage === 'conti' && status?.current_status === 'awaiting_confirmation'
+    // 예전 흐름(콘티가 Artist 앞에 오기 전)으로 Artist 까지 연 프로젝트 — 실행이 산문 초안 그대로라 씬 · 샷은 Artist 목록 단추
+    //   [목록이 맞아요 · 그림 만들기](예전 [만들기])가 나눈다. 안내는 그 단추 이름을 그대로 부른다(화면 확인 2026-11-26).
+    //   "다음" · [콘티로 가기] · 레일 Writer 가 이 콘티로 데려오므로 할 일과 Artist 로 가는 단추를 보인다(검토 rev-flow 2026-11-26 3번, 혼자 정한 것).
+    const splitInArtist = boardStage === 'conti' && stageIndex(reachedStage) >= stageIndex('artist') && status?.draft === true
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <WriterHeader description={headerDescription} />
@@ -1165,8 +1175,18 @@ export function RoughStoryboardView() {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
             <ImageIcon className="size-10 text-subtle-foreground" />
-            <p className="text-body font-semibold text-foreground">{contiSplitPending ? t('The prose is confirmed. Start splitting it into scenes and shots.') : waiting ? progress.label : t('No scenes or shots generated yet')}</p>
-            {contiSplitPending ? (
+            <p className="text-body font-semibold text-foreground">{splitInArtist ? t('Scenes and shots are split in Artist.') : contiSplitPending ? t('The prose is confirmed. Start splitting it into scenes and shots.') : waiting ? progress.label : t('No scenes or shots generated yet')}</p>
+            {splitInArtist ? (
+              <>
+                <p className="max-w-md text-caption text-muted-foreground">
+                  {t('In this project, pressing “{button}” in Artist splits the confirmed prose into scenes and shots. The rough storyboard appears here after that.', { button: t('The list is right · make the images') })}
+                </p>
+                <Button onClick={() => void useGlobalChatStore.getState().requestNextStep()} data-testid="conti-split-in-artist">
+                  {t('Go to Artist')}
+                  <ArrowRight className="size-4" />
+                </Button>
+              </>
+            ) : contiSplitPending ? (
               <ContiSplitStart />
             ) : status?.pipeline_failed ? (
               <>

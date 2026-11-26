@@ -3,13 +3,14 @@
 // Storyboard(id writer) 워크스페이스 — 탭 뷰를 동시에 마운트해 내부 상태를 보존한다.
 
 import { useEffect, useRef, useState } from 'react'
+import { usePathname } from 'next/navigation'
 import { DialogueView } from '@/features/writer/dialogue-view'
 import { RoughStoryboardView } from '@/features/writer/rough-storyboard-view'
 import { WriterGenerationView } from '@/features/writer/writer-generation-view'
 import { WriterV2Preview } from '@/features/writer/writer-v2-preview'
 import { StageWaitCard } from '@/components/feedback/stage-wait'
 import { useStoryboardWait } from '@/hooks/use-stage-wait'
-import { boardStageOf } from '@/lib/writer/board-stage'
+import { boardStageAt, boardStageOfPath } from '@/lib/writer/board-stage'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
@@ -60,7 +61,13 @@ export function WriterWorkspace() {
   // 샷을 아직 다 읽기 전에는 "아직 생성된 씬·샷이 없어요" 대신 Storyboard 기다리는 카드(오너 2026-11-26 m1126 G1, hooks/use-stage-wait).
   const storyboardWait = useStoryboardWait()
   // 같은 보드를 콘티(/studio/conti)와 Storyboard 가 쓴다 — 기다리는 카드도 지금 단계 것(콘티는 Writer 옷 "콘티를 불러오는 중…", O1 · G1 2026-11-26).
-  const boardStage = useProjectStore((state) => boardStageOf(state.currentStage))
+  //   단계는 화면 주소로 정해 보드 · 대사 탭에 넘긴다 — 지금 단계 값은 보드가 처음 붙는 순간 아직 앞 화면이다(검토 rev-flow 1번, board-stage.ts).
+  const pathname = usePathname()
+  const storeStage = useProjectStore((state) => state.currentStage)
+  const boardStage = boardStageAt(pathname, storeStage)
+  // 빈 Artist 그림 채우기는 Storyboard 주소(/studio/writer)에 붙은 보드만 한다 — 콘티 주소면 지금 단계 값이 무엇이든 하지 않는다:
+  //   붙는 첫 순간(값이 아직 앞 화면)도, [Artist로 가기]가 값을 artist 로 올린 떠나는 순간(화면을 옮기기 전)도(리드 2026-11-26, m-artist 재현).
+  const artistFill = boardStageOfPath(pathname) === 'writer'
   const debugGeneration = useGenerationDebug()
 
   // V2 프로젝트 진입 동선 (#v2-tab 2026-08-17): 이전엔 engine=v2 면 프리뷰가 워크스페이스를
@@ -132,7 +139,7 @@ export function WriterWorkspace() {
           visibleTab === 'storyboard' ? cn('flex min-h-0 flex-1 flex-col', slideClass) : 'hidden',
         )}
       >
-        <RoughStoryboardView />
+        <RoughStoryboardView stage={boardStage} artistFill={artistFill} />
       </div>
       <div
         aria-hidden={visibleTab !== 'dialogue'}
@@ -140,7 +147,7 @@ export function WriterWorkspace() {
           visibleTab === 'dialogue' ? cn('flex min-h-0 flex-1 flex-col', slideClass) : 'hidden',
         )}
       >
-        <DialogueView />
+        <DialogueView stage={boardStage} />
       </div>
     </div>
   )

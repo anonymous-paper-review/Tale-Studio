@@ -21,7 +21,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
-import { boardStageOf } from '@/lib/writer/board-stage'
+import { boardStageOf, type BoardStage } from '@/lib/writer/board-stage'
 import { DialogueLineRow, type DialogueLineState } from '@/features/writer/dialogue-line-row'
 import { saveShotDialogue, shotDialogueLines } from '@/features/writer/dialogue-line-save'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
@@ -73,8 +73,10 @@ interface LineSave extends LineDraft {
   saved: string
 }
 
-export function DialogueView() {
-  const boardStage = useProjectStore((s) => boardStageOf(s.currentStage))
+export function DialogueView({ stage }: { stage?: BoardStage } = {}) {
+  // 이 탭이 붙은 보드 단계 — 작업 공간이 화면 주소로 정해 넘긴다(보드와 같은 규칙, 검토 rev-flow 1번). 주소 없이 그린 때(시험)만 지금 단계 값.
+  const storeBoardStage = useProjectStore((s) => boardStageOf(s.currentStage))
+  const boardStage = stage ?? storeBoardStage
   const t = useT()
   // 씬 · 샷 이름은 화면 언어(오너 2026-11-14 답 7).
   const locale = useLocaleStore((s) => s.locale)
