@@ -281,8 +281,10 @@ interface ProducerState {
    *  이 목록을 함께 고친 결과로 목록을 바꾼다. 받지 않으면 목록은 그대로이고 까닭(화면 언어)을 돌려준다. */
   applyRecheck: (ops: RecheckOp[], kept?: string[]) => Promise<{ ok: true } | { ok: false; error: string; reloaded?: true }>
   /** artistGate(리뉴얼 1차): Artist [만들기] — 확정 산문 초안을 이어 가며 Artist 화면에 머문다. 2026-10-20부터 디자인 뒤에도 멈추지 않고
-   *  씬 · 샷까지 이어 만든다(서버에 멈춤 표시를 보내지 않는다 — 오너 "Artist 만들면서 씬 · 샷 · Storyboard 도 같이"). */
-  saveAndHandoff: (options?: { rerun?: boolean; artistGate?: boolean }) => Promise<boolean>
+   *  씬 · 샷까지 이어 만든다(서버에 멈춤 표시를 보내지 않는다 — 오너 "Artist 만들면서 씬 · 샷 · Storyboard 도 같이").
+   *  conti(O1 오너 2026-11-26 "콘티를 Artist 앞에"): 산문 확정 뒤 확정 산문 초안을 이어 가 디자인 · 씬 · 샷 나누기를 건다 — 저장 단계는 콘티
+   *  (확정이 이미 올렸다)에서 더 올리지 않고 콘티 화면에 머문다. 인물 · 배경 그림은 Artist [만들기]가 그린다(lib/artist/draft-trigger). */
+  saveAndHandoff: (options?: { rerun?: boolean; artistGate?: boolean; conti?: boolean }) => Promise<boolean>
   loadProject: () => Promise<void>
   clearError: () => void
   reset: () => void
@@ -1347,8 +1349,8 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
             backgrounds: backgroundContract,
           }),
         })
-        // Artist [만들기]는 확정한 산문 초안을 늘 이어 간다(산문 확정이 화면의 초안 표시를 내렸어도).
-        const continueDraft = options?.artistGate === true || (useProjectStore.getState().treatmentDraft && options?.rerun !== true)
+        // Artist [만들기] · 산문 확정 뒤 콘티(O1)는 확정한 산문 초안을 늘 이어 간다(산문 확정이 화면의 초안 표시를 내렸어도).
+        const continueDraft = options?.artistGate === true || options?.conti === true || (useProjectStore.getState().treatmentDraft && options?.rerun !== true)
         let writerResponse = await requestStart(continueDraft)
         if (continueDraft && writerResponse.status === 409) {
           const body = await writerResponse.clone().json().catch(() => ({}))
@@ -1415,23 +1417,26 @@ export const useProducerStore = create<ProducerState>((set, get) => ({
         throw writerErr
       }
 
-      const { error: stageError } = await supabase
-        .from('projects')
-        .update({
-          // current_stage 는 MVP에서 "최고로 열린 단계"로 재사용한다.
-          // Writer 시작 성공 후에만 DB unlock을 artist까지 올린다.
-          current_stage: 'artist',
-        })
-        .eq('id', projectId)
-      if (stageError) throw stageError
+      // 콘티(O1): 저장 단계는 산문 확정이 이미 conti 로 올렸다 — Artist 는 콘티의 [Artist로 가기]가 연다.
+      if (options?.conti !== true) {
+        const { error: stageError } = await supabase
+          .from('projects')
+          .update({
+            // current_stage 는 MVP에서 "최고로 열린 단계"로 재사용한다.
+            // Writer 시작 성공 후에만 DB unlock을 artist까지 올린다.
+            current_stage: 'artist',
+          })
+          .eq('id', projectId)
+        if (stageError) throw stageError
+      }
       if (useProjectStore.getState().projectId !== projectId) return false
 
-      useProjectStore.getState().unlockThrough('artist')
+      useProjectStore.getState().unlockThrough(options?.conti === true ? 'conti' : 'artist')
       // Writer 가 시작됐고 DB 단계도 넘어갔다 — 이 순간부터 Producer 는 잠긴다(새 프로젝트만 새로 시작).
       useProjectStore.getState().lockProducer()
       // 확정 단계가 있으면 Producer 화면에 머문다(씬 스토리 확인·수정·확정 뒤 Writer 로).
       //   Artist [만들기](리뉴얼 1차)는 Artist 에 머문다 — Storyboard 는 [완료하기]가 연다.
-      if (!gated && options?.artistGate !== true) useProjectStore.getState().setStage('writer')
+      if (!gated && options?.artistGate !== true && options?.conti !== true) useProjectStore.getState().setStage('writer')
       set({ syncing: false, lastHandoffGated: gated })
       return true
     } catch (err) {

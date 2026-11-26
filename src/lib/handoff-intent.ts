@@ -13,6 +13,8 @@ import type { StageId } from '@/types'
 export interface HandoffSpec {
   from: StageId
   to: StageId
+  /** 목적지 말 말고도 이 넘김으로 알아듣는 단계 이름(예: 씬 스토리에서 "Artist로" — O1 2026-11-26). */
+  alsoTo?: readonly StageId[]
   /** 제안 버튼을 누르면 채팅에 그대로 입력되는 문장. */
   utterance: string
   /** 제안 버튼 라벨. */
@@ -24,11 +26,21 @@ export interface HandoffSpec {
 //   채팅에 전송되므로, 번역 후에도 MOVE_WORDS(예: 'handover')·STAGE_WORDS 매칭 토큰을 포함해야
 //   matchHandoffIntent 가 여전히 인식한다 — "Please hand over to {Stage}" 형태로 고정.
 // 리뉴얼 1차(2026-10-19): 넘김 순서 = Writer(id producer) → Artist → Storyboard(id writer) → Director → Editor.
+//   O1(오너 2026-11-26 "콘티를 Artist 앞에"): Writer 씬 스토리(id producer) → Writer 콘티(id conti) → Artist → Storyboard.
+//     씬 스토리 → 콘티는 산문 확정(확정 창), 콘티 → Artist 는 [Artist로 가기](예전 씬 스토리 → Artist 의 말 그대로).
 //   Producer(id entry) → Writer 는 시작 화면의 [시작] 버튼이 맡아 채팅 넘김이 없다.
 //   Storyboard → Director 는 아래 resolveDirectorHandoffIntent 전용 길이라 이 표에 없다.
 export const HANDOFFS: readonly HandoffSpec[] = [
   {
     from: 'producer',
+    to: 'conti',
+    utterance: 'Please hand over to the rough storyboard',
+    label: 'Hand over to the rough storyboard',
+    // 쓰던 말버릇 "Artist로 넘겨줘"도 씬 스토리에서는 산문 확정 창을 연다 — Artist 는 콘티 다음이다(혼자 정한 것 · O1).
+    alsoTo: ['artist'],
+  },
+  {
+    from: 'conti',
     to: 'artist',
     utterance: 'Please hand over to Artist',
     label: 'Hand over to Artist',
@@ -61,8 +73,8 @@ export type NextStepAction =
   | { kind: 'open'; stage: StageId; label: string }
 
 export function nextStepAction(stage: StageId, opts: { producerLocked: boolean }): NextStepAction | null {
-  // 산문을 확정한 Writer(id producer)는 다시 넘기지 않고 Artist 화면으로 가기만 한다.
-  if (stage === 'producer' && opts.producerLocked) return { kind: 'open', stage: 'artist', label: 'Go to Artist' }
+  // 산문을 확정한 Writer 씬 스토리(id producer)는 다시 넘기지 않고 콘티 화면으로 가기만 한다(O1 2026-11-26).
+  if (stage === 'producer' && opts.producerLocked) return { kind: 'open', stage: 'conti', label: 'Go to the rough storyboard' }
   const spec = handoffFrom(stage)
   return spec ? { kind: 'handoff', ...spec } : null
 }
@@ -72,6 +84,8 @@ export function nextStepAction(stage: StageId, opts: { producerLocked: boolean }
 const STAGE_WORDS: Record<StageId, readonly string[]> = {
   entry: ['producer', '프로듀서'],
   producer: ['writer', '작가', '라이터'],
+  // 콘티(O1 2026-11-26) — 한국어 "콘티", 영어 화면 이름 "rough storyboard"(띄어쓰기는 normalize 가 지운다).
+  conti: ['conti', '콘티', 'roughstoryboard', '러프스토리보드'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
   writer: ['storyboard', '스토리보드'], // i18n-ok: 사용자 말에서 단계 이름을 알아듣는 단어
   artist: ['artist', '아티스트', '컨셉아티스트'],
   director: ['director', '디렉터', '디렉타', '감독'],
@@ -154,7 +168,7 @@ export function matchStoryboardToDirector(text: string): boolean {
 //   앞에는 맞장구 · please · let's 만, 뒤에는 please · now · then 만 올 수 있다(앞에 쉼표가 있어도 된다 — "Go to next stage, please"). 대상은 "다음 단계" 또는 그 단계 이름(Storyboard · Artist …)이다.
 const EN_GO_LEAD = "^(?:(?:ok(?:ay)?|yes|yeah|yep|sure|alright|great|good|now|then|so|and|please|let(?:['’]?s|\\s+us))[\\s,.!]*)*"
 function englishGoNext(request: string, spec: HandoffSpec): boolean {
-  const names = STAGE_WORDS[spec.to].filter((word) => /^[a-z]+$/i.test(word))
+  const names = [spec.to, ...(spec.alsoTo ?? [])].flatMap((stage) => STAGE_WORDS[stage]).filter((word) => /^[a-z]+$/i.test(word))
   const destination = ['next\\s+(?:step|stage|screen|tab|phase)', ...names].join('|')
   const re = new RegExp(`${EN_GO_LEAD}(?:go|move|head)\\s+(?:on\\s+)?(?:to|onto)\\s+(?:the\\s+)?(?:${destination})(?:[\\s,]+(?:please|now|then))?[\\s.!]*$`, 'i')
   return re.test(request.trim())
@@ -166,7 +180,7 @@ function matchHandoffSpec(text: string, spec: HandoffSpec): HandoffSpec | null {
   if (englishGoNext(request, spec)) return spec
   const t = normalize(request)
   if (!MOVE_WORDS.some((w) => t.includes(normalize(w)))) return null
-  const mentionsTarget = STAGE_WORDS[spec.to].some((w) => t.includes(normalize(w)))
+  const mentionsTarget = [spec.to, ...(spec.alsoTo ?? [])].some((stage) => STAGE_WORDS[stage].some((w) => t.includes(normalize(w))))
   const mentionsNextStep = NEXT_STEP_WORDS.some((w) => t.includes(w))
   return mentionsTarget || mentionsNextStep ? spec : null
 }

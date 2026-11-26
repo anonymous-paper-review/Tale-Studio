@@ -55,9 +55,10 @@ describe('영어 다음 단계 말', () => {
   })
 
   it('다른 단계의 넘김도 같은 꼴을 읽는다', () => {
-    // 왜: 말 읽기는 단계마다 하나다 — Writer 에서는 Artist, Director 에서는 Editor 로 간다.
-    expect(matchHandoffIntent('move to the next step', 'producer')?.to).toBe('artist')
-    expect(matchHandoffIntent('go to artist', 'producer')?.to).toBe('artist')
+    // 왜: 말 읽기는 단계마다 하나다 — Writer 씬 스토리에서는 콘티(O1 2026-11-26, 예전 말 "Artist"도 콘티로), 콘티에서는 Artist, Director 에서는 Editor 로 간다.
+    expect(matchHandoffIntent('move to the next step', 'producer')?.to).toBe('conti')
+    expect(matchHandoffIntent('go to artist', 'producer')?.to).toBe('conti')
+    expect(matchHandoffIntent('go to artist', 'conti')?.to).toBe('artist')
     expect(matchHandoffIntent('go to the next stage', 'director')?.to).toBe('editor')
     expect(matchHandoffIntent('head to the editor', 'director')?.to).toBe('editor')
     // 넘길 곳이 없는 단계(Editor 마지막)는 읽지 않는다.

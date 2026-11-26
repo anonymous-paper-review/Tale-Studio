@@ -13,6 +13,7 @@ import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { lookChipClass } from '@/features/artist/card-parts'
 import { PropAppearanceCreateDialog } from '@/features/artist/prop-appearance-create-dialog'
 import { PropViewDialog, usePropStyleId } from '@/features/artist/prop-view-dialog'
+import { ArtistHistoryHover } from '@/features/artist-room/artist-history-hover'
 import { propSlotKey } from '@/lib/artist/props'
 import { failureBadge } from '@/lib/artist/failure-badge'
 import { propImageStale } from '@/lib/artist/prop-image'
@@ -34,7 +35,16 @@ export function mentionPropCard(name: string, clientX: number, clientY: number):
   launchMentionFlight({ label: name, clickX: clientX, clickY: clientY, toChat: !removing })
 }
 
-export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoomStep?: (dir: 1 | -1) => void }) {
+export function PropPanel({
+  columns = 1,
+  onZoomStep,
+  drawLocked = false,
+}: {
+  columns?: number
+  onZoomStep?: (dir: 1 | -1) => void
+  /** Artist 새 흐름(m1126 O1)의 [만들기] 전 — 카드 [그리기]를 숨긴다. 그림은 [이미지 만들기]로 시작한다(하나만 그리면 이어 그리기가 나머지를 다 그린다). */
+  drawLocked?: boolean
+}) {
   const t = useT()
   const projectId = useProjectStore((s) => s.projectId)
   const propAssets = useArtistStore((s) => s.propAssets)
@@ -51,6 +61,12 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
   const [viewing, setViewing] = useState<string | null>(null)
   // [+ 모습 추가] 창(m1126 A3) — 배경 카드와 같다.
   const [createFor, setCreateFor] = useState<string | null>(null)
+  // 지난 그림 줄(m1126 A4)에서 누른 그림 — 그림 창이 그 그림을 먼저 보이고 [채택]을 단다. 다른 길로 열면 비운다.
+  const [viewCandidate, setViewCandidate] = useState<string | null>(null)
+  const openDetail = (propId: string, candidateId: string | null = null) => {
+    setViewCandidate(candidateId)
+    setViewing(propId)
+  }
   const noteSelection = (propId: string) => {
     if (projectId) useArtistStore.getState().setChatSelection({ projectId, target: 'prop', id: propId, appearanceKey: DEFAULT_LOCATION_APPEARANCE_KEY, source: 'card' })
   }
@@ -108,9 +124,16 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
       e.stopPropagation()
       void useArtistStore.getState().generateProp(prop.propId, 'ui', variant ? { appearanceKey: variant.appearanceKey } : undefined)
     }
+    // 지난 그림 줄(m1126 A4) — 카드에 마우스를 올리면 아래에 고른 모습의 지난 그림이 5개까지. 누르면 그림 창이 그 그림을 먼저 보인다.
     return (
-      <div
+      <ArtistHistoryHover
         key={prop.propId}
+        candidates={variant ? variant.candidates : prop.candidates}
+        shownUrl={shownImage}
+        onOpen={(candidateId) => { select(); openDetail(prop.propId, candidateId) }}
+        onMore={() => { select(); openDetail(prop.propId) }}
+      >
+      <div
         role="button"
         tabIndex={0}
         data-testid="artist-prop-card"
@@ -130,7 +153,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
           mentionPropCard(prop.name, e.clientX, e.clientY)
         }}
         // 두 번 누르기 = 그림 누르기와 같다(인물 · 배경 카드와 같다) — 그림 창.
-        onDoubleClick={() => setViewing(prop.propId)}
+        onDoubleClick={() => openDetail(prop.propId)}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') select()
         }}
@@ -185,7 +208,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
           onClick={(e) => {
             e.stopPropagation()
             select()
-            setViewing(prop.propId)
+            openDetail(prop.propId)
           }}
           className="relative block w-full overflow-hidden rounded-[14px] focus:outline-none focus-visible:ring-2 focus-visible:ring-ring hover-red-beam"
         >
@@ -194,7 +217,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
 
         {/* 그리기 · 다시 그리기(무료) — 실패했거나 바뀌었으면 다시 그리기, 그림이 없으면 그리기. 그리는 중에는 숨긴다(두 번 그리지 않게).
             데모(보기 전용 공유)는 그리지 않으므로 단추를 보이지 않는다. */}
-        {generating || demo ? null : failure || contentRefused || (shownImage && stale !== 'fresh') ? (
+        {generating || demo || drawLocked ? null : failure || contentRefused || (shownImage && stale !== 'fresh') ? (
           <Button size="sm" variant="outline" className="mt-2.5" onClick={draw} data-testid="artist-prop-redraw">
             <RefreshCw className="size-3.5" />{t('Redraw')}
           </Button>
@@ -214,13 +237,14 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
             : t('Not in any shot yet')}
         </p>
       </div>
+      </ArtistHistoryHover>
     )
   }
 
   return (
     <div ref={wheelRef} data-testid="artist-prop-cards">
       <div className={gridClass}>{propAssets.map(card)}</div>
-      <PropViewDialog propId={viewing} onClose={() => setViewing(null)} onAddAppearance={(id) => setCreateFor(id)} />
+      <PropViewDialog propId={viewing} viewCandidateId={viewCandidate} onClose={() => setViewing(null)} onAddAppearance={(id) => setCreateFor(id)} />
       <PropAppearanceCreateDialog propId={createFor} onClose={() => setCreateFor(null)} />
     </div>
   )

@@ -217,8 +217,8 @@ describe('정한 수정안 카드는 바로 내려간다', () => {
 })
 
 describe('산문 확정', () => {
-  // 왜: [예, 확정하기] → 산문 목록을 저장하고 확정을 보낸 뒤 Artist 를 연다(산문은 잠긴다).
-  it('산문을 확정하면 인물 · 배경 목록을 저장하고 Artist 를 연다', async () => {
+  // 왜: [예, 확정하기] → 산문 목록을 저장하고 확정을 보낸 뒤 콘티를 연다(산문은 잠긴다 — O1 오너 2026-11-26 "콘티를 Artist 앞에").
+  it('산문을 확정하면 인물 · 배경 목록을 저장하고 콘티를 연다', async () => {
     const save = vi.spyOn(useProducerStore.getState(), 'saveDraftNow').mockResolvedValue(true)
     request.mockResolvedValue(Response.json({ ok: true }))
 
@@ -228,7 +228,7 @@ describe('산문 확정', () => {
     expect(save).toHaveBeenCalled()
     expect(bodies()).toEqual([{ url: '/api/writer/prose-confirm', body: { projectId: 'prose-project' } }])
     expect(useProjectStore.getState().producerLocked).toBe(true)
-    expect(useProjectStore.getState().reachedStage).toBe('artist')
+    expect(useProjectStore.getState().reachedStage).toBe('conti')
     save.mockRestore()
   })
 

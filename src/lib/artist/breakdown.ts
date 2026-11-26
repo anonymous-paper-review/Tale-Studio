@@ -51,7 +51,8 @@ export function rowsToDraw<T extends Pick<BreakdownRow, 'imageAsIs'>>(rows: read
   return { draw, asIs: rows.length - draw.length }
 }
 
-export type ArtistPhase = 'list' | 'making' | 'cards' | 'done'
+/** ready = Artist 새 흐름(m1126 O1)의 [만들기] 기다림 — 디자인 · 씬 · 샷은 산문 확정 뒤에 끝났고 그림은 아직 그리지 않았다. */
+export type ArtistPhase = 'list' | 'making' | 'ready' | 'cards' | 'done'
 
 type RunStatusLike = { started?: boolean; current_status?: string | null; current_stage?: string | null; pipeline_completed?: boolean; pipeline_failed?: boolean } | null | undefined
 
@@ -78,13 +79,32 @@ export function artistPhase(input: {
   hasAssets: boolean
   /** [완료하기]를 해 Storyboard 가 열렸다(예전 흐름으로 끝까지 만든 프로젝트 포함) — 다시 완료하지 않는다. */
   artistCompleted?: boolean
+  /** Artist 새 흐름(m1126 O1): 씬 · 샷이 이미 나뉘었다(샷 행이 있다). 주지 않으면 예전 흐름 그대로. */
+  shotsExist?: boolean
+  /** 인물 · 배경 · 소품 그림 작업이 한 번이라도 있었다(images-started) — null 은 아직 모름. */
+  imagesStarted?: boolean | null
+  /** 카드에 그림이 하나라도 있다(사람이 올린 그림 포함) — 그림 작업 기록을 모를 때만 본다. */
+  anyImage?: boolean
+  /** 그리는 중인 그림이 있다(화면이 보냈거나 서버가 그리는 중). */
+  drawing?: boolean
+  /** 모든 카드(인물 · 배경 · 소품)에 그림이 이미 있다 — [이미지 만들기]로 그릴 것이 없다(작업 기록 없이 옮겨 온 프로젝트 · 올린 그림으로 다 채움). */
+  allDrawn?: boolean
 }): ArtistPhase {
   if (input.draftRun) return 'list'
   const status = input.status
   if (status?.started && !status.pipeline_completed && !status.pipeline_failed && DESIGN_STEPS.has(status.current_stage ?? '') && status.current_status !== 'awaiting_artist') return 'making'
   if (input.artistCompleted) return 'done'
   // 2026-10-20: [만들기]는 디자인 뒤에도 멈추지 않고 씬 · 샷을 나눈다 — 디자인이 끝났으면 완료하기 전까지 카드와 [완료하기]다.
-  if (designFinished(status)) return input.hasAssets ? 'cards' : 'making'
+  if (designFinished(status)) {
+    if (!input.hasAssets) return 'making'
+    // m1126 O1(콘티를 Artist 앞에): 디자인 · 씬 · 샷 나누기가 산문 확정 뒤에 끝났고 그림은 아직이다 — 그림체와 [만들기]를 기다린다(리드 2차).
+    //   그림 작업 기록을 모를 때(새로고침 직후)는 그림이 있으면 예전처럼 카드로 본다.
+    if (input.shotsExist && !input.drawing && !input.allDrawn) {
+      const notStarted = input.imagesStarted === false || (input.imagesStarted == null && input.anyImage === false)
+      if (notStarted) return 'ready'
+    }
+    return 'cards'
+  }
   return 'done'
 }
 

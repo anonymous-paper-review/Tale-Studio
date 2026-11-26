@@ -39,7 +39,7 @@ import { fetchArtistGenerationLimit, runAdaptivePool } from '@/lib/artist/genera
 import { characterRefusalKey } from '@/lib/artist/failure-badge'
 import { DRAW_CONTINUE_MAX_ROUNDS, STYLE_WAIT_RECHECK_MS, USER_LIMIT_RECHECK_MS, missingDrawTargets, USER_LIMIT_WAIT_MAX_MS } from '@/lib/artist/draw-continue'
 import type { ArtistSection } from '@/lib/artist/card-filter'
-import { DEFAULT_PROP_APPEARANCE_KEY, orderPropsByUsage, propAssetsFromRows, propAppearancesByProp, propSlotKey, propUsage, propsToAutoDraw, type PropAppearanceRow, type PropRow, type PropUsage } from '@/lib/artist/props'
+import { DEFAULT_PROP_APPEARANCE_KEY, orderPropsByUsage, propAssetsFromRows, propAppearancesByProp, propCandidatesBySlot, propSlotKey, propUsage, propsToAutoDraw, type PropAppearanceRow, type PropCandidateRow, type PropRow, type PropUsage } from '@/lib/artist/props'
 // 최종 룩 요약(design_tokens 파생) — 옛 온보딩 버블 카피용으로 태어났지만(2026-08-06 제거)
 //   "지금 룩이 뭔지"의 파생 상태로 남긴다. 채팅 컨텍스트·향후 UI가 소비.
 export interface ArtistLookSummary {
@@ -545,19 +545,29 @@ async function refreshPropAppearanceRow(
   set: (fn: (state: ArtistState) => Partial<ArtistState>) => void,
 ): Promise<void> {
   try {
-    const { data } = await createClient()
-      .from('prop_appearances')
-      .select('prop_id, appearance_key, label, narrative_time, appearance, appearance_native, image_url, source_hash')
-      .eq('project_id', projectId)
-      .eq('prop_id', propId)
-      .eq('appearance_key', appearanceKey)
-      .maybeSingle()
+    const [{ data }, candidates] = await Promise.all([
+      createClient()
+        .from('prop_appearances')
+        .select('prop_id, appearance_key, label, narrative_time, appearance, appearance_native, image_url, source_hash')
+        .eq('project_id', projectId)
+        .eq('prop_id', propId)
+        .eq('appearance_key', appearanceKey)
+        .maybeSingle(),
+      readPropSlotCandidates(projectId, propId, appearanceKey),
+    ])
     if (!data || useProjectStore.getState().projectId !== projectId) return
     const fresh = propAppearancesByProp([data as PropAppearanceRow]).get(propId)?.[0]
     if (!fresh) return
     set((state) => ({
       propAssets: state.propAssets.map((p) =>
-        p.propId === propId ? { ...p, appearances: (p.appearances ?? []).map((a) => (a.appearanceKey === appearanceKey ? fresh : a)) } : p,
+        p.propId === propId
+          ? {
+              ...p,
+              appearances: (p.appearances ?? []).map((a) =>
+                a.appearanceKey === appearanceKey ? { ...fresh, ...(candidates ? { candidates } : a.candidates ? { candidates: a.candidates } : {}) } : a,
+              ),
+            }
+          : p,
       ),
     }))
   } catch {
@@ -566,23 +576,52 @@ async function refreshPropAppearanceRow(
 }
 
 /** 소품 행 하나를 다시 읽는다(D7) — 다 그린 그림 · 그림 지문 · 생김새를 카드에 넣는다(best-effort). */
+/** 그 칸(소품 × 모습)의 지난 그림을 다시 읽는다(m1126 A4) — 새로 그린 그림이 선택본이 되고 앞 그림이 지난 그림이 된다. 못 읽으면 null(있던 것 그대로). */
+async function readPropSlotCandidates(projectId: string, propId: string, appearanceKey: string): Promise<CandidateImage[] | null> {
+  try {
+    const { data, error } = await createClient()
+      .from('prop_image_candidates')
+      .select('id, prop_id, appearance_key, url, source_hash, is_selected, generated_at')
+      .eq('project_id', projectId)
+      .eq('prop_id', propId)
+      .eq('appearance_key', appearanceKey)
+    if (error || !data) return null
+    return propCandidatesBySlot(data as PropCandidateRow[]).get(propSlotKey(propId, appearanceKey)) ?? []
+  } catch {
+    return null
+  }
+}
+
 async function refreshPropRow(
   projectId: string,
   propId: string,
   set: (fn: (state: ArtistState) => Partial<ArtistState>) => void,
 ): Promise<void> {
   try {
-    const { data } = await createClient()
-      .from('props')
-      .select('prop_id, name, appearance, appearance_native, image_url, source_hash, origin')
-      .eq('project_id', projectId)
-      .eq('prop_id', propId)
-      .maybeSingle()
+    const [{ data }, candidates] = await Promise.all([
+      createClient()
+        .from('props')
+        .select('prop_id, name, appearance, appearance_native, image_url, source_hash, origin')
+        .eq('project_id', projectId)
+        .eq('prop_id', propId)
+        .maybeSingle(),
+      readPropSlotCandidates(projectId, propId, DEFAULT_PROP_APPEARANCE_KEY),
+    ])
     if (!data || useProjectStore.getState().projectId !== projectId) return
     const [fresh] = propAssetsFromRows([data as PropRow], new Set())
     if (!fresh) return
-    // 모습 목록은 이 행에 없다 — 카드가 들고 있던 모습을 그대로 둔다(m1126 A3).
-    set((state) => ({ propAssets: state.propAssets.map((p) => (p.propId === propId ? { ...fresh, ...(p.appearances ? { appearances: p.appearances } : {}) } : p)) }))
+    // 모습 목록은 이 행에 없다 — 카드가 들고 있던 모습을 그대로 둔다(m1126 A3). 지난 그림은 새로 읽은 것(못 읽었으면 있던 것).
+    set((state) => ({
+      propAssets: state.propAssets.map((p) =>
+        p.propId === propId
+          ? {
+              ...fresh,
+              ...(p.appearances ? { appearances: p.appearances } : {}),
+              ...(candidates ? { candidates } : p.candidates ? { candidates: p.candidates } : {}),
+            }
+          : p,
+      ),
+    }))
   } catch {
     /* best-effort */
   }
@@ -750,6 +789,13 @@ interface ArtistState {
   continueMissingProps: () => Promise<void>
   /** 소품 생김새(원천) 고치기 — 그림은 그대로 둔다(다시 그리기 전까지 "설명 바뀜"). */
   updatePropAppearance: (propId: string, appearance: string) => Promise<void>
+  /** Artist 새 흐름(m1126 O1): 인물 · 배경 · 소품 그림 작업이 한 번이라도 있었나(생성 상태 창구 imagesStarted) — null 은 아직 모름. */
+  imagesStarted: boolean | null
+  /** 이 프로젝트의 샷 수(loadData) — 0 보다 크면 씬 · 샷이 이미 나뉘었다(새 흐름 판정). */
+  shotCount: number
+  /** Artist 새 흐름의 [이미지 만들기] — 고른 그림체(바꿨으면 서버가 저장)로 인물 · 배경 · 소품 그림만 그린다(/api/artist/make-images).
+   *  씬 · 샷 · 산문은 건드리지 않는다. ok = 그리기 시작했거나 이미 그리는 중, style = 서버가 바꿔 저장한 작품 그림체(안 바꿨으면 null). */
+  makeImages: (styleAnchorKey?: string | null) => Promise<{ ok: boolean; style: string | null }>
   /** 카드에서 고른 소품 모습(m1126 A3) — 키 = propId, 값 = 모습 열쇠(기본 'default'). */
   selectedPropAppearances: Record<string, string>
   selectPropAppearance: (propId: string, appearanceKey: string) => void
@@ -918,6 +964,9 @@ interface ArtistState {
     view: CharacterViewKey,
     candidateId: string,
   ) => Promise<void>
+  /** 소품 지난 그림 채택(m1126 A4) — 그 칸(소품 × 모습, 기본 = 'default')의 지금 그림 · 그림 지문 · 기록 표시를 고른 그림으로. 다시 그리지 않는다.
+   *  다른 작품 스타일 판 그림이면 서버가 거절한다(code other_style). 그 밖의 실패는 던진다. */
+  selectPropCandidate: (propId: string, appearanceKey: string, candidateId: string) => Promise<{ ok: boolean; code?: string }>
   reset: () => void
 }
 
@@ -935,6 +984,12 @@ function dedupeLoadData(projectId: string | null, run: () => Promise<void>): Pro
   return started
 }
 
+/** [이미지 만들기](m1126 O1) 거절 까닭 — 영어 원문 = 사전 키. 없는 코드는 "시작하지 못했어요"로 알린다. */
+const MAKE_IMAGES_ERROR_TEXT: Record<string, string> = {
+  images_started: 'The images have already been started. To change the style, use Regenerate everything.',
+  completed: 'The style cannot be changed after Storyboard opens.',
+}
+
 export const useArtistStore = create<ArtistState>((set, get) => ({
   sceneManifest: null,
   characterAssets: [],
@@ -950,6 +1005,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   propFailures: {},
   propContentRefusals: {},
   selectedPropAppearances: {},
+  imagesStarted: null,
+  shotCount: 0,
   selectedCharacterId: null,
   chatSelection: null,
   setChatSelection: selection => {
@@ -1016,6 +1073,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           { data: dbProps },
           { data: dbShotProps },
           { data: dbPropAppearances },
+          { data: dbPropCandidates },
         ] = await Promise.all([
           supabase
             .from('scenes')
@@ -1072,6 +1130,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             .select('prop_id, appearance_key, label, narrative_time, appearance, appearance_native, image_url, source_hash')
             .eq('project_id', projectId)
             .order('created_at'),
+          // 소품 지난 그림(m1126 A4 — m-history 의 줄 · [채택]) — 인물 · 배경 후보와 같은 소유자 읽기 정책. 못 읽으면 기록만 빈 목록.
+          supabase
+            .from('prop_image_candidates')
+            .select('id, prop_id, appearance_key, url, source_hash, is_selected, generated_at')
+            .eq('project_id', projectId),
         ])
         if (useProjectStore.getState().projectId !== projectId) return
         dbRead = true
@@ -1217,7 +1280,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           })
 
           // 소품 카드(D7) — 같은 id 의 인물 행이 있으면 빼고, 나오는 샷이 많은 순으로.
-          const props = propAssetsFromRows((dbProps ?? []) as PropRow[], new Set(characterAssets.map((c) => c.characterId)), (dbPropAppearances ?? []) as PropAppearanceRow[])
+          const props = propAssetsFromRows(
+            (dbProps ?? []) as PropRow[],
+            new Set(characterAssets.map((c) => c.characterId)),
+            (dbPropAppearances ?? []) as PropAppearanceRow[],
+            (dbPropCandidates ?? []) as PropCandidateRow[],
+          )
           const usage = propUsage(props, dbScenes, (dbShotProps ?? []).map((row) => ({ shotId: String(row.shot_id), sceneId: (row as { scene_id?: string | null }).scene_id ?? null, propPlacement: (row as { prop_placement?: unknown }).prop_placement })))
           const propAssets = orderPropsByUsage(props, usage)
 
@@ -1232,6 +1300,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
             worldAssets,
             propAssets,
             propUsage: usage,
+            shotCount: (dbShotProps ?? []).length,
             selectedPropId: keepSelection(get().selectedPropId, propAssets.map((p) => p.propId)),
             // 고른 소품 모습이 지워졌으면 기본으로(배경 모습과 같다).
             selectedPropAppearances: Object.fromEntries(
@@ -1528,6 +1597,36 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       return 'failed'
     } finally {
       set((state) => ({ generatingProps: state.generatingProps.filter((id) => id !== slot) }))
+    }
+  },
+
+  makeImages: async (styleAnchorKey) => {
+    const failed = { ok: false, style: null }
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId || isDemoSession()) return failed
+    const locale = useLocaleStore.getState().locale
+    try {
+      const res = await fetch('/api/artist/make-images', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ projectId, styleAnchorKey: styleAnchorKey ?? null }),
+      })
+      const body = (await res.json().catch(() => ({}))) as { code?: string; error?: string; style?: string | null }
+      // 다른 창에서 이미 [이미지 만들기]를 눌러 그리는 중 — 또 보내지 않고 그 그림을 기다린다.
+      const alreadyDrawing = res.status === 409 && body.code === 'drafts_already_queued'
+      if (!res.ok && !alreadyDrawing) {
+        if (!notifyIfQuotaExceeded(res.status, body)) toast.error(translate(locale, MAKE_IMAGES_ERROR_TEXT[body.code ?? ''] ?? 'Could not start making the images. Please try again.'))
+        return failed
+      }
+      const style = res.ok && typeof body.style === 'string' ? body.style : null
+      if (useProjectStore.getState().projectId !== projectId) return { ok: true, style }
+      set({ imagesStarted: true })
+      // 서버가 그리는 그림을 그리는 중으로 세고 카드에 넣는다(생성 상태의 대기 작업) — 화면은 카드 · 진행 단계로 넘어간다.
+      void get().syncGenerationStatus(projectId)
+      return { ok: true, style }
+    } catch {
+      toast.error(translate(locale, 'Could not start making the images. Please try again.'))
+      return failed
     }
   },
 
@@ -1876,7 +1975,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
         `/api/artist/generation-status?projectId=${encodeURIComponent(projectId)}`,
       )
       if (!res.ok) return
-      const { failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps } = (await res.json()) as {
+      const { failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps, imagesStarted } = (await res.json()) as {
+        imagesStarted?: boolean | null
         capacitySkips?: Record<string, 'user' | 'global'>
         propFailures?: Parameters<typeof propFailuresFromStatus>[0]
         queuedProps?: Array<{ propId: string; appearanceKey?: string | null; jobId: string }>
@@ -1911,7 +2011,18 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
           safeFailCount: f.safeFailCount,
         }
       }
-      set({ worldFailures: worldFailuresFromStatus(worldFailures), viewFailures: vf, capacitySkips: capacitySkips ?? {}, propFailures: propFailuresFromStatus(propFailures) })
+      set({
+        worldFailures: worldFailuresFromStatus(worldFailures),
+        viewFailures: vf,
+        capacitySkips: capacitySkips ?? {},
+        propFailures: propFailuresFromStatus(propFailures),
+        // 새 흐름 판정(m1126 O1) — 한 번 참이면 이 화면에서는 다시 거짓으로 돌리지 않는다(창구가 모르면 null 이 와도 있던 값을 둔다).
+        //   읽는 사이 다른 프로젝트로 옮겼으면 그 프로젝트 값을 건드리지 않는다.
+        imagesStarted:
+          useProjectStore.getState().projectId !== projectId || get().imagesStarted === true
+            ? get().imagesStarted
+            : typeof imagesStarted === 'boolean' ? imagesStarted : get().imagesStarted,
+      })
       // 서버가 그리는 중인 소품(D7) — 그리는 중으로 세고 작업 확인(reconcile)으로 마무리해 카드에 바로 넣는다(배경과 같다).
       for (const { propId, appearanceKey, jobId } of queuedProps ?? []) {
         // 칸(소품 × 모습)마다 — 모습 그림이면 그 모습 행을 다시 읽는다(m1126 A3).
@@ -2952,6 +3063,41 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   // 후보 히스토리에서 이전 이미지를 선택본으로 되돌린다(#owner-keep-prev 2026-08-31) —
   //   finalize 는 슬롯당 최근 N장을 보관하므로(selectCandidatesToEvict) 이 액션이 그 보관분을 되살린다.
   //   재생성 없이 DB flip만 하므로 fal 과금이 없다.
+  selectPropCandidate: async (propId, appearanceKey, candidateId) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to select a prop image')
+    const res = await fetch('/api/artist/select-prop-candidate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, propId, appearanceKey, candidateId }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      if (body.code === 'other_style') {
+        refusedOtherStyle()
+        return { ok: false, code: 'other_style' }
+      }
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    const { url, sourceHash } = (await res.json()) as { url: string; sourceHash?: string | null }
+    // 다른 프로젝트로 옮겼으면 그 프로젝트 카드를 고치지 않는다.
+    if (useProjectStore.getState().projectId !== projectId) return { ok: true }
+    const pick = <C extends { id: string; isSelected: boolean }>(list: C[] | undefined) => list?.map((c) => ({ ...c, isSelected: c.id === candidateId }))
+    set((state) => ({
+      propAssets: state.propAssets.map((p) => {
+        if (p.propId !== propId) return p
+        if (appearanceKey === DEFAULT_PROP_APPEARANCE_KEY) return { ...p, imageUrl: url, sourceHash: sourceHash ?? null, candidates: pick(p.candidates) }
+        return {
+          ...p,
+          appearances: (p.appearances ?? []).map((a) =>
+            a.appearanceKey === appearanceKey ? { ...a, imageUrl: url, sourceHash: sourceHash ?? null, candidates: pick(a.candidates) } : a,
+          ),
+        }
+      }),
+    }))
+    return { ok: true }
+  },
+
   selectCandidate: async (characterId, appearanceKey, view, candidateId) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
@@ -3008,6 +3154,8 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       propFailures: {},
       propContentRefusals: {},
       selectedPropAppearances: {},
+      imagesStarted: null,
+      shotCount: 0,
       selectedCharacterId: null,
       selectedLocationId: null,
       selectedLocationAppearances: {},

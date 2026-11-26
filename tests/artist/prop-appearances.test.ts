@@ -140,7 +140,7 @@ describe('소품 모습 만들기', () => {
       prop_appearances: { data: [{ prop_id: 'sword', appearance_key: 'broken', label: '부러진 칼', narrative_time: 'future', appearance: 'the same sword snapped in half', appearance_native: '두 동강 난 같은 칼', image_url: BROKEN.imageUrl, source_hash: null }], error: null },
     }
     await useArtistStore.getState().loadData()
-    expect(useArtistStore.getState().propAssets[0].appearances).toEqual([BROKEN])
+    expect(useArtistStore.getState().propAssets[0].appearances).toEqual([{ ...BROKEN, candidates: [] }])
   })
 
   // 왜: 코드가 먼저 나가고 표는 그 뒤에 만들어진다(.claude/rules/supabase.md Expand → Contract) — 소품 모습 표를 못 읽어도 소품 카드 · 기본 그림은 그대로 보여야 한다.
@@ -153,6 +153,40 @@ describe('소품 모습 만들기', () => {
     await useArtistStore.getState().loadData()
     const [prop] = useArtistStore.getState().propAssets
     expect(prop).toMatchObject({ propId: 'sword', imageUrl: 'https://media.test/props/sword.png', appearances: [] })
+  })
+
+  // 왜: m-history A4(카드 아래 지난 그림 줄 · [채택])가 칸마다 지난 그림을 읽는다 — 인물 · 배경처럼 카드(기본 모습)와 모습마다 기록을 가장 새 것부터 싣는다(리드 승인 나누기).
+  it('소품 지난 그림 기록을 칸마다 읽어 기본 모습은 카드에, 다른 모습은 그 모습에 가장 새 것부터 싣는다', async () => {
+    mocks.tables = {
+      locations: { data: [{ location_id: 'forest', name: '숲', visual_description: 'a pine forest' }], error: null },
+      props: { data: [{ prop_id: 'sword', name: '칼', appearance: 'a straight steel sword', appearance_native: '곧은 강철 칼', image_url: 'https://media.test/props/sword-2.png', source_hash: null, origin: 'writer' }], error: null },
+      prop_appearances: { data: [{ prop_id: 'sword', appearance_key: 'broken', label: '부러진 칼', narrative_time: 'future', appearance: 'the same sword snapped in half', appearance_native: '두 동강 난 같은 칼', image_url: BROKEN.imageUrl, source_hash: null }], error: null },
+      prop_image_candidates: {
+        data: [
+          { id: 'c1', prop_id: 'sword', appearance_key: 'default', url: 'https://media.test/props/sword-1.png', source_hash: 'p1:a:real', is_selected: false, generated_at: '2026-11-26T01:00:00Z' },
+          { id: 'c2', prop_id: 'sword', appearance_key: 'default', url: 'https://media.test/props/sword-2.png', source_hash: 'p1:b:real', is_selected: true, generated_at: '2026-11-26T02:00:00Z' },
+          { id: 'c3', prop_id: 'sword', appearance_key: 'broken', url: BROKEN.imageUrl, source_hash: null, is_selected: true, generated_at: '2026-11-26T03:00:00Z' },
+        ],
+        error: null,
+      },
+    }
+    await useArtistStore.getState().loadData()
+    const [prop] = useArtistStore.getState().propAssets
+    expect(prop.candidates?.map((c) => [c.id, c.isSelected])).toEqual([['c2', true], ['c1', false]])
+    expect(prop.candidates?.[0]).toMatchObject({ url: 'https://media.test/props/sword-2.png', sourceHash: 'p1:b:real', generatedAt: '2026-11-26T02:00:00Z' })
+    expect(prop.appearances?.[0].candidates?.map((c) => c.id)).toEqual(['c3'])
+  })
+
+  // 왜: 표보다 코드가 먼저 나간다(supabase.md) — 지난 그림 표를 못 읽어도 카드와 모습은 그대로, 기록만 빈 목록이다.
+  it('소품 지난 그림 표를 못 읽어도 소품 카드와 모습은 그대로 보이고 기록만 비어 있다', async () => {
+    mocks.tables = {
+      locations: { data: [{ location_id: 'forest', name: '숲', visual_description: 'a pine forest' }], error: null },
+      props: { data: [{ prop_id: 'sword', name: '칼', appearance: 'a straight steel sword', appearance_native: '곧은 강철 칼', image_url: 'https://media.test/props/sword.png', source_hash: null, origin: 'writer' }], error: null },
+      prop_image_candidates: { data: null, error: { message: 'relation "public.prop_image_candidates" does not exist' } },
+    }
+    await useArtistStore.getState().loadData()
+    const [prop] = useArtistStore.getState().propAssets
+    expect(prop).toMatchObject({ propId: 'sword', imageUrl: 'https://media.test/props/sword.png', candidates: [] })
   })
 
   // 왜: 모습 칸마다 그리는 중 · 실패가 따로다 — 기본 그림을 다시 그리는 동안에도 다른 모습 칸은 그리기 단추가 남는다(배경 모습과 같다).

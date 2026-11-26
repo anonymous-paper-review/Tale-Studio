@@ -69,12 +69,13 @@ describe('단추 줄', () => {
     expect(src).toMatch(/const boardColumns = 4 - zoom/)
   })
 
-  // 왜: 단추가 빈 곳으로 가지 않게, 소품이 왜 없는지 알게 — 소품은 [만들기] 때 이야기에서 고른 물건과 Producer 사물에서 생긴다(오너 E5 2026-11-22).
+  // 왜: 단추가 빈 곳으로 가지 않게, 소품이 왜 없는지 알게 — 소품은 이야기에서 고른 물건과 Producer 사물에서 생긴다(오너 E5 2026-11-22).
+  //   고르는 때는 O1(콘티를 Artist 앞에)로 [만들기]가 아니라 [브레이크다운하기]로 산문을 확정할 때다(리드 2026-11-26 — 디자인 단계와 함께 옮겨 감).
   it('카드가 없는 묶음도 머리와 안내 한 줄이 보인다', () => {
     setLocale('ko')
     const empty = renderToStaticMarkup(createElement(ArtistSectionHeading, { section: 'props', count: 0 }))
     expect(empty).toContain('소품 0')
-    expect(empty).toContain('소품이 없어요. [만들기] 때 이야기에서 고른 중요한 물건과 Producer 에서 사물로 정한 것이 소품이 돼요.')
+    expect(empty).toContain('소품이 없어요. [브레이크다운하기]로 산문을 확정할 때 이야기에서 고른 중요한 물건과 Producer 에서 사물로 정한 것이 소품이 돼요.')
     const filled = renderToStaticMarkup(createElement(ArtistSectionHeading, { section: 'characters', count: 3 }))
     expect(filled).toContain('인물 3')
     expect(filled).not.toContain('아직')

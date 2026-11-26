@@ -13,7 +13,7 @@ import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { DescriptionBox, DetailFrame, DetailSection } from '@/features/artist/detail-parts'
 import { failureBadge, failureNotice } from '@/lib/artist/failure-badge'
 import { propImageStale } from '@/lib/artist/prop-image'
-import { propSlotKey } from '@/lib/artist/props'
+import { DEFAULT_PROP_APPEARANCE_KEY, propSlotKey } from '@/lib/artist/props'
 import { DEFAULT_LOCATION_APPEARANCE_KEY } from '@/types/asset'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { BREAKDOWN_IMAGE_ERROR_TEXT } from '@/lib/artist/breakdown-image'
@@ -25,6 +25,9 @@ import { styleIdOf } from '@/lib/series/snapshot'
 import { useT } from '@/lib/i18n'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProducerStore } from '@/stores/producer-store'
+import { VersionViewingBar } from '@/components/version-history/version-viewing-bar'
+import { relativeTime } from '@/lib/i18n/relative-time'
+import { useHistoryStyle } from '@/features/artist-room/use-history-style'
 
 /** 지금 작품 그림체 id — 소품 그림 지문과 견주어 "그림체 바뀜"을 가린다(서버 styleIdOf 와 같은 값). */
 export function usePropStyleId(): string | null {
@@ -53,9 +56,15 @@ export function usePropImageState(propId: string) {
   return { prop, variant, imageUrl, generating, failure, contentRefused, stale }
 }
 
-function PropDetailLeft({ propId }: { propId: string }) {
+function PropDetailLeft({ propId, viewCandidateId = null }: { propId: string; viewCandidateId?: string | null }) {
   const t = useT()
   const { prop, variant, imageUrl, generating, failure, contentRefused, stale } = usePropImageState(propId)
+  // 지난 그림 줄(m1126 A4)에서 연 그림 — [지금 그림 보기]로 닫은 그림 · [채택]을 저장하는 중 · 저장 실패. 다른 작품 스타일 판이면 채택할 수 없다(상세 기록과 같은 판정).
+  const historyStyle = useHistoryStyle()
+  const selectPropCandidate = useArtistStore((s) => s.selectPropCandidate)
+  const [dismissedCandidate, setDismissedCandidate] = useState<string | null>(null)
+  const [adopting, setAdopting] = useState(false)
+  const [adoptError, setAdoptError] = useState<string | null>(null)
   // 배지 · 안내는 인물 · 배경 창과 같은 규칙(lib/artist/failure-badge) — 그린 뒤 거절이면 순화 단추, 보내기 전 거절이면 설명 고치기만.
   const badge = failureBadge({ contentRefused: contentRefused || failure?.moderation === true, failed: !!failure || contentRefused })
   const notice = failureNotice({ failure, contentRefused })
@@ -75,6 +84,26 @@ function PropDetailLeft({ propId }: { propId: string }) {
     if (result.status === 'error') setUploadError(t(BREAKDOWN_IMAGE_ERROR_TEXT[result.error]))
   }
   if (!prop) return null
+  // 카드가 보이는 모습(그 칸)의 지난 그림 — 카드 그림이 아닌 것. 채택하면 카드 그림이 되어 저절로 사라진다.
+  const slotCandidates = variant ? variant.candidates : prop.candidates
+  const viewing = viewCandidateId && dismissedCandidate !== viewCandidateId
+    ? slotCandidates?.find((c) => c.id === viewCandidateId && c.url !== imageUrl) ?? null
+    : null
+  const viewingState = viewing ? historyStyle.describe?.(viewing) ?? null : null
+  // [채택] — 그 칸의 소품 그림을 고른다(select-prop-candidate, 다시 그리지 않는다). 못 고르면 보던 그림에 남아 까닭을 보인다.
+  const adopt = async () => {
+    if (!viewing || viewingState?.disabled) return
+    setAdopting(true)
+    setAdoptError(null)
+    try {
+      const result = await selectPropCandidate(propId, variant?.appearanceKey ?? DEFAULT_PROP_APPEARANCE_KEY, viewing.id)
+      if (!result.ok && result.code !== 'other_style') setAdoptError(t('Could not adopt this version. Please try again.'))
+    } catch {
+      setAdoptError(t('Could not adopt this version. Please try again.'))
+    } finally {
+      setAdopting(false)
+    }
+  }
   const redraw = (safeMode = false) => {
     void useArtistStore.getState().generateProp(propId, 'ui', { instruction, safeMode, ...(variant ? { appearanceKey: variant.appearanceKey } : {}) })
   }
@@ -86,7 +115,21 @@ function PropDetailLeft({ propId }: { propId: string }) {
         {stale === 'edited' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Description changed')}</Badge> : null}
         {stale === 'style' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Style changed')}</Badge> : null}
       </div>
-      <ImagePlaceholder label={t('Prop')} aspectRatio="video" imageUrl={imageUrl} generating={generating} />
+      <ImagePlaceholder label={t('Prop')} aspectRatio="video" imageUrl={viewing ? viewing.url : imageUrl} generating={viewing ? false : generating} />
+      {viewing ? (
+        <VersionViewingBar
+          text={t('Viewing an earlier picture · {time}', { time: relativeTime(viewing.generatedAt, t) })}
+          note={viewingState?.note}
+          adoptDisabled={!!viewingState?.disabled}
+          adoptReason={viewingState?.disabled ? t('It is in another style, so it cannot be adopted') : null}
+          busy={adopting}
+          error={adoptError}
+          onAdopt={adopt}
+          onBack={() => { setAdoptError(null); setDismissedCandidate(viewing.id) }}
+          testId="artist-detail-viewing"
+          adoptTestId="artist-detail-adopt"
+        />
+      ) : null}
       {demo ? null : (
         <>
           <Textarea
@@ -228,16 +271,22 @@ function PropDetailRight({ propId, onAddAppearance }: { propId: string; onAddApp
 }
 
 /** 창의 두 칸을 한 번에 — 화면 테스트(정적 그리기)용. 창은 같은 두 칸을 DetailFrame 에 나눠 싣는다. */
-export function PropDetailPanels({ propId }: { propId: string }) {
+export function PropDetailPanels({ propId, viewCandidateId = null }: { propId: string; viewCandidateId?: string | null }) {
   return (
     <div>
-      <PropDetailLeft propId={propId} />
+      <PropDetailLeft propId={propId} viewCandidateId={viewCandidateId} />
       <PropDetailRight propId={propId} />
     </div>
   )
 }
 
-export function PropViewDialog({ propId, onClose, onAddAppearance }: { propId: string | null; onClose: () => void; onAddAppearance?: (propId: string) => void }) {
+export function PropViewDialog({ propId, viewCandidateId = null, onClose, onAddAppearance }: {
+  propId: string | null
+  /** 카드의 지난 그림 줄(m1126 A4)에서 누른 그림 — 그 그림을 먼저 보이고 [채택]을 단다. */
+  viewCandidateId?: string | null
+  onClose: () => void
+  onAddAppearance?: (propId: string) => void
+}) {
   const t = useT()
   const prop = useArtistStore((s) => (propId ? s.propAssets.find((p) => p.propId === propId) ?? null : null))
   return (
@@ -245,7 +294,7 @@ export function PropViewDialog({ propId, onClose, onAddAppearance }: { propId: s
       open={!!propId && !!prop}
       onClose={onClose}
       title={t('{name} · Prop', { name: prop?.name ?? '' })}
-      left={propId ? <PropDetailLeft key={propId} propId={propId} /> : null}
+      left={propId ? <PropDetailLeft key={`${propId}:${viewCandidateId ?? ''}`} propId={propId} viewCandidateId={viewCandidateId} /> : null}
       right={propId ? <PropDetailRight propId={propId} onAddAppearance={onAddAppearance} /> : null}
       footer={<Button onClick={onClose}>{t('Close')}</Button>}
       testId="prop-detail"
