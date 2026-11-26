@@ -53,7 +53,7 @@ export function withoutEndFrames(
   return { urls: kept, roles: kept.map((_, index): VideoReferenceRole => (index === 0 ? 'start' : 'ref')), droppedEnds: kept.includes(last) ? [] : [last] }
 }
 
-/** 한 요청이 그림을 몇 장까지 받나 — 모델별 상한(최대 9)보다 넉넉하게 둔다. 넘으면 참고 그림만 뒤에서부터 덜어 받는다(dev 방안 고장 1). */
+/** 한 요청이 그림을 몇 장까지 받나 — 모델별 상한(최대 9)보다 넉넉하게 둔다. 넘으면 참고 그림부터 뒤에서 덜고, 그래도 넘으면 뒤에서 자른다(dev 방안 고장 1 · 검토 rev-video A). */
 export const MAX_REQUEST_REFERENCE_IMAGES = 12
 
 export interface ClampedReferenceImages {
@@ -68,7 +68,8 @@ export interface ClampedReferenceImages {
 /**
  * 그림 목록을 max 장 안으로 줄인다(dev 방안 고장 1 · 오너 2026-11-27 N4a "dev에서 수정한 것처럼"). 예전에는 앞 4장만 남기고 역할이 4개를 넘으면
  *   역할을 통째로 버려, 참고 그림을 세 장 넘게 이으면 역할을 잃은 시작 그림 앞에 DB 시작 그림이 한 장 더 붙었다.
- *   - 역할이 있으면: 시작 · 미들 등 장면 역할은 남기고 참고 그림(ref)만 뒤에서부터 덜어 낸다.
+ *   - 역할이 있으면: 시작 칸은 하나라 첫 시작 그림만 남기고 나머지 시작은 버린다(검토 rev-video A). 그다음 참고 그림(ref)을 뒤에서부터 덜고,
+ *     그래도 넘으면(장면 역할 그림만으로 넘을 때) 뒤에서부터 자른다. 버린 그림은 모두 덜어 낸 수에 센다.
  *   - 역할이 없는 옛 목록: 옛 규약("첫 = 시작, 마지막 = 끝")대로 첫 · 마지막을 남기고 그 사이를 뒤에서부터 덜어 낸다(끝은 그 뒤 withoutEndFrames 가 뺀다).
  */
 export function clampReferenceImages(
@@ -79,11 +80,18 @@ export function clampReferenceImages(
   const limit = Number.isFinite(max) && max >= 1 ? Math.floor(max) : 1
   const all = urls.map((_, i) => i)
   if (roles && roles.length === urls.length) {
-    if (urls.length <= limit) return { urls: [...urls], roles: [...roles], dropped: 0, keptIndices: all }
-    const keep = urls.map(() => true)
-    let count = urls.length
+    const firstStart = roles.indexOf('start')
+    const keep = urls.map((_, i) => roles[i] !== 'start' || i === firstStart)
+    let count = keep.filter(Boolean).length
+    if (count === urls.length && count <= limit) return { urls: [...urls], roles: [...roles], dropped: 0, keptIndices: all }
     for (let i = urls.length - 1; i >= 0 && count > limit; i -= 1) {
-      if (roles[i] === 'ref') {
+      if (keep[i] && roles[i] === 'ref') {
+        keep[i] = false
+        count -= 1
+      }
+    }
+    for (let i = urls.length - 1; i >= 0 && count > limit; i -= 1) {
+      if (keep[i]) {
         keep[i] = false
         count -= 1
       }

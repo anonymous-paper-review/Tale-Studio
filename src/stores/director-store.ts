@@ -1651,12 +1651,14 @@ export function videoModeRefusal(): { shotNodeId: string; code: string } | null 
   return lastVideoModeRefusal
 }
 
-/** 테이크 목록의 made_frames(지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소) — 모양이 다르면 모른다(null). */
-function parseMadeFrames(value: unknown): VideoNodeData['madeFrames'] {
+/** 테이크 목록의 made_frames(지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소 · 그때 실사 판 id) — 모양이 다르면 모른다(null).
+ *  판 id 는 Take 줄이 같은 주소의 판 중 쓴 판을 고르는 근거다(검토 rev-video C). */
+export function parseMadeFrames(value: unknown): VideoNodeData['madeFrames'] {
   if (!value || typeof value !== 'object') return null
-  const { start, end } = value as { start?: unknown; end?: unknown }
+  const { start, end, versionId } = value as { start?: unknown; end?: unknown; versionId?: unknown }
   const text = (v: unknown) => (typeof v === 'string' && v ? v : null)
-  return text(start) || text(end) ? { start: text(start), end: text(end) } : null
+  const version = text(versionId)
+  return text(start) || text(end) ? { start: text(start), end: text(end), ...(version ? { versionId: version } : {}) } : null
 }
 
 function videoOwnerKey(data: VideoNodeData): string {

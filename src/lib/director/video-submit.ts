@@ -63,6 +63,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { holdTakesForVideoJob } from '@/lib/billing/take-hold'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { hasStoryboardImage } from '@/lib/director/storyboard-image'
+import { currentStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { MAX_REQUEST_REFERENCE_IMAGES, clampReferenceImages, resolveVideoReferenceFrames } from '@/lib/director/video-reference-frames'
 import {
   DEFAULT_VIDEO_MODE,
@@ -87,7 +88,7 @@ import { directorRefsExcludeWorld, parseDirectorRefs } from '@/lib/director/dire
 import { planShotPropRefs } from '@/lib/director/shot-prop-refs'
 import type { Json } from '@/types/database'
 import type { CameraConfig, CameraPreset } from '@/types'
-import type { StandaloneVideoConfig } from '@/types/director'
+import type { StandaloneVideoConfig, StoryboardImage } from '@/types/director'
 
 // reference-to-video는 레퍼런스 이미지가 필수. 레퍼런스 없는 T2V는 이 Kling 엔드포인트로 폴백.
 const FAL_T2V_FALLBACK_MODEL = 'fal-ai/kling-video/v2.1/master/text-to-video'
@@ -634,8 +635,8 @@ async function prepareVideoRequest(
     // V2 refs(#real-strip): [START, END] 등 다중 레퍼런스. referenceImageUrl(단일)과 병행 수신 —
     //   단일은 I2V 판별·스냅샷 하위호환 축, 배열은 실제 제출 레퍼런스로 우선.
     // dev 방안 고장 1(오너 2026-11-27 N4a "dev에서 수정한 것처럼"): 예전에는 그림을 앞 4장만 남기고 역할이 4개를 넘으면 역할을 통째로 버려,
-    //   참고 그림을 세 장 넘게 이으면 역할을 잃은 시작 그림 앞에 DB 시작 그림이 한 장 더 붙었다. 이제 역할째 받아 시작은 남기고
-    //   참고 그림만 덜어 MAX_REQUEST_REFERENCE_IMAGES 안으로 받는다(모델별 상한은 모델이 정해진 뒤 한 번 더).
+    //   참고 그림을 세 장 넘게 이으면 역할을 잃은 시작 그림 앞에 DB 시작 그림이 한 장 더 붙었다. 이제 역할째 받아 시작은 첫 장만 남기고
+    //   참고 그림부터 덜어, 그래도 넘으면 뒤에서 잘라 MAX_REQUEST_REFERENCE_IMAGES 안으로 받는다(검토 rev-video A, 모델별 상한은 모델이 정해진 뒤 한 번 더).
     const rawClientReferenceImageUrls = Array.isArray(body.referenceImageUrls)
       ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u)
       : undefined
@@ -776,6 +777,9 @@ async function prepareVideoRequest(
       )
     }
     const generationMethod: GenerationMethod = chosenFrames.generationMethod
+    // 판 기록이 있는 실사만 — 판이 하나뿐인 옛 실사(판 목록 없음)는 주소로 그 판을 안다(검토 rev-video C).
+    const storyboardForVersion = standalone || !shot ? null : (shot.storyboard_image as StoryboardImage | null)
+    const storyboardVersionId = storyboardForVersion?.versions?.length ? currentStoryboardVersion(storyboardForVersion)?.id ?? null : null
     const referenceImageUrl = chosenFrames.referenceImageUrl ?? undefined
     let referenceImageUrlsV2 = chosenFrames.referenceImageUrls
     let alignedReferenceImageRoles = chosenFrames.referenceImageRoles
@@ -845,14 +849,15 @@ async function prepareVideoRequest(
     // 모델이 받는 장 수 안으로(dev 방안 고장 1 · N4a) — 시작 · 미들은 남기고 참고 그림만 뒤에서부터 덜어 낸다. 손 배선이든 ② 레퍼런스든 같다
     //   (레퍼런스는 샷 실사 → 인물 → 배경 → 소품 순이라 소품 → 배경 → 인물 순으로 덜리고, 덜어 낸 그림의 이름은 글에서도 뺀다). 덜어 낸 수는 기록 · 응답에 남긴다.
     let referenceLabels: string[] | null = modeSelection?.labels ?? null
-    let droppedReferenceImages = 0
+    // 화면이 보낸 그림을 그대로 쓰는 요청이면 한 요청 상한(시작은 첫 장만 · 12장)에서 덜어 낸 수도 센다(검토 rev-video A).
+    let droppedReferenceImages = !modeSelection && frames.source === 'client' ? requestImages?.dropped ?? 0 : 0
     if (referenceImageUrlsV2?.length) {
       const clamped = clampReferenceImages(referenceImageUrlsV2, alignedReferenceImageRoles, VIDEO_MODELS[modelKey].maxImageUrls)
       if (clamped.dropped > 0) {
         referenceImageUrlsV2 = clamped.urls
         alignedReferenceImageRoles = clamped.roles
         if (referenceLabels) referenceLabels = clamped.keptIndices.map((index) => modeSelection!.labels![index]!)
-        droppedReferenceImages = clamped.dropped
+        droppedReferenceImages += clamped.dropped
       }
     }
 
@@ -1135,8 +1140,8 @@ async function prepareVideoRequest(
       } catch (error) {
         if (!(error instanceof VideoReferenceTooSmallError)) throw error
         return NextResponse.json({
-          // 끝 그림은 오너 2026-11-27 N4a 로 보내지 않는다 — 시작 그림이라고만 말한다(화면은 code 를 보고 사용자 언어로 띄운다).
-          error: `The start image is smaller than ${minImageSide} px, which this video model does not accept, and it could not be enlarged. Choose another video model or remake the images. (${error.message})`,
+          // 키우기는 보낼 그림 전부(시작 · 가운데 장 · 참고 · 이음 장면)에 걸린다 — 어느 역할인지 말하지 않는다(검토 rev-video B, 화면은 code 를 보고 사용자 언어로 띄운다).
+          error: `One of the images is smaller than ${minImageSide} px, which this video model does not accept, and it could not be enlarged. Choose another video model or remake the images. (${error.message})`,
           code: 'reference_image_too_small',
         }, { status: 422 })
       }
@@ -1181,6 +1186,9 @@ async function prepareVideoRequest(
         : {}),
       ...(referenceLabels ? { reference_labels: referenceLabels } : {}),
       ...(droppedReferenceImages > 0 ? { dropped_reference_images: droppedReferenceImages } : {}),
+      // 그때 지금이던 실사 판(검토 rev-video C) — 실사 화살표만 고친 판은 시작 · 끝 주소가 앞 판과 같아 주소로는 어느 판으로 만들었는지 모른다.
+      //   Take 줄이 이 id 로 판 번호를 적는다. 샷 실사가 있을 때만 적는다(재생 비교 칸이 아니다 — 같은 요청을 다시 내면 같은 값).
+      ...(storyboardVersionId ? { storyboard_version_id: storyboardVersionId } : {}),
       movement_preset: movementPreset ?? null,
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),

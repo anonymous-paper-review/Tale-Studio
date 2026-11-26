@@ -35,6 +35,7 @@ vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: mocks.from, rpc:
 vi.mock('@/lib/fal/keys', () => ({ falKeyById: vi.fn(), FalUnknownKeyError: class FalUnknownKeyError extends Error {} }))
 
 import { buildVideoPrompt } from '@/lib/director/video-prompt'
+import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import type { ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { _clearDesignMemoForTest, prepareDirectorVideoSubmission, type PreparedDirectorVideoSubmission } from '@/lib/director/video-submit'
 import { _clearReferenceImageCacheForTest } from '@/lib/style-facets/reference-image'
@@ -273,6 +274,16 @@ describe('같이 정한 것', () => {
       expect({ extra, lead: fullPrompt(prepared).startsWith(`Movement (from the edited direction sketch): ${LINE}`) }).toEqual({ extra, lead: true })
       expect(prepared.inputSnapshot.direction_read).toBe(LINE)
     }
+  })
+
+  // 왜(검토 rev-video C): 실사 화살표만 고친 판은 시작 · 끝 주소가 앞 판과 같아, 주소만으로는 그 Take 가 어느 판으로 만들어졌는지 모른다 —
+  //   만들 때 지금 판의 id 를 작업 기록에 남기면 Take 줄이 그 판 번호를 적는다.
+  it('영상 작업 기록에 그때 지금인 실사 판 id 를 남긴다', async () => {
+    const first = withStoryboardVersion(null, { id: 'job-1', url: START, frames: { start: START, direction: REAL_DIRECTION, end: END }, generatedAt: 1, source: 'generated' }, { select: true })
+    const arrows = withStoryboardVersion(first, { id: 'arrows-1', url: START, frames: { start: START, direction: media(`${WORKSPACE}/${PROJECT}/storyboard/shot-2_direction-arrows.png`), end: END }, generatedAt: 2, source: 'generated' }, { select: true })
+    seed({ shots: [{ ...SHOT, storyboard_image: arrows }, SCENE_SHOTS] })
+    const prepared = await prepare({ model: 'seedance', videoMode: 'start_prompt' })
+    expect(prepared.inputSnapshot.storyboard_version_id).toBe('arrows-1')
   })
 })
 

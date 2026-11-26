@@ -42,16 +42,17 @@ it('H3 로 보낼 작은 그림을 키우지 못해 막히면 새 Take 줄을 �
   expect(shown).not.toContain('px')
 })
 
-it('작은 그림을 키우지 못해 막힌 까닭은 끝 그림을 말하지 않고 시작 그림이라고 알린다', async () => {
-  // 왜(오너 2026-11-27 N4a · dev 때 시작+끝 폐기): 끝 그림은 이제 어느 길로도 영상에 보내지 않는다 — "시작 · 끝 그림이 작다"는 틀린 말이다.
+it('작은 그림을 키우지 못해 막힌 까닭은 그림의 역할을 말하지 않고 "보낼 그림 하나가 너무 작다"고 알린다', async () => {
+  // 왜(검토 rev-video B · 오너 N4a — 끝 그림은 보내지 않는다): 키우기는 보낼 그림 전부(시작 · 가운데 장 · 참고 · 이음 장면)에 걸린다 —
+  //   "시작 그림이 작다"는 참고 그림이 작을 때 틀린 말이고, "시작 · 끝 그림"은 끝 그림을 보내지 않으니 틀린 말이다.
   await api().generateVideoForShot(shotId)
   const korean = vi.mocked(toast.error).mock.calls[0]![0] as string
-  expect(korean).toContain('시작 그림')
-  expect(korean).not.toContain('끝')
+  expect(korean).toContain('보낼 그림 하나가 너무 작아')
+  expect(korean).not.toMatch(/시작|끝/)
   vi.mocked(toast.error).mockClear()
   useLocaleStore.setState({ locale: 'en' })
   await api().generateVideoForShot(shotId)
   const english = vi.mocked(toast.error).mock.calls[0]![0] as string
-  expect(english).toContain('The start image')
-  expect(english).not.toMatch(/\bend image\b/i)
+  expect(english).toContain('One of the images to send is too small')
+  expect(english).not.toMatch(/\b(start|end) image\b/i)
 })
