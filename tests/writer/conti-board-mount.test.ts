@@ -1,4 +1,4 @@
-// 콘티 보드를 화면에 붙였을 때 — 첫 순간(지금 단계 값이 아직 앞 화면)에도 콘티로 굴러 Artist 그림을 저절로 그리지 않고 첫 안내를 콘티 채팅에 남기는지, 씬 · 샷이 아직 없는 예전 흐름 프로젝트에는 Artist [만들기] 안내를 보이는지 검사한다 (검토 rev-flow 2026-11-26 1번 · 3번)
+// 콘티 보드를 화면에 붙였을 때 — 첫 순간(지금 단계 값이 아직 앞 화면)과 [Artist로 가기]로 떠나는 순간에도 Artist 그림을 저절로 그리지 않고(채우기는 Storyboard 주소에서만) 첫 안내를 콘티 채팅에 남기는지, 씬 · 샷이 아직 없는 예전 흐름 프로젝트에는 Artist 안내를 보이는지 검사한다 (검토 rev-flow 2026-11-26 1번 · 3번, m-artist 재현)
 import { isValidElement, type ReactElement, type ReactNode } from 'react'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { StateCreator } from 'zustand/vanilla'
@@ -100,21 +100,24 @@ function elements(node: ReactNode): Element[] {
 }
 const same = (a?: readonly unknown[], b?: readonly unknown[]) => !!a && !!b && a.length === b.length && a.every((value, i) => Object.is(value, b[i]))
 
-/** 콘티 화면(작업 공간)이 그린 보드 — 작업 공간이 보드에 넘긴 값 그대로. 작업 공간의 훅 자리는 보드와 섞이지 않게 비운다. */
-function boardFromWorkspace(): Element {
-  hooks.slots = []
+/** 작업 공간의 훅 자리 — 보드의 훅 자리와 따로 둔다(작업 공간도 붙어 있는 동안 제 값을 지킨다). 작업 공간의 효과는 돌리지 않는다. */
+let workspaceSlots: unknown[] = []
+/** 작업 공간(콘티 화면)을 지금 주소 · 지금 단계 값으로 그려 보드에 넘긴 값을 받는다. */
+function boardProps(): Record<string, unknown> {
+  const saved = { slots: hooks.slots, cursor: hooks.cursor, effects: hooks.effects }
+  hooks.slots = workspaceSlots
   hooks.cursor = 0
   hooks.effects = []
-  const board = elements(WriterWorkspace()).find((node) => node.type === RoughStoryboardView)
-  hooks.slots = []
-  hooks.cursor = 0
-  hooks.effects = []
-  if (!board) throw new Error('the rough storyboard board was not rendered')
-  return board
+  try {
+    const board = elements(WriterWorkspace()).find((node) => node.type === RoughStoryboardView)
+    if (!board) throw new Error('the rough storyboard board was not rendered')
+    return board.props
+  } finally {
+    Object.assign(hooks, saved)
+  }
 }
-/** 보드를 화면에 붙인다 — 첫 렌더의 효과부터 돌고, 그 사이 상태가 바뀌면 가라앉을 때까지 다시 그린다. */
-function mount(board: Element) {
-  const props = board.props
+/** 보드를 그 값으로 그려 화면에 붙인다 — 바뀐 deps 의 효과만 다시 돌고, 그 사이 상태가 바뀌면 가라앉을 때까지 다시 그린다. */
+function commitBoard(props: Record<string, unknown>) {
   for (let pass = 0; pass < 10; pass++) {
     hooks.dirty = false
     hooks.cursor = 0
@@ -147,6 +150,7 @@ function unmount() {
   for (const mounted of hooks.mounted) if (typeof mounted?.cleanup === 'function') mounted.cleanup()
   hooks.mounted = []
   hooks.slots = []
+  workspaceSlots = []
 }
 
 const scene: Scene = {
@@ -163,8 +167,8 @@ const drawnShot = (shotId: string, sortOrder: number): Shot => ({
 const autoGenerateBaseImages = vi.fn(async () => {})
 const offerSuggestion = vi.fn()
 
-/** 콘티의 러프를 다 그린 프로젝트를 연다 — 지금 단계 값은 아직 앞 화면(previous)이다. */
-function openConti(projectId: string, previous: StageId, reached: StageId) {
+/** 러프를 다 그린 프로젝트의 보드를 그 주소(기본 콘티)로 연다 — 지금 단계 값은 아직 앞 화면(previous)일 수 있다. */
+function openConti(projectId: string, previous: StageId, reached: StageId, path = '/studio/conti') {
   _setGenerationQueueSnapshotForTests({ projectId, jobs: [] })
   useProjectStore.setState({ projectId, currentStage: previous, reachedStage: reached })
   useWriterStore.setState({
@@ -174,8 +178,8 @@ function openConti(projectId: string, previous: StageId, reached: StageId) {
     error: null,
   })
   useGlobalChatStore.setState({ offerSuggestion, messages: [], messagesLoadedProjectId: projectId })
-  route.path = '/studio/conti'
-  mount(boardFromWorkspace())
+  route.path = path
+  commitBoard(boardProps())
 }
 
 // 콘티로 돌아오는 두 길(검토 rev-flow 1번): [Artist로 가기] → Artist([이미지 만들기] 전) → 레일 Writer(콘티),
@@ -188,6 +192,7 @@ const RETURNS: ReadonlyArray<{ previous: StageId; reached: StageId }> = [
 beforeEach(() => {
   hooks.slots = []
   hooks.mounted = []
+  workspaceSlots = []
   writer.status = null
   autoGenerateBaseImages.mockClear()
   offerSuggestion.mockClear()
@@ -216,6 +221,27 @@ describe('콘티 보드가 처음 붙는 순간의 단계', () => {
       expect(autoGenerateBaseImages, `${previous} → conti`).not.toHaveBeenCalled()
       unmount()
     }
+  })
+
+  // 왜: m-artist 재현(2026-11-26, 고치기 전 빌드) — [Artist로 가기]가 지금 단계 · 연 단계를 artist 로 올리는 순간, 화면을 옮기기 전까지 붙어 있는
+  //   콘티 보드가 자기를 Storyboard 로 알아 1초 안에 인물 시트 2장 · 34초에 배경 2장을 그렸다. Artist 는 "그림을 그리기 시작함"으로 보고
+  //   [이미지 만들기] 단계를 건너뛰었다. 새 흐름의 주된 길이다. 화면을 옮기는 사이 주소가 먼저 바뀌어도 채우지 않는다.
+  it('콘티에서 [Artist로 가기]로 단계가 artist 가 돼도 콘티 보드는 Artist 그림 채우기를 하지 않는다', async () => {
+    openConti('p-conti-leave', 'conti', 'conti')
+    useProjectStore.setState({ currentStage: 'artist', reachedStage: 'artist' })
+    commitBoard(boardProps())
+    route.path = '/studio/artist'
+    commitBoard(boardProps())
+    await Promise.resolve()
+    expect(autoGenerateBaseImages).not.toHaveBeenCalled()
+  })
+
+  // 왜: 리드 2026-11-26 — 빈 Artist 그림 채우기는 Storyboard 주소(/studio/writer)에 붙은 보드만 한다. 지금 단계 값으로 정하면 위 두 순간에
+  //   콘티 보드가 채웠다. (지금 Storyboard 화면은 실사 보드라 이 보드가 붙지 않는다 — 규칙만 남는다.)
+  it('Storyboard 주소에 붙은 보드만 빈 Artist 그림을 채운다', async () => {
+    openConti('p-storyboard-fill', 'writer', 'writer', '/studio/writer')
+    await Promise.resolve()
+    expect(autoGenerateBaseImages).toHaveBeenCalledTimes(1)
   })
 
   // 왜: 같은 까닭으로 첫 안내("이렇게 나눴어요")가 Storyboard 채팅에 남으면, 콘티 채팅에는 안내가 없고 아직 열리지 않은 Storyboard 채팅에 말이 쌓인다.

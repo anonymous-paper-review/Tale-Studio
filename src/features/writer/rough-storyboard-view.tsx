@@ -169,7 +169,7 @@ export function applyRoughStoryboardZoomShortcut(
   return applyStoryboardZoomShortcut(zoomLevel, event)
 }
 
-export function RoughStoryboardView({ stage }: { stage?: BoardStage } = {}) {
+export function RoughStoryboardView({ stage, artistFill = false }: { stage?: BoardStage; artistFill?: boolean } = {}) {
   const t = useT()
   // useCallback/useEffect 본문 안에서는 t() 대신 translate()+locale 을 쓴다(#i18n-s5-batch3) —
   //   useT() 의 반환 함수는 매 렌더 새 참조라 deps 에 넣으면 메모이제이션이 무너진다. locale 은
@@ -291,8 +291,10 @@ export function RoughStoryboardView({ stage }: { stage?: BoardStage } = {}) {
   //   동시성 1(ARTIST_GENERATION_CONCURRENCY)이라 큐를 1슬롯만 점유하고, 나머지 슬롯은
   //   유저가 writer 에서 수정·재생성할 때를 위해 비워 둔다. 멱등: 채워진 칸 skip + 서버 dedupe.
   //   O1(오너 2026-11-26): 콘티에서는 채우지 않는다 — Artist 그림은 Artist [이미지 만들기]가 그린다(그림체를 보고 고른 뒤).
+  //   채우기는 Storyboard 주소에 붙은 보드만 한다(작업 공간이 주소로 정해 넘긴 artistFill, 넘기지 않으면 하지 않음) — 지금 단계 값으로 정하면
+  //   콘티 보드가 붙는 첫 순간과 [Artist로 가기]로 값이 artist 가 된 떠나는 순간에 자기를 Storyboard 로 보고 채웠다(검토 rev-flow 1번 · m-artist 재현).
   useEffect(() => {
-    if (!projectId || !roughAllReady || boardStage === 'conti') return
+    if (!projectId || !roughAllReady || !artistFill) return
     if (artistBackfillTriggered.has(projectId)) return
     artistBackfillTriggered.add(projectId)
     void (async () => {
@@ -318,7 +320,7 @@ export function RoughStoryboardView({ stage }: { stage?: BoardStage } = {}) {
         })
       })
     })()
-  }, [projectId, roughAllReady, boardStage])
+  }, [projectId, roughAllReady, artistFill])
   useEffect(() => {
     if (!projectId || !roughAllReady || !chatHistoryLoaded) return
     // 콘티의 러프가 다 그려지면 Artist 로 넘어가자고 권한다(O1 — 콘티 다음은 Artist). Storyboard 는 넘김 표에 없어 권하지 않는다.
