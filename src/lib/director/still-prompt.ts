@@ -4,6 +4,7 @@
 //   약속: tests/director/still-consistency.test.ts
 import { parseDirectorRefs } from '@/lib/director/director-refs'
 import { postureFromPoseText } from '@/lib/writer/pipeline/stage/posture_text'
+import { isAddedFillSpec } from '@/lib/writer/pipeline/stage/added_fill_mark'
 
 /** 러프 칸이 정하는 것 — 다른 줄과 다르면 러프 칸을 따른다. */
 export const STILL_PANEL_RULE = {
@@ -400,12 +401,14 @@ const SAME_DRAW_MS = 5_000
  * 러프가 멈춘 그림인 샷인가 — 사람이 더한 샷(설계 없음)의 러프는 늘 "static hold"로 그려진다(rough-storyboard-grid).
  *   파이프라인이 만든 샷은 설계 칸이 비어 있어도 러프에 움직임이 있을 수 있어 아니다.
  *   사람이 고친 샷(읽은 줄이 있거나, 세 장 가운데 한 장이라도 나중에 저장됨 — 화살표 저장 · 한 장 다시 그리기)도 아니다. 모르면 아니라고 본다.
+ *   앞뒤 샷으로 채운 칸(added_fill, 오너 2026-11-27 N2)은 자리 · 자세 · 빛이지 움직임 설계가 아니다 — 그 러프도 멈춘 한 순간이라 설계 없음으로 본다.
  */
 export function roughIsStaticHold(
   shot: { source?: unknown; static_spec?: unknown; dynamic_spec?: unknown; design_ref?: unknown; rough_storyboard?: unknown } | null | undefined,
 ): boolean {
   if (!shot || shot.source === 'pipeline') return false
-  if ([shot.dynamic_spec, shot.static_spec].some((spec) => spec && typeof spec === 'object') || (typeof shot.design_ref === 'string' && shot.design_ref.trim())) return false
+  const designed = (spec: unknown) => !!spec && typeof spec === 'object' && !isAddedFillSpec(spec)
+  if ([shot.dynamic_spec, shot.static_spec].some(designed) || (typeof shot.design_ref === 'string' && shot.design_ref.trim())) return false
   const rough = shot.rough_storyboard as { generatedAt?: unknown; frames?: Record<string, unknown>; directionRead?: unknown } | null | undefined
   if (!rough || typeof rough !== 'object' || rough.directionRead || typeof rough.generatedAt !== 'number') return false
   const savedAt = ['start', 'direction', 'end'].map((key) => {

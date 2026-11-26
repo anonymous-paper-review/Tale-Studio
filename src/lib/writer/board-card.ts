@@ -7,6 +7,7 @@ import type { AppLocale } from '@/lib/locale'
 import { normalizeCameraMotionType, type CameraMotionType } from '@/lib/writer/motion-vocabulary'
 import { isDefaultCamera, isDefaultLighting } from '@/lib/writer/shot-config-from-design'
 import { angleOfCamera, type CameraAngle } from '@/lib/writer/shot-edit'
+import { ADD_SHOT_START_LIGHTING } from '@/lib/writer/add-shot-defaults'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import type { DialogueLine, Shot, ShotStageDesign } from '@/types'
 
@@ -81,7 +82,10 @@ export function shotCardChips(
   if (angle) chips.push({ kind: 'angle', label: translate(locale, angle) })
   const motion = design?.cameraMotion ? motionKey(design.cameraMotion) : null
   if (motion) chips.push({ kind: 'motion', label: translate(locale, motion) })
-  const kelvin = !isDefaultLighting(shot.lighting) ? shot.lighting?.colorTemp : design?.colorTempK
+  // [+ 샷 추가] 창의 처음 빛(5600K)을 그대로 둔 더한 샷은 사람이 정한 빛이 아니다 — 앞뒤 샷에서 이은 빛이 있으면 그것(러프가 그 빛으로 그린다, N2 2026-11-27).
+  const startLighting = !!shot.lighting && !!design?.colorTempK &&
+    (['position', 'brightness', 'colorTemp'] as const).every((k) => shot.lighting?.[k] === ADD_SHOT_START_LIGHTING[k])
+  const kelvin = !isDefaultLighting(shot.lighting) && !startLighting ? shot.lighting?.colorTemp : design?.colorTempK
   if (typeof kelvin === 'number' && kelvin > 0) chips.push({ kind: 'temperature', label: `◐ ${Math.round(kelvin)}K` })
   return chips
 }
