@@ -59,9 +59,12 @@ vi.mock('@/lib/supabase/admin', () => {
 
 import { fillAddedShot, isAddedFillSpec, isFillableAddedShot, type AddedShotRow } from '@/lib/writer/pipeline/stage/added_shot'
 import { refillAddedShots } from '@/lib/writer/pipeline/util/added_shot_persist'
-import { roughIsStaticHold, poseOf } from '@/lib/director/still-prompt'
+import { leftToRight, roughIsStaticHold, poseOf, stillCharacterLabel } from '@/lib/director/still-prompt'
+import { describePhotoCharacterRef } from '@/lib/director/photo-strip'
 import { shotCardChips, shotStageDesign } from '@/lib/writer/board-card'
 import { ADD_SHOT_START_LIGHTING } from '@/lib/writer/add-shot-defaults'
+import { buildRoughGridCell, describePlacement } from '@/lib/writer/rough-storyboard-grid'
+import type { RoughStoryboardSpec } from '@/lib/writer/rough-storyboard'
 
 const read = (rel: string) => readFileSync(rel, 'utf8')
 
@@ -504,4 +507,48 @@ describe('러프를 그릴 때 다시 채우기', () => {
     expect(db.updates.map((u) => u.patch)).toHaveLength(1)
   })
 
+})
+
+describe('러프 칸의 인물 이름 단서', () => {
+  const NAMES = new Map([['mina', 'Mina'], ['jun', 'Jun']])
+  const cellOf = (staticSpec: unknown, action: string) =>
+    buildRoughGridCell(
+      { shotType: 'MS', actionDescription: action, characterNames: ['Mina', 'Jun'], characterNameById: NAMES, spec: { staticSpec: staticSpec as RoughStoryboardSpec['staticSpec'] } },
+      'sh_x',
+    ).start
+
+  // 왜: 파이프라인 샷의 러프 칸은 figure 마다 자세 글 · 소품으로 누구인지 드러나 지금 그대로 둔다 — 더한 샷 고침이 그 글을 한 글자도 바꾸지 않는다.
+  it('파이프라인 샷 러프 칸은 지금 글 그대로다(한 글자도 안 바뀐다)', () => {
+    expect(cellOf(P2.static_spec, 'Jun hands Mina a warm can.')).toBe(
+      "medium shot, eye-level angle, 50mm, rule of thirds. figure 1 in the left third of the frame, in the midground, small, far away, three-quarter view, turned toward screen-left, sitting, blank head facing toward camera; figure 2 in the right third of the frame, in the midground, small, far away, three-quarter view, turned toward screen-left, standing, blank head facing toward camera; carried prop (teacup) at center — this is an inanimate object: draw the object itself, NEVER a mannequin, person or head. fg: teacup / mg: two people / bg: window. moment: Jun hands Mina a warm can.. the numbered figure(s) above and any people described in the fg/mg/bg layers are the SAME subjects — draw each subject only once (no plain duplicate mannequin alongside them); anyone mentioned in the moment but not listed as a figure here is OFF-SCREEN, do not draw them. focal point: Mina's hands. lighting and focus (draw these into the sketch): lit from top left — shade figures and ground with directional pencil hatching, cast shadows toward the lower-right, soft feathered shadow edges; draw Mina's hands with the densest, sharpest line detail as the focal point; keep the background loosely and vaguely indicated (shallow focus)",
+    )
+  })
+
+  // 왜: 통합 확인(n-qa 2026-11-27) — 채팅으로 더한 2인 샷(씬 1 끝)의 러프 · 실사에서 두 사람이 DB 자리(서윤 왼쪽)와 반대로 그려졌다. 더한 샷 칸은 figure 를
+  //   자리로만 적어(자세를 비우면 "in the midground"뿐) 누가 figure 1 인지의 단서가 이야기 글(도식을 먼저 부름)뿐이었다 — 이름과 자리를 묶어 적는다.
+  it('여러 사람 더한 샷의 러프 칸은 figure 마다 이름을 붙이고, 이야기 속 각 사람의 동작 · 소품을 그 figure 자리에 두라고 말한다', () => {
+    const silent = addedShot('sh_01_70', ['mina', 'jun'], { action_description: 'Jun turns back and they both get up', action_description_native: 'Jun turns back and they both get up' })
+    const silentSpec = fill(silent, [P1, P2, silent]).spec!
+    const [m, j] = silentSpec.screen_layout!.characters.map((c) => c.start as unknown as Parameters<typeof describePlacement>[0])
+    const cell = cellOf(silentSpec, 'Jun turns back and they both get up')
+    // 자세를 비운 샷은 자세 자리를 아예 비운다 — 깊이를 두 번 적거나 "standing"을 대신 넣지 않는다.
+    expect(cell).toContain(`figure 1 (Mina) ${describePlacement(m)}, blank head facing`)
+    expect(cell).toContain(`figure 2 (Jun) ${describePlacement(j)}, blank head facing`)
+    expect(cell).toContain('figure 1 is Mina and figure 2 is Jun')
+    expect(cell).not.toMatch(/standing|sitting/)
+    const posed = addedShot('sh_01_71', ['mina', 'jun'], { action_description: 'Mina and Jun look at each other', action_description_native: 'Mina and Jun look at each other' })
+    const posedSpec = fill(posed, [P1, P2, posed]).spec!
+    expect(cellOf(posedSpec, 'Mina and Jun look at each other')).toMatch(/figure 1 \(Mina\) [^;]*, sitting, in the \w+, blank head facing [^;]*; figure 2 \(Jun\) [^;]*, sitting, in the \w+, blank head facing/)
+  })
+
+  // 왜: 정상 경로 고정 — 실사 인물 줄은 더한 두 사람 샷에도 이름 · 화면 자리(왼쪽 · 오른쪽)와 왼쪽부터 차례를 말한다. 러프와 함께 누가 어디인지 이 줄로 묶인다.
+  it('더한 두 사람 샷의 실사 인물 줄은 이름 · 화면 자리와 왼쪽부터 차례를 말한다', () => {
+    const added = addedShot('sh_01_72', ['mina', 'jun'], { action_description: 'they both get up', action_description_native: 'they both get up' })
+    const spec = fill(added, [P1, P2, added]).spec!
+    const labels = (spec.character_blocking ?? []).map((b) =>
+      stillCharacterLabel({ characterId: b.character_id, name: NAMES.get(b.character_id)!, position: b.position_in_frame, pose: b.pose }, spec),
+    )
+    expect(labels.map((l) => describePhotoCharacterRef(l))).toEqual(['Mina (left third of the frame — in the midground)', 'Jun (right third of the frame — in the midground)'])
+    expect(leftToRight(labels, { start: 'START panel', end: 'END panel' })).toBe(' Left to right in START panel: Mina, Jun.')
+  })
 })

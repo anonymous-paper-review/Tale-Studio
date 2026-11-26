@@ -123,8 +123,10 @@ describe('러프를 그릴 때 다시 채우기 — 러프 길', () => {
     expect(preloaded.stageByScene.get('sc_01')).toEqual(STAGE)
     expect(preloaded.format).toBe('horizontal_16:9')
     const prompt = String((mocks.submit.mock.calls.at(-1)?.[0] as { prompt?: string }).prompt)
+    // 두 사람 더한 샷은 figure 에 이름을 붙인다(이 시험은 영어 이름 사전이 비어 id 가 붙는다).
     for (const [i, c] of FILLED.screen_layout.characters.entries()) {
-      expect(prompt).toContain(`figure ${i + 1} ${describePlacement(c.start)}`)
+      expect(prompt).toContain(`figure ${i + 1} (${c.character_id}) ${describePlacement(c.start)}`)
     }
+    expect(prompt).toContain('figure 1 is mina and figure 2 is jun')
   })
 })

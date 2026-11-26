@@ -18,6 +18,7 @@ import { backgroundClauseFromView, landmarksInView, stripCameraMoveSentences } f
 import { cameraWhyClause } from '@/lib/writer/motion-vocabulary'
 import type { ProjectFormat } from '@/types/project'
 import type { ScreenPlacement } from '@/lib/writer/types/pipeline'
+import { isAddedFillSpec } from '@/lib/writer/pipeline/stage/added_fill_mark'
 
 // ── 셀 지오메트리 (finalize crop 이 소비) ─────────────────────────────────────
 // 템플릿 실측 비례 좌표(격자선 3px 인셋) — public/rough-storyboard-grid.png 1672×941 기준.
@@ -363,6 +364,11 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   // #stage(2026-09-03): 무대에서 계산된 화면 배치(screen_layout)가 있으면 위치·깊이·크기·향을 문장에 싣는다.
   //   위치 낱말은 LLM 값이 아니라 계산값(character_blocking.position_in_frame 도 이미 덮어써져 있다).
   const layoutById = new Map((s?.screen_layout?.characters ?? []).map((c) => [c.character_id, c]))
+  // 앞뒤 샷으로 채운 더한 샷(N2 2026-11-27): 파이프라인 샷은 figure 마다 자세 글 · 소품으로 누구인지 드러나지만, 더한 샷은 자리만 있어 누가 figure 1 인지
+  //   단서가 이야기 글뿐이었다(통합 확인: 2인 샷 좌우가 DB 와 반대로 그려짐). 사람이 둘 이상이면 figure 에 이름을 붙여 자리와 묶는다 — 파이프라인 샷 칸은 그대로.
+  const neighborFilled = isAddedFillSpec(s)
+  const figureName = (b: { character_id: string }) => stripColor(input.characterNameById?.get(b.character_id) ?? b.character_id)
+  const named = neighborFilled && blocking.length >= 2
   const personLine = blocking.length
     ? blocking
         .map(
@@ -376,7 +382,11 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
                 ? `NOT visible at START (off-screen ${lay.start.screen_x < 0 ? 'left' : 'right'}); enters from the ${lay.start.screen_x < 0 ? 'left' : 'right'} and by END is ${describePlacement(lay.end)}`
                 : describePlacement(lay.start)
               : `at ${words(b.position_in_frame) || 'center'}`
-            return `figure ${i + 1} ${place}, ${stripColor(words(b.pose)) || 'standing'}, blank head facing ${words(b.gaze) || 'ahead'}`
+            const figure = named ? `figure ${i + 1} (${figureName(b)})` : `figure ${i + 1}`
+            const pose = stripColor(words(b.pose))
+            // 더한 샷이 자세를 비운 글("in the midground")은 자세가 아니라 깊이다 — 자세 자리를 비워 이야기 글이 자세를 정하게 한다("standing"으로 채우지 않는다).
+            const posePart = neighborFilled && /^in the (?:foreground|midground|background)$/i.test(pose) ? null : pose || 'standing'
+            return `${figure} ${place}${posePart ? `, ${posePart}` : ''}, blank head facing ${words(b.gaze) || 'ahead'}`
           },
         )
         .join('; ')
@@ -479,6 +489,11 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
   const povLine = povName
     ? `point-of-view shot: the camera is ${povName}'s eyes — ${povName} is never visible (at most a hand or weapon at the frame edge)`
     : null
+  // 이름 붙인 figure 를 이야기 글과 묶는다 — 이야기 속 각 사람의 동작 · 소품을 그 사람의 figure 자리에.
+  const figureNames = named ? blocking.map((b, i) => `figure ${i + 1} is ${figureName(b)}`) : []
+  const nameGuard = figureNames.length
+    ? `${figureNames.length > 2 ? `${figureNames.slice(0, -1).join(', ')} and ${figureNames[figureNames.length - 1]}` : figureNames.join(' and ')} — when the moment names them, give each person's own action and props to that figure, in that figure's place`
+    : null
   const startParts = [
     `${size}, ${angle}, ${lens}mm, ${rule}`,
     povLine,
@@ -489,6 +504,7 @@ export function buildRoughGridCell(input: RoughStoryboardPromptInput, shotId: st
     // 정지 프롬프트 위생: 카메라 무브 서술은 정지 그림의 재료가 아니다(MOTION 줄이 따로 싣는다).
     input.actionDescription ? `moment: ${stripColor(stripCameraMoveSentences(input.actionDescription))}` : null,
     pvzStartLine,
+    nameGuard,
     figureGuard,
     `focal point: ${focal}`,
     drawLine,
