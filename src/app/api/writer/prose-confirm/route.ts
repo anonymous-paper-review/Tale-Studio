@@ -1,6 +1,7 @@
 // 산문 확정(리뉴얼 1차 2026-10-19, 프로토타입 W6 "산문을 확정할까요? · 예, 확정하기").
-//   Writer 의 [브레이크다운하기]를 확정하면 산문을 잠그고(_proseLocked) Artist 단계를 연다(current_stage = artist).
-//   실행은 이어 가지 않는다 — 확정을 기다리는 산문 초안 그대로 두고, 인물 · 배경 디자인은 Artist [만들기]가 이어 간다.
+//   Writer 의 [브레이크다운하기]를 확정하면 산문을 잠그고(_proseLocked) 콘티 단계를 연다(current_stage = conti — O1 오너 2026-11-26 "콘티를 Artist 앞에").
+//   실행은 여기서 이어 가지 않는다 — 확정 뒤 화면이 writer/start(continueDraft)로 디자인 · 씬 · 샷 나누기를 이어 건다
+//   (인물 · 배경 목록 · 그림체를 실어 보내야 해서다, features/prose/confirm-prose-flow). 인물 · 배경 그림은 Artist [만들기]가 그린다.
 //   잠긴 산문은 scene-gate 가 고치는 요청을 받지 않는다. 넘길 때 러닝타임 검사는 없다(프로토타입 "러닝타임 검사 없음").
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
@@ -45,10 +46,10 @@ export async function POST(req: NextRequest) {
         if (error) throw new Error(error.message)
         if (!data?.length) continue
       }
-      // Artist 를 연다 — 이미 Artist · Storyboard 로 간 프로젝트의 단계는 되돌리지 않는다.
+      // 콘티를 연다 — 이미 콘티 · Artist · Storyboard 로 간 프로젝트의 단계는 되돌리지 않는다.
       const { error: stageError } = await supabaseAdmin
         .from('projects')
-        .update({ current_stage: 'artist' })
+        .update({ current_stage: 'conti' })
         .eq('id', access.projectId)
         .in('current_stage', ['entry', 'producer'])
       if (stageError) throw new Error(stageError.message)

@@ -12,7 +12,14 @@ export interface ChatToolContext {
   turn?: ToolTurn
 }
 
-export function toolResourcesForStage(stage: string): string[] {
+/** 콘티(conti)는 Storyboard(writer)와 같은 씬 · 샷 보드라 같은 도구 · 같은 서버 길(api/writer/chat)을 쓴다(O1 오너 2026-11-26).
+ *  도구 층(대상 목록 · 들여다보기 · 고침 영수증)은 보드 단계를 writer 로 읽는다. 승인 카드는 낸 단계(콘티)에 뜬다 — stores/chat-tool-bindings. */
+export function toolStageOf(stage: string): string {
+  return stage === 'conti' ? 'writer' : stage
+}
+
+export function toolResourcesForStage(stageId: string): string[] {
+  const stage = toolStageOf(stageId)
   if (stage === 'producer') return ['settings']
   if (stage === 'writer') return ['scenes', 'shots', 'dialogue', 'characters', 'backgrounds']
   if (stage === 'artist') return ['characters', 'backgrounds', 'appearances', 'background_appearances']

@@ -122,6 +122,8 @@ export interface ActivityItem {
   refKind: string | null
   refId: string | null
   at: string
+  /** 묶은 Take 가 음악 만들기(Editor [생성], editor_music 작업)에 쓰였으면 'music'(2026-11-26). 없으면 영상이다. */
+  media?: 'music'
 }
 
 /** 관리자 화면(/admin)의 [저장]·[해지]·Take 수 바꾸기가 남기는 ref_kind. */
@@ -214,4 +216,33 @@ export function summarizeSubscription(workspacePlan: string, row: SubscriptionRo
 export function canBuyTakePack(input: { plan: string; packPurchasedBefore: boolean }): boolean {
   if (input.plan !== 'free') return true
   return !input.packPurchasedBefore
+}
+
+/**
+ * 음악 작업에 묶인 내역에 음악 표시를 붙인다(2026-11-26 m1126 E1 · 리드 O3) — Take 장부 행에는 작업 종류가 없어, 요약을 만드는 서버가
+ *   작업 장부(generation_jobs)에서 음악 작업 번호를 골라 넘긴다. 그 밖의 내역은 그대로.
+ */
+export function markMusicActivity(items: readonly ActivityItem[], musicJobIds: ReadonlySet<string>): ActivityItem[] {
+  return items.map((item) =>
+    item.refKind === 'generation_job' && item.refId && musicJobIds.has(item.refId) ? { ...item, media: 'music' } : item,
+  )
+}
+
+/** 내역 한 줄의 이름(영어 원문 = i18n 키). 음악에 묶거나 쓴 Take 는 "Music generation", 영상은 예전 그대로 "Video generation". */
+const ACTIVITY_LABEL_KEY: Record<LedgerKind, string> = {
+  grant_free: 'Free Takes',
+  grant_plan: 'Plan Takes',
+  grant_purchase: 'Take pack',
+  grant_bonus: 'Bonus Takes',
+  hold: 'Video generation',
+  hold_release: 'Returned (generation failed)',
+  consume: 'Video generation',
+  expire: 'Expired',
+  refund_revoke: 'Refund',
+  manual_adjust: 'Adjustment',
+}
+
+export function activityLabelKey(item: Pick<ActivityItem, 'kind' | 'media'>): string {
+  if (item.media === 'music' && (item.kind === 'hold' || item.kind === 'consume')) return 'Music generation'
+  return ACTIVITY_LABEL_KEY[item.kind]
 }

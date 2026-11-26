@@ -153,7 +153,7 @@ export interface ContentPolicyBlockedBody {
   code?: string
   policyUrl?: string
   /** 걸린 그림의 대상(2026-11-25 오너) — 서버가 이름을 알 때만 오고, 있으면 안내가 그 이름을 말한다. */
-  target?: { kind: 'character' | 'world'; name: string }
+  target?: { kind: 'character' | 'world' | 'prop'; name: string }
 }
 
 export function isContentPolicyBlocked(status: number, body: unknown): body is ContentPolicyBlockedBody {

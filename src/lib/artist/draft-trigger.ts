@@ -59,6 +59,7 @@ import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { styleAnalysisPending } from '@/lib/style-facets/analysis-wait'
 import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
 import { recordModerationPass } from '@/lib/api/moderation'
+import { triggerPropDrafts } from '@/lib/artist/prop-drafts'
 
 interface DraftCharacterRow {
   character_id: string
@@ -115,6 +116,8 @@ export interface AssetDraftTriggerResult {
   deferred_style_analysis?: true
   characters: DraftTriggerResult
   worlds: DraftTriggerResult
+  /** 소품 그림 첫 그림(D7 2026-11-22) — 인물 · 배경 다음. 앞에서 멈춘 경우(그림체 없음 · 분석 중 · 자리 없음)에는 없다. */
+  props?: DraftTriggerResult
 }
 
 /**
@@ -628,10 +631,11 @@ export async function triggerAssetDrafts(
   await recordWriterObservabilityEvent(projectId, 'asset_trigger_started', { source })
   let workspaceId: string | null = null
   let customStyleAnchor: unknown = null
+  let storedStage: string | null = null
   try {
     const { data: project, error } = await supabaseAdmin
       .from('projects')
-      .select('design_tokens, workspace_id, custom_style_anchor')
+      .select('design_tokens, workspace_id, custom_style_anchor, current_stage')
       .eq('id', projectId)
       .maybeSingle()
 
@@ -646,6 +650,7 @@ export async function triggerAssetDrafts(
     }
     workspaceId = (project.workspace_id as string | undefined) ?? null
     customStyleAnchor = (project as { custom_style_anchor?: unknown }).custom_style_anchor ?? null
+    storedStage = (project as { current_stage?: string | null }).current_stage ?? null
   } catch (e) {
     console.warn(
       '[v2design-trigger] design_tokens absent — skipping (stalled path)',
@@ -656,6 +661,14 @@ export async function triggerAssetDrafts(
       reason: 'design_tokens_lookup_failed',
     })
     return { skipped_no_look: true, characters: zero(), worlds: zero() }
+  }
+
+  // 콘티(O1 오너 2026-11-26 "콘티를 Artist 앞에"): 산문을 확정하면 디자인 · 씬 · 샷 나누기가 바로 돌지만 인물 · 배경 그림은
+  //   Artist [만들기]가 그린다("Artist [만들기]는 그림만"). 저장 단계가 아직 콘티면 그리지 않는다 — Artist 가 열린 뒤 [만들기] · 다시 그리기가 부른다.
+  //   저장 단계 conti 는 O1 흐름에만 있다 — 예전 흐름(Artist [만들기]로 나누기를 이어 간 프로젝트)은 지금처럼 그린다.
+  if (storedStage === 'conti') {
+    await recordWriterObservabilityEvent(projectId, 'asset_trigger_deferred', { source, reason: 'before_artist' })
+    return { characters: zero(), worlds: zero() }
   }
 
   // 그림체 분석이 도는 동안은 미룬다(2026-10-10 오너 "분석이 진행 중에는 artist 생성이 안 되게 막아두고 끝나면 진행") —
@@ -687,14 +700,23 @@ export async function triggerAssetDrafts(
       return zero()
     }),
   ])
+  // 소품 그림(D7 · 리드 결정 2, 2026-11-22) — 인물 · 배경을 먼저 낸 뒤 빈칸만 그린다. 자리가 없으면 건너뛰고 화면이 이어 그린다.
+  const props = await triggerPropDrafts(projectId).catch((e) => {
+    console.error(
+      `[v2design-trigger] ${projectId} prop drafts failed:`,
+      e instanceof Error ? e.message : e,
+    )
+    return zero()
+  })
 
   console.log(
-    `[v2design-trigger] ${projectId} — chars ${characters.submitted}/${characters.skipped}/${characters.failed}, worlds ${worlds.submitted}/${worlds.skipped}/${worlds.failed}`,
+    `[v2design-trigger] ${projectId} — chars ${characters.submitted}/${characters.skipped}/${characters.failed}, worlds ${worlds.submitted}/${worlds.skipped}/${worlds.failed}, props ${props.submitted}/${props.skipped}/${props.failed}`,
   )
   await recordWriterObservabilityEvent(projectId, 'asset_trigger_completed', {
     source,
     characters,
     worlds,
+    props,
   })
-  return { characters, worlds }
+  return { characters, worlds, props }
 }

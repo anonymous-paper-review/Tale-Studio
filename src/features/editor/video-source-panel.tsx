@@ -23,7 +23,7 @@ import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { clipDisplayStatus, clipStatusLabel, shotLabel } from '@/features/editor/editor-labels'
 import { EffectsPanel } from '@/features/editor/effects-panel'
-import { selectVideoLayout, useEditorStore } from '@/stores/editor-store'
+import { selectVideoLayout, useEditorStore, type MusicClipSource } from '@/stores/editor-store'
 
 /**
  * 끌어 놓은 자리(초) — 스냅이 켜져 있으면 놓는 것의 시작이나 끝이 0초 · 플레이헤드 · 모든 줄 클립의 경계 · 마커에 붙는다
@@ -55,6 +55,10 @@ interface ProjectPanelProps {
   onBinDragStart: (kind: 'video' | 'audio') => void
   onBinDragEnd: () => void
   onSetBinDropSec: (sec: number | null) => void
+  /** [생성]에서 만든 곡 중 타임라인에 놓을 수 있는 것(끝났고 길이를 잰 곡, 2026-11-26 E1). 없으면 "만든 음악" 칸을 숨긴다. */
+  music?: MusicClipSource[]
+  /** 만든 곡을 끌어 오디오 줄에 놓는다 — trackId = 놓은 소리 줄. */
+  onAddMusic?: (musicId: string, atSec: number, trackId?: string) => void
 }
 
 /**
@@ -80,6 +84,8 @@ export function ProjectPanel({
   onBinDragStart,
   onBinDragEnd,
   onSetBinDropSec,
+  music = [],
+  onAddMusic,
 }: ProjectPanelProps) {
   const entityNames = useEntityNames()
   const t = useT()
@@ -234,6 +240,39 @@ export function ProjectPanel({
                 )
               })}
               {sourceShots.length === 0 && <p className="px-1 py-4 text-meta text-subtle-foreground">{t('No clips generated yet')}</p>}
+
+              {/* 만든 음악 — [생성]에서 만든 곡(2026-11-26 E1). 보관함 주소라 다른 브라우저에서도 같은 목록 · 소리다. 끌면 오디오 줄에 놓인다. */}
+              {music.length > 0 ? (
+                <div className="mt-3 flex flex-col gap-1">
+                  <p className="px-1 pb-1 text-meta font-medium text-subtle-foreground">{t('Made music · {count}', { count: music.length })}</p>
+                  {music.map((song) => (
+                    <div
+                      key={song.id}
+                      data-music-id={song.id}
+                      onPointerDown={(e) =>
+                        startBinDrag({
+                          event: e,
+                          label: `♪ ${song.title}`,
+                          dropSelector: '[data-drop="audio-track"]',
+                          onDragStart: () => onBinDragStart('audio'),
+                          onDragEnd: onBinDragEnd,
+                          onDrop: ({ target, clientX }) =>
+                            onAddMusic?.(song.id, snappedDropSec(target, clientX, song.durationSec), (target as HTMLElement).dataset.trackId),
+                        })
+                      }
+                      title={`${song.title}\n${t('(Drag: add to audio track)')}`}
+                      // 긴 곡 이름(한 줄 truncate)이 판 안쪽 표 폭을 넓혀 판 전체가 오른쪽에서 잘리지 않게 폭 계산을 줄 안에 가둔다(ScrollArea 최소 폭 함정).
+                      className="flex cursor-grab items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors [contain:inline-size] hover:bg-card active:cursor-grabbing"
+                    >
+                      <div className="flex h-8 w-6 shrink-0 items-center justify-center rounded bg-card">
+                        <Music className="size-3.5 text-stage" />
+                      </div>
+                      <span className="min-w-0 flex-1 truncate text-label text-foreground">{song.title}</span>
+                      <span className="shrink-0 font-num text-meta text-subtle-foreground tabular-nums">{`A · ${formatClipLength(song.durationSec)}`}</span>
+                    </div>
+                  ))}
+                </div>
+              ) : null}
 
               {/* 내 파일 — 올린 소리. 이 칸에 소리 파일을 끌어 놓아도 올라간다. */}
               <div

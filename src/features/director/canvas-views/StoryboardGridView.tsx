@@ -20,11 +20,14 @@ import {
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
 import {
   isStoppedTake,
+  selectHandoffTake,
   selectLatestAttempt,
   selectLatestShotAttempt,
-  selectNewestSuccessfulTake,
   type VideoTakeSelectionRecord,
 } from '@/lib/director-video-take-selection'
+import { VersionHistoryHover, stripAspect, type VersionStripCard } from '@/components/version-history/version-history-hover'
+import { historyStrip, pastImageVersions, pastTakes } from '@/lib/version-history'
+import { aspectRatioFromFormat } from '@/types/project'
 import {
   getChildShots,
   effectivePrompt,
@@ -58,6 +61,7 @@ import {
   type ShotNodeData,
 } from '@/types/director'
 import { directorMentionTargets, directorNodeLabel, sortByBoard } from '@/features/director/node-label'
+import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { useT } from '@/lib/i18n'
 import { Lumi } from '@/components/lumi/lumi'
@@ -110,13 +114,15 @@ export function selectGridVideoAttemptState(
 }
 
 /** 카드가 트는 영상 · 만드는 중 · 실패 글 — 화면에서 멈춘 Take 는 만드는 중이 아니고, ★ 가 아니면 카드 영상도 아니다
- *  (샷 상태 shot-state.ts 와 같은 규칙, 오너 2026-11-14 7번 · 리드 S4-2 1). 약속: tests/director/stopped-take.test.ts */
+ *  (샷 상태 shot-state.ts 와 같은 규칙, 오너 2026-11-14 7번 · 리드 S4-2 1). 약속: tests/director/stopped-take.test.ts
+ *  카드는 ★ 로 고른(채택한) Take 를 틀고, 고르지 않았으면 가장 새 완성 Take 를 튼다 — Editor 로 가는 것과 같은 규칙(selectHandoffTake).
+ *  채택했는데 카드가 가장 새 Take 그대로면 채택이 안 된 것처럼 보인다(오너 2026-11-26 D2). 약속: tests/director/version-history.test.ts */
 export function gridVideoView<T extends GridVideoTakeRecord>(
   records: readonly T[],
   t: ReturnType<typeof useT> = (text) => text,
 ): { cardTake: T | null; generating: boolean; failure: string | null } {
   // ★ 로 고른 멈춘 Take 는 영상이다 — 카드 영상 고르기에서만 멈춤을 지운다.
-  const cardTake = selectNewestSuccessfulTake(records.map((r) => (r.is_final ? { ...r, cancelled_at: null } : r)))
+  const cardTake = selectHandoffTake(records.map((r) => (r.is_final ? { ...r, cancelled_at: null } : r)))
   const { generating } = selectGridVideoAttemptState(records.filter((r) => r.cancelled_at == null), t)
   // 실패 글은 샷 상태와 같은 가장 새 시도로 — 그것이 멈춘 Take 면 뒤에서 실패했어도 띄우지 않는다(리드 2026-11-14 규칙).
   const latest = selectLatestShotAttempt(records)
@@ -300,7 +306,7 @@ function ShotCell({
     }
   }
   const [previzOpen, setPrevizOpen] = useState(false)
-  // Grid always projects the newest successful take; Final is an editor/export decision.
+  // 카드는 ★ 로 고른 Take, 없으면 가장 새 완성 Take 를 튼다(gridVideoView — Editor 로 가는 것과 같다, 오너 2026-11-26 D2).
   const directorNodes = useDirectorCanvasStore((s) => s.nodes)
   // #real-grid-auto: 일괄 시트 생성 중엔 개별 생성/재생성 잠금 (스토어 가드와 이중 방어).
   //   아래 isShotData early return 보다 위에 있어야 한다 — 훅의 조건부 호출은 렌더 간 훅 순서를
@@ -332,11 +338,11 @@ function ShotCell({
       }),
     [directorNodes, node.id],
   )
-  // Grid always projects the newest successful take; Final is an editor/export decision.
+  // 카드는 ★ 로 고른(채택한) Take, 없으면 가장 새 완성 Take 를 튼다 — Editor 로 가는 것과 같다(오너 2026-11-26 D2).
   //   화면에서 멈춘 Take 는 ★ 가 아니면 카드 영상도 만드는 중도 아니다(오너 7번 — 멈춘 채 도는 Take 가 [영상 만들기]를 잠그지 않게).
-  const { cardTake: newestSuccessful, generating: childVideoGenerating, failure: childVideoFailure } =
+  const { cardTake, generating: childVideoGenerating, failure: childVideoFailure } =
     gridVideoView(takeRecords, t)
-  const completedVideoUrl = newestSuccessful?.url ?? null
+  const completedVideoUrl = cardTake?.url ?? null
 
   // 화면 포맷(2026-09-30) — 훅은 조기 반환보다 앞에 둔다(React 훅 순서 규칙).
   const projectFormat = useProjectFormatStore((s) => s.format)
@@ -504,17 +510,62 @@ function ShotCell({
       ? t('{seconds}s', { seconds: Math.round(data.durationSeconds) })
       : null
 
+  // 지난 판 줄(오너 2026-11-26 D2, 시안 없음) — 카드에 마우스를 올리면 아래에 지난 판이 5개까지: 카드가 영상을 틀면 지난 Take,
+  //   그림이면 지난 이미지 판. 러프 보기는 판 기록이 없다. 누르면 그 판의 상세가 열리고 상세의 [채택]이 그 판을 최종으로.
+  const historyTakes = mediaMode === 'real' && cardTake
+    ? historyStrip(pastTakes(takeRecords.map((r) => ({
+        id: r.node.id,
+        takeNumber: r.take_number,
+        createdAt: r.created_at,
+        status: r.status,
+        videoUrl: r.url,
+        thumbnailUrl: isVideoData(r.node.data) ? r.node.data.thumbnailUrl : null,
+        cancelledAt: r.cancelled_at,
+      })), cardTake.node.id))
+    : null
+  const historyImages = mediaMode === 'real' && !historyTakes ? historyStrip(pastImageVersions(img)) : null
+  const historyCards: VersionStripCard[] = historyTakes
+    ? historyTakes.shown.map((take) => ({
+        id: take.id,
+        label: t('Take {n}', { n: take.takeNumber }),
+        thumbUrl: take.thumbUrl,
+        videoUrl: take.videoUrl,
+        note: take.stopped ? t('Finished after it was stopped') : null,
+      }))
+    : (historyImages?.shown ?? []).map((version) => ({
+        id: version.id,
+        label: `v${version.n}`,
+        thumbUrl: version.thumbUrl,
+        note: version.upload ? t('Uploaded image') : version.stopped ? t('Finished after it was stopped') : null,
+      }))
+  const openHistory = (id: string) => {
+    // 지난 Take 는 그 Take 를 연다(영상 탭이 그 Take 를 먼저 보인다), 지난 이미지 판은 이미지 탭이 그 판을 먼저 보인다.
+    if (historyTakes) openShotDetail(id, 'video')
+    else openShotDetail(node.id, 'image', { versionId: id })
+  }
+
+  // ⌘/Ctrl+클릭 = 멘션 + 누른 자리에서 채팅으로 나는 @이름(오너 2026-11-26 G3 — 다른 탭과 같은 연출).
   const mentionCardOnModifierClick = (
-    event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
+    event: Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'clientX' | 'clientY'>,
   ): boolean => {
     const label = mentionLabelForModifierClick(event, shotMention)
     if (!label) return false
+    // Producer · Artist 카드와 같은 길: 방향은 넣고 빼기 전의 입력칸 글로 보고(#b2) → 멘션 토글 → 비행.
+    const removing = chatInputHasMention(label)
     requestMentionToggle(label)
+    launchMentionFlight({ label, clickX: event.clientX, clickY: event.clientY, toChat: !removing })
     return true
   }
 
   return (
     <>
+    <VersionHistoryHover
+      cards={historyCards}
+      more={(historyTakes ?? historyImages)?.more ?? 0}
+      aspect={stripAspect(aspectRatioFromFormat(projectFormat ?? 'horizontal_16:9'))}
+      onOpen={openHistory}
+      onMore={() => openShotDetail(node.id, historyTakes ? 'video' : 'image')}
+    >
     <div
       // v3(2026-11-03): 노드 캔버스와 같은 판(작업 바탕색 · 모서리 16 · 그림자 하나 · 안쪽 12) — 캔버스 판(--canvas-bg) 위에 뜬다.
       className={cn(
@@ -833,6 +884,7 @@ function ShotCell({
         )}
       </div>
     </div>
+    </VersionHistoryHover>
     </>
   )
 }
@@ -851,9 +903,10 @@ export function StoryboardGridView({
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
-  // 미디어 모드: Previz(러프 3프레임 보드, 기본) | Real(실사) — 상단바(PaletteBar) 토글이 제어(2026-07-22).
-  const mediaMode: StoryboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
-  const setStoryboardMediaMode = useDirectorCanvasStore((s) => s.setStoryboardMediaMode)
+  // 미디어 모드: 늘 실사(오너 2026-11-26 D1 "스토리보드뷰에서 러프/실사 버튼 없애기") — 러프는 Writer 콘티 · Storyboard 가 맡는다.
+  //   store 의 storyboardMediaMode 는 읽지 않는다: 처음 여는 프로젝트 · 예전에 러프를 골라 둔 브라우저는 그 값이 러프라, 단추 없이 러프 카드에 갇힌다.
+  //   카드(ShotCell)의 러프 갈래는 남겨 두었다(쓰지 않음) — 되돌릴 때 단추만 되살리면 된다.
+  const mediaMode: StoryboardMediaMode = 'real'
 
   // 슬러그 → 실제 이름 로스터(#e6) — asset-storage(진입 시 DB hydrate)에서 인물·장소 이름.
   //   표시 전용: 노드 데이터·프롬프트 원문(구동)은 그대로 둔다.
@@ -907,16 +960,9 @@ export function StoryboardGridView({
     }
   }, [activeRoughShots, projectId])
   const queuedImageShots = useMemo(
-    // #f10(2026-08-27 오너): previz 모드에선 러프 재생성 잡도 "생성 중"의 근거다 — 큐 진실이라
-    //   탭을 떠났다 와도 오버레이가 복원되고, 문구가 없어 재생성을 또 누르던 문제가 사라진다.
-    () =>
-      activeShotIds(
-        activeJobs,
-        mediaMode === 'previz'
-          ? ['shot_storyboard', 'storyboard_real_grid', 'shot_rough_storyboard']
-          : ['shot_storyboard', 'storyboard_real_grid'],
-      ),
-    [activeJobs, mediaMode],
+    // 실사 카드의 "생성 중" 근거는 실사 잡(한 장 · 네 장 시트)뿐이다. 예전 러프 보기는 러프 재생성 잡도 셌다(#f10) — 러프 보기를 없앴다(D1).
+    () => activeShotIds(activeJobs, ['shot_storyboard', 'storyboard_real_grid']),
+    [activeJobs],
   )
   const queuedVideoShots = useMemo(
     () => activeShotIds(activeJobs, ['shot_video']),
@@ -1049,7 +1095,10 @@ export function StoryboardGridView({
                   if (!label) return
                   event.preventDefault()
                   event.stopPropagation()
+                  // 씬 이름도 카드와 같은 멘션 비행(오너 2026-11-26 G3 · D9 "모든 탭에서 같게").
+                  const removing = chatInputHasMention(label)
                   requestMentionToggle(label)
+                  launchMentionFlight({ label, clickX: event.clientX, clickY: event.clientY, toChat: !removing })
                 }}
               >
                 {group.label}

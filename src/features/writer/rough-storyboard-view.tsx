@@ -40,6 +40,9 @@ import { ShotDetailDialog } from '@/features/writer/shot-detail-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
+import { boardStageOf } from '@/lib/writer/board-stage'
+import { ContiSplitStart } from '@/features/writer/conti-split-start'
+import { STAGE_PERSONA } from '@/lib/lumi'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { handOverToDirector } from '@/features/writer/storyboard-director'
 import { StoryboardDirectorDialog } from '@/features/writer/storyboard-director-dialog'
@@ -166,6 +169,8 @@ export function RoughStoryboardView() {
   //   원시값이라 실제로 로케일이 바뀔 때만 재계산을 트리거한다.
   const locale = useLocaleStore((s) => s.locale)
   const projectId = useProjectStore((s) => s.projectId)
+  // 이 보드가 붙은 단계(콘티 · Storyboard, O1 2026-11-26) — 첫 안내 · 넘김 권유 · 알림 · 잠금 Lumi 가 이 단계를 따른다.
+  const boardStage = useProjectStore((s) => boardStageOf(s.currentStage))
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
@@ -300,21 +305,22 @@ export function RoughStoryboardView() {
   }, [projectId, roughAllReady])
   useEffect(() => {
     if (!projectId || !roughAllReady) return
-    if (!shouldOfferHandoffNudge('writer', reachedStage)) return
+    // 콘티의 러프가 다 그려지면 Artist 로 넘어가자고 권한다(O1 — 콘티 다음은 Artist). Storyboard 는 넘김 표에 없어 권하지 않는다.
+    if (!shouldOfferHandoffNudge(boardStage, reachedStage)) return
     if (artistNudgeRef.current === projectId) return
     artistNudgeRef.current = projectId
-    const spec = handoffFrom('writer')
+    const spec = handoffFrom(boardStage)
     if (!spec) return
     offerSuggestion({
-      id: `handoff:writer:${projectId}`,
-      stage: 'writer',
+      id: `handoff:${boardStage}:${projectId}`,
+      stage: boardStage,
       content: translate(
         locale,
         'The rough storyboard is all ready. Ready to move to Artist and work out character and background concepts?',
       ),
       action: { kind: 'handoff', utterance: translate(locale, spec.utterance), label: translate(locale, spec.label) },
     })
-  }, [projectId, roughAllReady, offerSuggestion, reachedStage, locale])
+  }, [projectId, roughAllReady, offerSuggestion, reachedStage, locale, boardStage])
 
   // 파이프라인이 이 화면을 보는 중에 완료되면 씬/샷을 1회 재로드.
   useEffect(() => {
@@ -610,7 +616,9 @@ export function RoughStoryboardView() {
           // 이번 라운드 잡들의 종결(성공/실패 모두 위에서 상태 반영) — 펌프의 라운드 배리어.
           //   묶음이 끝나면 내용 검사로 걸린 샷을 채팅에 한 줄로 알린다(걸린 샷이 없으면 아무것도 안 한다).
           done: Promise.allSettled(polls).then((results) => {
-            announceRoughModerationFailures('writer', moderationShots)
+            // 콘티 보드에서 그린 묶음은 콘티 채팅에, Storyboard 보드에서 그린 묶음은 Storyboard 채팅에 알린다(O1 2026-11-26).
+            if (boardStage === 'conti') announceRoughModerationFailures('conti', moderationShots)
+            else announceRoughModerationFailures('writer', moderationShots)
             return results
           }),
         }
@@ -630,7 +638,7 @@ export function RoughStoryboardView() {
         return null
       }
     },
-    [projectId, loadProject, locale],
+    [projectId, loadProject, locale, boardStage],
   )
 
   // ── 더한 샷 바로 그리기(2026-11-02 오너 "더할 때마다 자동") ── 카드의 그리기와 같은 요청 길로 그 샷 하나를 보낸다.
@@ -813,7 +821,7 @@ export function RoughStoryboardView() {
     setLock((prev) => advanceBoardLock(prev, lockFacts))
   }
   const busy = storyboardBusyView(
-    { status, facts: lockFacts, lock, rough: roughProgress, sceneCount: sceneManifest?.scenes.length ?? 0 },
+    { status, facts: lockFacts, lock, rough: roughProgress, sceneCount: sceneManifest?.scenes.length ?? 0, boardStage },
     locale,
   )
   // 남은 컷([남은 컷 (다시) 그리기]) — 보드 순서(씬 → 샷)로 고른다. Director 넘김 창은 보드가 지금 보여 주는 그림으로 센다.
@@ -871,16 +879,16 @@ export function RoughStoryboardView() {
     if (!hasShots || busyOpen) return
     const sceneCount = sceneManifest?.scenes.length ?? 0
     if (sceneCount === 0) return
-    if (chatMessages.some((m) => m.stage === 'writer')) return
+    if (chatMessages.some((m) => m.stage === boardStage)) return
     briefedRef.current = true
     offerSuggestion({
-      id: `writer-brief:${projectId}`,
-      stage: 'writer',
+      id: `${boardStage}-brief:${projectId}`,
+      stage: boardStage,
       dismissible: false,
       action: null,
       content: storyboardBriefing(locale, { sceneCount, shotCount: shots.length }),
     })
-  }, [projectId, sceneManifest, shots.length, hasShots, busyOpen, chatMessages, chatHistoryLoaded, offerSuggestion, locale])
+  }, [projectId, sceneManifest, shots.length, hasShots, boardStage, busyOpen, chatMessages, chatHistoryLoaded, offerSuggestion, locale])
   // 제목 아래 설명문은 제거(#c2 2026-07-14) — 카드 사용법은 첫 진입 브리핑 채팅이 안내한다.
   // 트리트먼트·대사 탭과 같은 자리의 도움말(#c4 2026-08-03) — 헤더 아래 한 줄.
   const headerDescription = t(
@@ -1098,7 +1106,7 @@ export function RoughStoryboardView() {
               footer={busyFooter}
               // 큰 Lumi(Storyboard 옷, 오너 결정 8) — Artist → Storyboard 로 넘어가며 기다리는 동안 로딩, 실패 안내면 오류 모습(공용 덮개가 정한다).
               //   보드에서 다시 그리는 잠금에는 두지 않는다(lib/writer/board-busy lumi).
-              lumi={busy.lumi ? 'storyboard' : undefined}
+              lumi={busy.lumi ? STAGE_PERSONA[boardStage] : undefined}
             />,
             document.body,
           )
@@ -1124,6 +1132,9 @@ export function RoughStoryboardView() {
   if (!hasShots) {
     const waiting = status?.current_status === 'awaiting_artist' || status?.current_status === 'awaiting_confirmation'
     const progress = writerProgressView(status, locale)
+    // 산문은 확정했는데(저장 단계 conti) 씬 · 샷 나누기가 걸리지 않은 콘티 — 다시 거는 단추를 둔다(O1 2026-11-26).
+    //   예전 흐름으로 Artist 까지 간 프로젝트(저장 단계 artist)는 지금처럼 Artist [만들기]로 나눈다.
+    const contiSplitPending = boardStage === 'conti' && reachedStage === 'conti' && status?.current_status === 'awaiting_confirmation'
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <WriterHeader description={headerDescription} />
@@ -1132,8 +1143,10 @@ export function RoughStoryboardView() {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
             <ImageIcon className="size-10 text-subtle-foreground" />
-            <p className="text-body font-semibold text-foreground">{waiting ? progress.label : t('No scenes or shots generated yet')}</p>
-            {status?.pipeline_failed ? (
+            <p className="text-body font-semibold text-foreground">{contiSplitPending ? t('The prose is confirmed. Start splitting it into scenes and shots.') : waiting ? progress.label : t('No scenes or shots generated yet')}</p>
+            {contiSplitPending ? (
+              <ContiSplitStart />
+            ) : status?.pipeline_failed ? (
               <>
                 <p className="text-caption text-muted-foreground">
                   {t('Generation stopped')}

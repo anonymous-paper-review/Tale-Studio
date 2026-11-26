@@ -51,7 +51,7 @@ export function buildWriterDirectorPromptPatch(
   return patch
 }
 
-/** 처음 정렬(오너 2026-11-16)의 점검: DB 에 저장된 자리 · 영상 테이크가 있는가(읽는 중) + 점검을 시작할 때의 카드 자리. */
+/** 처음 정렬(오너 2026-11-16)의 점검: DB 에 저장된 씬 · 샷 자리가 있는가(읽는 중) + 점검을 시작할 때의 카드 자리. 영상 Take 는 세지 않는다(2026-11-26 D7). */
 export interface FirstEntryCheck {
   saved: Promise<boolean>
   snapshot: ReadonlyMap<string, XYPosition>
@@ -76,7 +76,8 @@ export function startFirstEntryCheck(projectId: string): FirstEntryCheck | null 
 
 /**
  * 처음 들어온 프로젝트면 [자동 정렬]을 한 번 요청한다. 요청했으면 true.
- * 처음 = DB 에 저장된 자리도 영상 테이크도 없고, 카드가 Writer 에서 온 것뿐일 때(리드 2026-11-16: 브라우저에 옛 간격 자리가 남아 있어도 한다).
+ * 처음 = DB 에 저장된 씬 · 샷 자리가 없고, 카드가 Writer 에서 온 것(과 그 샷의 Take)뿐일 때(리드 2026-11-16: 브라우저에 옛 간격 자리가 남아 있어도 한다.
+ * 오너 2026-11-26 D7: Take 자리는 만들 때 저절로 저장되는 값이라 Take 가 있어도 한다).
  * 저장된 자리는 DB 에서 직접 본다: 카드 자리만 보면 저장된 자리가 아직 안 들어온 것과 없는 것을 못 가른다
  * (진입 때 DB 읽기가 둘 겹쳐 돌아 먼저 끝난 쪽이 버려진다). 기다리는 사이 카드가 옮겨지거나 새로 생겼거나, 끌기가 아직 저장되기 전이면 그만둔다.
  * 자리는 카드를 그리기 전에 정해 크기를 모르므로 넉넉하게 벌어진다 — 카드를 다 그려 잰 뒤 단추와 같은 길로 놓는다.
@@ -99,9 +100,9 @@ export async function arrangeIfFirstEntry(projectId: string, check?: FirstEntryC
 
 /**
  * 처음 정렬을 실제로 하기 직전(화면이 카드를 다 그린 뒤)에 한 번 더 본다. 하나라도 어긋나면 false — 정렬하지 않고 "확인 마침"으로도 기억하지 않는다.
- * 요청한 뒤 정렬하기까지 기다리는 사이(스토리보드 보기로 열리면 노드 보기가 열릴 때까지) 카드가 옮겨지거나 Take 가 생기거나 끌기가 저장되기 전일 수 있고,
+ * 요청한 뒤 정렬하기까지 기다리는 사이(스토리보드 보기로 열리면 노드 보기가 열릴 때까지) 카드가 옮겨지거나 끌기가 저장되기 전일 수 있고,
  * 늦게 돌게 됐으면 다른 탭에서 저장한 자리가 생겼을 수 있다(리뷰 s11 낮음 1). 요청한 적 없는 정렬은 확인할 것이 없어 false.
- * 확인할 것: 전부 Writer 카드다 · 직접 만든 카드와 Take 가 없다(isAutoPlacedCandidate) · 요청할 때 찍은 자리에서 카드가 안 옮겨졌다 · 저장 전 끌기가 없다 · (늦으면) DB 에 저장된 자리가 없다.
+ * 확인할 것: 전부 Writer 카드(와 그 샷의 Take)다 · 직접 만든 카드가 없다(isAutoPlacedCandidate) · 요청할 때 찍은 자리에서 카드가 안 옮겨졌다 · 저장 전 끌기가 없다 · (늦으면) DB 에 저장된 자리가 없다.
  */
 export async function confirmFirstEntryArrange(projectId: string): Promise<boolean> {
   const pending = pendingFirstEntry
@@ -479,7 +480,7 @@ export function useWriterDirectorSync() {
       dir.updateNodeData<'shot'>(id, patch)
     }
 
-    // ── 처음 정렬(오너 2026-11-16): 카드가 갖춰진 지금 DB 에 저장된 자리 · 영상 테이크가 있는지 읽기 시작한다(아래 Pass 2.5 의 DB 읽기와 함께 돈다) ──
+    // ── 처음 정렬(오너 2026-11-16): 카드가 갖춰진 지금 DB 에 저장된 씬 · 샷 자리가 있는지 읽기 시작한다(아래 Pass 2.5 의 DB 읽기와 함께 돈다) ──
     if (firstEntry.check === undefined) firstEntry.check = startFirstEntryCheck(entryProjectId)
 
     // ── Pass 2.5: DB → 캔버스 hydrate (DB가 진실, projectId별 1회) ──────
@@ -518,7 +519,7 @@ export function useWriterDirectorSync() {
     // 먼저 나서 껐다. 실사 생성은 전체 버튼·개별 버튼·채팅 셋 중 하나로만 시작한다.
 
     // ── Pass 2.8: 처음 들어온 프로젝트면 [자동 정렬]을 한 번 한다(오너 2026-11-16) ──────────
-    // 자리는 카드를 그리기 전에 정해 크기를 몰라 넉넉하게 벌어진다. DB 에 저장된 자리 · 영상 테이크가 있거나 직접 만든 카드가 있으면 하지 않는다(first-entry-layout.ts).
+    // 자리는 카드를 그리기 전에 정해 크기를 몰라 넉넉하게 벌어진다. DB 에 저장된 씬 · 샷 자리가 있거나 직접 만든 카드가 있으면 하지 않는다(first-entry-layout.ts, Take 는 세지 않음 — D7).
     if (!firstEntry.requested) {
       firstEntry.requested = true
       await arrangeIfFirstEntry(entryProjectId, firstEntry.check)

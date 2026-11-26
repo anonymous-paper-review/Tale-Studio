@@ -16,9 +16,11 @@
 import { STAGES } from '@/lib/constants'
 import type { StageId } from '@/types'
 
+// 숫자는 레일 칸 순서다 — 콘티(id conti, O1 2026-11-26)는 Writer 칸 안이라 자기 숫자가 없고 Alt+2(Writer 칸)로 간다.
 export const STAGE_ACCESS_KEY: Record<StageId, string> = {
   entry: '1',
   producer: '2',
+  conti: '',
   artist: '3',
   writer: '4',
   director: '5',
@@ -39,6 +41,7 @@ export function accessModifierLabel(platform?: string): string {
 const STAGE_BY_CODE = new Map<string, StageId>(
   STAGES.flatMap((s) => {
     const key = STAGE_ACCESS_KEY[s.id as StageId]
+    if (!key) return []
     return [
       [`Digit${key}`, s.id as StageId] as const,
       [`Numpad${key}`, s.id as StageId] as const,

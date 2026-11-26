@@ -245,6 +245,60 @@ export function validateWriterUpdates(
   return clarification ? [clarification] : out
 }
 
+/** 서버가 읽은 Artist 배경 한 줄(locations.location_id · name). */
+export interface LocationRosterRow {
+  location_id: string
+  name: string | null
+}
+
+const placeKey = (text: string) => text.trim().replace(/\s+/g, ' ').toLowerCase()
+
+/**
+ * 채팅이 적은 씬 장소(addScene.location · updateScene.patch.location)를 Artist 배경 id 로 잇는다(W6 오너 2026-11-26).
+ *   왜: 채팅 문맥에 배경 목록이 없어 AI 가 배경 이름("천장 형광등")을 장소 칸에 적었고, 씬 장소는 배경 id 로만 이어지므로
+ *   러프 배경 글 · 실사 참고 배경 · Director 배경 선이 모두 빠졌다(개발 DB 재현 2026-11-26).
+ *   규칙: 배경 id 그대로면 그대로 → id 를 대소문자 · 띄어쓰기만 다르게 적었으면 그 id → 배경 이름과 같으면 그 배경 id.
+ *   어느 것도 아니면 새 장소로 보고 적은 글을 그대로 두며 unknownPlaces 에 담는다(호출부가 답 끝에 알린다).
+ *   배경 목록을 모르면(undefined — 못 읽음 · 옛 클라) 바꾸지도 알리지도 않는다(지금 그대로). 약속: tests/chat/writer-chat-place.test.ts
+ */
+export function resolveSceneLocations(
+  updates: unknown[],
+  locations: readonly LocationRosterRow[] | undefined,
+): { updates: unknown[]; unknownPlaces: string[] } {
+  if (!locations) return { updates, unknownPlaces: [] }
+  const ids = new Set(locations.map((row) => row.location_id).filter(Boolean))
+  const byKey = new Map<string, string>()
+  for (const row of locations) if (row.location_id && !byKey.has(placeKey(row.location_id))) byKey.set(placeKey(row.location_id), row.location_id)
+  for (const row of locations) {
+    const name = row.name?.trim()
+    if (row.location_id && name && !byKey.has(placeKey(name))) byKey.set(placeKey(name), row.location_id)
+  }
+  const unknown: string[] = []
+  const resolve = (location: string): string => {
+    if (ids.has(location)) return location
+    const matched = byKey.get(placeKey(location))
+    if (matched) return matched
+    const place = location.trim()
+    if (place && !unknown.includes(place)) unknown.push(place)
+    return location
+  }
+  const out = updates.map((update) => {
+    const rec = asObj(update)
+    if (!rec) return update
+    if (rec.type === 'addScene' && typeof rec.location === 'string') {
+      const location = resolve(rec.location)
+      return location === rec.location ? update : { ...rec, location }
+    }
+    const patch = rec.type === 'updateScene' ? asObj(rec.patch) : null
+    if (patch && typeof patch.location === 'string') {
+      const location = resolve(patch.location)
+      return location === patch.location ? update : { ...rec, patch: { ...patch, location } }
+    }
+    return update
+  })
+  return { updates: out, unknownPlaces: unknown }
+}
+
 export function classifyDialoguePatch(
   current: DialogueLine[],
   next: DialogueLine[],

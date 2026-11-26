@@ -39,6 +39,9 @@ import { MoveFirstButton } from '@/features/director/move-first-button'
 import { NodeWaitCard } from '@/components/feedback/node-wait'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { useWriterStore } from '@/stores/writer-store'
+import { VersionHistoryHover, stripAspect } from '@/components/version-history/version-history-hover'
+import { historyStrip, pastImageVersions } from '@/lib/version-history'
+import { aspectRatioFromFormat } from '@/types/project'
 
 /** 노드 뷰 미디어 틀의 높이 상한 — 샷 행 간격(SHOT_OFFSET_Y 560px)의 절반 아래로 둬 아래 샷과 겹치지 않는다. */
 const SHOT_NODE_MEDIA_MAX_H = 240
@@ -64,6 +67,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   const generateVideoForShot = useDirectorCanvasStore(
     (s) => s.generateVideoForShot,
   )
+  const openShotDetail = useDirectorCanvasStore((s) => s.openShotDetail)
   // 가지 내기(새 영상 노드 → 바로 생성)도 Take 를 쓴다 — 잔액을 못 읽으면 시작하지 않고 노드 안에 까닭(리드 11/14).
   const takeBalance = useTakeBalance()
   const [takesUnknown, setTakesUnknown] = useState(false)
@@ -122,6 +126,15 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   //   보낸 작업이 아직 목록에 없으면(막 보냄) 단추 없이 카드만. 응답을 놓친 확인 중에는 덮지 않는다(꼬리가 그 글을 말한다).
   const drawing = isGenerating && (generation.phase === 'generating' || generation.phase === 'submitting')
   const imageStop = drawing && writerShotId ? shotStopTarget(activeJobs, writerShotId, 'image') : null
+  // 지난 판 줄(오너 2026-11-26 D2, 시안 없음) — 실사 그림에 마우스를 올리면 그 아래에 지난 이미지 판이 5개까지. 누르면 왼쪽 상세가 그 판을
+  //   먼저 보이고 [채택]이 그 판을 지금 그림으로 만든다. 러프만 있으면 판 기록이 없다. Take 노드는 Take 하나가 노드 하나라 줄이 없다.
+  const history = realImage ? historyStrip(pastImageVersions(data.storyboardImage)) : null
+  const historyCards = (history?.shown ?? []).map((version) => ({
+    id: version.id,
+    label: `v${version.n}`,
+    thumbUrl: version.thumbUrl,
+    note: version.upload ? t('Uploaded image') : version.stopped ? t('Finished after it was stopped') : null,
+  }))
 
   return (
     <>
@@ -192,6 +205,13 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
             옛 hover 디밍+프로비넌스 오버레이는 순환을 가리는 회색 화면이라 제거 — 프롬프트는
             카드 본문·팝업에서 이미 보인다. 3프레임 없는 이미지(구버전/수동 노드)는 정적 표시. */}
         {stageImageUrl && (
+          <VersionHistoryHover
+            cards={historyCards}
+            more={history?.more ?? 0}
+            aspect={stripAspect(aspectRatioFromFormat(projectFormat ?? 'horizontal_16:9'))}
+            onOpen={(versionId) => openShotDetail(id, 'image', { versionId })}
+            onMore={() => openShotDetail(id, 'image')}
+          >
           <div
             className={cn('relative mt-2 overflow-hidden rounded-[10px] bg-art-placeholder', !mediaFrame && 'aspect-video w-full')}
             style={mediaFrame ?? undefined}
@@ -226,6 +246,7 @@ function ShotNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
               </span>
             )}
           </div>
+          </VersionHistoryHover>
         )}
 
         {failed && (

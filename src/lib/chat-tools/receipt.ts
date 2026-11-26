@@ -1,6 +1,6 @@
 import { translate } from '@/lib/i18n/translate'
 import { withoutMediaGenerationProhibition } from '@/lib/handoff-intent'
-import type { ToolOutcome } from './protocol'
+import { toolStageOf, type ToolOutcome } from './protocol'
 
 /** Keep separate requested fields separate, even when they share a target. */
 export function latestEdits(outcomes: ToolOutcome[]): ToolOutcome[] {
@@ -37,7 +37,9 @@ export function guardChatToolReply(reply: string, outcomes: ToolOutcome[], korea
 }
 
 /** A narrow recovery hint for explicit edit requests; it never authorizes a write by itself. */
-export function requestsSupportedChatEdit(stage: string, message: string): boolean {
+export function requestsSupportedChatEdit(stageId: string, message: string): boolean {
+  // 콘티는 Storyboard 와 같은 보드 채팅이다(O1 2026-11-26).
+  const stage = toolStageOf(stageId)
   message = withoutMediaGenerationProhibition(message)
   if (!/(바꿔|바꾼|바꾸|변경(?:해|한|하고)|수정(?:해|한|하고)|고쳐|고치|번역(?:해|한|하고)|\b(change|update|edit|translate|rename)\b)/i.test(message)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
   if (/(하지\s*마|말고|don't|do not)/i.test(message)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.

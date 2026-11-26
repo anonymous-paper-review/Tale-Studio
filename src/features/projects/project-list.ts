@@ -72,6 +72,8 @@ export function visibleProjects<T extends ListedProject>(
 const STAGE_DOT: Record<StageId, string> = {
   entry: 'bg-stage-producer',
   producer: 'bg-stage-writer',
+  // 콘티(O1 2026-11-26)는 Writer 칸 — 목록 점도 Writer 색.
+  conti: 'bg-stage-writer',
   artist: 'bg-stage-artist',
   writer: 'bg-stage-storyboard',
   director: 'bg-stage-director',

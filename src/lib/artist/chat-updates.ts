@@ -27,6 +27,8 @@ const VALID_NARRATIVE_TIMES = new Set(['present', 'past', 'future'])
 export const AUTO_APPLY_UPDATE_TYPES = new Set([
   'regenerateCharacter',
   'regenerateWorldAsset',
+  // D7(2026-11-22, 리드 결정 2): 소품 그림 한 장 다시 그리기 — 인물 · 배경과 같이 화면이 승인 카드로 띄운다.
+  'regenerateProp',
 ])
 
 /** 새 인물 · 배경을 만들어 달라는 말에 Artist 채팅이 하는 답(2026-10-27 오너 "채팅 추가 막고 안내"). */
@@ -97,6 +99,17 @@ export function validateUpdates(raw: unknown[]): unknown[] {
             // 약속 C10: 특정 배경 모습(변형)만 다시 그린다. 없으면 기본 모습.
             ...(asString(rec.appearanceKey)?.trim() ? { appearanceKey: (rec.appearanceKey as string).trim() } : {}),
             // 배경 팝업의 이미지 모델 선택과 같다. 유효한 키만 통과.
+            ...(isImageModelKey(rec.model) ? { model: rec.model } : {}),
+            ...(rec.safeMode === true ? { safeMode: true } : {}),
+          })
+        }
+        break
+      case 'regenerateProp':
+        if (asString(rec.propId)?.trim()) {
+          out.push({
+            type: 'regenerateProp',
+            propId: (rec.propId as string).trim(),
+            ...(asString(rec.instruction)?.trim() ? { instruction: (rec.instruction as string).trim() } : {}),
             ...(isImageModelKey(rec.model) ? { model: rec.model } : {}),
             ...(rec.safeMode === true ? { safeMode: true } : {}),
           })

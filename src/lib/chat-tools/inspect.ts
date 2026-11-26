@@ -1,4 +1,4 @@
-import type { ToolResult } from './protocol'
+import { toolStageOf, type ToolResult } from './protocol'
 
 export type InspectionTarget = 'scene' | 'shot' | 'character' | 'background'
 export interface InspectionRequest {
@@ -8,7 +8,9 @@ export interface InspectionRequest {
   includeImage?: boolean
   expectedImageRevision?: string
 }
-export function parseInspection(value: unknown, stage: string): InspectionRequest | null {
+export function parseInspection(value: unknown, stageId: string): InspectionRequest | null {
+  // 콘티는 Storyboard 와 같은 보드 — 씬 · 샷을 들여다본다(O1 2026-11-26).
+  const stage = toolStageOf(stageId)
   if (!value || typeof value !== 'object' || Array.isArray(value)) return null
   const input = value as Record<string, unknown>
   const targets = stage === 'writer' ? ['scene', 'shot'] : stage === 'artist' ? ['character', 'background'] : []
@@ -31,7 +33,9 @@ export function inspectionImageRevision(url: unknown): string {
   return `${(hash >>> 0).toString(16).padStart(8, '0')}-${url.length}`
 }
 
-export async function executeProjectInspection(projectId: string, stage: string, input: unknown, signal: AbortSignal, selection?: { target: string; id: string; appearanceKey: string; imageRevision?: string } | null): Promise<ToolResult> {
+export async function executeProjectInspection(projectId: string, stageId: string, input: unknown, signal: AbortSignal, selection?: { target: string; id: string; appearanceKey: string; imageRevision?: string } | null): Promise<ToolResult> {
+  // 서버 들여다보기 길은 보드 단계를 writer 로 받는다 — 콘티도 writer 로 보낸다(O1 2026-11-26).
+  const stage = toolStageOf(stageId)
   const request = parseInspection(input, stage)
   if (!request) return { status: 'invalid_input', message: 'Use an exact target ID and, for image inspection, an exact appearanceKey from the project context or appearance list.' }
   if (request.includeImage && selection?.target === request.target && selection.id === request.id && selection.appearanceKey === request.appearanceKey && selection.imageRevision) {

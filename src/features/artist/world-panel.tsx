@@ -12,6 +12,7 @@ import { useArtistStore, worldFailureKey, type WorldShotKey } from '@/stores/art
 import { DEFAULT_LOCATION_APPEARANCE_KEY, type WorldAsset } from '@/types/asset'
 import { groupSeriesAssets } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
+import { ArtistHistoryHover } from '@/features/artist-room/artist-history-hover'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useProjectStore } from '@/stores/project-store'
 import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
@@ -54,6 +55,8 @@ export function WorldPanel({
     locationId: string
     shot: WorldShotKey
     appearanceKey: string | null
+    /** 지난 그림 줄(오너 2026-11-26 A4)에서 누른 그림 — 상세가 그 그림을 먼저 보이고 [채택]을 단다. */
+    candidateId?: string | null
   } | null>(null)
   // 약속 C10: 카드 안에서 고른 모습(기본 = 'default'). 캐릭터 카드의 pickedAppearance 와 같다.
   const [createFor, setCreateFor] = useState<string | null>(null)
@@ -119,9 +122,22 @@ export function WorldPanel({
       failed: !!failed || contentRefused,
     })
 
+    // 지난 그림 줄(오너 2026-11-26 A4) — 카드에 마우스를 올리면 아래에 고른 모습의 지난 그림이 5개까지. 누르면 상세가 그 그림을 먼저 보인다.
     return (
-      <div
+      <ArtistHistoryHover
         key={world.locationId}
+        candidates={candidates}
+        shownUrl={shownImage}
+        onOpen={(candidateId) => {
+          noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
+          setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey, candidateId })
+        }}
+        onMore={() => {
+          noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'image')
+          setViewDialog({ locationId: world.locationId, shot: 'wideShot', appearanceKey: variantKey })
+        }}
+      >
+      <div
         role="button"
         tabIndex={0}
         onClick={() => { selectLocation(world.locationId); noteSelection(world.locationId, variantKey ?? DEFAULT_LOCATION_APPEARANCE_KEY, 'card') }}
@@ -259,6 +275,7 @@ export function WorldPanel({
 
         {/* 카드 생성 버튼 제거(약속 B2, 2026-09-04) — 캐릭터 카드와 같이 생성/재생성은 팝업과 채팅으로만. */}
       </div>
+      </ArtistHistoryHover>
     )
   }
 
@@ -280,6 +297,7 @@ export function WorldPanel({
         locationId={viewDialog?.locationId ?? null}
         shot={viewDialog?.shot ?? null}
         appearanceKey={viewDialog?.appearanceKey ?? null}
+        viewCandidateId={viewDialog?.candidateId ?? null}
         onAddAppearance={(id) => setCreateFor(id)}
         onClose={() => setViewDialog(null)}
       />
