@@ -432,7 +432,6 @@ export const KO: Record<string, string> = {
   'Still finishing the previous generation for {count} panels. Try again in a moment.': '패널 {count}개는 앞선 생성이 아직 끝나지 않았어요. 잠시 후 다시 눌러주세요.',
   'Some image generations failed. Click the Artist tab to retry.': '일부 이미지 생성에 실패했어요. Artist 탭을 눌러 다시 시도할 수 있어요.',
   'Image generation is taking longer than usual. Click the Artist tab to retry.': '이미지 생성이 평소보다 오래 걸리고 있어요. Artist 탭을 눌러 다시 시도할 수 있어요.',
-  'Generating images {ready}/{total}': '이미지 생성 중 {ready}/{total}',
   'Project name': '프로젝트 이름',
   'Enter to save · Esc to cancel': 'Enter 저장 · Esc 취소',
   Share: '공유',
@@ -3757,9 +3756,11 @@ export const KO: Record<string, string> = {
   'Splitting into scenes and shots. This can take a few minutes. The screen and chat stay locked until the split is done, then each card draws its rough sketch.': '씬 · 샷을 나누고 있어요. 몇 분 걸릴 수 있어요. 나누기가 끝날 때까지 화면과 채팅은 잠기고, 그 뒤 카드마다 콘티 그림을 그려요.',
   'Draw the rough sketches': '콘티 그림 그리기',
   'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
-  // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
+  // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 대사는 Writer 콘티에서(실사 화살표는 상세의 [화살표 고치기] — 오너 2026-11-27 N4b).
   'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
   'Fix the story and dialogue in Writer.': '이야기 · 대사는 Writer 콘티에서 고쳐요.',
+  // Storyboard 채팅은 글을 고치지 않는다(오너 2026-11-27 N3) — 모델이 글 고치기를 냈으면 떨구고 답 끝에 붙이는 안내.
+  "Storyboard doesn't change text, so nothing was rewritten. Edit the story, shots and dialogue in Writer's rough storyboard. Dialogue can also be edited right in the Dialogue tab.": 'Storyboard에서는 글을 바꾸지 않아 아무것도 고치지 않았어요. 이야기 · 샷 · 대사는 Writer 콘티에서 고칠 수 있어요(대사는 대사 탭에서 바로 고칠 수도 있어요).',
   // 채팅이 실사를 다시 그리라고 했는데 맡기지 못했을 때(채팅 한 줄).
   "Couldn't find the shot to draw. Ask again with the shot name.": '그릴 샷을 찾지 못했어요. 샷 이름으로 다시 부탁해 주세요.',
   '{shot} is being drawn right now. Ask again when it is done.': '{shot}은(는) 지금 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',

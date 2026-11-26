@@ -6,6 +6,7 @@ import { supabaseAdmin } from '@/lib/supabase/admin';
 import { requireProjectAccess } from '@/lib/api/guard';
 import { isAdminUserId } from '@/lib/quota-exempt-server';
 import { STALE_QUEUED_MS } from '@/lib/generation-jobs';
+import { artistImagesStarted } from '@/lib/artist/images-started';
 import {
   getRunStatusLight,
   type StageTiming,
@@ -68,6 +69,9 @@ async function computeAssets(
       failedJobs,
       staleQueuedJobs,
       candidateResult,
+      sheetResult,
+      shotCount,
+      imagesStarted,
     ] = await Promise.all([
       supabaseAdmin
         .from('projects')
@@ -133,26 +137,41 @@ async function computeAssets(
         .select('character_id')
         .eq('project_id', projectId)
         .eq('view', 'main'),
+      // 대표 모습에 시트가 있는 인물(올린 그림 포함) — 초안 그리기 · Artist [완료하기]가 그린 것으로 보는 기준(오너 2026-11-27 N7).
+      supabaseAdmin
+        .from('character_appearances')
+        .select('character_id')
+        .eq('project_id', projectId)
+        .eq('is_default', true)
+        .not('sheet_url', 'is', null),
+      // 새 흐름(m1126 O1)은 씬 · 샷을 먼저 나누고 Artist [이미지 만들기]로 그린다 — 샷이 있고 그림 작업이 한 번도 없으면 아직 시작 전이다.
+      countRows(
+        supabaseAdmin
+          .from('shots')
+          .select('shot_id', { count: 'exact', head: true })
+          .eq('project_id', projectId),
+      ),
+      artistImagesStarted(projectId),
     ]);
 
     if (projectResult.error) throw new Error(projectResult.error.message ?? 'project query failed');
     if (candidateResult.error) throw new Error(candidateResult.error.message ?? 'candidate query failed');
+    if (sheetResult.error) throw new Error(sheetResult.error.message ?? 'appearance sheet query failed');
 
-    const candidateIds = [
-      ...new Set(
-        ((candidateResult.data ?? []) as Array<{ character_id?: unknown }>)
-          .map((row) => row.character_id)
-          .filter((id): id is string => typeof id === 'string' && id.length > 0),
-      ),
-    ];
-    const charsReadyFromCandidates = candidateIds.length
+    const idsOf = (rows: unknown) => ((rows ?? []) as Array<{ character_id?: unknown }>)
+      .map((row) => row.character_id)
+      .filter((id): id is string => typeof id === 'string' && id.length > 0);
+    // 대표 그림 칸(view_main)이 비었어도 후보 그림이나 대표 모습 시트(올린 그림 포함)가 있으면 그린 인물이다.
+    //   시트를 안 세면 올린 그림 프로젝트가 늘 "오래 걸림"이었다(2026-11-27 시험 복사본 실측 — 레일 Artist 칸이 다시 시도 칸으로 굳음).
+    const readyWithoutViewMain = [...new Set([...idsOf(candidateResult.data), ...idsOf(sheetResult.data)])];
+    const charsReadyFromCandidates = readyWithoutViewMain.length
       ? await countRows(
           supabaseAdmin
             .from('characters')
             .select('character_id', { count: 'exact', head: true })
             .eq('project_id', projectId)
             .eq('origin', 'producer')
-            .in('character_id', candidateIds)
+            .in('character_id', readyWithoutViewMain)
             .is('view_main', null),
         )
       : 0;
@@ -161,6 +180,8 @@ async function computeAssets(
     // 멈춘 대기 작업은 실패로 합치지 않고 따로 센다 — 합치면 AI 가 "마지막 시도가 실패했어요"라고 DB(대기 그대로)와 다르게 말했다.
     const imagesReady = charsReady === charsTotal && worldsReady === worldsTotal;
     const designTokensPresent = projectResult.data?.design_tokens != null;
+    // [이미지 만들기] 전(새 흐름: 샷이 먼저 있고 Artist 그림 작업이 한 번도 없음)은 멈춘 것이 아니다 — 작업 기록을 못 읽으면(null) 지금처럼 본다.
+    const waitingForMakeImages = shotCount > 0 && imagesStarted === false;
 
     return {
       chars_ready: charsReady,
@@ -170,7 +191,7 @@ async function computeAssets(
       queued_count: queuedCount,
       failed_count: failedJobs,
       stale_count: staleQueuedJobs,
-      stalled: (designTokensPresent || pipelineCompleted) && !imagesReady && queuedCount === 0,
+      stalled: (designTokensPresent || pipelineCompleted) && !imagesReady && queuedCount === 0 && !waitingForMakeImages,
       images_ready: imagesReady,
     };
   } catch (e) {

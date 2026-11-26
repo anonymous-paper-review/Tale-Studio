@@ -22,7 +22,7 @@ import {
 import { cn } from '@/lib/utils'
 import { STAGES, STAGE_LABEL, SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
 import { STAGE_PERSONA } from '@/lib/lumi'
-import { RAIL_ITEMS, railItemBadge, railItemOf, railStageState, railTarget } from '@/lib/stage-rail'
+import { RAIL_ITEMS, railArtistAttention, railItemBadge, railItemOf, railStageState, railTarget } from '@/lib/stage-rail'
 import { STAGE_ACCESS_KEY, stageForShortcut } from '@/lib/stage-shortcuts'
 import { navigateWithStageSlide } from '@/lib/stage-transition'
 import { UserMenu } from '@/components/layout/user-menu'
@@ -76,10 +76,8 @@ export function Sidebar() {
   )
   const requestNextStep = useGlobalChatStore((s) => s.requestNextStep)
   const artistImagesReady = useProjectStore((s) => s.artistImagesReady)
-  const artistAssetProgress = useProjectStore((s) => s.artistAssetProgress)
   const artistImagesFailed = useProjectStore((s) => s.artistImagesFailed)
   const artistImagesStalled = useProjectStore((s) => s.artistImagesStalled)
-  const retryArtistDrafts = useProjectStore((s) => s.retryArtistDrafts)
   // 크로스스테이지 완료 알림 배지 (chat-proactive-copilot Phase 2)
   // 약속 D3(2026-09-04): 배지는 서버 완료 기록에서 파생 — 화면이 완료를 봤는지와 무관하다.
   const currentStage = useProjectStore((s) => s.currentStage)
@@ -163,17 +161,12 @@ export function Sidebar() {
     }
   }, [goToRailItem])
 
-  const reachedStageIndex = STAGES.findIndex((stage) => stage.id === reachedStage)
   // stalled 는 실패가 아니라 "오래 대기 중"이다 (#stale-gate 2026-08-26). 한 문구로 뭉치면
   //   실패 0건인데도 "생성 실패"가 떠서 사용자가 사고로 오인한다 - 오너 실측 신고 사례.
+  //   Artist 칸 표시(railArtistAttention)가 있을 때만 툴팁 · 읽기 이름에 싣는다 — 다시 시도는 Artist 화면에서(오너 2026-11-27 N7).
   const artistImageLockCopy = artistImagesFailed
     ? t('Generation failed · retry')
-    : artistImagesStalled
-      ? t('Taking longer than usual · retry')
-      : t('Generating images {ready}/{total}', {
-          ready: artistAssetProgress?.ready ?? 0,
-          total: artistAssetProgress?.total ?? 0,
-        })
+    : t('Taking longer than usual · retry')
 
   // 화면 가장자리에 붙은 area 가 아니라 INSET 만큼 띄운 둥근 패널 (#shell-lift 2026-07-31).
   //   v3(2026-11-03): 바탕은 사이드바 색(#1F1E1D) 하나, 테두리 · 그림자 없음. 맨 위는 Tale 로고(누르면 프로젝트 목록),
@@ -227,15 +220,17 @@ export function Sidebar() {
             finishedVideo: directorFinishedVideo,
           })
           const isLocked = !canNavigateTo(stage.id) && !viaHandoff
-          const reachedByStage =
-            STAGES.findIndex((item) => item.id === stage.id) <= reachedStageIndex
-          const isArtistImageLocked =
-            stage.id === 'artist' && reachedByStage && !artistImagesReady
-          const isArtistRetryable =
-            isArtistImageLocked && (artistImagesFailed || artistImagesStalled)
+          // Artist 그림이 실패했거나 오래 걸리면 칸 아이콘 모서리 점으로 알린다(오너 2026-11-27 N7) — 칸은 그대로 Artist 로 가고, 다시 시도는 Artist 화면에서.
+          const artistAttention = railArtistAttention({
+            stage: stage.id,
+            reached: reachedStage,
+            imagesReady: artistImagesReady,
+            failed: artistImagesFailed,
+            stalled: artistImagesStalled,
+          })
           // AI 가 일하는 동안은 지금 화면이 아닌 단계 단추를 막는다(디자이너 QA 1차 #07) — 지금 단계 단추는 그대로 둔다.
           const busyBlocked = aiBusy && !isCommitted
-          const isDisabled = (isLocked && !isArtistRetryable) || busyBlocked || (aiBusy && isArtistRetryable)
+          const isDisabled = isLocked || busyBlocked
           // 다른 stage 작업 완료 배지 — 활성/잠금 stage엔 표시 안 함(활성은 진입 시 클리어됨)
           //   Writer 칸은 씬 스토리 · 콘티 숫자를 합친다(O1).
           const badge = !isActive && !isLocked ? railItemBadge(stage.id, stageBadges) : 0
@@ -247,15 +242,17 @@ export function Sidebar() {
               <TooltipTrigger asChild>
                 <button
                   onClick={() => {
-                    // AI 가 일하는 동안은 다시 시도도 보내지 않는다(2026-10-27) — 그리는 중에 요청을 또 보낼 수 있었다.
-                    if (isArtistRetryable && !aiBusy) void retryArtistDrafts()
-                    else if (isArtistRetryable) return
+                    // 그림이 실패했거나 오래 걸려도 다시 그리기를 보내지 않고 Artist 로 간다(오너 2026-11-27 N7) — 다시 시도는 Artist 화면의 단추가 맡는다.
                     // 데모(URL 티켓): share 쿼리 유지 — 쿠키 차단 브라우저에서도 스테이지 이동 생존
                     //   이동 자체는 goToStage 한 곳(단축키와 공유. 세로 스트립 전환 포함).
-                    else if (viaHandoff) void requestNextStep()
+                    if (viaHandoff) void requestNextStep()
                     else if (!isLocked && !isCommitted) goToRailItem(stage.id)
                   }}
-                  aria-label={badge > 0 ? `${STAGE_LABEL[stage.id]} · ${t('Unseen completions: {count}', { count: badge })}` : STAGE_LABEL[stage.id]}
+                  aria-label={[
+                    STAGE_LABEL[stage.id],
+                    artistAttention ? artistImageLockCopy : null,
+                    badge > 0 ? t('Unseen completions: {count}', { count: badge }) : null,
+                  ].filter(Boolean).join(' · ')}
                   aria-current={isCommitted ? 'page' : undefined}
                   disabled={isDisabled}
                   data-stage={STAGE_PERSONA[stage.id]}
@@ -264,8 +261,6 @@ export function Sidebar() {
                     'group relative flex h-[58px] w-16 shrink-0 flex-col items-center justify-center gap-1 rounded-lg transition-colors',
                     isDisabled && 'cursor-not-allowed',
                     busyBlocked && 'opacity-40',
-                    // 글자 색은 칸 모습이 정한다 — 예전처럼 다시 시도 칸의 빨강보다 뒤에 둬서 칸 모습 색이 이긴다(오래 걸림은 실패가 아니다, #stale-gate).
-                    isArtistRetryable && !aiBusy && 'cursor-pointer text-destructive hover:bg-sidebar-accent',
                     railState === 'current' && 'bg-sidebar-accent text-foreground',
                     (railState === 'done' || railState === 'open') && 'text-muted-foreground',
                     railState === 'upcoming' && 'text-subtle-foreground',
@@ -274,16 +269,38 @@ export function Sidebar() {
                 >
                   <span className="relative">
                     {/* 지금 단계 아이콘만 그 단계 색(브랜드 가이드 "현재 단계 아이콘") — 색은 data-stage 가 정한다.
-                        다른 단계 아이콘은 이름보다 한 단계 밝은 #C2C0B6(11/5 시안), 다시 시도 칸은 칸의 빨강을 그대로 따른다. */}
+                        다른 단계 아이콘은 이름보다 한 단계 밝은 #C2C0B6(11/5 시안). */}
                     <Icon
                       className={cn(
                         'size-[22px]',
                         railState === 'current'
                           ? 'text-stage'
-                          : !(isArtistRetryable && !aiBusy) && cn('text-muted-foreground', !isDisabled && 'group-hover:text-foreground'),
+                          : cn('text-muted-foreground', !isDisabled && 'group-hover:text-foreground'),
                       )}
                     />
-                    {railState === 'done' && (
+                    {/* Artist 그림 실패 · 오래 걸림(오너 2026-11-27 N7) — 칸 글자 색이 아니라 아이콘 모서리에 따로 그린 점(design §2.5 색 + 아이콘 + 글).
+                        실패 = destructive 바탕 느낌표 · 오래 걸림 = warning 바탕 시계 바늘. 글은 툴팁 · 읽기 이름이 말한다. 끝낸 단계 체크 자리를 대신한다. */}
+                    {artistAttention ? (
+                      <span
+                        data-testid="rail-artist-attention"
+                        data-state={artistAttention}
+                        className={cn(
+                          'absolute -right-1.5 -top-1 flex size-3 items-center justify-center rounded-full ring-2 ring-sidebar',
+                          artistAttention === 'failed' ? 'bg-destructive text-white' : 'bg-warning text-warning-foreground',
+                        )}
+                        aria-hidden
+                      >
+                        {artistAttention === 'failed' ? (
+                          <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.6} strokeLinecap="round">
+                            <path d="M6 3.2v3.4M6 8.6v.01" />
+                          </svg>
+                        ) : (
+                          <svg viewBox="0 0 12 12" className="size-3" fill="none" stroke="currentColor" strokeWidth={1.4} strokeLinecap="round" strokeLinejoin="round">
+                            <path d="M6 3.4V6l1.7 1.1" />
+                          </svg>
+                        )}
+                      </span>
+                    ) : railState === 'done' && (
                       <span
                         data-testid="rail-done-check"
                         className="absolute -right-1.5 -top-1 flex size-2.5 items-center justify-center rounded-full bg-foreground text-on-stage"
@@ -328,12 +345,10 @@ export function Sidebar() {
                   {busyBlocked
                     ? t('AI is working. You can move once it finishes.')
                     : isLocked
-                      ? isArtistImageLocked
-                        ? artistImageLockCopy
-                        : stage.id === 'editor' && reachedStage === 'director' && visibleStage === 'director'
-                          ? t('A finished video lets you move on.')
-                          : t('Complete previous step first')
-                      : stage.agent}
+                      ? stage.id === 'editor' && reachedStage === 'director' && visibleStage === 'director'
+                        ? t('A finished video lets you move on.')
+                        : t('Complete previous step first')
+                      : artistAttention ? artistImageLockCopy : stage.agent}
                 </span>
                 {/* 단축키 표기는 Alt 홀드 배지가 전담(#feedback 2026-08-11) — 툴팁에서 제거. */}
               </TooltipContent>

@@ -25,7 +25,7 @@ import {
   type ChatLlmUsage,
 } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
-import { STORYBOARD_IMAGE_TOOL_GUIDE, pickStoryboardImageUpdates, storyboardImageStatusSection, withStoryboardImageUpdates } from '@/lib/storyboard/chat-image-tool'
+import { STORYBOARD_IMAGE_TOOL_GUIDE, pickStoryboardImageUpdates, storyboardChatSystem, storyboardImageStatusSection, storyboardOnlyUpdates, storyboardTextNotice, withStoryboardImageUpdates } from '@/lib/storyboard/chat-image-tool'
 
 // #dialogue-language-chat(2026-08-27 오너): 챗으로 대사를 새로 쓰거나 고칠 때도 파이프라인과
 //   같은 대사 언어를 따른다 — 단, 사용자가 그 메시지에서 명시적으로 다른 언어를 요구하면 요청이
@@ -161,6 +161,17 @@ Reply text in 1-3 sentences (Korean if the user wrote Korean), then — only if 
 </example>
 </examples>`
 
+/** Writer 채팅 안내에서 한 덩어리(<tag>…</tag>)를 그대로 꺼낸다 — Storyboard 안내가 샷 이름 규칙을 같은 글로 쓰게(글을 두 곳에 두지 않는다). */
+function promptSection(prompt: string, tag: string): string {
+  const open = `<${tag}>`
+  const close = `</${tag}>`
+  const start = prompt.indexOf(open)
+  const end = prompt.indexOf(close)
+  return start >= 0 && end > start ? prompt.slice(start, end + close.length) : ''
+}
+
+// Storyboard 채팅 안내(오너 2026-11-27 N3 "추천대로" — 실사 고치기만, 글은 콘티로 안내). 씬 · 샷 고치기 동작(<actions>) · 예시는 싣지 않는다.
+const STORYBOARD_CHAT_SYSTEM = storyboardChatSystem(promptSection(WRITER_CHAT_SYSTEM, 'shot-numbers'))
 
 function formatLineRefTable(rawLineRefs: unknown): string {
   const lineRefs = sanitizeLineRefs(rawLineRefs)
@@ -177,28 +188,38 @@ function parseAgenticResponse(
   text: string,
   allowedCharacterIds: ReadonlySet<string> | undefined,
   locale: AppLocale,
-  /** Storyboard 단계 채팅(m1126 O7) — 실사 그림 요청(generateImage)도 받는다. */
-  imageTool = false,
+  /** Storyboard 단계 채팅(m1126 O7 · 2026-11-27 N3) — 실사 그림 요청(generateImage) · 되묻기만 받고 씬 · 샷 글 고치기는 떨군다. */
+  storyboardStage = false,
 ): {
   reply: string
   updates: unknown[]
   droppedCharacterIds: string[]
+  /** Storyboard 채팅이 떨군 글 고치기 수 — 0 보다 크면 답 끝에 안내를 붙인다. */
+  droppedTextEdits: number
   parseStatus: string
   rawUpdateCount: number
   validUpdateCount: number
 } {
   // 펜스 추출·복구·유출 방어·신호·부분 적용 안내는 공용 가드가 담당(#p4-json-guard).
   const dropped: string[] = []
+  let droppedTextEdits = 0
   const { reply, updates, raw, status } = parseFencedUpdates(
     text,
     'writer/chat',
-    (raw) => withStoryboardImageUpdates(validateWriterUpdates(raw, allowedCharacterIds, dropped), imageTool ? pickStoryboardImageUpdates(raw) : []),
+    (raw) => {
+      if (!storyboardStage) return withStoryboardImageUpdates(validateWriterUpdates(raw, allowedCharacterIds, dropped), [])
+      // 떨굴 글 고치기에서 빠진 인물은 알리지 않는다 — 그 고치기 자체를 하지 않는다.
+      const picked = storyboardOnlyUpdates(validateWriterUpdates(raw, allowedCharacterIds, []), pickStoryboardImageUpdates(raw))
+      droppedTextEdits = picked.droppedTextEdits
+      return picked.updates
+    },
     locale,
   )
   return {
     reply,
     updates,
     droppedCharacterIds: dropped,
+    droppedTextEdits,
     parseStatus: status,
     rawUpdateCount: raw.length,
     validUpdateCount: updates.length,
@@ -280,6 +301,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
 
     // Storyboard 실사 그림 도구(오너 2026-11-26 m1126 O7 "채팅으로") — Storyboard 단계 채팅 요청에만 싣는다(콘티 채팅은 Artist 앞이라 실사를 못 그린다).
     //   샷마다 실사가 있는지 · 지금 판을 문맥에 싣는다. 못 읽으면 그 덩어리 없이 간다(도구는 그대로).
+    //   Storyboard 채팅은 실사 고치기만 한다(오너 2026-11-27 N3) — 씬 · 샷 고치기 동작 없는 안내 · 읽기 도구만 · 받는 것은 그림 요청과 되묻기만.
     const imageTool = storyboardImages === true && typeof projectId === 'string' && !!projectId
     const imageStatus = imageTool
       ? await supabaseAdmin
@@ -291,7 +313,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       : ''
 
     if (toolsEnabled === true && (typeof projectId !== 'string' || !projectId)) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
-    const appTools = prepareChatTools('writer', toolsEnabled, toolMessages, chatWorkflow, chatDomain)
+    const appTools = prepareChatTools('writer', toolsEnabled, toolMessages, chatWorkflow, chatDomain, { edit: !imageTool })
 
     const normalizedHistory = normalizeHistory(history)
     const contextSections = [
@@ -301,15 +323,21 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     ].filter(Boolean)
     const ctx = contextSections.length > 0 ? `${contextSections.join('\n\n')}\n\n---\n\n` : ''
     const traceId = createChatTraceId(requestedTraceId)
-    const systemPrompt =
-      CHAT_AGENT_GUIDE +
-      (chatDomain === true ? WRITER_DOMAIN_GUIDE : '') +
-      WRITER_CHAT_SYSTEM +
-      (imageTool ? STORYBOARD_IMAGE_TOOL_GUIDE : '') +
-      CHAT_OUTPUT_FORMAT_GUIDE +
-      CHAT_UPDATES_BATCH_GUIDE +
-      responseLanguageDirective(projectLocale) +
-      dialogueLanguageChatDirective(dialogueLanguage)
+    const systemPrompt = imageTool
+      ? CHAT_AGENT_GUIDE +
+        (chatDomain === true ? WRITER_DOMAIN_GUIDE : '') +
+        STORYBOARD_CHAT_SYSTEM +
+        STORYBOARD_IMAGE_TOOL_GUIDE +
+        CHAT_OUTPUT_FORMAT_GUIDE +
+        CHAT_UPDATES_BATCH_GUIDE +
+        responseLanguageDirective(projectLocale)
+      : CHAT_AGENT_GUIDE +
+        (chatDomain === true ? WRITER_DOMAIN_GUIDE : '') +
+        WRITER_CHAT_SYSTEM +
+        CHAT_OUTPUT_FORMAT_GUIDE +
+        CHAT_UPDATES_BATCH_GUIDE +
+        responseLanguageDirective(projectLocale) +
+        dialogueLanguageChatDirective(dialogueLanguage)
     const userPrompt = `${ctx}${buildChatTaskContext(taskContext)}${message}`
 
     context.start()
@@ -338,6 +366,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       reply,
       updates,
       droppedCharacterIds,
+      droppedTextEdits,
       parseStatus,
       rawUpdateCount,
       validUpdateCount,
@@ -349,6 +378,8 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
     const notices = [
       dropped.length ? droppedCharactersNotice(dropped, replyLocale) : null,
       placed.unknownPlaces.length ? unknownPlacesNotice(placed.unknownPlaces, replyLocale) : null,
+      // Storyboard 채팅이 글 고치기를 냈으면 떨구고 사실을 알린다(오너 2026-11-27 N3 — 글은 콘티에서).
+      droppedTextEdits > 0 ? storyboardTextNotice(replyLocale) : null,
     ].filter((notice): notice is string => !!notice)
     const replyOut = notices.length ? `${reply}\n\n${notices.join('\n\n')}` : reply
     const trace = buildChatTrace({
