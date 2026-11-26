@@ -130,6 +130,8 @@ import {
   resolveShotFrameImageUrl,
   usableFrameImageUrl,
 } from '@/lib/director/video-frame-inputs'
+import { prepareContinueFrom } from '@/lib/director/video-frame-capture'
+import { takeOverrideForRequest, videoModeForRequest } from '@/lib/director/video-modes'
 
 // ============================================================================
 // Defaults
@@ -697,36 +699,8 @@ async function captureVideoThumbnail(videoUrl: string): Promise<Blob | null> {
   return captureVideoFrame(videoUrl, 'start')
 }
 
-async function captureVideoEndFrame(videoUrl: string): Promise<Blob | null> {
-  return captureVideoFrame(videoUrl, 'end')
-}
-
-async function uploadVideoChainFrame(
-  projectId: string,
-  sourceVideoClipId: string,
-  sourceGenerationJobId: string,
-  blob: Blob,
-): Promise<string | null> {
-  if (!projectId || !sourceVideoClipId || !sourceGenerationJobId) return null
-  try {
-    const form = new FormData()
-    form.append('projectId', projectId)
-    form.append('type', 'video')
-    form.append('entityId', sourceVideoClipId)
-    form.append('field', 'chain_frame')
-    form.append('generationJobId', sourceGenerationJobId)
-    form.append('file', blob, `${sourceVideoClipId}_chain-frame.jpg`)
-    const response = await fetch('/api/assets/upload-image', {
-      method: 'POST',
-      body: form,
-    })
-    if (!response.ok) return null
-    const body = (await response.json().catch(() => ({}))) as { publicUrl?: unknown }
-    return usableFrameImageUrl(body.publicUrl)
-  } catch {
-    return null
-  }
-}
+// 이어 붙일 장면(끝 장면) 잡기 · 올리기는 src/lib/director/video-frame-capture.ts 로 옮겼다(오너 2026-11-27 N4a ① · dev 방안 고장 2) —
+//   샷 상세의 [이어서]와 노드 '이전 영상' 구멍이 같은 규칙(Editor 가 자르는 자리 · 검은 화면 판별)을 쓰게.
 
 // ============================================================================
 // Step 0 (unify-director-store-db): Shot 편집 → DB shots write-through
@@ -2812,11 +2786,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       wireFrameToVideo: (sourceNodeId, videoNodeId, targetHandle) => {
         if (isDemoSession()) return
-        if (
-          targetHandle !== 'frame-start' &&
-          targetHandle !== 'frame-end' &&
-          targetHandle !== 'frame-ref'
-        ) {
+        // 끝(END) 칸으로는 새로 잇지 않는다(오너 dev 때 "Start, End 프레임 생성 방식은 일단 폐기" · 2026-11-27 N4a) — 손 · 채팅 어느 길이든 같다.
+        if (targetHandle !== 'frame-start' && targetHandle !== 'frame-ref') {
           return
         }
         const state = get()
@@ -2840,11 +2811,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             edge.target === videoNodeId &&
             edge.targetHandle === targetHandle,
         )
-        const slot = targetHandle === 'frame-start'
-          ? 'start'
-          : targetHandle === 'frame-end'
-            ? 'end'
-            : 'refs'
+        const slot = targetHandle === 'frame-start' ? 'start' : 'refs'
         const alreadyWired =
           existingEdge &&
           (slot === 'refs'
@@ -2863,7 +2830,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           const nextInputs: VideoNodeData['frameInputs'] = {
             ...frameInputs,
             ...(slot === 'start' ? { start: sourceNodeId } : {}),
-            ...(slot === 'end' ? { end: sourceNodeId } : {}),
             ...(slot === 'refs' && !frameInputs.refs.includes(sourceNodeId)
               ? { refs: [...frameInputs.refs, sourceNodeId] }
               : {}),
@@ -3015,29 +2981,27 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           return false
         }
 
-        let blob: Blob | null
-        try {
-          blob = await captureVideoEndFrame(sourceVideoUrl)
-        } catch {
-          blob = null
-        }
-        if (!blob) {
+        // Editor 가 자르는 자리(앞 샷 길이)에서 잡고, 검으면 앞으로 가며 다시 잡는다(dev 방안 고장 2) —
+        //   잡는 규칙 · 올리기는 샷 상세의 [이어서]와 같은 함수(video-frame-capture)다.
+        const sourceShot = initial.nodes.find((node) => node.id === sourceNode.data.parentShotNodeId)
+        const prepared = await prepareContinueFrom({
+          projectId,
+          source: { videoClipId: sourceClipId, generationJobId: sourceJobId, videoUrl: sourceVideoUrl },
+          plannedSec: sourceShot && isShotData(sourceShot.data) ? sourceShot.data.durationSeconds : null,
+        })
+        if (!prepared.ok) {
           return failure(
             translate(
               useLocaleStore.getState().locale,
-              'Unable to capture the source video last frame.',
+              prepared.reason === 'black_frame'
+                ? 'The previous video ends on a black screen, so there is no scene to continue from.'
+                : prepared.reason === 'upload_failed'
+                  ? 'Unable to upload the source video last frame.'
+                  : 'Unable to capture the source video last frame.',
             ),
           )
         }
-        const publicUrl = await uploadVideoChainFrame(projectId, sourceClipId, sourceJobId, blob)
-        if (!publicUrl) {
-          return failure(
-            translate(
-              useLocaleStore.getState().locale,
-              'Unable to upload the source video last frame.',
-            ),
-          )
-        }
+        const publicUrl = prepared.continueFrom.frameUrl
 
         const latestSource = get().nodes.find((node) => node.id === sourceVideoNodeId)
         const latestTarget = get().nodes.find((node) => node.id === targetVideoNodeId)
@@ -3485,7 +3449,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             }
 
             addFrameEdge(frameInputs.start, 'frame-start')
-            addFrameEdge(frameInputs.end, 'frame-end')
+            // 끝(END) 칸은 없앴다(오너 dev 때 "Start, End 프레임 생성 방식은 일단 폐기" · 2026-11-27 N4a) — 저장된 끝 배선은 지우지 않되 선으로 그리지 않는다(닿을 구멍이 없다).
             for (const sourceNodeId of frameInputs.refs) {
               addFrameEdge(sourceNodeId, 'frame-ref')
             }
@@ -4955,23 +4919,18 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         const idempotencyKey = crypto.randomUUID()
         const preserveSuccess = !!videoNode.data.videoUrl
         const frameInputs = normalizeFrameInputs(videoNode.data.frameInputs)
-        const hasManualFrameInputs =
-          !!frameInputs.start || !!frameInputs.end || frameInputs.refs.length > 0
+        // 끝 그림은 영상에 보내지 않는다(오너 dev 때 "Start, End 프레임 생성 방식은 일단 폐기" · 2026-11-27 N4a) — 끝 칸만 이은 Take 는 손 배선으로 치지 않는다.
+        const hasManualFrameInputs = !!frameInputs.start || frameInputs.refs.length > 0
         const storyboard =
           shotNode && isShotData(shotNode.data)
             ? shotNode.data.storyboardImage
             : null
-        // V2 refs(#real-strip): 실사 3프레임이 있으면 [START, END] 2장 — 시작·끝 구도 고정.
+        // 실사 3프레임이 있으면 시작 한 장(서버가 방식대로 다시 고른다 — 실사 끝은 보내지 않는다, N4a).
         const sbFrames = storyboard?.status === 'completed' ? storyboard.frames : undefined
         const automaticStart =
           shotNode && isShotData(shotNode.data)
             ? resolveShotFrameImageUrl(shotNode.data, 'start')
             : null
-        const automaticEnd = sbFrames
-          ? shotNode && isShotData(shotNode.data)
-            ? resolveShotFrameImageUrl(shotNode.data, 'end')
-            : null
-          : null
         const automaticReferenceImageUrl =
           shotNode && isShotData(shotNode.data)
             ? (storyboard?.status === 'completed'
@@ -4980,7 +4939,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               resolveShotFrameImageUrl(shotNode.data, 'ref')
             : null
         let referenceImageUrls: string[] | undefined
-        let referenceImageRoles: Array<'start' | 'end' | 'ref'> | undefined
+        let referenceImageRoles: Array<'start' | 'ref'> | undefined
         if (chainFrameUrl || hasManualFrameInputs || sbFrames) {
           // Unresolvable manual slots deliberately fall back to the corresponding
           // automatic image so a stale source node cannot remove a valid frame.
@@ -4995,12 +4954,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               resolveFrameInputImageUrl(get().nodes, sourceNodeId, 'ref'),
             )
             .filter((url): url is string => !!url)
-          const end =
-            (frameInputs.end
-              ? resolveFrameInputImageUrl(get().nodes, frameInputs.end, 'end')
-              : null) ?? automaticEnd
           const urls: string[] = []
-          const roles: Array<'start' | 'end' | 'ref'> = []
+          const roles: Array<'start' | 'ref'> = []
           if (start) {
             urls.push(start)
             roles.push('start')
@@ -5008,10 +4963,6 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           for (const url of refs) {
             urls.push(url)
             roles.push('ref')
-          }
-          if (end) {
-            urls.push(end)
-            roles.push('end')
           }
           if (urls.length > 0) {
             referenceImageUrls = urls
@@ -5040,6 +4991,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // 샷 Take 의 모델 · 해상도는 [다시 만들기] 단추 값과 같은 함수(takeSettings)로 정한다 — 요청이 따로 세면
         //   한쪽만 바뀌는 날 단추에 적은 Take 값과 실제 요청이 갈라진다(리드 검토 a). 독립 영상은 지금처럼 자기 설정.
         const shotTake = shotNode && isShotData(shotNode.data) ? takeSettings(shotNode.data, videoNode.data) : null
+        // 영상 만드는 방식(오너 2026-11-27 N4a): Take 에 적힌 방식을 싣는다 — 노드에서 손으로 이은 그림이 있으면 손 배선이 이긴다.
+        //   이어서는 기록된 출처를 그대로 싣는다(앞 샷 영상이 그대로인지는 서버가 본다). 방식이 없으면 서버가 기본(시작+프롬프트)으로 만든다.
+        const videoMode = shotNode ? videoModeForRequest(videoNode.data.override as VideoOverride, !!chainFrameUrl || hasManualFrameInputs) : undefined
+        const continueFrom = videoMode === 'continue' ? (videoNode.data.override as VideoOverride).continueFrom : undefined
         const requestPayload = {
           projectId,
           ...(shotNode && isShotData(shotNode.data)
@@ -5077,6 +5032,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           frameSource: chainFrameUrl || hasManualFrameInputs ? 'manual' : 'auto',
           ...(referenceImageUrls ? { referenceImageUrls } : {}),
           ...(referenceImageUrls && referenceImageRoles ? { referenceImageRoles } : {}),
+          ...(videoMode ? { videoMode } : {}),
+          ...(continueFrom ? { continueFrom } : {}),
           ...(options?.traceId ? { traceId: options.traceId, actor: 'chat' } : {}),
           ...(shotTake
             ? {
@@ -5084,7 +5041,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 resolution: shotTake.resolution,
                 // 아직 저장 전인 새 테이크는 이 노드의 설정(override)도 보낸다 — 리테이크가 물려받은 해상도 · 모델이
                 //   서버 테이크에도 남아, 다시 읽어 와도 같은 설정으로 보인다(#retake-inherit 의 상속을 DB 까지).
-                ...(videoNode.data.videoClipId ? {} : { override: videoNode.data.override }),
+                //   방식은 실제로 쓰는 것만 남긴다(손 배선이면 지우고, 이어서가 아니면 이어서 출처를 지운다 — N4a).
+                ...(videoNode.data.videoClipId ? {} : { override: takeOverrideForRequest(videoNode.data.override, videoMode) }),
               }
             : {}),
         }
@@ -5877,11 +5835,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               case 'connectFrame': {
                 const s = resolveId(u.sourceId)
                 const t = resolveId(u.targetId)
-                if (
-                  u.targetHandle !== 'frame-start' &&
-                  u.targetHandle !== 'frame-end' &&
-                  u.targetHandle !== 'frame-ref'
-                ) {
+                // 끝(END) 칸은 없앴다(N4a) — 옛 답 · 잘못된 답이 끝 칸을 다시 살리지 않게 화면도 거른다.
+                if (u.targetHandle !== 'frame-start' && u.targetHandle !== 'frame-ref') {
                   result.skipped.push({
                     update: u,
                     reason: 'invalid frame target handle',
@@ -5919,9 +5874,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                   wiredInputs !== null &&
                   (u.targetHandle === 'frame-start'
                     ? wiredInputs.start === s
-                    : u.targetHandle === 'frame-end'
-                      ? wiredInputs.end === s
-                      : wiredInputs.refs.includes(s))
+                    : wiredInputs.refs.includes(s))
                 const edgeMatches = get().edges.some(
                   (edge) =>
                     edge.data?.category === 'frame' &&
@@ -6313,7 +6266,7 @@ export function serializeDirectorCanvasContext(
           const frameInputs = normalizeFrameInputs(vData.frameInputs)
           const frameSlots = [
             frameInputs.start ? `START=${frameInputs.start}` : null,
-            frameInputs.end ? `END=${frameInputs.end}` : null,
+            // 끝 입력은 영상에 쓰지 않는다(N4a) — 문맥에 남으면 모델이 끝 그림대로 된다고 약속한다.
             frameInputs.refs.length > 0
               ? `REF=${frameInputs.refs.join(',')}`
               : null,

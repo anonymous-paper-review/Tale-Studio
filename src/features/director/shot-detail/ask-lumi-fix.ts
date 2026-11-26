@@ -12,6 +12,7 @@ import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useWriterStore } from '@/stores/writer-store'
 import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
+import type { ContinueFrom, VideoMode } from '@/lib/director/video-modes'
 
 export type FixKind = 'image' | 'video'
 export type AskLumiResult = 'sent' | 'busy' | 'empty' | 'no-shot'
@@ -21,6 +22,10 @@ export interface AskLumiVideoTake {
   fromTakeId: string | null
   provider: VideoModelKey
   resolution: VideoResolution
+  /** 고른 영상 방식(오너 2026-11-27 N4a) — 없으면 그 Take 의 방식을 이어받는다. */
+  videoMode?: VideoMode
+  /** 이어서면 누를 때 잡은 앞 영상 마지막 장면. */
+  continueFrom?: ContinueFrom
 }
 
 /** 그 샷의 채팅 @이름 — 채팅 고르기 목록 · 카드 ⌘/Ctrl+클릭과 같은 이름("Real Shot 3" · "실사 샷 3", 화면 말). */
@@ -59,6 +64,8 @@ export function askLumiToFix(input: { shotNodeId: string; kind: FixKind; change:
         fromTakeId: input.take.fromTakeId,
         provider: input.take.provider,
         resolution: input.take.resolution,
+        ...(input.take.videoMode ? { videoMode: input.take.videoMode } : {}),
+        ...(input.take.videoMode === 'continue' && input.take.continueFrom ? { continueFrom: input.take.continueFrom } : {}),
       },
     })
   }

@@ -6,6 +6,8 @@ import type {
   GenerationMethod,
 } from '@/types/shot'
 import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
+import type { DirectionRead } from '@/lib/writer/direction-read'
+import type { ContinueFrom, VideoMode } from '@/lib/director/video-modes'
 
 // ============================================================================
 // Director Canvas Types
@@ -88,6 +90,11 @@ export type StoryboardImage = {
   versionId?: string | null
   /** 쓰기 차례 — 두 쓰기가 겹치면 뒤 쓰기가 다시 읽고 쓴다(버전을 잃지 않게). */
   rev?: number
+  /** 실사 가운데 장에서 고친 화살표를 읽은 줄(오너 2026-11-27 N4b · 리드 D2 A) — 모양은 콘티 rough_storyboard.directionRead 와 같다.
+   *  direction 이 지금 frames.direction 일 때만 산다(판을 바꾸면 저절로 낡는다). 마지막으로 고친 판 하나 것만 남는다. 영상 지시가 콘티 줄보다 먼저 쓴다. */
+  directionRead?: DirectionRead
+  /** 실사 가운데 장의 화살표 층 나누기 밑층 캐시(N4b) — direction = 밑층을 만든 가운데 장 주소. 지금 frames.direction 과 같을 때만 쓴다. */
+  cleanDirection?: { url: string; direction: string }
 }
 
 /** 실사 이미지 버전 하나 — 그림 파일은 작업마다 새 이름이라 덮어쓰지 않는다. */
@@ -182,6 +189,10 @@ export type VideoOverride = Partial<{
   /** 샷 상세 영상 고치기의 바꿀 점(디자이너 11/13 D7 · 리드 검토 c ③) — 이 Take 를 만들 때 지금 샷 프롬프트 끝에 한 번 붙인다.
    *  기록으로 남아 다음 Take 의 칸에 미리 채워질 뿐 쌓이지 않는다. 빈 글 = 바꿀 점 없음. */
   changeNote: string
+  /** 영상 만드는 방식(오너 2026-11-27 N4a) — 없으면 기본(시작+프롬프트). 영상 요청에 실리고 [다시 만들기]가 이어받는다. */
+  videoMode: VideoMode
+  /** ① 이어서의 출처 — 앞 샷 Take · 그 영상을 낸 작업 · 잡은 장면. 다시 만들어도 같은 장면에서 잇는다(앞 샷 영상이 그대로인지는 서버가 본다). */
+  continueFrom: ContinueFrom
 }>
 
 /** 부모 Shot 없이 독립 생성한 Video가 직접 소유하는 완전한 생성 설정. */

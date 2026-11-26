@@ -1,15 +1,9 @@
 // Storyboard → Director 넘기기 창(D0): 실사는 Storyboard [시작]이 만들어(오너 2026-11-26 m1126 S2 · 리드 결정) 창에 "넘어가면서 이미지 만들기" 고르기가 없고, 실사가 없는 샷 수를 알린다.
-//   아래 "넘어간 뒤 Director 에서 일괄 이미지 시작" 묶음은 창에서 더는 고를 수 없는 예전 길(handOverToDirector makeImages · entry-images-intent)을 지키는 시험이다 — 지울지는 오너 결정(보고 ④-5).
-import { readFileSync } from 'node:fs'
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
+//   창에서 더는 고를 수 없던 "넘어가면서 이미지 만들기" 예전 길(handOverToDirector makeImages · entry-images-intent)은 지웠다(오너 2026-11-27 N5) — 남지 않았는지도 본다.
+import { existsSync, readFileSync } from 'node:fs'
+import { describe, expect, it } from 'vitest'
 import { directorConfirmView, directorHandoffSummary } from '@/lib/writer/board-summary'
 import { realImageBatchMinutes } from '@/lib/director/generation-estimate'
-import { requestImagesOnDirectorEntry, takeImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
-import { handOverToDirector } from '@/features/writer/storyboard-director'
-import { useGlobalChatStore } from '@/stores/global-chat-store'
-import { useProjectStore } from '@/stores/project-store'
-import { useLocaleStore } from '@/stores/locale-store'
 import type { RoughStoryboardImage, Shot } from '@/types'
 
 // 이 시험을 위해 지은 보드 — 씬 둘, 샷 셋(4초 · 2초 · 4초), 모두 러프가 있다.
@@ -21,11 +15,6 @@ const board = () => [
   { shotId: 'b1', sceneId: 's2', durationSeconds: 4, actionDescription: 'look', roughStoryboard: drawn('b1') },
 ] as unknown as Shot[]
 const extra = { characters: 2, backgrounds: 1, imagesToMake: 3, takesPerShot: 5 }
-
-afterEach(() => {
-  vi.unstubAllGlobals()
-  takeImagesOnDirectorEntry('__clear__')
-})
 
 describe('Director 넘기기 창 — 실사는 Storyboard 에서', () => {
   // 왜(오너 2026-11-26 S2 · 리드 결정): 실사는 Storyboard [시작]이 만든다 — 넘기는 창에서 또 만들기를 고르게 하면 같은 일을 두 곳에서 고른다.
@@ -79,63 +68,13 @@ describe('Director 넘기기 창 — 실사는 Storyboard 에서', () => {
   })
 })
 
-describe('넘어간 뒤 Director 에서 일괄 이미지 시작', () => {
-  // 넘김 서버 확인(/api/project/[id]/handoff)의 답 — ready 면 Director 를 연다(tests/writer/board-director-handoff 와 같은 꾸밈).
-  const ready = { ready: true, blockers: [], warnings: [], counts: { scenes: 2, shots: 3 }, path: '/studio/director' }
-  let handoffReply: unknown = ready
-  beforeEach(() => {
-    handoffReply = ready
-    useGlobalChatStore.getState().reset()
-    useProjectStore.setState({ projectId: 'proj-1', currentStage: 'writer', reachedStage: 'writer', projectLocale: 'ko', projectLocaleLocked: true })
-    useLocaleStore.setState({ locale: 'ko' })
-    vi.stubGlobal('fetch', vi.fn(async () => Response.json(handoffReply)))
-  })
-
-  // 왜: 창에서 고른 것이 Director 가 열린 뒤에 일어나야 한다 — 같은 일괄이 두 번 돌지 않게 한 번만.
-  it('넘기기 창에서 이미지 만들기를 고르고 넘어가면 Director 가 열린 뒤 일괄 이미지 만들기를 한 번만 시작한다', async () => {
-    await handOverToDirector({ makeImages: true })
-    expect(useGlobalChatStore.getState().pendingNavigatePath).toContain('/studio/director')
-    expect(takeImagesOnDirectorEntry('proj-1')).toBe(true)
-    expect(takeImagesOnDirectorEntry('proj-1')).toBe(false)
-  })
-
-  // 왜: 8/27 "들어가기만 해도 실사를 만들지 않는다" — 직접 고르기를 골랐거나 다른 프로젝트의 Director 가 열리면 시작하지 않는다.
-  it('넘어가서 직접 고르기로 넘어가면 Director 가 열려도 이미지를 만들지 않는다', async () => {
-    await handOverToDirector({ makeImages: false })
-    expect(takeImagesOnDirectorEntry('proj-1')).toBe(false)
-    requestImagesOnDirectorEntry('proj-1')
-    expect(takeImagesOnDirectorEntry('proj-2')).toBe(false)
-  })
-
-  // 왜(혼자 정한 것): 넘김이 막혀 Director 가 안 열렸다가 나중에 다른 길(사이드바 등)로 들어갔을 때 갑자기 만들지 않는다.
-  it('넘김이 막혀 Director 가 열리지 않으면 고른 이미지 만들기는 없던 일이 된다', async () => {
-    handoffReply = { ready: false, blockers: [{ code: 'missing_image', label: '코마츠: 기본 이미지 필요', action: 'Artist에서 코마츠 이미지를 준비해 주세요' }], warnings: [], counts: { scenes: 2, shots: 3 } }
-    await handOverToDirector({ makeImages: true })
-    expect(useGlobalChatStore.getState().pendingNavigatePath).toBeNull()
-    expect(takeImagesOnDirectorEntry('proj-1')).toBe(false)
-    requestImagesOnDirectorEntry('proj-1', 0)
-    expect(takeImagesOnDirectorEntry('proj-1', 10 * 60_000 + 1)).toBe(false)
-  })
-
-  // 왜(검토 b 낮음 6): 넘어가는 중에 채팅으로 "취소"하면 넘김은 거둬지는데 고른 이미지 만들기 표시가 남아, 10분 안에 다른 길로 Director 에
-  //   들어가면 일괄이 시작됐다 — 취소는 넘김과 함께 그 표시도 거둔다.
-  it('Director 로 넘어가는 중에 채팅으로 취소하면 "넘어가면서 이미지 만들기"도 거둔다', async () => {
-    await handOverToDirector({ makeImages: true })
-    await useGlobalChatStore.getState().sendMessage('취소')
-    expect(useGlobalChatStore.getState().pendingNavigatePath).toBeNull()
-    expect(takeImagesOnDirectorEntry('proj-1')).toBe(false)
-  })
-
-  // 왜(검토 b 낮음 6, 정상 경로 고정): Director 를 여는 데 실패한 것은 사람이 마음을 바꾼 것이 아니다 — 고른 대로 다음 진입에서 시작한다(리드 판단).
-  it('Director 를 여는 데 실패해도 고른 "넘어가면서 이미지 만들기"는 남는다', async () => {
-    await handOverToDirector({ makeImages: true })
-    useGlobalChatStore.getState().failDirectorHandoff()
-    expect(takeImagesOnDirectorEntry('proj-1')).toBe(true)
-  })
-
-  // 왜: 시작은 Director 화면이 준비된 뒤 그 화면이 한다 — 진입 자동 채움(8/27 에 지운 것)과 다른 길이라는 것을 코드에 둔다.
-  it('Director 화면은 넘기기 창에서 고른 경우에만 들어온 뒤 일괄 이미지를 시작한다', () => {
-    const page = readFileSync('src/app/studio/director/page.tsx', 'utf8')
-    expect(page).toMatch(/if \(takeImagesOnDirectorEntry\(guideProjectId\)\) void runRealBatch\(guideProjectId\)/)
+describe('넘어가면서 이미지 만들기 예전 길 없음', () => {
+  // 왜(오너 2026-11-27 N5 "옛길 지워줘"): 넘기기 창에서 더는 고를 수 없는 길이 코드에 남아 있으면, 그 표시가 남았을 때 Director 에 들어가자마자
+  //   실사 일괄이 저절로 시작될 수 있다 — 실사는 Storyboard [시작] · Director [이미지 만들기]를 사람이 누를 때만 만든다.
+  it('Director 화면은 넘어온 뒤 저절로 실사 일괄을 시작하지 않는다 — 넘기기 창에서 고르는 예전 길이 없다', () => {
+    expect(existsSync('src/lib/director/entry-images-intent.ts')).toBe(false)
+    expect(readFileSync('src/app/studio/director/page.tsx', 'utf8')).not.toMatch(/ImagesOnDirectorEntry|entry-images-intent/)
+    expect(readFileSync('src/features/writer/storyboard-director.ts', 'utf8')).not.toMatch(/makeImages|ImagesOnDirectorEntry/)
+    expect(readFileSync('src/stores/global-chat-store.ts', 'utf8')).not.toMatch(/ImagesOnDirectorEntry|entry-images-intent/)
   })
 })

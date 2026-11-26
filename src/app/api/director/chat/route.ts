@@ -70,7 +70,7 @@ For pure discussion, omit the JSON block.
   - 'parent' Scene→Shot, Shot→Video (자동, 사용자 수동 안 함)
   - 'relates-to' 사용자 정의 내러티브 관계
   - 'image' 이미지 source→Shot image-reference (image-reference 입력은 여러 source 허용)
-  - 'frame' 이미지 source→Video START/END/REF (START·END는 하나, REF는 여러 개)
+  - 'frame' 이미지 source→Video START/REF (START는 하나, REF는 여러 개)
   - 'video-chain' 완료된 Video의 마지막 프레임→다음 Video START (공개 이미지로 추출)
 - 6-axis camera: horizontal/vertical (좌우/상하 슬라이드), pan (피치 상하 회전), tilt (요 좌우 회전), roll (롤), zoom (화각). Kling 매핑.
 - Lighting position: left|top|right|front, brightness 0-100, colorTemp 2000-10000K (낮을수록 따뜻)
@@ -93,8 +93,8 @@ Non-destructive (direct execution — the app runs these at once):
 9b. {"type":"generateVideos","shotIds":["<shotId>", ...],"change":"..."}  — videos for those shots. Leave "shotIds" out only for every remaining shot. It runs at once and uses Takes. Add "change" only to remake a shot's video with a fix: what to change, in one or two sentences. The app keeps the shot text and the writer's motion.
     (Changes to a shot's name or prompt and a scene's name, place, time of day, mood or description are shown to the user as before and after, and change only when the user picks Apply.)
 10. {"type":"connect","sourceId":"<id>","targetId":"<id>","category":"relates-to","relationText":"..."}
-11. {"type":"connectFrame","sourceId":"<sourceId|tempId>","targetId":"<videoId|tempId>","targetHandle":"frame-start"|"frame-end"|"frame-ref"}
-    (semantic frame wiring only; targetHandle must be exactly frame-start, frame-end, or frame-ref)
+11. {"type":"connectFrame","sourceId":"<sourceId|tempId>","targetId":"<videoId|tempId>","targetHandle":"frame-start"|"frame-ref"}
+    (semantic frame wiring only; targetHandle must be exactly frame-start or frame-ref)
 12. {"type":"connectImage","sourceId":"<sourceId|tempId>","targetId":"<shotId|tempId>","targetHandle":"image-reference"}
     (image reference wiring only; targetHandle must be exactly image-reference)
 13. {"type":"connectVideo","sourceId":"<sourceId|tempId>","targetId":"<videoId|tempId>","targetHandle":"video-chain"}
@@ -236,9 +236,9 @@ const VALID_PROVIDERS = new Set([
   'kling', // legacy → normalizeProvider가 'kling-o3'로
 ])
 const VALID_LIGHT_POSITIONS = new Set(['left', 'top', 'right', 'front'])
+// 끝(END) 칸은 없앴다(오너 dev 때 "Start, End 프레임 생성 방식은 일단 폐기" · 2026-11-27 N4a) — 안내에서도 허용 목록에서도 뺀다.
 const VALID_FRAME_TARGET_HANDLES = new Set<DirectorVideoFrameTargetHandle>([
   'frame-start',
-  'frame-end',
   'frame-ref',
 ])
 const VALID_IMAGE_TARGET_HANDLES = new Set<DirectorImageTargetHandle>([

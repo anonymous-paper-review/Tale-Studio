@@ -46,6 +46,7 @@ import { storageKeySegment } from '@/lib/storage/key-segment'
 import { updateStoryboardImage } from '@/lib/director/storyboard-image-store'
 import { isJobCancelled } from '@/lib/director/job-cancellations'
 import { finalizeRoughEndFrameJob } from '@/lib/writer/directing-edit'
+import { finalizeRealEndFrameJob } from '@/lib/storyboard/real-directing-edit'
 import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { editorMusicPath } from '@/lib/editor/music-path'
@@ -1153,6 +1154,12 @@ export async function finalizeShotStoryboardJob(
   falImageUrl: string,
   falPayload?: unknown,
 ): Promise<string> {
+  // 실사 가운데 장 화살표 고치기의 끝 장(오너 2026-11-27 N4b) — 화살표를 저장한 그 판의 끝 장만 바꿔 끼운다(새 판을 만들지 않는다).
+  //   [멈추기]로 멈춘 작업은 끼우지 않는다(실패로 끝나 화면이 "그대로예요"를 알린다).
+  if (job.target.realEnd) {
+    await recordFalResponseSnapshot(job, falPayload)
+    return finalizeRealEndFrameJob(job, falImageUrl, { stopped: await isJobCancelled(job.id) })
+  }
   // 스트립 잡(#real-strip): target.gridVariant === 'strip1' 이 판별 신호.
   if (job.target.gridVariant === 'strip1') {
     return finalizeStoryboardStripJob(job, falImageUrl, falPayload)

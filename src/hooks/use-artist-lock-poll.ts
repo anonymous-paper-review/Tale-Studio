@@ -9,6 +9,8 @@ import { useProjectStore, type WriterStatusAssets } from '@/stores/project-store
 import type { StageId } from '@/types'
 
 export const ARTIST_LOCK_POLL_MS = 5_000
+/** 그리는 작업 · 멈춤 · 실패가 없을 때(새 흐름 [이미지 만들기] 전 등) 다시 확인하는 간격 — 그림을 맡기면 다음 확인부터 5초(오너 2026-11-27 N7). */
+export const ARTIST_LOCK_IDLE_POLL_MS = 30_000
 export const ARTIST_LOCK_REQUEST_TIMEOUT_MS = 15_000
 
 const ARTIST_STAGE_INDEX = STAGES.findIndex((stage) => stage.id === 'artist')
@@ -24,6 +26,8 @@ export interface LockPollDecision {
   stop: boolean
   /** 다음 tick 으로 넘길 연속 stalled 카운트. */
   stalledStreak: number
+  /** 다음 확인까지 기다릴 시간 — 그리는 작업 · 멈춤 · 실패가 없으면 길게(ARTIST_LOCK_IDLE_POLL_MS). */
+  delayMs: number
 }
 
 /**
@@ -38,10 +42,13 @@ export function decideLockPoll(assets: WriterStatusAssets, prevStreak: number): 
   const stalledSignal = !!assets.stalled && !assets.images_ready && !failed
   const stalledStreak = stalledSignal ? prevStreak + 1 : 0
   const latchStalled = stalledSignal && stalledStreak >= 2
+  // 그리는 작업도 멈춤 · 실패도 없다 — 멈춤으로 확정할 일이 없으니 천천히 다시 본다(그림을 맡기면 대기 작업이 생겨 5초로 돌아온다).
+  const idle = !assets.images_ready && !failed && !stalledSignal && (assets.queued_count ?? 0) === 0
   return {
     gate: { ...assets, stalled: latchStalled },
     stop: assets.images_ready || latchStalled || failed,
     stalledStreak,
+    delayMs: idle ? ARTIST_LOCK_IDLE_POLL_MS : ARTIST_LOCK_POLL_MS,
   }
 }
 
@@ -81,8 +88,10 @@ export function useArtistLockPoll() {
     let requestController: AbortController | null = null
     let tickVersion = 0
 
+    // 다음 확인 간격 — 마지막 판단이 정한다(그리는 작업 · 멈춤 · 실패가 없으면 30초, 그 밖에는 5초).
+    let nextDelay = ARTIST_LOCK_POLL_MS
     const schedule = () => {
-      timer = setTimeout(tick, ARTIST_LOCK_POLL_MS)
+      timer = setTimeout(tick, nextDelay)
     }
 
     const tick = async () => {
@@ -108,6 +117,7 @@ export function useArtistLockPoll() {
             if (cancelled) return
             const decision = decideLockPoll(assets, stalledStreak)
             stalledStreak = decision.stalledStreak
+            nextDelay = decision.delayMs
             setArtistAssetGate(decision.gate)
             // 실패·지연은 사이드바 뱃지로만 알리면 조용하다 (#stale-gate 2026-08-26, 오너 지적:
             //   "실패는 실패라고 떠야 하는 거 아님?"). 판정이 서는 순간 한 번만 토스트로 말한다.

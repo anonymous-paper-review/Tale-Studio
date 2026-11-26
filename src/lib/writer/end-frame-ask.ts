@@ -73,6 +73,10 @@ export interface EndRedrawDeps {
     error: (message: string, retry: () => void, detail: string | null) => void
   }
   messages: { drawing: string; done: string; failed: string; unreadable: string; translateFailed: string }
+  /** 실사(N4b): 작업을 받으면 다 그리기 전에 한 번 다시 읽는다 — 서버가 작업을 낼 때 남긴 읽은 줄이 편집기 아래에 바로 보이게. 콘티는 넘기지 않는다. */
+  accepted?: () => Promise<void> | void
+  /** 실사(N4b): 읽는 AI 가 화살표를 못 읽었을 때 알림 대신 부른다(줄을 직접 적는 물음 창). 콘티는 넘기지 않는다(알림 — 연출 탭에 적는다). */
+  unreadable?: () => void
 }
 
 /** [그대로] + 고친 줄 남기기 요청 본문 — 화면이 본 연출 장 주소(읽은 줄의 주소)를 같이 보내 그새 바뀌었으면 서버가 남기지 않는다. 못 읽은 샷은 주소 없이. */
@@ -126,6 +130,10 @@ export async function redrawEndFrame(projectId: string, shotId: string, deps: En
     result = { ok: false, error: null }
   }
   if (!result.ok || !result.jobId) {
+    if (result.code === 'direction_unreadable' && deps.unreadable) {
+      deps.unreadable()
+      return false
+    }
     const message =
       result.code === 'direction_unreadable' ? deps.messages.unreadable
         : result.code === 'direction_translate_failed' ? deps.messages.translateFailed
@@ -133,6 +141,7 @@ export async function redrawEndFrame(projectId: string, shotId: string, deps: En
     deps.notify.error(message, retry, result.error ?? null)
     return false
   }
+  await deps.accepted?.()
   try {
     await deps.waitJob(result.jobId)
   } catch (err) {

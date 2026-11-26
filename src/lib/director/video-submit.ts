@@ -18,12 +18,11 @@ import {
 import {
   type DialogueLine,
   type DialogueSpeaker,
-  type VideoReferenceImageRole,
   buildVideoPrompt,
 } from '@/lib/director/video-prompt'
 import { directorPromptOf } from '@/lib/director/director-prompt'
 import { ensureMinImageSide, VideoReferenceTooSmallError } from '@/lib/director/video-ref-min-size'
-import { freshDirectionRead } from '@/lib/writer/direction-read'
+import { videoDirectionLine } from '@/lib/writer/direction-read'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDesign, ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, linkGenerationJobToChatTrace, userOwnsProject } from '@/lib/generation-jobs'
@@ -64,7 +63,28 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { holdTakesForVideoJob } from '@/lib/billing/take-hold'
 import { takeCostForVideo } from '@/lib/billing/take-cost'
 import { hasStoryboardImage } from '@/lib/director/storyboard-image'
-import { resolveVideoReferenceFrames } from '@/lib/director/video-reference-frames'
+import { MAX_REQUEST_REFERENCE_IMAGES, clampReferenceImages, resolveVideoReferenceFrames } from '@/lib/director/video-reference-frames'
+import {
+  DEFAULT_VIDEO_MODE,
+  RETIRED_START_END,
+  isKnownVideoMode,
+  isVideoMode,
+  parseContinueFrom,
+  type ContinueFrom,
+  type VideoMode,
+} from '@/lib/director/video-modes'
+import { isRoughImageUrl, resolveModeFrames, type LabeledImage, type ModeFramesResult } from '@/lib/director/video-mode-frames'
+import { checkContinueSource } from '@/lib/director/video-continue-source'
+import {
+  MISSING_CHARACTER_SHEETS,
+  loadPropsForReferences,
+  loadSceneWorldRefs,
+  loadShotReferencePlans,
+  missingSheetsMessage,
+  type ShotRowForReferences,
+} from '@/lib/director/shot-references'
+import { directorRefsExcludeWorld, parseDirectorRefs } from '@/lib/director/director-refs'
+import { planShotPropRefs } from '@/lib/director/shot-prop-refs'
 import type { Json } from '@/types/database'
 import type { CameraConfig, CameraPreset } from '@/types'
 import type { StandaloneVideoConfig } from '@/types/director'
@@ -172,7 +192,8 @@ function snapshotValueMatches(snapshot: Record<string, unknown>, candidate: Reco
 
 // 새 테이크 기록(video_clips.override)에 남길 수 있는 칸 — 영상 노드 설정(VideoOverride)과 같다.
 // changeNote: 샷 상세 영상 고치기의 바꿀 점 — Take 에 기록으로 남아 다음 Take 칸에 미리 채워진다(디자이너 11/13 D7 · 리드 검토 c ③).
-const NEW_TAKE_OVERRIDE_KEYS = ['prompt', 'camera', 'lighting', 'cameraPreset', 'provider', 'resolution', 'changeNote'] as const
+// videoMode · continueFrom: 영상 만드는 방식과 ① 이어서의 출처(오너 2026-11-27 N4a) — Take 에 적혀 [다시 만들기] · 노드 · Lumi 가 이어받는다.
+const NEW_TAKE_OVERRIDE_KEYS = ['prompt', 'camera', 'lighting', 'cameraPreset', 'provider', 'resolution', 'changeNote', 'videoMode', 'continueFrom'] as const
 
 /**
  * 새 테이크에 남길 설정(2026-10-31 리뷰). 평범한 객체만 받는다(아니면 undefined → 400, video-takes PATCH 와 같은 규칙).
@@ -189,6 +210,13 @@ export function newTakeOverride(value: unknown): Record<string, Json> | undefine
     if (!Object.hasOwn(source, key)) continue
     if (key === 'resolution' && !isVideoResolution(source.resolution)) continue
     if (key === 'changeNote' && (typeof source.changeNote !== 'string' || source.changeNote.length > 2000)) continue
+    // 고를 수 있는 넷만 남긴다 — 폐기한 'start_end'(옛 Take 가 물려준 값)는 새 Take 기록에 남기지 않는다.
+    if (key === 'videoMode' && !isVideoMode(source.videoMode)) continue
+    if (key === 'continueFrom') {
+      const continueFrom = parseContinueFrom(source.continueFrom)
+      if (continueFrom) kept.continueFrom = { ...continueFrom }
+      continue
+    }
     if (isJsonValue(source[key])) kept[key] = source[key]
   }
   return kept
@@ -394,6 +422,99 @@ async function readVideoReplay(
   return { existingReplay, exactReplay }
 }
 
+/** 방식대로 그림을 고를 때 읽는 샷 행(영상 준비의 shots select). */
+type ModeShotRow = ShotRowForReferences & { storyboard_image?: unknown; rough_storyboard?: unknown }
+
+/**
+ * ② 레퍼런스의 소품 그림 — 실사 샷 그림과 같은 규칙(그 샷 소품 칸에 나오는 소품 중 그림이 있는 것, 2장까지 · 씬의 이야기 속 때에 맞는 모습).
+ *   dev 는 이 칸을 비워 뒀다(소품 함수 전). 읽지 못하면 소품 없이 만든다(실사 길과 같다).
+ */
+async function loadShotPropReferenceImages(projectId: string, shot: ModeShotRow): Promise<LabeledImage[]> {
+  try {
+    const props = await loadPropsForReferences(projectId)
+    if (!props.length) return []
+    let narrativeTime: string | null = null
+    if (typeof shot.scene_id === 'string' && shot.scene_id) {
+      const { data: scene } = await supabaseAdmin.from('scenes').select('narrative_time').eq('project_id', projectId).eq('scene_id', shot.scene_id).maybeSingle()
+      const value = (scene as { narrative_time?: unknown } | null)?.narrative_time
+      narrativeTime = typeof value === 'string' ? value : null
+    }
+    return planShotPropRefs(shot.static_spec, props, undefined, narrativeTime).map((ref) => ({ url: ref.url, label: `prop: ${ref.name}` }))
+  } catch (error) {
+    console.warn('[director/generate-video] reference props skipped:', error instanceof Error ? error.message : error)
+    return []
+  }
+}
+
+const MODE_FRAME_ERRORS: Record<Exclude<ModeFramesResult, { ok: true }>['code'], { status: 400 | 409; error: string }> = {
+  missing_storyboard: { status: 409, error: 'The live-action storyboard is missing for this shot. Generate it before the video.' },
+  missing_middle_frame: { status: 409, error: "This shot's live-action storyboard has no middle (direction) panel. Generate the live-action storyboard again first." },
+  // dev 리드 D1: 실사를 그린 뒤 콘티 러프가 바뀌었으면 실사 가운데 장(고치기 전 움직임)과 읽은 줄(고친 뒤 움직임)이 다르다.
+  middle_outdated: { status: 409, error: 'Redraw the live-action storyboard after editing the rough to use Start + middle.' },
+  missing_reference_images: { status: 409, error: 'This shot has no images to use as references.' },
+  missing_continue_frame: { status: 400, error: 'Invalid request: continueFrom is required for continue' },
+}
+
+/**
+ * 영상 만드는 방식(오너 2026-11-27 N4a)대로 그림을 고른다 — ① 이어서 출처 확인 · ② 인물 시트 · 배경 · 소품 · ③ 실사 가운데 장.
+ *   막히면 Take 를 잡기 전에 응답(400 · 409, code 포함)을 돌려준다. 그림 고르는 규칙 자체는 video-mode-frames(순수 함수).
+ */
+async function selectModeFrames(
+  mode: VideoMode,
+  input: { projectId: string; workspaceId: string; writerShotId: string; shot: ModeShotRow; continueFrom: ContinueFrom | null },
+): Promise<Extract<ModeFramesResult, { ok: true }> | Response> {
+  const { projectId, workspaceId, writerShotId, shot } = input
+  let continueFrameUrl: string | null = null
+  if (mode === 'continue' && input.continueFrom) {
+    const check = await checkContinueSource({ projectId, workspaceId, shotId: writerShotId, sceneId: shot.scene_id ?? null, continueFrom: input.continueFrom })
+    if (!check.ok) return NextResponse.json({ error: check.error, code: check.code, shotId: writerShotId }, { status: check.status })
+    continueFrameUrl = check.frameUrl
+  }
+  let references: Parameters<typeof resolveModeFrames>[0]['references'] = null
+  if (mode === 'reference') {
+    const plan = (await loadShotReferencePlans(projectId, [shot])).get(writerShotId)
+    if (plan?.missing.length) {
+      return NextResponse.json(
+        { error: missingSheetsMessage(plan.missing), code: MISSING_CHARACTER_SHEETS, shotId: writerShotId, missing: plan.missing },
+        { status: 409 },
+      )
+    }
+    // 인물 목록이 없는 샷은 계획이 없다 — 배경만 따로 읽는다(사람이 배경을 뺀 샷은 빼고).
+    const worldRef = plan
+      ? plan.worldRef
+      : shot.scene_id && !directorRefsExcludeWorld(parseDirectorRefs(shot.director_refs))
+        ? (await loadSceneWorldRefs(projectId, [shot.scene_id])).get(shot.scene_id) ?? null
+        : null
+    // 지시문은 영어다 — 인물은 저장된 영어 이름(움직임 약속 · 실사 그림체 지시문과 같은 promptName)으로 부르고, 없으면 이름 그대로.
+    const characterIds = (plan?.characterRefs ?? []).map((ref) => ref.characterId)
+    const { data: nameRows } = characterIds.length
+      ? await supabaseAdmin.from('characters').select('character_id, name, name_en, name_en_source').eq('project_id', projectId).in('character_id', characterIds)
+      : { data: [] }
+    const rows = (Array.isArray(nameRows) ? nameRows : []) as Array<{ character_id?: unknown; name?: unknown; name_en?: unknown; name_en_source?: unknown }>
+    const sheetName = (ref: { characterId: string; name: string }) => {
+      const row = rows.find((candidate) => candidate.character_id === ref.characterId)
+      return row ? promptName(row, ref.name) : ref.name
+    }
+    references = {
+      characters: (plan?.characterRefs ?? []).map((ref) => ({ url: ref.url, label: `character sheet: ${sheetName(ref)}` })),
+      world: worldRef ? { url: worldRef, label: 'the location' } : null,
+      props: await loadShotPropReferenceImages(projectId, shot),
+    }
+  }
+  const selected = resolveModeFrames({
+    mode,
+    storyboardImage: shot.storyboard_image,
+    roughStoryboard: shot.rough_storyboard,
+    continueFrameUrl,
+    references,
+  })
+  if (!selected.ok) {
+    const { status, error } = MODE_FRAME_ERRORS[selected.code]
+    return NextResponse.json({ error, code: selected.code, shotId: writerShotId }, { status })
+  }
+  return selected
+}
+
 export interface PreparedDirectorVideoSubmission {
   ownerId: string
   projectId: string
@@ -471,6 +592,10 @@ async function prepareVideoRequest(
       changeNote?: unknown
       /** 'director' = Director 화면이 지금 보이는 글(막 고친 글 포함)을 보냈다 — DB 의 고친 글(director_prompt)로 바꾸지 않는다. */
       promptSource?: unknown
+      /** 영상 만드는 방식(오너 2026-11-27 N4a) — 없으면 서버가 그림을 고르는 요청('auto')은 기본(시작+프롬프트), 손 배선 · 옛 요청은 보낸 그림에서 끝만 뺀다. */
+      videoMode?: unknown
+      /** ① 이어서의 출처 — videoMode 'continue' 일 때 필수. */
+      continueFrom?: unknown
     }
     let {
       prompt,
@@ -508,23 +633,30 @@ async function prepareVideoRequest(
     const change = typeof body.changeNote === 'string' ? body.changeNote.trim() : ''
     // V2 refs(#real-strip): [START, END] 등 다중 레퍼런스. referenceImageUrl(단일)과 병행 수신 —
     //   단일은 I2V 판별·스냅샷 하위호환 축, 배열은 실제 제출 레퍼런스로 우선.
-    const clientReferenceImageUrls = Array.isArray(body.referenceImageUrls)
-      ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u).slice(0, 4)
+    // dev 방안 고장 1(오너 2026-11-27 N4a "dev에서 수정한 것처럼"): 예전에는 그림을 앞 4장만 남기고 역할이 4개를 넘으면 역할을 통째로 버려,
+    //   참고 그림을 세 장 넘게 이으면 역할을 잃은 시작 그림 앞에 DB 시작 그림이 한 장 더 붙었다. 이제 역할째 받아 시작은 남기고
+    //   참고 그림만 덜어 MAX_REQUEST_REFERENCE_IMAGES 안으로 받는다(모델별 상한은 모델이 정해진 뒤 한 번 더).
+    const rawClientReferenceImageUrls = Array.isArray(body.referenceImageUrls)
+      ? body.referenceImageUrls.filter((u): u is string => typeof u === 'string' && !!u)
       : undefined
     const referenceImageRolesV2 = Array.isArray(body.referenceImageRoles)
-      ? body.referenceImageRoles.length <= 4 &&
-        body.referenceImageRoles.every(
-          (role): role is VideoReferenceImageRole =>
+      ? body.referenceImageRoles.every(
+          // 화면이 보내는 역할은 셋뿐 — 미들('direction')은 서버가 방식대로 고를 때만 생긴다(N4a).
+          (role): role is 'start' | 'end' | 'ref' =>
             role === 'start' || role === 'end' || role === 'ref',
         )
         ? body.referenceImageRoles
         : undefined
       : undefined
-    const clientAlignedRoles =
-      clientReferenceImageUrls?.length &&
-      referenceImageRolesV2?.length === clientReferenceImageUrls.length
-        ? referenceImageRolesV2
-        : undefined
+    const requestImages = rawClientReferenceImageUrls?.length
+      ? clampReferenceImages(
+          rawClientReferenceImageUrls,
+          referenceImageRolesV2?.length === rawClientReferenceImageUrls.length ? referenceImageRolesV2 : undefined,
+          MAX_REQUEST_REFERENCE_IMAGES,
+        )
+      : null
+    const clientReferenceImageUrls = requestImages ? requestImages.urls : rawClientReferenceImageUrls
+    const clientAlignedRoles = requestImages?.roles as Array<'start' | 'end' | 'ref'> | undefined
     let writerShotId = body.writerShotId ?? body.shotId
     projectId = body.projectId ?? ''
     if (
@@ -543,10 +675,32 @@ async function prepareVideoRequest(
     if (body.resolution != null && !isVideoResolution(body.resolution)) {
       return NextResponse.json({ error: 'Invalid request: resolution must be 720p or 1080p' }, { status: 400 })
     }
-    const newTakeSettings = newTakeOverride(override)
-    if (!newTakeSettings) {
+    // 영상 만드는 방식(오너 2026-11-27 N4a): 모르는 이름은 어떤 그림을 보낼지 정한 적이 없다 — Take 를 잡기 전에 거절한다.
+    //   폐기한 'start_end'(옛 Take 다시 만들기 · 옛 화면)는 거절하지 않고 기본 방식으로 만든다. 독립 영상(샷 없음)은 방식이 없다.
+    if (body.videoMode != null && !isKnownVideoMode(body.videoMode)) {
+      return NextResponse.json({ error: 'Invalid request: videoMode must be continue, reference, start_middle or start_prompt' }, { status: 400 })
+    }
+    // 서버가 그림을 고르는 요청('auto' — 화면 · 일괄)은 방식이 없으면 기본 방식(시작+프롬프트, 오너 M1)으로 만든다.
+    //   손 배선('manual')은 방식이 없다(손 배선이 이긴다). 그림을 직접 보낸 옛 요청(frameSource 없음)은 보낸 그림에서 끝만 뺀다.
+    const videoMode: VideoMode | null = standalone
+      ? null
+      : isVideoMode(body.videoMode)
+        ? body.videoMode
+        : body.frameSource !== 'manual' && (body.videoMode === RETIRED_START_END || body.frameSource === 'auto')
+          ? DEFAULT_VIDEO_MODE
+          : null
+    const continueFrom = videoMode === 'continue' ? parseContinueFrom(body.continueFrom) : null
+    if (videoMode === 'continue' && !continueFrom) {
+      return NextResponse.json({ error: 'Invalid request: continueFrom is required for continue' }, { status: 400 })
+    }
+    const takeSettingsSent = newTakeOverride(override)
+    if (!takeSettingsSent) {
       return NextResponse.json({ error: 'Invalid request: override must be a plain JSON object or null' }, { status: 400 })
     }
+    // 새 Take 기록은 실제로 쓰는 방식만 — 방식 없는 요청(손 배선 · 옛 요청)이면 방식을, 이어서가 아니면 이어서 출처를 남기지 않는다.
+    const newTakeSettings: Record<string, Json> = { ...takeSettingsSent }
+    if (!videoMode || newTakeSettings.videoMode !== videoMode) delete newTakeSettings.videoMode
+    if (videoMode !== 'continue') delete newTakeSettings.continueFrom
     if (clientGenerationMethod === 'I2V' && !clientReferenceImageUrl) return NextResponse.json({ error: 'Invalid request: referenceImageUrl is required for I2V' }, { status: 400 })
     if (!(await userOwnsProject(projectId, user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     if (traceId && !(await chatTraceBelongsToProject(projectId, traceId))) {
@@ -558,7 +712,8 @@ async function prepareVideoRequest(
       // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
       standalone
         ? Promise.resolve({ data: null, error: null })
-        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, static_spec, design_ref, dialogue_lines, character_appearance_keys, prompt, director_prompt, storyboard_image, rough_storyboard').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
+        // 방식(N4a): 씬 · 순서(① 앞 샷) · 인물 · 무대(② 참고 그림)도 같이 읽는다.
+        : supabaseAdmin.from('shots').select('shot_id, scene_id, sort_order, dynamic_spec, static_spec, design_ref, dialogue_lines, character_appearance_keys, characters, director_refs, prompt, director_prompt, storyboard_image, rough_storyboard').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
     ])
     if (projectError) throw projectError
     if (shotError) throw shotError
@@ -598,10 +753,32 @@ async function prepareVideoRequest(
       referenceImageRoles: clientAlignedRoles,
       storyboardImage: standalone ? null : shot!.storyboard_image,
     })
-    const generationMethod: GenerationMethod = frames.generationMethod
-    const referenceImageUrl = frames.referenceImageUrl ?? undefined
-    const referenceImageUrlsV2 = frames.referenceImageUrls
-    const alignedReferenceImageRoles = frames.referenceImageRoles
+    // 영상 만드는 방식(오너 2026-11-27 N4a): 방식이 있는 요청의 그림은 서버가 DB 에서 그 방식대로 고른다(화면이 보낸 목록은 쓰지 않는다).
+    const modeSelection = videoMode && shot ? await selectModeFrames(videoMode, {
+      projectId,
+      workspaceId: project.workspace_id as string,
+      writerShotId: writerShotId!,
+      shot: shot as unknown as ModeShotRow,
+      continueFrom,
+    }) : null
+    if (modeSelection instanceof Response) return modeSelection
+    const chosenFrames = modeSelection
+      ? { generationMethod: 'I2V' as const, referenceImageUrl: modeSelection.urls[0] ?? null, referenceImageUrls: modeSelection.urls, referenceImageRoles: modeSelection.roles }
+      : frames
+    // 오너 V1 "영상 생성에는 무조건 실사 그림만": 러프(목각 인형) 그림이 섞이면 Take 를 잡기 전에 멈춘다 — 몰래 빼고 만들지 않는다.
+    //   지금 화면은 러프를 보내지 않는다(시작+미들의 미들도 실사 가운데 장) — 걸리면 고장이다.
+    const shotRough = standalone ? null : (shot as { rough_storyboard?: unknown } | null)?.rough_storyboard
+    const imagesToSend = [...(chosenFrames.referenceImageUrls ?? []), ...(chosenFrames.referenceImageUrl ? [chosenFrames.referenceImageUrl] : [])]
+    if (imagesToSend.some((url) => isRoughImageUrl(url, shotRough))) {
+      return NextResponse.json(
+        { error: 'Rough (wooden mannequin) images cannot be used to make a video.', code: 'rough_image_not_allowed', shotId: writerShotId },
+        { status: 400 },
+      )
+    }
+    const generationMethod: GenerationMethod = chosenFrames.generationMethod
+    const referenceImageUrl = chosenFrames.referenceImageUrl ?? undefined
+    let referenceImageUrlsV2 = chosenFrames.referenceImageUrls
+    let alignedReferenceImageRoles = chosenFrames.referenceImageRoles
     let standaloneConfig: StandaloneVideoConfig | null = null
     if (standalone) {
       const { data: clip, error } = await supabaseAdmin
@@ -665,6 +842,19 @@ async function prepareVideoRequest(
     // 모델 이름은 무엇이 와도 fal 카탈로그 키로만 정규화된다 — 지운 'local' 은 기본 모델로.
     const modelKey: VideoModelKey = normalizeProvider(model ?? '')
     const dur = durationSeconds ?? 5
+    // 모델이 받는 장 수 안으로(dev 방안 고장 1 · N4a) — 시작 · 미들은 남기고 참고 그림만 뒤에서부터 덜어 낸다. 손 배선이든 ② 레퍼런스든 같다
+    //   (레퍼런스는 샷 실사 → 인물 → 배경 → 소품 순이라 소품 → 배경 → 인물 순으로 덜리고, 덜어 낸 그림의 이름은 글에서도 뺀다). 덜어 낸 수는 기록 · 응답에 남긴다.
+    let referenceLabels: string[] | null = modeSelection?.labels ?? null
+    let droppedReferenceImages = 0
+    if (referenceImageUrlsV2?.length) {
+      const clamped = clampReferenceImages(referenceImageUrlsV2, alignedReferenceImageRoles, VIDEO_MODELS[modelKey].maxImageUrls)
+      if (clamped.dropped > 0) {
+        referenceImageUrlsV2 = clamped.urls
+        alignedReferenceImageRoles = clamped.roles
+        if (referenceLabels) referenceLabels = clamped.keptIndices.map((index) => modeSelection!.labels![index]!)
+        droppedReferenceImages = clamped.dropped
+      }
+    }
 
     // #motion-contract: 모션 계약 소스 해석 — shots.dynamic_spec(신규 persist) 우선,
     //   구버전 프로젝트는 writer_runs.state.shotDesign 을 design_ref 로 조인(러프보드와 동일 패턴).
@@ -744,10 +934,11 @@ async function prepareVideoRequest(
       !standalone && typeof shot?.prompt === 'string' && shot.prompt.trim() === prompt.trim()
     // 실사 그림체: 카메라는 움직임 약속 한 곳이 정한다 — 작가의 움직임 글에서 카메라 말을 빼고 인물 · 환경의 움직임만 싣는다.
     const motionProse = aligned && writerMotionPrompt && dynamicSpec ? withoutCameraMoves(writerMotionPrompt) : writerMotionPrompt
-    // 콘티에서 고친 연출 장을 AI 가 읽은 줄(오너 2026-11-22 Q4 · 리드 D2 — 끝 장과 상관없이 지금 연출 장을 읽은 줄, freshDirectionRead).
+    // 고친 연출 장을 AI 가 읽은 줄(오너 2026-11-22 Q4 · 리드 D2 — 끝 장과 상관없이 지금 연출 장을 읽은 줄). 실사 가운데 장을 고쳐 읽은 줄이
+    //   지금 실사 가운데 장의 것이면 그 줄, 아니면 콘티 줄(오너 2026-11-27 N4b — videoDirectionLine).
     //   있으면 영상의 움직임은 그 줄이 정한다 — 작가의 옛 움직임 글은 붙이지 않고, 옛 움직임 약속은 buildVideoPrompt 가 뺀다.
     //   없거나 낡았으면(연출 장 주소가 바뀜) null — 지시 · 검사 · 기록이 이 기능 전과 같다.
-    const directionLine = standalone ? null : freshDirectionRead((shot as { rough_storyboard?: unknown } | null)?.rough_storyboard)?.en ?? null
+    const directionLine = standalone ? null : videoDirectionLine(shot as { storyboard_image?: unknown; rough_storyboard?: unknown } | null)
     const promptForVideo =
       motionProse && writerMotionPrompt && promptIsStoredComposition && !promptEn.includes(writerMotionPrompt) && !directionLine
         ? `${motionProse} ${promptEn}`
@@ -892,6 +1083,8 @@ async function prepareVideoRequest(
       ...(changeEn ? { change: changeEn } : {}),
       // 콘티에서 고친 연출 장을 읽은 줄(오너 Q4) — 맨 앞, 움직임은 이 줄이 정한다.
       ...(directionLine ? { directionLine } : {}),
+      // 방식 문장(오너 2026-11-27 N4a) — 그림 역할 · 방식 · 진실, 맨 뒤.
+      ...(videoMode ? { videoMode, referenceLabels } : {}),
     })
     // #creem-moderation(2026-10-11): 최종 프롬프트가 확정된 직후·자리 예약(submitPreparedVideo) 전에
     //   사용자 글만 검사한다 — 샷 산문(모션 프롬프트 포함)과 대사. 모션 계약·카메라 기재·negative_prompt
@@ -904,6 +1097,8 @@ async function prepareVideoRequest(
       ...(changeEn ? [changeEn] : []),
       // 읽은 줄에는 사람이 연출 장에 쓴 손글씨 · 고친 글이 옮겨진다(오너 Q4) — 사용자 글처럼 같이 검사한다.
       ...(directionLine ? [directionLine] : []),
+      // ② 레퍼런스 그림 이름에는 사람이 정한 인물 · 소품 이름이 들어간다(N4a) — 같이 검사한다.
+      ...(referenceLabels ?? []),
       ...(dialogueLines ?? []).map((line) => line?.text),
       ...(subjects ? [...subjects.values()].flatMap((person) => [person.name, person.anchor]) : []),
       ...(aligned && dialogueSpeakers ? Object.values(dialogueSpeakers).flatMap((speaker) => [speaker.name, speaker.appearance]) : []),
@@ -940,7 +1135,8 @@ async function prepareVideoRequest(
       } catch (error) {
         if (!(error instanceof VideoReferenceTooSmallError)) throw error
         return NextResponse.json({
-          error: `The start or end image is smaller than ${minImageSide} px, which this video model does not accept, and it could not be enlarged. Choose another video model or remake the images. (${error.message})`,
+          // 끝 그림은 오너 2026-11-27 N4a 로 보내지 않는다 — 시작 그림이라고만 말한다(화면은 code 를 보고 사용자 언어로 띄운다).
+          error: `The start image is smaller than ${minImageSide} px, which this video model does not accept, and it could not be enlarged. Choose another video model or remake the images. (${error.message})`,
           code: 'reference_image_too_small',
         }, { status: 422 })
       }
@@ -978,6 +1174,13 @@ async function prepareVideoRequest(
       ...(enlargedRefUrls ? { fal_reference_image_urls: enlargedRefUrls } : {}),
       // 실은 읽은 줄(오너 Q4) — 실었을 때만 적는다(없는 요청은 이 기능 전 기록 모양 그대로, 재생 비교 보호).
       ...(directionLine ? { direction_read: promptParts.directionRead ?? directionLine } : {}),
+      // 방식(N4a) — 기본도 적는다(기본이 시작+프롬프트로 바뀌어 "안 적음"으로는 옛 시작+끝 작업과 못 가른다). 재생 비교 칸이 아니다.
+      ...(videoMode ? { video_mode: videoMode } : {}),
+      ...(videoMode === 'continue' && continueFrom
+        ? { continue_from: { video_clip_id: continueFrom.videoClipId, generation_job_id: continueFrom.generationJobId, frame_url: continueFrom.frameUrl } }
+        : {}),
+      ...(referenceLabels ? { reference_labels: referenceLabels } : {}),
+      ...(droppedReferenceImages > 0 ? { dropped_reference_images: droppedReferenceImages } : {}),
       movement_preset: movementPreset ?? null,
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),
@@ -1114,7 +1317,9 @@ async function submitPreparedVideo(
     }
     const reservedJob = await getGenerationJobById(reservation.job_id)
     if (!reservedJob) throw new Error('Reserved video job not found')
-    const response = { shotId: writerShotId, jobId: reservation.job_id, videoClipId: reservation.video_clip_id, takeNumber: reservation.take_number, replayed: reservation.replayed, provider: reservedJob.provider ?? 'fal', model: reservedJob.model, taskId: reservedJob.request_id.startsWith('reserved:') ? undefined : reservedJob.request_id }
+    // 모델이 받지 않아 덜어 낸 참고 그림 수(dev 방안 고장 1) — 덜었을 때만 싣는다.
+    const droppedImages = typeof inputSnapshot.dropped_reference_images === 'number' ? inputSnapshot.dropped_reference_images : 0
+    const response = { shotId: writerShotId, jobId: reservation.job_id, videoClipId: reservation.video_clip_id, takeNumber: reservation.take_number, replayed: reservation.replayed, provider: reservedJob.provider ?? 'fal', model: reservedJob.model, taskId: reservedJob.request_id.startsWith('reserved:') ? undefined : reservedJob.request_id, ...(droppedImages > 0 ? { droppedImages } : {}) }
     if (reservedJob.status !== 'queued') {
       return NextResponse.json({ ...response, status: reservedJob.status })
     }

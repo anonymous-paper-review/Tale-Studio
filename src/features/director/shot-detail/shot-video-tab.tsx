@@ -5,7 +5,7 @@
 //   이미지 고치기(장면 · 인물 · 구도)와 영상 고치기(움직임 · 카메라 · 길이)를 한 화면에 둔다. 영상 고치기의 단추는 늘 새 Take 를
 //   만들고 보고 있던 Take 의 설정을 이어받는다 — 같은 Take 를 덮던 다시 만들기는 여기서 쓰지 않는다.
 //   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts · shot-detail-take.test.ts
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Loader2, Play, Trash2 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -27,7 +27,7 @@ import {
   newTakeRequest,
   shotDetailFrames,
   shotDetailTakes,
-  takeImageVersions,
+  takeImageLabel,
   takePhaseOf,
   takeSettings,
   type ShotDetailTake,
@@ -41,6 +41,10 @@ import { isStoppableJob } from '@/lib/director/stop-work'
 import { aspectRatioFromFormat } from '@/types/project'
 import type { ShotNodeData, VideoOverride } from '@/types/director'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
+import { useWriterStore } from '@/stores/writer-store'
+import { DEFAULT_VIDEO_MODE, isVideoMode, videoModeAvailability, type VideoMode } from '@/lib/director/video-modes'
+import { prepareContinueFrom } from '@/lib/director/video-frame-capture'
+import { SHOT_VIDEO_MODES, VIDEO_MODE_HINT, VIDEO_MODE_LABEL, defaultVideoMode, shotVideoModeFacts, videoModeBlockText } from './video-mode'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { AskLumiButton } from './ask-lumi-button'
 import { VideoResolutionButtons } from '@/features/director/video-resolution-buttons'
@@ -76,10 +80,16 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
   const portrait = !!w && !!h && w < h
 
   // "시작 v1 + 끝 v1"(D7 · 리드 B) — 그 Take 를 만든 작업이 쓴 그림을 지금 버전 목록과 맞춘다. 모르면 비운다.
+  //   끝 그림을 따로 쓴 옛 Take 만 "시작 + 끝", 끝을 쓰지 않은 Take(영상 방식 넷, 오너 2026-11-27 N4a)는 "그림 v1".
   const madeWith = (take: ShotDetailTake): string | null => {
-    const used = takeImageVersions(data.storyboardImage, take.data)
-    if (!used?.start) return null
-    return t('Start v{start} + End v{end}', { start: used.start, end: used.end ?? used.start })
+    const named = takeImageLabel(data.storyboardImage, take.data)
+    return named ? t(named.key, named.params) : null
+  }
+
+  // 그 Take 를 만든 방식(오너 2026-11-27 N4a) — 기본(시작+프롬프트)이 아닌 방식만 이름을 붙인다(방식이 적히지 않은 옛 Take 도 안 붙인다).
+  const takeModeName = (take: ShotDetailTake): string | null => {
+    const mode = (take.data.override as VideoOverride | undefined)?.videoMode
+    return isVideoMode(mode) && mode !== DEFAULT_VIDEO_MODE ? t(VIDEO_MODE_LABEL[mode]) : null
   }
 
   const markFinal = async (take: ShotDetailTake, next: boolean) => {
@@ -119,7 +129,7 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                     <p className="text-caption text-subtle-foreground">{t("Stopped. Takes for videos that had already started aren't refunded. If this one finishes later, it stays in this list.")}</p>
                   ) : phase === 'done' ? (
                     <p className="text-caption text-subtle-foreground">
-                      {[madeWith(take), VIDEO_MODELS[setup.model].label, resolution].filter(Boolean).join(' · ')}
+                      {[takeModeName(take), madeWith(take), VIDEO_MODELS[setup.model].label, resolution].filter(Boolean).join(' · ')}
                       {take.data.cancelledAt ? <span className="ml-1.5 rounded-full border border-border px-1.5 text-micro">{t('Finished after it was stopped')}</span> : null}
                     </p>
                   ) : phase === 'failed' ? (
@@ -238,13 +248,17 @@ function FixImage({ nodeId, data, layout }: { nodeId: string; data: ShotNodeData
   )
 }
 
-/** 영상 고치기 — 늘 새 Take 를 만든다. 보고 있던 Take 의 설정을 이어받고, 여기서 바꾼 모델 · 해상도만 새 Take 에 얹는다.
- *  바꿀 점(글)은 Lumi(채팅)에게 보낸다(오너 2026-11-26 D6) — 채팅이 샷 프롬프트를 고치고 [적용]하면 새 Take 로 다시 만든다. */
+/** 영상 고치기 — 늘 새 Take 를 만든다. 보고 있던 Take 의 설정을 이어받고, 여기서 바꾼 모델 · 해상도 · 방식만 새 Take 에 얹는다.
+ *  바꿀 점(글)은 Lumi(채팅)에게 보낸다(오너 2026-11-26 D6) — 채팅이 샷 프롬프트를 고치고 [적용]하면 새 Take 로 다시 만든다.
+ *  영상 만드는 방식 넷(오너 2026-11-27 N4a) — 고를 수 없는 방식은 꺼지고 까닭이 한 줄로 보인다. 이어서는 누를 때 앞 영상 마지막 장면을 잡는다. 시안 없음. */
 function FixVideo({ shotNodeId, data, current, busy, layout }: { shotNodeId: string; data: ShotNodeData; current: ShotDetailTake | null; busy: boolean; layout: 'popup' | 'panel' }) {
   const t = useT()
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
   const generateVideoForShot = useDirectorCanvasStore((s) => s.generateVideoForShot)
   const openDeleteConfirm = useDirectorCanvasStore((s) => s.openDeleteConfirm)
+  const nodes = useDirectorCanvasStore((s) => s.nodes)
+  const projectId = useDirectorCanvasStore((s) => s.projectId)
+  const writerShots = useWriterStore((s) => s.shots)
   const takeBalance = useTakeBalance()
   const imageGeneration = useStoryboardImageGeneration(data)
   const base = takeSettings(data, current?.data ?? null)
@@ -253,8 +267,13 @@ function FixVideo({ shotNodeId, data, current, busy, layout }: { shotNodeId: str
   // 보고 있던 Take 의 바꿀 점을 미리 채운다(리드 검토 c ③) — 고치거나 지울 수 있고, 쌓이지 않는다.
   const [change, setChange] = useState(((current?.data.override ?? {}) as VideoOverride).changeNote ?? '')
   const [sending, setSending] = useState(false)
+  const [capturing, setCapturing] = useState(false)
   // Take 를 확인하지 못해 시작하지 않은 까닭 — 단추 아래에 보이고, 다음에 누를 때 지운다.
   const [notice, setNotice] = useState<string | null>(null)
+  // 방식(N4a) — 처음엔 보고 있는 Take 의 방식(없으면 기본 시작+프롬프트). 고를 수 없는 방식은 까닭과 함께 꺼진다(video-modes).
+  const [mode, setMode] = useState<VideoMode>(() => defaultVideoMode(current?.data ?? null))
+  const { facts, previous, previousNoRecord } = useMemo(() => shotVideoModeFacts({ shotNodeId, nodes, writerShots: writerShots ?? [] }), [shotNodeId, nodes, writerShots])
+  const modeState = videoModeAvailability(mode, facts)
   const hasImage = !!shotDetailFrames(data.storyboardImage).start
   const imageChanged = !!current && imageChangedForTake(data.storyboardImage, current.data)
   // 단추 값이 곧 동의인 자리 — 잔액을 못 읽어도 값을 보이고, 숨기는 것은 과금이 꺼졌을 때뿐이다(entry D8 과 같은 말, 리드 2026-11-14).
@@ -269,7 +288,24 @@ function FixVideo({ shotNodeId, data, current, busy, layout }: { shotNodeId: str
   const videoSeconds = clampDuration(VIDEO_MODELS[provider], data.durationSeconds)
   // 시작 · 끝 이미지를 다시 만드는 중(또는 기다리는 중)이면 옛 그림으로 Take 가 나간다(리드 검토 c ①).
   const imageBusy = hasImage && (imageGeneration.generating || data.storyboardImage?.status === 'pending')
-  const disabled = !hasImage || busy || imageBusy || videoBatchBusy || sending
+  const modeBlockedReason = modeState.enabled || modeState.reason === 'storyboard_missing' ? null : videoModeBlockText(modeState.reason, { previousNoRecord })
+  const disabled = !hasImage || busy || imageBusy || videoBatchBusy || sending || capturing || !modeState.enabled
+
+  /** ① 이어서: 앞 샷의 Editor 로 가는 Take 영상에서 마지막 장면을 잡아 올린다. 못 잡으면 null — Take 를 쓰지 않고 까닭을 보인다. */
+  const captureContinue = async () => {
+    if (!previous || !projectId) return null
+    setCapturing(true)
+    const prepared = await prepareContinueFrom({ projectId, source: previous, plannedSec: previous.plannedSec }).finally(() => setCapturing(false))
+    if (prepared.ok) return prepared.continueFrom
+    setNotice(t(
+      prepared.reason === 'black_frame'
+        ? 'The previous video ends on a black screen, so there is no scene to continue from.'
+        : prepared.reason === 'upload_failed'
+          ? 'Unable to upload the source video last frame.'
+          : 'Unable to capture the source video last frame.',
+    ))
+    return null
+  }
 
   const make = async () => {
     if (disabled) return
@@ -281,6 +317,8 @@ function FixVideo({ shotNodeId, data, current, busy, layout }: { shotNodeId: str
         setNotice(t("I couldn't check your Takes, so I didn't start. Please try again in a moment."))
         return
       }
+      const continueFrom = mode === 'continue' ? await captureContinue() : null
+      if (mode === 'continue' && !continueFrom) return
       await generateVideoForShot(shotNodeId, newTakeRequest({
         takeId: current?.id ?? null,
         take: current?.data ?? null,
@@ -288,6 +326,8 @@ function FixVideo({ shotNodeId, data, current, busy, layout }: { shotNodeId: str
         change,
         provider: provider !== base.model ? provider : undefined,
         resolution: resolution !== base.resolution ? resolution : undefined,
+        mode,
+        continueFrom,
       }))
     } finally {
       setSending(false)
@@ -304,6 +344,36 @@ function FixVideo({ shotNodeId, data, current, busy, layout }: { shotNodeId: str
         <Textarea value={change} onChange={(e) => setChange(e.target.value)} rows={2}
           placeholder={t('What to change in the motion or camera · Leave it empty to keep the shot prompt')} />
       ) : null}
+      <div className="space-y-1.5" data-testid="shot-detail-video-modes">
+        <p className="text-caption text-subtle-foreground">{t('How to make the video')}</p>
+        {/* 방식 넷(오너 N4a) — 고를 수 없는 방식은 꺼지고 마우스를 올리면 까닭이 보인다. 지금 고른 것이면 막혀도 눌러 둔 채 까닭을 보인다. */}
+        <div role="radiogroup" aria-label={t('How to make the video')} className="flex flex-wrap gap-2">
+          {SHOT_VIDEO_MODES.map((option) => {
+            const state = videoModeAvailability(option, facts)
+            const chosen = option === mode
+            return (
+              <button key={option} type="button" role="radio" aria-checked={chosen}
+                disabled={!state.enabled && !chosen}
+                title={state.enabled ? t(VIDEO_MODE_HINT[option]) : t(videoModeBlockText(state.reason, { previousNoRecord }))}
+                onClick={() => setMode(option)}
+                className={cn('rounded-[10px] border px-3 py-1.5 text-body transition-colors disabled:cursor-not-allowed disabled:opacity-40', chosen ? 'border-info bg-info/15' : 'border-border hover:bg-accent')}>
+                {t(VIDEO_MODE_LABEL[option])}
+              </button>
+            )
+          })}
+        </div>
+        <p className="text-caption text-subtle-foreground">{t(VIDEO_MODE_HINT[mode])}</p>
+        {/* 꺼진 방식마다 까닭 한 줄 — 그림이 없어 모두 꺼진 때는 아래 단추 까닭이 말한다. 고른 방식의 까닭은 단추 아래에. */}
+        {SHOT_VIDEO_MODES.map((option) => {
+          const state = videoModeAvailability(option, facts)
+          if (state.enabled || state.reason === 'storyboard_missing' || option === mode) return null
+          return (
+            <p key={option} className="text-caption text-subtle-foreground">
+              {t(VIDEO_MODE_LABEL[option])} · {t(videoModeBlockText(state.reason, { previousNoRecord }))}
+            </p>
+          )
+        })}
+      </div>
       <div className="space-y-1.5">
         <p className="text-caption text-subtle-foreground">{t('Video model')}</p>
         <div className="flex flex-wrap gap-2">
@@ -330,11 +400,20 @@ function FixVideo({ shotNodeId, data, current, busy, layout }: { shotNodeId: str
         <p className="text-caption text-subtle-foreground">{t('The start and end images are being remade. Make the Take when they are done.')}</p>
       ) : busy ? (
         <p className="text-caption text-subtle-foreground">{t('A Take is being made. You can make a new one when it is done.')}</p>
+      ) : modeBlockedReason ? (
+        <p className="text-caption text-subtle-foreground">{t(modeBlockedReason)}</p>
       ) : null}
+      {capturing ? <p className="text-caption text-subtle-foreground">{t("Getting the last frame of the previous shot's video…")}</p> : null}
       <div className="flex flex-wrap items-center gap-2">
         {/* 바꿀 점이 있으면 Lumi(채팅)에게(오너 2026-11-26 D6), 비우면 지금처럼 이 자리에서 새 Take. */}
         {change.trim() ? <AskLumiButton shotNodeId={shotNodeId} kind="video" change={change} closeDetail={layout === 'popup'} onSent={() => setChange('')}
-            take={{ fromTakeId: current?.id ?? null, provider, resolution }} />
+            blocked={!modeState.enabled || capturing}
+            take={{ fromTakeId: current?.id ?? null, provider, resolution, videoMode: mode }}
+            prepareTake={mode === 'continue' ? async () => {
+              setNotice(null)
+              const continueFrom = await captureContinue()
+              return continueFrom ? { continueFrom } : null
+            } : undefined} />
           : <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => void make()}>{label}</Button>}
         {current ? (
           <Button type="button" size="sm" variant="outline" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => openDeleteConfirm(current.id)}>
