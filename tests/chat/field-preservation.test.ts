@@ -4,8 +4,9 @@ import { omitRepeatedToolEdits, requestsSupportedChatEdit } from '@/lib/chat-too
 import { writerToolRowPatch } from '@/lib/chat-tools/writer-save'
 it('수정한 다음 이동하라는 문장에서 생성 금지가 수정 부분을 지우지 않는다', () => {
   // 왜: 이동 빠른 경로가 먼저 실행되어 샷 변경을 생략한 DEV 사례를 막는다.
-  expect(requestsSupportedChatEdit('writer', '첫 번째 샷 길이를 10초로 바꾼 다음 Artist로 이동해줘. 이미지 생성은 하지 마.')).toBe(true)
-  expect(requestsSupportedChatEdit('writer', '샷 길이를 변경하지 마. Artist로 이동해줘.')).toBe(false)
+  //   씬 · 샷을 고치고 Artist 로 가는 말은 콘티 채팅의 일이다 — Storyboard 채팅은 글을 고치지 않는다(오너 2026-11-27 N3).
+  expect(requestsSupportedChatEdit('conti', '첫 번째 샷 길이를 10초로 바꾼 다음 Artist로 이동해줘. 이미지 생성은 하지 마.')).toBe(true)
+  expect(requestsSupportedChatEdit('conti', '샷 길이를 변경하지 마. Artist로 이동해줘.')).toBe(false)
 })
 it('기존 JSON 씬 편집의 원문 인용도 실제 저장 필드로 보존한다', () => {
   // 왜: 공통 실행 경로로 옮겨도 기존에 편집 가능했던 필드를 누락하면 안 된다.

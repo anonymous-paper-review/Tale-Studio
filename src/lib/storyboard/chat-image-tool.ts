@@ -1,9 +1,13 @@
 // Storyboard 채팅의 실사 그림 도구(오너 2026-11-26 m1126 O7 "채팅으로 — 고칠 글을 채팅에 보내면 채팅이 맥락을 보고 그 샷 실사를 다시 그린다").
 //   Storyboard 단계(writer) 채팅 요청에만 싣는다 — 콘티 채팅은 Artist 앞이라 인물 시트가 없어 실사를 그릴 수 없다(혼자 정한 것 j).
+//   Storyboard 채팅은 실사 고치기만 한다(오너 2026-11-27 N3 "추천대로") — 씬 · 샷 · 대사 글은 고치지 않고 Writer 콘티(대사는 대사 탭에서도)로 안내한다.
+//   그래서 Storyboard 요청은 씬 · 샷 고치기 동작 없는 안내(STORYBOARD_CHAT_SYSTEM) · 읽기 도구만 받고, 서버는 그림 요청 · 되묻기만 화면에 넘긴다.
 //   이름 · 뜻은 Director 채팅의 generateImage 와 같다(id 없으면 실사 없는 샷 전부 = [시작]). 여기 id 는 Writer 샷 id.
 //   바꿀 점은 Director 샷 상세 "바꾸고 싶은 점"과 같은 글 자리에 실린다(lib/storyboard/redraw-image — 지시문 글자 변화 0).
 //   서버(api/writer/chat)는 받을 모양만 받는다(architecture §3) — 적용은 화면(채팅 저장소)이 한다.
-//   약속: tests/chat/storyboard-image-tool.test.ts
+//   약속: tests/chat/storyboard-image-tool.test.ts · tests/chat/storyboard-chat-text.test.ts
+import { translate } from '@/lib/i18n/translate'
+import type { AppLocale } from '@/lib/locale'
 import { currentStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { hasStoryboardImage } from '@/lib/director/storyboard-image'
 import type { StoryboardImage } from '@/types/director'
@@ -30,27 +34,53 @@ To make or remake a shot's live-action image, emit (in the same updates block):
 - Leave "change" out to draw the image just as the shot describes (for a shot that has no live-action image yet, or "draw it again").
 - Leave "id" out to make live-action images for every shot that has none yet (the same as the Start button).
 - It runs at once and uses no Takes. Each shot runs one image at a time, so emit at most one generateImage per shot.
-- When the user asks to change how a shot looks, do not edit the shot text with updateShot; emit generateImage with a change.
-- When the user also asks to change text (dialogue, narration, the shot's story or description, a name, the length), make that text change with the edit tools as usual. generateImage only redraws the picture and never changes text. Never say text was changed unless the edit result confirms it.
+- When the user asks to change how a shot looks, do not edit the shot text; emit generateImage with a change.
+- generateImage only redraws the picture and never changes text. Text is not changed on this screen: when the user also asks to change text (dialogue, narration, the shot's story or description, a name, the length), say that it is edited on the Writer screen's rough storyboard and that dialogue can also be edited right in the Dialogue tab. Never say text was changed.
 - Emit generateImage only when the user asks to make, remake or change a picture. Your reply says which shot (by its board name) you are redrawing and what will change.
 </live-action-images>`
 
-// 사람이 그림만 고쳐 달라고 했나 — 도구 고리가 "그림 요청만의 답"을 글 고치기 확인(requireEdit) 없이 받아도 되는 때(검토 2026-11-26 rev-director).
-//   그림을 가리키는 말(이미지 · 그림 · 실사 · 사진 · 그려 · image · picture · redraw …)이 있고, 글을 가리키는 말(대사 · 내레이션 · 자막 · 설명 · 이야기 ·
-//   대본 · 문구 · 제목 · 이름 · N초 · dialogue · narration · description · story · text · name · duration …)이 없을 때만 그렇다.
-//   인물 · 배경 · 표정 · 빛 · 구도는 그림의 생김새라 글 말로 세지 않는다(AI 안내가 그림 바꿀 점으로 부르는 것과 같다).
-//   "대사는 그대로"처럼 글을 두라는 말은 빼고 본다. 애매하면 false — 예전처럼 실행을 확인한다(리드 "불확실하면 안전한 쪽").
-//   약속: tests/chat/storyboard-image-tool.test.ts · storyboard-image-loop.test.ts · storyboard-chat-store.test.ts
-const PICTURE_WORDS = /(이미지|그림|실사|사진|그려|그리기|\b(images?|pictures?|photos?|redraw|repaint|draw)\b)/i // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
-const TEXT_TARGET = '대사|내레이션|나레이션|자막|설명|스토리|이야기|줄거리|대본|문구|문장|제목|이름' // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
-const TEXT_TARGET_EN = 'dialogue|dialog|lines?|narration|captions?|subtitles?|description|story|text|wording|script|title|names?'
-const TEXT_WORDS = new RegExp(`(${TEXT_TARGET}|\\d+\\s*초|\\b(${TEXT_TARGET_EN}|rename|duration|seconds?)\\b)`, 'i') // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
-const KEEP_TEXT = new RegExp(`(${TEXT_TARGET})(은|는|이|가|을|를|도)?\\s*(그대로|유지)|\\bkeep\\s+(the\\s+)?(${TEXT_TARGET_EN})\\b|\\b(${TEXT_TARGET_EN})\\s+(unchanged|as\\s+is)\\b`, 'gi') // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+// 한국어 대화에서 부를 화면 이름(채팅 안내 CHAT_AGENT_GUIDE 의 콘티 이름과 같다).
+const KO_CONTI = 'Writer 콘티' // i18n-ok: 모델에게 보이는 한국어 화면 이름
+const KO_DIALOGUE_TAB = '대사 탭' // i18n-ok: 모델에게 보이는 한국어 탭 이름
 
-/** 사람이 그림만 고쳐 달라고 했나(Storyboard 채팅) — 위 주석. */
-export function requestsPictureOnlyChange(message: string): boolean {
-  const asked = message.replace(KEEP_TEXT, ' ')
-  return PICTURE_WORDS.test(asked) && !TEXT_WORDS.test(asked)
+/** Storyboard 채팅의 AI 안내(오너 2026-11-27 N3) — 씬 · 샷 고치기 동작이 없다. 샷 이름 규칙(shotNumbers)은 Writer 채팅 안내의 것을 그대로 싣는다. */
+export function storyboardChatSystem(shotNumbers: string): string {
+  return `You are the Storyboard assistant in an AI video production pipeline called "The Set."
+The user is on the Storyboard screen. The story is already broken into Scenes and Shots on the Writer screen's rough storyboard, and here each shot's rough pencil sketch is turned into a live-action image.
+
+<role>
+You discuss the story and staging, answer questions, and make or remake the shots' live-action images (see <live-action-images>).
+You never change text on this screen. Do not add, split, reorder or remove scenes or shots, and do not change a scene's or a shot's story, action, shot size, length, characters, dialogue or narration. There are no edit actions here, and the app tools on this screen are read-only (there is no edit_project).
+When the user asks for such a change, do not pretend to make it. Say in one or two sentences that the story, shots and dialogue are edited on the Writer screen's rough storyboard (call it "${KO_CONTI}" in Korean replies), and that dialogue can also be edited right in this screen's Dialogue tab ("${KO_DIALOGUE_TAB}" in Korean replies).
+Character and background descriptions are edited on the Artist screen.
+If the same message also asks for a picture change, make the picture part with generateImage and say that the text part is edited on the rough storyboard.
+For pure discussion or questions, omit the JSON block entirely.
+</role>
+
+<model>
+- Scene: location, time of day, mood, summary and the characters present.
+- Shot: one cut inside a scene, with its shot size, action description, characters, length and dialogue lines.
+- The context lists every scene and shot with its exact ID. Use those IDs only inside the JSON block.
+</model>
+
+${shotNumbers}
+
+<format>
+Reply text in 1-3 sentences (Korean if the user wrote Korean), then, only when making images or asking which shot, a single JSON block as the LAST element:
+
+\`\`\`json
+{"updates":[ ... ]}
+\`\`\`
+
+The only update types here are generateImage (see <live-action-images>) and clarify:
+{"type":"clarify","question":"<short question>","candidates":["<board name or wording>", ...]}
+Use clarify alone when you cannot tell which shot the user means (2-4 candidates the user can answer with). Never mix it with other updates.
+</format>`
+}
+
+/** Storyboard 채팅 답의 글 고치기를 떨군 뒤 답 끝에 붙이는 안내(혼자 정한 것 c) — 답과 같은 채팅 언어. */
+export function storyboardTextNotice(locale: AppLocale): string {
+  return translate(locale, "Storyboard doesn't change text, so nothing was rewritten. Edit the story, shots and dialogue in Writer's rough storyboard. Dialogue can also be edited right in the Dialogue tab.")
 }
 
 /** 채팅 답의 updates 중 실사 그림 요청인가(서버가 모양을 이미 걸렀다) — 채팅 저장소가 씬 · 샷 고치기와 가른다. */
@@ -80,6 +110,13 @@ export function pickStoryboardImageUpdates(raw: readonly unknown[]): StoryboardI
 export function withStoryboardImageUpdates(validated: readonly unknown[], images: readonly StoryboardImageUpdate[]): unknown[] {
   const clarify = validated.find((u) => !!u && typeof u === 'object' && (u as { type?: unknown }).type === 'clarify')
   return clarify ? [clarify] : [...validated, ...images]
+}
+
+/** Storyboard 채팅 답에서 화면에 넘길 것 — 되묻기 · 실사 그림 요청만(오너 2026-11-27 N3). 떨군 글 고치기 수도 센다(답 끝 안내). */
+export function storyboardOnlyUpdates(validated: readonly unknown[], images: readonly StoryboardImageUpdate[]): { updates: unknown[]; droppedTextEdits: number } {
+  const isClarify = (u: unknown) => !!u && typeof u === 'object' && (u as { type?: unknown }).type === 'clarify'
+  const clarify = validated.filter(isClarify)
+  return { updates: withStoryboardImageUpdates(clarify, images), droppedTextEdits: validated.length - clarify.length }
 }
 
 /** AI 문맥 한 덩어리 — 샷마다 실사가 있는지와 지금 판 번호. 샷 이름은 문맥의 샷 줄(보드 이름)이 이미 준다. */

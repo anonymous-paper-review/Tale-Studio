@@ -1,4 +1,4 @@
-// Storyboard 채팅이 실사 그림 도구 표시를 싣고, 답의 그림 요청을 씬 · 샷 고치기와 따로 맡기며 못 맡긴 까닭을 Storyboard 채팅에 남기는지 — 콘티 채팅은 그대로인지 검사한다
+// Storyboard 채팅이 실사 그림 도구 표시를 싣고, 답의 그림 요청을 씬 · 샷 고치기와 따로 맡기며 못 맡긴 까닭을 Storyboard 채팅에 남기는지, 글 고치기는 다시 요구하지 않는지(N3) — 콘티 채팅은 그대로인지 검사한다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({ workflow: vi.fn(), execute: vi.fn(), images: vi.fn(async (_projectId: string, _updates: unknown[], _opts: unknown) => {}) }))
@@ -92,18 +92,29 @@ describe('Storyboard 채팅의 실사 그림 요청', () => {
     expect(mocks.images).not.toHaveBeenCalled()
   })
 
-  // 왜(검토 2026-11-26 rev-director): 글 고치기가 섞인 부탁에 그림 요청만으로 답하면 대사는 그대로인데 "바꿀게요"로 끝났다 —
-  //   이제 예전처럼 실행을 다시 확인하고, 끝내 글을 안 고치면 그림도 맡기지 않고 못 했다고 말한다.
-  it("대사를 바꾸고 다시 그려 달라는 부탁에 그림 요청만으로 답하면 실행을 다시 확인하고, 끝내 글을 안 고치면 그림도 맡기지 않고 못 했다고 말한다", async () => {
+  // 왜(오너 2026-11-27 N3 — Storyboard 채팅은 실사 고치기만, 글은 콘티로 안내): 글 · 그림이 섞인 부탁에서 그림 부분은 Storyboard 가 할 일이다 —
+  //   예전처럼 글 고치기를 다시 요구하면 그림 요청까지 버리고 "실행을 확인하지 못했습니다"로 끝난다. 대사는 콘티 · 대사 탭에서 고친다.
+  it('대사를 바꾸고 다시 그려 달라는 부탁에는 다시 묻지 않고 답의 그림 요청을 맡긴다 — 대사는 콘티에서 고친다', async () => {
     fetchMock.mockImplementation(async (url: string) =>
-      url === '/api/writer/chat' ? Response.json({ toolSupport: true, reply: '대사를 바꾸고 다시 그릴게요.', updates: [IMAGE] }) : Response.json({}),
+      url === '/api/writer/chat' ? Response.json({ toolSupport: true, reply: '대사는 Writer 콘티에서 고칠 수 있어요. 그림은 다시 그릴게요.', updates: [IMAGE] }) : Response.json({}),
     )
     await chat.getState().sendMessage("@샷 2 대사를 '잘 가'로 바꾸고 다시 그려 줘")
+    await vi.waitFor(() => expect(mocks.images).toHaveBeenCalledTimes(1))
+    expect(chatRequests()).toHaveLength(1)
+    expect(chat.getState().messages.some((message) => message.content.includes('요청한 변경의 실행을 확인하지 못했습니다'))).toBe(false)
+  })
+
+  // 왜(오너 2026-11-27 N3): Storyboard 채팅은 글을 고치지 않는다 — 글만 고쳐 달라는 말에 고치기를 다시 요구하면 콘티로 가라는 안내 대신
+  //   "요청한 변경의 실행을 확인하지 못했습니다"가 남는다.
+  it('Storyboard 채팅은 글을 고쳐 달라는 부탁에도 고치기를 다시 요구하지 않고 안내 답을 그대로 보인다', async () => {
+    fetchMock.mockImplementation(async (url: string) =>
+      url === '/api/writer/chat' ? Response.json({ toolSupport: true, reply: '대사는 Writer 콘티에서 고칠 수 있어요. 대사 탭에서 바로 고칠 수도 있어요.', updates: [] }) : Response.json({}),
+    )
+    await chat.getState().sendMessage("@샷 2 대사를 '잘 가'로 바꿔 줘")
     await vi.waitFor(() => expect(chat.getState().loading).toBe(false))
-    expect(chatRequests()).toHaveLength(2)
-    await new Promise((resolve) => setTimeout(resolve, 20))
+    expect(chatRequests()).toHaveLength(1)
+    expect(chat.getState().messages.at(-1)?.content).toContain('대사는 Writer 콘티에서 고칠 수 있어요')
     expect(mocks.images).not.toHaveBeenCalled()
-    expect(chat.getState().messages.at(-1)?.content).toContain('요청한 변경의 실행을 확인하지 못했습니다')
   })
 
   // 왜(오너 O7 · 2026-11-26 개발 서버 실측): 그림만 고쳐 달라는 부탁은 그림 요청만으로 다 한 것이다 — 실행 확인 없이 그 그림을 맡긴다.

@@ -3753,6 +3753,8 @@ export const KO: Record<string, string> = {
   // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
   'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
   'Fix the story, arrows, and dialogue in Writer.': '이야기 · 화살표 · 대사는 Writer 콘티에서 고쳐요.',
+  // Storyboard 채팅은 글을 고치지 않는다(오너 2026-11-27 N3) — 모델이 글 고치기를 냈으면 떨구고 답 끝에 붙이는 안내.
+  "Storyboard doesn't change text, so nothing was rewritten. Edit the story, shots and dialogue in Writer's rough storyboard. Dialogue can also be edited right in the Dialogue tab.": 'Storyboard에서는 글을 바꾸지 않아 아무것도 고치지 않았어요. 이야기 · 샷 · 대사는 Writer 콘티에서 고칠 수 있어요(대사는 대사 탭에서 바로 고칠 수도 있어요).',
   // 채팅이 실사를 다시 그리라고 했는데 맡기지 못했을 때(채팅 한 줄).
   "Couldn't find the shot to draw. Ask again with the shot name.": '그릴 샷을 찾지 못했어요. 샷 이름으로 다시 부탁해 주세요.',
   '{shot} is being drawn right now. Ask again when it is done.': '{shot}은(는) 지금 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',

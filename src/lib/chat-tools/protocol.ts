@@ -63,7 +63,8 @@ For a compound edit-then-move request, finish and verify ALL edits before openin
 Keep using the existing approval/JSON paths for operations these tools do not support (creation, deletion, generation, Director handoff).
 </app-tools>`
 
-export function prepareChatTools(stage: string, enabled: unknown, history: unknown, workflow: unknown = false, domain: unknown = false): ChatToolContext | undefined {
+/** options.edit === false: 고치기 도구(edit_project)를 빼고 읽기 도구만 준다 — Storyboard 채팅은 글을 고치지 않는다(오너 2026-11-27 N3). */
+export function prepareChatTools(stage: string, enabled: unknown, history: unknown, workflow: unknown = false, domain: unknown = false, options: { edit?: boolean } = {}): ChatToolContext | undefined {
   const resources = toolResourcesForStage(stage)
   if (enabled !== true || resources.length === 0) return undefined
   const messages = history ?? []
@@ -79,9 +80,9 @@ export function prepareChatTools(stage: string, enabled: unknown, history: unkno
       { name: 'read_project', description: 'Read the current project data before answering state questions or editing. Returns exact target IDs, editable values and revisions. Settings are the current working board; other resources are saved rows.', input_schema: {
         type: 'object', properties: { resource, id: { type: 'string', description: 'Optional exact ID. Omit to list targets.' } }, required: ['resource'], additionalProperties: false,
       } },
-      { name: 'edit_project', description: 'Edit one previously read target with its revision and only requested patch fields. Wait for saved/approval/failure result. No generation, creation, deletion or automatic approval.', input_schema: {
-        type: 'object', properties: { resource, id: { type: 'string' }, revision: { type: 'string' }, patch: { type: 'object', description: 'Only editable fields listed in the app-tools instructions; preserve unchanged dialogue metadata.' } }, required: ['resource', 'id', 'revision', 'patch'], additionalProperties: false,
-      } },
+      ...(options.edit === false ? [] : [{ name: 'edit_project', description: 'Edit one previously read target with its revision and only requested patch fields. Wait for saved/approval/failure result. No generation, creation, deletion or automatic approval.', input_schema: {
+        type: 'object' as const, properties: { resource, id: { type: 'string' as const }, revision: { type: 'string' as const }, patch: { type: 'object' as const, description: 'Only editable fields listed in the app-tools instructions; preserve unchanged dialogue metadata.' } }, required: ['resource', 'id', 'revision', 'patch'], additionalProperties: false,
+      } }]),
       ...(domain === true && ['writer', 'artist'].includes(stage) ? [{ name: 'inspect_project', description: 'Read saved domain evidence for one exact target. Writer: current shot/scene specs and linked generation-time intent. Artist: all appearance descriptions; includeImage with an exact appearanceKey supplies that existing sheet/background for visual inspection. Read-only: never edits, selects candidates, approves or generates.', input_schema: {
         type: 'object' as const, properties: {
           target: { type: 'string' as const, enum: stage === 'writer' ? ['scene', 'shot'] : ['character', 'background'] },

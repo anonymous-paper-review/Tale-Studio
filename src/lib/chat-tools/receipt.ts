@@ -38,7 +38,9 @@ export function guardChatToolReply(reply: string, outcomes: ToolOutcome[], korea
 
 /** A narrow recovery hint for explicit edit requests; it never authorizes a write by itself. */
 export function requestsSupportedChatEdit(stageId: string, message: string): boolean {
-  // 콘티는 Storyboard 와 같은 보드 채팅이다(O1 2026-11-26).
+  // Storyboard(id writer) 채팅은 글을 고치지 않는다 — 실사 고치기만 하고 글은 콘티로 안내한다(오너 2026-11-27 N3). 고치기를 요구하지 않는다.
+  if (stageId === 'writer') return false
+  // 콘티는 Storyboard 와 같은 보드 채팅 도구를 쓴다(O1 2026-11-26) — 씬 · 샷 · 대사 고치기는 콘티 채팅의 일이다.
   const stage = toolStageOf(stageId)
   message = withoutMediaGenerationProhibition(message)
   if (!/(바꿔|바꾼|바꾸|변경(?:해|한|하고)|수정(?:해|한|하고)|고쳐|고치|번역(?:해|한|하고)|\b(change|update|edit|translate|rename)\b)/i.test(message)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
