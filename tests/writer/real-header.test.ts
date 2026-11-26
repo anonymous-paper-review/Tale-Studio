@@ -88,7 +88,7 @@ describe('Storyboard 머리 단추', () => {
   // 왜(오너 S2): [시작]은 화면이 센 샷으로 Storyboard 일괄을 시작한다 — Director 와 같은 길(lib/storyboard/start-real).
   it('[시작]을 누르면 화면이 센 샷으로 Storyboard 일괄을 시작하고, 빠지는 샷이 있으면 먼저 알린다', () => {
     const src = readFileSync('src/features/storyboard/header-actions.tsx', 'utf8')
-    expect(src).toMatch(/const notice = noContiNotice\(locale, view\.noConti\.map\(nameOf\)\)\s*if \(notice\) toast\.info\(notice\)\s*void startStoryboardReal\(projectId, view\.targets\)/)
+    expect(src).toMatch(/const notice = noContiNotice\(locale, view\.noConti\.map\(nameOf\)\)\s*if \(notice\) toast\.info\(notice\)\s*const targets = view\.targets\s*void import\('@\/lib\/storyboard\/start-real'\)\.then\(\(\{ startStoryboardReal \}\) => startStoryboardReal\(projectId, targets\)\)/)
   })
 })
 

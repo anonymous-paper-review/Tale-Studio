@@ -5,6 +5,7 @@ const cache = vi.hoisted(() => ({
   rows: {} as Record<string, Array<{ shot_id: string; storyboard_image: unknown }>>,
   order: [] as string[],
   gate: null as null | Promise<void>,
+  fail: false,
 }))
 vi.mock('@/lib/shots-cache', () => ({
   invalidateShots: vi.fn(async (projectId: string) => {
@@ -13,6 +14,7 @@ vi.mock('@/lib/shots-cache', () => ({
   loadShots: vi.fn(async (projectId: string) => {
     cache.order.push(`load:${projectId}`)
     if (cache.gate) await cache.gate
+    if (cache.fail) throw new Error('network down')
     return cache.rows[projectId] ?? []
   }),
 }))
@@ -29,7 +31,8 @@ beforeEach(() => {
   }
   cache.order = []
   cache.gate = null
-  useStoryboardRealImages.setState({ projectId: null, images: {}, loaded: false })
+  cache.fail = false
+  useStoryboardRealImages.setState({ projectId: null, images: {}, loaded: false, failed: false })
 })
 
 describe('Storyboard 실사 그림 읽기', () => {
@@ -59,5 +62,14 @@ describe('Storyboard 실사 그림 읽기', () => {
     const state = useStoryboardRealImages.getState()
     expect(state.projectId).toBe('p2')
     expect(Object.keys(state.images)).toEqual(['z'])
+  })
+
+  // 왜(검토 b 낮음 7과 같은 규칙): 읽지 못한 것을 "실사 없음"으로 세면 넘기기 창이 샷 전부를 실사 없는 수로 보인다 — 못 읽었다고 표시해 아는 만큼만 보이게.
+  it('shots 사물함을 읽지 못하면 실사 그림을 못 읽었다고 표시하고 던지지 않는다', async () => {
+    cache.fail = true
+    await expect(useStoryboardRealImages.getState().load('p1')).resolves.toBeUndefined()
+    const state = useStoryboardRealImages.getState()
+    expect(state.loaded).toBe(false)
+    expect(state.failed).toBe(true)
   })
 })

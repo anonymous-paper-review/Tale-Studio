@@ -118,7 +118,7 @@ describe('Storyboard 실사 보기 보드', () => {
     expect(view).not.toMatch(/runRealBatch|startStoryboardReal|generate-storyboard/)
     const actions = readFileSync('src/features/storyboard/header-actions.tsx', 'utf8')
     expect(actions.match(/startStoryboardReal\(/g)).toHaveLength(1)
-    expect(actions).toMatch(/const start = \(\) => \{[\s\S]*startStoryboardReal\(projectId, view\.targets\)[\s\S]*onClick=\{start\}/)
+    expect(actions).toMatch(/const start = \(\) => \{[\s\S]*startStoryboardReal\(projectId, targets\)[\s\S]*onClick=\{start\}/)
   })
 
   // 왜(오너 O7 "다시 그리면 카드가 새 그림"): 실사 작업이 큐에서 빠지면 30초 사물함을 낡음으로 표시하고 실사 그림을 다시 읽는다.

@@ -19,11 +19,6 @@ import { isRoughDrawn } from '@/lib/writer/rough-progress'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useWriterStore } from '@/stores/writer-store'
 
-/** 채팅 답의 updates 중 실사 그림 요청인가(서버가 모양을 이미 걸렀다). */
-export function isStoryboardImageUpdate(update: unknown): update is StoryboardImageUpdate {
-  return !!update && typeof update === 'object' && (update as { type?: unknown }).type === 'generateImage'
-}
-
 /** 실사 그림 요청을 맡긴다. notify = 채팅 한 줄(그 채팅 언어로 지은 글), locale = 그 글의 언어. */
 export async function runStoryboardImageUpdates(
   projectId: string,

@@ -22,6 +22,7 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
 import { boardStageOf } from '@/lib/writer/board-stage'
+import { StoryboardHeader } from '@/features/storyboard/storyboard-header'
 
 interface WriterHeaderProps {
   description?: string
@@ -48,6 +49,10 @@ export function WriterHeader({ description, tools, actions, hideNextStep = false
   const handoffRunning = useGlobalChatStore(
     (state) => state.directorHandoff?.phase === 'checking' || state.directorHandoff?.phase === 'navigating',
   )
+
+  // Storyboard(id writer, /studio/writer)는 실사 보기 머리를 쓴다(오너 2026-11-26 m1126 S1 · S2 · S4) — 탭 [스토리보드 | 대사] · [시작]/[멈추기] · [다음: Director로 →].
+  //   대사 탭이 이 머리를 부르므로 여기서 넘긴다. 콘티 · 관리자 V2 미리보기(hideNextStep)는 아래 그대로.
+  if (boardStage === 'writer' && !hideNextStep) return <StoryboardHeader description={description} tools={actions} />
 
   // 도움말은 상시 설명문 대신 제목 옆 "?" 뱃지 호버로 (2026-08-06) — v3 에서도 제목 바로 옆에 둔다.
   return (

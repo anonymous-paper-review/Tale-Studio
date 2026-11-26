@@ -34,6 +34,11 @@ To make or remake a shot's live-action image, emit (in the same updates block):
 - Emit generateImage only when the user asks to make, remake or change a picture. Your reply says which shot (by its board name) you are redrawing and what will change.
 </live-action-images>`
 
+/** 채팅 답의 updates 중 실사 그림 요청인가(서버가 모양을 이미 걸렀다) — 채팅 저장소가 씬 · 샷 고치기와 가른다. */
+export function isStoryboardImageUpdate(update: unknown): update is StoryboardImageUpdate {
+  return !!update && typeof update === 'object' && (update as { type?: unknown }).type === 'generateImage'
+}
+
 /** 모델이 낸 updates 중 실사 그림 요청만 받는다 — 샷 id · 바꿀 점은 글, 바꿀 점은 다듬고 자른다. 같은 샷은 뒤 것 하나만. */
 export function pickStoryboardImageUpdates(raw: readonly unknown[]): StoryboardImageUpdate[] {
   const byShot = new Map<string, StoryboardImageUpdate>()

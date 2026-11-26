@@ -14,6 +14,8 @@ interface RealImagesState {
   images: Readonly<Record<string, unknown>>
   /** 이 프로젝트를 한 번이라도 다 읽었는가. */
   loaded: boolean
+  /** 마지막 읽기가 실패했다 — 실사가 없는 것과 가른다(넘기기 창이 "최대 N개"로 보인다). 다음에 읽으면 다시 판단한다. */
+  failed: boolean
   /** 읽는다. fresh = 사물함을 낡음으로 표시하고 다시 받는다(작업이 막 끝났을 때). 프로젝트가 바뀌면 앞 그림을 먼저 비운다. */
   load: (projectId: string, opts?: { fresh?: boolean }) => Promise<void>
 }
@@ -25,12 +27,19 @@ export const useStoryboardRealImages = create<RealImagesState>((set, get) => ({
   projectId: null,
   images: {},
   loaded: false,
+  failed: false,
   load: async (projectId, opts) => {
-    if (get().projectId !== projectId) set({ projectId, images: {}, loaded: false })
+    if (get().projectId !== projectId) set({ projectId, images: {}, loaded: false, failed: false })
     const turn = ++loadTurn
-    if (opts?.fresh) await invalidateShots(projectId)
-    const rows = await loadShots(projectId)
-    if (turn !== loadTurn || get().projectId !== projectId) return
-    set({ images: Object.fromEntries(rows.map((row) => [row.shot_id, row.storyboard_image ?? null])), loaded: true })
+    try {
+      if (opts?.fresh) await invalidateShots(projectId)
+      const rows = await loadShots(projectId)
+      if (turn !== loadTurn || get().projectId !== projectId) return
+      set({ images: Object.fromEntries(rows.map((row) => [row.shot_id, row.storyboard_image ?? null])), loaded: true, failed: false })
+    } catch (error) {
+      // 읽기 실패는 던지지 않는다(화면 효과가 부르고 기다리지 않는다) — 표시만 하고 다음 읽기에 맡긴다.
+      console.warn('[storyboard] real images read failed:', error instanceof Error ? error.message : error)
+      if (turn === loadTurn && get().projectId === projectId) set({ failed: true })
+    }
   },
 }))

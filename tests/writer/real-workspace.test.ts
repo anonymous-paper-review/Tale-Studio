@@ -15,6 +15,9 @@ vi.mock('@/features/writer/dialogue-view', async () => {
   return { DialogueView: () => h('div', null, 'DIALOGUE') }
 })
 vi.mock('@/features/storyboard/storyboard-header', () => ({ STORYBOARD_TABS: ['storyboard', 'dialogue'] }))
+// 샷을 다 읽은 뒤의 화면만 본다 — 읽는 동안의 기다림 카드는 tests/writer/storyboard-open-wait 가 본다.
+vi.mock('@/hooks/use-stage-wait', () => ({ useStoryboardWait: () => false }))
+vi.mock('@/components/feedback/stage-wait', () => ({ StageWaitCard: () => null }))
 
 import { StoryboardWorkspace } from '@/features/storyboard/storyboard-workspace'
 

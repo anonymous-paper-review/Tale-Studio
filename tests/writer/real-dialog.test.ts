@@ -1,4 +1,4 @@
-// Storyboard 샷 상세(카드를 누르면 열림)가 큰 그림 · 샷 글 · 대사와 "바꾸고 싶은 점" → [채팅으로 고치기]를 보이고, 고칠 글을 채팅에 "@샷 N …"으로 보내는지 검사한다
+// Storyboard 샷 상세(카드를 누르면 열림)가 큰 그림 · 샷 글 · 대사와 "바꾸고 싶은 점" → [Lumi 에게 고쳐 달라고 하기]를 보이고, 고칠 글을 Director 상세와 같은 말로 채팅에 보내는지 검사한다
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -16,12 +16,14 @@ const data = vi.hoisted(() => ({
   jobs: [] as unknown[],
   send: vi.fn(async (_text: string) => {}),
   collapse: vi.fn(),
+  chatLoading: false,
 }))
 vi.mock('@/stores/project-store', () => ({ useProjectStore: (select: (s: unknown) => unknown) => select(data.project) }))
 vi.mock('@/stores/writer-store', () => ({ useWriterStore: (select: (s: unknown) => unknown) => select(data.writer) }))
 vi.mock('@/lib/storyboard/real-images-store', () => ({ useStoryboardRealImages: (select: (s: unknown) => unknown) => select(data.images) }))
 vi.mock('@/lib/generation-queue', async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), useActiveGenerationJobs: () => data.jobs }))
-vi.mock('@/stores/global-chat-store', () => ({ useGlobalChatStore: Object.assign(() => null, { getState: () => ({ sendMessage: data.send }) }) }))
+vi.mock('@/stores/global-chat-store', () => ({ useGlobalChatStore: Object.assign(() => null, { getState: () => ({ sendMessage: data.send, loading: data.chatLoading }) }) }))
+vi.mock('@/stores/locale-store', () => ({ useLocaleStore: Object.assign((select: (s: unknown) => unknown) => select({ locale: 'ko' }), { getState: () => ({ locale: 'ko' }) }) }))
 vi.mock('@/stores/chat-ui-store', () => ({ useChatUiStore: Object.assign(() => null, { getState: () => ({ setCollapsed: data.collapse }) }) }))
 vi.mock('@/components/lumi/lumi', () => ({ Lumi: () => null }))
 vi.mock('@/lib/i18n', async () => {
@@ -59,6 +61,7 @@ beforeEach(() => {
   data.jobs = []
   data.send.mockClear()
   data.collapse.mockClear()
+  data.chatLoading = false
 })
 
 describe('Storyboard 샷 상세', () => {
@@ -79,12 +82,12 @@ describe('Storyboard 샷 상세', () => {
     expect(html).toContain('>콘티<')
   })
 
-  // 왜(오너 O7 "고칠 글을 채팅에 보내면"): 상세에서 바꾸고 싶은 점을 적어 채팅으로 보낸다 — 빈 글은 보낼 것이 없다.
-  it('상세에는 "바꾸고 싶은 점" 칸과 [채팅으로 고치기]가 있고, 칸이 비면 단추가 꺼져 있다', () => {
+  // 왜(오너 O7 "고칠 글을 채팅에 보내면" · O5 Director 상세와 같은 단추): 상세에서 바꾸고 싶은 점을 적어 Lumi 에게 보낸다 — 빈 글은 보낼 것이 없다.
+  it('상세에는 "바꾸고 싶은 점" 칸과 [Lumi 에게 고쳐 달라고 하기]가 있고, 칸이 비면 단추가 꺼져 있다', () => {
     const html = dialog('b')
     expect(html).toContain('바꾸고 싶은 점')
     expect(html).toMatch(/<button[^>]*disabled=""[^>]*data-testid="storyboard-fix-in-chat"|<button[^>]*data-testid="storyboard-fix-in-chat"[^>]*disabled=""/)
-    expect(html).toContain('채팅으로 고치기')
+    expect(html).toContain('Lumi 에게 고쳐 달라고 하기')
   })
 
   // 왜(혼자 정한 것 h): 같은 샷 두 번 맡기기는 서버가 거절하고 바꿀 점이 버려진다 — 그리는 동안은 고치기를 끄고 까닭을 보인다.
@@ -106,18 +109,25 @@ describe('Storyboard 샷 상세', () => {
   })
 })
 
-describe('채팅으로 고치기', () => {
-  // 왜(오너 O7): 채팅이 어느 샷인지 알게 보드 이름 멘션("@샷 2")을 앞에 붙여 보낸다 — 채팅 @ 고르기와 같은 이름.
-  it('[채팅으로 고치기]를 누르면 채팅을 펴고 "@샷 N 바꿀 점"을 보낸다', async () => {
-    expect(fixInChatText('샷 2', '  표정을 더 슬프게 ')).toBe('@샷 2 표정을 더 슬프게')
-    await sendFixToChat('샷 2', '표정을 더 슬프게')
+describe('Lumi 에게 고쳐 달라고 하기', () => {
+  // 왜(오너 O7 · O5): Director 상세와 같은 말로 보낸다 — 채팅이 어느 샷인지 알게 보드 이름 멘션("@샷 2")을 앞에 붙인다(채팅 @ 고르기와 같은 이름).
+  it('[Lumi 에게 고쳐 달라고 하기]를 누르면 채팅을 펴고 "@샷 N 이미지를 고쳐서 다시 만들어 줘: 바꿀 점"을 보낸다', () => {
+    expect(fixInChatText('ko', '샷 2', '  표정을 더 슬프게 ')).toBe('@샷 2 이미지를 고쳐서 다시 만들어 줘: 표정을 더 슬프게')
+    expect(sendFixToChat('샷 2', '표정을 더 슬프게')).toBe('sent')
     expect(data.collapse).toHaveBeenCalledWith(false)
-    expect(data.send).toHaveBeenCalledWith('@샷 2 표정을 더 슬프게')
+    expect(data.send).toHaveBeenCalledWith('@샷 2 이미지를 고쳐서 다시 만들어 줘: 표정을 더 슬프게')
   })
 
   // 왜: 빈 글을 보내면 채팅이 무엇을 고칠지 모른다.
-  it('바꿀 점이 비어 있으면 채팅에 보내지 않는다', async () => {
-    await sendFixToChat('샷 2', '   ')
+  it('바꿀 점이 비어 있으면 채팅에 보내지 않는다', () => {
+    expect(sendFixToChat('샷 2', '   ')).toBe('empty')
+    expect(data.send).not.toHaveBeenCalled()
+  })
+
+  // 왜(Director 상세와 같은 규칙): 채팅이 다른 말을 처리하는 중이면 보낸 말이 조용히 버려진다 — 보내지 않고 까닭을 보인다.
+  it('채팅이 다른 말을 처리하는 중이면 보내지 않고 바쁘다고 돌려준다', () => {
+    data.chatLoading = true
+    expect(sendFixToChat('샷 2', '표정을 더 슬프게')).toBe('busy')
     expect(data.send).not.toHaveBeenCalled()
   })
 })

@@ -3701,6 +3701,11 @@ export const KO: Record<string, string> = {
   'Move over and pick yourself': '넘어가서 직접 고르기',
   'Choose the shots to make and make them one by one.': '만들 샷을 골라 하나씩 만들어요.',
   'Move over': '넘어가기',
+  // 넘기기 창 다음 줄 — 실사는 Storyboard [시작]이 만든다(오너 2026-11-26 m1126 S2), 남은 것은 Director 에서도.
+  'Real images · counting': '실사 그림 · 세는 중',
+  '1 shot still needs a real image · you can make it in Director too': '실사 그림이 없는 샷 1개 · Director에서도 만들 수 있어요',
+  '{count} shots still need a real image · you can make them in Director too': '실사 그림이 없는 샷 {count}개 · Director에서도 만들 수 있어요',
+  'Up to {count} shots still need a real image · you can make them in Director too': '실사 그림이 없는 샷 최대 {count}개 · Director에서도 만들 수 있어요',
   // Storyboard 실사 보기(오너 2026-11-26 m1126 S2 · O7) — 처음엔 Writer 콘티 그림, [시작] → 실사. 카드 꼬리표 · 콘티 그림 없음 안내.
   'Rough sketch': '콘티',
   'No rough storyboard yet': '콘티 그림이 없어요',
@@ -3711,7 +3716,6 @@ export const KO: Record<string, string> = {
   '{shots} and {count} more have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots} 외 {count}컷은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
   'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
   // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
-  'Fix in chat': '채팅으로 고치기',
   'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
   'Fix the story, arrows, and dialogue in Writer.': '이야기 · 화살표 · 대사는 Writer 콘티에서 고쳐요.',
   // 채팅이 실사를 다시 그리라고 했는데 맡기지 못했을 때(채팅 한 줄).

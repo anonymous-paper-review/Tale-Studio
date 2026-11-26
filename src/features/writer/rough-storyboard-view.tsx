@@ -1119,9 +1119,9 @@ export function RoughStoryboardView() {
           setDirectorConfirmOpen(false)
           void drawShots(remainingIds)
         }}
-        onConfirm={(choice) => {
+        onConfirm={() => {
           setDirectorConfirmOpen(false)
-          void handOverToDirector({ makeImages: choice === 'makeImages' })
+          void handOverToDirector()
         }}
       />
     </>

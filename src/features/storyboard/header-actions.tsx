@@ -14,7 +14,6 @@ import { useActiveGenerationJobs } from '@/lib/generation-queue'
 import { useLocale, useT } from '@/lib/i18n'
 import { noContiNotice, realDrawingShotIds, storyboardStartView } from '@/lib/storyboard/real-board'
 import { useStoryboardRealImages } from '@/lib/storyboard/real-images-store'
-import { startStoryboardReal, stopStoryboardReal } from '@/lib/storyboard/start-real'
 import { boardShots } from '@/lib/writer/board-summary'
 import { useDirectorCanvasStore } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -49,11 +48,17 @@ export function StoryboardHeaderActions() {
   })
   const noByShot = new Map(board.map((entry) => [entry.shot.shotId, entry.shotNo]))
   const nameOf = (shotId: string) => shotName(locale, noByShot.get(shotId) ?? shotId)
+  // 일괄 러너는 누를 때 불러온다 — 머리(대사 탭 · 콘티와 같이 쓰는 WriterHeader 가 부른다)를 그리는 것만으로 러너 · Director 알림 상점을 끌어오지 않게.
   const start = () => {
     if (!projectId) return
     const notice = noContiNotice(locale, view.noConti.map(nameOf))
     if (notice) toast.info(notice)
-    void startStoryboardReal(projectId, view.targets)
+    const targets = view.targets
+    void import('@/lib/storyboard/start-real').then(({ startStoryboardReal }) => startStoryboardReal(projectId, targets))
+  }
+  const stop = () => {
+    if (!projectId) return
+    void import('@/lib/storyboard/start-real').then(({ stopStoryboardReal }) => stopStoryboardReal(projectId))
   }
 
   return (
@@ -72,9 +77,7 @@ export function StoryboardHeaderActions() {
         <Button
           variant="secondary"
           disabled={view.mode === 'stopping' || !projectId}
-          onClick={() => {
-            if (projectId) void stopStoryboardReal(projectId)
-          }}
+          onClick={stop}
           data-testid="storyboard-stop"
         >
           <Square className="size-3.5" aria-hidden />

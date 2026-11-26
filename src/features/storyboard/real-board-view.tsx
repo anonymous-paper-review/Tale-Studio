@@ -58,6 +58,8 @@ export function RealBoardView() {
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
   const images = useStoryboardRealImages((s) => (s.projectId === projectId ? s.images : NO_IMAGES))
+  const imagesLoaded = useStoryboardRealImages((s) => s.projectId === projectId && s.loaded)
+  const imagesFailed = useStoryboardRealImages((s) => s.projectId === projectId && s.failed)
   const activeJobs = useActiveGenerationJobs(projectId)
   const batch = useDirectorCanvasStore(
     useShallow((s) => ({ busy: s.realBatchBusy, cancelled: s.realBatchCancelled, shotIds: s.realBatchShotIds })),
@@ -200,7 +202,12 @@ export function RealBoardView() {
     ...directorConfirmView(directorSummary, locale, {
       characters: artistCharacters,
       backgrounds: artistBackgrounds,
-      imagesToMake: directorSummary.movingShotIds.filter((id) => !realPanelOf(images[id])).length,
+      // 실사 그림을 아직 읽는 중이면 "세는 중", 읽지 못했으면 많아야 몇 개인지만(검토 b 낮음 7과 같은 규칙).
+      imagesToMake: imagesFailed
+        ? { atMost: directorSummary.movingShotIds.length }
+        : !imagesLoaded
+          ? 'counting'
+          : directorSummary.movingShotIds.filter((id) => !realPanelOf(images[id])).length,
       takesPerShot: takeValuesShown(takeBalance) ? takeCostForVideo(DEFAULT_VIDEO_MODEL, '720p') : null,
     }),
     canDrawRemaining: false,
@@ -220,9 +227,9 @@ export function RealBoardView() {
         view={directorView}
         onClose={() => setDirectorConfirmOpen(false)}
         onDrawRemaining={() => setDirectorConfirmOpen(false)}
-        onConfirm={(choice) => {
+        onConfirm={() => {
           setDirectorConfirmOpen(false)
-          void handOverToDirector({ makeImages: choice === 'makeImages' })
+          void handOverToDirector()
         }}
       />
     </>
