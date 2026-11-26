@@ -3166,6 +3166,8 @@ export const KO: Record<string, string> = {
   // 실사 · 영상 지시문에 싣기(R1 · Q4)는 m-director 몫이라 그 전까지 중립 문장(리드 2026-11-26) — 들어오면 dev 문장으로 바꾼다.
   'You can edit the line. The end frame is drawn from it, and videos use it even if you choose Keep as is.': '줄을 고칠 수 있어요. 끝 장은 이 줄대로 그리고, [그대로]를 골라도 영상에는 이 줄이 들어가요.',
   'Videos use this line. To match, redraw the end frame with it, then the live-action images.': '영상에는 이 줄이 들어가요. 끝 장을 이 줄로 다시 그린 뒤 실사도 다시 그려야 맞아요.',
+  // 실사 가운데 장 화살표 고치기(오너 2026-11-27 N4b) — 저장하면 끝 장을 저절로 다시 그린다.
+  'The end frame is not drawn from this line yet. Videos use this line.': '끝 장은 아직 이 줄로 그리지 않았어요. 영상에는 이 줄이 들어가요.',
   'Kept your line. The end frame stays as it is.': '고친 줄을 남겼어요. 끝 장은 그대로예요.',
   'Could not translate your line, so it was not kept. The previous line stays. Try again.': '고친 줄을 영어로 옮기지 못해 남기지 못했어요. 전에 있던 줄은 그대로예요. 다시 시도해 주세요.',
   'The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.': '그사이 연출 장이 바뀌어 고친 줄을 남기지 않았어요. 연출 탭을 다시 열어 주세요.',
@@ -3752,7 +3754,7 @@ export const KO: Record<string, string> = {
   'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
   // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
   'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
-  'Fix the story, arrows, and dialogue in Writer.': '이야기 · 화살표 · 대사는 Writer 콘티에서 고쳐요.',
+  'Fix the story and dialogue in Writer.': '이야기 · 대사는 Writer 콘티에서 고쳐요.',
   // 채팅이 실사를 다시 그리라고 했는데 맡기지 못했을 때(채팅 한 줄).
   "Couldn't find the shot to draw. Ask again with the shot name.": '그릴 샷을 찾지 못했어요. 샷 이름으로 다시 부탁해 주세요.',
   '{shot} is being drawn right now. Ask again when it is done.': '{shot}은(는) 지금 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',

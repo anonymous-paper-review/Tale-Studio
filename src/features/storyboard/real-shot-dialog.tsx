@@ -180,7 +180,8 @@ function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () =
             {t('Ask Lumi to fix')}
           </Button>
           {busyNotice ? <p className="text-caption text-destructive">{t('Lumi is busy with another request. Try again when it is done.')}</p> : null}
-          <p className="text-caption text-subtle-foreground">{t('Fix the story, arrows, and dialogue in Writer.')}</p>
+          {/* 실사 그림의 화살표는 이 창의 [화살표 고치기]로 고친다(오너 2026-11-27 N4b) — 이야기 · 대사만 Writer 콘티로 안내한다. */}
+          <p className="text-caption text-subtle-foreground">{t('Fix the story and dialogue in Writer.')}</p>
         </div>
       </div>
     </DialogContent>
