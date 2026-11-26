@@ -2653,9 +2653,9 @@ export const KO: Record<string, string> = {
   'Make the dialogue funnier': '대사를 더 웃기게',
   'Go to Artist': 'Artist로 가기',
   // 예전 흐름 프로젝트의 빈 콘티(검토 rev-flow 2026-11-26 3번).
-  'Scenes and shots are split by Make in Artist.': 'Artist [만들기]에서 씬 · 샷을 나눠요',
-  'This project splits the confirmed prose into scenes and shots when you press Make in Artist. The rough storyboard appears here after that.':
-    '이 프로젝트는 Artist 에서 [만들기]를 누르면 확정한 산문을 씬 · 샷으로 나눠요. 그 뒤 여기에 콘티가 보여요.',
+  'Scenes and shots are split in Artist.': 'Artist 에서 씬 · 샷을 나눠요',
+  'In this project, pressing “{button}” in Artist splits the confirmed prose into scenes and shots. The rough storyboard appears here after that.':
+    '이 프로젝트는 Artist 의 [{button}]를 누르면 확정한 산문을 씬 · 샷으로 나눠요. 그 뒤 여기에 콘티가 보여요.',
   'Creating a new project…': '새 프로젝트를 만드는 중…',
   'While AI is working, the screen and chat are locked. You can edit once it finishes.': 'AI가 작업하는 동안은 화면과 채팅이 잠겨요. 끝나면 고칠 수 있어요.',
   'AI is working. You can move once it finishes.': 'AI가 일하는 중이에요. 끝나면 옮겨 갈 수 있어요.',

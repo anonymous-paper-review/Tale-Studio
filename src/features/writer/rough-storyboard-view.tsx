@@ -1161,7 +1161,8 @@ export function RoughStoryboardView({ stage }: { stage?: BoardStage } = {}) {
     // 산문은 확정했는데(저장 단계 conti) 씬 · 샷 나누기가 걸리지 않은 콘티 — 다시 거는 단추를 둔다(O1 2026-11-26).
     //   예전 흐름으로 Artist 까지 간 프로젝트(저장 단계 artist)는 지금처럼 Artist [만들기]로 나눈다.
     const contiSplitPending = boardStage === 'conti' && reachedStage === 'conti' && status?.current_status === 'awaiting_confirmation'
-    // 예전 흐름(콘티가 Artist 앞에 오기 전)으로 Artist 까지 연 프로젝트 — 실행이 산문 초안 그대로라 씬 · 샷은 Artist [만들기]가 나눈다.
+    // 예전 흐름(콘티가 Artist 앞에 오기 전)으로 Artist 까지 연 프로젝트 — 실행이 산문 초안 그대로라 씬 · 샷은 Artist 목록 단추
+    //   [목록이 맞아요 · 그림 만들기](예전 [만들기])가 나눈다. 안내는 그 단추 이름을 그대로 부른다(화면 확인 2026-11-26).
     //   "다음" · [콘티로 가기] · 레일 Writer 가 이 콘티로 데려오므로 할 일과 Artist 로 가는 단추를 보인다(검토 rev-flow 2026-11-26 3번, 혼자 정한 것).
     const splitInArtist = boardStage === 'conti' && stageIndex(reachedStage) >= stageIndex('artist') && status?.draft === true
     return (
@@ -1172,11 +1173,11 @@ export function RoughStoryboardView({ stage }: { stage?: BoardStage } = {}) {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
             <ImageIcon className="size-10 text-subtle-foreground" />
-            <p className="text-body font-semibold text-foreground">{splitInArtist ? t('Scenes and shots are split by Make in Artist.') : contiSplitPending ? t('The prose is confirmed. Start splitting it into scenes and shots.') : waiting ? progress.label : t('No scenes or shots generated yet')}</p>
+            <p className="text-body font-semibold text-foreground">{splitInArtist ? t('Scenes and shots are split in Artist.') : contiSplitPending ? t('The prose is confirmed. Start splitting it into scenes and shots.') : waiting ? progress.label : t('No scenes or shots generated yet')}</p>
             {splitInArtist ? (
               <>
                 <p className="max-w-md text-caption text-muted-foreground">
-                  {t('This project splits the confirmed prose into scenes and shots when you press Make in Artist. The rough storyboard appears here after that.')}
+                  {t('In this project, pressing “{button}” in Artist splits the confirmed prose into scenes and shots. The rough storyboard appears here after that.', { button: t('The list is right · make the images') })}
                 </p>
                 <Button onClick={() => void useGlobalChatStore.getState().requestNextStep()} data-testid="conti-split-in-artist">
                   {t('Go to Artist')}

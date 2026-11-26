@@ -246,11 +246,13 @@ describe('씬 · 샷이 아직 없는 콘티', () => {
 
   // 왜(혼자 정한 것): 예전 흐름(콘티가 Artist 앞에 오기 전)으로 Artist 까지 연 프로젝트는 Artist [만들기]가 씬 · 샷을 나눈다 —
   //   "다음" · [콘티로 가기] · 레일 Writer 가 데려온 빈 콘티가 "씬 확인을 기다리는 중"만 보여 무엇을 해야 할지 몰랐다(검토 rev-flow 3번).
-  //   이 프로젝트들은 지금처럼 콘티로 오고, 콘티가 할 일과 가는 단추를 보인다.
-  it('예전 흐름으로 Artist 까지 연 프로젝트의 콘티는 씬 · 샷이 없으면 "Artist [만들기]에서 씬 · 샷을 나눠요"와 [Artist로 가기]를 보인다', () => {
+  //   이 프로젝트들은 지금처럼 콘티로 오고, 콘티가 할 일과 가는 단추를 보인다. 단추 이름은 Artist 화면에 실제로 보이는 이름이다.
+  it('예전 흐름으로 Artist 까지 연 프로젝트의 콘티는 씬 · 샷이 없으면 "Artist 에서 씬 · 샷을 나눠요"와 그 단추 이름 · [Artist로 가기]를 보인다', () => {
     requestNextStep.mockClear()
     const tree = emptyConti('artist')
-    expect(tree.map(textOf).join(' ')).toContain('Artist [만들기]에서 씬 · 샷을 나눠요')
+    const text = tree.map(textOf).join(' ')
+    expect(text).toContain('Artist 에서 씬 · 샷을 나눠요')
+    expect(text).toContain('[목록이 맞아요 · 그림 만들기]')
     const go = button(tree, 'Artist로 가기')
     expect(go, 'Artist로 가기').toBeTruthy()
     ;(go!.props.onClick as () => void)()
@@ -261,6 +263,6 @@ describe('씬 · 샷이 아직 없는 콘티', () => {
   it('산문만 확정하고 나누기가 걸리지 않은 콘티는 지금처럼 [씬 · 샷 나누기 시작]을 보이고 Artist 안내는 보이지 않는다', () => {
     const tree = emptyConti('conti')
     expect(tree.some((node) => typeof node.type === 'function' && node.type.name === 'ContiSplitStart')).toBe(true)
-    expect(tree.map(textOf).join(' ')).not.toContain('Artist [만들기]에서 씬 · 샷을 나눠요')
+    expect(tree.map(textOf).join(' ')).not.toContain('Artist 에서 씬 · 샷을 나눠요')
   })
 })
