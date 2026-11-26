@@ -68,7 +68,8 @@ describe('받아 둔 미리 보기 다시 쓰기', () => {
     const out = screen()
 
     expect(readyPreview('p1', 'en')).toBeNull()
-    expect(out).toContain('data-testid="prose-loading"')
+    // 읽는 중 표시는 산문 판 안 작은 줄이 아니라 Writer 기다리는 카드다(오너 2026-11-26 m1126 G1 — tests/writer/prose-open-wait.test.ts).
+    expect(out).toContain('data-stage-wait="producer"')
     expect(out).not.toContain(P1)
   })
 

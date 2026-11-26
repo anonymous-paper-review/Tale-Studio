@@ -3,9 +3,11 @@
 // 샷 상세의 이미지 탭(디자이너 11/13 시안 D6, 오너 2026-11-14 답 5번) — 시작 · 끝 그림을 나란히, 설정은 한 화면
 //   (바꾸고 싶은 점 · 프롬프트 · 이미지 모델 · 비율 · 해상도 · 개수 · 참고 이미지 · 등장인물 · 장소). "고치기 / 설정" 탭은 없다.
 //   1단계 다시 만들기는 지금처럼 시작 · 끝 함께 — 고르기 표시는 둘 다 고른 채 잠가 둔다. 모델 칸은 실제로 도는 것만.
-//   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts
+//   지난 판 줄(오너 2026-11-26 D2)에서 연 상세는 그 지난 판을 먼저 보이고 [채택]을 단다 — 채택하면 그 판이 지금 그림이 된다(Take 0).
+//   버전 칩은 지금처럼 누르면 바로 그 판으로 돌아간다(11/14 답 5).
+//   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts · version-history.test.ts
 import { useMemo, useState } from 'react'
-import { ChevronLeft, ChevronRight, Trash2, Upload, X } from 'lucide-react'
+import { Check, ChevronLeft, ChevronRight, Trash2, Upload, X } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ThumbImage } from '@/components/thumb-image'
@@ -23,6 +25,7 @@ import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store
 import { aspectRatioFromFormat } from '@/types/project'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
+import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { LockedFrame } from './locked-frame'
 
 // 버전 줄 넘기기 단추(‹ ›) — 시안에 없어(시안 없음) 칩과 같은 높이(24) · 테두리의 동그란 단추로 둔다. 꺼지면 40%(디자이너 R).
@@ -47,18 +50,36 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   const characters = useMemo(() => Object.values(characterRecords).filter((c) => c.projectId === projectId), [characterRecords, projectId])
   const worlds = useMemo(() => Object.values(worldRecords).filter((w) => w.projectId === projectId), [worldRecords, projectId])
   const selectStoryboardImageVersion = useDirectorCanvasStore((s) => s.selectStoryboardImageVersion)
+  const setDetailVersion = useDirectorCanvasStore((s) => s.setDetailVersion)
+  // 지난 판 줄에서 연 판(오너 2026-11-26 D2) — 이 샷의 상세를 그 판으로 열었을 때만.
+  const viewingId = useDirectorCanvasStore((s) => (s.detailNodeId === nodeId ? s.detailVersionId : null))
   const [change, setChange] = useState('')
+  const [adoptError, setAdoptError] = useState<string | null>(null)
   const frames = shotDetailFrames(data.storyboardImage)
   const versions = storyboardImageVersions(data.storyboardImage)
   const current = currentStoryboardVersion(data.storyboardImage)
+  const currentId = current?.id ?? null
+  // 보고 있는 지난 판 — 지금 그림인 판이면 없다(채택하면 지금 그림이 되어 저절로 사라진다).
+  const viewing = viewingId && viewingId !== currentId ? versions.find((version) => version.id === viewingId) ?? null : null
   // 버전 줄은 한 번에 5개(오너 11/14 답 5) — 보이는 5개는 맨 오른쪽 버전으로 기억해, 멈춘 뒤 끝난 그림이 뒤에 붙어도 밀리지 않는다(리드 검토 11/14).
   //   처음 열 때와 지금 그림이 바뀔 때만 지금 그림이 든 칸으로 다시 잡고, 다시 잡은 창도 바로 기억한다(그 뒤 붙는 버전에도 밀리지 않게).
-  const currentId = current?.id ?? null
-  const [savedVersionWindow, setSavedVersionWindow] = useState(() => versionRowWindow(versions, currentId, null))
-  const versionWindow = versionRowWindow(versions, currentId, savedVersionWindow)
+  //   지난 판을 보는 동안은 그 판이 든 칸으로 잡는다 — 보는 판이 줄 밖에 있으면 어느 판인지 놓친다(D2).
+  const rowAnchor = viewing?.id ?? currentId
+  const [savedVersionWindow, setSavedVersionWindow] = useState(() => versionRowWindow(versions, rowAnchor, null))
+  const versionWindow = versionRowWindow(versions, rowAnchor, savedVersionWindow)
   if (versionWindow !== savedVersionWindow) setSavedVersionWindow(versionWindow)
   const versionRow = versionRowView(versions, versionWindow.endId)
-  const moveVersions = (step: 1 | -1) => setSavedVersionWindow({ anchor: currentId, endId: versionRowStep(versions, versionRow.endId, step) })
+  const moveVersions = (step: 1 | -1) => setSavedVersionWindow({ anchor: rowAnchor, endId: versionRowStep(versions, versionRow.endId, step) })
+  // 보이는 시작 · 끝 그림 — 지난 판을 보는 동안은 그 판의 것.
+  const shownFrames = viewing ? { start: viewing.frames?.start ?? viewing.url, end: viewing.frames?.end ?? null } : frames
+  // [채택](D2) — 그 판이 지금 그림이 된다. 다시 만들지 않는다(Take 0, 버전 칩과 같은 길). 못 바꾸면 보던 판에 남아 까닭을 보인다.
+  const adopt = async () => {
+    if (!viewing) return
+    setAdoptError(null)
+    setSavedVersionWindow({ anchor: viewing.id, endId: versionRow.endId })
+    if (await selectStoryboardImageVersion(nodeId, viewing.id)) setDetailVersion(null)
+    else setAdoptError(t('Could not adopt this version. Please try again.'))
+  }
   const hasImage = !!frames.start
   const frameStyle = mediaFrameStyle(projectFormat, layout === 'popup' ? 360 : 200)
   // 실제로 도는 모델을 골라진 칸으로(리드 검토 c ④) — Writer 샷에 시트를 못 그리는 옛 모델이 저장돼 있으면 GPT Image 2.
@@ -80,7 +101,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   const framesBlock = (
     <div className="space-y-2" data-testid="shot-detail-frames">
       <div className="grid grid-cols-2 gap-3">
-        {(['start', 'end'] as const).map((which) => <LockedFrame key={which} which={which} url={frames[which]} style={frameStyle} />)}
+        {(['start', 'end'] as const).map((which) => <LockedFrame key={which} which={which} url={shownFrames[which]} style={frameStyle} />)}
       </div>
       {/* 버전 줄(D6) — 1단계는 시작 · 끝이 함께라 줄은 하나. 버전은 지우지 않고 한 번에 5개만 보이며, 5개를 넘으면 맨 앞 ‹ · 맨 뒤 › 로
           이전 · 다음 5개를 넘겨 본다(오너 11/14 답 5 · 끝 쪽에서는 그쪽 단추가 꺼짐). 고르기는 Take 0 이고 줄은 보던 쪽 그대로. */}
@@ -93,15 +114,21 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
           ) : null}
           {versionRow.shown.map((version) => {
             const active = version.id === current?.id
+            // 지난 판 줄에서 열어 보고 있는 판(D2) — 지금 그림과 다른 점선 테두리.
+            const isViewing = version.id === viewing?.id
             return (
               <button key={version.id} type="button" aria-pressed={active}
                 title={version.source === 'upload' ? t('Uploaded image') : version.cancelled ? t('Finished after it was stopped') : undefined}
+                data-viewing={isViewing ? 'true' : undefined}
                 onClick={() => {
-                  if (active) return
+                  // 지금 그림 칩은 보던 지난 판을 닫고 지금 그림으로 돌아간다.
+                  setAdoptError(null)
+                  if (active) { setDetailVersion(null); return }
                   setSavedVersionWindow({ anchor: version.id, endId: versionRow.endId })
+                  setDetailVersion(null)
                   void selectStoryboardImageVersion(nodeId, version.id)
                 }}
-                className={cn('shrink-0 rounded-full border px-2.5 py-0.5 font-num text-caption transition-colors', active ? 'border-info bg-info/15 text-foreground' : 'border-border text-muted-foreground hover:bg-accent')}>
+                className={cn('shrink-0 rounded-full border px-2.5 py-0.5 font-num text-caption transition-colors', active ? 'border-info bg-info/15 text-foreground' : isViewing ? 'border-dashed border-foreground/60 text-foreground' : 'border-border text-muted-foreground hover:bg-accent')}>
                 {`v${version.n}`}
               </button>
             )
@@ -113,6 +140,12 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
           ) : null}
         </div>
       ) : null}
+      {/* 보고 있는 지난 판(D2, 시안 없음) — [채택]이 그 판을 지금 그림으로, [지금 그림 보기]가 채택하지 않고 돌아간다. */}
+      {viewing ? (
+        <ViewingBar data={data} viewingN={viewing.n} currentN={current?.n ?? null} onAdopt={() => void adopt()}
+          onBack={() => { setAdoptError(null); setDetailVersion(null) }} />
+      ) : null}
+      {adoptError ? <p className="text-caption text-destructive">{adoptError}</p> : null}
       <p className="text-caption text-subtle-foreground">
         {t('Start and end images are remade together for now.')}
         {versions.length > 1 ? ` ${t('Click v1 or v2 to go back to that version.')}` : null}
@@ -191,6 +224,34 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
       {imageUploadConsentDialog}
       {framesBlock}
       {settings}
+    </div>
+  )
+}
+
+/** 보고 있는 지난 판 줄(D2) — 다시 만드는 중에는 [채택]을 끈다: 끝난 새 그림이 그 채택을 덮는다(끝난 뒤에 채택한다).
+ *  만드는 중 판정(서버 작업 목록)은 이 줄만 읽는다 — 지난 판을 볼 때만 그린다. */
+function ViewingBar({ data, viewingN, currentN, onAdopt, onBack }: {
+  data: ShotNodeData
+  viewingN: number
+  currentN: number | null
+  onAdopt: () => void
+  onBack: () => void
+}) {
+  const t = useT()
+  const generation = useStoryboardImageGeneration(data)
+  const busy = generation.generating || data.storyboardImage?.status === 'pending'
+  return (
+    // 보는 판 칩과 같은 점선 테두리(시안 없음) — 메인(크림) 단추는 화면에 하나라 [채택]은 테두리 단추.
+    <div className="flex flex-wrap items-center gap-2 rounded-[10px] border border-dashed border-foreground/40 px-3 py-2" data-testid="shot-detail-viewing">
+      <p className="min-w-0 flex-1 text-caption text-foreground">
+        {currentN !== null ? t('Viewing v{n} · Current v{current}', { n: viewingN, current: currentN }) : t('Viewing v{n}', { n: viewingN })}
+      </p>
+      <Button type="button" size="sm" variant="outline" disabled={busy}
+        title={busy ? t('You can adopt it after the image is remade.') : undefined}
+        onClick={onAdopt} data-testid="shot-detail-adopt">
+        <Check className="size-3.5" aria-hidden />{t('Adopt')}
+      </Button>
+      <Button type="button" size="sm" variant="ghost" onClick={onBack}>{t('Back to current')}</Button>
     </div>
   )
 }

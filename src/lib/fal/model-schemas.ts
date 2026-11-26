@@ -8,6 +8,8 @@ const FAL_VIDEO_MODEL_ENDPOINTS: Record<VideoModelKey, string> = {
   'seedance-2.5': 'bytedance/seedance-2.5/us/reference-to-video',
   'kling-o3': 'fal-ai/kling-video/o3/pro/reference-to-video',
   veo: 'fal-ai/veo3.1/reference-to-video',
+  'h3-max': 'minimax/h3-max/reference-to-video',
+  'h3-max-turbo': 'minimax/h3-max-turbo/reference-to-video',
 }
 
 const fieldSet = (fields: readonly string[]): Set<string> => new Set(fields)
@@ -79,6 +81,45 @@ const VEO31_REFERENCE_TO_VIDEO_FIELDS = [
   'auto_fix',
   'safety_tolerance',
   'image_urls',
+] as const
+
+// minimax/h3-max/reference-to-video schema (fal OpenAPI 2026-11-26). prompt_expansion_mode is required; no negative_prompt / audio toggle.
+//   First · middle · last frame inputs exist only on H3 Max (not Turbo).
+const H3_MAX_REFERENCE_TO_VIDEO_FIELDS = [
+  'prompt',
+  'reference_image_urls',
+  'reference_video_urls',
+  'reference_audio_urls',
+  'image_url',
+  'middle_image_url',
+  'middle_frame_time',
+  'end_image_url',
+  'target_audio_url',
+  'duration',
+  'resolution',
+  'seed',
+  'enable_safety_checker',
+  'sync_mode',
+  'prompt_expansion_mode',
+  'aspect_ratio',
+  'reference_conditions',
+] as const
+
+// minimax/h3-max-turbo/reference-to-video schema (fal OpenAPI 2026-11-26) — references only, no frame inputs.
+const H3_MAX_TURBO_REFERENCE_TO_VIDEO_FIELDS = [
+  'prompt',
+  'reference_image_urls',
+  'reference_video_urls',
+  'reference_audio_urls',
+  'target_audio_url',
+  'duration',
+  'resolution',
+  'seed',
+  'enable_safety_checker',
+  'sync_mode',
+  'prompt_expansion_mode',
+  'aspect_ratio',
+  'reference_conditions',
 ] as const
 
 // fal-ai/kling-video/v2.1/master/text-to-video schema used by Director's no-reference fallback.
@@ -215,6 +256,28 @@ const NANO_BANANA_2_EDIT_FIELDS = [
   'thinking_level',
 ] as const
 
+// minimax/h3-image/text-to-image schema (fal OpenAPI 2026-11-26). image_size = {width,height} or preset; no aspect_ratio/negative_prompt/seed.
+const H3_IMAGE_T2I_FIELDS = [
+  'prompt',
+  'image_size',
+  'num_images',
+  'loras',
+  'enable_prompt_expansion',
+  'output_format',
+  'sync_mode',
+] as const
+
+// minimax/h3-image/edit schema (fal OpenAPI 2026-11-26). image_urls up to 16; image_size 'auto' keeps the first image's ratio.
+const H3_IMAGE_EDIT_FIELDS = [
+  'prompt',
+  'image_urls',
+  'image_size',
+  'num_images',
+  'loras',
+  'output_format',
+  'sync_mode',
+] as const
+
 // fal-ai/bytedance/seedream/v4/text-to-image schema. Uses image_size (min 960², max 4096²).
 const SEEDREAM_V4_T2I_FIELDS = [
   'prompt',
@@ -256,6 +319,12 @@ export const FAL_INPUT_ALLOWLIST: Record<string, Set<string>> = {
   veo: fieldSet(VEO31_REFERENCE_TO_VIDEO_FIELDS),
   [FAL_VIDEO_MODEL_ENDPOINTS.veo]: fieldSet(VEO31_REFERENCE_TO_VIDEO_FIELDS),
 
+  'h3-max': fieldSet(H3_MAX_REFERENCE_TO_VIDEO_FIELDS),
+  [FAL_VIDEO_MODEL_ENDPOINTS['h3-max']]: fieldSet(H3_MAX_REFERENCE_TO_VIDEO_FIELDS),
+
+  'h3-max-turbo': fieldSet(H3_MAX_TURBO_REFERENCE_TO_VIDEO_FIELDS),
+  [FAL_VIDEO_MODEL_ENDPOINTS['h3-max-turbo']]: fieldSet(H3_MAX_TURBO_REFERENCE_TO_VIDEO_FIELDS),
+
   'fal-ai/kling-video/v2.1/master/text-to-video': fieldSet(KLING_V21_MASTER_TEXT_TO_VIDEO_FIELDS),
   'fal-ai/kling-video/v2.1/master/image-to-video': fieldSet(KLING_V21_MASTER_IMAGE_TO_VIDEO_FIELDS),
 
@@ -271,6 +340,8 @@ export const FAL_INPUT_ALLOWLIST: Record<string, Set<string>> = {
   'fal-ai/nano-banana-2/edit': fieldSet(NANO_BANANA_2_EDIT_FIELDS),
   'fal-ai/bytedance/seedream/v4/text-to-image': fieldSet(SEEDREAM_V4_T2I_FIELDS),
   'fal-ai/bytedance/seedream/v4/edit': fieldSet(SEEDREAM_V4_EDIT_FIELDS),
+  'minimax/h3-image/text-to-image': fieldSet(H3_IMAGE_T2I_FIELDS),
+  'minimax/h3-image/edit': fieldSet(H3_IMAGE_EDIT_FIELDS),
 }
 
 export function getAllowedFields(modelKey: string | null | undefined): Set<string> | undefined {

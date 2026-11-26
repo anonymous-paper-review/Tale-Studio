@@ -1185,6 +1185,7 @@ export const KO: Record<string, string> = {
   'Google Gemini 3.1 · strong character consistency, up to 14 references':
     'Google Gemini 3.1 · 캐릭터 일관성이 강함, 참조 최대 14장',
   'Google Gemini 2.5 · previous generation': 'Google Gemini 2.5 · 이전 세대',
+  'MiniMax · exact sizes, up to 16 references': 'MiniMax · 정확한 크기, 참조 최대 16장',
   // #ref-gate: 생성 선행조건(인물 시트·러프·실사 스토리보드) 대기·자동 재개 안내
   'character sheets for {names}': '{names}의 인물 시트', // copy-ok: fragment
   'the rough storyboard of {shot}': '{shot}의 러프 스토리보드', // copy-ok: fragment
@@ -1992,6 +1993,13 @@ export const KO: Record<string, string> = {
   'Click to cancel': '클릭하면 취소돼요',
   'Preparing clips…': '클립 준비 중…',
   'Preparing clips… {percent}%': '클립 준비 중… {percent}%',
+  // 단계 화면을 여는 동안 기다리는 카드 제목(m1126 G1, lib/stage-wait STAGE_WAIT_TITLE) — Editor 는 위 'Preparing clips…' 그대로.
+  'Loading the start screen…': '시작 화면을 불러오는 중…',
+  'Loading the prose…': '산문을 불러오는 중…',
+  'Loading the rough storyboard…': '콘티를 불러오는 중…',
+  'Loading characters and backgrounds…': '인물 · 배경을 불러오는 중…',
+  'Loading the storyboard…': '스토리보드를 불러오는 중…',
+  'Loading shots…': '샷을 불러오는 중…',
   'Rendering… {percent}%': '렌더링 중… {percent}%',
   'Draft render records in real time. Keep this tab visible until it finishes.':
     '드래프트 렌더는 실시간으로 녹화돼요. 끝날 때까지 이 탭을 화면에 켜 둬 주세요.',
@@ -3007,6 +3015,17 @@ export const KO: Record<string, string> = {
   'Tidy': '깔끔한',
   'History · load an earlier image': '기록 · 이전 그림 불러오기',
   'Load': '불러오기',
+  // 지난 판 줄 · 채택(오너 2026-11-26 A4 · S3 · D2) — 카드 아래 작은 카드, 상세의 [채택].
+  'Earlier versions': '지난 판',
+  'Open {label} in details': '{label} 상세 열기',
+  'See all {count} more versions in details': '상세에서 나머지 {count}개 판 보기',
+  'Adopt': '채택',
+  '☆ Adopt': '☆ 채택',
+  'Viewing v{n} · Current v{current}': '보는 판 v{n} · 지금 그림 v{current}',
+  'Viewing v{n}': '보는 판 v{n}',
+  'Back to current': '지금 그림 보기',
+  'You can adopt it after the image is remade.': '그림을 다시 만든 뒤에 채택할 수 있어요.',
+  'Could not adopt this version. Please try again.': '이 판을 채택하지 못했어요. 다시 해 주세요.',
   'View only': '보기만 가능',
   'Changed · remake to apply': '바뀜 · 다시 만들어야 반영',
   'After you apply it, you can remake the image on the left.': '적용하면 왼쪽에서 다시 만들 수 있어요.',

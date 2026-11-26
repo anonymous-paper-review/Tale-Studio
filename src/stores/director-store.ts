@@ -1164,6 +1164,9 @@ interface DirectorCanvasState {
    *  다시 붙지 않고 탭만 고른 탭으로 맞춘다 — 이미 열린 상세를 안에서 다른 탭으로 바꿔 두었어도 [바꾸기] · ⤢ 가 고른 탭으로 열고,
    *  탭이 그대로면 상세 안에서 적던 글도 남는다(리드 11/14, 검토 a). */
   detailOpenSeq: number
+  /** 지난 판 줄(오너 2026-11-26 D2)에서 연 상세가 먼저 보일 지난 이미지 판(채택 전) — 상세 이미지 탭이 그 판을 보이고 [채택]을 단다.
+   *  지금 그림인 판이면 보일 것이 없다. 상세를 닫거나 판 없이 다시 열면 비운다. */
+  detailVersionId: string | null
   deleteConfirmInfo: DeleteCascadeInfo
   relationModal: RelationModalState
 
@@ -1364,8 +1367,11 @@ interface DirectorCanvasState {
   // popups / modals
   openPopup: (id: string) => void
   closePopup: () => void
-  /** 샷 상세 열기 — 영상 노드면 그 샷의 영상 탭(그 Take 먼저), 샷이면 이미지 탭. tab 을 주면 그 탭. */
-  openShotDetail: (nodeId: string, tab?: 'image' | 'video') => void
+  /** 샷 상세 열기 — 영상 노드면 그 샷의 영상 탭(그 Take 먼저), 샷이면 이미지 탭. tab 을 주면 그 탭.
+   *  versionId 를 주면 이미지 탭이 그 지난 판을 먼저 보인다(지난 판 줄, 오너 2026-11-26 D2). */
+  openShotDetail: (nodeId: string, tab?: 'image' | 'video', opts?: { versionId?: string | null }) => void
+  /** 상세에서 보던 지난 이미지 판을 바꾸거나(null = 지금 그림으로) 닫는다. */
+  setDetailVersion: (versionId: string | null) => void
   closeShotDetail: () => void
   openDeleteConfirm: (id: string) => void
   closeDeleteConfirm: () => void
@@ -1759,6 +1765,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       detailNodeId: null,
       detailTab: 'image',
       detailOpenSeq: 0,
+      detailVersionId: null,
       deleteConfirmInfo: null,
       relationModal: null,
       generatingNodeIds: {},
@@ -4388,6 +4395,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 // 수동 샷 실사 이미지도 Producer 포맷의 비율(2026-09-30, 실측: "New Shot" 이 16:9 로 나감) — 서버가 포맷을 읽는다.
                 aspectFromProject: true,
                 referenceImageUrls,
+                // 샷 상세 이미지 모델 칸에서 고른 모델(오너 답 5번 "실제로 도는 것만", 2026-11-26 D5) — 예전에는 싣지 않아 늘 기본 모델로 그렸다.
+                ...(data.imageModel ? { imageModel: data.imageModel } : {}),
               }),
               signal: controller.signal,
             })
@@ -5362,10 +5371,16 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
       openPopup: (id) => set({ popupNodeId: id }),
       closePopup: () => set({ popupNodeId: null }),
-      openShotDetail: (nodeId, tab) => {
+      openShotDetail: (nodeId, tab, opts) => {
         const node = get().nodes.find((n) => n.id === nodeId)
-        set((s) => ({ detailNodeId: nodeId, detailTab: tab ?? (node && isVideoData(node.data) ? 'video' : 'image'), detailOpenSeq: s.detailOpenSeq + 1 }))
+        set((s) => ({
+          detailNodeId: nodeId,
+          detailTab: tab ?? (node && isVideoData(node.data) ? 'video' : 'image'),
+          detailOpenSeq: s.detailOpenSeq + 1,
+          detailVersionId: opts?.versionId ?? null,
+        }))
       },
+      setDetailVersion: (versionId) => set({ detailVersionId: versionId }),
       // 지금은 selectNode · openPopup 으로 연 상세도 같은 닫기로 닫는다 — 샷 · 영상을 가리킬 때만 비운다(에셋 · 씬은 그대로).
       closeShotDetail: () =>
         set((s) => {
@@ -5375,6 +5390,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           }
           return {
             detailNodeId: null,
+            detailVersionId: null,
             ...(isDetailTarget(s.selectedNodeId) ? { selectedNodeId: null } : {}),
             ...(isDetailTarget(s.popupNodeId) ? { popupNodeId: null } : {}),
           }
