@@ -3160,6 +3160,9 @@ export const KO: Record<string, string> = {
   'The AI could not read the arrows, so the end frame was not redrawn. Write the motion in the directing tab.': 'AI 가 화살표를 읽지 못해 끝 장을 다시 그리지 않았어요. 연출 탭에서 움직임을 직접 적어 주세요.',
   'Could not translate the motion line. Try again.': '움직임 줄을 영어로 옮기지 못했어요. 다시 시도해 주세요.',
   'Edit and redraw the end frame': '고쳐서 끝 장 다시 그리기',
+  // W6 · 리드 승인 ⑥(2026-11-26): 보드 [+ 씬 추가]의 장소는 Artist 배경 목록에서 고르거나 새 장소를 적는다.
+  'Pick an Artist background': 'Artist 배경 고르기',
+  'New place': '새 장소',
   // W5(오너 2026-11-26): 고치기 창은 그리기를 맡기고 닫힌다 — 그리는 동안은 그 카드에만 기다림.
   'Redrawing the rough of this shot. The card updates when it is done.': '이 샷의 러프를 다시 그려요. 다 그리면 카드가 바뀌어요.',
   'This shot is being drawn. You can redraw it once it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 다시 그릴 수 있어요.',
