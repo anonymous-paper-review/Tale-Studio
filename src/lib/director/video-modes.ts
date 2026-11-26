@@ -8,6 +8,7 @@
 //   옛 'start_end'(실사 시작 · 끝)는 오너 "기존에 있던 Start, End 프레임 생성 방식은 일단 폐기"로 고를 수 없다 — 옛 Take 다시 만들기 · 옛 화면이
 //   보내면 기본으로 만든다. 어느 방식이든 끝 그림 · 러프(목각 인형) 그림은 영상에 보내지 않는다. 방식은 Take 값을 바꾸지 않는다(Take = 모델 · 해상도).
 //   약속: tests/director/video-mode-rules.test.ts · video-modes.test.ts
+import { mediaPathFromUrl } from '@/lib/storage/media-url'
 
 export const VIDEO_MODES = ['continue', 'reference', 'start_middle', 'start_prompt'] as const
 export type VideoMode = (typeof VIDEO_MODES)[number]
@@ -45,6 +46,19 @@ export function parseContinueFrom(value: unknown): ContinueFrom | null {
   if (typeof generationJobId !== 'string' || !ID.test(generationJobId)) return null
   if (typeof frameUrl !== 'string' || !frameUrl.trim() || frameUrl.length > 2048) return null
   return { videoClipId, generationJobId, frameUrl }
+}
+
+/**
+ * 지금 영상 파일을 낸 작업(검토 rev-video 4 — 서버 director-video-takes 의 madeByJob · 이어서 출처 확인과 같은 뜻). 영상 파일은 `…/videos/<Take>/<작업>.mp4` 다.
+ *   같은 Take 다시 만들기가 실패 · 멈춤이면 Take 의 마지막 작업은 그 실패한 작업이고 영상은 예전 작업 것이다 — 이어서 장면은 이 작업으로 잡고 올린다.
+ *   파일 이름을 못 읽는 주소면 마지막 작업이 끝났을 때만 그 작업이다. 작업 기록이 아예 없는 Take(복사한 프로젝트 · 기록 전 옛 Take)는 파일 이름이 있어도
+ *   그 작업이 이 프로젝트에 없을 수 있어 모르는 것으로 둔다(화면은 "만든 기록이 없어요"). 모르면 null.
+ */
+export function videoMadeByJobId(take: { videoUrl: string | null; videoClipId: string | null; generationJobId: string | null; lastAttemptStatus: string | null }): string | null {
+  if (!take.videoUrl || !take.videoClipId || !take.generationJobId) return null
+  const file = mediaPathFromUrl(take.videoUrl)?.match(/\/videos\/([^/]+)\/([^/]+)\.mp4$/)
+  if (file) return file[1] === take.videoClipId && ID.test(file[2]!) ? file[2]! : null
+  return take.lastAttemptStatus === 'completed' ? take.generationJobId : null
 }
 
 export interface SceneShotOrder {

@@ -147,15 +147,16 @@ describe('Director 샷 상세 화면', () => {
     expect(readFileSync('src/features/director/shot-detail/shot-image-tab.tsx', 'utf8')).toMatch(/selectStoryboardImageVersion\(nodeId, version\.id\)/)
   })
 
-  it('Take 카드는 그 Take 가 쓴 이미지 버전을 "시작 v1 + 끝 v1 · 모델 · 해상도"로 보이고, 지금 버전과 다르면 "이미지가 바뀌었어요"를 보인다', () => {
-    // 왜: D7 Take 카드 "시작 v1 + 끝 v1 · Seedance 2.0" — 어느 그림으로 만든 영상인지 보인다(리드 B). 지금 그림이 v2 면 그 Take 는 옛 그림이다.
+  it('Take 카드는 그 Take 가 쓴 이미지 버전을 "시작 v1 + 끝 v1 · 모델 · 해상도"로 보이고, 지금 시작 이미지와 다르면 "시작 이미지가 바뀌었어요"를 보인다', () => {
+    // 왜: D7 Take 카드 "시작 v1 + 끝 v1 · Seedance 2.0" — 어느 그림으로 만든 영상인지 보인다(리드 B). 지금 그림이 v2 면 그 Take 는 옛 시작 그림이다
+    //   (검토 rev-video 8 ① · 오너 N4a — 영상에는 시작 이미지만 쓰니 안내도 시작 이미지만 말한다).
     const version = (id: string, tag: string, at: number) => ({ id, url: `https://media.test/${tag}-s.png`, frames: { start: `https://media.test/${tag}-s.png`, direction: `https://media.test/${tag}-d.png`, end: `https://media.test/${tag}-e.png` }, generatedAt: at, source: 'generated' as const })
     const two = withStoryboardVersion(withStoryboardVersion(null, version('job-1', 'a', 1), { select: true }), version('job-2', 'b', 2), { select: true })
     director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: two })
     done(1, { madeFrames: { start: 'https://media.test/a-s.png?v=1', end: 'https://media.test/a-e.png' } })
     const out = render('panel', 'video')
     expect(out).toContain('Start v1 + End v1 · Seedance 2.0 · 720p')
-    expect(out).toContain('The start and end images changed · A new Take will use them')
+    expect(out).toContain('The start image changed · A new Take will use it')
     setLocale('ko')
     expect(render('panel', 'video')).toContain('시작 v1 + 끝 v1 · Seedance 2.0 · 720p')
   })
@@ -385,16 +386,17 @@ describe('Director 샷 상세 화면', () => {
     for (const label of ['이미지 고치기', '영상 고치기', '새 Take 만들기 · 5 Take', '이 Take 삭제']) expect(ko, label).toContain(label)
   })
 
-  it('보고 있는 Take 를 만든 뒤 시작 · 끝 이미지를 다시 만들었으면 "이미지가 바뀌었어요"를 보이고 단추는 "바뀐 이미지로 새 Take 만들기"다', () => {
-    // 왜: D7 "시작 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요" — 그 Take 는 옛 이미지로 만든 것이라 새 Take 를 만들어야 바뀐 이미지가 영상에 들어간다.
+  it('보고 있는 Take 를 만든 뒤 시작 이미지를 다시 만들었으면 "시작 이미지가 바뀌었어요"를 보이고 단추는 "바뀐 이미지로 새 Take 만들기"다', () => {
+    // 왜: D7 · 검토 rev-video 8 ①(오너 N4a — 영상에는 시작 이미지만 쓰고 끝 이미지는 보내지 않는다) — 그 Take 는 옛 시작 이미지로 만든 것이라
+    //   새 Take 를 만들어야 바뀐 시작 이미지가 영상에 들어간다.
     director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: { ...IMAGE, generatedAt: Date.parse('2026-11-14T02:00:00.000Z') } })
     done(1, { lastAttemptAt: '2026-11-14T01:00:00.000Z' })
     const out = render('panel', 'video')
-    expect(out).toContain('The start and end images changed · A new Take will use them')
+    expect(out).toContain('The start image changed · A new Take will use it')
     expect(out).toContain('Make a new Take with the changed image · 5 Takes')
     setLocale('ko')
     const ko = render('panel', 'video')
-    expect(ko).toContain('시작 · 끝 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요')
+    expect(ko).toContain('시작 이미지가 바뀌었어요 · 새 Take 에 반영돼요')
     expect(ko).toContain('바뀐 이미지로 새 Take 만들기 · 5 Take')
   })
 

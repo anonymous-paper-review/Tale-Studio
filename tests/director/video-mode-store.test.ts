@@ -16,6 +16,7 @@ vi.mock('@/lib/generation-queue', () => ({ refreshGenerationQueue: vi.fn() }))
 vi.mock('@/lib/shots-cache', () => ({ invalidateShots: () => Promise.resolve() }))
 
 import { useDirectorCanvasStore } from '@/stores/director-store'
+import { isVideoData } from '@/types/director'
 
 const api = () => useDirectorCanvasStore.getState()
 const CONTINUE_FROM = { videoClipId: 'clip-prev', generationJobId: 'job-prev', frameUrl: 'https://media.test/clip-prev/job-prev_chain-frame-2850.jpg' }
@@ -46,6 +47,41 @@ afterEach(async () => {
   await vi.runAllTimersAsync()
   vi.unstubAllGlobals()
   vi.useRealTimers()
+})
+
+describe('같이 정한 것', () => {
+  // 왜(검토 rev-video 3 · 리드 결정 "사람이 그 자리에서 고른 방식이 이김"): 보던 Take 를 노드에서 손으로 이어 두었으면 새 Take 가 그 배선 · 체인을 물려받아
+  //   샷 상세에서 고른 방식이 소리 없이 버려졌다(손 배선이 이기면 방식을 보내지 않는다). 샷 상세는 고른 방식을 칩으로 보이니 보이는 대로 만든다.
+  it('샷 상세에서 방식을 골라 만든 새 Take 는 보던 Take 의 손 배선 · 영상 체인을 물려받지 않고 고른 방식으로 만든다', async () => {
+    const sourceId = api().addVideoTake(shotId)!
+    api().updateNodeData<'video'>(sourceId, { status: 'completed', lastAttemptStatus: 'completed', videoUrl: 'https://media.test/videos/clip-src/job-src.mp4', videoClipId: 'clip-src', generationJobId: 'job-src' })
+    api().updateNodeData<'video'>(videoId, {
+      status: 'completed', lastAttemptStatus: 'completed', videoUrl: 'https://media.test/videos/clip-viewed/job-viewed.mp4', videoClipId: 'clip-viewed', generationJobId: 'job-viewed',
+      frameInputs: { start: shotId, end: null, refs: [] }, videoChainInputId: sourceId, videoChainFrameUrl: 'https://media.test/videos/clip-src/job-src_chain-frame-2850.jpg',
+    })
+    const before = new Set(api().nodes.map((node) => node.id))
+    await api().remakeShotVideo(shotId, { fromTakeId: videoId, videoOverride: { videoMode: 'reference' } })
+
+    const [body] = generationBodies()
+    expect(body).toMatchObject({ videoMode: 'reference', frameSource: 'auto' })
+    expect(body).not.toHaveProperty('referenceImageUrls')
+    const created = api().nodes.find((node) => !before.has(node.id) && isVideoData(node.data))
+    expect(created?.data).toMatchObject({ frameInputs: { start: null, end: null, refs: [] }, videoChainInputId: null, videoChainFrameUrl: null })
+  })
+
+  // 왜(리드 결정): 노드 Take 판 [다시 만들기]는 그 Take 를 그대로 다시 만든다 — 노드에서 손으로 이은 그림이 그 자리에서 사람이 한 것이라 손 배선이 이긴다.
+  it('노드 Take 판에서 같은 Take 를 다시 만들면 그 Take 의 손 배선이 그대로 이긴다', async () => {
+    api().updateNodeData<'video'>(videoId, {
+      status: 'completed', lastAttemptStatus: 'completed', videoUrl: 'https://media.test/videos/clip-viewed/job-viewed.mp4', videoClipId: 'clip-viewed', generationJobId: 'job-viewed',
+      override: { videoMode: 'reference' }, frameInputs: { start: shotId, end: null, refs: [] },
+    })
+    await api().regenerateVideo(videoId)
+
+    const [body] = generationBodies()
+    expect(body).toMatchObject({ frameSource: 'manual' })
+    expect(body).not.toHaveProperty('videoMode')
+    expect(api().nodes.find((node) => node.id === videoId)?.data).toMatchObject({ frameInputs: { start: shotId, end: null, refs: [] } })
+  })
 })
 
 describe('혼자 정한 것', () => {

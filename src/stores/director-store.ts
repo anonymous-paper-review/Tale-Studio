@@ -40,7 +40,7 @@ import {
   type DirectorVideoStatus,
   type DirectorVideoProvider,
 } from '@/types/director'
-import { isQuotaExceeded, notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
+import { isQuotaExceeded, isVideoModeRefused, notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import {
   isPrerequisiteMissing,
   notifyPrerequisiteResumed,
@@ -1642,6 +1642,13 @@ const stoppedJobIds = new Set<string>()
 let lastVideoLimitRefusal: { shotNodeId: string } | null = null
 export function videoLimitRefusal(): { shotNodeId: string } | null {
   return lastVideoLimitRefusal
+}
+
+/** 마지막으로 고른 영상 방식 때문에 서버가 Take 전에 막은 샷 요청과 그 까닭(code — 앞 샷 영상이 바뀜 등, 검토 rev-video 8 ②).
+ *  채팅이 "잠시 뒤 다시" 대신 카드 안내와 같은 까닭을 말하게 한다. 거절마다 새 값 — 부른 쪽은 부르기 전 값과 달라졌는지로 이번 거절인지 안다. */
+let lastVideoModeRefusal: { shotNodeId: string; code: string } | null = null
+export function videoModeRefusal(): { shotNodeId: string; code: string } | null {
+  return lastVideoModeRefusal
 }
 
 /** 테이크 목록의 made_frames(지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소) — 모양이 다르면 모른다(null). */
@@ -4746,22 +4753,32 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             )
             if (source && isVideoData(source.data)) {
               const src = source.data
+              // 샷 상세에서 방식을 골라 만든 새 Take(그 자리에서 Lumi 에게 맡긴 것 포함)는 보던 Take 의 손 배선 · 영상 체인을 물려받지 않는다 —
+              //   사람이 그 자리에서 고른 방식이 이긴다(검토 rev-video 3 · 리드 결정). 물려받으면 손 배선이 이겨 고른 방식이 소리 없이 버려졌다.
+              //   방식을 싣지 않은 다시 만들기(넘기기 창 · Lumi 말 부탁 · 알림 카드)는 지금처럼 배선을 이어받는다.
+              const keepWiring = !options.videoOverride?.videoMode
               get().updateNodeData<'video'>(videoNodeId, {
-                frameInputs: {
-                  start: src.frameInputs?.start ?? null,
-                  end: src.frameInputs?.end ?? null,
-                  refs: [...(src.frameInputs?.refs ?? [])],
-                },
-                videoChainInputId: src.videoChainInputId,
-                videoChainFrameUrl: src.videoChainFrameUrl,
+                ...(keepWiring
+                  ? {
+                      frameInputs: {
+                        start: src.frameInputs?.start ?? null,
+                        end: src.frameInputs?.end ?? null,
+                        refs: [...(src.frameInputs?.refs ?? [])],
+                      },
+                      videoChainInputId: src.videoChainInputId,
+                      videoChainFrameUrl: src.videoChainFrameUrl,
+                    }
+                  : {}),
                 // 새 Take 의 바탕은 늘 지금 샷 프롬프트(리드 검토 c ③) — 앞 Take 의 프롬프트(옛 바꿀 점이 붙은 것)는 잇지 않는다.
                 //   바꿀 점(changeNote)은 기록으로 이어받아 이번에 한 번 붙는다(상세는 칸에서 고치거나 지운다).
                 override: withoutTakePrompt(src.override),
               })
-              // 상속된 배선을 엣지로 복원 + DB write-through.
-              get().rebuildFrameEdges()
-              get().rebuildVideoChainEdges()
-              scheduleWiringSweepToDb(get)
+              if (keepWiring) {
+                // 상속된 배선을 엣지로 복원 + DB write-through.
+                get().rebuildFrameEdges()
+                get().rebuildVideoChainEdges()
+                scheduleWiringSweepToDb(get)
+              }
             }
           }
 
@@ -4918,6 +4935,17 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         }
         const idempotencyKey = crypto.randomUUID()
         const preserveSuccess = !!videoNode.data.videoUrl
+        // 서버가 Take 전에 막은 요청(다른 요청이 그 샷을 만드는 중 · 고른 방식 · 동시 한도 · Take 부족 · 그림 기다림 …)은 없던 시도다 — 요청 전 상태로 되돌린다.
+        //   영상이 있는 Take 를 같은 Take 로 다시 만들다 막히면 만드는 중 표시와 이번 요청 키가 남아, 다시 읽어도(내 시도가 더 새것이라) 계속 만드는 중으로 보였다(검토 rev-video 1).
+        const restoreBeforeAttempt = () =>
+          get().updateNodeData<'video'>(videoNodeId, {
+            status: videoNode.data.status,
+            errorMessage: videoNode.data.errorMessage,
+            generationJobId: videoNode.data.generationJobId,
+            lastAttemptStatus: videoNode.data.lastAttemptStatus,
+            lastAttemptError: videoNode.data.lastAttemptError,
+            lastAttemptAt: videoNode.data.lastAttemptAt,
+          })
         const frameInputs = normalizeFrameInputs(videoNode.data.frameInputs)
         // 끝 그림은 영상에 보내지 않는다(오너 dev 때 "Start, End 프레임 생성 방식은 일단 폐기" · 2026-11-27 N4a) — 끝 칸만 이은 Take 는 손 배선으로 치지 않는다.
         const hasManualFrameInputs = !!frameInputs.start || frameInputs.refs.length > 0
@@ -5102,14 +5130,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           if (!res.ok) {
             if (res.status === 409 && body.code === 'director_video_shot_busy') {
               // 다른 요청의 영상은 이 카드의 새 결과가 아니다. 원래 상태를 복원하고 서버 목록을 읽는다.
-              get().updateNodeData<'video'>(videoNodeId, {
-                status: videoNode.data.status,
-                errorMessage: videoNode.data.errorMessage,
-                generationJobId: videoNode.data.generationJobId,
-                lastAttemptStatus: videoNode.data.lastAttemptStatus,
-                lastAttemptError: videoNode.data.lastAttemptError,
-                lastAttemptAt: videoNode.data.lastAttemptAt,
-              })
+              restoreBeforeAttempt()
               refreshGenerationQueue()
               toast.info(translate(useLocaleStore.getState().locale, 'A video is already being generated for this shot.'))
               await get().hydrateFreshFromDb().catch(() => {})
@@ -5137,7 +5158,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             //   false 를 돌려주면 호출부가 방금 만든 미저장 take 노드를 롤백하므로, 재개는 새 take 로 다시 시작한다.
             if (isPrerequisiteMissing(res.status, body)) {
               notifyPrerequisiteWaiting('director', body)
-              if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
+              if (!(body as VideoGenerationResponse).jobId) restoreBeforeAttempt()
+              else if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
               const depth = options?.resumeDepth ?? 0
               const resumeShotNodeId = shotNode && isShotData(shotNode.data) ? shotNode.id : null
               // #batch-resume: 중단하거나 새 실행으로 바뀐 뒤에는 예전 그림 대기가 영상을 내지 않는다.
@@ -5161,7 +5183,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             }
             if (notifyIfQuotaExceeded(res.status, body)) {
               if (shotNode && isQuotaExceeded(res.status, body) && (body as { scope?: unknown }).scope !== 'global') lastVideoLimitRefusal = { shotNodeId: shotNode.id }
-              if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
+              if (shotNode && isVideoModeRefused(res.status, body)) lastVideoModeRefusal = { shotNodeId: shotNode.id, code: String(body.code) }
+              // 서버가 작업을 만들지 않은 거절이면 이 시도는 없던 것이다 — 작업을 돌려줬으면 위에서 서버 기록을 이미 다시 읽었다.
+              if (!body.jobId) restoreBeforeAttempt()
+              else if (!preserveSuccess) get().setVideoStatus(videoNodeId, 'pending')
               return false
             }
             throw new Error(body.error ?? `HTTP ${res.status}`)
