@@ -1,7 +1,7 @@
 ---
 name: tale-studio design system
 version: 1.1.1
-last_updated: 2026-11-26
+last_updated: 2026-11-27
 owner: shared
 canonical_implementation: src/app/globals.css
 source_of_truth: 토큰 값은 globals.css. design.md는 *역할 / 사용 룰 / 스케일 정량 명세*.
@@ -589,7 +589,7 @@ Editor 클립 준비. `lumi` 를 안 주는 잠금(그림이 없는 컷을 보�
 그림이 이미 있는 카드를 다시 그릴 때(콘티 · Storyboard 보드의 고치기 창 [적용 · 러프 다시 그리기] · [연출만 다시 만들기] · 채팅 [러프 다시 그리기] · 카드 [다시 시도])는
 잠그지 않는다 — 창은 그리기를 맡기고 닫히고 그 카드에만 아래 "노드 · 카드 위 기다림"을 보인다(W5 오너 2026-11-26, 약속 tests/writer/card-redraw-wait.test.ts).
 **단계 화면을 여는 동안**(오너 2026-11-26): 레일로 옮겨 오거나 프로젝트를 여는 동안 그 단계가 자기 자료를 다 읽기 전에는 Editor 클립 준비와 같은 카드(그 단계 옷 · 설명 없음 · 잠금 아님)를 화면 가운데에 둔다 —
-`<StageWaitCard stage />`(`src/components/feedback/stage-wait.tsx`, 언제는 `src/lib/stage-wait.ts` · `src/hooks/use-stage-wait.ts`, 레일을 누른 순간은 `app/studio/<단계>/loading.tsx`). 제목은 "산문을 불러오는 중…"처럼 무엇을 읽는지. Director 는 캔버스 판 위를 덮는다(`cover`). Writer 칸 안 콘티 화면(`/studio/conti`, 오너 O1)은 Writer 옷 "콘티를 불러오는 중…". 약속 tests/project/stage-wait.test.ts.
+`<StageWaitCard stage />`(`src/components/feedback/stage-wait.tsx`, 언제는 `src/lib/stage-wait.ts` · `src/hooks/use-stage-wait.ts`, 레일을 누른 순간은 `app/studio/<단계>/loading.tsx`). 제목은 "산문을 불러오는 중…"처럼 무엇을 읽는지. Director 는 캔버스 판 위를 덮는다(`cover`). Writer 칸 안 콘티 화면(`/studio/conti`, 오너 O1)은 Writer 옷 "콘티를 불러오는 중…". 서버 · 하이드레이션 첫 그림에서는 화면 언어를 몰라 제목 줄을 숨기고(자리는 둠) 앱이 붙은 뒤 그 언어로 보인다. Writer 는 산문 초안 프로젝트인지 확인(verifyWriterGate)이 끝날 때까지 기다린다(m-qa 2026-11-27). 약속 tests/project/stage-wait.test.ts · tests/writer/prose-open-wait.test.ts.
 실패 안내의 오류 모습 큰 Lumi 도 단계를 넘어가는 기다림의 실패에만 둔다 — Storyboard 보드에서 컷을 다시 그리다 난 실패는 작은 카드(약속 tests/writer/board-wait-lumi.test.ts).
 
 **노드 · 카드 위에서 기다릴 때**(SYS, DG 기준) — `src/components/feedback/node-wait.tsx` `<NodeWaitCard lumi title description? progress? note? announce? />`(화면 읽기 알림 `announce` 는 여럿 중 하나만 — 보드 · Director 는 첫 카드):

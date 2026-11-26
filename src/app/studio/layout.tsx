@@ -14,6 +14,7 @@ import { useWriterStore } from '@/stores/writer-store'
 import { useArtistStore } from '@/stores/artist-store'
 import { useEntryStore } from '@/features/entry/entry-store'
 import { warmWriterPreview } from '@/lib/writer/preview-cache'
+import { noteWriterGateChecked } from '@/lib/writer/gate-check'
 import { Sidebar } from '@/components/layout/sidebar'
 import { GlobalChat } from '@/components/layout/global-chat'
 import { useWriterRoomStore, writerRightChatHidden } from '@/stores/writer-room-store'
@@ -80,9 +81,20 @@ export default function StudioLayout({
   // writer 산출물 게이트: projectId 확정 시 1회 검증 → 씬 없으면 producer 로 게이트백.
   //   양쪽 진입 경로를 모두 커버 — 새로고침(initProject 가 projectId 세팅) /
   //   홈 클릭(switchProject 가 projectId 세팅). initProject 의 early-return 과 무관하게 동작.
+  //   확인이 끝나야 산문 초안 프로젝트인지 안다(treatmentDraft) — 끝나면(실패해도) 적어 Writer 기다리는 카드가 그 전에 "아직 산문이 없어요"를
+  //   먼저 보이지 않게 한다(lib/writer/gate-check, m-qa 2026-11-27). 프로젝트를 비우면(바꾸는 중) 지운다.
   useEffect(() => {
-    if (!projectId) return
-    void verifyWriterGate(projectId)
+    if (!projectId) {
+      noteWriterGateChecked(null)
+      return
+    }
+    let alive = true
+    void verifyWriterGate(projectId).finally(() => {
+      if (alive) noteWriterGateChecked(projectId)
+    })
+    return () => {
+      alive = false
+    }
   }, [projectId, verifyWriterGate])
 
   // store.projectId ↔ URL ?projectId 동기화. 프로젝트 전환·stage 이동으로
