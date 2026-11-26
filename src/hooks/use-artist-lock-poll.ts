@@ -3,15 +3,34 @@
 import { useEffect, useRef } from 'react'
 import { toast } from 'sonner'
 import { STAGES } from '@/lib/constants'
+import { isCancelledJob, useActiveGenerationJobs, type ActiveJob } from '@/lib/generation-queue'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useProjectStore, type WriterStatusAssets } from '@/stores/project-store'
 import type { StageId } from '@/types'
 
 export const ARTIST_LOCK_POLL_MS = 5_000
-/** 그리는 작업 · 멈춤 · 실패가 없을 때(새 흐름 [이미지 만들기] 전 등) 다시 확인하는 간격 — 그림을 맡기면 다음 확인부터 5초(오너 2026-11-27 N7). */
-export const ARTIST_LOCK_IDLE_POLL_MS = 30_000
+/** 오래 걸림으로 확정된 뒤 늦게 끝난 그림을 잡으려고 다시 보는 간격과 그 상한(검토 rev-flow 리드 1) — 상한이 지나면 멈춘다(끝없는 확인 없음). */
+export const ARTIST_LOCK_WATCH_POLL_MS = 30_000
+export const ARTIST_LOCK_STALL_WATCH_MS = 30 * 60_000
 export const ARTIST_LOCK_REQUEST_TIMEOUT_MS = 15_000
+
+/** 그림 준비(레일 Artist 칸)가 보는 작업 — 인물 · 배경 그림. */
+const ARTIST_GATE_JOB_KINDS: ReadonlySet<string> = new Set(['character_view', 'world_shot'])
+
+/** 대기열의 인물 · 배경 그림 작업 열쇠 — 바뀌어 비어 있지 않으면 그림을 새로 맡긴 것이다(어느 길로 맡겼든, 리드 1). 화면에서 멈춘 작업은 세지 않는다. */
+export function artistGateWakeKey(jobs: readonly ActiveJob[]): string {
+  return jobs
+    .filter((job) => ARTIST_GATE_JOB_KINDS.has(job.kind) && !isCancelledJob(job))
+    .map((job) => job.id)
+    .sort()
+    .join('|')
+}
+
+/** 오래 걸림으로 확정된 때부터 다음 확인까지 기다릴 시간 — 상한(30분) 안이면 30초, 지나면 null(멈춘다). */
+export function stallWatchDelay(stalledSince: number, now: number): number | null {
+  return now - stalledSince < ARTIST_LOCK_STALL_WATCH_MS ? ARTIST_LOCK_WATCH_POLL_MS : null
+}
 
 const ARTIST_STAGE_INDEX = STAGES.findIndex((stage) => stage.id === 'artist')
 
@@ -42,36 +61,41 @@ export function decideLockPoll(assets: WriterStatusAssets, prevStreak: number): 
   const stalledSignal = !!assets.stalled && !assets.images_ready && !failed
   const stalledStreak = stalledSignal ? prevStreak + 1 : 0
   const latchStalled = stalledSignal && stalledStreak >= 2
-  // 그리는 작업도 멈춤 · 실패도 없다 — 멈춤으로 확정할 일이 없으니 천천히 다시 본다(그림을 맡기면 대기 작업이 생겨 5초로 돌아온다).
+  // 그리는 작업도 멈춤 · 실패도 없다 — 기다릴 것이 없으니 확인을 멈춘다(리드 결정 8 — 끝없는 확인 없음). 그림을 맡기면 다시 켠다(artistGateWakeKey).
   const idle = !assets.images_ready && !failed && !stalledSignal && (assets.queued_count ?? 0) === 0
   return {
     gate: { ...assets, stalled: latchStalled },
-    stop: assets.images_ready || latchStalled || failed,
+    stop: assets.images_ready || latchStalled || failed || idle,
     stalledStreak,
-    delayMs: idle ? ARTIST_LOCK_IDLE_POLL_MS : ARTIST_LOCK_POLL_MS,
+    delayMs: ARTIST_LOCK_POLL_MS,
   }
 }
 
 /**
- * Artist 이미지-락 구간 폴러. reachedStage≥artist 이고 아직 준비/실패/stalled 아닐 때만
+ * Artist 그림 준비 확인(레일 Artist 칸 · 토스트). reachedStage≥artist 이고 아직 준비가 아닐 때
  * 5s 간격으로 /api/writer/status?assets=1 을 폴해 project-store 게이트를 갱신한다.
- * images_ready(언락) / 디바운스된 stalled / failed 에서 정지하고, 언마운트·프로젝트 전환 시 정리한다.
- * 재시도(retryArtistDrafts)로 stalled/failed 가 해제되면 imageLocked 가 다시 true 가 되어 폴링이 재개된다.
+ * images_ready / failed / 기다릴 것 없음(idle)에서 멈추고, 오래 걸림으로 확정되면 30분까지 30초마다 다시 봐서 늦게 끝난 그림을 잡는다.
+ * 대기열에 인물 · 배경 그림 작업이 새로 오르면(카드 · 안 나온 그림 · 이미지 만들기 · 채팅 · 다른 창 어느 길이든) resumeArtistGate 로
+ * 실패 · 오래 걸림 표시를 내리고 다시 켠다(검토 rev-flow 리드 1 · 8). 언마운트 · 프로젝트 전환 시 정리한다.
  */
 export function useArtistLockPoll() {
   const projectId = useProjectStore((s) => s.projectId)
   const reachedStage = useProjectStore((s) => s.reachedStage)
   const artistImagesReady = useProjectStore((s) => s.artistImagesReady)
-  const artistImagesFailed = useProjectStore((s) => s.artistImagesFailed)
-  const artistImagesStalled = useProjectStore((s) => s.artistImagesStalled)
+  const artistGateWake = useProjectStore((s) => s.artistGateWake)
+  const resumeArtistGate = useProjectStore((s) => s.resumeArtistGate)
   const setArtistAssetGate = useProjectStore((s) => s.setArtistAssetGate)
+
+  // 대기열(생성 작업 구독 — 스튜디오 화면마다 이미 돈다)에 인물 · 배경 그림 작업이 새로 오르면 확인을 다시 켠다.
+  const wakeKey = artistGateWakeKey(useActiveGenerationJobs(projectId))
+  useEffect(() => {
+    if (wakeKey) resumeArtistGate()
+  }, [wakeKey, resumeArtistGate])
 
   const imageLocked =
     !!projectId &&
     hasReachedArtist(reachedStage) &&
-    !artistImagesReady &&
-    !artistImagesFailed &&
-    !artistImagesStalled
+    !artistImagesReady
 
   // 프로젝트당 1회만 알린다 - 폴러가 재개돼도 같은 상태로 반복해서 떠들지 않게.
   const notifiedRef = useRef(false)
@@ -87,8 +111,10 @@ export function useArtistLockPoll() {
     let stalledStreak = 0
     let requestController: AbortController | null = null
     let tickVersion = 0
+    // 오래 걸림으로 확정된 때 — 그때부터 30분까지만 30초마다 다시 본다(리드 1).
+    let stalledSince: number | null = null
 
-    // 다음 확인 간격 — 마지막 판단이 정한다(그리는 작업 · 멈춤 · 실패가 없으면 30초, 그 밖에는 5초).
+    // 다음 확인 간격 — 마지막 판단이 정한다(보통 5초, 오래 걸림을 지켜보는 동안 30초).
     let nextDelay = ARTIST_LOCK_POLL_MS
     const schedule = () => {
       timer = setTimeout(tick, nextDelay)
@@ -118,6 +144,12 @@ export function useArtistLockPoll() {
             const decision = decideLockPoll(assets, stalledStreak)
             stalledStreak = decision.stalledStreak
             nextDelay = decision.delayMs
+            // 오래 걸림으로 확정됐으면 상한까지 30초마다 지켜본다 — 그 사이 다 그려지면 images_ready 로 멈추고 레일 점이 내려간다.
+            const watching = decision.gate.stalled && !decision.gate.images_ready
+            if (watching) stalledSince ??= Date.now()
+            else stalledSince = null
+            const watchDelay = watching && stalledSince !== null ? stallWatchDelay(stalledSince, Date.now()) : null
+            if (watchDelay !== null) nextDelay = watchDelay
             setArtistAssetGate(decision.gate)
             // 실패·지연은 사이드바 뱃지로만 알리면 조용하다 (#stale-gate 2026-08-26, 오너 지적:
             //   "실패는 실패라고 떠야 하는 거 아님?"). 판정이 서는 순간 한 번만 토스트로 말한다.
@@ -138,7 +170,7 @@ export function useArtistLockPoll() {
                 )
               }
             }
-            if (decision.stop) return
+            if (decision.stop && watchDelay === null) return
           }
         }
       } catch {
@@ -178,5 +210,5 @@ export function useArtistLockPoll() {
       document.removeEventListener('visibilitychange', onWake)
       window.removeEventListener('focus', onWake)
     }
-  }, [imageLocked, projectId, setArtistAssetGate])
+  }, [imageLocked, projectId, artistGateWake, setArtistAssetGate])
 }

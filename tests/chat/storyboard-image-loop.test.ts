@@ -27,8 +27,9 @@ describe('Storyboard 채팅의 실사 그림 요청과 도구 고리', () => {
     expect(result.data.reply).toBe('샷 2를 더 슬픈 표정으로 다시 그릴게요.')
   })
 
-  // 왜(정상 경로 고정 — tests/chat/tool-loop "실행을 재확인한 뒤에도 …"): 글 고치기가 섞이면 그 고치기는 도구로 해야 한다 — 지금처럼 다시 묻고, 안 하면 남은 변경을 넘기지 않는다.
-  it('실사 그림 요청과 글 고치기가 섞인 답은 지금처럼 고치기 도구를 요구하고 안 하면 변경을 넘기지 않는다', async () => {
+  // 왜(정상 경로 고정 — tests/chat/tool-loop "실행을 재확인한 뒤에도 …"): 글 고치기를 요구하는 채팅(콘티)에서 답이 글 고치기를 JSON 으로 내면 도구로 해야 한다 —
+  //   지금처럼 다시 묻고, 안 하면 그 답의 변경(같이 온 그림 요청 포함)을 넘기지 않는다. 검토 rev-flow 리드 5 — 이름을 검사하는 동작대로 바로잡음(N3 뒤 Storyboard 는 고치기를 요구하지 않는다).
+  it('글 고치기를 요구하는 채팅은 답에 글 고치기 JSON 과 그림 요청이 섞여 와도 고치기 도구를 다시 요구하고, 끝내 안 하면 그 답의 변경을 넘기지 않는다', async () => {
     const mixed = { toolSupport: true, reply: '고쳤어요.', updates: [IMAGE, { type: 'updateShot', id: 'sh_01_02', patch: { actionDescription: '슬픈 얼굴' } }] }
     const request = replies(mixed, mixed)
     const result = await runChatToolLoop({ request, execute: vi.fn(), requireEdit: true, ...scope() })
@@ -48,8 +49,9 @@ describe('Storyboard 채팅의 실사 그림 요청과 도구 고리', () => {
     expect(result.data.updates).toEqual([IMAGE])
   })
 
-  // 왜(정상 경로 고정): 글 고치기가 섞인 부탁이라도 대사를 고치기 도구로 고치고 그림 요청을 내면 둘 다 한 것이다 — 둘 다 넘긴다.
-  it('글 고치기가 섞인 부탁에 대사를 고치기 도구로 고친 뒤 그림 요청을 내면 고친 결과와 그림 요청을 함께 넘긴다', async () => {
+  // 왜(정상 경로 고정): 글 고치기를 요구하는 채팅에서 고치기 도구로 고친 결과가 있으면 다 한 것이다 — 같은 답의 그림 요청도 함께 넘긴다.
+  //   검토 rev-flow 리드 5 — 이름을 검사하는 동작대로 바로잡음(N3 뒤 Storyboard 는 고치기를 요구하지 않는다).
+  it('글 고치기를 요구하는 채팅에서 고치기 도구로 고친 결과가 있으면, 같은 답의 그림 요청도 고친 결과와 함께 넘긴다', async () => {
     const edit = { type: 'tool_use', id: 'edit-1', name: 'edit_project', input: { resource: 'dialogue', id: 'sh_01_02', revision: 'r1', patch: { text: '잘 가' } } }
     const request = replies(
       { toolTurn: { content: [edit], stopReason: 'tool_use' } },

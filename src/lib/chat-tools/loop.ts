@@ -27,6 +27,8 @@ export async function runChatToolLoop(options: {
   onResult?: (outcome: ToolOutcome) => void
   /** 사람이 앱 도구로 할 수 있는 글 고치기를 부탁했다 — 고치기 결과 없이 끝나지 않게 한 번 더 묻는다. Storyboard 채팅은 글을 고치지 않아 늘 끈다(오너 2026-11-27 N3). */
   requireEdit?: boolean
+  /** 이 화면에서 실행하지 않을 호출이면 모델에 돌려줄 결과(Storyboard 의 고치기 — 검토 rev-flow 리드 2). 서버가 거절한 호출(rejectedToolCalls)과 같이 다룬다. */
+  refuse?: (call: ToolCall) => ToolResult | null
   /** The user explicitly asked to look up an image; a text answer must follow a storage read. */
   requireInspection?: boolean
   locale?: 'ko' | 'en'
@@ -112,8 +114,18 @@ export async function runChatToolLoop(options: {
     }
     const returned: ToolMessage['content'] = []
     let limited = false
+    // 서버가 거절한 호출(그 요청에 주지 않은 도구)과 이 화면이 실행하지 않는 호출(리드 2) — 실행하지 않고 쓸 수 없다는 결과만 모델에 돌려준다.
+    //   실행 결과(results)에는 넣지 않는다 — 실행한 고치기가 아니므로 영수증 · 고치기 확인 · 넘김 막이가 그것을 고치기로 세지 않게.
+    const rejected = new Set(Array.isArray(data.rejectedToolCalls) ? data.rejectedToolCalls.filter((id): id is string => typeof id === 'string') : [])
     for (const call of toolCalls) {
       check()
+      const refusal = rejected.has(call.id)
+        ? { status: 'unsupported', message: 'This tool is not available in this chat. Nothing was executed.' }
+        : options.refuse?.(call) ?? null
+      if (refusal) {
+        returned.push({ type: 'tool_result', tool_use_id: call.id, content: JSON.stringify(refusal), is_error: true })
+        continue
+      }
       const signature = toolValueKey([call.name, call.input])
       const failureKey = failureKeyFor(call)
       const prior = cached.get(call.id)

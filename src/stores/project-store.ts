@@ -126,6 +126,11 @@ interface ProjectState {
   setArtistAssetGate: (assets: WriterStatusAssets | null | undefined) => void
   /** 잠금 실패/stalled 시 재시도 — POST /api/artist/retry-drafts 후 실패·stalled 해제(폴링 재개). */
   retryArtistDrafts: () => Promise<void>
+  /** 그림 확인을 다시 켠 횟수 — 오를 때마다 그림 준비 확인(use-artist-lock-poll)이 다시 돈다. */
+  artistGateWake: number
+  /** Artist 그림 작업(인물 · 배경)을 새로 맡겼을 때 — 실패 · 오래 걸림 표시를 내리고 그림 확인을 다시 켠다(검토 rev-flow 리드 1).
+   *  레일 다시 그리기가 하던 "표시 내리고 다시 보기"를 어느 길로 맡기든(카드 · 안 나온 그림 · 이미지 만들기 · 채팅 · 다른 창) 하게 한다. */
+  resumeArtistGate: () => void
   resetProject: () => void
 }
 
@@ -230,6 +235,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
   artistAssetProgress: null,
   artistImagesFailed: false,
   artistImagesStalled: false,
+  artistGateWake: 0,
 
   // currentStage는 "지금 보는 단계", reachedStage는 "지금까지 연 최고 단계".
   // 뒤로 가도(currentStage 후퇴) 이미 연 단계가 잠기지 않도록 reachedStage는 단조 증가.
@@ -256,6 +262,7 @@ export const useProjectStore = create<ProjectState>((set, get) => ({
 
   setLifecycleStatus: (status) => set({ lifecycleStatus: status }),
   setArtistAssetGate: (assets) => set(artistAssetGateFromAssets(assets)),
+  resumeArtistGate: () => set((s) => ({ artistImagesFailed: false, artistImagesStalled: false, artistGateWake: s.artistGateWake + 1 })),
   retryArtistDrafts: async () => {
     const { projectId } = get()
     if (!projectId) return

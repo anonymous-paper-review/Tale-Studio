@@ -38,8 +38,9 @@ const P = 'project-gate'
 const OLD = new Date(Date.now() - 60 * 60 * 1000).toISOString()
 async function assets() {
   const res = await GET(new Request(`http://localhost/api/writer/status/${P}?assets=1`) as unknown as NextRequest, { params: Promise.resolve({ projectId: P }) })
-  return ((await res.json()) as { assets: { chars_ready: number; images_ready: boolean; stalled: boolean } }).assets
+  return ((await res.json()) as { assets: { chars_ready: number; images_ready: boolean; stalled: boolean; failed_count: number } }).assets
 }
+const NEWER = new Date(Date.now() - 30 * 60 * 1000).toISOString()
 
 beforeEach(() => {
   mocks.run.mockReset().mockResolvedValue({ status: 'completed', completed_units: 1, total_units: 1, current_stage: null, timings: {}, engine: 'v2' })
@@ -81,5 +82,33 @@ describe('레일 Artist 칸의 그림 준비 판정', () => {
     const got = await assets()
     expect(got.images_ready).toBe(false)
     expect(got.stalled).toBe(true)
+  })
+  // 왜(검토 rev-flow 리드 3): 실패 수가 지난 실패까지 세서, 다시 그려 그림이 생긴 대상도 "생성 실패"로 레일 점을 띄웠다.
+  it('같은 대상을 다시 그려 그림이 생겼으면 그 대상의 지난 실패는 실패로 세지 않는다', async () => {
+    mocks.tables.character_appearances = [{ project_id: P, character_id: 'mina', is_default: true, sheet_url: 'https://img/mina.png' }]
+    mocks.tables.generation_jobs = [
+      { project_id: P, kind: 'world_shot', status: 'failed', created_at: OLD, target: { locationId: 'bus', column: 'wide_shot' } },
+      { project_id: P, kind: 'world_shot', status: 'completed', created_at: NEWER, target: { locationId: 'bus', column: 'wide_shot' } },
+      { project_id: P, kind: 'character_view', status: 'failed', created_at: OLD, target: { characterId: 'mina', appearanceKey: 'current', view: 'main' } },
+    ]
+    const got = await assets()
+    expect(got.failed_count).toBe(0)
+    expect(got.images_ready).toBe(true)
+  })
+
+  // 왜(검토 rev-flow 리드 3): 대상마다 가장 최근 작업이 실패이고 그 그림이 지금 없을 때만 "다시 그려야 할 실패"다.
+  it('대상마다 가장 최근 작업이 실패이고 그 그림이 지금 없을 때만 실패로 센다', async () => {
+    mocks.tables.locations = [
+      { project_id: P, location_id: 'bus', wide_shot: null },
+      { project_id: P, location_id: 'room', wide_shot: 'https://img/room.png' },
+    ]
+    mocks.tables.generation_jobs = [
+      { project_id: P, kind: 'world_shot', status: 'completed', created_at: OLD, target: { locationId: 'bus', column: 'wide_shot' } },
+      { project_id: P, kind: 'world_shot', status: 'failed', created_at: NEWER, target: { locationId: 'bus', column: 'wide_shot' } },
+      { project_id: P, kind: 'world_shot', status: 'failed', created_at: NEWER, target: { locationId: 'room', column: 'wide_shot' } },
+    ]
+    const got = await assets()
+    expect(got.failed_count).toBe(1)
+    expect(got.images_ready).toBe(false)
   })
 })

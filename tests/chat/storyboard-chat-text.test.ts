@@ -46,7 +46,9 @@ async function ask(body: Record<string, unknown>) {
   return { status: res.status, json: (await res.json()) as { updates?: unknown[]; reply?: string } }
 }
 const systemOf = () => (mocks.chat.mock.calls[0] as [string])[0]
-const toolNamesOf = () => ((mocks.chat.mock.calls[0] as unknown[])[5] as { appTools?: { tools: Array<{ name: string }> } }).appTools?.tools.map((tool) => tool.name) ?? []
+const toolsOf = () => ((mocks.chat.mock.calls[0] as unknown[])[5] as { appTools?: { tools: Array<{ name: string; input_schema?: unknown }> } }).appTools?.tools ?? []
+const toolNamesOf = () => toolsOf().map((tool) => tool.name)
+const workflowActionsOf = () => ((toolsOf().find((tool) => tool.name === 'project_workflow')?.input_schema as { properties: { action: { enum: string[] } } } | undefined)?.properties.action.enum ?? [])
 
 beforeEach(() => {
   mocks.chat.mockReset().mockResolvedValue(fenced('샷 2 대사를 바꾸고 다시 그릴게요.', [TEXT_EDIT, IMAGE]))
@@ -68,13 +70,15 @@ describe('Storyboard 채팅은 실사 고치기만 한다', () => {
 
   // 왜(오너 N3): 안내를 어기고 모델이 글 고치기를 내도 Storyboard 에서 글이 바뀌면 안 된다(architecture §3 받을 모양만 받는다) —
   //   모델이 "바꿨어요"라고 해도 사람이 사실을 알게 답 끝에 고정 안내를 붙인다(혼자 정한 것 c).
-  it('Storyboard 채팅 답에 글 고치기가 섞여 와도 서버는 그림 요청만 화면에 넘기고, 글은 바꾸지 않았다는 안내를 답 끝에 붙인다', async () => {
+  //   안내는 글만 아니라고 한다 — 같은 답이 그림을 다시 그리면 "아무것도 고치지 않았다"는 틀린 말이다(검토 rev-flow 리드 4).
+  it('Storyboard 채팅 답에 글 고치기가 섞여 와도 서버는 그림 요청만 화면에 넘기고, 글은 Storyboard 에서 바꾸지 않는다는 안내를 답 끝에 붙인다', async () => {
     const { status, json } = await ask({ storyboardImages: true })
     expect(status).toBe(200)
     expect(json.updates).toEqual([IMAGE])
     expect(json.reply).toContain('샷 2 대사를 바꾸고 다시 그릴게요.')
-    expect(json.reply).toContain('Storyboard에서는 글을 바꾸지 않아')
+    expect(json.reply).toContain('Storyboard에서는 글을 바꾸지 않아요')
     expect(json.reply).toContain('Writer 콘티')
+    expect(json.reply).not.toContain('아무것도')
   })
 
   // 왜(정상 경로 고정): 어느 샷을 다시 그릴지 모를 때 되묻는 것은 글 고치기가 아니다 — 질문은 그대로 넘기고 안내는 붙이지 않는다.
@@ -86,13 +90,46 @@ describe('Storyboard 채팅은 실사 고치기만 한다', () => {
     expect(json.reply).not.toContain('Storyboard에서는 글을 바꾸지 않아')
   })
 
-  // 왜(오너 N3): 고치기 도구(edit_project)가 있으면 모델이 도구로 씬 · 샷 · 대사를 저장한다 — 읽기 도구(묻는 말에 답하기)만 준다.
-  it('Storyboard 채팅에는 고치기 도구를 주지 않고 읽기 도구만 준다', async () => {
+  // 왜(오너 N3): 고치기 도구(edit_project)가 있으면 모델이 도구로 씬 · 샷 · 대사를 저장한다 — 묻는 말에 답하는 도구 · 화면 열기는 그대로 둔다.
+  //   AI 안내에도 그 도구 이름을 싣지 않는다(검토 rev-flow 리드 2 — 없는 도구를 말하면 부르려 든다).
+  it('Storyboard 채팅에는 고치기 도구(edit_project)를 주지 않고 AI 안내에도 싣지 않는다 — 묻는 말에 답하는 도구 · 화면 열기는 그대로', async () => {
     await ask({ storyboardImages: true, ...TOOLS })
     const names = toolNamesOf()
     expect(names).toContain('read_project')
+    expect(names).toContain('project_workflow')
     expect(names).not.toContain('edit_project')
-    expect(systemOf()).toMatch(/no edit_project/i)
+    expect(systemOf()).not.toContain('edit_project')
+  })
+
+  // 왜(검토 rev-flow 리드 7 · 오너 N3 "실사 고치기만"): 씬 · 샷을 다시 나누는 Writer 실행 다시 돌리기는 콘티의 일이다.
+  it('Storyboard 채팅 요청의 화면 도구에는 Writer 실행 다시 돌리기(resume)가 없고, 콘티 채팅 요청에는 지금처럼 있다', async () => {
+    await ask({ storyboardImages: true, ...TOOLS })
+    expect(workflowActionsOf()).not.toContain('resume')
+    mocks.chat.mockClear()
+    await ask({ ...TOOLS })
+    expect(workflowActionsOf()).toContain('resume')
+  })
+
+  // 왜(검토 rev-flow 리드 6): 글 부탁에 "Writer 콘티에서 고쳐요"라고 안내한다 — 사람이 가자고 하면 채팅이 그 화면을 연다는 것을 AI 가 알아야 한다.
+  it('Storyboard 채팅 AI 안내는 사람이 부탁하면 Writer 콘티 화면을 열 수 있다고 한다', async () => {
+    await ask({ storyboardImages: true })
+    expect(systemOf()).toMatch(/targetStage "?conti"?/)
+  })
+
+  // 왜(검토 rev-flow 리드 2 · architecture §3 모델 출력 무검증 실행 금지): 모델이 그 요청에 주지 않은 도구를 부르면 서버가 거절 목록에 담는다 — 화면은 그 호출을 실행하지 않는다.
+  it('Storyboard 채팅 모델이 주지 않은 고치기 도구를 부르면 서버는 그 호출을 거절 목록에 담아 넘긴다', async () => {
+    mocks.chat.mockImplementation(async (...args: unknown[]) => {
+      const opts = args[5] as { appTools?: { turn?: unknown } }
+      if (opts.appTools) opts.appTools.turn = { stopReason: 'tool_use', content: [
+        { type: 'tool_use', id: 'edit-1', name: 'edit_project', input: { resource: 'dialogue', id: 'sh_01_02', revision: 'r', patch: {} } },
+        { type: 'tool_use', id: 'read-1', name: 'read_project', input: { resource: 'shots' } },
+      ] }
+      return ''
+    })
+    const res = await POST(new Request('http://localhost/api/writer/chat', { method: 'POST', body: JSON.stringify({ message: "@샷 2 대사를 '잘 가'로 바꿔 줘", projectId: 'p1', storyboardImages: true, ...TOOLS }) }))
+    const json = (await res.json()) as { toolTurn?: unknown; rejectedToolCalls?: string[] }
+    expect(json.toolTurn).toBeDefined()
+    expect(json.rejectedToolCalls).toEqual(['edit-1'])
   })
 })
 

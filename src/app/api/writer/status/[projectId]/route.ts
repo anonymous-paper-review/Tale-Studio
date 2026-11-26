@@ -20,7 +20,7 @@ interface WriterStatusAssets {
   worlds_ready: number;
   worlds_total: number;
   queued_count: number;
-  /** 실패한 작업만 센다 — 10분 넘게 멈춘 대기 작업은 여기 섞지 않는다(stale_count). */
+  /** 실패한 작업만 센다 — 10분 넘게 멈춘 대기 작업은 여기 섞지 않는다(stale_count). 대상마다 가장 최근 작업이 실패이고 그 그림이 지금 없을 때만(지난 실패는 빼고 — 검토 rev-flow 리드 3). */
   failed_count: number;
   /** 10분 넘게 대기로 멈춘 작업 수 — 실패도 대기도 아니다. 웹훅을 놓친 유령 · 접수 확인이 안 된 예약(2026-11-14 오너 — 현황이 멈춘 작업을 따로 말하게).
    *  Lumi 가 이 키를 "멈춘 작업 N개"로 말한다(chat-tools/protocol.ts 안내). */
@@ -51,6 +51,56 @@ async function countRows(
   return count ?? 0;
 }
 
+interface ArtistJobRow { kind: string; status: string; target: unknown; created_at: string }
+const FAILED_JOB = new Set(['failed', 'errored']);
+
+/** 지금 다시 그려야 할 실패 수(검토 rev-flow 리드 3) — 대상(인물 · 배경)마다 가장 최근 작업이 실패이고 그 그림이 지금 없을 때만 센다.
+ *  같은 대상을 다시 그려 그림이 생겼거나 다시 맡긴 작업이 더 최근이면 지난 실패는 세지 않는다. 대상을 모르는 옛 실패 작업은 지금처럼 센다.
+ *  그림이 있는가는 위 준비 판정과 같은 기준(인물: 대표 그림 · 후보 · 대표 모습 시트, 배경: wide_shot). */
+async function currentArtistFailures(projectId: string, rows: readonly ArtistJobRow[], charReadyWithoutViewMain: ReadonlySet<string>): Promise<number> {
+  const latest = new Map<string, { status: string; at: string }>();
+  let untargeted = 0;
+  for (const row of rows) {
+    const target = (row.target && typeof row.target === 'object' ? row.target : {}) as { characterId?: unknown; locationId?: unknown };
+    const key = row.kind === 'character_view' && typeof target.characterId === 'string' && target.characterId
+      ? `char:${target.characterId}`
+      : row.kind === 'world_shot' && typeof target.locationId === 'string' && target.locationId
+        ? `loc:${target.locationId}`
+        : null;
+    if (!key) {
+      if (FAILED_JOB.has(row.status)) untargeted += 1;
+      continue;
+    }
+    const at = String(row.created_at ?? '');
+    const prev = latest.get(key);
+    if (!prev || at >= prev.at) latest.set(key, { status: row.status, at });
+  }
+  const failedIds = (prefix: string) => [...latest].filter(([key, job]) => key.startsWith(prefix) && FAILED_JOB.has(job.status)).map(([key]) => key.slice(prefix.length));
+  const failedCharacters = failedIds('char:');
+  const failedLocations = failedIds('loc:');
+  let missing = 0;
+  if (failedCharacters.length) {
+    const { data, error } = await supabaseAdmin
+      .from('characters')
+      .select('character_id, view_main')
+      .eq('project_id', projectId)
+      .eq('origin', 'producer')
+      .in('character_id', failedCharacters);
+    if (error) throw new Error(error.message ?? 'failed character query failed');
+    missing += ((data ?? []) as Array<{ character_id: string; view_main: unknown }>).filter((row) => row.view_main == null && !charReadyWithoutViewMain.has(row.character_id)).length;
+  }
+  if (failedLocations.length) {
+    const { data, error } = await supabaseAdmin
+      .from('locations')
+      .select('location_id, wide_shot')
+      .eq('project_id', projectId)
+      .in('location_id', failedLocations);
+    if (error) throw new Error(error.message ?? 'failed location query failed');
+    missing += ((data ?? []) as Array<{ location_id: string; wide_shot: unknown }>).filter((row) => row.wide_shot == null).length;
+  }
+  return untargeted + missing;
+}
+
 async function computeAssets(
   projectId: string,
   pipelineCompleted: boolean,
@@ -66,7 +116,7 @@ async function computeAssets(
       worldsTotal,
       worldsReady,
       queuedCount,
-      failedJobs,
+      artistJobsResult,
       staleQueuedJobs,
       candidateResult,
       sheetResult,
@@ -115,14 +165,12 @@ async function computeAssets(
           .eq('status', 'queued')
           .gte('created_at', cutoff),
       ),
-      countRows(
-        supabaseAdmin
-          .from('generation_jobs')
-          .select('id', { count: 'exact', head: true })
-          .eq('project_id', projectId)
-          .in('kind', ['character_view', 'world_shot'])
-          .in('status', ['failed', 'errored']),
-      ),
+      // 인물 · 배경 그림 작업 — 대상마다 가장 최근 작업을 보고 지금 실패인지 가린다(검토 rev-flow 리드 3, 아래 currentArtistFailures).
+      supabaseAdmin
+        .from('generation_jobs')
+        .select('kind, status, target, created_at')
+        .eq('project_id', projectId)
+        .in('kind', ['character_view', 'world_shot']),
       countRows(
         supabaseAdmin
           .from('generation_jobs')
@@ -157,6 +205,7 @@ async function computeAssets(
     if (projectResult.error) throw new Error(projectResult.error.message ?? 'project query failed');
     if (candidateResult.error) throw new Error(candidateResult.error.message ?? 'candidate query failed');
     if (sheetResult.error) throw new Error(sheetResult.error.message ?? 'appearance sheet query failed');
+    if (artistJobsResult.error) throw new Error(artistJobsResult.error.message ?? 'artist job query failed');
 
     const idsOf = (rows: unknown) => ((rows ?? []) as Array<{ character_id?: unknown }>)
       .map((row) => row.character_id)
@@ -177,6 +226,7 @@ async function computeAssets(
       : 0;
 
     const charsReady = Math.min(charsTotal, charsWithImage + charsReadyFromCandidates);
+    const failedJobs = await currentArtistFailures(projectId, (artistJobsResult.data ?? []) as ArtistJobRow[], new Set(readyWithoutViewMain));
     // 멈춘 대기 작업은 실패로 합치지 않고 따로 센다 — 합치면 AI 가 "마지막 시도가 실패했어요"라고 DB(대기 그대로)와 다르게 말했다.
     const imagesReady = charsReady === charsTotal && worldsReady === worldsTotal;
     const designTokensPresent = projectResult.data?.design_tokens != null;

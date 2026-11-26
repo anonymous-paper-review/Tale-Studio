@@ -3766,7 +3766,7 @@ export const KO: Record<string, string> = {
   '{shot} has no rough storyboard. Draw it in Writer, then ask again.': '{shot}은(는) 콘티 그림이 없어요. Writer 콘티에서 그린 뒤 다시 부탁해 주세요.',
   "Couldn't redraw {shot}. Please ask again.": '{shot}을(를) 다시 그리지 못했어요. 다시 부탁해 주세요.',
   // Storyboard 채팅은 글을 고치지 않는다(오너 2026-11-27 N3) — 모델이 글 고치기를 냈으면 떨구고 답 끝에 붙이는 안내.
-  "Storyboard doesn't change text, so nothing was rewritten. Edit the story, shots and dialogue in Writer's rough storyboard. Dialogue can also be edited right in the Dialogue tab.": 'Storyboard에서는 글을 바꾸지 않아 아무것도 고치지 않았어요. 이야기 · 샷 · 대사는 Writer 콘티에서 고칠 수 있어요(대사는 대사 탭에서 바로 고칠 수도 있어요).',
+  "Storyboard doesn't change text. Edit the story, shots and dialogue in Writer's rough storyboard. Dialogue can also be edited right in the Dialogue tab.": 'Storyboard에서는 글을 바꾸지 않아요. 이야기 · 샷 · 대사는 Writer 콘티에서 고칠 수 있어요(대사는 대사 탭에서 바로 고칠 수도 있어요).',
   // 보드 진행 줄 · 화면 설명 · 첫 진입 안내.
   'Storyboard progress': '스토리보드 진행 현황',
   'Not real yet': '실사 없음',

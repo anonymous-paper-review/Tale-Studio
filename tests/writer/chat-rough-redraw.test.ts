@@ -1,4 +1,5 @@
-// Storyboard 채팅으로 러프가 있는 샷의 그림에 보이는 내용을 고치면, 그림은 예전 그대로라고 알리고 [러프 다시 그리기]를 주는지 검사한다
+// 콘티 채팅으로 러프가 있는 샷의 그림에 보이는 내용을 고치면, 그림은 예전 그대로라고 알리고 [러프 다시 그리기]를 주는지 검사한다
+//   (오너 2026-11-27 N3 — 채팅 글 고치기는 콘티의 일이다. Storyboard 채팅은 글을 고치지 않는다: tests/chat/storyboard-chat-store.test.ts)
 import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -54,7 +55,7 @@ function modelEdits(resource: 'shots' | 'scenes', id: string, patch: Record<stri
 beforeEach(() => {
   chat.getState().reset()
   project.getState().resetProject()
-  project.setState({ projectId: 'p-redraw', currentStage: 'writer', reachedStage: 'writer', projectLocale: 'ko', projectLocaleLocked: true })
+  project.setState({ projectId: 'p-redraw', currentStage: 'conti', reachedStage: 'conti', projectLocale: 'ko', projectLocaleLocked: true })
   useWriterStore.setState({ sceneManifest: manifest([scene('sc_01'), scene('sc_02')]), shots: [shot('sh_01_02', true), shot('sh_01_03', false), shot('sh_01_04', true), shot('sh_02_05', true, 'sc_02')], error: null })
   useBoardUiStore.setState({ boardProjectId: 'p-redraw', roughRedrawRequest: null })
   mocks.workflow.mockReset().mockResolvedValue({ status: 'ok' })
@@ -129,7 +130,7 @@ describe('채팅 고치기 뒤 [러프 다시 그리기] 제안', () => {
     await chat.getState().sendMessage('씬1 샷2를 클로즈업으로 바꿔줘')
 
     const suggestion = chat.getState().suggestion
-    expect(suggestion?.stage).toBe('writer')
+    expect(suggestion?.stage).toBe('conti')
     expect(suggestion?.action).toEqual({ kind: 'roughRedraw', projectId: 'p-redraw', shotIds: ['sh_01_02'], label: '러프 다시 그리기' })
     expect(suggestion?.content).toContain('예전 그대로')
     expect(useBoardUiStore.getState().roughRedrawRequest).toBeNull()
@@ -152,7 +153,7 @@ describe('채팅 고치기 뒤 [러프 다시 그리기] 제안', () => {
   })
 
   // 왜: 리뷰 B1 — 보드가 없는 화면에서 남은 제안 · 요청이 다음에 열리는 다른 프로젝트 보드에서 그려졌다. 그 프로젝트 보드가 열려 있을 때만 묻는다.
-  it('그 프로젝트의 Storyboard 보드가 열려 있지 않으면 채팅이 [러프 다시 그리기]를 묻지 않는다', async () => {
+  it('그 프로젝트의 콘티 보드가 열려 있지 않으면 채팅이 [러프 다시 그리기]를 묻지 않는다', async () => {
     useBoardUiStore.setState({ boardProjectId: null })
     modelEdits('shots', 'sh_01_02', { shotType: 'CU' })
     await chat.getState().sendMessage('씬1 샷2를 클로즈업으로 바꿔줘')
