@@ -957,27 +957,15 @@ function CanvasInner() {
 const TOOLBAR_PILL =
   'flex h-[34px] shrink-0 items-center gap-1.5 rounded-full bg-background px-3.5 text-[13px] font-medium text-foreground shadow-node transition-colors duration-100 hover:bg-card'
 
-// Alt+←/→ 순환 뷰 시퀀스(#keyboard-only 2026-08-11) — Node → Storyboard(Previz) → Storyboard(Real).
-const DIRECTOR_VIEW_CYCLE = ['node', 'previz', 'real'] as const
-type DirectorViewStep = (typeof DIRECTOR_VIEW_CYCLE)[number]
+// Alt+←/→ 순환 뷰 시퀀스(#keyboard-only 2026-08-11) — Node ↔ Storyboard.
+//   스토리보드 보기는 실사만 보인다(오너 2026-11-26 D1 "러프/실사 버튼 없애기") — 예전 세 칸(Node → 러프 → 실사)에서 러프 칸을 뺐다.
+const DIRECTOR_VIEW_CYCLE = ['node', 'storyboard'] as const
 
 function PaletteBar() {
   const t = useT()
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
-  const storyboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
-  const setStoryboardMediaMode = useDirectorCanvasStore((s) => s.setStoryboardMediaMode)
-  // 두 상태(viewMode, mediaMode)를 하나의 걸음으로 합쳐 순환한다.
-  const viewStep: DirectorViewStep =
-    viewMode === 'node' ? 'node' : storyboardMediaMode === 'real' ? 'real' : 'previz'
-  useAltArrowCycle(DIRECTOR_VIEW_CYCLE, viewStep, (next) => {
-    if (next === 'node') {
-      setViewMode('node')
-      return
-    }
-    setViewMode('storyboard')
-    setStoryboardMediaMode(next)
-  })
+  useAltArrowCycle(DIRECTOR_VIEW_CYCLE, viewMode, setViewMode)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   // #real-grid: 일괄 생성은 4샷 시트 러너(runRealBatch)로 통합 — 진행 플래그는 스토어 공유.
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
@@ -1238,27 +1226,7 @@ function PaletteBar() {
             </Tabs>
           </AltArrowHint>
 
-          {/* 러프 | 실사 미디어 토글(#previz-video) — Storyboard 뷰 전용, 상단바 상주(2026-07-22). */}
-          {viewMode === 'storyboard' && (
-            <div className="flex h-9 items-center gap-0.5 rounded-full bg-background p-1 shadow-node">
-              {(['previz', 'real'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setStoryboardMediaMode(m)}
-                  aria-pressed={storyboardMediaMode === m}
-                  className={cn(
-                    'h-full rounded-full px-3 text-[13px] transition-colors',
-                    storyboardMediaMode === m
-                      ? 'bg-accent font-semibold text-foreground'
-                      : 'font-medium text-subtle-foreground hover:text-foreground',
-                  )}
-                >
-                  {m === 'previz' ? t('Rough') : t('Real')}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* 러프 | 실사 단추는 없앴다(오너 2026-11-26 D1) — 스토리보드 보기는 늘 실사. 러프는 Writer 콘티가 맡는다. */}
 
           {/* 제목(#e1 2026-07-14 스테이지 헤더 → v3 툴바 안) — 설명문은 "?" 뱃지 호버(2026-08-06). */}
           <div className="flex min-w-0 items-center gap-2">
