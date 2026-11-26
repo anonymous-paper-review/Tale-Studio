@@ -89,8 +89,8 @@ Non-destructive (direct execution — the app runs these at once):
 6. {"type":"setCamera","id":"<shotOrVideoId>","camera":{"horizontal":0,"vertical":0,"pan":0,"tilt":0,"roll":0,"zoom":0}}
 7. {"type":"setLighting","id":"<shotOrVideoId>","lighting":{"position":"left|top|right|front","brightness":50,"colorTemp":5600}}
 8. {"type":"setCameraPreset","id":"<shotOrVideoId>","preset":{"brand":"arri","focalLength":35,"aperture":2.8,"whiteBalance":5600}}
-9. {"type":"generateImage","id":"<shotId>"}  — the live-action image of that shot. Leave "id" out to make every shot that has no image yet. It runs at once and uses no Takes.
-9b. {"type":"generateVideos","shotIds":["<shotId>", ...]}  — videos for those shots. Leave "shotIds" out only for every remaining shot. It runs at once and uses Takes.
+9. {"type":"generateImage","id":"<shotId>","change":"..."}  — the live-action image of that shot. Leave "id" out to make every shot that has no image yet. It runs at once and uses no Takes. Add "change" only to fix that shot's current image: what to change, in one or two sentences. The app keeps everything else in the current image.
+9b. {"type":"generateVideos","shotIds":["<shotId>", ...],"change":"..."}  — videos for those shots. Leave "shotIds" out only for every remaining shot. It runs at once and uses Takes. Add "change" only to remake a shot's video with a fix: what to change, in one or two sentences. The app keeps the shot text and the writer's motion.
     (Changes to a shot's name or prompt and a scene's name, place, time of day, mood or description are shown to the user as before and after, and change only when the user picks Apply.)
 10. {"type":"connect","sourceId":"<id>","targetId":"<id>","category":"relates-to","relationText":"..."}
 11. {"type":"connectFrame","sourceId":"<sourceId|tempId>","targetId":"<videoId|tempId>","targetHandle":"frame-start"|"frame-end"|"frame-ref"}
@@ -107,6 +107,7 @@ Destructive — opens confirmation modal (NOT immediate):
 <hybrid_intent_rule>
 - For free canvas edits, emit only the requested edit actions. Never infer or append generateImage or generateVideos.
 - Emit generateImage only when the user explicitly asks to generate or regenerate an image.
+- When the user asks to fix a shot's image or video, put what to change in "change" of generateImage or generateVideos for that shot. Do not rewrite the shot prompt with updateShot unless the user also asks to change the shot text.
 - When you change a shot's prompt or a scene's text, say that you prepared the change for the user to check, not that it is changed.
 </hybrid_intent_rule>
 
@@ -255,6 +256,12 @@ function asNonEmptyString(x: unknown): string | undefined {
   const value = x.trim()
   return value ? value : undefined
 }
+/** 고치기의 바꿀 점(오너 2026-11-26 O5 · O8) — 빈 글은 버리고, 그림 · 영상 서버가 받는 1000자까지만 넘긴다. */
+function asChangeNote(x: unknown): string | undefined {
+  if (typeof x !== 'string') return undefined
+  const text = x.trim()
+  return text ? text.slice(0, 1000) : undefined
+}
 function asObj(x: unknown): Record<string, unknown> | null {
   return x && typeof x === 'object' ? (x as Record<string, unknown>) : null
 }
@@ -401,18 +408,23 @@ function validateCanvasUpdates(raw: unknown[]): unknown[] {
       }
       case 'generateImage': {
         // id 는 선택 — 없으면 미생성 전체 일괄(#c5). 있으면 그 Shot 만.
-        out.push(asString(rec.id) ? { type: 'generateImage', id: rec.id } : { type: 'generateImage' })
+        const image = asString(rec.id) ? { type: 'generateImage', id: rec.id } : { type: 'generateImage' }
+        // 바꿀 점(오너 2026-11-26 O8 (a))은 샷을 정한 그림 고치기에만 싣는다 — "빈 샷 전부"는 고치기가 아니다.
+        const change = 'id' in image ? asChangeNote(rec.change) : undefined
+        out.push(change ? { ...image, change } : image)
         break
       }
       case 'generateVideos': {
         // shotIds 가 있으면 그 샷만, 칸이 아예 없으면 남은 샷 전부 — 화면이 막이(말한 샷만) · Take 셈 뒤 바로 시작한다(오너 2026-11-14 9번).
         //   칸은 있는데 쓸 값이 없으면 "전부"로 바꾸지 않고 빈 목록으로 넘긴다 — 화면이 번호를 묻는다(검토 b 보통 2).
+        // 바꿀 점(오너 O8 (e)(f)) — 영상 다시 만들기(새 Take)의 고칠 점. 샷 글에 붙이지 않고 따로 넘긴다.
+        const videoChange = asChangeNote(rec.change)
         if (!('shotIds' in rec)) {
-          out.push({ type: 'generateVideos' })
+          out.push(videoChange ? { type: 'generateVideos', change: videoChange } : { type: 'generateVideos' })
           break
         }
         const shotIds = Array.isArray(rec.shotIds) ? rec.shotIds.flatMap((id) => (asNonEmptyString(id) ? [asNonEmptyString(id)!] : [])) : []
-        out.push({ type: 'generateVideos', shotIds })
+        out.push(videoChange ? { type: 'generateVideos', shotIds, change: videoChange } : { type: 'generateVideos', shotIds })
         break
       }
       case 'generateVideo':

@@ -28,6 +28,9 @@ import { applyStyleAnchor, resolveStyleAnchor, type AnchorableSubmit } from '@/l
 import { appendCheckConstraints, parseCheckConstraints } from '@/lib/writer/check-notes'
 import { englishTimeOfDay, isReflectionShot, quotePreviousShot, roughIsStaticHold, stillCharacterLabel, stillConstraints } from '@/lib/director/still-prompt'
 import { buildPhotoStripPrompt, type PhotoCharacterLabel } from '@/lib/director/photo-strip'
+import { buildStripFixPrompt } from '@/lib/director/strip-fix-prompt'
+import { currentStripFrames } from '@/lib/director/storyboard-image'
+import { promptWithChange } from '@/lib/director/shot-detail'
 import { realCineLine } from '@/lib/director/real-cine-line'
 import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
 import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
@@ -59,7 +62,7 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, writerShotId, prompt, referenceImageUrls, aspectRatio, traceId, imageModel, characterRefCount: bodyCharCount, worldRefCount: bodyWorldCount } =
+    const { projectId, writerShotId, prompt: requestPrompt, referenceImageUrls, aspectRatio, traceId, imageModel, characterRefCount: bodyCharCount, worldRefCount: bodyWorldCount, changeNote } =
       (await req.json()) as {
         projectId?: string
         writerShotId?: string
@@ -70,7 +73,15 @@ export async function POST(req: Request) {
         imageModel?: string
         characterRefCount?: number
         worldRefCount?: number
+        /** 바꿀 점(오너 2026-11-26 O5 · (a)) — 글에 붙이지 않고 따로 받는다. 지금 실사 그림이 있으면 그 그림을 바탕으로 고친다. */
+        changeNote?: string
       }
+    // 바꿀 점은 한두 문장이다 — 긴 글이 시트 지시문을 밀어내지 않게, 돈이 드는 요청 전에 막는다.
+    if (changeNote !== undefined && (typeof changeNote !== 'string' || changeNote.length > 1000)) {
+      return NextResponse.json({ error: 'Invalid request: changeNote must be text up to 1000 characters' }, { status: 400 })
+    }
+    const change = changeNote?.trim() || null
+    const prompt = requestPrompt
     // #image-model-select: 화이트리스트 밖 모델명은 400 — 임의 fal 경로 주입 방지.
     //   실제 엔드포인트는 reference 유무가 정해지는 submit 시점에 고른다(#registry-merge).
     if (imageModel !== undefined && !isImageModelKey(imageModel)) {
@@ -106,7 +117,7 @@ export async function POST(req: Request) {
         .maybeSingle(),
       supabaseAdmin
         .from('shots')
-        .select('shot_id, scene_id, source, sort_order, rough_storyboard, check_notes, characters, character_appearance_keys, static_spec, director_refs, dynamic_spec, design_ref, prompt, action_description, action_description_native')
+        .select('shot_id, scene_id, source, sort_order, rough_storyboard, check_notes, characters, character_appearance_keys, static_spec, director_refs, dynamic_spec, design_ref, prompt, action_description, action_description_native, storyboard_image')
         .eq('project_id', projectId)
         .eq('shot_id', writerShotId)
         .maybeSingle(),
@@ -196,9 +207,14 @@ export async function POST(req: Request) {
     //   영상 라우트(#w-c)와 동일하게 서버 최종 방어로 EN 파생. 이미 영어면 LLM 없이 통과,
     //   실패 항목은 맵에 없어 원문 폴백. 배치 그리드 라우트는 산문을 싣지 않아 해당 없음.
     let promptEn = prompt
+    // 바꿀 점도 같은 한 번의 번역에 싣는다(한국어면 영어로, 이미 영어면 LLM 없이 그대로).
+    let changeEn = change
     try {
-      const en = (await deriveEnBatch([{ id: 'p', native: prompt }], 'director storyboard prompt')).get('p')
+      const derived = await deriveEnBatch([{ id: 'p', native: prompt }, ...(change ? [{ id: 'c', native: change }] : [])], 'director storyboard prompt')
+      const en = derived.get('p')
       if (en) promptEn = en
+      const enChange = derived.get('c')
+      if (enChange) changeEn = enChange
     } catch (err) {
       console.warn('[director/generate-storyboard] EN derive skipped:', err instanceof Error ? err.message : err)
     }
@@ -210,7 +226,7 @@ export async function POST(req: Request) {
       } | null
     )?.frames
     // 약속 I4: 이 실사가 참조하는 러프의 시각 — 나중에 러프가 바뀌면 카드에 "러프 바뀜"이 뜬다.
-    const roughGeneratedAt = (shot?.rough_storyboard as { generatedAt?: number } | null)?.generatedAt
+    const roughFramesAt = (shot?.rough_storyboard as { generatedAt?: number } | null)?.generatedAt
     const stripFrames =
       roughFrames?.start && roughFrames.direction && roughFrames.end
         ? { start: roughFrames.start, direction: roughFrames.direction, end: roughFrames.end }
@@ -228,6 +244,16 @@ export async function POST(req: Request) {
         { status: 409 },
       )
     }
+
+    // 이미지 고치기(오너 2026-11-26 O5 · (a) "지금 그림을 참고로"): 바꿀 점이 있고 지금 실사 세 칸이 있으면 그 시트를 바탕으로 바꿀 점만 고친다.
+    //   지금 그림이 없으면(처음 그리기 · 실패 뒤) 바탕이 없으니 예전처럼 러프 시트로 그리고 바꿀 점을 글 끝에 붙인다.
+    const currentImage = (shot as { storyboard_image?: unknown } | null)?.storyboard_image
+    const fixFrames = change && stripFrames ? currentStripFrames(currentImage) : null
+    if (changeEn && !fixFrames) promptEn = promptWithChange(promptEn, changeEn)
+    // 약속 I4 의 러프 시각 — 고친 그림은 바탕 그림의 구도를 이어받으므로 바탕 그림이 따른 러프 시각을 그대로 잇는다
+    //   (그 뒤 러프가 바뀌었으면 "러프 바뀜"이 남는다). 바탕 그림에 기록이 없으면 적지 않는다(옛 실사처럼 판정하지 않음).
+    const baseRoughAt = fixFrames ? (currentImage as { roughGeneratedAt?: unknown } | null)?.roughGeneratedAt : undefined
+    const roughGeneratedAt = fixFrames ? (typeof baseRoughAt === 'number' ? baseRoughAt : undefined) : roughFramesAt
 
     // #n-1(2026-08-05): 같은 씬 직전 샷의 종료 상태를 서버측 첨부 — 샷별 독립 잡이던 실사의
     //   연속성 봉합. DB pull 이라 잡 간 의존이 생기지 않는다 (architecture §0: 둘 다 진실을 읽는다).
@@ -283,7 +309,28 @@ export async function POST(req: Request) {
     let stripSheetFormat: ReturnType<typeof parseProjectFormat> = null
     // 이번 시트 크기('WxH') — 비율로만 그리는 모델(Nano Banana 2)이 이 시트를 그릴 수 있는지 판정한다(리드 Q2 길 a).
     let stripSheetCanvas: string | null = null
-    if (stripFrames) {
+    if (stripFrames && fixFrames && changeEn) {
+      // 고치기: 지금 실사 세 칸을 같은 시트 틀에 합쳐 1번 참고로 — 인물 시트 · 배경은 얼굴 · 장소를 지키는 뒤 참고로만. 그림체 앵커는 싣지 않는다(지금 그림이 이미 그 그림체).
+      const composed = await composeRoughReferenceStrip(fixFrames, projectFormat)
+      stripSheetFormat = composed.sheetFormat
+      stripSheetCanvas = composed.geometry.repaintCanvas
+      const fixPath = `${project.workspace_id}/${projectId}/shots/${storageKeySegment(writerShotId)}_storyboard_fix_strip.png`
+      const { error: fixUpErr } = await mediaUpload(fixPath, composed.buffer, { contentType: 'image/png', upsert: true })
+      if (fixUpErr) throw fixUpErr
+      stripRefUrl = `${mediaPublicUrl(fixPath)}?v=${Date.now()}`
+      finalOpts = {
+        prompt: buildStripFixPrompt({
+          change: changeEn,
+          shotDescription: promptEn,
+          frameAxis: composed.geometry.frameAxis,
+          characterRefCount: refCounts.characterRefCount,
+          worldRefCount: refCounts.worldRefCount,
+          extraRefCount: refCounts.extraRefCount,
+        }),
+        image_size: composed.geometry.repaintCanvas,
+        reference_image_urls: [stripRefUrl, ...assembledRefs],
+      }
+    } else if (stripFrames) {
       // #F-006: 씬 시간대를 스트립 리페인트에 배선 — 샷 산문의 시간대 단어는 확률적이라(실측
       //   1e166e55 sc_04: 7샷 중 4샷에만 존재) scenes.time_of_day 진실로 고정한다.
       let sceneNarrativeTime: string | null = null
@@ -403,6 +450,9 @@ export async function POST(req: Request) {
           }
         : null,
       ...(stripRefUrl ? { strip_ref_url: stripRefUrl } : {}),
+      // 고치기(오너 O5 · (a)) — 바꿀 점과 바탕으로 삼은 지금 세 칸(어느 판을 고쳤는지 기록으로 남긴다).
+      ...(changeEn ? { change_note: changeEn } : {}),
+      ...(fixFrames ? { fix_base_frames: fixFrames } : {}),
       // #sheet-formats: finalize 크롭·방향 가드가 이 값으로 같은 지오메트리를 복원한다.
       sheet_format: stripSheetFormat,
       // fal 요청 본문 캡처의 자리 — 예약 시점에는 접수 응답이 없어 빈 값이고, 접수가 확정되면
@@ -417,6 +467,8 @@ export async function POST(req: Request) {
       moderation = await assertUserTextAllowed(
         [
           promptEn,
+          // 고치기의 바꿀 점(지금 그림 바탕) — 지금 그림이 없어 글 끝에 붙인 경우는 promptEn 에 이미 들어 있다.
+          ...(changeEn && fixFrames ? [changeEn] : []),
           ...(constraints ?? parseCheckConstraints(checkNotes)),
           continuityPrevText,
           ...(characterRefLabels ?? []).flatMap((r) => [r.name, r.pose, ...(photoLook ? [r.look] : [])]),

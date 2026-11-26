@@ -463,6 +463,8 @@ async function prepareVideoRequest(
       frameSource?: 'manual' | 'auto'
       /** 영상 노드가 고른 해상도(오너 2026-10-31) — '720p' | '1080p', 없으면 720p. */
       resolution?: unknown
+      /** 영상 고치기의 바꿀 점(오너 2026-11-26 O5 · (e)(f)) — 샷 글에 붙이지 않고 따로 받아 움직임 약속 바로 뒤에 싣는다. */
+      changeNote?: unknown
     }
     let {
       prompt,
@@ -493,6 +495,11 @@ async function prepareVideoRequest(
     if (traceId !== undefined && !isChatTraceId(traceId)) {
       return NextResponse.json({ error: 'Invalid request: traceId must be a UUID' }, { status: 400 })
     }
+    // 영상 고치기의 바꿀 점(오너 2026-11-26 O5 · (e)(f)) — 한두 문장이다. 긴 글이 지시문을 밀어내지 않게 Take 를 잡기 전에 막는다.
+    if (body.changeNote !== undefined && (typeof body.changeNote !== 'string' || body.changeNote.length > 1000)) {
+      return NextResponse.json({ error: 'Invalid request: changeNote must be text up to 1000 characters' }, { status: 400 })
+    }
+    const change = typeof body.changeNote === 'string' ? body.changeNote.trim() : ''
     // V2 refs(#real-strip): [START, END] 등 다중 레퍼런스. referenceImageUrl(단일)과 병행 수신 —
     //   단일은 I2V 판별·스냅샷 하위호환 축, 배열은 실제 제출 레퍼런스로 우선.
     const clientReferenceImageUrls = Array.isArray(body.referenceImageUrls)
@@ -699,9 +706,14 @@ async function prepareVideoRequest(
     //   서버 최종 방어로 여기서 파생한다: 이미 영어면 deriveEnBatch 가 LLM 없이 통과라 파이프라인
     //   샷은 비용 0, 실패 항목은 맵에 없어 원문 폴백. 대사 원문은 dialogueClause 가 따로 싣는다.
     let promptEn = prompt
+    // 바꿀 점도 같은 한 번의 번역에 싣는다(한국어면 영어로, 이미 영어면 LLM 없이 그대로).
+    let changeEn = change
     try {
-      const en = (await deriveEnBatch([{ id: 'p', native: prompt }], 'director video prompt')).get('p')
+      const derived = await deriveEnBatch([{ id: 'p', native: prompt }, ...(change ? [{ id: 'c', native: change }] : [])], 'director video prompt')
+      const en = derived.get('p')
       if (en) promptEn = en
+      const enChange = derived.get('c')
+      if (enChange) changeEn = enChange
     } catch (err) {
       console.warn('[director/generate-video] EN derive skipped:', err instanceof Error ? err.message : err)
     }
@@ -861,6 +873,8 @@ async function prepareVideoRequest(
         subjects,
         fallbackContract: !dynamicSpec,
       } : {}),
+      // 영상 고치기(오너 O5 · (e)(f)) — 바꿀 점은 샷 글에 붙이지 않고(그래야 움직임 글이 남는다) 움직임 약속 바로 뒤에.
+      ...(changeEn ? { change: changeEn } : {}),
     })
     // #creem-moderation(2026-10-11): 최종 프롬프트가 확정된 직후·자리 예약(submitPreparedVideo) 전에
     //   사용자 글만 검사한다 — 샷 산문(모션 프롬프트 포함)과 대사. 모션 계약·카메라 기재·negative_prompt
@@ -870,6 +884,7 @@ async function prepareVideoRequest(
     // 실사 그림체: 움직임 약속 · 대사에 싣는 인물 이름과 겉모습도 사람이 고쳐 쓸 수 있는 글이다 — 같이 검사한다.
     const moderationParts = [
       promptForVideo,
+      ...(changeEn ? [changeEn] : []),
       ...(dialogueLines ?? []).map((line) => line?.text),
       ...(subjects ? [...subjects.values()].flatMap((person) => [person.name, person.anchor]) : []),
       ...(aligned && dialogueSpeakers ? Object.values(dialogueSpeakers).flatMap((speaker) => [speaker.name, speaker.appearance]) : []),

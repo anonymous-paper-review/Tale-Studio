@@ -20,6 +20,8 @@ export type VideoPromptParts = {
   /** #u17-3: 레퍼런스 권위 절 — I2V 에서 텍스트↔레퍼런스 상충 시 레퍼런스가 이긴다. */
   referenceAuthority?: string
   referenceRoles?: string
+  /** 영상 고치기의 바꿀 점(오너 2026-11-26 O5 · (e)(f)) — 움직임 약속 바로 뒤에 실린다. 고치기가 아니면 미설정. */
+  change?: string
 }
 
 export type VideoReferenceImageRole = 'start' | 'end' | 'ref'
@@ -65,6 +67,11 @@ export type BuildVideoPromptInput = {
   subjects?: ReadonlyMap<string, ContractSubject> | null
   /** 설계가 없는 샷에도 시간 · 지어내기 금지 규칙을 싣는다. */
   fallbackContract?: boolean
+  /**
+   * 영상 고치기의 바꿀 점(영어, 오너 2026-11-26 O5 · (e)(f)) — 샷 글에 붙이지 않고 움직임 약속 바로 뒤에 "Change from the previous take: …"로 싣는다.
+   *   앞쪽이라 길이 상한에 잘리지 않는다. 없거나 비면 지금과 글자까지 같다.
+   */
+  change?: string
 }
 
 /** 실사 그림체 영상 지시문의 앞부분 상한 — 글 상한이 없는 모델(Seedance · Veo …)도 이만큼까지만(옛 1,400 · 1,650자는 문장 중간에서 잘렸다). */
@@ -269,6 +276,9 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   const prompt_parts: VideoPromptParts = { prompt, movement: movementFragment, gear: gearFragment, camera: cameraText }
   if (contract.text) prompt_parts.motionContract = contract.text
   if (dialogue) prompt_parts.dialogue = dialogue
+  // 영상 고치기의 바꿀 점(오너 O5 · (e)(f)) — 움직임 약속 바로 뒤 · 대사와 샷 글 앞. 상한은 뒤에서 자르므로 여기는 잘리지 않는다.
+  const changeText = parts.change?.trim() ? `Change from the previous take: ${parts.change.trim()}` : ''
+  if (changeText) prompt_parts.change = changeText
   // 계약문이 맨 앞(모델이 앞 토큰을 강하게 가중) — 그 뒤 장면 묘사·수동 카메라·기어.
   //   계약 있는 경로는 캡을 950 으로: 계약(~400자)이 묘사문에 밀려 잘리지 않게. 레거시(계약 없음)는 500 유지.
   // 대사는 계약 바로 뒤(#g7) — 앞 토큰 가중을 받되 모션 계약을 밀어내지 않는 자리.
@@ -290,7 +300,7 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
     designed
       ? `${limit === null ? head : clipSentences(head, Math.max(0, limit - tail.length - 1))} ${tail}`
       : `${head} ${tail}`.slice(0, legacyMax)
-  const pieces = [contract.text, dialogue, prompt, movementFragment, gearFragment, cameraText].filter(Boolean)
+  const pieces = [contract.text, changeText, dialogue, prompt, movementFragment, gearFragment, cameraText].filter(Boolean)
   let fullPrompt = designed
     ? clipSentences(closeSentence(joinSentences(pieces)), limit === null ? cap : Math.min(cap, limit))
     : pieces.join('. ').slice(0, cap)

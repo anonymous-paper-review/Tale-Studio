@@ -39,3 +39,19 @@ export function storyboardImageEndFrame(raw: unknown): string | null {
 export function hasStoryboardImage(raw: unknown): boolean {
   return storyboardImageStartFrame(raw) !== null
 }
+
+/**
+ * 이미지 고치기의 바탕(오너 2026-11-26 O5 · (a) "지금 그림을 참고로") — 지금 그림(고른 판)의 세 칸(시작 · 방향 · 끝).
+ *   하나라도 없거나(올린 한 장 · 옛 단일 그림) 완료가 아니거나(실패) 고른 판이 없으면(멈춘 그림만) null — 부르는 쪽은 러프 시트로 그린다.
+ */
+export function currentStripFrames(raw: unknown): { start: string; direction: string; end: string } | null {
+  if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null
+  const img = raw as StoryboardImageLike & { versionId?: unknown; frames?: { start?: unknown; direction?: unknown; end?: unknown } | null }
+  if (typeof img.status === 'string' && img.status !== 'completed') return null
+  if (img.versionId === null) return null
+  const pick = (value: unknown) => (typeof value === 'string' && value.trim() ? value.trim() : null)
+  const start = pick(img.frames?.start)
+  const direction = pick(img.frames?.direction)
+  const end = pick(img.frames?.end)
+  return start && direction && end ? { start, direction, end } : null
+}
