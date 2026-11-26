@@ -205,9 +205,13 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
     : null
   // 다른 작품 스타일 판에서 그린 그림이면 채택할 수 없다 — 상세 기록(시계)의 [불러오기]와 같은 판정 · 같은 덧말.
   const viewingState = viewingCandidate ? historyStyle.describe?.(viewingCandidate) ?? null : null
+  // 그 칸을 다시 그리는 중이면 채택하지 않는다 — 끝난 새 그림이 채택을 덮는다(Director · Storyboard 상세와 같은 규칙, 검토 11/26).
+  const adoptReason = viewingState?.disabled
+    ? t('It is in another style, so it cannot be adopted')
+    : isGenerating ? t('You can adopt it after the image is remade.') : null
   // [채택] — 그 그림을 고른다(기록 [불러오기]와 같은 길, 다시 그리지 않는다). 카드 그림이 그 그림이 되면 보는 줄이 사라진다.
   const adopt = async () => {
-    if (!viewingCandidate || viewingState?.disabled) return
+    if (!viewingCandidate || adoptReason) return
     setAdopting(true)
     try {
       await selectCandidate(char.characterId, appearanceKey, view, viewingCandidate.id)
@@ -358,8 +362,8 @@ export function CharacterViewDialog({ charId, appearanceKey: appearanceKeyProp, 
         <VersionViewingBar
           text={t('Viewing an earlier picture · {time}', { time: relativeTime(viewingCandidate.generatedAt, t) })}
           note={viewingState?.note}
-          adoptDisabled={!!viewingState?.disabled}
-          adoptReason={viewingState?.disabled ? t('It is in another style, so it cannot be adopted') : null}
+          adoptDisabled={!!adoptReason}
+          adoptReason={adoptReason}
           busy={adopting}
           onAdopt={adopt}
           onBack={() => setDismissedCandidate(viewingCandidate.id)}

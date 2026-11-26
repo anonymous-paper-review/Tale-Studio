@@ -90,9 +90,13 @@ function PropDetailLeft({ propId, viewCandidateId = null }: { propId: string; vi
     ? slotCandidates?.find((c) => c.id === viewCandidateId && c.url !== imageUrl) ?? null
     : null
   const viewingState = viewing ? historyStyle.describe?.(viewing) ?? null : null
+  // 그 칸을 다시 그리는 중이면 채택하지 않는다 — 끝난 새 그림이 채택을 덮는다(Director · Storyboard 상세와 같은 규칙, 검토 11/26).
+  const adoptReason = viewingState?.disabled
+    ? t('It is in another style, so it cannot be adopted')
+    : generating ? t('You can adopt it after the image is remade.') : null
   // [채택] — 그 칸의 소품 그림을 고른다(select-prop-candidate, 다시 그리지 않는다). 못 고르면 보던 그림에 남아 까닭을 보인다.
   const adopt = async () => {
-    if (!viewing || viewingState?.disabled) return
+    if (!viewing || adoptReason) return
     setAdopting(true)
     setAdoptError(null)
     try {
@@ -120,8 +124,8 @@ function PropDetailLeft({ propId, viewCandidateId = null }: { propId: string; vi
         <VersionViewingBar
           text={t('Viewing an earlier picture · {time}', { time: relativeTime(viewing.generatedAt, t) })}
           note={viewingState?.note}
-          adoptDisabled={!!viewingState?.disabled}
-          adoptReason={viewingState?.disabled ? t('It is in another style, so it cannot be adopted') : null}
+          adoptDisabled={!!adoptReason}
+          adoptReason={adoptReason}
           busy={adopting}
           error={adoptError}
           onAdopt={adopt}
