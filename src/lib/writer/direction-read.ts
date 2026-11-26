@@ -45,6 +45,7 @@ export function freshDirectionRead(rough: unknown): DirectionRead | null {
 
 /** 영상 지시에 싣는 읽은 줄과 그 출처(오너 2026-11-27 N4b · 리드) — 실사 가운데 장을 고쳐 읽은 줄(shots.storyboard_image.directionRead)이
  *  지금 실사 가운데 장의 것이면 그 줄('real'), 아니면 콘티 연출 장을 읽은 줄('conti', 끝 장과 상관없이 — 리드 D2). 둘 다 없거나 낡았으면 null.
+ *  둘 다 살아 있으면 읽은(고친) 시각이 더 나중인 줄(리드 B).
  *  실사 줄이 앞서는 까닭: 실사 가운데 장을 고치면 실사 시트(시작+미들 영상이 보내는 장)가 그 움직임이다. 실사를 다시 그리거나 다른 판을 고르면
  *  가운데 장 주소가 달라 실사 줄은 저절로 낡고 콘티 줄로 돌아간다. 출처는 시작+미들의 "러프 바뀜" 막기(n-video)가 쓴다.
  *  약속: tests/director/video-line-pick.test.ts */
@@ -52,8 +53,9 @@ export function pickVideoDirectionRead(
   shot: { storyboard_image?: unknown; rough_storyboard?: unknown } | null | undefined,
 ): { en: string; source: 'real' | 'conti' } | null {
   const real = freshDirectionRead(shot?.storyboard_image)
-  if (real) return { en: real.en, source: 'real' }
   const conti = freshDirectionRead(shot?.rough_storyboard)
+  // 둘 다 살아 있으면 더 나중에 읽은(고친) 줄이 이긴다(리드 B 2026-11-27) — 사람이 마지막으로 정한 움직임.
+  if (real && (!conti || real.at >= conti.at)) return { en: real.en, source: 'real' }
   return conti ? { en: conti.en, source: 'conti' } : null
 }
 

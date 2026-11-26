@@ -99,3 +99,10 @@ describe('Director 샷 팝업의 [화살표 고치기]', () => {
     expect(render()).not.toContain('data-testid="shot-detail-edit-arrows"')
   })
 })
+
+describe('검토 rev-realarrow — Director 다시 읽기', () => {
+  // 왜(검토 rev-realarrow 4): 끝 장이 늦게 끝났을 때 그사이 다른 프로젝트를 열었으면 Director 캔버스를 다시 읽지 않는다.
+  it('Director 팝업의 끝 장이 늦게 끝나 다시 읽을 때 지금 프로젝트가 같을 때만 캔버스를 다시 읽는다', () => {
+    expect(readFileSync('src/features/director/shot-detail/shot-image-tab.tsx', 'utf8')).toMatch(/sameProjectReload\(projectId, \(\) => useDirectorCanvasStore\.getState\(\)\.projectId, \(\) => useDirectorCanvasStore\.getState\(\)\.hydrateFreshFromDb\(\)\)/)
+  })
+})

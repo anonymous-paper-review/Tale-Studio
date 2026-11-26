@@ -1,11 +1,12 @@
 // 실사 가운데 장(N4b)의 끝 장 다시 그리기 흐름 — 실사 주소로 보내기 · 작업을 받으면 읽은 줄을 바로 보이기 · 못 읽으면 줄을 직접 적게 하기 · 콘티는 지금 그대로 — 를 검사한다
+import { readFileSync } from 'node:fs'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), success: vi.fn(), error: vi.fn() } }))
 vi.mock('@/lib/generation-jobs-client', () => ({ pollGenerationJob: vi.fn(async () => 'https://media.test/end.png') }))
 vi.mock('@/lib/shots-cache', () => ({ invalidateShots: vi.fn(async () => {}) }))
 
-import { endRedrawDeps, keepLineDeps } from '@/features/writer/unsaved-arrows-confirm'
+import { endRedrawDeps, keepLineDeps, runEndRedraw } from '@/features/writer/unsaved-arrows-confirm'
 import { redrawEndFrame, type EndRedrawDeps } from '@/lib/writer/end-frame-ask'
 
 const REAL_URL = '/api/storyboard/real-directing-edit'
@@ -80,5 +81,37 @@ describe('실사 끝 장 다시 그리기 흐름', () => {
     const bad = fakeDeps(async () => ({ ok: false, code: 'direction_unreadable', error: 'x' }))
     await redrawEndFrame('p1', 'sh_1', bad.deps)
     expect(bad.calls).toEqual(['info', 'error:unreadable'])
+  })
+})
+
+describe('실사 길 알림 말', () => {
+  // 왜(검토 rev-realarrow 8): 실사 상세에는 콘티의 "연출 탭"이 없다 — 실사 길 알림이 연출 탭을 다시 열라고 하면 갈 곳이 없다.
+  it('실사 끝 장 · 고친 줄 알림은 연출 탭을 말하지 않고 실사 상세의 이름으로 안내하며, 콘티 알림은 지금 그대로다', () => {
+    const real = { projectId: 'p1', shotId: 'sh_1', onRedrawn: () => {}, endpoint: REAL_URL }
+    const rough = { projectId: 'p1', shotId: 'sh_1', onRedrawn: () => {} }
+    const realEnd = endRedrawDeps(real, t).messages
+    const realKeep = keepLineDeps(real, t).messages
+    for (const text of [realEnd.unreadable, realKeep.stale]) expect(text).not.toMatch(/directing tab/i)
+    expect(realEnd.unreadable).toBe('The AI could not read the arrows, so the end frame was not redrawn. Press Edit and redraw the end frame and write the motion.')
+    expect(realKeep.stale).toBe('The middle frame changed meanwhile, so your line was not kept. Open Edit arrows again.')
+    expect(endRedrawDeps(rough, t).messages.unreadable).toBe('The AI could not read the arrows, so the end frame was not redrawn. Write the motion in the directing tab.')
+    expect(keepLineDeps(rough, t).messages.stale).toBe('The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.')
+  })
+})
+
+describe('물음 창 [다시 그리기] 길의 잠금', () => {
+  // 왜(검토 rev-realarrow 2): 물음 창의 [다시 그리기]로 끝 장을 그리는 동안에도 다시 저장하면 옛 판의 끝 장 작업과 겹친다 — 그 길도 그 샷을 잠근다.
+  it('물음 창 [다시 그리기]로 끝 장을 그리는 동안 대상의 잠금을 켜고, 끝나면(실패해도) 끈다', async () => {
+    const track = vi.fn()
+    const target = { projectId: 'p1', shotId: 'sh_1', onRedrawn: () => {}, endpoint: REAL_URL, track }
+    const ok = fakeDeps(async () => ({ ok: true, jobId: 'job-1' }), { waitJob: async () => { expect(track).toHaveBeenLastCalledWith(true) } })
+    await expect(runEndRedraw(target, ok.deps)).resolves.toBe(true)
+    expect(track.mock.calls).toEqual([[true], [false]])
+    track.mockClear()
+    const bad = fakeDeps(async () => ({ ok: false, code: 'busy', error: 'x' }))
+    await expect(runEndRedraw(target, bad.deps)).resolves.toBe(false)
+    expect(track.mock.calls).toEqual([[true], [false]])
+    // 물음 창의 [다시 그리기]는 이 길로 간다.
+    expect(readFileSync('src/features/writer/unsaved-arrows-confirm.tsx', 'utf8')).toMatch(/\(\) => void runEndRedraw\(current\.target, endRedrawDeps\(current\.target, t\), line\)/)
   })
 })

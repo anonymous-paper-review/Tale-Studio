@@ -25,6 +25,7 @@ import {
   keepEditedLine,
   redrawEndFrame,
   resolveEndAsk,
+  type EditedEndLine,
   type EndAskChoice,
   type EndRedrawDeps,
   type KeepLineDeps,
@@ -103,11 +104,24 @@ export interface EndAskTarget {
   onRedrawn: () => void | Promise<void>
   /** 요청을 보낼 곳 — 없으면 콘티(러프) 주소. 실사 가운데 장(N4b)은 directingEditUrl('real'). */
   endpoint?: string
+  /** 끝 장을 그리는 동안 켜고(true) 끝나면(실패해도) 끄는(false) 잠금 — 실사는 그 카드 표시(cardDrawing, 검토 rev-realarrow 2). */
+  track?: (busy: boolean) => void
+}
+
+/** 끝 장 다시 그리기 — 대상의 잠금을 켜고 그리고, 끝나면(실패해도) 끈다. 물음 창 [다시 그리기] · 실사 저장 뒤 자동 길이 같이 쓴다. */
+export function runEndRedraw(target: EndAskTarget, deps: EndRedrawDeps, line?: EditedEndLine | null): Promise<boolean> {
+  target.track?.(true)
+  return redrawEndFrame(target.projectId, target.shotId, deps, line).finally(() => target.track?.(false))
 }
 
 /** 대상의 요청 주소 — 넘긴 주소가 없으면 콘티(러프)의 지금 주소. */
 function endpointOf(target: Pick<EndAskTarget, 'endpoint'>): string {
   return target.endpoint ?? directingEditUrl('rough')
+}
+
+/** 실사 가운데 장 길인가 — 알림 말이 달라진다(실사 상세에는 콘티의 "연출 탭"이 없다, 검토 rev-realarrow 8). */
+function isRealTarget(target: Pick<EndAskTarget, 'endpoint'>): boolean {
+  return endpointOf(target) === directingEditUrl('real')
 }
 
 /** 끝 장 다시 그리기의 실제 부품 — 요청 · 작업 기다리기 · 알림 · 다시 읽기. 물음의 [다시 그리기]와 [이 장만 다시 만들기](끝)가 같이 쓴다. */
@@ -139,7 +153,9 @@ export function endRedrawDeps(target: EndAskTarget, t: ReturnType<typeof useT>):
       drawing: t('Redrawing the end frame, which takes over a minute'),
       done: t('Redrew the {frame}. The other two are unchanged.', { frame }),
       failed: t('Could not redraw the end frame. It stays as it was.'),
-      unreadable: t('The AI could not read the arrows, so the end frame was not redrawn. Write the motion in the directing tab.'),
+      unreadable: isRealTarget(target)
+        ? t('The AI could not read the arrows, so the end frame was not redrawn. Press Edit and redraw the end frame and write the motion.')
+        : t('The AI could not read the arrows, so the end frame was not redrawn. Write the motion in the directing tab.'),
       translateFailed: t('Could not translate the motion line. Try again.'),
     },
   }
@@ -165,7 +181,9 @@ export function keepLineDeps(target: EndAskTarget, t: ReturnType<typeof useT>): 
     messages: {
       kept: t('Kept your line. The end frame stays as it is.'),
       translateFailed: t('Could not translate your line, so it was not kept. The previous line stays. Try again.'),
-      stale: t('The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.'),
+      stale: isRealTarget(target)
+        ? t('The middle frame changed meanwhile, so your line was not kept. Open Edit arrows again.')
+        : t('The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.'),
       failed: t('Could not keep your line. The previous line stays.'),
     },
   }
@@ -200,6 +218,11 @@ export function useUnsavedArrowsGuard(close: () => void) {
   const requestClose = () => {
     if (closeRequest(dirty) === 'ask') setPending({ purpose: 'close', proceed: close })
     else close()
+  }
+  /** 창을 떠나는 다른 일(실사 상세 [Lumi 에게 고쳐 달라고 하기] — 보내면 창이 닫힌다) — 그린 것이 있으면 닫기와 같은 물음을 거친 뒤 그 일을 한다(검토 rev-realarrow 6). */
+  const requestLeave = (proceed: () => void) => {
+    if (closeRequest(dirty) === 'ask') setPending({ purpose: 'close', proceed })
+    else proceed()
   }
   /** 탭 바꾸기 — 바꾸면 편집기가 사라지므로 그린 것이 있으면 닫기와 같은 물음을 거친다. */
   const requestSwitch = <Tab extends string>(current: Tab, next: Tab, proceed: () => void) => {
@@ -240,7 +263,7 @@ export function useUnsavedArrowsGuard(close: () => void) {
     // [그대로] 단추는 고친 줄만 남긴다(리드 (A)) — 안 고쳤으면 keepEditedLine 이 아무것도 보내지 않는다. Esc · ✕ 는 'keep' 이라 버린다.
     resolveEndAsk(
       choice,
-      () => void redrawEndFrame(current.target.projectId, current.target.shotId, endRedrawDeps(current.target, t), line),
+      () => void runEndRedraw(current.target, endRedrawDeps(current.target, t), line),
       () => void keepEditedLine(current.target.projectId, current.target.shotId, keepLineDeps(current.target, t), line, current.read?.direction ?? null),
     )
     current.done()
@@ -252,6 +275,7 @@ export function useUnsavedArrowsGuard(close: () => void) {
     setDirty,
     saveArrows,
     requestClose,
+    requestLeave,
     requestSwitch,
     requestRedraw,
     confirm: { open: pending !== null, purpose: pending?.purpose ?? 'close', saving, onChoose: choose },
