@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { DescriptionBox, DetailFrame, DetailSection } from '@/features/artist/detail-parts'
+import { failureBadge, failureNotice } from '@/lib/artist/failure-badge'
 import { propImageStale } from '@/lib/artist/prop-image'
 import { SAFE_RETRY_CAP } from '@/lib/artist/safe-retry'
 import { BREAKDOWN_IMAGE_ERROR_TEXT } from '@/lib/artist/breakdown-image'
@@ -34,14 +35,19 @@ export function usePropImageState(propId: string) {
   const prop = useArtistStore((s) => s.propAssets.find((p) => p.propId === propId) ?? null)
   const generating = useArtistStore((s) => s.generatingProps.includes(propId))
   const failure = useArtistStore((s) => s.propFailures[propId] ?? null)
+  // 보내기 전 내용 검사에 걸렸다(main 2026-11-25, 인물 · 배경과 같다) — 작업 기록이 없어 화면이 기억한 것.
+  const contentRefused = useArtistStore((s) => !!s.propContentRefusals[propId])
   const styleId = usePropStyleId()
   const stale = prop?.imageUrl ? propImageStale(prop.sourceHash, prop.appearance, styleId) : 'fresh'
-  return { prop, generating, failure, stale }
+  return { prop, generating, failure, contentRefused, stale }
 }
 
 function PropDetailLeft({ propId }: { propId: string }) {
   const t = useT()
-  const { prop, generating, failure, stale } = usePropImageState(propId)
+  const { prop, generating, failure, contentRefused, stale } = usePropImageState(propId)
+  // 배지 · 안내는 인물 · 배경 창과 같은 규칙(lib/artist/failure-badge) — 그린 뒤 거절이면 순화 단추, 보내기 전 거절이면 설명 고치기만.
+  const badge = failureBadge({ contentRefused: contentRefused || failure?.moderation === true, failed: !!failure || contentRefused })
+  const notice = failureNotice({ failure, contentRefused })
   const [instruction, setInstruction] = useState('')
   // 데모(보기 전용 공유)는 그리지 않는다 — 그림 · 바뀜 표시만 보인다.
   const demo = isDemoSession()
@@ -65,7 +71,7 @@ function PropDetailLeft({ propId }: { propId: string }) {
     <>
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-sm font-semibold">{t('Prop')}</span>
-        {failure ? <Badge variant="destructive" className="text-[10px]">{t('Image failed')}</Badge> : null}
+        {badge ? <Badge variant="destructive" className="text-[10px]">{badge === 'content-check' ? t('Content check') : t('Image failed')}</Badge> : null}
         {stale === 'edited' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Description changed')}</Badge> : null}
         {stale === 'style' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Style changed')}</Badge> : null}
       </div>
@@ -91,7 +97,7 @@ function PropDetailLeft({ propId }: { propId: string }) {
               {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
               {t('Upload a reference image')}
             </Button>
-            {failure?.moderation ? (
+            {notice === 'content-check-softer' && failure ? (
               <Button
                 variant="outline"
                 size="sm"
@@ -123,11 +129,13 @@ function PropDetailLeft({ propId }: { propId: string }) {
           {imageUploadConsentDialog}
         </>
       )}
-      {failure ? (
+      {notice ? (
         <p className="text-xs text-muted-foreground" role="status">
-          {failure.moderation
-            ? t('Generation was declined by content policy. You can retry below with "Retry with a softer prompt."')
-            : t('Generation failed. Please try again.')}
+          {notice === 'content-check-softer'
+            ? t('This description did not pass the content check, so it was not drawn. Press "Retry with a softer prompt" below, or edit the description and draw again.')
+            : notice === 'content-check-edit'
+              ? t('This description did not pass the content check, so it was not drawn. Edit the description and draw again.')
+              : t('Generation failed. Please try again.')}
         </p>
       ) : null}
     </>

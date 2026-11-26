@@ -121,4 +121,32 @@ describe('화면 이어 그리기', () => {
     expect(asked.length).toBeLessThanOrEqual(3)
     expect(useArtistStore.getState().propFailures.p1).toBeUndefined()
   })
+
+  // 왜: main 이 11/24 오너 결정으로 Artist 동시 장수를 3 → 2 로 내렸다(20명 × 3장이 fal 자리를 넘었다). 소품만 3장씩 보내면 같은 일이 난다 —
+  //   인물 · 배경과 같은 창구(/api/artist/generation-slots)에 물어 러프가 도는 동안 1장, 아니면 2장씩 보낸다.
+  it('소품 이어 그리기는 인물 · 배경과 같은 동시 장수로 보낸다 — 러프가 도는 동안 1장, 아니면 2장', async () => {
+    for (const limit of [2, 1]) {
+      useProjectStore.setState({ projectId: `project-slots-${limit}` })
+      useArtistStore.setState({ propAssets: [asset('p1'), asset('p2'), asset('p3'), asset('p4')], generatingProps: [], propFailures: {} })
+      let inflight = 0
+      let peak = 0
+      const asked: string[] = []
+      vi.stubGlobal('fetch', vi.fn(async (url: string, init?: RequestInit) => {
+        if (url === '/api/artist/generation-slots') return new Response(JSON.stringify({ limit }), { status: 200 })
+        if (url === '/api/artist/generate-prop') {
+          asked.push(JSON.parse(String(init?.body)).propId)
+          inflight++
+          peak = Math.max(peak, inflight)
+          await new Promise((resolve) => setTimeout(resolve, 5))
+          inflight--
+          return new Response(JSON.stringify({ ok: true, skipped: true }), { status: 200 })
+        }
+        return new Response('{}', { status: 200 })
+      }))
+      await useArtistStore.getState().continueMissingProps()
+      expect({ limit, peak }).toEqual({ limit, peak: limit })
+      expect(asked.sort()).toEqual(['p1', 'p2', 'p3', 'p4'])
+      vi.unstubAllGlobals()
+    }
+  })
 })

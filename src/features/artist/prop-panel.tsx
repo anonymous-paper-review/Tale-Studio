@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { ImagePlaceholder } from '@/features/artist/image-placeholder'
 import { PropViewDialog, usePropStyleId } from '@/features/artist/prop-view-dialog'
+import { failureBadge } from '@/lib/artist/failure-badge'
 import { propImageStale } from '@/lib/artist/prop-image'
 import { isMentionModifierClick } from '@/lib/card-mention'
 import { isDemoSession } from '@/lib/demo/context'
@@ -37,6 +38,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
   const selectedPropId = useArtistStore((s) => s.selectedPropId)
   const generatingProps = useArtistStore((s) => s.generatingProps)
   const propFailures = useArtistStore((s) => s.propFailures)
+  const propContentRefusals = useArtistStore((s) => s.propContentRefusals)
   const mentionedRefs = useChatUiStore((s) => s.mentionedRefs)
   const styleId = usePropStyleId()
   const demo = isDemoSession()
@@ -76,6 +78,10 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
     const usage = propUsage[prop.propId] ?? { scenes: 0, shots: 0 }
     const generating = generatingProps.includes(prop.propId)
     const failure = propFailures[prop.propId] ?? null
+    // 실패 배지 — 인물 · 배경 카드와 같다(main 2026-11-25): 내용 검사에 걸렸으면 그것이 이긴다.
+    //   보내기 전(Creem) 거절은 propContentRefusals, 그린 뒤(fal) 거절은 propFailures 의 moderation 에서 온다.
+    const contentRefused = !!propContentRefusals[prop.propId]
+    const badge = failureBadge({ contentRefused: contentRefused || failure?.moderation === true, failed: !!failure || contentRefused })
     // 바뀜(D7 · 리드 결정 3): 생김새가 바뀌었거나("설명 바뀜") 작품 그림체가 바뀌었다("그림체 바뀜") — 그림체 재생성은 소품을 함께 다시 그리지 않는다.
     const stale = prop.imageUrl ? propImageStale(prop.sourceHash, prop.appearance, styleId) : 'fresh'
     const select = () => {
@@ -122,7 +128,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
           {/* 좁은 카드에서 이름이 잘리지 않게 두 줄까지 보인다(배경 카드와 같다). */}
           <span className="line-clamp-2 min-w-0 break-words text-body font-semibold">{prop.name}</span>
           <Badge variant="tag">{t('Prop')}</Badge>
-          {failure ? <Badge variant="destructive" className="text-[10px]">{t('Image failed')}</Badge> : null}
+          {badge ? <Badge variant="destructive" className="text-[10px]">{badge === 'content-check' ? t('Content check') : t('Image failed')}</Badge> : null}
           {stale === 'edited' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Description changed')}</Badge> : null}
           {stale === 'style' && !generating ? <Badge variant="outline" className="text-[10px] text-warning">{t('Style changed')}</Badge> : null}
         </div>
@@ -143,7 +149,7 @@ export function PropPanel({ columns = 1, onZoomStep }: { columns?: number; onZoo
 
         {/* 그리기 · 다시 그리기(무료) — 실패했거나 바뀌었으면 다시 그리기, 그림이 없으면 그리기. 그리는 중에는 숨긴다(두 번 그리지 않게).
             데모(보기 전용 공유)는 그리지 않으므로 단추를 보이지 않는다. */}
-        {generating || demo ? null : failure || (prop.imageUrl && stale !== 'fresh') ? (
+        {generating || demo ? null : failure || contentRefused || (prop.imageUrl && stale !== 'fresh') ? (
           <Button size="sm" variant="outline" className="mt-2.5" onClick={draw} data-testid="artist-prop-redraw">
             <RefreshCw className="size-3.5" />{t('Redraw')}
           </Button>

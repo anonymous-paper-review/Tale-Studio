@@ -9,7 +9,7 @@ import { requireProjectAccess } from '@/lib/api/guard'
 import { countFailedJobsForTarget, AUTO_GENERATION_GIVE_UP_THRESHOLD, type GenerationJobActor } from '@/lib/generation-jobs'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { capacityReservationRejection, quotaRejectionResponse } from '@/lib/api/quota'
-import { assertUserTextAllowed } from '@/lib/moderation/creem'
+import { assertUserTextAllowed, ModerationBlockedError } from '@/lib/moderation/creem'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { resolveStyleAnchor } from '@/lib/style-anchor'
 import { styleDrawsWithoutReference } from '@/lib/style-facets/reference-image'
@@ -108,7 +108,13 @@ export async function POST(req: Request) {
     try {
       moderation = await assertUserTextAllowed([prop.name, appearance, instruction], { projectId, kind: 'prop_image', userId: access.userId })
     } catch (e) {
-      const rejected = moderationRejectionResponse(e, { projectId, kind: 'prop_image', userId: access.userId })
+      // 걸린 소품의 이름을 싣는다(main 2026-11-25 인물 · 배경과 같다) — 거절은 작업 기록이 없어 화면이 이 이름으로만 어느 소품인지 안다.
+      const rejected = moderationRejectionResponse(e, {
+        projectId,
+        kind: 'prop_image',
+        userId: access.userId,
+        ...(e instanceof ModerationBlockedError ? { target: { kind: 'prop' as const, name: prop.name } } : {}),
+      })
       if (rejected) return rejected
       throw e
     }

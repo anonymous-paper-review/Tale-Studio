@@ -31,7 +31,7 @@ import {
 import { claimAction } from '@/lib/action-guard'
 import { translate } from '@/lib/i18n'
 import { useLocaleStore } from '@/stores/locale-store'
-import { isContentPolicyBlocked, isQuotaExceeded, notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
+import { isContentPolicyBlocked, isQuotaExceeded, notifyContentPolicyBlocked, notifyIfQuotaExceeded } from '@/lib/generation-quota-toast'
 import { registerCharacterCard } from '@/stores/asset-storage-store'
 import { isDemoSession } from '@/lib/demo/context'
 import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
@@ -180,8 +180,6 @@ export type PropDrawOutcome = 'drawn' | 'skipped' | 'quota' | 'failed'
 
 /** 이어 그리기가 이번에 청한 소품(프로젝트별) — 같은 화면에서 같은 소품을 끝없이 다시 청하지 않는다. */
 const propAutoTried = new Map<string, Set<string>>()
-/** 소품 이어 그리기를 한 번에 함께 청하는 수 — 인물 · 배경을 다 그린 뒤라 사람당 그림 자리(6)의 반만 쓴다. */
-const PROP_AUTO_BATCH = 3
 
 /** 생성 트리거 주체. `auto`는 Artist 자동 first-fill 내부 표식이며 서버 job actor 로는 ui 처리된다. */
 export type GenerationActor = 'ui' | 'chat' | 'auto'
@@ -709,6 +707,9 @@ interface ArtistState {
   generatingProps: string[]
   /** 소품 그림 실패(reload-survivable) — 배경 worldFailures 와 같은 모양. 키 = propId. */
   propFailures: Record<string, ViewFailure>
+  /** 소품 그림이 보내기 전 내용 검사(Creem)에 걸렸다 — 키 = propId, 값 = 라우트가 알려준 소품 이름(모를 때 null).
+   *  인물 · 배경의 contentRefusals 와 같은 뜻(main 2026-11-25 오너)이고, 키가 섞이지 않게 따로 둔다. 새로고침 · 프로젝트를 옮기면 사라진다. */
+  propContentRefusals: Record<string, { name: string | null }>
   /** 소품 그림 한 장 그리기(D7) — 지시문은 서버가 짓는다(소품 행 + 작품 그림체). auto = 빈칸 채우기(그림이 있으면 서버가 건너뛴다). */
   generateProp: (
     propId: string,
@@ -902,6 +903,7 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   selectedPropId: null,
   generatingProps: [],
   propFailures: {},
+  propContentRefusals: {},
   selectedCharacterId: null,
   chatSelection: null,
   setChatSelection: selection => {
@@ -1421,8 +1423,20 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       const body = (await res.json().catch(() => ({}))) as { jobId?: string; deduped?: boolean; skipped?: boolean; error?: string }
       // 자리가 없다(사람당 그림 자리 · 모두의 자리) — 그림 실패가 아니다. 카드의 [그리기]로 남긴다.
       if (res.status === 429) return 'quota'
+      // 보내기 전 내용 검사에 걸렸다(main 2026-11-25, 인물 · 배경과 같다) — 작업 기록이 없어 화면이 기억해야 카드 · 창이 알린다.
+      //   알림은 소품 이름을 말한다. 순화 재시도 자격은 없으니 그림 실패(propFailures)와 섞지 않는다.
+      if (isContentPolicyBlocked(res.status, body)) {
+        const name = contentRefusalName(body)
+        set((state) => ({ propContentRefusals: { ...state.propContentRefusals, [propId]: { name } } }))
+        options?.onContentRefusal?.(name)
+        options?.onJob?.({ jobId: null, status: 'failed', httpStatus: res.status, error: body.error ?? `HTTP ${res.status}` })
+        notifyContentPolicyBlocked(body)
+        return 'failed'
+      }
       if (!res.ok) throw new Error(body.error ?? `HTTP ${res.status}`)
       if (body.jobId) {
+        // 다시 보내 접수됐다 — 내용 검사 표시를 지운다(인물 · 배경과 같다).
+        set((state) => (propId in state.propContentRefusals ? { propContentRefusals: withoutContentRefusal(state.propContentRefusals, propId) } : {}))
         options?.onJob?.({ jobId: body.jobId, status: 'queued' })
         await pollGenerationJob(body.jobId, { onStatus: options?.onJob })
         if (useProjectStore.getState().projectId !== projectId) return 'drawn'
@@ -1458,7 +1472,11 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
     propAutoTried.set(projectId, tried)
     for (;;) {
       if (useProjectStore.getState().projectId !== projectId) return
-      const targets = propsToAutoDraw(get().propAssets, { generating: get().generatingProps, failures: get().propFailures, tried }).slice(0, PROP_AUTO_BATCH)
+      if (propsToAutoDraw(get().propAssets, { generating: get().generatingProps, failures: get().propFailures, tried }).length === 0) return
+      // 한 번에 함께 청하는 수는 인물 · 배경과 같은 창구에 묻는다 — 러프가 도는 동안 1장, 아니면 2장(main 2026-11-24 오너 3 → 2).
+      const limit = await fetchArtistGenerationLimit()
+      if (useProjectStore.getState().projectId !== projectId) return
+      const targets = propsToAutoDraw(get().propAssets, { generating: get().generatingProps, failures: get().propFailures, tried }).slice(0, limit)
       if (targets.length === 0) return
       for (const propId of targets) tried.add(propId)
       const outcomes = await Promise.all(targets.map((propId) => get().generateProp(propId, 'auto')))
@@ -2819,11 +2837,12 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
       contentRefusals: {},
       lookSummary: null,
       worldAssets: [],
-  propAssets: [],
-  propUsage: {},
-  selectedPropId: null,
-  generatingProps: [],
-  propFailures: {},
+      propAssets: [],
+      propUsage: {},
+      selectedPropId: null,
+      generatingProps: [],
+      propFailures: {},
+      propContentRefusals: {},
       selectedCharacterId: null,
       selectedLocationId: null,
       selectedLocationAppearances: {},
