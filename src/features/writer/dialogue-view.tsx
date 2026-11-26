@@ -20,6 +20,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import { WriterHeader } from '@/features/writer/writer-header'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
+import { boardStageOf } from '@/lib/writer/board-stage'
 import { DialogueLineRow, type DialogueLineState } from '@/features/writer/dialogue-line-row'
 import { saveShotDialogue, shotDialogueLines } from '@/features/writer/dialogue-line-save'
 import { useGuardedAction } from '@/hooks/use-guarded-action'
@@ -71,6 +72,7 @@ interface LineSave extends LineDraft {
 }
 
 export function DialogueView() {
+  const boardStage = useProjectStore((s) => boardStageOf(s.currentStage))
   const t = useT()
   // 씬 · 샷 이름은 화면 언어(오너 2026-11-14 답 7).
   const locale = useLocaleStore((s) => s.locale)
@@ -157,7 +159,8 @@ export function DialogueView() {
   // 클릭 즉시 잠금 + 1초 창(#double-fire). 대사 생성은 1~2분짜리라 연타가 특히 비싸다.
   const generate = useGuardedAction({
     actionKey: `writer:dialogue:${projectId ?? 'none'}`,
-    stage: 'writer',
+    // 실패 사유는 이 보드가 붙은 단계(콘티 · Storyboard, O1 2026-11-26) 채팅에 남는다.
+    stage: boardStage,
     label: t('Dialogue'),
     busy: generating,
     action: runGenerate,

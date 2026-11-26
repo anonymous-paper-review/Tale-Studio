@@ -248,6 +248,13 @@ export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
   ],
 }
 
+/** 씬 · 샷 보드(러프 · 대사 탭)를 다루는 단계 — 콘티(conti)와 Storyboard(writer)가 같은 보드 · 같은 보드 채팅(api/writer/chat)을 쓴다
+ *  (O1 오너 2026-11-26 "콘티를 Artist 앞에"). 넘김(콘티 → Artist · Storyboard → Director)은 단계마다 따로다. */
+export const BOARD_STAGES: ReadonlySet<StageId> = new Set<StageId>(['conti', 'writer'])
+export function isBoardStage(stage: string | null | undefined): boolean {
+  return BOARD_STAGES.has(stage as StageId)
+}
+
 // writer 채팅: 러프 스토리보드 검토 단계에서 씬/샷 CRUD (api/writer/chat + global-chat-store 'writer' case).
 //   editor 채팅은 조언만 한다(api/editor/chat — 오너 2026-11-14 10번, 작업물을 바꾸는 길이 없다).
 export const CHAT_SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([

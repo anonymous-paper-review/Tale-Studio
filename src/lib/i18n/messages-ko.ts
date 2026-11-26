@@ -3192,6 +3192,10 @@ export const KO: Record<string, string> = {
   'Scenes and shots are made when you press Complete in Artist.': 'Artist에서 [완료하기]를 누르면 씬 · 샷을 나눠요.',
   'Scene and shot work is done.\n\n· Split into {sceneCount} scenes, {shotCount} shots\n· Each shot is pre-drawn as a rough storyboard (pencil sketch)\n\nTell me which scene or shot you want to revise or add.\nPress "@" to pick a scene or shot.': '씬·샷 작업이 완료됐어요.\n\n· 씬 {sceneCount}개, 샷 {shotCount}개로 나눴어요\n· 각 샷은 러프 스토리보드(연필 스케치)로 미리 그려놨어요\n\n수정하거나 추가하고 싶은 씬이나 샷을 알려주세요.\n"@"를 누르면 씬·샷을 골라 붙일 수 있어요.',
   'Moving to Storyboard': 'Storyboard로 넘어가는 중이에요',
+  // O1(오너 2026-11-26): 산문을 확정하면 콘티에서 씬 · 샷을 나눈다 — 그동안의 잠금 제목.
+  'Moving to the rough storyboard': '콘티로 넘어가는 중이에요',
+  // 콘티 → Artist 넘김 막힘(혼자 정한 것): 씬 · 샷을 아직 나누지 않았으면 넘길 콘티가 없다.
+  'Scenes and shots are not split yet. You can move on once the split finishes.': '씬 · 샷을 아직 나누지 않았어요. 나누기가 끝나면 넘어갈 수 있어요.',
   'Splitting into scenes and shots, then drawing the roughs. This can take a few minutes. The screen and chat stay locked until it is done.': '씬 · 샷을 나누고 러프를 그려요. 몇 분 걸릴 수 있어요. 끝날 때까지 화면과 채팅은 잠겨요.',
   'Reading the prose': '산문 읽기',
   'Splitting into scenes': '씬 나누기',
