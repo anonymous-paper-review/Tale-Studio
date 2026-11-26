@@ -313,6 +313,23 @@ describe('혼자 정한 채우기 규칙', () => {
     expect(spec?.lighting).toEqual(LIGHT)
   })
 
+  // 왜: 자세 글은 실사 지시문(영어)의 인물 줄에 그대로 실린다 — 무대 메모는 이야기 언어로 적혀 한국어 프로젝트에서는 영어 지시문에 한국어가 섞였다
+  //   (2026-11-27 dev 계정 화면 확인, 실사 1인 복사본 씬 2 끝). 글 모델 없이 막는다: 영어가 아닌 메모는 빼고 자세 · 깊이만 적는다.
+  it('무대 메모가 영어가 아니면 더한 샷의 자세 글에 싣지 않고, 영어 메모는 그대로 싣는다', () => {
+    const noted: SceneStage = {
+      ...STAGE,
+      beats: STAGE.beats.map((b) => ({
+        ...b,
+        characters: b.characters.map((c) => (c.character_id === 'mina' ? { ...c, note: '탁자에 팔꿈치를 괴고 앉아 있음' } : { ...c, note: 'leaning on the counter' })),
+        ...(b.end_characters ? { end_characters: b.end_characters.map((c) => (c.character_id === 'mina' ? { ...c, note: '탁자에 팔꿈치를 괴고 앉아 있음' } : { ...c, note: 'leaning on the counter' })) } : {}),
+      })),
+    }
+    const added = addedShot('sh_01_30', ['mina', 'jun'])
+    const poses = new Map(fill(added, [P1, P2, added], noted).spec?.character_blocking?.map((b) => [b.character_id, b.pose]))
+    expect(poses.get('mina')).toBe('sitting, in the midground')
+    expect(poses.get('jun')).toMatch(/^sitting, leaning on the counter, in the /)
+  })
+
   // 왜: 소품 자리 · 구도 겹 · 초점은 그 카메라 화면의 자리라, 빌리면 클로즈업에도 억지로 그린다. 씬 고정 소품은 무대 표지로 배경 줄에 들어간다.
   it('소품 자리 · 구도 겹 · 초점 · 심도 · 색감은 빌리지 않는다', () => {
     const added = addedShot('sh_01_23', ['mina', 'jun'])

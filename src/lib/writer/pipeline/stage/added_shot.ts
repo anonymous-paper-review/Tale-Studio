@@ -157,6 +157,8 @@ function parseStage(value: unknown): SceneStage | null {
 }
 
 const LENS_DEFAULT = 35
+/** 영어(인쇄 가능한 ASCII)로만 된 글. */
+const ENGLISH_TEXT = /^[\x20-\x7E]+$/
 const lensOf = (row: AddedShotRow | undefined): number | null => {
   const spec = row && isRecord(row.static_spec) ? row.static_spec : null
   const lens = spec?.lens_mm
@@ -219,7 +221,9 @@ function stagePlacement(
     const pick = pickSide(id)
     const base = pick === 'end' ? (states.end.find((e) => e.character_id === id) ?? startState) : startState
     const posture = (characters.length === 1 && id === characters[0] ? textPosture : null) ?? (refLayout ? refPosture(refLayout, id, pick) : null) ?? base.posture
-    return { ...base, posture }
+    // 무대 메모는 자세 글로 실사 지시문(영어)에 실린다 — 영어가 아닌 메모는 빼고 자세 · 깊이만 적는다(글 모델 없이).
+    const { note, ...rest } = base
+    return { ...rest, posture, ...(note && ENGLISH_TEXT.test(note) ? { note } : {}) }
   })
 
   // 카메라: 이은 샷의 방향(없으면 무대 기본), 높이 = 사람이 고른 앵글(없으면 눈높이), 렌즈 = 같은 씬 같은 크기 샷 → 이은 샷 → 35mm.
