@@ -2,8 +2,9 @@
 
 // Storyboard 실사 보기 보드(오너 2026-11-26 m1126 S1 · S2 · S4 · S5 · G3 · O7) — 지금 Storyboard 보드 모양(씬 머리 · 카드 격자 · 축척 · 끌어 넘기기 · 씬 접기) 그대로,
 //   카드 그림만 실사 · 콘티(RealShotCard). 처음엔 Writer 콘티의 목각 그림이고, 머리의 [시작]이 Director [이미지 만들기]와 같은 일괄로 실사를 만든다.
-//   들어오기만 해서는 실사를 만들지 않는다(8/27 오너). 러프 그리기 · 보드 잠금 · 더한 샷 그리기 · 연출 점검은 Writer 콘티(/studio/conti)가 한다 — 여기 없다.
-//   실사를 만들거나 다시 그리는 동안 화면 · 채팅은 그대로고 그 카드에만 기다림이 뜬다(S5 · O7) — 기다림의 진실은 작업 큐(lib/storyboard/real-board).
+//   들어오기만 해서는 실사를 만들지 않는다(8/27 오너). 빠진 콘티 그림(러프)은 화면이 열려 있는 동안 예전 Storyboard 와 같은 규칙으로 이어 그린다
+//   (리드 2026-11-26, features/storyboard/use-rough-fill) — 보드 잠금 · 더한 샷 그리기 · 연출 점검 · 러프 다시 그리기는 Writer 콘티(/studio/conti)가 한다.
+//   실사 · 콘티를 그리거나 다시 그리는 동안 화면 · 채팅은 그대로고 그 카드에만 기다림이 뜬다(S5 · O7) — 기다림의 진실은 작업 큐(lib/storyboard/real-board).
 //   실사 작업이 큐에서 빠지면 실사 그림을 다시 읽어 카드가 새 그림을 보인다. 카드를 누르면 샷 상세(RealShotDialog), ⌘/Ctrl+클릭은 채팅 멘션(G3).
 //   약속: tests/writer/real-board-view.test.ts
 import { useEffect, useRef, useState } from 'react'
@@ -16,6 +17,7 @@ import { handOverToDirector } from '@/features/writer/storyboard-director'
 import { RealShotCard } from '@/features/storyboard/real-shot-card'
 import { RealShotDialog } from '@/features/storyboard/real-shot-dialog'
 import { StoryboardHeader } from '@/features/storyboard/storyboard-header'
+import { useStoryboardRoughFill } from '@/features/storyboard/use-rough-fill'
 import { useModifierHeld } from '@/hooks/use-modifier-held'
 import { sceneName, sceneShotName } from '@/lib/board-names'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
@@ -28,11 +30,13 @@ import {
   REAL_IMAGE_JOB_KINDS,
   realDrawingShotIds,
   realPanelOf,
+  roughDrawingShotIds,
   storyboardCardPicture,
   storyboardCardWait,
   storyboardRealProgress,
 } from '@/lib/storyboard/real-board'
 import { useStoryboardRealImages } from '@/lib/storyboard/real-images-store'
+import { useRoughFillPending } from '@/lib/storyboard/rough-fill-store'
 import { cn } from '@/lib/utils'
 import { createWheelNotchStepper } from '@/lib/wheel-notch'
 import { boardShots, boardTotalText, directorConfirmView, directorHandoffSummary, sceneStats, sceneStatsLabel } from '@/lib/writer/board-summary'
@@ -119,7 +123,12 @@ export function RealBoardView() {
   const hasShots = board.length > 0
   const drawing = realDrawingShotIds(activeJobs)
   for (const [shotId, owner] of Object.entries(cardDrawing)) if (owner === projectId) drawing.add(shotId)
-  const progress = storyboardRealProgress({ shots: board.map((e) => e.shot), realOf: (id) => images[id], drawing, batch })
+  // 콘티 그림을 그리는 샷 — 큐 + 이어 그리기가 보내고 아직 다시 읽지 않은 샷. 빠진 콘티는 화면이 열려 있는 동안 이어 그린다(리드 2026-11-26).
+  const roughPending = useRoughFillPending(projectId)
+  const roughDrawing = roughDrawingShotIds(activeJobs, Object.keys(roughPending))
+  const boardShotList = board.map((e) => e.shot)
+  useStoryboardRoughFill({ projectId, shots: boardShotList, roughDrawing, activeJobs, locale })
+  const progress = storyboardRealProgress({ shots: boardShotList, realOf: (id) => images[id], drawing, batch, roughDrawing })
 
   // 첫 진입 안내(혼자 정한 것) — 실사가 아직 하나도 없고 Storyboard 채팅 기록이 없으면 [시작]과 채팅으로 고치는 법을 먼저 알린다.
   //   채팅 기록을 다 읽은 뒤에만(기록이 비어 있는 동안 같은 안내를 또 남기지 않게 — 지금 보드와 같은 규칙).
@@ -263,7 +272,7 @@ export function RealBoardView() {
     const shot = board.find((entry) => entry.shot.shotId === shotId)?.shot
     const hasReal = !!realPanelOf(images[shotId])
     const hasConti = !!shot && storyboardCardPicture(shot.roughStoryboard, null).kind === 'conti'
-    return storyboardCardWait({ shotId, hasReal, hasConti, drawing, batch })
+    return storyboardCardWait({ shotId, hasReal, hasConti, drawing, batch, roughDrawing })
   }
   // 화면 읽기에 알리는 기다림 카드는 하나 — 보드 순서(씬 → 샷)로 첫 장, 접힌 씬은 건너뛴다(지금 보드와 같은 규칙).
   const announcedShotId = board.find((entry) => !collapsedScenes.has(entry.shot.sceneId) && waitOf(entry.shot.shotId) !== 'none')?.shot.shotId ?? null

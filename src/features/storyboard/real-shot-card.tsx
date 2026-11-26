@@ -2,7 +2,7 @@
 
 // Storyboard 실사 카드(오너 2026-11-26 m1126 S1 · S2 · S5 · G3) — 지금 Storyboard 카드 모양 그대로(머리 · 그림 · 샷 글 · 대사 한 줄 · 칩)이고
 //   그림만 바뀐다: 실사가 있으면 실사(시작 · 연출 · 끝), 없으면 Writer 콘티의 목각 그림에 "콘티" 꼬리표, 둘 다 없으면 콘티 그림이 없다는 자리.
-//   실사를 그리거나 [시작]의 차례를 기다리는 동안 이 카드에만 기다림 카드(NodeWaitCard — Lumi 는 그림이라 여러 장이어도 WebGL 을 열지 않는다)를 덮는다.
+//   실사 · 콘티 그림을 그리거나 [시작]의 차례를 기다리는 동안 이 카드에만 기다림 카드(NodeWaitCard — Lumi 는 그림이라 여러 장이어도 WebGL 을 열지 않는다)를 덮는다.
 //   그냥 누르면 샷 상세, ⌘/Ctrl+클릭은 채팅 멘션(lib/storyboard/mention). 지난 판 줄(m-history)은 이 카드를 바깥에서 감싼다.
 //   무엇을 보일지는 lib/storyboard/real-board 가 정한다 — 여기는 그리기만 한다. 약속: tests/writer/real-card.test.ts
 import { Fragment } from 'react'
@@ -170,7 +170,7 @@ export function RealShotCard({
         // 카드 전체를 덮는다(SYS "그 노드 크기에 맞춘다") — 덮인 카드도 누르면 상세가 열린다. 화면 읽기에는 첫 장만 알린다.
         <NodeWaitCard
           lumi="storyboard"
-          title={wait === 'drawing' ? t('Drawing the image') : t('Waiting to generate image')}
+          title={wait === 'drawing' ? t('Drawing the image') : wait === 'rough' ? t('Drawing the rough sketch') : t('Waiting to generate image')}
           description={compact ? undefined : `${label} · ${seconds}`}
           announce={announceWait}
           className={compact ? 'gap-2 p-2.5' : undefined}

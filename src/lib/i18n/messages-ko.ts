@@ -1651,6 +1651,8 @@ export const KO: Record<string, string> = {
   '{agent} is generating character and background images': '{agent}가 캐릭터·배경 이미지를 생성하고 있습니다',
   '{agent} is generating images': '{agent}가 이미지를 생성하고 있습니다',
   '{agent} is generating shooting-ready images': '{agent}가 촬영용 이미지를 생성하고 있습니다',
+  // Storyboard 화면의 실사 그림 묶음(2026-11-26 m1126 S2 · O7) — Storyboard [시작] · 채팅 다시 그리기.
+  '{agent} is making real images': '{agent}가 실사 그림을 만들고 있습니다',
   '{agent} is generating video': '{agent}가 영상을 생성하고 있습니다',
   '{agent} is generating character images': '{agent}가 캐릭터 이미지를 생성하고 있습니다',
   '{agent} is generating background images': '{agent}가 배경 이미지를 생성하고 있습니다',
@@ -3277,8 +3279,8 @@ export const KO: Record<string, string> = {
   'Running time': '러닝타임',
   '{seconds}s': '{seconds}초',
   'Director makes the cuts from the roughs and the Artist images': 'Director가 러프와 Artist 그림을 참조해 컷을 만들어요',
-  'These shots have no rough and are left out this time: {shots}.': '러프가 없는 {shots}은(는) 이번에 빠져요.',
-  'These shots have no rough and are left out this time: {shots} and {count} more.': '러프가 없는 {shots} 외 {count}컷은(는) 이번에 빠져요.',
+  'These shots have no rough and are left out this time: {shots}.': '콘티 그림이 없는 {shots}은(는) 이번에 빠져요.',
+  'These shots have no rough and are left out this time: {shots} and {count} more.': '콘티 그림이 없는 {shots} 외 {count}컷은(는) 이번에 빠져요.',
   'Draw the remaining cuts': '남은 컷 그리기',
   'Yes, hand over': '예, 넘기기',
   // ── 시리즈(2026-10-26) · 프로젝트 목록 · 다음 화 만들기 ──
@@ -3683,7 +3685,7 @@ export const KO: Record<string, string> = {
   'Some shots have no video yet. Check the list in the window, then hand over the shots with video or make the rest again first.': '아직 영상이 없는 샷이 있어요. 창에서 목록을 보고 영상 있는 샷만 넘기거나, 나머지를 먼저 다시 만들어 주세요.',
   // Storyboard → Director 넘기기 창(D0, 2026-11-14 디자이너 1110 확정 · 페이지 추천)
   'Move on to Director?': 'Director로 넘어갈까요?',
-  'Shots {shots} · {seconds}s · Characters {characters} · Backgrounds {backgrounds} · Roughs {roughs}': '샷 {shots} · {seconds}초 · 인물 {characters} · 배경 {backgrounds} · 러프 {roughs}장',
+  'Shots {shots} · {seconds}s · Characters {characters} · Backgrounds {backgrounds} · Roughs {roughs}': '샷 {shots} · {seconds}초 · 인물 {characters} · 배경 {backgrounds} · 콘티 {roughs}장',
   'The real images are already made': '실사 이미지는 이미 다 있어요',
   'After that': '그다음',
   // 값은 앱의 Take 표기("5 Take")로 — D8 단추와 같게(리드 2026-11-14)
@@ -3704,6 +3706,12 @@ export const KO: Record<string, string> = {
   '{shots} has no rough storyboard, so it is left out. Draw it in Writer, then press Start again.': '콘티 그림이 없는 {shots}은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
   '{shots} have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots}은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
   '{shots} and {count} more have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots} 외 {count}컷은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  // Storyboard 가 빠진 콘티 그림을 이어 그린다(리드 2026-11-26 m1126) — 그리는 중인 샷은 [시작] · 채팅 고치기에서 빼고 알린다.
+  '{shots} is still getting its rough storyboard, so it is left out. Press Start again when it is drawn.': '콘티 그림을 그리는 중인 {shots}은(는) 빼고 만들어요. 다 그리면 [시작]을 다시 눌러 주세요.',
+  '{shots} are still getting their rough storyboards, so they are left out. Press Start again when they are drawn.': '콘티 그림을 그리는 중인 {shots}은(는) 빼고 만들어요. 다 그리면 [시작]을 다시 눌러 주세요.',
+  '{shots} and {count} more are still getting their rough storyboards, so they are left out. Press Start again when they are drawn.': '콘티 그림을 그리는 중인 {shots} 외 {count}컷은(는) 빼고 만들어요. 다 그리면 [시작]을 다시 눌러 주세요.',
+  '{shot} is still getting its rough storyboard. Ask again when it is drawn.': '{shot}은(는) 콘티 그림을 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',
+  'Drawing the rough sketch': '콘티 그림을 그리고 있어요',
   'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
   // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
   'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',

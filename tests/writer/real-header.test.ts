@@ -17,6 +17,8 @@ const data = vi.hoisted(() => ({
   director: { realBatchBusy: false, realBatchCancelled: false, realBatchShotIds: null as string[] | null },
   chat: { loading: false, directorHandoff: null },
   board: { setDirectorConfirmOpen: () => {} },
+  jobs: [] as unknown[],
+  roughFill: { projectId: null as string | null, pending: {} as Record<string, true>, running: false },
 }))
 vi.mock('@/stores/project-store', () => ({ useProjectStore: (select: (s: unknown) => unknown) => select(data.project) }))
 vi.mock('@/stores/writer-store', () => ({ useWriterStore: (select: (s: unknown) => unknown) => select(data.writer) }))
@@ -26,10 +28,16 @@ vi.mock('@/stores/global-chat-store', () => ({ useGlobalChatStore: (select: (s: 
 vi.mock('@/features/writer/board-ui-store', () => ({ useBoardUiStore: (select: (s: unknown) => unknown) => select(data.board) }))
 // 단추 모습만 본다 — 일괄 러너는 tests/writer/real-start · real-start-runner 가 본다.
 vi.mock('@/lib/storyboard/start-real', () => ({ startStoryboardReal: vi.fn(), stopStoryboardReal: vi.fn() }))
-vi.mock('@/lib/generation-queue', async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), useActiveGenerationJobs: () => [] }))
+vi.mock('@/lib/generation-queue', async (importOriginal) => ({ ...(await importOriginal<Record<string, unknown>>()), useActiveGenerationJobs: () => data.jobs }))
 vi.mock('@/lib/i18n', async () => {
   const { translate } = await import('@/lib/i18n/translate')
   return { translate, useLocale: () => 'ko', useT: () => (text: string, params?: Record<string, string | number>) => translate('ko', text, params) }
+})
+
+// 이어 그리기 상태는 다른 상점처럼 값으로 꾸민다(프로젝트 거르기는 진짜 roughFillPendingOf).
+vi.mock('@/lib/storyboard/rough-fill-store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/storyboard/rough-fill-store')>()
+  return { ...actual, useRoughFillPending: (projectId: string | null) => actual.roughFillPendingOf(data.roughFill, projectId) }
 })
 
 import { StoryboardHeaderActions } from '@/features/storyboard/header-actions'
@@ -53,6 +61,8 @@ beforeEach(() => {
   ]
   data.images = { projectId: 'p1', images: {} }
   data.director = { realBatchBusy: false, realBatchCancelled: false, realBatchShotIds: null }
+  data.jobs = []
+  data.roughFill = { projectId: null, pending: {}, running: false }
 })
 
 describe('Storyboard 머리 단추', () => {
@@ -89,6 +99,21 @@ describe('Storyboard 머리 단추', () => {
   it('[시작]을 누르면 화면이 센 샷으로 Storyboard 일괄을 시작하고, 빠지는 샷이 있으면 먼저 알린다', () => {
     const src = readFileSync('src/features/storyboard/header-actions.tsx', 'utf8')
     expect(src).toMatch(/const notice = noContiNotice\(locale, view\.noConti\.map\(nameOf\)\)\s*if \(notice\) toast\.info\(notice\)\s*const targets = view\.targets\s*void import\('@\/lib\/storyboard\/start-real'\)\.then\(\(\{ startStoryboardReal \}\) => startStoryboardReal\(projectId, targets\)\)/)
+  })
+})
+
+describe('콘티 그림을 그리는 중인 샷', () => {
+  // 왜(리드 2026-11-26 "그리는 중인 샷은 (f)처럼 빼고 이름을 알린다"): 바뀌는 중인 콘티로 실사를 만들면 다시 만들어야 한다 —
+  //   [시작]이 세는 수에서 빼고(이어 그리기가 보낸 샷 · 다른 곳에서 그리는 샷 모두), 누르면 그 이름을 먼저 알린다.
+  it('[시작]은 콘티 그림을 그리는 중인 샷을 세지 않고, 누르면 그 샷 이름을 먼저 알린다', () => {
+    data.jobs = [{ id: 'r1', kind: 'shot_rough_storyboard', target: { writerShotIds: ['b'] } }]
+    const html = renderToStaticMarkup(createElement(StoryboardHeaderActions))
+    expect(html).toContain('콘티 그림 1장을 실사 그림으로 바꿔요')
+    data.jobs = []
+    data.roughFill = { projectId: 'p1', pending: { a: true, b: true }, running: true }
+    expect(buttons().map((b) => b.id)).toEqual(['storyboard-next-director'])
+    const src = readFileSync('src/features/storyboard/header-actions.tsx', 'utf8')
+    expect(src).toMatch(/const drawingNotice = roughDrawingNotice\(locale, view\.roughDrawing\.map\(nameOf\)\)\s*if \(drawingNotice\) toast\.info\(drawingNotice\)\s*const notice = noContiNotice/)
   })
 })
 

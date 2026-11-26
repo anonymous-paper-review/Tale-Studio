@@ -18,7 +18,7 @@ import { useWriterStatus } from '@/lib/writer/use-writer-status'
 import { writerProgressView } from '@/lib/writer/progress-view'
 import { STAGE_FACE_COLOR } from '@/lib/constants'
 import { useGenerationBatches } from '@/lib/generation-queue'
-import { batchWorks, writerPipelineWork, type PipelineWork } from '@/lib/pipeline-progress'
+import { batchWorks, screenBatchLabels, writerPipelineWork, type PipelineWork } from '@/lib/pipeline-progress'
 import { withStoryboardBacklog } from '@/lib/generation-batches'
 import type { StageId } from '@/types'
 
@@ -86,7 +86,8 @@ function UnifiedPin({ projectId, stage }: { projectId: string; stage: StageId })
     works.push({ ...writerPipeline, label: scoped.label, done: scoped.done, total: scoped.total })
   }
   // 나머지는 전부 서버 배치(약속 D1·D3·D6): 레인마다 done/total(+실패).
-  works.push(...batchWorks(withStoryboardBacklog(batches, realBatchRemaining ?? 0), locale))
+  //   Storyboard 화면이면 실사 그림 묶음을 Storyboard 의 말 · 색으로(Storyboard [시작] · 채팅 다시 그리기도 실사를 만든다, 2026-11-26 m1126).
+  works.push(...screenBatchLabels(batchWorks(withStoryboardBacklog(batches, realBatchRemaining ?? 0), locale), stage, locale))
 
   const progress = status ? writerProgressView(status, locale) : null
   const footer = progress && !status?.pipeline_completed && !status?.pipeline_failed

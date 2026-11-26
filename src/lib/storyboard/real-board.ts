@@ -2,6 +2,7 @@
 //   처음엔 Writer 콘티의 목각 그림이 보이고, [시작]을 누르면 Director [이미지 만들기]와 같은 일괄이 실사를 만든다.
 //   실사가 "있는가"는 실사 일괄 서버와 같은 판정(hasStoryboardImage)으로, 콘티 그림이 "있는가"는 러프 보드와 같은 판정(isRoughDrawn)으로 본다 —
 //   화면이 만들 샷으로 센 것과 서버가 그릴 샷이 어긋나지 않게(서버는 실사 있는 샷 · 러프 없는 샷을 건너뛴다).
+//   콘티 그림을 그리는 중인 샷(리드 2026-11-26 — Storyboard 가 빠진 콘티를 이어 그린다)은 [시작]이 빼고 이름을 알리며, 그 카드에만 기다림을 보인다.
 //   약속: tests/writer/real-board.test.ts
 import { activeShotIds, type ActiveJob } from '@/lib/generation-queue'
 import { translate } from '@/lib/i18n/translate'
@@ -56,6 +57,16 @@ export function realDrawingShotIds(jobs: readonly ActiveJob[]): Set<string> {
   return activeShotIds(jobs, REAL_IMAGE_JOB_KINDS)
 }
 
+/** 콘티 그림(목각 러프)을 그리는 작업. */
+export const ROUGH_IMAGE_JOB_KINDS: readonly GenerationJobKind[] = ['shot_rough_storyboard']
+
+/** 지금 콘티 그림을 그리는 샷 — 큐에 떠 있는 러프 작업이 맡은 샷 + Storyboard 이어 그리기가 보내고 아직 다시 읽지 않은 샷(pending). */
+export function roughDrawingShotIds(jobs: readonly ActiveJob[], pending: Iterable<string> = []): Set<string> {
+  const ids = activeShotIds(jobs, ROUGH_IMAGE_JOB_KINDS)
+  for (const id of pending) ids.add(id)
+  return ids
+}
+
 /** 실사 일괄의 진행 깃발(Director store 의 realBatch* — 한 탭에 일괄 하나). shotIds null = 실사 없는 샷 전부. */
 export interface RealBatchFlags {
   busy: boolean
@@ -69,17 +80,20 @@ function batchPending(shotId: string, hasReal: boolean, hasConti: boolean, batch
   return batch.shotIds === null || batch.shotIds.includes(shotId)
 }
 
-export type StoryboardCardWait = 'none' | 'drawing' | 'queued'
+export type StoryboardCardWait = 'none' | 'drawing' | 'queued' | 'rough'
 
-/** 카드 위 기다림 — drawing: 실사를 그리는 작업이 떠 있다 · queued: [시작] 일괄의 차례를 기다린다 · none: 기다림 없음. */
+/** 카드 위 기다림 — drawing: 실사를 그리는 작업이 떠 있다 · rough: 실사가 없고 콘티 그림을 그리는 중이다 ·
+ *  queued: [시작] 일괄의 차례를 기다린다 · none: 기다림 없음. 실사가 있는 카드는 콘티를 다시 그려도 실사를 그대로 보인다. */
 export function storyboardCardWait(input: {
   shotId: string
   hasReal: boolean
   hasConti: boolean
   drawing: ReadonlySet<string>
   batch: RealBatchFlags
+  roughDrawing?: ReadonlySet<string>
 }): StoryboardCardWait {
   if (input.drawing.has(input.shotId)) return 'drawing'
+  if (!input.hasReal && input.roughDrawing?.has(input.shotId)) return 'rough'
   return batchPending(input.shotId, input.hasReal, input.hasConti, input.batch) ? 'queued' : 'none'
 }
 
@@ -89,8 +103,10 @@ export interface StoryboardBoardShot {
 }
 
 export interface StoryboardStartView {
-  /** [시작]이 만들 샷(보드 순서) — 실사 없음 · 콘티 그림 있음 · 지금 그리는 중이 아님. */
+  /** [시작]이 만들 샷(보드 순서) — 실사 없음 · 콘티 그림 있음 · 실사도 콘티도 그리는 중이 아님. */
   targets: string[]
+  /** 실사가 없고 콘티 그림을 그리는 중이라 [시작]이 빼는 샷(보드 순서) — 다 그리면 다음 [시작]이 넣는다. 옛 콘티가 있어도 바뀌는 중이라 뺀다. */
+  roughDrawing: string[]
   /** 실사도 콘티 그림도 없어 [시작]이 빼는 샷(보드 순서) — Writer 콘티에서 그린다. */
   noConti: string[]
   /** start = [시작] · stop = 일괄이 돌아 [멈추기] · stopping = 멈춘 판을 정리하는 중 · all-real = 실사가 다 있음 · nothing = 만들 수 있는 것이 없음(콘티 그림 없는 샷만 남음). */
@@ -105,13 +121,19 @@ export function storyboardStartView(input: {
   realOf: (shotId: string) => unknown
   drawing: ReadonlySet<string>
   batch: RealBatchFlags
+  roughDrawing?: ReadonlySet<string>
 }): StoryboardStartView {
   const targets: string[] = []
+  const roughDrawing: string[] = []
   const noConti: string[] = []
   let allReal = true
   for (const shot of input.shots) {
     if (realPanelOf(input.realOf(shot.shotId))) continue
     allReal = false
+    if (input.roughDrawing?.has(shot.shotId)) {
+      roughDrawing.push(shot.shotId)
+      continue
+    }
     if (!shot.roughStoryboard || !isRoughDrawn(shot.roughStoryboard)) {
       noConti.push(shot.shotId)
       continue
@@ -125,14 +147,14 @@ export function storyboardStartView(input: {
       : allReal
         ? 'all-real'
         : 'nothing'
-  return { targets, noConti, mode, nextIsPrimary: mode !== 'start' }
+  return { targets, roughDrawing, noConti, mode, nextIsPrimary: mode !== 'start' }
 }
 
 export interface StoryboardRealProgress {
   total: number
   /** 지금 실사가 있고 다시 그리는 중이 아닌 샷. */
   real: number
-  /** 실사를 그리는 중이거나 [시작] 일괄의 차례를 기다리는 샷. */
+  /** 실사를 그리는 중 · [시작] 일괄의 차례를 기다리는 중 · 실사가 없고 콘티 그림을 그리는 중인 샷(카드에 기다림이 보이는 수). */
   making: number
   /** 실사가 없고 만드는 중도 아닌 샷. */
   noReal: number
@@ -144,13 +166,14 @@ export function storyboardRealProgress(input: {
   realOf: (shotId: string) => unknown
   drawing: ReadonlySet<string>
   batch: RealBatchFlags
+  roughDrawing?: ReadonlySet<string>
 }): StoryboardRealProgress {
   let real = 0
   let making = 0
   for (const shot of input.shots) {
     const hasReal = !!realPanelOf(input.realOf(shot.shotId))
     const hasConti = !!shot.roughStoryboard && isRoughDrawn(shot.roughStoryboard)
-    const wait = storyboardCardWait({ shotId: shot.shotId, hasReal, hasConti, drawing: input.drawing, batch: input.batch })
+    const wait = storyboardCardWait({ shotId: shot.shotId, hasReal, hasConti, drawing: input.drawing, batch: input.batch, roughDrawing: input.roughDrawing })
     if (wait !== 'none') making += 1
     else if (hasReal) real += 1
   }
@@ -171,4 +194,17 @@ export function noContiNotice(locale: AppLocale, names: readonly string[]): stri
   return names.length === 1
     ? translate(locale, '{shots} has no rough storyboard, so it is left out. Draw it in Writer, then press Start again.', { shots })
     : translate(locale, '{shots} have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.', { shots })
+}
+
+/** [시작] 때 콘티 그림을 그리는 중이라 빠지는 샷 알림(리드 2026-11-26, (f)와 같은 꼴) — 없으면 null. names = 보드 이름("샷 3"). */
+export function roughDrawingNotice(locale: AppLocale, names: readonly string[]): string | null {
+  if (names.length === 0) return null
+  const shots = names.slice(0, NO_CONTI_LABEL_LIMIT).join(', ')
+  const more = names.length - NO_CONTI_LABEL_LIMIT
+  if (more > 0) {
+    return translate(locale, '{shots} and {count} more are still getting their rough storyboards, so they are left out. Press Start again when they are drawn.', { shots, count: more })
+  }
+  return names.length === 1
+    ? translate(locale, '{shots} is still getting its rough storyboard, so it is left out. Press Start again when it is drawn.', { shots })
+    : translate(locale, '{shots} are still getting their rough storyboards, so they are left out. Press Start again when they are drawn.', { shots })
 }
