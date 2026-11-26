@@ -13,12 +13,15 @@ export type GenerationLane = 'artist' | 'writer-rough' | 'director-storyboard' |
 export const LANE_OF_KIND: Record<GenerationJobKind, GenerationLane | null> = {
   character_view: 'artist',
   world_shot: 'artist',
+  prop_image: 'artist',
   shot_rough_storyboard: 'writer-rough',
   shot_storyboard: 'director-storyboard',
   image_generation: null,
   storyboard_real_grid: 'director-storyboard',
   shot_video: 'director-video',
   shot_previz_video: 'director-previz',
+  // Editor [생성] 음악(2026-11-26) — 진행은 [생성] 목록이 보인다. 채팅 핀 · 왼쪽 탭 숫자 · Director 단추 숫자에는 세지 않는다.
+  editor_music: null,
 }
 
 export const LANE_STAGE: Record<GenerationLane, StageId> = {

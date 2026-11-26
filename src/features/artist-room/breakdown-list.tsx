@@ -18,6 +18,9 @@ import { useSeriesInfo } from '@/features/series/use-series-info'
 import { useT } from '@/lib/i18n'
 import { cn } from '@/lib/utils'
 import { breakdownRows, type BreakdownRow } from '@/lib/artist/breakdown'
+import { isMentionModifierClick } from '@/lib/card-mention'
+import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
+import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useProducerStore } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 
@@ -26,6 +29,8 @@ type Filter = 'all' | 'person' | 'background'
 function Row({ row, reference }: { row: BreakdownRow & { inherited: boolean }; reference?: ReactNode }) {
   const t = useT()
   const [draft, setDraft] = useState<string | null>(null)
+  // 입력창에 @멘션된 줄은 카드처럼 빛난다 — 이 화면의 @목록은 글 목록 줄(lib/artist/mention-items).
+  const mentioned = useChatUiStore((s) => s.mentionedRefs.includes(row.id))
   const save = () => {
     if (draft === null) return
     const value = draft.trim()
@@ -35,10 +40,25 @@ function Row({ row, reference }: { row: BreakdownRow & { inherited: boolean }; r
   }
   return (
     <li
-      className={cn('flex gap-4 border-b border-border px-1 py-3 last:border-b-0', row.isNew && 'shadow-[inset_3px_0_0_var(--success)]')}
+      className={cn('flex gap-4 border-b border-border px-1 py-3 last:border-b-0', row.isNew && 'shadow-[inset_3px_0_0_var(--success)]', mentioned && 'mention-flash rounded-md bg-sky-400/10 ring-2 ring-sky-400/70')}
       data-testid="breakdown-row"
       data-kind={row.kind}
       data-new={row.isNew || undefined}
+      // ⌘/Ctrl+클릭 = 채팅 @멘션 + 비행(D9 2026-11-22 "모든 탭에서") — 카드가 생기기 전 첫 화면에서도 인물 · 배경 카드와 같다.
+      onPointerDownCapture={(e) => {
+        if (isMentionModifierClick(e)) {
+          e.preventDefault()
+          e.stopPropagation()
+        }
+      }}
+      onClickCapture={(e) => {
+        if (!isMentionModifierClick(e) || !row.name.trim()) return
+        e.preventDefault()
+        e.stopPropagation()
+        const removing = chatInputHasMention(row.name)
+        useChatUiStore.getState().requestMentionToggle(row.name)
+        launchMentionFlight({ label: row.name, clickX: e.clientX, clickY: e.clientY, toChat: !removing })
+      }}
     >
       <div className="min-w-0 flex-1 space-y-1">
         <p className="flex items-center gap-2 text-sm">

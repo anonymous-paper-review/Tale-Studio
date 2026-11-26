@@ -34,6 +34,7 @@ import { inferSceneCinematographyFromShots } from '@/lib/writer/pipeline/util/in
 import { persistDesignTokens } from '@/lib/writer/pipeline/util/persist_design_tokens';
 import { persistAssetsToDb, persistShotsToDb, persistSceneStagesToDb, persistSceneLedgersToDb } from '@/lib/writer/pipeline/util/persist_manifest';
 import { triggerAssetDrafts } from '@/lib/artist/draft-trigger';
+import { pickKeyProps, type KeyPropsOutcome } from '@/lib/writer/pipeline/stages/key_props';
 import { isCompactDepth } from '@/lib/writer/types/pipeline';
 import { analyzeSceneActionBudget } from '@/lib/writer/pipeline/validators/action_budget';
 import { resolveModels, resolveSkip, emptyC1Report } from '@/lib/writer/pipeline';
@@ -100,6 +101,8 @@ export interface WriterRunState extends WriterRunStateBase {
   _gateConfirmed?: boolean;
   /** 그림체 분석이 도는 동안이라 v2Design 의 Artist 초안을 미뤘다(2026-10-10) — Writer 가 끝날 때 한 번 더 챙긴다. */
   _artistDeferred?: boolean;
+  /** [만들기] 때 중요한 소품 고르기 결과(D7 오너 E5 2026-11-22) — v2Design 앞에서 더한 소품 · 버린 까닭 · 실패. */
+  keyProps?: KeyPropsOutcome;
   /** 리뉴얼 1차: Artist 에서 [완료하기]를 눌렀다 — 인물 · 배경 디자인 뒤 멈춤(awaiting_artist)을 지나 씬 · 샷을 나눈다. */
   _artistCompleted?: boolean;
   /** 리뉴얼 1차: Writer 에서 [브레이크다운하기]로 산문을 확정했다 — 산문은 잠기고 다시 쓰기 · 직접 저장을 받지 않는다(prose-confirm). */
@@ -537,11 +540,25 @@ export const WRITER_STEPS: WriterStep[] = [
       const keep = !!preservedScript(s.input) && !!s.scenes;
       const world = keep ? mergeOpenWorld(s.world, s.scenes!) : s.world;
       // 대소문자만 다른 장면 장소("BUS STOP" · "Bus Stop")는 같은 배경 번호로 맞춘다(검토 c 낮음 5). 그림 참조 · Director 는 장소를 글자 그대로 비교한다.
-      const scenes = keep && world ? normalizeSceneLocations(s.scenes!, world) : s.scenes;
+      const placedScenes = keep && world ? normalizeSceneLocations(s.scenes!, world) : s.scenes;
+      // 중요한 소품 고르기(D7 오너 E5 2026-11-22) — 디자인 바로 앞. 고른 소품은 사물 캐스트로 더하고 나오는 장면 등장 목록에 잇는다 →
+      //   그 뒤는 Producer 사물 카드와 같은 길(디자인 · props 행 · 서버 첫 그림 · 샷 소품 칸 id). 실패해도 소품 없이 이어 간다.
+      const picked = await pickKeyProps({
+        characters: s.characters!,
+        scenes: placedScenes,
+        world,
+        story: s.input.story,
+        locale: s.input.outputLocale,
+        logger,
+        axis: models.V,
+        projectId,
+      });
+      const characters = picked.characters ?? s.characters!;
+      const scenes = picked.scenes ?? placedScenes;
       const { characterVisual, worldVisual } = await runV2Design(
         s.visualIdentity!,                    // v0 전역 스타일 루트
         s.actVisualArc!,                      // v1 막별 아크 (v-체인 상속)
-        s.characters!,                        // s2 인물
+        characters,                           // s2 인물 (+ [만들기] 때 고른 소품)
         world,                                // s2 월드 (producer + 오픈캐스트, 대본 그대로면 + 장면 장소)
         '',                                    // bridge seed 제거(E6 삭제 채택) — v2Design 시그니처 하위호환용 빈 값
         logger,
@@ -562,7 +579,7 @@ export const WRITER_STEPS: WriterStep[] = [
       //   assets persist 는 기존처럼 best-effort, 이후 writer 가 v2Design 확인점에서 producer-origin drafts 를 submit 한다.
       await persistDesignTokens(projectId, s.visualIdentity!, worldVisual);
       // best-effort 유지하되 침묵 금지(#persist-guard) — 실패를 로그로 드러낸다(shots 0행 사고 교훈).
-      await persistAssetsToDb(projectId, s.characters!, scenes!, worldVisual, characterVisual, world).catch((e) => {
+      await persistAssetsToDb(projectId, characters, scenes!, worldVisual, characterVisual, world).catch((e) => {
         console.error('[writer] persistAssetsToDb 실패 (best-effort 계속):', e instanceof Error ? e.message : e);
       });
       // #C(2026-09-02 observability-audit): 생성 제출 자신는 best-effort 유지(v2Design 핵심경로를 막지 않는다)
@@ -575,7 +592,15 @@ export const WRITER_STEPS: WriterStep[] = [
         });
       });
       // 그림체 분석이 도는 중이라 미뤘다 — 기다리지 않고 다음 단계로 간다(분석 창구가 끝날 때 그린다, Writer 가 끝날 때 한 번 더 챙긴다).
-      return { characterVisual, worldVisual, ...(world !== s.world ? { world } : {}), ...(scenes !== s.scenes ? { scenes } : {}), ...(drafts?.deferred_style_analysis ? { _artistDeferred: true } : {}) };
+      return {
+        characterVisual,
+        worldVisual,
+        ...(world !== s.world ? { world } : {}),
+        ...(characters !== s.characters ? { characters } : {}),
+        ...(scenes !== s.scenes ? { scenes } : {}),
+        ...(picked.outcome ? { keyProps: picked.outcome } : {}),
+        ...(drafts?.deferred_style_analysis ? { _artistDeferred: true } : {}),
+      };
     },
   },
   {

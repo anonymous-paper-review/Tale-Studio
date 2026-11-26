@@ -201,10 +201,11 @@ describe('약속 D — 숫자 싱크', () => {
     expect(readStageSeen('proj-x').artist).toBe(T0 + 1)
   })
 
-  it('Artist 탭을 떠났다 돌아오면 보던 탭(인물/배경)과 고른 카드가 그대로다', () => {
+  // 왜: 약속 D15(보던 자리 그대로) — D13(2026-11-22)으로 걸러 보기 탭이 한 페이지 묶음이 되어, 기억하는 것이 "마지막에 간 묶음"이 됐다.
+  it('Artist 탭을 떠났다 돌아오면 마지막에 간 묶음(인물 · 배경 · 소품)과 고른 카드가 그대로다', () => {
     const page = read('src/app/studio/artist/page.tsx')
-    expect(page).toMatch(/const tab = useArtistStore\(\(s\) => s\.uiTab\)/)
-    expect(page).not.toMatch(/useState<ArtistTab>\('characters'\)/)
+    expect(page).toMatch(/const remembered = useArtistStore\(\(s\) => s\.uiTab\)/)
+    expect(page).not.toMatch(/useState<ArtistSection>\('characters'\)/)
     // 고른 카드(selectedCharacterId/selectedLocationId)는 원래 스토어에 있다.
     const store = read('src/stores/artist-store.ts')
     expect(store).toMatch(/uiTab: 'characters',\s*setUiTab: \(tab\) => set\(\{ uiTab: tab \}\)/)

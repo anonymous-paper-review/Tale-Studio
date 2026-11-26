@@ -436,6 +436,11 @@ const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; st
     agent: STAGE_AGENT_NAME.artist,
     stage: 'artist',
   },
+  prop_image: {
+    labelKey: '{agent} is generating prop images',
+    agent: STAGE_AGENT_NAME.artist,
+    stage: 'artist',
+  },
   shot_rough_storyboard: {
     labelKey: '{agent} is drawing the rough storyboard',
     agent: STAGE_AGENT_NAME.writer,
@@ -462,6 +467,8 @@ const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; st
     agent: STAGE_AGENT_NAME.director,
     stage: 'director',
   },
+  // Editor [생성] 음악(2026-11-26) — 진행은 [생성] 목록이 보인다(큐 알림바를 세우지 않는다, 수동 이미지와 같다).
+  editor_music: null,
 }
 
 /**

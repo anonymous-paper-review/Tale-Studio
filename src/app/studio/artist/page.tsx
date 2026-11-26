@@ -1,10 +1,12 @@
 'use client'
 
-import { useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState } from 'react'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { useSequentialPoll } from '@/hooks/use-sequential-poll'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowRight, Check, Loader2, ZoomIn, ZoomOut } from 'lucide-react'
+import { StageWaitCard } from '@/components/feedback/stage-wait'
+import { useArtistWait } from '@/hooks/use-stage-wait'
 import { Button } from '@/components/ui/button'
 import { ChoiceChip } from '@/components/controls/choice-chip'
 import { PageHeader } from '@/components/layout/page-header'
@@ -12,6 +14,8 @@ import { Slider } from '@/components/ui/slider'
 import { NextStepButton } from '@/components/handoff/next-step-button'
 import { CharacterPanel } from '@/features/artist/character-panel'
 import { WorldPanel } from '@/features/artist/world-panel'
+import { PropPanel } from '@/features/artist/prop-panel'
+import { ArtistSectionHeading, SECTION_LABEL, sectionName } from '@/features/artist/section-heading'
 import { useArtistStore } from '@/stores/artist-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -50,14 +54,17 @@ import { RegenerateStyleDialog } from '@/features/artist-room/regenerate-style-d
 import { VersionHistoryDialog } from '@/features/artist-room/version-history-dialog'
 import { completeVersionBlock, useArtistVersionStore, versionsNeedRefresh } from '@/stores/artist-version-store'
 import { regenOverlayDescription, regenStepLines, versionStyleLabel } from '@/lib/artist/style-versions'
-import { ARTIST_FILTERS, artistFilterCounts, artistFilterPanels, type ArtistFilter } from '@/lib/artist/card-filter'
+import { propsAutoDrawOpen } from '@/lib/artist/props'
+import { ARTIST_SECTIONS, activeArtistSection, artistDataLoading, artistSectionCounts, artistSectionId, jumpToArtistSection, keyScrollsArtistBoard, shownArtistSection, type ArtistSection } from '@/lib/artist/card-filter'
 
-// v3 A5(2026-11-03): 탭(등장인물 · 배경) 대신 걸러 보기 칸(모두 · 인물 · 배경) — lib/artist/card-filter.
-type ArtistTab = ArtistFilter
-
-// 칸 순서 — 전환 슬라이드 방향의 기준 (#d3 2026-08-03, writer 탭과 동일 패턴).
-const ARTIST_TAB_ORDER: readonly ArtistTab[] = ARTIST_FILTERS
-const FILTER_LABEL: Record<ArtistTab, string> = { all: 'All {count}', characters: 'Characters {count}', world: 'Backgrounds {count}' }
+/** 움직임 줄이기 설정 — 켜져 있으면 바로가기가 미끄러지지 않는다(D13). */
+const prefersReducedMotion = () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true
+/** 축척 저장 — 세 묶음이 한 값을 쓴다(D13). 저장소를 못 쓰면(사생활 창 등) 이번 화면에서만 기억한다. */
+const saveZoom = (v: number) => {
+  try {
+    localStorage.setItem('artist:zoomLevel', String(v))
+  } catch {}
+}
 
 export default function VisualPage() {
   const t = useT()
@@ -72,66 +79,135 @@ export default function VisualPage() {
   } = useArtistStore()
 
   const projectId = useProjectStore((s) => s.projectId)
-  // 약속 D15(2026-09-04): 보던 탭은 스토어가 기억한다 — 떠났다 돌아와도 그대로.
-  const tab = useArtistStore((s) => s.uiTab)
-  const setTab = useArtistStore((s) => s.setUiTab)
-  // Alt+←/→ 로 칸 순환(#keyboard-only 2026-08-11) — v3 에서는 모두 · 인물 · 배경 세 칸을 차례로 돈다(예전 두 탭, 오너 2026-11-03 v3 대로 확인).
-  useAltArrowCycle(ARTIST_FILTERS, tab, setTab)
-  // 탭 전환 슬라이드(#d3) — 방향은 탭 순서 기준(왼→오른쪽 = forward). set-state-in-render 패턴.
-  //   미끄러짐은 새로 보이게 된 묶음에만(검토 A M1) — slideFrom = 바로 앞 칸. 계속 보이는 묶음은 움직이지 않는다.
-  const [prevTab, setPrevTab] = useState<ArtistTab>(tab)
-  const [slideFrom, setSlideFrom] = useState<ArtistTab>(tab)
-  const [tabSlide, setTabSlide] = useState<'forward' | 'back' | 'none'>('none')
-  if (tab !== prevTab) {
-    setTabSlide(
-      ARTIST_TAB_ORDER.indexOf(tab) > ARTIST_TAB_ORDER.indexOf(prevTab) ? 'forward' : 'back',
-    )
-    setSlideFrom(prevTab)
-    setPrevTab(tab)
-  }
-  const tabSlideClass =
-    tabSlide === 'forward'
-      ? 'animate-in fade-in-25 slide-in-from-right-6 duration-500 ease-out motion-reduce:animate-none'
-      : tabSlide === 'back'
-        ? 'animate-in fade-in-25 slide-in-from-left-6 duration-500 ease-out motion-reduce:animate-none'
-        : undefined
-
-  // 보드 축척(#d1 2026-07-14) — writer 러프 보드와 같은 슬라이더. 인물/배경 탭별로 저장.
-  //   레벨 1(축소·3열) ~ 3(확대·1열, 기존 모습), cols = 4 - level. localStorage 탭별 키.
-  // 기본 레벨 2(#f5 2026-08-26 오너): 3(최대 확대)은 오너가 항상 최소로 줄여 썼다 — 중간이 기본.
-  //   저장값이 있으면 그것이 우선(아래 read).
-  const [zoomByTab, setZoomByTab] = useState<{ characters: number; world: number }>({
-    characters: 2,
-    world: 2,
-  })
+  // 인물 · 배경과 진행 상태를 처음 다 읽기 전에는 예전 진행 화면 · 빈 카드 대신 Artist 기다리는 카드(오너 2026-11-26 m1126 G1, hooks/use-stage-wait).
+  const artistWait = useArtistWait()
+  const propAssets = useArtistStore((s) => s.propAssets)
+  const loadedProjectId = useArtistStore((s) => s.loadedProjectId)
+  // D13(오너 2026-11-22 "한 페이지에 다 담아주고 버튼을 누르면 그 섹션으로 바로 이동") — 걸러 보기 칸(v3 A5) 대신 묶음 바로가기.
+  //   마지막에 간 묶음은 스토어가 기억한다(약속 D15) — 떠났다 돌아오면 그 묶음으로 간다. 묶음은 늘 그려져 있어 카드에서 고른 것이 남는다.
+  const remembered = useArtistStore((s) => s.uiTab)
+  const setRemembered = useArtistStore((s) => s.setUiTab)
+  const [active, setActive] = useState<ArtistSection>(remembered)
+  /** 이 화면이 스토어에 적은 마지막 묶음 — 다른 화면이 정한 묶음(Director 넘기기 창의 "채우러 가기")만 가려 따라간다. */
+  const written = useRef<ArtistSection>(remembered)
+  const [board, setBoard] = useState<HTMLDivElement | null>(null)
+  const sectionBarRef = useRef<HTMLDivElement>(null)
+  // 단추 줄 높이 — 좁은 화면에서는 두 줄이 된다. 바로 간 묶음 머리가 단추 줄에 가리지 않게 묶음 위 여백과 "지금 묶음" 기준선을 이 높이로 맞춘다.
+  const [barHeight, setBarHeight] = useState(48)
   useEffect(() => {
-    const read = (key: string) => {
-      const v = Number(localStorage.getItem(`artist:zoomLevel:${key}`))
-      return v >= 1 && v <= 3 ? v : 2
+    const bar = sectionBarRef.current
+    if (!bar || typeof ResizeObserver === 'undefined') return
+    const observer = new ResizeObserver(() => setBarHeight(bar.offsetHeight))
+    observer.observe(bar)
+    return () => observer.disconnect()
+  }, [board])
+  /** 누른 묶음 — 사람이 직접 스크롤하기 전까지 그 단추를 켜 둔다(짧은 페이지에서 "맨 아래" 규칙이 다른 단추를 켜지 않게). */
+  const pinned = useRef<ArtistSection | null>(null)
+  const jumpTo = useCallback((section: ArtistSection) => {
+    if (!jumpToArtistSection(section, { getElement: (id) => document.getElementById(id), reducedMotion: prefersReducedMotion() })) return
+    pinned.current = section
+    setActive(section)
+    written.current = section
+    setRemembered(section)
+  }, [setRemembered])
+  // Alt+←/→ 로 앞 · 뒤 묶음(#keyboard-only 2026-08-11 의 한 페이지판).
+  useAltArrowCycle(ARTIST_SECTIONS, active, jumpTo)
+  // 지금 보는 묶음 — 스크롤 칸([data-ai-busy-scroll])을 따라 단추 줄 바로 아래 걸친 묶음의 단추를 켠다(lib/artist/card-filter activeArtistSection).
+  useEffect(() => {
+    const scroller = board?.closest<HTMLElement>('[data-ai-busy-scroll]')
+    if (!scroller) return
+    let frame = 0
+    const measure = () => {
+      frame = 0
+      const base = scroller.getBoundingClientRect().top - scroller.scrollTop
+      const tops = ARTIST_SECTIONS.flatMap((section) => {
+        const element = document.getElementById(artistSectionId(section))
+        return element ? [{ section, top: element.getBoundingClientRect().top - base }] : []
+      })
+      const next = shownArtistSection(pinned.current, activeArtistSection(tops, {
+        scrollTop: scroller.scrollTop,
+        clientHeight: scroller.clientHeight,
+        scrollHeight: scroller.scrollHeight,
+        offset: (sectionBarRef.current?.offsetHeight ?? 0) + 12,
+      }))
+      setActive(next)
+      if (written.current !== next) {
+        written.current = next
+        setRemembered(next)
+      }
+    }
+    const onScroll = () => {
+      if (!frame) frame = requestAnimationFrame(measure)
+    }
+    // 사람이 직접 스크롤하면(휠 · 손가락 · 스크롤 막대 · 스크롤 키) 누른 단추 고정을 풀고 다시 잰다.
+    const unpin = () => {
+      pinned.current = null
+    }
+    const onKey = (e: KeyboardEvent) => {
+      if (keyScrollsArtistBoard(e.key)) unpin()
+    }
+    scroller.addEventListener('scroll', onScroll, { passive: true })
+    scroller.addEventListener('wheel', unpin, { passive: true })
+    scroller.addEventListener('touchstart', unpin, { passive: true })
+    scroller.addEventListener('pointerdown', unpin, { passive: true })
+    window.addEventListener('keydown', onKey)
+    return () => {
+      scroller.removeEventListener('scroll', onScroll)
+      scroller.removeEventListener('wheel', unpin)
+      scroller.removeEventListener('touchstart', unpin)
+      scroller.removeEventListener('pointerdown', unpin)
+      window.removeEventListener('keydown', onKey)
+      if (frame) cancelAnimationFrame(frame)
+    }
+  }, [board, setRemembered])
+  // 카드 판이 처음 그려지면 마지막에 간 묶음으로 바로(미끄러지지 않고) 간다. 그 뒤 다른 화면이 묶음을 정하면 그리로 간다.
+  const restoredBoard = useRef<HTMLDivElement | null>(null)
+  useEffect(() => {
+    if (!board) return
+    if (restoredBoard.current !== board) {
+      restoredBoard.current = board
+      written.current = remembered
+      const id = requestAnimationFrame(() => {
+        if (remembered !== ARTIST_SECTIONS[0] && jumpToArtistSection(remembered, { getElement: (key) => document.getElementById(key), reducedMotion: true })) pinned.current = remembered
+        setActive(remembered)
+      })
+      return () => cancelAnimationFrame(id)
+    }
+    if (remembered !== written.current) jumpTo(remembered)
+  }, [board, remembered, jumpTo])
+
+  // 보드 축척(#d1 2026-07-14) — writer 러프 보드와 같은 슬라이더. 레벨 1(축소·3열) ~ 3(확대·1열), 칸 수 = 4 - 레벨.
+  //   슬라이더 하나가 세 묶음(인물 · 배경 · 소품)을 함께 바꾼다(D13 — 예전 "모두" 칸 동작). 기본 레벨 2(#f5 2026-08-26 오너).
+  //   저장값이 있으면 그것이 우선 — 예전 인물 칸 저장값(artist:zoomLevel:characters)도 이어 읽는다.
+  const [zoom, setZoomLevel] = useState(2)
+  useEffect(() => {
+    const read = () => {
+      try {
+        for (const key of ['artist:zoomLevel', 'artist:zoomLevel:characters']) {
+          const v = Number(localStorage.getItem(key))
+          if (v >= 1 && v <= 3) return v
+        }
+      } catch {}
+      return 2
     }
     // rAF 경유 — 하이드레이션 mismatch 없이 저장값 반영 + set-state-in-effect 린트 준수.
-    const id = requestAnimationFrame(() =>
-      setZoomByTab({ characters: read('characters'), world: read('world') }),
-    )
+    const id = requestAnimationFrame(() => setZoomLevel(read()))
     return () => cancelAnimationFrame(id)
   }, [])
-  const setZoom = (key: 'characters' | 'world', v: number) => {
+  const setZoom = (v: number) => {
     const clamped = Math.min(3, Math.max(1, v))
-    setZoomByTab((prev) => ({ ...prev, [key]: clamped }))
-    try {
-      localStorage.setItem(`artist:zoomLevel:${key}`, String(clamped))
-    } catch {}
+    setZoomLevel(clamped)
+    saveZoom(clamped)
   }
   // Ctrl+휠 축척(#d1 2026-07-15) — 함수형 업데이트라 휠 연타에도 최신값 기준으로 단계 이동.
-  const stepZoom = (key: 'characters' | 'world', dir: 1 | -1) => {
-    setZoomByTab((prev) => {
-      const next = Math.min(3, Math.max(1, prev[key] + dir))
-      try {
-        localStorage.setItem(`artist:zoomLevel:${key}`, String(next))
-      } catch {}
-      return { ...prev, [key]: next }
+  const stepZoom = useCallback((dir: 1 | -1) => {
+    setZoomLevel((prev) => {
+      const next = Math.min(3, Math.max(1, prev + dir))
+      saveZoom(next)
+      return next
     })
-  }
+  }, [])
+  const boardColumns = 4 - zoom
 
   // 실험 New UI(에셋·샷 보드) 토글 — 스토어 보관으로 탭 전환(remount)에도 유지.
 
@@ -394,6 +470,13 @@ export default function VisualPage() {
   useEffect(() => {
     if (drawDecision === 'continue') void useArtistStore.getState().continueMissingImages()
   }, [drawDecision])
+  // 소품 그림 이어 그리기(D7 · 리드 결정 2) — 인물 · 배경 그림을 다 그린 뒤, 서버 첫 그림이 자리 때문에 건너뛴 소품을 이 화면이 채운다.
+  //   [완료하기] 전(카드 단계)에만 — 완료한 프로젝트를 열었다고 저절로 그리지 않는다. 실패한 소품은 카드의 [다시 그리기]를 기다린다.
+  const propsAuto = propsAutoDrawOpen({ phase, done: progress.done, demo: isDemoSession() })
+  const propsMissing = propAssets.filter((prop) => !prop.imageUrl).length
+  useEffect(() => {
+    if (projectId && propsAuto && propsMissing > 0) void useArtistStore.getState().continueMissingProps()
+  }, [projectId, propsAuto, propsMissing])
   const redrawButton = drawDecision === 'stop' && missingCount > 0 ? (
     <Button size="sm" onClick={() => void useArtistStore.getState().redrawMissingImages()} data-testid="artist-redraw-missing">
       {t('Draw the {count} missing images', { count: missingCount })}
@@ -488,6 +571,7 @@ export default function VisualPage() {
   const legacyProgressBusy = legacyProgressHolds({ gateOpen, phase, status: writerStatus })
   useAiBusyHold(legacyProgressBusy)
 
+  if (artistWait) return <StageWaitCard stage="artist" />
   if (phase === 'list') {
     return (
       <>
@@ -544,12 +628,18 @@ export default function VisualPage() {
       {t(storyboardPrep === 'splitting' ? 'Getting Storyboard ready · splitting scenes and shots' : storyboardPrep === 'drawing' ? 'Getting Storyboard ready · drawing the roughs' : 'Storyboard is ready')}
     </span>
   ) : null
+  // 자료를 다 읽기 전(실제 프로젝트 QA a, 2026-11-23) — 머리 줄 · 바로가기 단추 · 묶음 머리에 숫자 0 과 "아직 ~이 없어요" 대신 불러오는 중을 보인다.
+  const sectionLoading = artistDataLoading({
+    projectId,
+    loadedProjectId,
+    counts: artistSectionCounts({ characters: characterAssets.length, worlds: worldAssets.length, props: propAssets.length }),
+  })
   const headerRow = (
     <PageHeader
-      title={t('Characters · backgrounds')}
+      title={t('Characters · backgrounds · props')}
       meta={
         <span data-testid="artist-header-counts">
-          {t('Characters {persons} · backgrounds {places}', { persons: headerPersons, places: headerPlaces })}
+          {sectionLoading ? t('Loading…') : t('Characters {persons} · backgrounds {places} · props {props}', { persons: headerPersons, places: headerPlaces, props: propAssets.length })}
           {headerKept > 0 ? ` · ${t('Kept {count}', { count: headerKept })}` : null}
         </span>
       }
@@ -587,13 +677,8 @@ export default function VisualPage() {
     <NextStepButton />
   )
 
-  // 걸러 보기(v3 A5) — 칸마다 보이는 카드 수. 모두 칸에서 축척을 움직이면 인물 · 배경 둘 다 바뀐다.
-  const filterCounts = artistFilterCounts({ characters: characterAssets.length, worlds: worldAssets.length })
-  const zoomKey: 'characters' | 'world' = tab === 'world' ? 'world' : 'characters'
-  const setShownZoom = (v: number) => {
-    if (tab !== 'world') setZoom('characters', v)
-    if (tab !== 'characters') setZoom('world', v)
-  }
+  // 묶음 바로가기(D13) — 단추 · 묶음 머리의 카드 수(보관 카드 포함).
+  const sectionCounts = artistSectionCounts({ characters: characterAssets.length, worlds: worldAssets.length, props: propAssets.length })
 
   return (
     <>
@@ -609,30 +694,33 @@ export default function VisualPage() {
       ) : null}
       {/* 투명 덮개(다시 그리는 동안) 너머로 휠 · 손가락 끌기가 이 칸을 스크롤한다(lib/ai-busy-scroll). */}
       <div className="min-h-0 flex-1 overflow-y-auto px-8 pb-10 pt-7" data-ai-busy-scroll>
-        {/* v3 A5 — 화면 머리 · 작품 스타일 막대 · 걸러 보기 · 카드 묶음 · 맨 아래 다음 단계가 860 폭 한 줄로 쌓인다(간격 16). */}
-        <div className="mx-auto flex max-w-[860px] flex-col gap-4">
+        {/* v3 A5 — 화면 머리 · 작품 스타일 막대 · 묶음 단추 줄 · 인물 · 배경 · 소품 묶음 · 맨 아래 다음 단계가 860 폭 한 줄로 쌓인다(간격 16).
+            D13(2026-11-22): 세 묶음이 한 페이지에 늘 함께 있고, 단추 줄은 위에 붙어 그 묶음으로 바로 간다. */}
+        <div ref={setBoard} className="mx-auto flex max-w-[860px] flex-col gap-4">
           {headerRow}
           {/* 작품 스타일 막대(A5) — 견본 · 이름 · "작품 스타일 · v{n}" · [불러오기 · 기록 N] · [재생성하기].
               Storyboard 를 연 뒤 · 그리는 중에는 꺼지고 까닭이 보인다. */}
           <StyleVersionBar completed={artistCompleted} drawing={generatingCount > 0 || regenDrawing} />
-          <div className="flex flex-wrap items-center justify-between gap-4">
+          {/* 묶음 단추 줄(D13) — 스크롤해도 맨 위에 붙어 있고, 지금 보는 묶음의 단추가 켜진다. 오른쪽은 세 묶음 공용 축척. */}
+          {/* -top-7 = 스크롤 칸 위 여백(pt-7)만큼 올려 맨 위에 붙인다 — 붙는 자리는 스크롤 칸의 안쪽 여백 기준이라, 그대로 두면 그 틈으로 카드가 비쳤다. */}
+          <div ref={sectionBarRef} className="sticky -top-7 z-10 -mx-2 flex flex-wrap items-center justify-between gap-4 bg-background px-2 py-2" data-testid="artist-section-bar">
             <AltArrowHint>
-              <div role="group" aria-label={t('Filter cards')} className="flex flex-wrap gap-1.5" data-testid="artist-filter">
-                {ARTIST_FILTERS.map((filter) => (
-                  <ChoiceChip key={filter} selected={tab === filter} onClick={() => setTab(filter)} data-testid={`artist-filter-${filter}`}>
-                    {t(FILTER_LABEL[filter], { count: filterCounts[filter] })}
+              <nav aria-label={t('Jump to a section')} className="flex flex-wrap gap-1.5" data-testid="artist-sections-nav">
+                {ARTIST_SECTIONS.map((section) => (
+                  <ChoiceChip key={section} selected={active === section} onClick={() => jumpTo(section)} data-testid={`artist-jump-${section}`}>
+                    {sectionLoading ? sectionName(t, section) : t(SECTION_LABEL[section], { count: sectionCounts[section] })}
                   </ChoiceChip>
                 ))}
-              </div>
+              </nav>
             </AltArrowHint>
-            {/* 보드 축척(#d1) — writer 러프 보드와 동일 UI, 인물/배경 칸별 저장 */}
+            {/* 보드 축척(#d1) — writer 러프 보드와 동일 UI, 세 묶음 공용 저장 */}
             <div className="flex shrink-0 items-center gap-1.5">
               <Button
                 size="icon"
                 variant="ghost"
                 className="size-7 hover-red-beam"
                 aria-label={t('Zoom out (more columns)')}
-                onClick={() => setShownZoom(zoomByTab[zoomKey] - 1)}
+                onClick={() => setZoom(zoom - 1)}
               >
                 <ZoomOut className="size-4" />
               </Button>
@@ -641,8 +729,8 @@ export default function VisualPage() {
                 min={1}
                 max={3}
                 step={1}
-                value={[zoomByTab[zoomKey]]}
-                onValueChange={([v]) => setShownZoom(v)}
+                value={[zoom]}
+                onValueChange={([v]) => setZoom(v)}
                 aria-label={t('Board zoom')}
               />
               <Button
@@ -650,32 +738,33 @@ export default function VisualPage() {
                 variant="ghost"
                 className="size-7 hover-red-beam"
                 aria-label={t('Zoom in (fewer columns)')}
-                onClick={() => setShownZoom(zoomByTab[zoomKey] + 1)}
+                onClick={() => setZoom(zoom + 1)}
               >
                 <ZoomIn className="size-4" />
               </Button>
             </div>
           </div>
 
-          {/* 묶음마다 이름(key)이 고정이다 — 칸을 바꿔도 계속 보이는 묶음은 새로 그리지 않아 그 카드의 채팅 대상 · 카드 안에서
-              고른 모습이 남는다(예전 두 탭은 숨는 쪽만 사라졌다, 검토 A M1). 미끄러짐은 새로 보이게 된 묶음에만. */}
-          <div className="flex flex-col gap-3.5">
-            {artistFilterPanels(slideFrom, tab).map((panel) => (
-              <div key={panel.key} className={panel.entering ? tabSlideClass : undefined}>
-                {panel.key === 'characters' ? (
-                  <CharacterPanel
-                    columns={4 - zoomByTab.characters}
-                    onZoomStep={(dir) => stepZoom('characters', dir)}
-                  />
-                ) : (
-                  <WorldPanel
-                    columns={4 - zoomByTab.world}
-                    onZoomStep={(dir) => stepZoom('world', dir)}
-                  />
-                )}
-              </div>
-            ))}
-          </div>
+          {/* 묶음마다 이름(key)이 고정이고 늘 그려져 있다 — 단추는 스크롤만 해서 카드의 채팅 대상 · 카드 안에서 고른 모습이 남는다(검토 A M1).
+              머리 위 여백(scrollMarginTop)은 붙어 있는 단추 줄 높이만큼 — 바로 간 묶음 머리가 단추 줄에 가리지 않게. */}
+          {ARTIST_SECTIONS.map((section) => (
+            <section
+              key={section}
+              id={artistSectionId(section)}
+              data-artist-section={section}
+              className="flex flex-col gap-3.5"
+              style={{ scrollMarginTop: barHeight + 12 }}
+            >
+              <ArtistSectionHeading section={section} count={sectionCounts[section]} loading={sectionLoading} />
+              {section === 'characters' ? (
+                <CharacterPanel columns={boardColumns} onZoomStep={stepZoom} />
+              ) : section === 'world' ? (
+                <WorldPanel columns={boardColumns} onZoomStep={stepZoom} />
+              ) : (
+                <PropPanel columns={boardColumns} onZoomStep={stepZoom} />
+              )}
+            </section>
+          ))}
 
           <div className="flex flex-wrap items-start justify-end gap-3" data-testid="artist-next-row">{nextRow}</div>
         </div>

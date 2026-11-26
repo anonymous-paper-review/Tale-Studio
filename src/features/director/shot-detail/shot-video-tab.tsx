@@ -1,6 +1,6 @@
 'use client'
 
-// 샷 상세의 영상 탭(디자이너 11/13 시안 D7, 오너 2026-11-14) — Take 는 덮어쓰지 않고 새것부터 쌓이고 ★ 로 최종을 고른다
+// 샷 상세의 영상 탭(디자이너 11/13 시안 D7, 오너 2026-11-14) — Take 는 덮어쓰지 않고 새것부터 쌓이고 ★ 로 최종을 고른다([☆ 채택], 오너 2026-11-26 D2)
 //   (고르지 않았으면 가장 최근 완성 Take 가 "★ 최종 (자동)" — Editor 로 가는 것과 같은 규칙).
 //   이미지 고치기(장면 · 인물 · 구도)와 영상 고치기(움직임 · 카메라 · 길이)를 한 화면에 둔다. 영상 고치기의 단추는 늘 새 Take 를
 //   만들고 보고 있던 Take 의 설정을 이어받는다 — 같은 Take 를 덮던 다시 만들기는 여기서 쓰지 않는다.
@@ -146,7 +146,8 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
                           {final?.auto ? t('★ Final (auto)') : t('★ Final')}
                         </Button>
                       ) : (
-                        <Button type="button" size="pill" variant="ghost" onClick={() => void markFinal(take, true)}>{t('☆ Set as final')}</Button>
+                        // [☆ 채택](오너 2026-11-26 D2 — 세 탭 같은 말 "채택 → 최종") — 그 Take 가 ★ 최종이 되어 Editor 로 간다.
+                        <Button type="button" size="pill" variant="ghost" onClick={() => void markFinal(take, true)} data-testid="shot-detail-take-adopt">{t('☆ Adopt')}</Button>
                       )
                     ) : null}
                   </div>

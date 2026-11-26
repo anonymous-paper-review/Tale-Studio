@@ -8,7 +8,8 @@
 import { useEffect, useSyncExternalStore } from 'react'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
-import { CircleAlert, Loader2, Upload } from 'lucide-react'
+import { CircleAlert, Upload } from 'lucide-react'
+import { StageWaitCard } from '@/components/feedback/stage-wait'
 import { ChatIcon, ListIcon } from '@/components/icons/v3-icons'
 import { StudioTopBar } from '@/components/layout/studio-top-bar'
 import { Button } from '@/components/ui/button'
@@ -106,7 +107,8 @@ export function EntryWorkspace() {
             {t("Couldn't save the last change.")}
           </p>
         ) : null}
-        {!started ? (
+        {/* 탭은 시작 화면을 다 읽은 뒤에만 — 읽는 동안에는 시작한 프로젝트도 "시작 전"으로 보여 탭이 잠깐 보였다 사라졌다(m1126 G1). */}
+        {!started && ready ? (
           <TabsList aria-label={t('How to make it')}>
             <TabsTrigger value="form" className="px-3">
               <ListIcon aria-hidden />
@@ -131,10 +133,8 @@ export function EntryWorkspace() {
           </Button>
         </div>
       ) : !ready ? (
-        <p className="flex items-center justify-center gap-2 px-6 py-24 text-sm text-muted-foreground" role="status">
-          <Loader2 className="size-4 animate-spin motion-reduce:animate-none" aria-hidden />
-          {t('Loading…')}
-        </p>
+        // 시작 화면을 읽는 동안 — 작은 "불러오는 중…" 줄 대신 다른 단계 · Editor 와 같은 Producer 기다리는 카드(오너 2026-11-26 m1126 G1).
+        <StageWaitCard stage="entry" />
       ) : started ? (
         <div className="min-h-0 flex-1 overflow-y-auto">
           <EntrySummary />

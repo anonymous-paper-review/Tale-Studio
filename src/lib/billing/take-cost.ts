@@ -3,6 +3,9 @@
 // v4 확정(Take는 **영상 전용** — 이미지는 무과금): shot_video/shot_previz_video 잡만 이 계수를
 //   소모한다. 클라(생성 전 표시, v4 #2)와 서버(hold 금액)가 반드시 같은 계산기를 쓴다 — 표시가
 //   실제 차감과 다르면 "종량제 신뢰"가 깨진다(기획 근거: v4 시트 2_Take경제).
+// 2026-11-26(m1126 E1 · 리드 답 O3): Take 를 쓰는 생성이 **영상 · 음악**으로 넓어졌다 — Editor [생성]의 음악 한 곡
+//   (editor_music)은 모델 · 길이와 상관없이 1 Take, 영상과 같은 take_hold 길로 제출 전에 묶고 실패하면 돌려준다.
+//   이미지는 여전히 무과금이다. Take 를 쓰는 작업 종류는 아래 TAKE_BILLED_JOB_KINDS 한 곳에만 적는다(웹훅 · 폴링이 돌려줄 때 읽는다).
 //
 // ⚠ 계수 확정 상태: seedance(Seedance 2.0)=5 만 v4 확정값. kling-o3/veo=5 는 **잠정**(기획 확정
 //   대상) — 오너가 v4 시트에 최종 숫자를 박으면 이 표만 갱신하면 된다(호출부 변경 불필요).
@@ -56,4 +59,18 @@ export function takeValuesShown(balance: { mode: TakeBillingMode; failed?: boole
 /** 러프 previz 영상(#previz-video)은 항상 드래프트 단가 — happy-horse 고정 모델의 계수와 동일. */
 export function takeCostForPreviz(): number {
   return 1
+}
+
+/** 음악 한 곡(Editor [생성], editor_music)의 Take — 모델 · 길이와 상관없이 1(리드 답 O3, 2026-11-26). */
+export const TAKE_COST_PER_MUSIC = 1
+
+export function takeCostForMusic(): number {
+  return TAKE_COST_PER_MUSIC
+}
+
+/** Take 를 묶는 생성 작업 종류 — 영상 · 미리보기 영상 · 음악. 이 종류가 실패로 끝나면 묶은 Take 를 돌려준다. 이미지 종류는 없다(무과금). */
+export const TAKE_BILLED_JOB_KINDS = ['shot_video', 'shot_previz_video', 'editor_music'] as const
+
+export function isTakeBilledJobKind(kind: string | null | undefined): boolean {
+  return (TAKE_BILLED_JOB_KINDS as readonly string[]).includes(kind ?? '')
 }

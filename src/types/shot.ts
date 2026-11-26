@@ -180,7 +180,13 @@ export interface ClipTransition {
  */
 export interface ClipEffects {
   blackWhite?: boolean
+  /** 흐림 0 ~ 1 — [일정하게]면 그 값, [시작 → 끝]이면 클립 처음 값(D14, 2026-11-22). */
   blur?: number
+  /**
+   * 흐림 [시작 → 끝]의 클립 끝 값(0 ~ 1) — 칸이 있으면 [시작 → 끝], 없으면 [일정하게](D14). 효과 종류가 아니라 흐림의 칸이다.
+   *   판(version 2)은 그대로 — 예전 Editor 는 이 칸을 몰라 흐림 칸(시작 값)으로 일정하게 그리고, 효과 묶음째 옮겨 지우지 않는다(리드 11/22 답 1).
+   */
+  blurEnd?: number
   brightnessContrast?: { brightness: number; contrast: number }
 }
 

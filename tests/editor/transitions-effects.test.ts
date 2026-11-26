@@ -321,7 +321,8 @@ describe('혼자 정한 것', () => {
     api().addVideoEffect('B', 'brightnessContrast')
     api().selectClip('B')
     const markup = html(createElement(EffectControls))
-    expect(text(markup)).toContain('효과 흑백 켬 끔 빼기 가우시안 흐림 빼기 흐림 30% 밝기 및 대비 빼기 밝기 0% 대비 0%')
+    // 흐림 머리 아래 [일정하게] · [시작 → 끝] 고르기(D14, 2026-11-22 — 옛 글자: '… 가우시안 흐림 빼기 흐림 30% …').
+    expect(text(markup)).toContain('효과 흑백 켬 끔 빼기 가우시안 흐림 빼기 일정하게 시작 → 끝 흐림 30% 밝기 및 대비 빼기 밝기 0% 대비 0%')
     expect(pressed(markup)).toContain('켬')
     // 모션 · 불투명도 다음, 전환 앞.
     expect(text(markup).indexOf('불투명도')).toBeLessThan(text(markup).indexOf('효과 흑백'))
