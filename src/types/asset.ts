@@ -142,6 +142,8 @@ export interface PropAsset {
   origin: 'producer' | 'writer' | 'user'
   /** 다른 모습(prop_appearances 행, m1126 A3) — 기본 모습(키 'default')은 이 카드 자체. 모습 표를 읽은 카드에만 있다(만든 순서). */
   appearances?: PropAppearance[]
+  /** 기본 모습의 지난 그림(prop_image_candidates 칸 'default', m1126 A4 — m-history 의 줄 · [채택]이 읽는다). 가장 새 것 먼저. */
+  candidates?: CandidateImage[]
 }
 
 /** 소품의 다른 모습(m1126 A3 "소품 모습 추가") — 배경 모습(LocationAppearance)과 같은 축. 그림은 소품 양식 16:9 한 장. */
@@ -155,6 +157,8 @@ export interface PropAppearance {
   appearanceNative: string
   imageUrl: string | null
   sourceHash: string | null
+  /** 이 모습의 지난 그림(prop_image_candidates 칸 = 모습 열쇠). 가장 새 것 먼저. */
+  candidates?: CandidateImage[]
 }
 
 /** 배경 모습 변형(location_appearances 행). 기본 모습(키 'default')은 WorldAsset 자체가 담당한다. */
