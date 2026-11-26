@@ -3,7 +3,7 @@
 // Writer 산문 작업공간(리뉴얼 1차 2026-10-19, 프로토타입 W1 · W1r · W3 · W4 · W5 · W6 · WP · WN → v3 W1 2026-11-03).
 //   Writer 는 산문만 다룬다 — 제목 아래 설정 칩 · 인물 · 배경 카드 · 스타일이 없다(예전 Meeting Room 을 대신한다).
 //   v3(오너 결정 7): 고치기 방식 전환(화면에서 고치기 · 채팅으로 고치기)이 없는 한 화면이다 — 화면 머리 [직접 작성] · [AI 다시 쓰기] ·
-//   [Artist로 가기](확정 전엔 확인 창, 2026-11-26 오너 — 옛 이름 [브레이크다운하기]), 조건 칩, 산문, 오른쪽 채팅. 문단을 누르면 그 문단이 채팅 입력칸 위에 붙어 그 문단만 고친다(lib/prose/paragraph-pick).
+//   [브레이크다운하기], 조건 칩, 산문, 오른쪽 채팅. 문단을 누르면 그 문단이 채팅 입력칸 위에 붙어 그 문단만 고친다(lib/prose/paragraph-pick).
 //   AI 가 일하는 동안(초안 쓰기 · 다시 쓰기 · 수정안)은 화면 전체를 진행 표시로 덮는다 — 초안을 쓰는 동안은 큰 Lumi(오너 결정 8).
 import { useEffect, useMemo, useState } from 'react'
 import { useRouter } from 'next/navigation'
@@ -126,7 +126,7 @@ export function ProseWorkspace() {
     <>
       {prose.preserved ? null : <ProseEditActions prose={prose} />}
       <Button onClick={() => useWriterRoomStore.getState().openConfirm()} disabled={!prose.canBreakdown} data-testid="prose-breakdown">
-        {t('Go to Artist')}<ArrowRight className="size-4" />
+        {t('Run breakdown')}<ArrowRight className="size-4" />
       </Button>
     </>
   )
@@ -174,7 +174,7 @@ export function ProseWorkspace() {
             </div>
           ) : prose.preserved ? (
             <div className="rounded-xl bg-card px-4 py-3 text-label" role="status" data-testid="prose-preserved-banner">
-              {t('This project uses the script as written. You cannot change the prose. Check it, then press [Go to Artist].')}
+              {t('This project uses the script as written. You cannot change the prose. Check it, then run the breakdown.')}
             </div>
           ) : (
             <ProseConditionChips prose={prose} />

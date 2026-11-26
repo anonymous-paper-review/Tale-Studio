@@ -75,12 +75,12 @@ describe('지시문 · 도구 안내', () => {
     expect(lockedProducerDirective(false)).toBeNull()
   })
 
-  it('산문 초안 지시문은 지금 Writer 화면의 길(채팅 · Rewrite · 직접 고치기 · Go to Artist)로 말한다', () => {
+  it('산문 초안 지시문은 지금 Writer 화면의 길(채팅 · Rewrite · 직접 고치기 · Run breakdown)로 말한다', () => {
     // 왜: "Producer 화면 아래 · Hand over to Writer 단추"는 옛 화면이다.
     const directive = treatmentDraftDirective(true)!
     expect(directive).not.toContain('Hand over to Writer')
     expect(directive).toContain('Writer screen')
-    expect(directive).toContain('Go to Artist')
+    expect(directive).toContain('Run breakdown')
     expect(directive).toContain('Rewrite')
     expect(directive).toContain('Edit it myself')
   })

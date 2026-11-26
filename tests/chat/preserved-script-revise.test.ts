@@ -38,7 +38,7 @@ describe('원작 그대로 대본의 수정 요청', () => {
       : Response.json({}))))
 
     expect(await useGlobalChatStore.getState().reviseSceneGate('완료')).toBe(false)
-    expect(useGlobalChatStore.getState().error).toBe('원작 그대로 쓰는 대본이라 산문을 고칠 수 없어요. 다 읽었으면 [Artist로 가기]를 눌러 넘어가 주세요.')
+    expect(useGlobalChatStore.getState().error).toBe('원작 그대로 쓰는 대본이라 산문을 고칠 수 없어요. 다 읽었으면 [브레이크다운하기]를 눌러 넘어가 주세요.')
   })
 
   it('그 밖의 까닭으로 수정 요청을 보내지 못하면 지금처럼 다시 시도하라고 한다', async () => {

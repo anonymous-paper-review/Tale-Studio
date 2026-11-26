@@ -211,9 +211,9 @@ describe('만화로 산문을 다시 쓰는 동안과 확정한 산문', () => {
     busy: proseToolsBusy({ busy: null, editing: false, openProposal: false, comicRewrite: producerBusyKind('proj-1', { pending: null, busy: chat.getState().boardBusy }) === 'comic' }),
   }).breakdown
 
-  // 왜: 검토 a 낮음 1(2026-11-10) — 만화를 읽는 30~60초 동안 옛 산문이 그대로 보여 [브레이크다운하기](2026-11-26 부터 [Artist로 가기])로 확정할 수 있었다.
+  // 왜: 검토 a 낮음 1(2026-11-10) — 만화를 읽는 30~60초 동안 옛 산문이 그대로 보여 [브레이크다운하기]로 확정할 수 있었다.
   //   대본이 들어온 직후 확정하면 뒤이어 온 다시 쓰기가 확정한 초안을 내려놓을 수 있었다. 다 끝나거나 실패하면 다시 확정할 수 있다.
-  it('만화로 산문을 다시 쓰는 동안에는 [Artist로 가기] · 확정을 막고, 다시 쓰기가 끝나거나 실패하면 다시 푼다', async () => {
+  it('만화로 산문을 다시 쓰는 동안에는 [브레이크다운하기] · 확정을 막고, 다시 쓰기가 끝나거나 실패하면 다시 푼다', async () => {
     let release: () => void = () => {}
     comicScript = () => new Promise<Response>((resolve) => { release = () => resolve(Response.json({ script: SCRIPT, stats: { scenes: 1, dialogue_lines: 2 } })) })
     expect(breakdownOpen()).toBe(true)

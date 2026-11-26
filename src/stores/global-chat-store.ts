@@ -2626,7 +2626,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (!response.ok) {
         if (accepted.code === 'scene_story_proposal_pending') set({ error: translate(contentLocale(), 'Apply or discard the current scene story proposal before requesting another.'), reviseRefused: 'pending' })
         // 원작 그대로 쓰는 대본은 서버가 고치지 않는다 — 다시 시도하라고 하면 같은 말만 돌아온다. 까닭과 넘어가는 길을 말한다(2026-10-27 운영).
-        if (accepted.code === 'preserved_script') set({ error: translate(contentLocale(), 'This project keeps the original script as is, so the prose cannot be changed. When you have read it, press [Go to Artist] to move on.') })
+        if (accepted.code === 'preserved_script') set({ error: translate(contentLocale(), 'This project keeps the original script as is, so the prose cannot be changed. When you have read it, press [Run breakdown] to move on.') })
         return false
       }
       set({ sceneStoryProposalPending: { projectId, id: accepted.proposalId ?? null } })
@@ -2741,7 +2741,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       if (!response.ok) {
         if (accepted.code === 'scene_story_proposal_pending') set({ error: translate(contentLocale(), 'Apply or discard the current scene story proposal before requesting another.') })
         // 원작 그대로 쓰는 대본은 서버가 고치지 않는다 — 다시 시도하라고 하면 같은 말만 돌아온다. 까닭과 넘어가는 길을 말한다(2026-10-27 운영).
-        if (accepted.code === 'preserved_script') set({ error: translate(contentLocale(), 'This project keeps the original script as is, so the prose cannot be changed. When you have read it, press [Go to Artist] to move on.') })
+        if (accepted.code === 'preserved_script') set({ error: translate(contentLocale(), 'This project keeps the original script as is, so the prose cannot be changed. When you have read it, press [Run breakdown] to move on.') })
         return false
       }
       set({ sceneStoryProposalPending: { projectId, id: accepted.proposalId ?? null } })
@@ -2773,9 +2773,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const current = get().suggestion
     if (current?.id.startsWith(`writer-next:${projectId}:`)) get().dismissSuggestion({ implicit: true })
     // 확정 창에서 [아니오]를 고른 사람에게는 같은 질문을 또 하지 않는다(디자이너 QA 1차 #08) — 적용했다는 말과
-    //   넘어가는 길([Artist로 가기] · "다음 단계로", 2026-11-26 오너 — 옛 이름 [브레이크다운하기])만 단추 없이 남긴다. 적용 · 직접 저장이 모두 이 길로 온다.
+    //   넘어가는 길([브레이크다운하기] · "다음 단계로")만 단추 없이 남긴다. 적용 · 직접 저장이 모두 이 길로 온다.
     if (step === 'ask' && get().proseConfirmDeclined === projectId) {
-      const content = translate(locale, 'Applied. When you are ready to move on, press [Go to Artist] or say "Next step".')
+      const content = translate(locale, 'Applied. When you are ready to move on, press Breakdown or say "Next step".')
       set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer', role: 'model', content }] }))
       saveChatMessage(projectId, 'producer', 'model', content)
       return
@@ -2786,7 +2786,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       dismissible: false,
       content: translate(locale, step === 'ask'
         ? 'Applied. Shall we move on to the next step? Moving on locks the prose, and Artist picks the characters and backgrounds from it.'
-        : 'What would you like to do next? When you apply a change, I will ask again. You can also press [Go to Artist] at any time.'),
+        : 'What would you like to do next? When you apply a change, I will ask again. You can also press Breakdown at any time.'),
       action: { kind: 'writerNext', step },
     }, { preempt: true })
   },
@@ -2851,7 +2851,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     if (announcedTreatments.has(key)) return false
     announcedTreatments.add(key)
     const content = translate(contentLocale(), preserved
-      ? 'I carried the script over as written. Check it, then press [Go to Artist].'
+      ? 'I carried the script over as written. Check it, then run the breakdown.'
       : 'I wrote the prose in {count} scenes. If you do not like it, say "Rewrite it" or change the conditions and rewrite it.', { count: sceneCount })
     set((state) => ({ messages: [...state.messages, { id: makeId(), stage: 'producer', role: 'model', content }] }))
     saveChatMessage(projectId, 'producer', 'model', content)

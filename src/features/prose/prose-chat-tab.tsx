@@ -118,7 +118,7 @@ export function ProseChatTab({ prose, title }: { prose: ProseState; title: strin
           <Bubble who="Writer" testId="prose-chat-card">
             <p className="text-sm">
               {prose.preserved
-                ? t('I carried the script over as written. Check it, then press [Go to Artist].')
+                ? t('I carried the script over as written. Check it, then run the breakdown.')
                 : t('I wrote the prose. If you do not like it, say "Rewrite it" or tell me what to change.')}
             </p>
             <div className="mt-3 rounded-lg border border-border bg-background/60 p-4">
@@ -138,7 +138,7 @@ export function ProseChatTab({ prose, title }: { prose: ProseState; title: strin
               ) : null}
               {!prose.locked ? (
                 <Button size="sm" onClick={() => useWriterRoomStore.getState().openConfirm()} disabled={!prose.canBreakdown} data-testid="prose-chat-breakdown">
-                  {t('Go to Artist')}<ArrowRight className="size-4" />
+                  {t('Run breakdown')}<ArrowRight className="size-4" />
                 </Button>
               ) : null}
             </div>

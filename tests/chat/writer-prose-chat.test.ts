@@ -143,7 +143,7 @@ describe('바꿀 곳이 없는 수정안', () => {
 
 describe('넘어갈지는 한 곳에서 묻는다', () => {
   it('산문 확정 창을 열면 채팅에 떠 있던 "다음 단계로 넘어갈까요?" 질문은 내린다', async () => {
-    // 왜: 같은 질문이 확정 창과 채팅 두 곳에 동시에 떠 있었다(디자이너 QA 1차 #08). 창은 [Artist로 가기](옛 이름 [브레이크다운하기], 2026-11-26 오너) · 다음 단계 버튼 · 채팅 넘김 말 어디서든 열린다.
+    // 왜: 같은 질문이 확정 창과 채팅 두 곳에 동시에 떠 있었다(디자이너 QA 1차 #08). 창은 [브레이크다운하기] · 다음 단계 버튼 · 채팅 넘김 말 어디서든 열린다.
     const ways = [
       () => useWriterRoomStore.getState().openConfirm(),
       () => useGlobalChatStore.getState().requestNextStep(),
@@ -162,8 +162,8 @@ describe('넘어갈지는 한 곳에서 묻는다', () => {
   })
 
   it('산문 확정 창에서 아니요를 고른 뒤 고친 걸 적용하면 다음 단계를 다시 묻지 않고 적용했다고만 알린다', async () => {
-    // 왜: 넘어가겠다고 한 번 말해 확정 창을 본 사람에게, 고친 걸 적용할 때마다 채팅에서 같은 질문이 또 들어왔다(디자이너 QA 1차 #08). 넘어가기는 [Artist로 가기] · "다음 단계로"로 언제든 연다(단추 이름 2026-11-26 오너).
-    const plain = '적용했어요. 넘어갈 준비가 되면 [Artist로 가기]를 누르거나 "다음 단계로"라고 말해 주세요.'
+    // 왜: 넘어가겠다고 한 번 말해 확정 창을 본 사람에게, 고친 걸 적용할 때마다 채팅에서 같은 질문이 또 들어왔다(디자이너 QA 1차 #08). 넘어가기는 [브레이크다운하기] · "다음 단계로"로 언제든 연다.
+    const plain = '적용했어요. 넘어갈 준비가 되면 [브레이크다운하기]를 누르거나 "다음 단계로"라고 말해 주세요.'
     await useGlobalChatStore.getState().requestNextStep()
     useGlobalChatStore.getState().declineProseConfirm()
     expect(useWriterRoomStore.getState().confirmOpen).toBe(false)

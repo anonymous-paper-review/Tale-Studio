@@ -88,7 +88,7 @@ export function treatmentDraftDirective(treatmentDraft: unknown): string | null 
     'This chat turn is for answering questions. You cannot edit the prose from here, so do not change the story text. Answer the question in a few sentences and do not emit extractedSettings or choices.',
     'If the user wants scenes, events, sentences, the flow or the ending changed, tell them to type what to change in this chat (the app turns it into a proposal they apply or discard),',
     'to press Rewrite it for three versions, or to edit it themselves with Edit it myself (Edit manually in older projects).',
-    'When the user is happy with the prose, they press Go to Artist on the Writer screen and confirm it. Then the prose is locked and Artist opens.',
+    'When the user is happy with the prose, they press Run breakdown on the Writer screen and confirm it. Then the prose is locked and Artist opens.',
   ].join('\n')
 }
 
