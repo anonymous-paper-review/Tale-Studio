@@ -36,6 +36,8 @@ async function generateViaFal(
   imageModel: ImageModelKey | undefined,
   moderation: ModerationReceipt,
   context: { projectId: string; userId?: string },
+  /** 화면비를 프로젝트 포맷으로 정했다(Director 캔버스 샷) — 참고 그림이 있어도 그 비율로 그린다(검토 rev-director 5번). */
+  fixedAspect = false,
 ): Promise<Response> {
   const resolvedModel = imageModel
     ? resolveImageEndpoint(imageModel, !!referenceImageUrls?.length).endpoint
@@ -45,12 +47,14 @@ async function generateViaFal(
   }
   // Grok 은 모델 고르기 창에서 "입력 구도를 지킨다"로 안내한다 — 참고 그림(고칠 그림)이 있으면 비율을 싣지 않아 그 구도를 따르게 한다.
   //   fal.ts 가 정한 비율을 Grok 에도 보내게 바뀐 뒤(2026-10-12)에도 Director 에셋 노드의 종전 동작이 그대로이게 한다.
-  const keepInputFraming = imageModel === 'grok-imagine' && !!referenceImageUrls?.length
+  //   화면비를 프로젝트 포맷으로 정한 요청(캔버스 샷 — 새로 그리는 샷)은 빼지 않는다(검토 rev-director 5번).
+  const keepInputFraming = imageModel === 'grok-imagine' && !!referenceImageUrls?.length && !fixedAspect
   const { url } = await generateReservedImage(
     {
       ...(resolvedModel ? { model: resolvedModel } : {}),
       prompt,
       ...(keepInputFraming ? {} : { aspect_ratio: aspectRatio }),
+      ...(fixedAspect ? { keep_aspect_ratio: true } : {}),
       reference_image_urls: referenceImageUrls?.length
         ? referenceImageUrls
         : undefined,
@@ -144,6 +148,7 @@ export async function POST(req: Request) {
         imageModel,
         moderation,
         { projectId, userId: user.id },
+        aspectFromProject === true,
       )
     } catch (error) {
       const rejected = capacityReservationRejection(error, {

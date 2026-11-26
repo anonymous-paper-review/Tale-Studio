@@ -37,7 +37,7 @@ import { realCineLine } from '@/lib/director/real-cine-line'
 import { resolvePhotoLook } from '@/lib/style-facets/photo-look'
 import { assertUserTextAllowed, moderatedSubmitInput } from '@/lib/moderation/creem'
 import { moderationRejectionResponse, recordModerationPass } from '@/lib/api/moderation'
-import { composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
+import { composeRealFixStrip, composeRoughReferenceStrip, buildRealStripPrompt } from '@/lib/director/storyboard-strip'
 import {
   loadPropsForReferences,
   loadShotReferencePlans,
@@ -325,7 +325,8 @@ export async function POST(req: Request) {
     let stripSheetCanvas: string | null = null
     if (stripFrames && fixFrames && changeEn) {
       // 고치기: 지금 실사 세 칸을 같은 시트 틀에 합쳐 1번 참고로 — 인물 시트 · 배경은 얼굴 · 장소를 지키는 뒤 참고로만. 그림체 앵커는 싣지 않는다(지금 그림이 이미 그 그림체).
-      const composed = await composeRoughReferenceStrip(fixFrames, projectFormat)
+      // 지금 실사 칸은 이미 마무리 자르기로 잘린 그림이다 — 러프 합성기(가장자리 3% 자름)가 아니라 자르지 않는 합성기로(검토 rev-director 1번).
+      const composed = await composeRealFixStrip(fixFrames, projectFormat)
       stripSheetFormat = composed.sheetFormat
       stripSheetCanvas = composed.geometry.repaintCanvas
       const fixPath = `${project.workspace_id}/${projectId}/shots/${storageKeySegment(writerShotId)}_storyboard_fix_strip.png`

@@ -960,11 +960,21 @@ export function directorRefsOf(data: ShotNodeData): { characters: string[]; loca
 // Director 고친 샷 프롬프트(오너 2026-11-26 O5 · 리드 승인) — 채팅 [적용] · 샷 상세 프롬프트 칸이 고친 글(promptOverride)을
 //   shots.director_prompt 에 0.5초 뒤 쓴다. null = Writer 글 그대로(고친 글이 없거나 Writer 글과 같음). 들어올 때 hydrateFromDb 가 읽어 맞춘다(DB 가 진실).
 //   Writer 가 샷 글을 다시 쓰면 DB 방아쇠가 이 칸을 비운다(20261126220000). 약속: tests/director/director-prompt-persist.test.ts
-const pendingDirectorPromptSaves = new Map<string, ReturnType<typeof setTimeout>>()
+// 저장 대기 표 — 열쇠는 프로젝트와 샷 이름을 함께(검토 rev-director #8: 샷 이름만이면 다른 프로젝트의 같은 이름 샷도 막혔다).
+const pendingDirectorPromptSaves = new Map<string, { timer: ReturnType<typeof setTimeout>; run: () => Promise<void> }>()
+const directorPromptSaveKey = (projectId: string, writerShotId: string) => `${projectId}\u0000${writerShotId}`
 
 /** 저장 전(0.5초 안)인 고친 글이 있는가 — 재수화가 막 고친 글을 DB 의 옛 값으로 덮지 않게 본다. */
-function hasPendingDirectorPromptSave(writerShotId: string): boolean {
-  return pendingDirectorPromptSaves.has(writerShotId)
+function hasPendingDirectorPromptSave(projectId: string, writerShotId: string): boolean {
+  return pendingDirectorPromptSaves.has(directorPromptSaveKey(projectId, writerShotId))
+}
+
+/** 기다리는 고친 글 저장을 지금 모두 보낸다 — 다른 프로젝트로 옮기기 전에(노드를 비우면 저장할 글을 못 읽는다, 검토 rev-director #8). */
+function flushDirectorPromptSaves(): void {
+  for (const pending of [...pendingDirectorPromptSaves.values()]) {
+    clearTimeout(pending.timer)
+    void pending.run()
+  }
 }
 
 /** DB 에 쓸 값 — 고친 글이 없거나 Writer 글과 같으면 null. */
@@ -980,34 +990,36 @@ function debouncedDirectorPromptSaveToDb(
   getData: () => ShotNodeData | undefined,
   delayMs = 500,
 ) {
-  const existing = pendingDirectorPromptSaves.get(writerShotId)
-  if (existing) clearTimeout(existing)
-  pendingDirectorPromptSaves.set(
-    writerShotId,
-    setTimeout(async () => {
-      pendingDirectorPromptSaves.delete(writerShotId)
-      const data = getData()
-      if (!projectId || !data) return
-      try {
-        const { error } = await createClient()
-          .from('shots')
-          .update({ director_prompt: directorPromptToSave(data) })
-          .eq('project_id', projectId)
-          .eq('shot_id', writerShotId)
-        if (error) throw error
-        markDirectorPromptSaved(writerShotId)
-        void invalidateShots(projectId) // 사물함 표시 — 다음 읽기가 새 값을 받게
-      } catch (err) {
-        // 못 올림 표시(directorPromptUnsaved)는 남는다 — 다음 고침 · 다음 진입 때 다시 올린다(검토 ③).
-        console.error('[director-store] director prompt DB save failed:', err)
-      }
-    }, delayMs),
-  )
+  const key = directorPromptSaveKey(projectId, writerShotId)
+  const existing = pendingDirectorPromptSaves.get(key)
+  if (existing) clearTimeout(existing.timer)
+  // 저장할 글은 부를 때(첫 await 전에) 읽는다 — 옮기기 전 비우기(flush)가 노드를 비우기 전에 부르면 그 글이 저장된다.
+  const run = async () => {
+    pendingDirectorPromptSaves.delete(key)
+    const data = getData()
+    if (!projectId || !data) return
+    try {
+      const { error } = await createClient()
+        .from('shots')
+        .update({ director_prompt: directorPromptToSave(data) })
+        .eq('project_id', projectId)
+        .eq('shot_id', writerShotId)
+      if (error) throw error
+      markDirectorPromptSaved(projectId, writerShotId)
+      void invalidateShots(projectId) // 사물함 표시 — 다음 읽기가 새 값을 받게
+    } catch (err) {
+      // 못 올림 표시(directorPromptUnsaved)는 남는다 — 다음 고침 · 다음 진입 때 다시 올린다(검토 ③).
+      console.error('[director-store] director prompt DB save failed:', err)
+    }
+  }
+  pendingDirectorPromptSaves.set(key, { timer: setTimeout(() => void run(), delayMs), run })
 }
 
 /** 고친 글이 DB 에 올라갔다 — 그 샷의 "못 올림" 표시를 지운다. 그사이 새로 고쳐 저장을 기다리면 그 저장이 지운다. */
-function markDirectorPromptSaved(writerShotId: string) {
-  if (pendingDirectorPromptSaves.has(writerShotId)) return
+function markDirectorPromptSaved(projectId: string, writerShotId: string) {
+  if (pendingDirectorPromptSaves.has(directorPromptSaveKey(projectId, writerShotId))) return
+  // 그사이 다른 프로젝트로 옮겼으면 지금 노드는 그 프로젝트 것이다 — 건드리지 않는다.
+  if (useDirectorCanvasStore.getState().projectId !== projectId) return
   useDirectorCanvasStore.setState((state) => ({
     nodes: state.nodes.map((n) =>
       isShotData(n.data) && n.data.writerShotId === writerShotId && n.data.directorPromptUnsaved
@@ -1031,6 +1043,7 @@ type HydrationLocalSnapshot = {
   override?: string
   final?: boolean
   storyboardImage?: string
+  promptOverride?: string
 }
 const stableHydrationValue = (value: unknown): string => JSON.stringify(value) ?? ''
 const snapshotHydrationLocals = (nodes: DirectorNode[]) =>
@@ -1046,11 +1059,14 @@ const snapshotHydrationLocals = (nodes: DirectorNode[]) =>
               final: node.data.final,
             }
           : isShotData(node.data)
-            ? { storyboardImage: stableHydrationValue(node.data.storyboardImage) }
+            ? { storyboardImage: stableHydrationValue(node.data.storyboardImage), promptOverride: stableHydrationValue(node.data.promptOverride ?? null) }
             : {}),
       },
     ]),
   )
+/** 재수화를 시작할 때와 고친 글이 같은가 — 다르면(그사이 고침) 읽어 둔 DB 값으로 덮지 않는다. 시작 때 없던 노드도 덮지 않는다(자리와 같은 규칙). */
+const promptOverrideMatchesHydrationSnapshot = (node: DirectorNode, snapshot: HydrationLocalSnapshot | undefined) =>
+  isShotData(node.data) && !!snapshot && stableHydrationValue(node.data.promptOverride ?? null) === snapshot.promptOverride
 const positionMatchesHydrationSnapshot = (
   node: DirectorNode,
   snapshot: HydrationLocalSnapshot | undefined,
@@ -1377,7 +1393,7 @@ interface DirectorCanvasState {
    *  opts.onAccepted — 접수 알림: 서버가 2xx 로 받아 jobId 를 준 때 한 번. 2xx 가 아니면(몸에 jobId · queued 가 실려 와도 — 4xx · 503 결과 모름)
    *  · 500 · 연결 끊김 · 실패 알림은 아니다(리드 결정 — 결과를 모르는 것은 부른 쪽이 새 Take 가 만드는 중으로 남았는지로 따로 말한다).
    *  Lumi 는 이것으로 다음 샷을 보낸다(board 검토 b · entry D8 이 같이 쓴다). opts.onJob — 진행 알림 그대로. 둘 다 없으면 지금 그대로. */
-  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void; changeNote?: string }) => Promise<string | null>
+  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void; changeNote?: string; fromTakeId?: string; videoOverride?: VideoOverride }) => Promise<string | null>
   generateVideoForShot: (
     shotNodeId: string,
     options?: DirectorGenerationRequestOptions,
@@ -1850,6 +1866,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // localStorage 잔존 노드가 새 프로젝트로 새지 않도록 in-memory를 리셋하고,
         // 변경된 빈 상태가 곧바로 persist에 덮어써지게 한다.
         if (get().projectId !== projectId) {
+          // 0.5초 저장을 기다리던 고친 글은 노드를 비우기 전에 그 프로젝트로 바로 보낸다(검토 rev-director #8 — 옮긴 뒤에는 글을 못 읽어 사라졌다).
+          flushDirectorPromptSaves()
           resetPipelineProgressBatches()
           const previous = get()
           const viewportInitializedProjects = { ...previous.viewportInitializedProjects }
@@ -2155,7 +2173,10 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                             writerFingerprint: n.data.writerFingerprint,
                             unsaved: n.data.directorPromptUnsaved,
                           },
-                          savePending: hasPendingDirectorPromptSave(n.data.writerShotId),
+                          // 저장 대기 중이거나, 재수화가 DB 를 읽은 뒤 고친 글이 바뀌었으면(그사이 저장이 끝났을 수도) 읽어 둔 값으로 덮지 않는다
+                          //   — 자리 · 그림처럼 시작 때와 비교한다(검토 rev-director 4번).
+                          savePending: hasPendingDirectorPromptSave(projectId, n.data.writerShotId) ||
+                            !promptOverrideMatchesHydrationSnapshot(n, localSnapshot.get(n.id)),
                           firstSync: directorPromptFirstSync,
                         })
                         if (decision.upload) directorPromptUploads.push(n.data.writerShotId)
@@ -4709,7 +4730,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       remakeShotVideo: (shotNodeId, opts) => {
-        const latest = latestShotTake(get().nodes, shotNodeId)
+        // 샷 상세 영상 고치기에서 보던 Take 가 있으면 그 Take 를 이어받는다(검토 rev-director 2번) — 없으면 지금처럼 가장 최근 Take.
+        const viewed = opts?.fromTakeId
+          ? get().nodes.find((n) => n.id === opts.fromTakeId && isVideoData(n.data) && n.data.parentShotNodeId === shotNodeId)
+          : undefined
+        const latest = viewed && isVideoData(viewed.data) ? { id: viewed.id, data: viewed.data } : latestShotTake(get().nodes, shotNodeId)
         // 알림이 없으면 지금과 같은 부름(샷 상세 · D8). 접수 알림은 2xx 로 받아 jobId 를 준 첫 알림 한 번뿐이다 —
         //   거절 길(4xx)도 몸에 jobId · queued 가 있으면 진행 알림을 부르고, 그 뒤 실패는 부른 것이 끝나도 노드 id 를 돌려준다(board 검토 b · entry).
         let accepted = false
@@ -4723,10 +4748,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               }
             }
           : undefined
-        // 채팅 고치기의 바꿀 점(오너 O8 (e)(f)) — 이어받은 설정 위에 이번 새 Take 의 바꿀 점으로 얹는다(샷 상세 영상 고치기와 같은 칸).
+        // 채팅 고치기의 바꿀 점(오너 O8 (e)(f)) · 샷 상세에서 고른 모델 · 해상도(검토 rev-director 2번) — 이어받은 설정 위에 이번 새 Take 에만 얹는다(샷 상세 [새 Take]와 같은 칸).
         const changeNote = opts?.changeNote?.trim()
-        const options = latest || onJob || changeNote
-          ? { ...(latest ? { inheritFromVideoNodeId: latest.id } : {}), ...(onJob ? { onJob } : {}), ...(changeNote ? { videoOverride: { changeNote } } : {}) }
+        const videoOverride: VideoOverride = { ...(opts?.videoOverride ?? {}), ...(changeNote ? { changeNote } : {}) }
+        const hasOverride = Object.keys(videoOverride).length > 0
+        const options = latest || onJob || hasOverride
+          ? { ...(latest ? { inheritFromVideoNodeId: latest.id } : {}), ...(onJob ? { onJob } : {}), ...(hasOverride ? { videoOverride } : {}) }
           : undefined
         return get().generateVideoForShot(shotNodeId, options)
       },

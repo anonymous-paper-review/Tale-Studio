@@ -9,27 +9,35 @@ vi.mock('@/lib/query-client', () => ({ getQueryClient: () => shared.client }))
 // supabase 흉내: 읽기는 표 이름으로 답하고, 쓰기(update)는 payload 와 거른 shot_id 를 기록한다.
 const db = vi.hoisted(() => ({
   shots: [] as Array<Record<string, unknown>>,
-  writes: [] as Array<{ table: string; payload: Record<string, unknown>; shotId: unknown }>,
+  writes: [] as Array<{ table: string; payload: Record<string, unknown>; shotId: unknown; projectId?: unknown }>,
   /** true 면 쓰기가 실패한다(네트워크 · 칸 없음 등) — 시도는 writes 에 남는다. */
   failWrites: false,
+  /** 있으면 shots 읽기가 이 약속이 풀릴 때까지 기다린다(재수화가 DB 를 읽는 동안 다른 일이 끼는 순간을 만든다). */
+  readGate: null as Promise<void> | null,
 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
     from: (table: string) => {
       let payload: Record<string, unknown> | null = null
       let shotId: unknown = null
-      const result = () => {
+      let projectId: unknown = null
+      const result = async () => {
         if (payload) {
-          db.writes.push({ table, payload, shotId })
+          db.writes.push({ table, payload, shotId, projectId })
           return db.failWrites ? { data: null, error: { message: 'write failed' } } : { data: null, error: null }
         }
-        if (table === 'shots') return { data: db.shots, error: null }
+        if (table === 'shots') {
+          const rows = db.shots
+          if (db.readGate) await db.readGate
+          return { data: rows, error: null }
+        }
         return { data: [], error: null }
       }
       const chain: Record<string, unknown> = {}
       for (const m of ['select', 'order', 'is', 'in', 'not', 'maybeSingle']) chain[m] = () => chain
       chain.eq = (column: string, value: unknown) => {
         if (column === 'shot_id') shotId = value
+        if (column === 'project_id') projectId = value
         return chain
       }
       chain.update = (p: Record<string, unknown>) => {
@@ -37,7 +45,7 @@ vi.mock('@/lib/supabase/client', () => ({
         return chain
       }
       chain.then = (resolve: (v: unknown) => unknown, reject?: (e: unknown) => unknown) =>
-        Promise.resolve(result()).then(resolve, reject)
+        result().then(resolve, reject)
       return chain
     },
   }),
@@ -76,6 +84,7 @@ beforeEach(() => {
   db.shots = []
   db.writes = []
   db.failWrites = false
+  db.readGate = null
   vi.useFakeTimers()
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString()
@@ -100,7 +109,7 @@ describe('Director 고친 프롬프트 저장', () => {
     //   같은 브라우저도 다른 프로젝트를 열었다 오면 사라져 다음 영상이 옛 글로 나갔다.
     api().updateNodeData<'shot'>(shotId, { promptOverride: `${WRITER_TEXT} Raindrops on the window behind her.` })
     await vi.advanceTimersByTimeAsync(600)
-    expect(promptWrites()).toEqual([{ table: 'shots', payload: { director_prompt: `${WRITER_TEXT} Raindrops on the window behind her.` }, shotId: 'sh_01_01' }])
+    expect(promptWrites()).toEqual([{ table: 'shots', payload: { director_prompt: `${WRITER_TEXT} Raindrops on the window behind her.` }, shotId: 'sh_01_01', projectId: 'p1' }])
   })
 
   it('고친 글을 지우거나 Writer 글과 같게 되돌리면 director_prompt 를 비운다', async () => {
@@ -279,5 +288,50 @@ describe('Director 화면이 보내는 그림 · 영상 요청', () => {
     api().updateNodeData<'shot'>(shotId, { promptOverride: 'Applied from chat for the video.' })
     await api().generateVideoForShot(shotId)
     expect(bodiesTo(fetcher, '/api/director/generate-video')[0]).toMatchObject({ prompt: 'Applied from chat for the video.', promptSource: 'director' })
+  })
+})
+
+describe('재수화 경쟁 · 프로젝트 옮기기', () => {
+  it('재수화가 DB 를 읽은 뒤 끝나기 전에 고친 글이 저장까지 끝났어도, 재수화가 읽어 둔 옛 값으로 덮지 않는다', async () => {
+    // 왜(검토 rev-director 4번): 재수화는 시작 때 DB 를 읽고 끝날 때 0.5초 대기만 봐서, 그사이 저장이 끝난 고친 글을 옛 값으로 덮었다. 자리 · 그림처럼 시작 때와 비교한다.
+    db.shots = [shotRow('sh_01_01')]
+    await api().hydrateFromDb('p1')
+    let release!: () => void
+    db.readGate = new Promise<void>((resolve) => { release = resolve })
+    rowsChangedElsewhere()
+    const hydrating = api().hydrateFromDb('p1')
+    await vi.advanceTimersByTimeAsync(0)
+    api().updateNodeData<'shot'>(shotId, { promptOverride: 'Edit while the board was reloading.' })
+    await vi.advanceTimersByTimeAsync(600)
+    expect(promptWrites().map((w) => w.payload.director_prompt)).toEqual(['Edit while the board was reloading.'])
+    db.readGate = null
+    release()
+    await hydrating
+    expect(shotData(shotId)?.promptOverride).toBe('Edit while the board was reloading.')
+  })
+
+  it('고친 뒤 0.5초 안에 다른 프로젝트로 옮겨도 그 고친 글은 옮길 때 바로 그 프로젝트에 저장된다', async () => {
+    // 왜(검토 #8): 저장 대기가 옮긴 뒤에 돌면 노드가 비어 저장하지 못하고 고친 글이 사라졌다.
+    db.shots = [shotRow('sh_01_01')]
+    await api().hydrateFromDb('p1')
+    api().updateNodeData<'shot'>(shotId, { promptOverride: 'Edited right before leaving.' })
+    api().setProjectId('p2')
+    await vi.advanceTimersByTimeAsync(0)
+    expect(promptWrites().map((w) => [w.projectId, w.payload.director_prompt])).toEqual([['p1', 'Edited right before leaving.']])
+  })
+
+  it('다른 프로젝트의 같은 이름 샷은 앞 프로젝트의 저장 대기에 막히지 않고 그 프로젝트의 고친 글을 받는다', async () => {
+    // 왜(검토 #8): 저장 대기 표의 열쇠가 샷 이름(sh_01_01)뿐이라 다른 프로젝트의 같은 이름 샷도 "저장 대기"로 보고 DB 값을 받지 않았다.
+    db.shots = [shotRow('sh_01_01')]
+    await api().hydrateFromDb('p1')
+    api().updateNodeData<'shot'>(shotId, { promptOverride: 'Edit in project one.' })
+    api().setProjectId('p2')
+    const sceneId = api().addSceneNode({ x: 0, y: 0 }, 'sc_01')
+    const otherShot = api().addShotNode(sceneId, { x: 300, y: 0 }, 'sh_01_01')
+    api().updateNodeData<'shot'>(otherShot, { writerShotId: 'sh_01_01', derivedPrompt: WRITER_TEXT, promptMigratedV2: true })
+    db.shots = [shotRow('sh_01_01', { director_prompt: 'Edit saved in project two.' })]
+    rowsChangedElsewhere()
+    await api().hydrateFromDb('p2')
+    expect(shotData(otherShot)?.promptOverride).toBe('Edit saved in project two.')
   })
 })

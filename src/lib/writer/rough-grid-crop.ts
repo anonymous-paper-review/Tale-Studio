@@ -41,6 +41,8 @@ const GUTTER_MISSING_RATIO = 0.3 // 골짜기 최솟값이 이보다 어두우�
 const SCAN_RANGE_FRAC = 0.03 // 기대 거터 중심에서 ±3% 탐색
 const OUTER_MARGIN_FRAC = 0.02 // 양끝(시트 마진) 거터 중심 = 셀 경계 바깥 2% 지점
 const CELL_INSET = 2 // 실측 경계에서 셀 안쪽 인셋(테두리선 두께 배제)
+/** 실사 리페인트 시트의 칸 안쪽 인셋(축 비례 3%) — 아래 #repaint-crop 근거. 그림 고치기의 바탕 시트(composeRealFixStrip)가 같은 값으로 칸 안쪽에 앉힌다. */
+export const REPAINT_INSET_FRAC = 0.03
 const SIZE_TOLERANCE_PX = 6 // 크기 클러스터 허용 오차
 // #label-invasion(2026-08-17, 실측 a219b9f3 시트 3장): DIRECTION 라벨 텍스트가 거터 주변을
 //   밝은 조각으로 파편화해 밸리 선택이 텍스트 줄 사이 틈에 앉았다. 실측 분포 — 진짜 거터
@@ -277,7 +279,6 @@ export async function cropRoughGridFrames(
     //   셀 안에서 모델이 내용 자체를 작게 그린 경우(sh_01_06 실측)는 크롭으로 못 고친다 —
     //   캔버스 상향(#hd-grid)과 프롬프트 계약(#end-fidelity)의 몫.
     if (surface === 'repaint') {
-      const REPAINT_INSET_FRAC = 0.03
       const insetX = Math.max(2, Math.round((cols[0][1] - cols[0][0]) * W * REPAINT_INSET_FRAC))
       const insetY = Math.max(2, Math.round((rows[0][1] - rows[0][0]) * H * REPAINT_INSET_FRAC))
       // #repaint-margin(2026-11-03, 운영 3945d1e6 88샷 중 25샷): 모델이 칸을 스펙 자리보다 짧게 · 옆으로 밀어 그리면 이 고정 자리가

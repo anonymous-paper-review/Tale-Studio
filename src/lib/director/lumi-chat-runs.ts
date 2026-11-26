@@ -9,7 +9,8 @@ import { effectivePromptOf } from '@/lib/director/video-frame-inputs'
 import type { BoardNodeNames } from '@/features/director/node-label'
 import { directorBoardNo, directorNodeLabel } from '@/features/director/node-label'
 import type { DirectorCanvasUpdate } from '@/stores/director-store'
-import { isSceneData, isShotData, type DirectorNode } from '@/types/director'
+import { isSceneData, isShotData, isVideoData, type DirectorNode } from '@/types/director'
+import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
 import type { ChatShotRef } from '@/lib/director/chat-video-targets'
 import { shotFactsByNode, shotState, type DirectorShotState } from '@/lib/director/shot-state'
 import { latestShotTake, takeSettings } from '@/lib/director/remake-take'
@@ -41,12 +42,19 @@ export function directorShotRefs(
 }
 
 /** 다시 만들기에 드는 Take — 그 샷의 가장 최근 Take(실패해도)의 모델 · 해상도로 센다(넘기기 창 · 샷 상세 [다시 만들기] 단추 값과 같은 셈). */
-export function remakeTakeCosts(nodes: readonly DirectorNode[], shotIds: readonly string[]): number[] {
+export function remakeTakeCosts(
+  nodes: readonly DirectorNode[],
+  shotIds: readonly string[],
+  /** 그 부탁의 영상 고치기(샷 노드 id →) — 팝업에서 고른 모델 · 해상도 · 보던 Take 가 있으면 그것으로 센다(검토 rev-director 2번). */
+  fixes?: Readonly<Record<string, { fromTakeId?: string; provider?: VideoModelKey; resolution?: VideoResolution }>>,
+): number[] {
   return shotIds.map((id) => {
     const shot = nodes.find((node) => node.id === id)
     if (!shot || !isShotData(shot.data)) return takeCostForVideo(null)
-    const { model, resolution } = takeSettings(shot.data, latestShotTake(nodes, id)?.data ?? null)
-    return takeCostForVideo(model, resolution)
+    const fix = fixes?.[id]
+    const viewed = fix?.fromTakeId ? nodes.find((node) => node.id === fix.fromTakeId && isVideoData(node.data) && node.data.parentShotNodeId === id) : undefined
+    const base = takeSettings(shot.data, (viewed && isVideoData(viewed.data) ? viewed.data : null) ?? latestShotTake(nodes, id)?.data ?? null)
+    return takeCostForVideo(fix?.provider ?? base.model, fix?.resolution ?? base.resolution)
   })
 }
 

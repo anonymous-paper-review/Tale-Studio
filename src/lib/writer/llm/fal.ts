@@ -11,7 +11,7 @@ import { pickFalKey, falKeyById, FalUnknownKeyError } from '@/lib/fal/keys';
 // 의존도, 요청 본문도 늘지 않는다. 표식은 moderatedSubmitInput() 만 붙일 수 있다.
 import type { ModerationProof } from '@/lib/moderation/creem';
 import { fitPromptToLimit } from '@/lib/fal/prompt-limit';
-import { imageSizeForAspect, nearestNanoBanana2Ratio } from '@/lib/fal/aspect-size';
+import { imageSizeForAspect, nearestNanoBanana2Ratio, nearestNanoBananaRatio } from '@/lib/fal/aspect-size';
 
 let imageCallCount = 0;
 let videoCallCount = 0;
@@ -90,6 +90,9 @@ export interface FalImageOptions {
   model?: string;             // 기본: openai/gpt-image-2
   prompt: string;
   aspect_ratio?: string;
+  /** 호출자가 화면비를 정했다(Director 캔버스 샷 = 프로젝트 화면비, 검토 rev-director 5번) — 참고 그림이 있는 편집에서도 그 비율로 그린다.
+   *  없으면 지금처럼 Nano Banana 편집은 첫 참고 그림 비율을 따른다(에셋 · Artist 고치기). fal 에는 보내지 않는 표시. */
+  keep_aspect_ratio?: boolean;
   /** 캔버스 지정 — 'WxH'('1024x1536' 등) 또는 fal preset('landscape_4_3' 등). 명시 시 aspect_ratio
    *  유도값보다 우선(#tfix-fal-wiring). WxH 는 스키마가 요구하는 {width,height} 객체로 변환해 보낸다
    *  (#fal-canvas 2026-08-17: 'WxH' 문자열 그대로는 422 — 실측 40/40 전멸. 객체는 4/4 수락 +
@@ -259,6 +262,7 @@ export function buildFalImageInput(opts: FalImageOptions, model: string): Record
     if (isImageEditModel(model)) {
       bananaInput.image_urls = opts.reference_image_urls ?? [];
       if (sheetRatio) bananaInput.aspect_ratio = sheetRatio;
+      else if (opts.keep_aspect_ratio && opts.aspect_ratio) bananaInput.aspect_ratio = nearestNanoBananaRatio(opts.aspect_ratio);
     } else if (sheetRatio) {
       bananaInput.aspect_ratio = sheetRatio;
     } else if (opts.aspect_ratio) {

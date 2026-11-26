@@ -28,7 +28,11 @@ export const KO: Record<string, string> = {
   '@{shot} Fix the video and remake it as a new Take: {change}': '@{shot} 영상을 고쳐서 새 Take 로 다시 만들어 줘: {change}',
   'Ask Lumi to fix': 'Lumi 에게 고쳐 달라고 하기',
   'Lumi is busy with another request. Try again when it is done.': 'Lumi 가 다른 일을 하는 중이에요. 끝나면 다시 눌러 주세요.',
-  'Lumi adds this to the shot prompt. Apply it in the chat to make it again.': 'Lumi 가 이 내용을 샷 프롬프트에 넣어 고쳐요. 채팅에서 [적용]하면 다시 만들어요.',
+  'Lumi remakes the image from the current one, changing only this. No Takes used.': 'Lumi 가 지금 그림을 바탕으로 이것만 바꿔 다시 그려요. Take 는 쓰지 않아요.',
+  'Lumi makes a new Take with this change. Say yes in the chat to start.': 'Lumi 가 이것을 바꾼 새 Take 를 만들어요. 채팅에서 "응"이라고 하면 시작해요.',
+  // 그리는 중인 샷의 그림 고치기(검토 rev-director 3번) — 채팅 답.
+  'The image for {shots} is being made right now. Ask again when it is done.': '{shots} 그림은 지금 만드는 중이에요. 다 만든 뒤 다시 부탁해 주세요.',
+  'The images for {shots} are being made right now. Ask again when they are done.': '{shots} 그림은 지금 만드는 중이에요. 다 만든 뒤 다시 부탁해 주세요.',
   'Make start and end images · Takes 0': '시작·끝 이미지 만들기 · Takes 0',
   'Next: make the video': '다음: 영상 만들기',
   'Next: make the video · {count} Takes': '다음: 영상 만들기 · {count} Take',
