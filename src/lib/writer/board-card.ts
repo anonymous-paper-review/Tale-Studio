@@ -8,6 +8,7 @@ import { normalizeCameraMotionType, type CameraMotionType } from '@/lib/writer/m
 import { isDefaultCamera, isDefaultLighting } from '@/lib/writer/shot-config-from-design'
 import { angleOfCamera, type CameraAngle } from '@/lib/writer/shot-edit'
 import { ADD_SHOT_START_LIGHTING } from '@/lib/writer/add-shot-defaults'
+import { isAddedFillSpec } from '@/lib/writer/pipeline/stage/added_fill_mark'
 import { resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import type { DialogueLine, Shot, ShotStageDesign } from '@/types'
 
@@ -32,7 +33,7 @@ export function shotStageDesign(staticSpec: unknown, dynamicSpec: unknown): Shot
   const cameraMotion = isRecord(moving.camera_motion) ? moving.camera_motion : {}
   const motion = typeof cameraMotion.type === 'string' && cameraMotion.type.trim() ? cameraMotion.type.trim() : null
   if (!angle && !motion && kelvin === null) return null
-  return { cameraAngle: angle, cameraMotion: motion, colorTempK: kelvin }
+  return { cameraAngle: angle, cameraMotion: motion, colorTempK: kelvin, ...(isAddedFillSpec(staticSpec) ? { neighborFill: true as const } : {}) }
 }
 
 /** 앵글 글 → 짧은 이름(영어 키). 무대 설계 → 6축 근사(shot-config-from-design angleToPitchRoll)와 같은 낱말 순서로 읽는다. 모르면 null. */
@@ -83,7 +84,8 @@ export function shotCardChips(
   const motion = design?.cameraMotion ? motionKey(design.cameraMotion) : null
   if (motion) chips.push({ kind: 'motion', label: translate(locale, motion) })
   // [+ 샷 추가] 창의 처음 빛(5600K)을 그대로 둔 더한 샷은 사람이 정한 빛이 아니다 — 앞뒤 샷에서 이은 빛이 있으면 그것(러프가 그 빛으로 그린다, N2 2026-11-27).
-  const startLighting = !!shot.lighting && !!design?.colorTempK &&
+  //   앞뒤 샷으로 채운 설계(neighborFill)일 때만 — 파이프라인 샷을 사람이 같은 값으로 맞췄으면 그 빛이다(검토 rev-addshot 4).
+  const startLighting = !!shot.lighting && !!design?.colorTempK && design.neighborFill === true &&
     (['position', 'brightness', 'colorTemp'] as const).every((k) => shot.lighting?.[k] === ADD_SHOT_START_LIGHTING[k])
   const kelvin = !isDefaultLighting(shot.lighting) && !startLighting ? shot.lighting?.colorTemp : design?.colorTempK
   if (typeof kelvin === 'number' && kelvin > 0) chips.push({ kind: 'temperature', label: `◐ ${Math.round(kelvin)}K` })

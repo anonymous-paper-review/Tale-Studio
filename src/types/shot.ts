@@ -128,6 +128,8 @@ export interface ShotStageDesign {
   cameraMotion: string | null
   /** 조명 색온도(K). */
   colorTempK: number | null
+  /** 앞뒤 샷으로 채운 더한 샷의 설계(static_spec.added_fill, N2 2026-11-27) — 카드가 [+ 샷 추가] 창의 처음 빛을 "정하지 않음"으로 볼 때만 쓴다. */
+  neighborFill?: true
 }
 
 export interface ShotSubtitle {
