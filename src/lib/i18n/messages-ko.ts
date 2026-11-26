@@ -1190,8 +1190,9 @@ export const KO: Record<string, string> = {
   'The content check is unavailable right now, so nothing was generated. Please try again in a moment.':
     '지금은 내용 검사를 할 수 없어서 아무것도 만들지 않았어요. 잠시 후 다시 시도해 주세요.',
   // m-qa 2026-11-27: H3 로 보낼 작은 그림(한 변 256 미만)을 키우지 못해 Take 전에 막음(generation-quota-toast.ts).
-  'The start or end image is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.':
-    '시작 · 끝 그림이 이 영상 모델이 받는 크기보다 작은데 키우지 못해서 아무것도 만들지 않았어요. 다른 영상 모델을 고르거나 그림을 다시 만들어 주세요.',
+  //   끝 그림은 오너 2026-11-27 N4a(dev 때 시작+끝 폐기)로 영상에 보내지 않는다 — "시작 그림"이라고만 말한다.
+  'The start image is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.':
+    '시작 그림이 이 영상 모델이 받는 크기보다 작은데 키우지 못해서 아무것도 만들지 않았어요. 다른 영상 모델을 고르거나 그림을 다시 만들어 주세요.',
   // 2026-11-25 오너: 내용 검사에 걸린 그림은 자동으로 다시 그리지 않는다 — 어느 인물·배경인지와 할 일(설명 고치기)만 쉬운 말로 알린다.
   //   제출 전(Creem) 거절은 순화 재시도 자격이 없고, 제출 뒤(fal) 거절은 순화 단추가 있다 — 두 안내를 가른다.
   'The description for "{name}" did not pass the content check, so it was not drawn. Edit the description and try again.':
