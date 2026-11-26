@@ -20,6 +20,7 @@ vi.mock('@/components/ui/dialog', async () => {
 
 import { CharacterViewDialog } from '@/features/artist/character-view-dialog'
 import { WorldViewDialog } from '@/features/artist/world-view-dialog'
+import { PropDetailPanels } from '@/features/artist/prop-view-dialog'
 import { useArtistStore } from '@/stores/artist-store'
 import { useArtistVersionStore } from '@/stores/artist-version-store'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -98,6 +99,21 @@ describe('Artist 상세의 보는 그림', () => {
     expect(big).toContain(`src="${url('night-old')}"`)
     expect(big).not.toContain(`src="${url('night-now')}"`)
     expect(out).toContain('>Adopt<')
+  })
+
+  it('소품 상세를 지난 그림으로 열면 큰 그림이 그 그림이고 "지난 그림 보는 중 · 그린 때"와 [채택]이 보인다', () => {
+    // 왜: 오너 A4 — 소품도 인물 · 배경과 같은 상세 · 같은 말(리드 승인 소품 기록 표).
+    useArtistStore.setState({
+      propAssets: [{ propId: 'obj_ring', name: '은반지', appearance: 'a ring', appearanceNative: '은반지', imageUrl: url('ring-now'), sourceHash: null, origin: 'producer', candidates: [cand('ring-now', 25, true), cand('ring-old', 24)] }],
+      propUsage: {}, selectedPropAppearances: {}, generatingProps: [], propFailures: {}, propContentRefusals: {},
+    } as never)
+    const out = html(createElement(PropDetailPanels, { propId: 'obj_ring', viewCandidateId: 'ring-old' }))
+    expect(out).toContain('Viewing an earlier picture · 2d ago')
+    const big = out.slice(0, out.indexOf('data-testid="artist-detail-viewing"'))
+    expect(big).toContain(`src="${url('ring-old')}"`)
+    expect(big).not.toContain(`src="${url('ring-now')}"`)
+    expect(out).toContain('>Adopt<')
+    expect(html(createElement(PropDetailPanels, { propId: 'obj_ring' }))).not.toContain('data-testid="artist-detail-viewing"')
   })
 
   it('지난 그림을 보는 동안에는 큰 그림 아래의 지금 그림 밑 글(그림체 · 올린 그림)을 숨긴다', () => {

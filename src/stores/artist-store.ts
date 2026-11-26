@@ -957,6 +957,9 @@ interface ArtistState {
     view: CharacterViewKey,
     candidateId: string,
   ) => Promise<void>
+  /** 소품 지난 그림 채택(m1126 A4) — 그 칸(소품 × 모습, 기본 = 'default')의 지금 그림 · 그림 지문 · 기록 표시를 고른 그림으로. 다시 그리지 않는다.
+   *  다른 작품 스타일 판 그림이면 서버가 거절한다(code other_style). 그 밖의 실패는 던진다. */
+  selectPropCandidate: (propId: string, appearanceKey: string, candidateId: string) => Promise<{ ok: boolean; code?: string }>
   reset: () => void
 }
 
@@ -3002,6 +3005,41 @@ export const useArtistStore = create<ArtistState>((set, get) => ({
   // 후보 히스토리에서 이전 이미지를 선택본으로 되돌린다(#owner-keep-prev 2026-08-31) —
   //   finalize 는 슬롯당 최근 N장을 보관하므로(selectCandidatesToEvict) 이 액션이 그 보관분을 되살린다.
   //   재생성 없이 DB flip만 하므로 fal 과금이 없다.
+  selectPropCandidate: async (propId, appearanceKey, candidateId) => {
+    const projectId = useProjectStore.getState().projectId
+    if (!projectId) throw new Error('A project is required to select a prop image')
+    const res = await fetch('/api/artist/select-prop-candidate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ projectId, propId, appearanceKey, candidateId }),
+    })
+    if (!res.ok) {
+      const body = await res.json().catch(() => ({}))
+      if (body.code === 'other_style') {
+        refusedOtherStyle()
+        return { ok: false, code: 'other_style' }
+      }
+      throw new Error(body.error ?? `HTTP ${res.status}`)
+    }
+    const { url, sourceHash } = (await res.json()) as { url: string; sourceHash?: string | null }
+    // 다른 프로젝트로 옮겼으면 그 프로젝트 카드를 고치지 않는다.
+    if (useProjectStore.getState().projectId !== projectId) return { ok: true }
+    const pick = <C extends { id: string; isSelected: boolean }>(list: C[] | undefined) => list?.map((c) => ({ ...c, isSelected: c.id === candidateId }))
+    set((state) => ({
+      propAssets: state.propAssets.map((p) => {
+        if (p.propId !== propId) return p
+        if (appearanceKey === DEFAULT_PROP_APPEARANCE_KEY) return { ...p, imageUrl: url, sourceHash: sourceHash ?? null, candidates: pick(p.candidates) }
+        return {
+          ...p,
+          appearances: (p.appearances ?? []).map((a) =>
+            a.appearanceKey === appearanceKey ? { ...a, imageUrl: url, sourceHash: sourceHash ?? null, candidates: pick(a.candidates) } : a,
+          ),
+        }
+      }),
+    }))
+    return { ok: true }
+  },
+
   selectCandidate: async (characterId, appearanceKey, view, candidateId) => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
