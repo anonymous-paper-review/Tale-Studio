@@ -30,12 +30,16 @@ import { cn } from '@/lib/utils'
 import { useLocale, useT } from '@/lib/i18n'
 import { styleAnchorName } from '@/lib/style-anchor-name'
 import { useHistoryStyle } from '@/features/artist-room/use-history-style'
+import { VersionViewingBar } from '@/components/version-history/version-viewing-bar'
+import { relativeTime } from '@/lib/i18n/relative-time'
 
 type Props = {
   locationId: string | null
   shot: WorldShotKey | null
   /** 배경 모습(약속 C10) — 없거나 'default' 면 기본 모습(locations 행). */
   appearanceKey?: string | null
+  /** 카드의 지난 그림 줄(오너 2026-11-26 A4)에서 누른 그림 — 그 그림을 먼저 보이고 [채택]을 단다. 카드가 연 모습의 후보다. */
+  viewCandidateId?: string | null
   onClose: () => void
   /** "+ 모습 추가하기" — 카드의 배경 모습 추가 창(약속 C10)을 연다. */
   onAddAppearance?: (locationId: string) => void
@@ -52,7 +56,7 @@ export function worldDescriptionDraft(world: { visualDescriptionNative?: string 
  *   같은 설명을 읽는다) · 모습 목록(약속 C10, 우리 기능) · 쓰인 샷. [↻ 다시 만들기]는 확인 창(공간의 성격 추천 · 이미지 생성 도구)을 거친다.
  *   약속 B(2026-09-04): 캐릭터 팝업과 같은 기능 — 후보 히스토리(최근 5장) 되돌리기, 모델 선택, 실패 표시, 우회(safe) 재시도.
  */
-export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKeyProp, onClose, onAddAppearance }: Props) {
+export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKeyProp, viewCandidateId = null, onClose, onAddAppearance }: Props) {
   const t = useT()
   // 기록(시계)은 지금 작품 스타일 그림만 불러온다 — 다른 스타일 버전 그림은 꺼 두고 어느 버전인지 보인다(2026-10-28).
   const historyStyle = useHistoryStyle()
@@ -90,9 +94,13 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   const [imageModel, setImageModel] = useState<ImageModelKey>(DEFAULT_WORLD_IMAGE_MODEL)
   const [regenOpen, setRegenOpen] = useState(false)
   const [redrawing, setRedrawing] = useState(false)
+  // 지난 그림 줄에서 연 그림(A4) — [지금 그림 보기]로 닫은 그림 · [채택]을 저장하는 중 · 저장 실패.
+  const [dismissedCandidate, setDismissedCandidate] = useState<string | null>(null)
+  const [adopting, setAdopting] = useState(false)
+  const [adoptError, setAdoptError] = useState<string | null>(null)
 
-  // 카드가 연 대상(배경 × 모습)이 바뀌거나 팝업을 닫으면 팝업 안에서 옮겨 본 모습 · 이름 고치기 · 안내 · 확인 창을 버린다(검토 지적).
-  const target = locationId && shot ? `${locationId}:${shot}:${appearanceKeyProp ?? DEFAULT_LOCATION_APPEARANCE_KEY}` : null
+  // 카드가 연 대상(배경 × 모습 · 지난 그림)이 바뀌거나 팝업을 닫으면 팝업 안에서 옮겨 본 모습 · 이름 고치기 · 안내 · 확인 창을 버린다(검토 지적).
+  const target = locationId && shot ? `${locationId}:${shot}:${appearanceKeyProp ?? DEFAULT_LOCATION_APPEARANCE_KEY}:${viewCandidateId ?? ''}` : null
   const [seenTarget, setSeenTarget] = useState<string | null>(null)
   if (seenTarget !== target) {
     setSeenTarget(target)
@@ -101,6 +109,8 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
     setRenameDraft('')
     setManageError(null)
     setRegenOpen(false)
+    setDismissedCandidate(null)
+    setAdoptError(null)
   }
   const viewedKey = viewing ? viewing.key : appearanceKeyProp ?? null
   const requestedVariant = viewedKey && viewedKey !== DEFAULT_LOCATION_APPEARANCE_KEY ? viewedKey : null
@@ -175,6 +185,27 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
   const candidates = variant ? variant.candidates : (world.candidates ?? [])
   const hasHistory = candidates.length >= 2
   const selectedCandidate = candidates.find((c) => c.isSelected)
+  // 지난 그림 줄에서 연 그림(A4) — 카드가 연 모습을 보는 동안만, 카드 그림이 아닌 그 모습의 후보. 채택하면 카드 그림이 되어 저절로 사라진다.
+  const cardVariant = appearanceKeyProp && appearanceKeyProp !== DEFAULT_LOCATION_APPEARANCE_KEY ? appearanceKeyProp : null
+  const viewingCandidate = viewCandidateId && dismissedCandidate !== viewCandidateId && variantKey === cardVariant
+    ? candidates.find((c) => c.id === viewCandidateId && c.url !== imageUrl) ?? null
+    : null
+  // 다른 작품 스타일 판에서 그린 그림이면 채택할 수 없다 — 상세 기록(시계)의 [불러오기]와 같은 판정 · 같은 덧말.
+  const viewingState = viewingCandidate ? historyStyle.describe?.(viewingCandidate) ?? null : null
+  // [채택] — 그 모습 칸의 그림을 고른다(기록 [불러오기]와 같은 길, 다시 그리지 않는다). 못 고르면 보던 그림에 남아 까닭을 보인다.
+  const adopt = async () => {
+    if (!viewingCandidate || viewingState?.disabled) return
+    setAdopting(true)
+    setAdoptError(null)
+    try {
+      const result = await selectLocationCandidate(world.locationId, viewingCandidate.id, variantKey)
+      if (!result.ok && result.code !== 'other_style') setAdoptError(t('Could not adopt this version. Please try again.'))
+    } catch {
+      setAdoptError(t('Could not adopt this version. Please try again.'))
+    } finally {
+      setAdopting(false)
+    }
+  }
   const staleClass = classifyWorldImageStale(variant ? variant.visualDescription : world.visualDescription, selectedCandidate)
   const descriptionChanged = !!imageUrl && staleClass !== 'fresh'
   const capReached = (failure?.safeFailCount ?? 0) >= SAFE_RETRY_CAP
@@ -255,7 +286,21 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
       </div>
       {manageError ? <p className="text-xs text-destructive">{manageError}</p> : null}
 
-      <ImagePlaceholder label="" aspectRatio="video" imageUrl={imageUrl} generating={isGenerating} />
+      <ImagePlaceholder label="" aspectRatio="video" imageUrl={viewingCandidate ? viewingCandidate.url : imageUrl} generating={viewingCandidate ? false : isGenerating} />
+      {viewingCandidate ? (
+        <VersionViewingBar
+          text={t('Viewing an earlier picture · {time}', { time: relativeTime(viewingCandidate.generatedAt, t) })}
+          note={viewingState?.note}
+          adoptDisabled={!!viewingState?.disabled}
+          adoptReason={viewingState?.disabled ? t('It is in another style, so it cannot be adopted') : null}
+          busy={adopting}
+          error={adoptError}
+          onAdopt={adopt}
+          onBack={() => { setAdoptError(null); setDismissedCandidate(viewingCandidate.id) }}
+          testId="artist-detail-viewing"
+          adoptTestId="artist-detail-adopt"
+        />
+      ) : null}
 
       {variant ? (
         <div className="flex flex-wrap gap-2">
@@ -265,9 +310,12 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
         </div>
       ) : null}
 
-      <p className="text-xs text-muted-foreground">
-        {styleLabel ? t('Background image · style {style}', { style: styleLabel }) : t('Background image')}
-      </p>
+      {/* 밑 글은 지금 그림 이야기라 지난 그림을 보는 동안은 숨긴다(지난 판 줄 A4). */}
+      {viewingCandidate ? null : (
+        <p className="text-xs text-muted-foreground">
+          {styleLabel ? t('Background image · style {style}', { style: styleLabel }) : t('Background image')}
+        </p>
+      )}
 
       {notice ? (
         <div className="flex items-start gap-2 rounded-md border border-destructive/30 bg-destructive/10 px-3 py-2 text-xs text-destructive">
