@@ -56,6 +56,10 @@ const SMALL = { width: 235, height: 421 }
 const LARGE = { width: 490, height: 872 }
 const pngOf = (size: { width: number; height: number }) =>
   sharp({ create: { ...size, channels: 3, background: { r: 90, g: 120, b: 150 } } }).png().toBuffer()
+// 우리 보관함 주소(서버는 우리 보관함 그림만 읽는다).
+const SMALL_URL = media('ws-1/p-1/shots/small.png')
+const LARGE_URL = media('ws-1/p-1/shots/large.png')
+const MISSING_URL = media('ws-1/p-1/shots/missing.png')
 let sizeByUrl: Record<string, { width: number; height: number } | 'missing'>
 let fetched: string[]
 
@@ -101,10 +105,10 @@ beforeEach(() => {
 describe('H3 에 보내는 작은 그림 키우기', () => {
   it('한 변이라도 256 보다 작은 그림은 비율 그대로 짧은 변을 256 으로 키워 우리 보관함에 올린 주소로 바꾸고, 큰 그림은 그대로 둔다', async () => {
     // 왜(m-qa 2026-11-27): H3 는 256 × 256 보다 작은 그림을 422 로 거절한다 — 9:16 일괄 실사 칸(235 × 421)은 H3 를 골라도 늘 Happy Horse 로 넘어갔다.
-    sizeByUrl = { 'https://m/small.png': SMALL, 'https://m/large.png': LARGE }
-    const urls = await ensureMinImageSide(['https://m/small.png', 'https://m/large.png'], 256, { workspaceId: 'ws-1', projectId: 'p-1' })
-    expect(urls[1]).toBe('https://m/large.png')
-    expect(urls[0]).not.toBe('https://m/small.png')
+    sizeByUrl = { [SMALL_URL]: SMALL, [LARGE_URL]: LARGE }
+    const urls = await ensureMinImageSide([SMALL_URL, LARGE_URL], 256, { workspaceId: 'ws-1', projectId: 'p-1' })
+    expect(urls[1]).toBe(LARGE_URL)
+    expect(urls[0]).not.toBe(SMALL_URL)
     expect(mocks.uploads).toHaveLength(1)
     expect(mocks.uploads[0]!).toMatchObject({ width: 256, height: 459 })
     expect(mocks.uploads[0]!.path.startsWith('ws-1/p-1/video-refs/')).toBe(true)
@@ -113,23 +117,32 @@ describe('H3 에 보내는 작은 그림 키우기', () => {
 
   it('같은 그림이면 늘 같은 주소로 올린다 — 다시 보내기 · 대체 모델이 같은 요청이 되게', async () => {
     // 왜: 같은 Take 를 다시 낼 때(복구 · 재생 비교) 주소가 바뀌면 다른 요청으로 보인다.
-    sizeByUrl = { 'https://m/small.png': SMALL }
-    const first = await ensureMinImageSide(['https://m/small.png'], 256, { workspaceId: 'ws-1', projectId: 'p-1' })
-    const second = await ensureMinImageSide(['https://m/small.png'], 256, { workspaceId: 'ws-1', projectId: 'p-1' })
+    sizeByUrl = { [SMALL_URL]: SMALL }
+    const first = await ensureMinImageSide([SMALL_URL], 256, { workspaceId: 'ws-1', projectId: 'p-1' })
+    const second = await ensureMinImageSide([SMALL_URL], 256, { workspaceId: 'ws-1', projectId: 'p-1' })
     expect(second).toEqual(first)
   })
 
   it('작은 그림을 키워 올리지 못하면 그렇다고 알린다', async () => {
     // 왜: 키우지 못한 채 보내면 H3 가 거절하고 다른 모델로 넘어간다 — 까닭 없이 다른 모델 영상이 나온다.
-    sizeByUrl = { 'https://m/small.png': SMALL }
+    sizeByUrl = { [SMALL_URL]: SMALL }
     mocks.failUpload = true
-    await expect(ensureMinImageSide(['https://m/small.png'], 256, { workspaceId: 'ws-1', projectId: 'p-1' })).rejects.toBeInstanceOf(VideoReferenceTooSmallError)
+    await expect(ensureMinImageSide([SMALL_URL], 256, { workspaceId: 'ws-1', projectId: 'p-1' })).rejects.toBeInstanceOf(VideoReferenceTooSmallError)
   })
 
   it('크기를 읽지 못한 그림은 작은지 모르니 그대로 보낸다(이 기능 전과 같다)', async () => {
     // 왜: 보관함이 잠깐 안 닿을 때 큰 그림까지 막으면 H3 를 아예 못 쓴다 — 막는 것은 작은 것을 알았는데 키우지 못했을 때뿐이다(리드).
-    sizeByUrl = { 'https://m/missing.png': 'missing' }
-    expect(await ensureMinImageSide(['https://m/missing.png'], 256, { workspaceId: 'ws-1', projectId: 'p-1' })).toEqual(['https://m/missing.png'])
+    sizeByUrl = { [MISSING_URL]: 'missing' }
+    expect(await ensureMinImageSide([MISSING_URL], 256, { workspaceId: 'ws-1', projectId: 'p-1' })).toEqual([MISSING_URL])
+    expect(mocks.uploads).toEqual([])
+  })
+
+  it('우리 보관함 주소가 아닌 그림은 서버가 읽지 않고 그대로 보낸다', async () => {
+    // 왜: 손으로 이은 그림 · 따로 만든 영상은 화면이 보낸 주소를 쓴다 — 아무 주소나 서버가 대신 가져오면 내부망까지 들여다보는 길이 된다(isOwnMediaUrl 경계).
+    const outside = 'https://outside.test/small.png'
+    sizeByUrl = { [outside]: SMALL }
+    expect(await ensureMinImageSide([outside], 256, { workspaceId: 'ws-1', projectId: 'p-1' })).toEqual([outside])
+    expect(fetched).toEqual([])
     expect(mocks.uploads).toEqual([])
   })
 })

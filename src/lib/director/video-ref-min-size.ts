@@ -4,10 +4,12 @@
 //   같은 그림은 늘 같은 주소로 올린다(다시 보내기 · 재생 비교 · 대체 모델이 같은 요청이 되게).
 //   작은 것을 알았는데 키우거나 올리지 못하면 VideoReferenceTooSmallError(Take 를 잡기 전에 막는다). 크기를 읽지 못한 그림은 작은지 모르니
 //   그대로 보낸다 — 이 기능 전과 같다(보관함이 잠깐 안 닿을 때 큰 그림까지 막지 않게).
+//   서버는 우리 보관함 주소(isOwnMediaUrl)만 읽는다 — 손으로 이은 그림 · 따로 만든 영상은 화면이 보낸 주소라, 다른 주소는 읽지 않고 그대로 보낸다.
 //   약속: tests/director/h3-min-size.test.ts
 import sharp from 'sharp'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { storageKeySegment } from '@/lib/storage/key-segment'
+import { isOwnMediaUrl } from '@/lib/storage/media-url'
 
 export class VideoReferenceTooSmallError extends Error {
   constructor(message: string) {
@@ -19,6 +21,8 @@ export class VideoReferenceTooSmallError extends Error {
 const SIZE_CHECK_TIMEOUT_MS = 15_000
 
 async function enlarge(url: string, minSide: number, store: { workspaceId: string; projectId: string }): Promise<string> {
+  // 아무 주소나 서버가 대신 가져오지 않는다(내부망 보호) — 우리 보관함 밖 주소는 이 기능 전처럼 그대로.
+  if (!isOwnMediaUrl(url)) return url
   let source: Buffer
   let width = 0
   let height = 0

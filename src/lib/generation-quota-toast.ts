@@ -225,6 +225,30 @@ export function notifyModerationUnavailable(): void {
 }
 
 /**
+ * H3 Max · Turbo 로 보낼 작은 그림(한 변 256 미만)을 서버가 키우지 못해 Take 전에 막았다(422 — m-qa 2026-11-27).
+ *   서버 문구는 영어라(사용자 언어를 모른다) code 를 보고 여기서 사용자 언어로 띄운다. 샷 여러 개를 한꺼번에 내도 안내는 하나.
+ */
+export function isReferenceImageTooSmall(status: number, body: unknown): boolean {
+  return (
+    status === 422 &&
+    typeof body === 'object' &&
+    body !== null &&
+    (body as { code?: unknown }).code === 'reference_image_too_small'
+  )
+}
+
+export function notifyReferenceImageTooSmall(): void {
+  const locale = useLocaleStore.getState().locale
+  toast.error(
+    translate(
+      locale,
+      'The start or end image is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.',
+    ),
+    { id: 'video-reference-too-small' },
+  )
+}
+
+/**
  * 429/402/내용 규칙 거절이면 안내하고 true. 호출부 관용구: `if (await notifyIfQuotaExceeded(res, body)) return`.
  * 안내 대상이 아니면 아무 것도 하지 않고 false — 나머지 오류 처리는 호출부 몫이다.
  * 동시성 한도와 프로젝트 영상 예산(#f4)에 이어 Take 부족(#payments-phase-2)도 여기서 갈라 안내한다 —
@@ -239,6 +263,10 @@ export function notifyIfQuotaExceeded(status: number, body: unknown): boolean {
   }
   if (isModerationUnavailable(status, body)) {
     notifyModerationUnavailable()
+    return true
+  }
+  if (isReferenceImageTooSmall(status, body)) {
+    notifyReferenceImageTooSmall()
     return true
   }
   if (isVideoBudgetExceeded(status, body)) {
