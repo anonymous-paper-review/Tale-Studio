@@ -53,26 +53,47 @@ export function withoutEndFrames(
   return { urls: kept, roles: kept.map((_, index): VideoReferenceRole => (index === 0 ? 'start' : 'ref')), droppedEnds: kept.includes(last) ? [] : [last] }
 }
 
+/** 한 요청이 그림을 몇 장까지 받나 — 모델별 상한(최대 9)보다 넉넉하게 둔다. 넘으면 참고 그림만 뒤에서부터 덜어 받는다(dev 방안 고장 1). */
+export const MAX_REQUEST_REFERENCE_IMAGES = 12
+
+export interface ClampedReferenceImages {
+  urls: string[]
+  roles: VideoReferenceRole[] | undefined
+  /** 덜어 낸 그림 수 — 작업 기록 · 응답에 남긴다(화면이 "N장은 이 모델이 받지 않아 뺐어요"를 보일 근거). */
+  dropped: number
+  /** 남긴 그림의 원래 자리 — 같은 순서의 다른 목록(② 레퍼런스의 그림 이름)을 같이 덜 때 쓴다. */
+  keptIndices: number[]
+}
+
 /**
- * 그림 목록을 max 장 안으로 줄인다 — 참고 그림(ref)만 뒤에서부터 덜어 내고 시작 · 미들 등 장면 역할은 남긴다(dev 방안 고장 1 과 같은 규칙).
- *   지금은 ② 레퍼런스(서버가 고른 목록)에만 쓴다. keptIndices = 남긴 그림의 원래 자리(그림 이름을 같이 덜어 낼 때).
+ * 그림 목록을 max 장 안으로 줄인다(dev 방안 고장 1 · 오너 2026-11-27 N4a "dev에서 수정한 것처럼"). 예전에는 앞 4장만 남기고 역할이 4개를 넘으면
+ *   역할을 통째로 버려, 참고 그림을 세 장 넘게 이으면 역할을 잃은 시작 그림 앞에 DB 시작 그림이 한 장 더 붙었다.
+ *   - 역할이 있으면: 시작 · 미들 등 장면 역할은 남기고 참고 그림(ref)만 뒤에서부터 덜어 낸다.
+ *   - 역할이 없는 옛 목록: 옛 규약("첫 = 시작, 마지막 = 끝")대로 첫 · 마지막을 남기고 그 사이를 뒤에서부터 덜어 낸다(끝은 그 뒤 withoutEndFrames 가 뺀다).
  */
 export function clampReferenceImages(
   urls: readonly string[],
-  roles: readonly VideoReferenceRole[],
+  roles: readonly VideoReferenceRole[] | undefined,
   max: number,
-): { urls: string[]; roles: VideoReferenceRole[]; dropped: number; keptIndices: number[] } {
+): ClampedReferenceImages {
   const limit = Number.isFinite(max) && max >= 1 ? Math.floor(max) : 1
-  const keep = urls.map(() => true)
-  let count = urls.length
-  for (let i = urls.length - 1; i >= 0 && count > limit; i -= 1) {
-    if (roles[i] === 'ref') {
-      keep[i] = false
-      count -= 1
+  const all = urls.map((_, i) => i)
+  if (roles && roles.length === urls.length) {
+    if (urls.length <= limit) return { urls: [...urls], roles: [...roles], dropped: 0, keptIndices: all }
+    const keep = urls.map(() => true)
+    let count = urls.length
+    for (let i = urls.length - 1; i >= 0 && count > limit; i -= 1) {
+      if (roles[i] === 'ref') {
+        keep[i] = false
+        count -= 1
+      }
     }
+    const keptIndices = all.filter((i) => keep[i])
+    return { urls: keptIndices.map((i) => urls[i]!), roles: keptIndices.map((i) => roles[i]!), dropped: urls.length - keptIndices.length, keptIndices }
   }
-  const keptIndices = urls.map((_, i) => i).filter((i) => keep[i])
-  return { urls: keptIndices.map((i) => urls[i]!), roles: keptIndices.map((i) => roles[i]!), dropped: urls.length - keptIndices.length, keptIndices }
+  if (urls.length <= limit) return { urls: [...urls], roles: undefined, dropped: 0, keptIndices: all }
+  const keptIndices = limit === 1 ? [0] : [...all.slice(0, limit - 1), urls.length - 1]
+  return { urls: keptIndices.map((i) => urls[i]!), roles: undefined, dropped: urls.length - keptIndices.length, keptIndices }
 }
 
 export function resolveVideoReferenceFrames(input: VideoReferenceFramesInput): VideoReferenceFrames {
