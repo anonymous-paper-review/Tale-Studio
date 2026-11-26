@@ -33,6 +33,7 @@ import { normalizeProvider } from '@/lib/video-models'
 import { useShotState } from '@/features/director/hooks/use-shot-states'
 import { dimmedByStatusFilter, takeCountsAsVideo, takeIsRunning, videoTakeFrame, videoTakeTail } from '@/lib/director/shot-state'
 import { StateTailLine } from '@/features/director/shot-status'
+import { videoOverrideChips } from '@/features/director/shot-detail/video-mode'
 
 /** 영상 노드 틀의 높이 상한(세로·정사각 포맷) — 테이크 간격(VIDEO_OFFSET_Y 260px) 안에서 겹치지 않게. */
 const VIDEO_NODE_MEDIA_MAX_H = 150
@@ -173,10 +174,8 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
   // 1080p 표시는 지금 영상에 대한 말이다 — 그 영상을 낸 작업 기록 기준(2026-10-31 리뷰). 설정은 왼쪽 패널이 보여준다.
   const madeAt1080p = !!data.videoUrl && data.videoResolution === '1080p'
   // 해상도는 마더 Shot 을 바꾼 값이 아니다(마더에는 해상도가 없다) — 노란 "바꾼 설정" 표시 대신 아래 1080p 표시로 보인다.
-  const overrideKeys =
-    data.parentShotNodeId === null
-      ? []
-      : (Object.keys(data.override) as (keyof typeof data.override)[]).filter((k) => k !== 'resolution')
+  //   만드는 방식은 사람이 읽는 이름으로, 기본 방식 · 이어서 출처는 칩 없이(통합 확인 n-qa 고장 3 — videoOverrideChips).
+  const overrideChips = data.parentShotNodeId === null ? [] : videoOverrideChips(data.override)
 
   const isStrongStale = data.stale
   const canMarkFinal =
@@ -409,14 +408,14 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
       </div>
 
       {/* override indicator */}
-      {overrideKeys.length > 0 && (
+      {overrideChips.length > 0 && (
         <div className="mt-2 flex flex-wrap gap-1" inert={generating}>
-          {overrideKeys.map((k) => (
+          {overrideChips.map((chip) => (
             <span
-              key={k}
+              key={chip.key}
               className="rounded-[6px] bg-warning/10 px-1.5 py-px text-[10px] font-medium text-warning"
             >
-              {k}
+              {chip.translate ? t(chip.label) : chip.label}
             </span>
           ))}
         </div>

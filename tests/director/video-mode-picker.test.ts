@@ -173,6 +173,38 @@ describe('같이 정한 것 — 검토 rev-video 고침', () => {
   })
 })
 
+describe('같이 정한 것 — 통합 확인 n-qa', () => {
+  // 왜(n-qa 고장 1): 이어서 Take 의 시작은 앞 영상의 마지막 장면이라 샷의 실사 시작 장과 늘 다르다 — 만든 직후에도 "시작 이미지가 바뀌었어요"와
+  //   [바뀐 이미지로 새 Take 만들기]가 떴다. 레퍼런스도 실사 시작을 장면으로 쓰지 않는다(참고로만). 실사 시작을 장면으로 쓴 Take 만 실사 시작과 견준다.
+  it('이어서 · 레퍼런스처럼 실사 시작을 장면으로 쓰지 않은 Take 는 실사 시작과 견주지 않아 "시작 이미지가 바뀌었어요"를 보이지 않는다', () => {
+    const version = (id: string, tag: string, generatedAt: number) => ({ id, url: `https://media.test/${tag}-s.png`, frames: { start: `https://media.test/${tag}-s.png`, direction: `https://media.test/${tag}-d.png`, end: `https://media.test/${tag}-e.png` }, generatedAt, source: 'generated' as const })
+    const first = withStoryboardVersion(null, version('job-1', 'a', Date.parse('2026-11-27T00:00:00Z')), { select: true })
+    director.getState().updateNodeData<'shot'>(secondShot, { storyboardImage: first })
+    const chainFrame = mediaPublicUrl('workspace-1/mode-project/videos/clip-a/job-a_chain-frame-8850.jpg')
+    const takeId = doneTake(secondShot, 1, { override: { videoMode: 'continue' }, createdAt: '2026-11-27T01:00:00Z', lastAttemptAt: '2026-11-27T01:00:00Z', madeFrames: { start: chainFrame, end: null } })
+    const out = () => render(secondShot)
+    expect(out()).not.toContain('The start image changed · A new Take will use it')
+    expect(out()).not.toContain('Make a new Take with the changed image')
+    // 방식 기록이 없어도 쓴 시작이 실사 시트의 어느 판 시작도 아니면(앞 영상 장면) 견주지 않는다.
+    director.getState().updateNodeData<'video'>(takeId, { override: {} })
+    expect(out()).not.toContain('The start image changed · A new Take will use it')
+
+    // 실사 시작이 바뀌어도 이어서 · 레퍼런스 Take 는 견주지 않는다.
+    director.getState().updateNodeData<'shot'>(secondShot, { storyboardImage: withStoryboardVersion(first, version('job-2', 'c', Date.parse('2026-11-27T02:00:00Z')), { select: true }) })
+    director.getState().updateNodeData<'video'>(takeId, { override: { videoMode: 'continue' } })
+    expect(out()).not.toContain('The start image changed · A new Take will use it')
+    director.getState().updateNodeData<'video'>(takeId, { override: { videoMode: 'reference' }, madeFrames: { start: 'https://media.test/a-s.png', end: null } })
+    expect(out()).not.toContain('The start image changed · A new Take will use it')
+    setLocale('ko')
+    expect(out()).not.toContain('시작 이미지가 바뀌었어요')
+
+    // 실사 시작을 장면으로 쓴 Take(시작+프롬프트)는 지금처럼 견준다.
+    setLocale('en')
+    director.getState().updateNodeData<'video'>(takeId, { override: { videoMode: 'start_prompt' } })
+    expect(out()).toContain('The start image changed · A new Take will use it')
+  })
+})
+
 describe('같이 정한 것 — 검토 rev-video C', () => {
   // 왜(검토 rev-video C): 실사 화살표를 저장하면 시작 · 끝이 같은 새 판(v2)이 생긴다 — 그 뒤 만든 Take 까지 Take 줄에 "그림 v1"로 적히고
   //   "바뀌었어요"와 [바뀐 이미지로 새 Take 만들기]가 늘 떴다. 그 Take 가 쓴 판은 v2 이고 시작 그림은 그대로다(판 id 가 없는 옛 Take 는 만든 때의 판).

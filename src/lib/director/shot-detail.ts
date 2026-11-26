@@ -171,13 +171,21 @@ function bareImageUrl(url: string | null | undefined): string | null {
  * 보던 Take 와 지금 시작 이미지가 다른가 — 영상에는 시작 이미지만 쓴다(오너 N4a — 끝 이미지는 보내지 않는다, 검토 rev-video 8 ①).
  *   Take 가 쓴 시작 그림을 알면 그 그림 자체로 견준다(되돌린 옛 판도 시작 그림이 다르면 "바뀜"). 판 번호로 견주지 않는다 — 실사 화살표만 고치면
  *   시작 그림이 같은 새 판이 생긴다(N4b). 모르면 만든 때와, 지금 시작 그림이 처음 생긴 때(같은 시작 그림의 가장 이른 판)로 견준다.
+ *   실사 시작을 장면으로 쓰지 않은 Take 는 견주지 않는다(통합 확인 n-qa 고장 1): 이어서(시작 = 앞 영상의 마지막 장면) · 레퍼런스(그림은 참고로만),
+ *   그리고 쓴 시작이 실사 시트의 어느 판 시작도 아닌 Take(앞 영상 장면 · 노드에서 손으로 이은 다른 그림).
  */
-export function imageChangedForTake(image: StoryboardImage | null | undefined, take: Pick<VideoNodeData, 'madeFrames' | 'createdAt' | 'lastAttemptAt'>): boolean {
+export function imageChangedForTake(image: StoryboardImage | null | undefined, take: Pick<VideoNodeData, 'madeFrames' | 'createdAt' | 'lastAttemptAt' | 'override'>): boolean {
   if (!image) return false
+  const mode = (take.override as VideoOverride | undefined)?.videoMode
+  if (mode === 'continue' || mode === 'reference') return false
   const current = currentStoryboardVersion(image)
   const currentStart = bareImageUrl(current ? current.frames?.start ?? current.url : null)
   const usedStart = bareImageUrl(take.madeFrames?.start)
-  if (usedStart && currentStart) return usedStart !== currentStart
+  if (usedStart && currentStart) {
+    const sheetStarts = storyboardImageVersions(image).map((version) => bareImageUrl(version.frames?.start ?? version.url))
+    if (!sheetStarts.includes(usedStart)) return false
+    return usedStart !== currentStart
+  }
   if (image.status !== 'completed') return false
   const sameStart = currentStart
     ? storyboardImageVersions(image)

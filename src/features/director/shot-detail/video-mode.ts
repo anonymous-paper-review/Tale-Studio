@@ -108,6 +108,25 @@ export function shotVideoModeFacts(input: {
   }
 }
 
+/**
+ * 영상 노드의 노란 "바꾼 설정" 칩(통합 확인 n-qa 고장 3) — 만드는 방식은 사람이 읽는 방식 이름(영어 원문 = i18n 키, translate: true)으로 보이고,
+ *   기본 방식(시작+프롬프트) · 모르는 값은 칩이 없으며, 이어서 출처(continueFrom)는 "이어서" 칩이 이미 말하므로 보이지 않는다.
+ *   해상도는 아래 1080p 표시가 맡아 칩이 아니다. 그 밖의 바꾼 설정은 지금처럼 칸 이름 그대로.
+ */
+export function videoOverrideChips(override: VideoOverride | null | undefined): Array<{ key: string; label: string; translate: boolean }> {
+  const chips: Array<{ key: string; label: string; translate: boolean }> = []
+  for (const key of Object.keys(override ?? {}) as Array<keyof VideoOverride>) {
+    if (key === 'resolution' || key === 'continueFrom') continue
+    if (key === 'videoMode') {
+      const mode = override!.videoMode
+      if (isVideoMode(mode) && mode !== DEFAULT_VIDEO_MODE) chips.push({ key, label: VIDEO_MODE_LABEL[mode], translate: true })
+      continue
+    }
+    chips.push({ key, label: key, translate: false })
+  }
+  return chips
+}
+
 /** 칸을 열 때 골라 둘 방식 — 보고 있는 Take 의 방식(그 Take 의 설정을 이어받는 것과 같다), 없거나 모르는 값이면 기본. */
 export function defaultVideoMode(take: Pick<VideoNodeData, 'override'> | null): VideoMode {
   const mode = (take?.override as VideoOverride | undefined)?.videoMode
