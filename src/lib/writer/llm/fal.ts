@@ -138,6 +138,7 @@ const EDIT_VARIANT_BY_MODEL: Record<string, string> = {
   'openai/gpt-image-2': 'openai/gpt-image-2/edit',
   'fal-ai/nano-banana': 'fal-ai/nano-banana/edit',
   'fal-ai/nano-banana-2': 'fal-ai/nano-banana-2/edit',
+  'minimax/h3-image/text-to-image': 'minimax/h3-image/edit',
 };
 
 /** Consumed by src/lib/style-anchor.ts for Rule M model normalization. */
@@ -200,8 +201,41 @@ function grokAspectRatio(ar?: string): string | undefined {
   return best;
 }
 
+/** MiniMax H3 Image 참고 그림 상한 · 넓이(화소) 하한 · 비율에서 셈하는 크기의 넓이 — fal 스키마 2026-11-26. */
+const H3_IMAGE_MAX_REFS = 16
+const H3_IMAGE_MIN_AREA = 655_360
+const H3_IMAGE_TARGET_AREA = 2048 * 1152
+
+/** 비율('16:9' · 'horizontal_16:9' · '2.39:1') → H3 Image 크기(약 236만 화소, 16 배수, 1:3~3:1). 비율을 모르면 null. */
+function h3ImageSizeForAspect(ar?: string): { width: number; height: number } | null {
+  const m = /^([\d.]+):([\d.]+)$/.exec((ar ?? '').replace(/^(horizontal_|vertical_|cinema_|square_)/, ''))
+  if (!m) return null
+  const ratio = Math.min(3, Math.max(1 / 3, parseFloat(m[1]) / parseFloat(m[2])))
+  if (!Number.isFinite(ratio) || ratio <= 0) return null
+  const height = Math.round(Math.sqrt(H3_IMAGE_TARGET_AREA / ratio) / 16) * 16
+  return { width: Math.round((height * ratio) / 16) * 16, height }
+}
+
+/** H3 Image 크기 — 호출자가 정한 가로 × 세로(시트 캔버스)가 넓이 하한 안이면 그대로, 아니면 비율로 셈한다. */
+function h3ImageSize(opts: FalImageOptions): { width: number; height: number } | null {
+  const exact = normalizeImageSize(opts.image_size)
+  if (exact && typeof exact === 'object' && exact.width * exact.height >= H3_IMAGE_MIN_AREA) return exact
+  return h3ImageSizeForAspect(opts.aspect_ratio)
+}
+
 /** export 는 테스트 전용 — 순수 조립 함수라 네트워크 없이 스키마 계약을 검증할 수 있다. */
 export function buildFalImageInput(opts: FalImageOptions, model: string): Record<string, unknown> {
+  // MiniMax H3 Image(2026-11-26 D5): 비율 칸이 없고 크기(image_size)를 가로 × 세로로 받는다. negative_prompt · seed 칸도 없다.
+  //   새로 그리기는 글 다시 쓰기를 끈다(기본 켬 — 우리 지시문을 그대로 쓰게). 편집 입구에는 그 칸이 없다. 크기를 모르면 편집은 첫 그림 비율.
+  if (model.startsWith('minimax/h3-image')) {
+    const h3: Record<string, unknown> = { prompt: opts.prompt }
+    const edit = isImageEditModel(model)
+    if (edit) h3.image_urls = (opts.reference_image_urls ?? []).slice(0, H3_IMAGE_MAX_REFS)
+    const size = h3ImageSize(opts)
+    if (size) h3.image_size = size
+    if (!edit) h3.enable_prompt_expansion = false
+    return h3
+  }
   // xai Grok Imagine(#arrow-layer 2026-08-09): image_size·negative_prompt·seed 는 스키마에 없다 — 알려진 키만 보낸다(422 방어).
   //   비율(2026-10-12 오너 "고친다"): 호출자가 비율을 정했으면 Grok 이 받는 가장 가까운 비율로 보낸다. 안 보내면 새로 그리기는 1:1,
   //   그림체 그림이 첫 참고인 배경 · 시트는 그 그림 비율(정사각형)로 나왔다. 고칠 그림의 구도를 지켜야 하는 편집은 호출자가 비율을

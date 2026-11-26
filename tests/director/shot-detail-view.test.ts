@@ -317,11 +317,13 @@ describe('Director 샷 상세 화면', () => {
     expect(out).not.toMatch(/>Edit<|>Settings</)
   })
 
-  it('Writer 샷의 이미지 탭 모델 칸에는 실제로 도는 GPT Image 2 · Seedream 4 만 보인다', () => {
+  it('Writer 샷의 이미지 탭 모델 칸에는 실제로 도는 GPT Image 2 · Seedream 4 · H3 Image 만 보인다', () => {
     // 왜: 오너 답 5번 "모델 칸에는 실제로 도는 것만" — 나머지 넷은 말없이 GPT Image 2 로 바뀌었다.
+    //   오너 2026-11-26 D5 "H3image … 까지 늘려줘" — H3 Image 는 시트를 정한 크기 그대로 그려(개발 DB 실측 2/2) Writer 샷에서도 돈다.
     const out = render('popup')
     expect(out).toContain('GPT Image 2')
     expect(out).toContain('Seedream 4')
+    expect(out).toContain('H3 Image')
     for (const hidden of ['Nano Banana', 'FLUX.2 Klein', 'Grok Imagine']) expect(out, hidden).not.toContain(hidden)
   })
 

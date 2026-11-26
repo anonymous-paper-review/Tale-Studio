@@ -256,6 +256,28 @@ const NANO_BANANA_2_EDIT_FIELDS = [
   'thinking_level',
 ] as const
 
+// minimax/h3-image/text-to-image schema (fal OpenAPI 2026-11-26). image_size = {width,height} or preset; no aspect_ratio/negative_prompt/seed.
+const H3_IMAGE_T2I_FIELDS = [
+  'prompt',
+  'image_size',
+  'num_images',
+  'loras',
+  'enable_prompt_expansion',
+  'output_format',
+  'sync_mode',
+] as const
+
+// minimax/h3-image/edit schema (fal OpenAPI 2026-11-26). image_urls up to 16; image_size 'auto' keeps the first image's ratio.
+const H3_IMAGE_EDIT_FIELDS = [
+  'prompt',
+  'image_urls',
+  'image_size',
+  'num_images',
+  'loras',
+  'output_format',
+  'sync_mode',
+] as const
+
 // fal-ai/bytedance/seedream/v4/text-to-image schema. Uses image_size (min 960², max 4096²).
 const SEEDREAM_V4_T2I_FIELDS = [
   'prompt',
@@ -318,6 +340,8 @@ export const FAL_INPUT_ALLOWLIST: Record<string, Set<string>> = {
   'fal-ai/nano-banana-2/edit': fieldSet(NANO_BANANA_2_EDIT_FIELDS),
   'fal-ai/bytedance/seedream/v4/text-to-image': fieldSet(SEEDREAM_V4_T2I_FIELDS),
   'fal-ai/bytedance/seedream/v4/edit': fieldSet(SEEDREAM_V4_EDIT_FIELDS),
+  'minimax/h3-image/text-to-image': fieldSet(H3_IMAGE_T2I_FIELDS),
+  'minimax/h3-image/edit': fieldSet(H3_IMAGE_EDIT_FIELDS),
 }
 
 export function getAllowedFields(modelKey: string | null | undefined): Set<string> | undefined {

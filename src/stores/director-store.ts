@@ -4388,6 +4388,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 // 수동 샷 실사 이미지도 Producer 포맷의 비율(2026-09-30, 실측: "New Shot" 이 16:9 로 나감) — 서버가 포맷을 읽는다.
                 aspectFromProject: true,
                 referenceImageUrls,
+                // 샷 상세 이미지 모델 칸에서 고른 모델(오너 답 5번 "실제로 도는 것만", 2026-11-26 D5) — 예전에는 싣지 않아 늘 기본 모델로 그렸다.
+                ...(data.imageModel ? { imageModel: data.imageModel } : {}),
               }),
               signal: controller.signal,
             })
