@@ -70,6 +70,8 @@ export interface VideoModelSpec {
   aspectRatios?: readonly string[]
   /** 참고 그림 목록 상한(fal 스키마) — 넘치면 뒤에서부터 덜어 낸다. 없으면 그대로. */
   maxRefImages?: number
+  /** 참고 그림의 가장 작은 변(px) — 더 작은 그림은 서버가 비율 그대로 키워 보낸다(H3 = 256, m-qa 2026-11-27). 없으면 크기를 보지 않는다. */
+  minImageSide?: number
   /** 늘 같이 보내는 값 — H3 는 글 다시 쓰기를 끈다(prompt_expansion_mode 는 필수 칸, 대체 미니맥스와 같은 값). */
   fixedInput?: Readonly<Record<string, string>>
 }
@@ -106,6 +108,8 @@ const H3_COMMON: Omit<VideoModelSpec, 'key' | 'label' | 'endpoint'> = {
   negativePrompt: false,
   aspectRatios: H3_ASPECT_RATIOS,
   maxRefImages: 9,
+  // fal 거절 실측(m-qa 2026-11-27): "Minimum dimensions are 256x256" — 9:16 일괄 실사 칸(235 × 421)은 서버가 키워 보낸다(video-ref-min-size).
+  minImageSide: 256,
   fixedInput: { prompt_expansion_mode: 'disabled' },
 }
 

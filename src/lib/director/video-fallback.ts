@@ -82,11 +82,16 @@ function readSteps(snapshot: Record<string, unknown>): VideoFallbackStep[] {
 }
 
 function readImages(snapshot: Record<string, unknown>): { imageUrls: string[]; roles: string[] | null } {
-  const urls = Array.isArray(snapshot.reference_image_urls)
+  const original = Array.isArray(snapshot.reference_image_urls)
     ? snapshot.reference_image_urls.filter((url): url is string => typeof url === 'string' && url.length > 0)
     : typeof snapshot.reference_image_url === 'string' && snapshot.reference_image_url
       ? [snapshot.reference_image_url]
       : []
+  // H3 에 보내려고 키운 그림 주소(m-qa 2026-11-27)가 있으면 그것 — 대체 미니맥스(H3 Max 그림→영상)도 256 보다 작은 그림을 거절한다. 순서 · 수가 같을 때만.
+  const enlarged = Array.isArray(snapshot.fal_reference_image_urls)
+    ? snapshot.fal_reference_image_urls.filter((url): url is string => typeof url === 'string' && url.length > 0)
+    : []
+  const urls = enlarged.length > 0 && enlarged.length === original.length ? enlarged : original
   const roles = Array.isArray(snapshot.reference_image_roles)
     && snapshot.reference_image_roles.length === urls.length
     && snapshot.reference_image_roles.every((role) => typeof role === 'string')

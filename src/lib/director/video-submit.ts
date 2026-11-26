@@ -22,6 +22,7 @@ import {
   buildVideoPrompt,
 } from '@/lib/director/video-prompt'
 import { directorPromptOf } from '@/lib/director/director-prompt'
+import { ensureMinImageSide, VideoReferenceTooSmallError } from '@/lib/director/video-ref-min-size'
 import { freshDirectionRead } from '@/lib/writer/direction-read'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDesign, ShotDynamicSpec } from '@/lib/writer/types/pipeline'
@@ -42,6 +43,7 @@ import { resolveWebhookUrl } from '@/lib/fal/webhook-url'
 import { buildBestEffortFalRequestCapturePatch } from '@/lib/fal/observability'
 import {
   DEFAULT_VIDEO_RESOLUTION,
+  VIDEO_MODELS,
   effectiveVideoResolution,
   isVideoResolution,
   normalizeProvider,
@@ -927,9 +929,26 @@ async function prepareVideoRequest(
         throw error
       }
     }
-    const falSubmitRequest = submitRefUrls
+    // H3 Max · Turbo 는 256 × 256 보다 작은 그림을 거절한다(m-qa 2026-11-27: 9:16 일괄 실사 칸 235 × 421 → 422 → 대체 모델로 넘어감).
+    //   작은 그림만 비율 그대로 키워 우리 보관함 주소로 보낸다. 다른 모델 요청은 그대로. 키울 수 없으면 Take 를 잡기 전에 막는다.
+    //   작업 기록의 원래 그림 주소(Take 의 시작 · 끝 판정 — madeFrames)는 그대로 두고, 보낸 주소는 fal_reference_image_urls 로 따로 적는다(대체 모델도 그 주소).
+    const minImageSide = VIDEO_MODELS[modelKey].minImageSide
+    let falRefUrls = submitRefUrls
+    if (submitRefUrls && minImageSide) {
+      try {
+        falRefUrls = await ensureMinImageSide(submitRefUrls, minImageSide, { workspaceId: project.workspace_id as string, projectId })
+      } catch (error) {
+        if (!(error instanceof VideoReferenceTooSmallError)) throw error
+        return NextResponse.json({
+          error: `The start or end image is smaller than ${minImageSide} px, which this video model does not accept, and it could not be enlarged. Choose another video model or remake the images. (${error.message})`,
+          code: 'reference_image_too_small',
+        }, { status: 422 })
+      }
+    }
+    const enlargedRefUrls = !!falRefUrls && !!submitRefUrls && falRefUrls.some((url, index) => url !== submitRefUrls[index]) ? falRefUrls : null
+    const falSubmitRequest = falRefUrls
       // 그림 역할(start · end · ref)은 첫 · 마지막 장면 칸이 있는 모델(H3 Max)만 쓴다 — 목록과 같은 순서일 때만 넘긴다.
-      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, submitRefUrls, dur, effectiveAspectRatio, resolution, referenceImageUrlsV2?.length ? alignedReferenceImageRoles : undefined)
+      ? buildFalReferenceToVideoRequest(modelKey, fullPrompt, falRefUrls, dur, effectiveAspectRatio, resolution, referenceImageUrlsV2?.length ? alignedReferenceImageRoles : undefined)
       : buildFalT2VFallbackRequest(fullPrompt, dur, effectiveAspectRatio)
     const falCapture = buildBestEffortFalRequestCapturePatch(falSubmitRequest.input, falSubmitRequest.model)
     const normalizedNewTakeMetadata = {
@@ -955,6 +974,8 @@ async function prepareVideoRequest(
       // 배열 키는 존재할 때만 — 구버전 예약 잡의 리플레이 비교(snapshotValueMatches)와 호환.
       ...(referenceImageUrlsV2?.length ? { reference_image_urls: referenceImageUrlsV2 } : {}),
       ...(alignedReferenceImageRoles ? { reference_image_roles: alignedReferenceImageRoles } : {}),
+      // H3 에 보내려고 키운 그림 주소(있을 때만 — 다른 모델 · 큰 그림 요청은 이 기능 전 기록 모양 그대로). 대체 모델도 이 주소를 쓴다.
+      ...(enlargedRefUrls ? { fal_reference_image_urls: enlargedRefUrls } : {}),
       // 실은 읽은 줄(오너 Q4) — 실었을 때만 적는다(없는 요청은 이 기능 전 기록 모양 그대로, 재생 비교 보호).
       ...(directionLine ? { direction_read: promptParts.directionRead ?? directionLine } : {}),
       movement_preset: movementPreset ?? null,
