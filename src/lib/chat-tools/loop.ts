@@ -6,7 +6,8 @@ import { isStoryboardImageUpdate } from '@/lib/storyboard/chat-image-tool'
 export interface ChatToolResponse { toolTurn?: ToolTurn; reply?: string; [key: string]: unknown }
 
 /** 실사 그림 요청만 담긴 답(Storyboard 채팅 generateImage, 오너 2026-11-26 m1126 O7) — 글을 고치는 답이 아니라 화면이 그림을 맡기는 답이다.
- *  "고쳐 줘" 부탁이라도 그림으로 답했으면 글 고치기(edit_project)를 요구하지 않는다. 글 고치기가 섞이면 지금처럼 도구를 요구한다. */
+ *  사람이 그림만 고쳐 달라고 했을 때(imageOnlyRequest)만 글 고치기(edit_project) 확인을 건너뛴다. 글 고치기가 섞인 부탁이거나
+ *  답에 글 고치기가 섞이면 예전처럼 도구를 요구한다(검토 2026-11-26 rev-director — 대사가 그대로인데 "바꿀게요"로 끝나지 않게). */
 function onlyImageRequests(data: ChatToolResponse): boolean {
   const updates = Array.isArray(data.updates) ? data.updates : []
   return updates.length > 0 && updates.every(isStoryboardImageUpdate)
@@ -34,6 +35,8 @@ export async function runChatToolLoop(options: {
   maxSameFailure?: number
   onResult?: (outcome: ToolOutcome) => void
   requireEdit?: boolean
+  /** 사람이 그림만 고쳐 달라고 했다(Storyboard — lib/storyboard/chat-image-tool requestsPictureOnlyChange). 이때만 그림 요청만의 답이 requireEdit 를 통과한다. */
+  imageOnlyRequest?: boolean
   /** The user explicitly asked to look up an image; a text answer must follow a storage read. */
   requireInspection?: boolean
   locale?: 'ko' | 'en'
@@ -86,7 +89,7 @@ export async function runChatToolLoop(options: {
           continue
         }
       }
-      if (options.requireEdit && !onlyImageRequests(data) && (data.toolSupport === true || results.length > 0) && !results.some(outcome => outcome.call.name === 'edit_project')) {
+      if (options.requireEdit && !(options.imageOnlyRequest && onlyImageRequests(data)) && (data.toolSupport === true || results.length > 0) && !results.some(outcome => outcome.call.name === 'edit_project')) {
         if (!checkedMissingEdit) {
           checkedMissingEdit = true
           messages.push({ role: 'assistant', content: [{ type: 'text', text: data.reply || 'No edit was executed.' }] },
