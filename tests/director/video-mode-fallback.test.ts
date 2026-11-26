@@ -24,6 +24,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 }))
 
 import { failDirectorVideoAttemptOrFallback } from '@/lib/director/video-fallback'
+import { buildVideoPrompt } from '@/lib/director/video-prompt'
 import { MODERATION_FIXTURE } from '../fixtures/_moderation.ts'
 
 const START = 'https://media.test/shot_start.png'
@@ -64,6 +65,25 @@ describe('혼자 정한 것', () => {
     expect(first!.endpoint).toBe('minimax/h3-max/image-to-video')
     expect(first!.input).toMatchObject({ image_url: START })
     expect(JSON.stringify(first!.input)).not.toContain(MIDDLE)
+  })
+
+  // 왜(검토 rev-video 7): 미니맥스는 가운데 장(연출 스케치)을 받는 칸이 없어 그 그림을 뺀다 — 글에 "Image 2 is the START frame overlaid…"가 남으면
+  //   보내지 않은 그림을 말한다. 그 방식 문장과 그림 순서의 "image 2 = DIRECTION"을 떼고, 장면 글 · 시작 그림 진실 문장은 남긴다.
+  it('시작+미들 영상이 미니맥스로 넘어가면 보내지 않은 가운데 장을 말하는 방식 문장도 글에서 뺀다', async () => {
+    const built = buildVideoPrompt({ prompt: 'A girl walks along the pier at dawn.', generationMethod: 'I2V', modelKey: 'seedance', durationSeconds: 5, referenceImageRoles: ['start', 'direction'], videoMode: 'start_middle' })
+    expect(built.fullPrompt).toContain('Image 2 is the START frame overlaid')
+    await failDirectorVideoAttemptOrFallback(job({
+      video_mode: 'start_middle', full_prompt: built.fullPrompt, prompt_parts: built.prompt_parts,
+      reference_image_url: START, reference_image_urls: [START, MIDDLE], reference_image_roles: ['start', 'direction'],
+    }), LIKENESS)
+
+    const prompt = submitted()[0]!.input.prompt as string
+    expect(prompt).toContain('A girl walks along the pier at dawn')
+    expect(prompt).not.toContain('Image 2')
+    expect(prompt).not.toContain('image 2')
+    expect(prompt).not.toContain('DIRECTION')
+    expect(prompt).toContain('Image 1 is the visual ground truth')
+    expect(prompt).toContain('image 1 = START')
   })
 
   // 왜: 레퍼런스는 시작 · 끝 장면이 없는 방식이다 — 넘어간 모델에서도 그림을 첫 장면으로 쓰지 않는다.

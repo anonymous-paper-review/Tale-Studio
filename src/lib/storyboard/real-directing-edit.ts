@@ -50,7 +50,7 @@ import {
   type EditedDirectionLine,
 } from '@/lib/writer/directing-edit'
 import { REAL_STRIP_ARROWS_PROMPT, realEndFramePlan } from '@/lib/storyboard/real-arrow-prompts'
-import { realEditFrames, withArrowVersion, withRealCleanPlate, withRealDirectionRead, withRealEndFrame } from '@/lib/storyboard/real-arrow-edit'
+import { isRealArrowImage, realEditFrames, realEndReplayable, withArrowVersion, withRealCleanPlate, withRealDirectionRead, withRealEndFrame } from '@/lib/storyboard/real-arrow-edit'
 
 // 밑층 그림 AI — 콘티 밑층과 같다(누를 때만, 장당 약 $0.02).
 const REAL_CLEAN_MODEL = 'xai/grok-imagine-image/edit'
@@ -73,7 +73,16 @@ export class RealFramesMissingError extends Error {
   }
 }
 
+/** 화살표를 고친 판이 아니다(리드 C) — 줄 읽기 · 끝 장 다시 그리기 · 고친 줄 남기기는 화살표 판에만 받는다(라우트 409 not_arrow_version). */
+export class RealNotArrowVersionError extends Error {
+  constructor(locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK) {
+    super(translate(locale, 'Only a version whose arrows you edited can be read or redrawn. Edit the arrows first.'))
+    this.name = 'RealNotArrowVersionError'
+  }
+}
+
 type RealShotRow = { storyboard_image?: unknown; duration_seconds?: unknown; characters?: unknown }
+type RealEndTarget = { versionId?: unknown; direction?: unknown }
 
 async function loadRealShot(projectId: string, shotId: string): Promise<RealShotRow | null> {
   const { data, error } = await supabaseAdmin
@@ -98,8 +107,27 @@ function framesOrThrow(row: RealShotRow | null, locale: AppLocale) {
   return frames
 }
 
-/** 그 샷 실사를 그리는 작업(화면에서 멈춘 것은 세지 않는다 — DB 트리거와 같은 기준). realEnd = 실사 끝 장 작업인가. */
-async function runningRealJob(projectId: string, shotId: string): Promise<{ id: string; realEnd: boolean } | null> {
+/** 화살표를 고친 판이 아니면 RealNotArrowVersionError(리드 C). */
+function assertArrowImage(row: RealShotRow | null, locale: AppLocale): void {
+  if (!isRealArrowImage(row?.storyboard_image)) throw new RealNotArrowVersionError(locale)
+}
+
+/** 그 주소들이 모두 우리 보관함 · 이 프로젝트 폴더("작업 공간/프로젝트/")의 그림인가 — 서버가 가져오기 전에 본다(검토 rev-realarrow 7). */
+async function framesInProject(projectId: string, urls: readonly string[]): Promise<boolean> {
+  const paths = urls.map((url) => mediaPathFromUrl(url))
+  if (paths.some((path) => !path)) return false
+  const { data, error } = await supabaseAdmin.from('projects').select('workspace_id').eq('id', projectId).maybeSingle()
+  if (error) throw error
+  const workspaceId = (data as { workspace_id?: unknown } | null)?.workspace_id
+  return typeof workspaceId === 'string' && !!workspaceId && paths.every((path) => path!.startsWith(`${workspaceId}/${projectId}/`))
+}
+
+async function assertFramesInProject(projectId: string, urls: readonly string[], locale: AppLocale): Promise<void> {
+  if (!(await framesInProject(projectId, urls))) throw new ForeignMediaPathError(locale)
+}
+
+/** 그 샷 실사를 그리는 작업(화면에서 멈춘 것은 세지 않는다 — DB 트리거와 같은 기준). realEnd = 실사 끝 장 작업이면 그 대상(판 · 가운데 장). */
+async function runningRealJob(projectId: string, shotId: string): Promise<{ id: string; realEnd: RealEndTarget | null } | null> {
   const { data, error } = await supabaseAdmin
     .from('generation_jobs')
     .select('id, kind, target')
@@ -112,7 +140,9 @@ async function runningRealJob(projectId: string, shotId: string): Promise<{ id: 
   if (!rows.length) return null
   const stopped = await cancelledJobsById(rows.map((row) => row.id))
   const live = rows.find((row) => !stopped.has(row.id))
-  return live ? { id: live.id, realEnd: !!live.target?.realEnd } : null
+  if (!live) return null
+  const realEnd = live.target?.realEnd
+  return { id: live.id, realEnd: realEnd && typeof realEnd === 'object' ? (realEnd as RealEndTarget) : null }
 }
 
 /** 우리 보관함 경로(이 프로젝트 폴더 안)만 — 실사 시트 주소는 브라우저가 고칠 수 있는 칸에서 온다(콘티 리뷰 M5 와 같다). */
@@ -191,17 +221,20 @@ export async function saveRealDirectingFrame(
   const frames = framesOrThrow(row, locale)
   if (opts.expectDirection && opts.expectDirection !== frames.direction) throw new StaleDirectionError(locale)
   if (await runningRealJob(projectId, shotId)) throw new RealShotBusyError(locale)
-  const m = /^data:image\/png;base64,([A-Za-z0-9+/=]+)$/.exec(imageDataUrl)
+  // 큰 칸 PNG 가 요청 몸 상한에 닿으면 화면이 JPEG 로 보낸다(리드 D) — PNG · JPEG · WebP 를 받는다.
+  const m = /^data:image\/(png|jpeg|webp);base64,([A-Za-z0-9+/=]+)$/.exec(imageDataUrl)
   if (!m) throw new Error(translate(locale, "This isn't a PNG data URL"))
-  const buf = Buffer.from(m[1]!, 'base64')
+  const type = m[1] as 'png' | 'jpeg' | 'webp'
+  const buf = Buffer.from(m[2]!, 'base64')
   if (buf.length < 10_000) throw new Error(translate(locale, 'The image to save is empty'))
   if (buf.length > 15_000_000) throw new Error(translate(locale, 'The image is too large (over 15MB)'))
   const project = await loadProject(projectId)
   if (!project?.workspace_id) throw new ForeignMediaPathError(locale)
   // 판마다 새 이름(_a{저장 id}) — 고치기 전 판이 가리키는 가운데 장 파일을 덮지 않는다(지난 판은 그대로 남아야 한다).
   const editId = randomUUID()
-  const path = `${project.workspace_id}/${projectId}/shots/${storageKeySegment(shotId)}_a${editId}_storyboard_direction.png`
-  const url = await upload(path, buf, 'image/png', true)
+  const ext = type === 'jpeg' ? 'jpg' : type
+  const path = `${project.workspace_id}/${projectId}/shots/${storageKeySegment(shotId)}_a${editId}_storyboard_direction.${ext}`
+  const url = await upload(path, buf, `image/${type}`, true)
   const versionId = `arrows-${editId}`
   const at = Date.now()
   const written = await updateStoryboardImage(projectId, shotId, (current) => withArrowVersion(current, { id: versionId, direction: url, at, from: frames.direction }))
@@ -215,14 +248,15 @@ async function storeRead(projectId: string, shotId: string, read: DirectionRead)
 }
 
 /** 지금 실사 가운데 장을 읽은 줄 — 이미 있으면 다시 읽지 않고, 없으면 읽는 AI 실사판으로 읽어 남긴다. 못 읽으면 null(물음 창이 "직접 적어 주세요"). */
-export async function readRealDirection(projectId: string, shotId: string): Promise<DirectionRead | null> {
+export async function readRealDirection(projectId: string, shotId: string, locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK): Promise<DirectionRead | null> {
   const row = await loadRealShot(projectId, shotId)
   const frames = realEditFrames(row?.storyboard_image)
   if (!frames) return null
+  assertArrowImage(row, locale)
   const fresh = freshDirectionRead(row?.storyboard_image)
   if (fresh) return fresh
-  // 우리 보관함 그림만 읽는다 — 서버가 남의 주소를 받아 오지 않게.
-  if (!mediaPathFromUrl(frames.start) || !mediaPathFromUrl(frames.direction)) return null
+  // 우리 보관함 · 이 프로젝트 폴더의 그림만 읽는다 — 서버가 남의 주소를 받아 AI 에 보내지 않게(검토 rev-realarrow 7).
+  if (!(await framesInProject(projectId, [frames.start, frames.direction]))) return null
   const marks = await readDirectionMarks(frames.start, frames.direction, 'real')
   if (!marks) return null
   const read: DirectionRead = { en: marks.en, ko: marks.ko, source: 'ai', direction: frames.direction, at: Date.now(), endDrawn: null }
@@ -240,6 +274,7 @@ export async function keepRealDirectionLine(
   const row = await loadRealShot(projectId, shotId)
   const frames = realEditFrames(row?.storyboard_image)
   if (!frames || (opts.expectDirection && opts.expectDirection !== frames.direction)) throw new StaleDirectionError(locale)
+  assertArrowImage(row, locale)
   const read = await userDirectionRead(shotId, line, frames.direction, locale)
   const prev = freshDirectionRead(row?.storyboard_image)
   const kept: DirectionRead = prev && prev.en === read.en ? { ...read, endDrawn: prev.endDrawn } : read
@@ -262,20 +297,25 @@ export async function redrawRealEndFrame(
   const frames = framesOrThrow(row, locale)
   const versionId = currentStoryboardVersion((row?.storyboard_image ?? null) as StoryboardImage | null)?.id
   if (!versionId) throw new RealFramesMissingError(locale)
+  // 같은 판 · 같은 가운데 장의 끝 장 작업이면 그 번호를, 아니면(그사이 다시 저장 · 다른 실사 작업) 바쁨(검토 rev-realarrow 2).
+  //   그리는 중이면 판이 무엇이든 바쁨이 먼저다 — 화살표 판 확인(리드 C)은 그 뒤.
   const running = await runningRealJob(projectId, shotId)
-  if (running?.realEnd) return { jobId: running.id, read: freshDirectionRead(row?.storyboard_image), replayed: true }
+  if (running?.realEnd && realEndReplayable(running.realEnd, row?.storyboard_image)) return { jobId: running.id, read: freshDirectionRead(row?.storyboard_image), replayed: true }
   if (running) throw new RealShotBusyError(locale)
-  // 그리기 전에 본다 — 끝 장은 이 프로젝트 폴더에 올린다.
-  await projectPath(projectId, frames.start, locale)
+  assertArrowImage(row, locale)
+  // 그리기 전에 본다 — 시작 · 가운데 장을 가져오고(크기 · 읽기) 끝 장은 이 프로젝트 폴더에 올린다(검토 rev-realarrow 7).
+  await assertFramesInProject(projectId, [frames.start, frames.direction], locale)
 
   let read: DirectionRead | null
   if (opts.line?.text?.trim()) {
     read = await userDirectionRead(shotId, opts.line, frames.direction, locale)
     if (!(await storeRead(projectId, shotId, read))) throw new StaleDirectionError(locale)
   } else {
-    read = freshDirectionRead(row?.storyboard_image) ?? (await readRealDirection(projectId, shotId))
+    read = freshDirectionRead(row?.storyboard_image) ?? (await readRealDirection(projectId, shotId, locale))
   }
   if (!read) throw new DirectionUnreadableError(locale)
+  // 줄을 읽는 사이 다른 창에서 다시 저장했으면 줄은 새 가운데 장의 것이고 이 요청은 옛 판을 본다 — 내지 않는다(검토 rev-realarrow 2).
+  if (read.direction !== frames.direction) throw new StaleDirectionError(locale)
 
   const project = await loadProject(projectId)
   const workspaceId = project?.workspace_id ?? undefined
@@ -309,7 +349,7 @@ export async function redrawRealEndFrame(
     const existing = existingStoryboardJobId(err)
     if (!existing) throw err
     const again = await runningRealJob(projectId, shotId)
-    if (again?.id === existing && again.realEnd) return { jobId: existing, read, replayed: true }
+    if (again?.id === existing && again.realEnd && realEndReplayable(again.realEnd, row?.storyboard_image)) return { jobId: existing, read, replayed: true }
     throw new RealShotBusyError(locale)
   }
   recordModerationPass(moderation, { projectId, kind: 'shot_storyboard', userId: opts.userId ?? null, jobId: job.id })
@@ -352,13 +392,15 @@ export async function finalizeRealEndFrameJob(job: GenerationJob, falImageUrl: s
   if (!withRealEndFrame(row?.storyboard_image, realEnd, falImageUrl)) throw changed()
   const project = await loadProject(job.project_id)
   if (!project?.workspace_id) throw changed()
+  const frames = (row?.storyboard_image as { versions?: Array<{ id: string; frames?: { start: string; direction: string; end: string } }> } | null)
+    ?.versions?.find((version) => version.id === realEnd.versionId)?.frames
+  // 크기를 재러 가져오기 전에 본다 — 판 주소는 브라우저가 고칠 수 있는 칸에서 온다(검토 rev-realarrow 7).
+  if (frames) await assertFramesInProject(job.project_id, [frames.start, frames.direction, frames.end], UNSPECIFIED_LOCALE_FALLBACK)
   const res = await fetch(falImageUrl)
   if (!res.ok) throw new Error(`real end frame image fetch failed: HTTP ${res.status}`)
   const buf = Buffer.from(await res.arrayBuffer())
   if (buf.length < 10_000) throw new Error(`real end frame image is abnormally small (${buf.length}b)`)
   // 크기는 그 판의 다른 두 장(시작 · 가운데)에서 — 세 장 크기가 다르면 카드 순환 · 편집기 그림 크기가 어긋난다.
-  const frames = (row?.storyboard_image as { versions?: Array<{ id: string; frames?: { start: string; direction: string; end: string } }> } | null)
-    ?.versions?.find((version) => version.id === realEnd.versionId)?.frames
   const size = frames ? await otherFramesSize(frames, 'end') : null
   const fitted = size ? await fitFrameToSize(buf, size.width, size.height) : buf
   // 실사 세 장과 같은 PNG 로 — 파일 이름 끝말(_storyboard_end.png)도 다른 실사 장과 같다.

@@ -32,7 +32,7 @@ import {
   buildFalReferenceToVideoRequest,
   submitFalReferenceToVideo,
 } from '@/lib/director/fal-video-request'
-import { fitPromptForModel } from '@/lib/director/video-prompt'
+import { fitPromptForModel, promptWithoutDirectionImage, type VideoReferenceImageRole } from '@/lib/director/video-prompt'
 import type { Json } from '@/types/database'
 
 /** 실패 후 넘어갈 모델 순서. 처음 요청한 모델과 이미 시도한 모델은 건너뛴다. */
@@ -167,7 +167,13 @@ function buildFallbackRequest(model: VideoFallbackModel, plan: FallbackPlan): Fa
     ? plan.snapshot.duration_seconds
     : 5
   const aspectRatio = typeof plan.snapshot.aspect_ratio === 'string' ? plan.snapshot.aspect_ratio : '16:9'
-  if (model === 'minimax') return buildMinimaxRequest(plan, prompt, durationSeconds, aspectRatio)
+  if (model === 'minimax') {
+    // 미니맥스는 가운데 장(연출 스케치)을 보내지 않는다 — 그 그림을 말하는 방식 문장도 뺀다(검토 rev-video 7).
+    const minimaxPrompt = plan.roles?.includes('direction')
+      ? promptWithoutDirectionImage(prompt, plan.snapshot.prompt_parts, plan.roles.filter((role): role is VideoReferenceImageRole => role !== 'direction'))
+      : prompt
+    return buildMinimaxRequest(plan, minimaxPrompt, durationSeconds, aspectRatio)
+  }
   const resolution = typeof plan.snapshot.resolution === 'string' ? plan.snapshot.resolution : null
   // Happy Horse 는 2,500자까지만 받는다 — 처음 모델(글 상한 없음)로 만든 긴 지시문은 문장 경계에서 줄인다(2026-11-23).
   return buildFalReferenceToVideoRequest(model, fitPromptForModel(prompt, model, plan.snapshot.prompt_parts), plan.imageUrls, durationSeconds, aspectRatio, resolution, plan.roles)

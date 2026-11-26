@@ -22,6 +22,7 @@ import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 import { askLineText, endAskAfterSave } from '@/lib/writer/end-frame-ask'
 import { freshDirectionRead } from '@/lib/writer/direction-read'
 import { directingEditUrl, directingSaveBody, type DirectingSurface } from '@/lib/writer/directing-edit-url'
+import { realSaveImageType } from '@/lib/storyboard/real-arrow-edit'
 import { warnBeforeLeaving } from '@/features/writer/unsaved-arrows-confirm'
 import { useLocaleStore } from '@/stores/locale-store'
 
@@ -55,6 +56,19 @@ function loadImage(src: string): Promise<HTMLImageElement> {
 
 // 층 나누기 · 저장 요청을 보낼 곳(콘티 · 실사) — 물음 창도 같이 쓰는 순수 파일에 둔다.
 export { directingEditUrl, type DirectingSurface } from '@/lib/writer/directing-edit-url'
+
+/** [저장]을 보낼지 — 실사(N4b)는 그린 것이 있을 때만(그린 것 없이 저장하면 새 판이 생기고 읽은 줄이 낡는다, 검토 rev-realarrow 3).
+ *  콘티는 지금처럼 늘 보낸다. 순수 함수 — 테스트 대상. */
+export function arrowSaveNeeded(surface: DirectingSurface, hadStrokes: boolean): boolean {
+  return surface !== 'real' || hadStrokes
+}
+
+/** 저장할 그림(data URL) — 실사는 PNG 가 3MB 를 넘으면 JPEG 로(요청 몸 상한 4.5MB, 리드 D), 콘티는 서버가 PNG 만 받아 늘 PNG. 테스트 대상. */
+export function saveImageDataUrl(canvas: { toDataURL: (type?: string, quality?: number) => string }, surface: DirectingSurface): string {
+  const png = canvas.toDataURL('image/png')
+  if (surface !== 'real' || realSaveImageType(png.length) === 'image/png') return png
+  return canvas.toDataURL('image/jpeg', 0.92)
+}
 
 /** 이 편집기에서 분리한 밑층 — 서버가 화살표를 지운 연출 그림 주소(?v= 포함)와 함께 둔다. */
 export type SeparatedPlate = { url: string; direction: string }
@@ -388,6 +402,7 @@ export function DirectingArrowEditor({
     if (!top || !ready) return false
     // 저장 전에 그린 것(되돌리기 칸)이 있었을 때만 끝 장을 묻는다 — 그린 것 없는 [저장]은 끝 장과 상관없다.
     const hadStrokes = undoStackRef.current.length > 0
+    if (!arrowSaveNeeded(surface, hadStrokes)) return true
     setSaving(true)
     try {
       // 평탄화: 밑층(클린 플레이트) → 위층 순서로 합성. 분리 전이면 위층 단독(원본+펜, 전면 불투명).
@@ -404,7 +419,7 @@ export function DirectingArrowEditor({
       const res = await fetch(directingEditUrl(surface), {
         method: 'POST',
         headers: { 'content-type': 'application/json' },
-        body: JSON.stringify(directingSaveBody(surface, { projectId, shotId, image: out.toDataURL('image/png'), direction: panel.frames?.direction })),
+        body: JSON.stringify(directingSaveBody(surface, { projectId, shotId, image: saveImageDataUrl(out, surface), direction: panel.frames?.direction })),
       })
       const j = await res.json().catch(() => null)
       if (!res.ok) throw new Error(j?.error ?? `HTTP ${res.status}`)
@@ -611,7 +626,7 @@ export function DirectingArrowEditor({
         <Button
           size="sm"
           variant="outline"
-          disabled={busy || !ready}
+          disabled={busy || !ready || !arrowSaveNeeded(surface, undoCount > 0)}
           onClick={() => void handleSave()}
         >
           {saving ? <Loader2 className="size-3.5 animate-spin" /> : <Save className="size-3.5" />}

@@ -29,7 +29,7 @@ import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/directo
 import { VersionViewingBar } from '@/components/version-history/version-viewing-bar'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { EndRedrawAsk, UnsavedArrowsConfirm, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
-import { RealArrowEditPane } from '@/features/storyboard/real-arrow-edit'
+import { RealArrowEditPane, fixSendRequest, sameProjectReload } from '@/features/storyboard/real-arrow-edit'
 import { realArrowEntry } from '@/lib/storyboard/real-arrow-edit'
 import type { StoryboardImage } from '@/types/director'
 import { boardShots } from '@/lib/writer/board-summary'
@@ -47,7 +47,7 @@ export function RealShotDialog({ shotId, onOpenChange }: { shotId: string | null
   return (
     <>
       <Dialog open={!!shotId} onOpenChange={(open) => { if (!open) guard.requestClose() }}>
-        {shotId ? <RealShotDialogBody key={shotId} shotId={shotId} onClose={guard.requestClose} guard={guard} /> : null}
+        {shotId ? <RealShotDialogBody key={shotId} shotId={shotId} onClose={() => onOpenChange(false)} guard={guard} /> : null}
       </Dialog>
       <UnsavedArrowsConfirm {...guard.confirm} />
       <EndRedrawAsk {...guard.endAsk} />
@@ -78,7 +78,9 @@ function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClos
   const label = sceneShotName(locale, entry.sceneNo, entry.shotNo)
   const mentionLabel = storyboardMentionLabels(sceneManifest, shots, locale).shots.get(shotId)
   const picture = storyboardCardPicture(shot.roughStoryboard, images[shotId])
-  const drawing = realDrawingShotIds(activeJobs).has(shotId)
+  // 큐에 떠 있는 실사 작업 + 끝 장 작업이 큐에 오르기 전 틈(cardDrawing — 화살표 저장 뒤 · 물음 창 [다시 그리기], 검토 rev-realarrow 2).
+  const cardDrawing = useBoardUiStore((state) => !!projectId && state.cardDrawing[shotId] === projectId)
+  const drawing = realDrawingShotIds(activeJobs).has(shotId) || cardDrawing
   const entityNames = manifestEntities(sceneManifest)
   const nameOf = new Map((sceneManifest?.characters ?? []).map((c) => [c.characterId, c.name]))
   const lines = (shot.dialogueLines ?? []).filter((line) => line.text?.trim())
@@ -91,9 +93,10 @@ function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClos
   // [화살표 고치기] — 지금 그림이 세 장 실사일 때만(지난 판을 보는 동안은 아님), 그 샷을 그리는 중이면 잠근다(혼자 정한 것 h · g).
   const arrows = realArrowEntry({ image: images[shotId], viewingPast: !!viewing, drawing })
   const editingArrows = arrowEditing && arrows.show
-  const reloadReal = async () => {
-    if (projectId) await useStoryboardRealImages.getState().load(projectId, { fresh: true })
-  }
+  // 끝 장은 1분 넘게 걸린다 — 그사이 다른 프로젝트로 옮겼으면 다시 읽지 않는다(검토 rev-realarrow 4).
+  const reloadReal = projectId
+    ? sameProjectReload(projectId, () => useProjectStore.getState().projectId, () => useStoryboardRealImages.getState().load(projectId, { fresh: true }))
+    : async () => {}
   // [채택] — Director 상세와 같은 판 고르기(다시 그리지 않는다). 카드 그림을 새로 읽은 뒤 보는 판을 닫는다. 못 고르면 보던 판에 남아 까닭을 보인다.
   const adopt = async () => {
     if (!viewing || drawing || !projectId) return
@@ -109,10 +112,15 @@ function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClos
 
   const send = () => {
     if (!canSend || !mentionLabel) return
-    const result = sendFixToChat(mentionLabel, change)
-    // 채팅이 다른 말을 처리하는 중이면 보내지 않았다 — 창을 닫지 않고 까닭을 보인다(Director 상세와 같다).
-    setBusyNotice(result === 'busy')
-    if (result === 'sent') onClose()
+    const deliver = () => {
+      const result = sendFixToChat(mentionLabel, change)
+      // 채팅이 다른 말을 처리하는 중이면 보내지 않았다 — 창을 닫지 않고 까닭을 보인다(Director 상세와 같다).
+      setBusyNotice(result === 'busy')
+      if (result === 'sent') onClose()
+    }
+    // 저장하지 않은 화살표가 있으면 보내기(창이 닫힌다) 전에 먼저 묻는다(검토 rev-realarrow 6) — 저장 · 버리기를 고르면 보낸다.
+    if (fixSendRequest(guard.dirty) === 'ask') guard.requestLeave(deliver)
+    else deliver()
   }
 
   return (

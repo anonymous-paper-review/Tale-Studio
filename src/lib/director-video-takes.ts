@@ -156,8 +156,8 @@ export async function updateDirectorVideoTakeMetadata(
 /** 영상 테이크 + 지금 영상이 1080p 로 만들어졌으면 '1080p'(모르거나 아니면 null) — 노드의 1080p 표시 근거(2026-10-31 리뷰). */
 export type LiveDirectorVideoTake = DirectorVideoTake & {
   video_resolution: '1080p' | null
-  /** 지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소(리드 B). 모르면 null. */
-  made_frames: { start: string | null; end: string | null } | null
+  /** 지금 영상을 낸 작업이 쓴 시작 · 끝 그림 주소(리드 B)와 그때 지금이던 실사 판 id(적힌 작업만, 검토 rev-video C). 모르면 null. */
+  made_frames: { start: string | null; end: string | null; versionId?: string } | null
   /** 그 Take 의 마지막 작업을 화면에서 멈춘 때(오너 2026-11-14 7번). 멈추지 않았으면 없음. */
   cancelled_at?: string
 }
@@ -174,10 +174,12 @@ type LastAttemptJob = {
   reference_image_url?: string | null
   reference_image_urls?: unknown
   reference_image_roles?: unknown
+  /** 그 작업을 만들 때 지금이던 실사 판 id(작업 기록 storyboard_version_id — 적기 전 작업은 없음, 검토 rev-video C). */
+  storyboard_version_id?: string | null
 }
 
 const LIVE_TAKE_WITH_LAST_JOB =
-  '*, last_attempt_job:generation_jobs!video_clips_last_attempt_job_fkey(id, status, model, result_url, resolution:input_snapshot->>resolution, resolved_model_key:input_snapshot->>resolved_model_key, reference_image_url:input_snapshot->>reference_image_url, reference_image_urls:input_snapshot->reference_image_urls, reference_image_roles:input_snapshot->reference_image_roles)'
+  '*, last_attempt_job:generation_jobs!video_clips_last_attempt_job_fkey(id, status, model, result_url, resolution:input_snapshot->>resolution, resolved_model_key:input_snapshot->>resolved_model_key, reference_image_url:input_snapshot->>reference_image_url, reference_image_urls:input_snapshot->reference_image_urls, reference_image_roles:input_snapshot->reference_image_roles, storyboard_version_id:input_snapshot->>storyboard_version_id)'
 
 /** 지금 영상 파일을 그 작업이 냈는가 — 다시 만드는 중 · 다시 만들기 실패면 지금 영상은 예전 작업 것이다. */
 function madeByJob(take: Pick<DirectorVideoTake, 'url' | 'storage_path'>, job: LastAttemptJob | null | undefined): job is LastAttemptJob {
@@ -192,14 +194,15 @@ function madeByJob(take: Pick<DirectorVideoTake, 'url' | 'storage_path'>, job: L
 export function madeFrames(
   take: Pick<DirectorVideoTake, 'url' | 'storage_path'>,
   job: LastAttemptJob | null | undefined,
-): { start: string | null; end: string | null } | null {
+): { start: string | null; end: string | null; versionId?: string } | null {
   if (!madeByJob(take, job)) return null
   const urls = Array.isArray(job.reference_image_urls) ? job.reference_image_urls.filter((u): u is string => typeof u === 'string') : []
   const roles = Array.isArray(job.reference_image_roles) ? job.reference_image_roles : []
   const start = job.reference_image_url || (roles[0] === 'start' ? urls[0] : null) || null
   const endAt = roles.indexOf('end')
   const end = endAt >= 0 ? urls[endAt] ?? null : null
-  return start || end ? { start, end } : null
+  const versionId = typeof job.storyboard_version_id === 'string' && job.storyboard_version_id ? job.storyboard_version_id : null
+  return start || end ? { start, end, ...(versionId ? { versionId } : {}) } : null
 }
 
 /**

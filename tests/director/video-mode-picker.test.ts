@@ -13,6 +13,8 @@ vi.mock('@/lib/billing/use-take-balance', () => ({ useTakeBalance: () => ({ bala
 
 import { DirectorShotDetail } from '@/features/director/shot-detail/director-shot-detail'
 import { askLumiToFix } from '@/features/director/shot-detail/ask-lumi-fix'
+import { shotVideoModeFacts } from '@/features/director/shot-detail/video-mode'
+import { mediaPublicUrl } from '@/lib/storage/media-url'
 import { newTakeRequest } from '@/lib/director/shot-detail'
 import { useDirectorCanvasStore as director } from '@/stores/director-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
@@ -118,6 +120,78 @@ describe('같이 정한 것', () => {
     expect(noMiddle).toContain("Start + middle · This shot's images have no middle frame yet. Remake images first.")
     setLocale('ko')
     expect(render(secondShot)).toContain('시작+미들 · 이 샷의 이미지에 가운데 장이 아직 없어요. 이미지를 다시 만들어 주세요.')
+  })
+})
+
+describe('같이 정한 것 — 검토 rev-video 고침', () => {
+  // 왜(검토 rev-video 4): 앞 샷 ★ Take 를 노드에서 같은 Take 로 다시 만드는 중이면 그 Take 의 마지막 작업은 아직 끝나지 않았다 — 이어서를 켜 두면
+  //   장면 올리기가 "끝난 작업이 아니다"로 막혔고, 끝나면 앞 영상이 바뀐다. 다 만들 때까지 끄고 까닭을 말한다.
+  it('앞 샷 ★ Take 를 같은 Take 로 다시 만드는 중이면 이어서는 꺼지고 까닭은 "앞 샷 영상을 아직 만드는 중"이다', () => {
+    doneTake(firstShot, 1, { final: true, lastAttemptStatus: 'generating', generationJobId: 'job-remake' })
+    const out = render(secondShot)
+    expect(chip(out, 'Continuation')).toContain('disabled=""')
+    expect(out).toContain("Continuation · The previous shot's video is still being made.")
+    setLocale('ko')
+    expect(render(secondShot)).toContain('이어서 · 앞 샷 영상을 아직 만드는 중이에요.')
+  })
+
+  // 왜(검토 rev-video 4): 같은 Take 다시 만들기가 실패 · 멈춤이면 Take 의 마지막 작업은 그 실패한 작업이고 영상은 예전 작업 것이다 —
+  //   마지막 작업으로 장면을 올리면 막혔다(403). 지금 영상 파일을 낸 작업(서버가 이어서 출처를 견주는 것과 같은 뜻)으로 잡는다.
+  it('앞 샷 ★ Take 의 다시 만들기가 실패 · 멈춤이어도 지금 영상을 낸 작업으로 이어서 장면을 잡는다', () => {
+    const oldVideo = mediaPublicUrl('workspace-1/mode-project/videos/clip-a/job-old.mp4')
+    const takeId = doneTake(firstShot, 1, { final: true, videoUrl: oldVideo, videoClipId: 'clip-a', generationJobId: 'job-failed', lastAttemptStatus: 'failed' })
+    const facts = () => shotVideoModeFacts({ shotNodeId: secondShot, nodes: director.getState().nodes, writerShots: writer.getState().shots })
+    expect(facts().facts.previousVideo).toBe('ready')
+    expect(facts().previous).toMatchObject({ videoClipId: 'clip-a', generationJobId: 'job-old', videoUrl: oldVideo })
+
+    director.getState().updateNodeData<'video'>(takeId, { generationJobId: 'job-stopped', lastAttemptStatus: 'generating', cancelledAt: '2026-11-27T01:00:00.000Z' })
+    expect(facts().facts.previousVideo).toBe('ready')
+    expect(facts().previous).toMatchObject({ generationJobId: 'job-old' })
+    expect(chip(render(secondShot), 'Continuation')).not.toContain('disabled=""')
+  })
+
+  // 왜(검토 rev-video 8 ①): 영상에는 시작 이미지만 쓴다(N4a — 끝 그림은 보내지 않는다). 실사 화살표를 고치면 시작 그림이 같은 새 판이 생긴다(N4b) —
+  //   판 번호로 견주면 영상에 들어갈 그림은 그대로인데 "바뀌었어요"가 떴다. 판을 모르는 옛 Take 는 지금 시작 그림이 처음 생긴 때와 견준다.
+  it('실사 화살표만 고쳐 새 판이 생겨도 시작 이미지가 같으면 "시작 이미지가 바뀌었어요"를 보이지 않고, 시작 이미지가 바뀌면 보인다', () => {
+    const at = (iso: string) => Date.parse(iso)
+    const version = (id: string, start: string, direction: string, generatedAt: number) => ({ id, url: `https://media.test/${start}-s.png`, frames: { start: `https://media.test/${start}-s.png`, direction: `https://media.test/${direction}-d.png`, end: `https://media.test/${start}-e.png` }, generatedAt, source: 'generated' as const })
+    const first = withStoryboardVersion(null, version('job-1', 'a', 'a', at('2026-11-27T00:00:00Z')), { select: true })
+    const arrows = withStoryboardVersion(first, version('job-2', 'a', 'b', at('2026-11-27T02:00:00Z')), { select: true })
+    director.getState().updateNodeData<'shot'>(secondShot, { storyboardImage: arrows })
+    const takeId = doneTake(secondShot, 1, { createdAt: '2026-11-27T01:00:00Z', lastAttemptAt: '2026-11-27T01:00:00Z', madeFrames: { start: 'https://media.test/a-s.png?v=1', end: null } })
+    expect(render(secondShot)).not.toContain('The start image changed · A new Take will use it')
+    director.getState().updateNodeData<'video'>(takeId, { madeFrames: null })
+    expect(render(secondShot)).not.toContain('The start image changed · A new Take will use it')
+
+    const redrawn = withStoryboardVersion(arrows, version('job-3', 'c', 'c', at('2026-11-27T03:00:00Z')), { select: true })
+    director.getState().updateNodeData<'shot'>(secondShot, { storyboardImage: redrawn })
+    expect(render(secondShot)).toContain('The start image changed · A new Take will use it')
+    director.getState().updateNodeData<'video'>(takeId, { madeFrames: { start: 'https://media.test/a-s.png', end: null } })
+    expect(render(secondShot)).toContain('The start image changed · A new Take will use it')
+    setLocale('ko')
+    expect(render(secondShot)).toContain('시작 이미지가 바뀌었어요 · 새 Take 에 반영돼요')
+  })
+})
+
+describe('같이 정한 것 — 검토 rev-video C', () => {
+  // 왜(검토 rev-video C): 실사 화살표를 저장하면 시작 · 끝이 같은 새 판(v2)이 생긴다 — 그 뒤 만든 Take 까지 Take 줄에 "그림 v1"로 적히고
+  //   "바뀌었어요"와 [바뀐 이미지로 새 Take 만들기]가 늘 떴다. 그 Take 가 쓴 판은 v2 이고 시작 그림은 그대로다(판 id 가 없는 옛 Take 는 만든 때의 판).
+  it('실사 화살표를 저장한 뒤 만든 Take 는 Take 줄에 지금 판("그림 v2")으로 적히고 "시작 이미지가 바뀌었어요"도 [바뀐 이미지로 새 Take 만들기]도 보이지 않는다', () => {
+    const at = (iso: string) => Date.parse(iso)
+    const version = (id: string, start: string, direction: string, generatedAt: number) => ({ id, url: `https://media.test/${start}-s.png`, frames: { start: `https://media.test/${start}-s.png`, direction: `https://media.test/${direction}-d.png`, end: `https://media.test/${start}-e.png` }, generatedAt, source: 'generated' as const })
+    const arrows = withStoryboardVersion(withStoryboardVersion(null, version('job-1', 'a', 'a', at('2026-11-27T00:00:00Z')), { select: true }), version('arrows-1', 'a', 'b', at('2026-11-27T02:00:00Z')), { select: true })
+    director.getState().updateNodeData<'shot'>(secondShot, { storyboardImage: arrows })
+    const takeId = doneTake(secondShot, 1, { createdAt: '2026-11-27T03:00:00Z', lastAttemptAt: '2026-11-27T03:00:00Z', madeFrames: { start: 'https://media.test/a-s.png?v=1', end: null, versionId: 'arrows-1' } })
+    const out = render(secondShot)
+    expect(out).toContain('Image v2 · Seedance 2.0 · 720p')
+    expect(out).not.toContain('The start image changed · A new Take will use it')
+    expect(out).not.toContain('Make a new Take with the changed image')
+    expect(out).toContain('Make a new Take · 5 Takes')
+
+    director.getState().updateNodeData<'video'>(takeId, { madeFrames: { start: 'https://media.test/a-s.png', end: null } })
+    expect(render(secondShot)).toContain('Image v2 · Seedance 2.0 · 720p')
+    setLocale('ko')
+    expect(render(secondShot)).toContain('그림 v2 · Seedance 2.0 · 720p')
   })
 })
 

@@ -47,6 +47,7 @@ import { _clearDesignMemoForTest, prepareDirectorVideoSubmission, submitDirector
 import { _clearReferenceImageCacheForTest } from '@/lib/style-facets/reference-image'
 import { _clearPhotoLookCacheForTest } from '@/lib/style-facets/photo-look'
 import { START, STORYBOARD, WORKSPACE, media, tablesFrom, videoRequest } from '../fixtures/_video-submit'
+import { MAX_REQUEST_REFERENCE_IMAGES, clampReferenceImages } from '@/lib/director/video-reference-frames'
 
 const MY_START = media(`${WORKSPACE}/project-1/director-assets/start/mine.png`)
 const REF = [1, 2, 3].map((n) => media(`${WORKSPACE}/project-1/director-assets/ref/ref-${n}.png`))
@@ -107,6 +108,32 @@ describe('같이 정한 것', () => {
     expect(prepared.inputSnapshot.reference_image_roles).toEqual(['start', 'ref', 'ref', 'ref'])
     expect(falInput(prepared).image_urls).not.toContain(START)
     expect(String(prepared.inputSnapshot.full_prompt)).not.toContain('END')
+  })
+})
+
+describe('같이 정한 것 — 검토 rev-video A', () => {
+  // 왜(검토 rev-video A): 한 요청의 그림 상한(12장)은 참고 그림만 덜어 지켰다 — 시작 칸으로 여러 장을 보내면 그대로 생성처로 갔다.
+  //   시작 칸은 하나라 첫 장만 시작으로 쓰고 나머지는 버린다. 덜어 낸 수는 작업 기록 · 응답에 남긴다.
+  it('시작 칸으로 여러 장을 보내면 첫 장만 시작으로 쓰고 나머지는 버리며, 버린 수를 작업 기록에 남긴다', async () => {
+    const extraStarts = [2, 3].map((n) => media(`${WORKSPACE}/project-1/director-assets/start/extra-${n}.png`))
+    const prepared = await prepare(videoRequest({
+      frameSource: 'manual', model: 'seedance', referenceImageUrl: MY_START,
+      referenceImageUrls: [MY_START, ...extraStarts, REF[0]], referenceImageRoles: ['start', 'start', 'start', 'ref'],
+    }))
+
+    expect(falInput(prepared).image_urls).toEqual([MY_START, REF[0]])
+    expect(prepared.inputSnapshot.reference_image_roles).toEqual(['start', 'ref'])
+    expect(prepared.inputSnapshot.dropped_reference_images).toBe(2)
+  })
+
+  // 왜(검토 rev-video A): 참고 그림을 다 덜고도 장면 역할 그림만으로 상한을 넘으면(옛 화면이 끝 칸 그림을 여러 장 보내는 등) 뒤에서부터 잘라 상한을 지킨다.
+  it('참고 그림을 다 덜고도 한 요청의 그림 상한을 넘으면 뒤에서부터 잘라 상한 안으로 받는다', () => {
+    const ends = Array.from({ length: 13 }, (_, n) => media(`${WORKSPACE}/project-1/director-assets/end/old-${n}.png`))
+    const clamped = clampReferenceImages([MY_START, ...ends], ['start', ...ends.map(() => 'end' as const)], MAX_REQUEST_REFERENCE_IMAGES)
+    expect(clamped.urls).toHaveLength(MAX_REQUEST_REFERENCE_IMAGES)
+    expect(clamped.urls[0]).toBe(MY_START)
+    expect(clamped.urls.at(-1)).toBe(ends[10])
+    expect(clamped.dropped).toBe(2)
   })
 })
 

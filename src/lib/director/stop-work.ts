@@ -29,9 +29,13 @@ export function videoBatchLive(
   return batch.jobIds.some((id) => live.has(id))
 }
 
-/** 멈춘 뒤 알림(영어 키) — 만들던 영상이 있었으면 Take 를 돌려드리지 않는다는 것까지(글은 오너 11/14 답 8 그대로). 이미지는 Take 를 쓰지 않는다. */
-export function stopNotice(stopped: { images: number; videos: number }): string {
+/** 멈춘 뒤 알림(영어 키) — 만들던 영상이 있었으면 Take 를 돌려드리지 않는다는 것까지(글은 오너 11/14 답 8 그대로). 이미지는 Take 를 쓰지 않는다.
+ *  ends = 멈춘 이미지 가운데 실사 끝 장 다시 그리기(N4b) — 뒤늦게 끝나도 끼우지 않아 판에 남지 않는다(검토 rev-realarrow 8). */
+export function stopNotice(stopped: { images: number; videos: number; ends?: number }): string {
   if (stopped.videos > 0) return "Stopped. Takes for videos that had already started aren't refunded. If they finish later, they stay in the history."
+  const ends = stopped.ends ?? 0
+  if (ends > 0 && stopped.images <= ends) return 'Stopped. The end frame being redrawn was discarded, so the end frame stays as it was.'
+  if (ends > 0) return 'Stopped. If the images being made finish later, they stay in the versions. The end frame being redrawn was discarded.'
   if (stopped.images > 0) return 'Stopped. If the images being made finish later, they stay in the versions.'
   return 'Stopped.'
 }
@@ -39,20 +43,24 @@ export function stopNotice(stopped: { images: number; videos: number }): string 
 /** [모두 멈추기] 알림에 쓸 수 — 멈춘 작업을 이미지 · 영상으로 세고, 도는 이미지 판을 멈췄으면 그 판이 보낸(또는 막 보내는) 장의
  *  작업이 아직 목록에 없어도 이미지를 멈춘 것으로 센다(영어 재점검 S1 — "Stopped."만 떴다). */
 export function stoppedCounts(
-  asked: readonly Pick<ActiveJob, 'id' | 'kind'>[],
+  asked: readonly (Pick<ActiveJob, 'id' | 'kind'> & { target?: ActiveJob['target'] })[],
   stopped: ReadonlySet<string>,
   imageBatchWasLive: boolean,
-): { images: number; videos: number } {
+): { images: number; videos: number; ends?: number } {
   const jobs = asked.filter((job) => stopped.has(job.id))
   const videos = jobs.filter((job) => job.kind === 'shot_video').length
   const images = jobs.length - videos
-  return { images: images === 0 && imageBatchWasLive ? 1 : images, videos }
+  // 실사 끝 장 다시 그리기를 멈췄을 때만 센다(그 밖에는 지금과 같은 모양).
+  const ends = jobs.filter((job) => !!job.target?.realEnd).length
+  return { images: images === 0 && imageBatchWasLive ? 1 : images, videos, ...(ends > 0 ? { ends } : {}) }
 }
 
 /** 카드 · 노드 [멈추기]가 멈출 것 — 그 샷을 만드는 작업들과, 그 작업이 함께 그리는 샷 수(4샷 한 장이면 4). */
 export interface ShotStopTarget {
   jobIds: string[]
   sheetShots: number
+  /** 그 가운데 실사 끝 장 다시 그리기(N4b) 작업 id — 멈추면 끼우지 않아 판에 남지 않는다. */
+  endJobIds?: string[]
 }
 
 const SHOT_JOB_KINDS: Record<'image' | 'video', readonly GenerationJobKind[]> = {
@@ -75,7 +83,8 @@ export function shotStopTarget(
 ): ShotStopTarget | null {
   const mine = jobs.filter((job) => SHOT_JOB_KINDS[kind].includes(job.kind) && !job.cancelledAt && jobShotIds(job.target).includes(writerShotId))
   if (mine.length === 0) return null
-  return { jobIds: mine.map((job) => job.id), sheetShots: new Set(mine.flatMap((job) => jobShotIds(job.target))).size }
+  const endJobIds = mine.filter((job) => !!job.target?.realEnd).map((job) => job.id)
+  return { jobIds: mine.map((job) => job.id), sheetShots: new Set(mine.flatMap((job) => jobShotIds(job.target))).size, ...(endJobIds.length ? { endJobIds } : {}) }
 }
 
 /** 카드 · 노드 [멈추기] — 멈추고 알릴 말(영어 키)을 돌려준다. 이미지는 4샷 한 장 단위라 같은 장 샷 수를 말한다. */
@@ -91,7 +100,7 @@ export async function stopShotWork(
     if (target.sheetShots > 1) {
       return { ok: true, text: 'Stopped {count} shots on the same sheet. If the images finish later, they stay in the versions.', params: { count: target.sheetShots } }
     }
-    return { ok: true, text: stopNotice({ images: stopped.length, videos: 0 }) }
+    return { ok: true, text: stopNotice({ images: stopped.length, videos: 0, ends: stopped.filter((id) => target.endJobIds?.includes(id)).length }) }
   } catch {
     return { ok: false, text: 'Could not stop it. Try again.' }
   }

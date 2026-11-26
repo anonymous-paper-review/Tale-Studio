@@ -67,7 +67,7 @@ export const KO: Record<string, string> = {
   'Write only what you want to change in the start and end images (e.g. show the umbrella handle)': '시작 · 끝 이미지에서 바꾸고 싶은 것만 적어요 (예: 우산 손잡이가 보이게)',
   'Fix the video': '영상 고치기',
   'When the motion, camera or length are off': '움직임·카메라·길이가 다를 때',
-  'The start and end images changed · A new Take will use them': '시작 · 끝 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요',
+  'The start image changed · A new Take will use it': '시작 이미지가 바뀌었어요 · 새 Take 에 반영돼요',
   'What to change in the motion or camera · Leave it empty to keep the shot prompt': '움직임·카메라에서 바꿀 점 · 비워 두면 샷 프롬프트 그대로',
   'The start and end images are being remade. Make the Take when they are done.': '시작 · 끝 이미지를 다시 만드는 중이에요. 다 되면 Take 를 만들어요.',
   'Video model': '영상 모델',
@@ -1190,9 +1190,9 @@ export const KO: Record<string, string> = {
   'The content check is unavailable right now, so nothing was generated. Please try again in a moment.':
     '지금은 내용 검사를 할 수 없어서 아무것도 만들지 않았어요. 잠시 후 다시 시도해 주세요.',
   // m-qa 2026-11-27: H3 로 보낼 작은 그림(한 변 256 미만)을 키우지 못해 Take 전에 막음(generation-quota-toast.ts).
-  //   끝 그림은 오너 2026-11-27 N4a(dev 때 시작+끝 폐기)로 영상에 보내지 않는다 — "시작 그림"이라고만 말한다.
-  'The start image is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.':
-    '시작 그림이 이 영상 모델이 받는 크기보다 작은데 키우지 못해서 아무것도 만들지 않았어요. 다른 영상 모델을 고르거나 그림을 다시 만들어 주세요.',
+  //   키우기는 보낼 그림 전부(시작 · 가운데 장 · 참고 · 이음 장면)에 걸린다 — 어느 역할인지 말하지 않는다(검토 rev-video B).
+  'One of the images to send is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.':
+    '보낼 그림 하나가 너무 작아 이 영상 모델에 보낼 수 없는데 키우지도 못해서 아무것도 만들지 않았어요. 다른 영상 모델을 고르거나 그림을 다시 만들어 주세요.',
   // 2026-11-25 오너: 내용 검사에 걸린 그림은 자동으로 다시 그리지 않는다 — 어느 인물·배경인지와 할 일(설명 고치기)만 쉬운 말로 알린다.
   //   제출 전(Creem) 거절은 순화 재시도 자격이 없고, 제출 뒤(fal) 거절은 순화 단추가 있다 — 두 안내를 가른다.
   'The description for "{name}" did not pass the content check, so it was not drawn. Edit the description and try again.':
@@ -3169,10 +3169,16 @@ export const KO: Record<string, string> = {
   // 실사 가운데 장 화살표 고치기(오너 2026-11-27 N4b) — 저장하면 끝 장을 저절로 다시 그린다.
   'The end frame is not drawn from this line yet. Videos use this line.': '끝 장은 아직 이 줄로 그리지 않았어요. 영상에는 이 줄이 들어가요.',
   'This shot has no three-frame image to edit. Make the image first.': '고칠 세 장 그림이 없는 샷이에요. 먼저 그림을 만들어 주세요.',
+  'Only a version whose arrows you edited can be read or redrawn. Edit the arrows first.': '화살표를 고친 판만 줄을 읽거나 끝 장을 다시 그릴 수 있어요. 먼저 화살표를 고쳐 주세요.',
   'Edit arrows': '화살표 고치기',
   'Edit the arrows on the middle frame': '가운데 장 화살표 고치기',
   'When you save, the end frame is redrawn to match your arrows. It takes over a minute.': '저장하면 고친 화살표대로 끝 장을 다시 그려요. 1분 넘게 걸려요.',
   'Back to the picture': '그림으로 돌아가기',
+  // 검토 rev-realarrow 8 — 실사 길 알림(실사 상세에는 연출 탭이 없다) · 끝 장 다시 그리기 멈추기.
+  'The AI could not read the arrows, so the end frame was not redrawn. Press Edit and redraw the end frame and write the motion.': 'AI 가 화살표를 읽지 못해 끝 장을 다시 그리지 않았어요. [고쳐서 끝 장 다시 그리기]를 눌러 움직임을 적어 주세요.',
+  'The middle frame changed meanwhile, so your line was not kept. Open Edit arrows again.': '그사이 가운데 장이 바뀌어 고친 줄을 남기지 않았어요. [화살표 고치기]를 다시 열어 주세요.',
+  'Stopped. The end frame being redrawn was discarded, so the end frame stays as it was.': '멈췄어요. 다시 그리던 끝 장은 버려져 끝 장은 그대로예요.',
+  'Stopped. If the images being made finish later, they stay in the versions. The end frame being redrawn was discarded.': '멈췄어요. 그리던 이미지는 뒤늦게 끝나면 버전으로 남아요. 다시 그리던 끝 장은 버려져요.',
   'Kept your line. The end frame stays as it is.': '고친 줄을 남겼어요. 끝 장은 그대로예요.',
   'Could not translate your line, so it was not kept. The previous line stays. Try again.': '고친 줄을 영어로 옮기지 못해 남기지 못했어요. 전에 있던 줄은 그대로예요. 다시 시도해 주세요.',
   'The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.': '그사이 연출 장이 바뀌어 고친 줄을 남기지 않았어요. 연출 탭을 다시 열어 주세요.',
@@ -3678,6 +3684,8 @@ export const KO: Record<string, string> = {
   "Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.": '동시에 만드는 영상이 많아 {shots} 영상은 시작하지 못했어요. 하나가 끝나면 다시 부탁해 주세요.',
   "Too many videos are being made at once, so I didn't start the videos for {shots}. Ask again once one is done.": '동시에 만드는 영상이 많아 {shots} 영상은 시작하지 못했어요. 하나가 끝나면 다시 부탁해 주세요.',
   "I couldn't start the video for {shots}. Please ask again in a moment.": '{shots} 영상을 시작하지 못했어요. 잠시 뒤 다시 부탁해 주세요.',
+  "I didn't start the video for {shots}.": '{shots} 영상은 시작하지 않았어요.',
+  "I didn't start the videos for {shots}.": '{shots} 영상은 시작하지 않았어요.',
   "I couldn't start the videos for {shots}. Please ask again in a moment.": '{shots} 영상을 시작하지 못했어요. 잠시 뒤 다시 부탁해 주세요.',
   // 2xx 가 아닌데 새 Take 가 만드는 중으로 남은 다시 만들기(리드 결정 — 503 결과 모름 · 409 영수증 필요 · 400 + jobId · queued).
   "I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.": '{shots} 영상은 접수됐는지 아직 몰라요. 카드에서 결과를 볼 수 있어요.',

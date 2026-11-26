@@ -202,4 +202,13 @@ describe('H3 영상 요청', () => {
     expect(response.status).toBe(422)
     expect(await response.json()).toMatchObject({ code: 'reference_image_too_small' })
   })
+
+  it('작은 그림을 키우지 못해 막힌 서버 까닭 글도 그림의 역할을 말하지 않는다', async () => {
+    // 왜(검토 rev-video B): 키우기는 보낼 그림 전부에 걸린다 — 기록 · 로그에 남는 서버 글도 화면 안내와 같은 뜻("보낼 그림 하나가 작다")이어야 한다.
+    mocks.failUpload = true
+    const prepared = await prepare('h3-max-turbo')
+    const body = await (prepared as Response).json() as { error: string }
+    expect(body.error).toContain('One of the images is smaller than 256 px')
+    expect(body.error).not.toMatch(/\b(start|end) image\b/i)
+  })
 })

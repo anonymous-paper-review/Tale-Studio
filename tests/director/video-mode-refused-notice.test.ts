@@ -53,3 +53,27 @@ it('고른 방식 때문에 서버가 Take 전에 막으면 새 Take 줄을 남�
     expect({ code, korean: Object.values(KO).includes(shown) }).toEqual({ code, korean: true })
   }
 })
+
+it('같은 Take 다시 만들기가 방식 · 한도 · Take 부족 때문에 막히면 그 Take 는 만드는 중으로 굳지 않고 요청 전 상태로 돌아온다', async () => {
+  // 왜(검토 rev-video 1): 노드 Take 판 [다시 만들기]는 영상이 있는 그 Take 를 다시 만든다 — 서버가 Take 전에 막으면(앞 샷 영상이 바뀜 · 동시 한도 · Take 부족)
+  //   만드는 중 표시와 이번 요청 키가 남아, 다시 읽어도(내 요청이 더 새것이라) 그 Take 가 계속 만드는 중으로 보였다.
+  for (const [status, code, error] of [[409, 'continue_source_changed', 'refused'], [429, 'quota_exceeded', 'refused'], [402, 'insufficient_takes', 'insufficient_takes']] as const) {
+    api().reset()
+    useDirectorCanvasStore.setState({ projectId: 'project-1' })
+    shotId = api().addShotNode(null, { x: 0, y: 0 }, '다시 만들기 막힘')
+    api().updateNodeData<'shot'>(shotId, { writerShotId: 'shot-1', promptOverride: 'A quiet mountain' })
+    const takeId = api().addVideoTake(shotId)!
+    const before = {
+      status: 'completed' as const, videoUrl: 'https://media.test/videos/clip-1/job-old.mp4', videoClipId: 'clip-1',
+      generationJobId: 'job-old', lastAttemptStatus: 'completed' as const, lastAttemptError: null, lastAttemptAt: '2026-11-20T00:00:00.000Z',
+      override: { videoMode: 'continue' as const, continueFrom: { videoClipId: 'clip-prev', generationJobId: 'job-prev', frameUrl: 'https://media.test/videos/clip-prev/job-prev_chain-frame-2850.jpg' } },
+    }
+    api().updateNodeData<'video'>(takeId, before)
+    refusal = { status, code, error }
+    await api().regenerateVideo(takeId)
+    const node = api().nodes.find((candidate) => candidate.id === takeId)
+    const data = node && isVideoData(node.data) ? node.data : null
+    expect({ code, state: { status: data?.status, generationJobId: data?.generationJobId, lastAttemptStatus: data?.lastAttemptStatus, lastAttemptAt: data?.lastAttemptAt, videoUrl: data?.videoUrl } })
+      .toEqual({ code, state: { status: 'completed', generationJobId: 'job-old', lastAttemptStatus: 'completed', lastAttemptAt: '2026-11-20T00:00:00.000Z', videoUrl: before.videoUrl } })
+  }
+})

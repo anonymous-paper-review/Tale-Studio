@@ -46,7 +46,8 @@ vi.mock('@/components/ui/dialog', async () => {
 })
 
 import { RealShotDialog } from '@/features/storyboard/real-shot-dialog'
-import { startRealEndRedraw } from '@/features/storyboard/real-arrow-edit'
+import { fixSendRequest, realEndTarget, sameProjectReload, startRealEndRedraw } from '@/features/storyboard/real-arrow-edit'
+import { sendFixToChat } from '@/lib/storyboard/fix-in-chat'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { realDrawingShotIds, storyboardCardWait } from '@/lib/storyboard/real-board'
 import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
@@ -170,9 +171,22 @@ describe('저장 뒤 끝 장 다시 그리기', () => {
   // 왜(같이 정한 것 · O7 · W5 결): 끝 장을 그리는 1분 넘게 화면 · 채팅을 막지 않는다 — 그 카드에만 기다림(큐에 오르기 전 틈은 cardDrawing, 그 뒤는 실사 작업).
   it('실사 끝 장을 다시 그리는 동안 화면 · 채팅은 막지 않고 그 카드에만 기다림이 뜬다', async () => {
     let during: Record<string, string> = {}
-    const onChanged = vi.fn(async () => { during = { ...useBoardUiStore.getState().cardDrawing } })
+    // 다른 샷 a 에도 실사가 있다 — 그리는 동안 a 의 상세 · 채팅 고치기가 그대로인지 본다(검토 rev-realarrow 9: 이름대로).
+    data.images = { projectId: 'p1', images: { ...data.images.images, a: real } }
+    let otherDetail = ''
+    let chatSend = ''
+    const onChanged = vi.fn(async () => {
+      during = { ...useBoardUiStore.getState().cardDrawing }
+      useBoardUiStore.getState().setShotEditId('a')
+      otherDetail = dialog('a')
+      chatSend = sendFixToChat('@샷 1', '우산 손잡이가 보이게')
+    })
     await startRealEndRedraw({ projectId: 'p1', shotId: 'b', onChanged, t: ((k: string) => k) as never, askLine: vi.fn() })
     expect(during).toEqual({ b: 'p1' })
+    // 화면: 다른 샷 상세는 잠기지 않는다(고치기 칸 · [화살표 고치기] 켜짐). 채팅: 고칠 말이 그대로 보내진다.
+    expect(otherDetail).not.toMatch(/<textarea[^>]*disabled=""/)
+    expect(buttonTag(otherDetail, 'real-arrow-edit-open')).not.toContain('disabled=""')
+    expect(chatSend).toBe('sent')
     expect(useBoardUiStore.getState().cardDrawing).toEqual({})
     // 큐에 오른 실사 끝 장 작업은 그 샷 카드만 "그리는 중"으로 만든다.
     const jobs = [{ id: 'job-1', kind: 'shot_storyboard', target: { writerShotId: 'b', realEnd: { versionId: 'arrows-1', direction: 'd', line: 'l' } } }] as unknown as ActiveJob[]
@@ -180,5 +194,52 @@ describe('저장 뒤 끝 장 다시 그리기', () => {
     const batch = { busy: false, cancelled: false, shotIds: null }
     expect(storyboardCardWait({ shotId: 'b', hasReal: true, hasConti: true, drawing, batch })).toBe('drawing')
     expect(storyboardCardWait({ shotId: 'a', hasReal: true, hasConti: true, drawing, batch })).toBe('none')
+  })
+})
+
+describe('검토 rev-realarrow — 상세의 잠금 · 보내기 · 다시 읽기', () => {
+  // 왜(검토 rev-realarrow 2): 저장 뒤 끝 장 작업이 큐에 오르기 전 틈(cardDrawing)에도 다시 저장 · 고치기를 하면 옛 판과 겹친다 — 그 틈도 그리는 중으로 본다.
+  it('끝 장 작업이 큐에 오르기 전에도 그 샷의 [화살표 고치기] · 편집기 · 고치기 칸이 잠긴다', () => {
+    useBoardUiStore.setState({ cardDrawing: { b: 'p1' } })
+    expect(buttonTag(dialog('b'), 'real-arrow-edit-open')).toContain('disabled=""')
+    expect(dialog('b')).toMatch(/<textarea[^>]*disabled=""/)
+    useBoardUiStore.getState().setRealArrowShotId('b')
+    expect(dialog('b')).toContain('data-locked="true"')
+    // 다른 프로젝트의 표시는 이 상세를 잠그지 않는다.
+    useBoardUiStore.setState({ cardDrawing: { b: 'other-project' }, realArrowShotId: null })
+    expect(buttonTag(dialog('b'), 'real-arrow-edit-open')).not.toContain('disabled=""')
+  })
+
+  // 왜(검토 rev-realarrow 2): 물음 창 [다시 그리기] 길도 같은 잠금을 쓴다 — 실사 상세가 만드는 대상은 그리는 동안 cardDrawing 을 켠다.
+  it('실사 상세의 끝 장 대상은 실사 주소로 보내고, 그리는 동안 그 카드 표시를 켜고 끈다', () => {
+    const target = realEndTarget('p1', 'b', async () => {})
+    expect(target.endpoint).toBe('/api/storyboard/real-directing-edit')
+    target.track?.(true)
+    expect(useBoardUiStore.getState().cardDrawing).toEqual({ b: 'p1' })
+    target.track?.(false)
+    expect(useBoardUiStore.getState().cardDrawing).toEqual({})
+    const pane = readFileSync('src/features/storyboard/real-arrow-edit.tsx', 'utf8')
+    expect(pane).toMatch(/onRedrawEnd=\{\(\) => void guard\.askEnd\(target\)\}/)
+    expect(pane).toMatch(/const target = realEndTarget\(projectId, shotId, onChanged\)/)
+  })
+
+  // 왜(검토 rev-realarrow 6): 저장하지 않은 화살표가 있는데 [Lumi 에게 고쳐 달라고 하기]로 창이 닫히면 그린 것을 잃는다 — 보내기 전에 먼저 묻는다.
+  it('저장하지 않은 화살표가 있으면 [Lumi 에게 고쳐 달라고 하기]는 보내기 전에 먼저 묻는다', () => {
+    expect(fixSendRequest(true)).toBe('ask')
+    expect(fixSendRequest(false)).toBe('send')
+    const source = readFileSync('src/features/storyboard/real-shot-dialog.tsx', 'utf8')
+    expect(source).toMatch(/if \(fixSendRequest\(guard\.dirty\) === 'ask'\) guard\.requestLeave\(deliver\)/)
+  })
+
+  // 왜(검토 rev-realarrow 4): 끝 장은 1분 넘게 걸린다 — 그사이 다른 프로젝트로 옮겼으면 옛 프로젝트 그림을 읽어 지금 화면을 덮지 않는다.
+  it('끝 장이 늦게 끝나 다시 읽을 때 지금 프로젝트가 같을 때만 다시 읽는다', async () => {
+    const reload = vi.fn(async () => {})
+    let currentProject: string | null = 'p1'
+    const onChanged = sameProjectReload('p1', () => currentProject, reload)
+    await onChanged()
+    currentProject = 'p2'
+    await onChanged()
+    expect(reload).toHaveBeenCalledTimes(1)
+    expect(readFileSync('src/features/storyboard/real-shot-dialog.tsx', 'utf8')).toMatch(/sameProjectReload\(projectId, \(\) => useProjectStore\.getState\(\)\.projectId,/)
   })
 })

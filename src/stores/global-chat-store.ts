@@ -41,8 +41,10 @@ import {
   useDirectorCanvasStore,
   serializeDirectorCanvasContext,
   videoLimitRefusal,
+  videoModeRefusal,
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
+import { videoModeRefusalText } from '@/lib/generation-quota-toast'
 import { isShotData, isVideoData, type DirectorNode, type VideoOverride } from '@/types/director'
 import { directorHasFinishedVideo, type DirectorShotState } from '@/lib/director/shot-state'
 import { editorHandoverView, type RemakeResult } from '@/lib/director/editor-handover'
@@ -1855,9 +1857,12 @@ async function startVideosFor(input: {
     const failed: string[] = []
     const uncertain: string[] = []
     let limited: string[] = []
+    // 고른 영상 방식 때문에 서버가 막은 샷(앞 샷 영상이 바뀜 등) — 까닭별로 모은다. 잠시 뒤 다시 부탁해도 같은 까닭으로 막히니 "잠시 뒤 다시"라고 하지 않는다(검토 rev-video 8 ②).
+    const modeBlocked = new Map<string, string[]>()
     for (const [index, id] of input.shotIds.entries()) {
       if (!input.isCurrent()) return
       const refusedBefore = videoLimitRefusal()
+      const modeRefusedBefore = videoModeRefusal()
       // 접수(서버가 2xx 로 받아 jobId 를 줌)되면 그 샷은 시작한 것으로 치고 다음 샷을 보낸다 — 영상이 끝나기를(5초마다 확인)
       //   기다리지 않는다(검토 b (a)~(g) 보통 1). 접수 없이 부른 것이 끝나면 시작하지 못한 것이다 — 실패해도 노드 id 를 돌려주는 길이 있다.
       const outcome = await new Promise<{ accepted: true } | { accepted: false; takeId: string | null }>((resolve) => {
@@ -1880,6 +1885,11 @@ async function startVideosFor(input: {
         limited = input.shotIds.slice(index)
         break
       }
+      const modeRefused = videoModeRefusal()
+      if (modeRefused && modeRefused !== modeRefusedBefore && modeRefused.shotNodeId === id && videoModeRefusalText(modeRefused.code)) {
+        modeBlocked.set(modeRefused.code, [...(modeBlocked.get(modeRefused.code) ?? []), id])
+        continue
+      }
       // 2xx 가 아닌데 몸에 jobId · queued 가 실려 와 이번 새 Take 가 보드에서 만드는 중으로 남았다(503 결과 모름 · 409 영수증 필요 · 400 …) —
       //   시작(Take 수)도 실패(다시 부탁하면 두 번 낼 수 있음)도 아닌 "아직 몰라요"(리드 결정). 그 샷의 다른 Take 가 아니라 이번 새 Take 하나만 본다.
       const take = outcome.takeId ? useDirectorCanvasStore.getState().nodes.find((node) => node.id === outcome.takeId) : undefined
@@ -1889,6 +1899,9 @@ async function startVideosFor(input: {
     if (started.length > 0) input.say(startedLine(started, started.reduce((sum, id) => sum + costs[input.shotIds.indexOf(id)], 0)))
     if (uncertain.length > 0) input.say(shotsLine(locale, uncertain.length, "I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.", "I can't tell yet whether the videos for {shots} were accepted. You can see the results on the cards.", { shots: shotsLabel(uncertain) }))
     if (limited.length > 0) input.say(shotsLine(locale, limited.length, "Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.", "Too many videos are being made at once, so I didn't start the videos for {shots}. Ask again once one is done.", { shots: shotsLabel(limited) }))
+    for (const [code, ids] of modeBlocked) {
+      input.say(`${shotsLine(locale, ids.length, "I didn't start the video for {shots}.", "I didn't start the videos for {shots}.", { shots: shotsLabel(ids) })} ${translate(locale, videoModeRefusalText(code)!)}`)
+    }
     if (failed.length > 0) input.say(shotsLine(locale, failed.length, "I couldn't start the video for {shots}. Please ask again in a moment.", "I couldn't start the videos for {shots}. Please ask again in a moment.", { shots: shotsLabel(failed) }))
     return
   }

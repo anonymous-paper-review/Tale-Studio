@@ -1,6 +1,6 @@
 // 실사 가운데 장 화살표 고치기(N4b)가 실사 시트(shots.storyboard_image)에 남는 모양 — 새 판 · 끝 장 넣기 · 읽은 줄 · 밑층 · 상세 단추 — 을 검사한다 (리드 D1 · D2 = A)
 import { describe, expect, it } from 'vitest'
-import { realArrowEntry, realEditorPanel, withArrowVersion, withRealCleanPlate, withRealDirectionRead, withRealEndFrame } from '@/lib/storyboard/real-arrow-edit'
+import { REAL_SAVE_PNG_LIMIT, isRealArrowImage, realArrowEntry, realEditorPanel, realEndReplayable, realSaveImageType, withArrowVersion, withFixedRealRead, withRealCleanPlate, withRealDirectionRead, withRealEndFrame } from '@/lib/storyboard/real-arrow-edit'
 import { currentStoryboardVersion, selectStoryboardVersion, storyboardImageVersions, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { freshDirectionRead } from '@/lib/writer/direction-read'
 import type { StoryboardImage } from '@/types/director'
@@ -136,5 +136,60 @@ describe('상세의 [화살표 고치기]', () => {
     expect(realArrowEntry({ image: null, viewingPast: false, drawing: false }).show).toBe(false)
     const upload = withStoryboardVersion(sheet(), { id: 'upload-1', url: `${B}/up.png`, generatedAt: 40, source: 'upload' }, { select: true })
     expect(realArrowEntry({ image: upload, viewingPast: false, drawing: false }).show).toBe(false)
+  })
+})
+
+describe('검토 rev-realarrow 고침', () => {
+  const realEnd = { versionId: 'arrows-1', direction: EDITED, line: LINE }
+
+  // 왜(리드 2 — 저장 ↔ 끝 장 예약 사이 틈): 그사이 다시 저장해 판이 바뀌었는데 옛 판의 끝 장 작업 번호를 돌려주면 화면이 엉뚱한 작업을 기다리고
+  //   새 판의 끝 장은 그려지지 않는다. 같은 판 · 같은 가운데 장의 작업일 때만 이어받는다.
+  it('돌고 있는 실사 끝 장 작업은 지금 판 · 지금 가운데 장의 것일 때만 이어받을 수 있다', () => {
+    expect(realEndReplayable(realEnd, saved())).toBe(true)
+    expect(realEndReplayable({ ...realEnd, versionId: 'arrows-0' }, saved())).toBe(false)
+    expect(realEndReplayable({ ...realEnd, direction: `${B}/older.png` }, saved())).toBe(false)
+    expect(realEndReplayable(realEnd, selectStoryboardVersion(saved(), 'g2'))).toBe(false)
+  })
+
+  // 왜(리드 C): 실사 줄은 사람이 고친 화살표를 읽은 줄이다 — 고치지 않은 실사(콘티대로 그린 그림)를 읽은 줄이 콘티 줄을 이기면 안 된다.
+  //   화살표 판(arrows-…)이거나, 그 판을 지금 그림을 참고로 고쳐 줄을 이어받은 판(리드 A)만 받는다.
+  it('실사 줄 읽기 · 끝 장 다시 그리기는 화살표를 고친 판에만 받는다', () => {
+    expect(isRealArrowImage(saved())).toBe(true)
+    expect(isRealArrowImage(sheet())).toBe(false)
+    expect(isRealArrowImage(selectStoryboardVersion(saved(), 'g2'))).toBe(false)
+    const inherited = withFixedRealRead(
+      withStoryboardVersion(withRealDirectionRead(saved(), read(EDITED))!, { id: 'g3', url: `${B}/f-start.png`, frames: { start: `${B}/f-start.png`, direction: `${B}/f-dir.png`, end: `${B}/f-end.png` }, generatedAt: 40, source: 'generated' }, { select: true }),
+      { direction: EDITED, end: V2.end },
+      { direction: `${B}/f-dir.png`, end: `${B}/f-end.png` },
+    )
+    expect(isRealArrowImage(inherited)).toBe(true)
+  })
+
+  // 왜(리드 A): 화살표 판을 "지금 그림을 참고로" 고치는 채팅 고치기는 화살표를 그대로 두고 다시 그린다 — 그 움직임 줄도 새 판으로 이어 간다.
+  //   그 줄로 그린 끝 장을 바탕으로 고쳤으면 새 끝 장도 그 줄로 그린 것으로 본다.
+  it('화살표 판을 지금 그림을 참고로 고쳐 다시 그리면 새 판도 그 실사 줄을 이어받는다', () => {
+    const drawn = withRealEndFrame(withRealDirectionRead(saved(), read(EDITED))!, realEnd, NEW_END)!
+    const fixed = withStoryboardVersion(drawn, { id: 'g3', url: `${B}/f-start.png`, frames: { start: `${B}/f-start.png`, direction: `${B}/f-dir.png`, end: `${B}/f-end.png` }, generatedAt: 40, source: 'generated' }, { select: true })
+    const next = withFixedRealRead(fixed, { direction: EDITED, end: NEW_END }, { direction: `${B}/f-dir.png`, end: `${B}/f-end.png` })
+    expect(freshDirectionRead(next)).toMatchObject({ en: LINE, direction: `${B}/f-dir.png`, endDrawn: `${B}/f-end.png` })
+    // 끝 장을 그 줄로 그리기 전에 고쳤으면 줄만 잇고 "그 줄로 그린 끝 장" 표시는 비운다.
+    const notDrawn = withFixedRealRead(withStoryboardVersion(withRealDirectionRead(saved(), read(EDITED))!, { id: 'g4', url: `${B}/f-start.png`, frames: { start: `${B}/f-start.png`, direction: `${B}/f-dir.png`, end: `${B}/f-end.png` }, generatedAt: 41, source: 'generated' }, { select: true }), { direction: EDITED, end: V2.end }, { direction: `${B}/f-dir.png`, end: `${B}/f-end.png` })
+    expect(freshDirectionRead(notDrawn)).toMatchObject({ direction: `${B}/f-dir.png`, endDrawn: null })
+  })
+
+  // 왜(리드 A): Director [다시 만들기]처럼 지금 그림을 바탕으로 하지 않는 다시 그리기는 콘티대로 그린 그림이다 — 실사 줄을 잇지 않는다.
+  //   다른 판의 줄(바탕 가운데 장과 다른 줄)도 잇지 않는다.
+  it('지금 그림을 바탕으로 하지 않는 다시 그리기는 실사 줄을 이어받지 않는다', () => {
+    const withRead = withRealDirectionRead(saved(), read(EDITED))!
+    const remade = withStoryboardVersion(withRead, { id: 'g3', url: `${B}/r-start.png`, frames: { start: `${B}/r-start.png`, direction: `${B}/r-dir.png`, end: `${B}/r-end.png` }, generatedAt: 40, source: 'generated' }, { select: true })
+    expect(withFixedRealRead(remade, null, { direction: `${B}/r-dir.png`, end: `${B}/r-end.png` })).toBe(remade)
+    expect(freshDirectionRead(withFixedRealRead(remade, { direction: V1.direction, end: V1.end }, { direction: `${B}/r-dir.png`, end: `${B}/r-end.png` }))).toBeNull()
+  })
+
+  // 왜(리드 D): 16:9 큰 칸 PNG 는 요청 몸 상한(4.5MB)에 닿을 수 있다 — 3MB 를 넘으면 실사 길은 JPEG 로 보낸다(콘티는 지금처럼 PNG).
+  it('실사 가운데 장 저장 그림은 PNG 가 3MB 이하면 PNG, 넘으면 JPEG 로 보낸다', () => {
+    expect(REAL_SAVE_PNG_LIMIT).toBe(3 * 1024 * 1024)
+    expect(realSaveImageType(REAL_SAVE_PNG_LIMIT)).toBe('image/png')
+    expect(realSaveImageType(REAL_SAVE_PNG_LIMIT + 1)).toBe('image/jpeg')
   })
 })

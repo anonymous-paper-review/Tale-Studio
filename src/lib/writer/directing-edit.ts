@@ -124,6 +124,16 @@ export class ForeignMediaPathError extends Error {
   }
 }
 
+/** 그 주소들이 모두 이 프로젝트 폴더("작업 공간/프로젝트/")의 우리 보관함 그림인가 — 던지지 않는 판정(읽기 길). */
+async function inProjectFolder(projectId: string, urls: readonly string[]): Promise<boolean> {
+  try {
+    for (const url of urls) await assertProjectFolder(projectId, storagePathFromPublicUrl(url), UNSPECIFIED_LOCALE_FALLBACK)
+    return true
+  } catch {
+    return false
+  }
+}
+
 /** 그 경로가 이 프로젝트 폴더("작업 공간/프로젝트/") 안인지 — 아니면 ForeignMediaPathError. */
 export async function assertProjectFolder(projectId: string, path: string, locale: AppLocale): Promise<void> {
   const { data, error } = await supabaseAdmin.from('projects').select('workspace_id').eq('id', projectId).maybeSingle()
@@ -546,6 +556,8 @@ export async function readDirection(projectId: string, shotId: string): Promise<
   const fresh = freshDirectionRead(rb)
   if (fresh) return fresh
   if (!mediaPathFromUrl(rb.frames.start) || !mediaPathFromUrl(rb.frames.direction)) return null
+  // 이 프로젝트 폴더 그림만 AI 에 보낸다 — 러프 기록 주소는 브라우저가 고칠 수 있다(검토 rev-realarrow 7, 실사 길과 같은 틈).
+  if (!(await inProjectFolder(projectId, [rb.frames.start, rb.frames.direction]))) return null
   const marks = await readDirectionMarks(rb.frames.start, rb.frames.direction)
   if (!marks) return null
   const read: DirectionRead = { en: marks.en, ko: marks.ko, source: 'ai', direction: rb.frames.direction, at: Date.now(), endDrawn: null }
@@ -638,8 +650,10 @@ export async function regenerateEndFrame(
     throw new Error(translate(locale, 'You need the 3-frame rough set to redraw a frame'))
   }
   const frames = rb.frames
-  // 그리기 전에 본다 — 남의 파일 자리 때문에 그림 값을 쓰지 않는다(리뷰 M5).
-  if (opts.projectFolderOnly) await assertProjectFolder(projectId, storagePathFromPublicUrl(frames.end!, locale), locale)
+  // 그리기 전에 본다 — 남의 파일 자리 때문에 그림 값을 쓰지 않는다(리뷰 M5). 시작 · 연출 장도 — 크기를 재고 AI 에 보내려 가져온다(검토 rev-realarrow 7).
+  if (opts.projectFolderOnly) {
+    for (const url of [frames.end!, frames.start!, frames.direction!]) await assertProjectFolder(projectId, storagePathFromPublicUrl(url, locale), locale)
+  }
 
   const running = await runningEndJob(projectId, shotId)
   if (running) return { jobId: running, read: freshDirectionRead(rb), replayed: true }

@@ -6,11 +6,19 @@
 //   서버(storyboard/real-directing-edit) · 화면(Storyboard 상세 · Director 팝업)이 같이 쓴다. 약속: tests/writer/real-arrow-versions.test.ts
 import { currentStripFrames } from '@/lib/director/storyboard-image'
 import { currentStoryboardVersion, storyboardImageVersions, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
-import { withEndDrawn, type DirectionRead } from '@/lib/writer/direction-read'
+import { freshDirectionRead, withEndDrawn, type DirectionRead } from '@/lib/writer/direction-read'
 import type { StoryboardImage } from '@/types/director'
 import type { RoughStoryboardImage } from '@/types/shot'
 
 export type RealFrames = { start: string; direction: string; end: string }
+
+/** 화살표를 저장해 만든 판의 id 머리 — 판 id 는 작업 id · 'upload-…' · 'legacy' 와 겹치지 않는다. */
+export const ARROW_VERSION_PREFIX = 'arrows-'
+
+/** 화살표를 저장해 만든 판인가. */
+export function isArrowVersionId(id: string | null | undefined): boolean {
+  return typeof id === 'string' && id.startsWith(ARROW_VERSION_PREFIX)
+}
 
 /** 화살표를 고칠 수 있는 지금 그림의 세 장 — 완료 · 고른 판 · 세 장이 다 있을 때만(올린 한 장 · 옛 단일 그림 · 멈춘 그림만 있는 샷은 null). */
 export function realEditFrames(image: unknown): RealFrames | null {
@@ -107,6 +115,42 @@ export function realEditorPanel(image: unknown): (RoughStoryboardImage & { direc
     ...(clean?.url && clean.direction === frames.direction ? { cleanDirection: { url: clean.url, for: generatedAt } } : {}),
     ...(img.directionRead !== undefined ? { directionRead: img.directionRead } : {}),
   }
+}
+
+/** 지금 그림이 화살표를 고친 판인가(리드 C 2026-11-27) — 화살표 판(arrows-…)이거나, 그 판을 지금 그림을 참고로 고쳐 실사 줄을 이어받은 판(리드 A).
+ *  실사 줄 읽기 · 끝 장 다시 그리기 · 고친 줄 남기기는 이 판에만 받는다 — 고치지 않은 실사(콘티대로 그린 그림)를 읽은 줄이 콘티 줄을 이기지 않게. */
+export function isRealArrowImage(image: unknown): boolean {
+  const img = asImage(image)
+  if (!img || !realEditFrames(img)) return false
+  return isArrowVersionId(currentStoryboardVersion(img)?.id) || !!freshDirectionRead(img)
+}
+
+/** 돌고 있는 실사 끝 장 작업을 이어받을 수 있나(리드 2) — 그 작업의 판 · 가운데 장이 지금 판 · 지금 가운데 장일 때만.
+ *  그사이 다시 저장해 판이 바뀌었으면 그 작업은 옛 판의 끝 장이다(이어받으면 새 판의 끝 장이 그려지지 않는다). */
+export function realEndReplayable(realEnd: { versionId?: unknown; direction?: unknown } | null | undefined, image: unknown): boolean {
+  const img = asImage(image)
+  const frames = realEditFrames(img)
+  return !!realEnd && !!frames && realEnd.versionId === currentStoryboardVersion(img)?.id && realEnd.direction === frames.direction
+}
+
+/** 지금 그림을 참고로 고쳐 다시 그린 새 판에 실사 줄을 잇는다(리드 A — 채팅 고치기 O8 "화살표 그대로 두고 고치기").
+ *  base = 고친 바탕 판의 가운데 · 끝 장(작업 기록 fix_base_frames), next = 새 판의 가운데 · 끝 장.
+ *  바탕이 없거나(Director [다시 만들기] 등 지금 그림을 바탕으로 하지 않음) 줄이 바탕 가운데 장의 것이 아니면 그대로 돌려준다.
+ *  그 줄로 그린 끝 장을 바탕으로 고쳤으면 새 끝 장도 그 줄로 그린 것으로 둔다. */
+export function withFixedRealRead<T>(image: T, base: { direction: string; end: string } | null | undefined, next: { direction: string; end: string }): T {
+  const img = asImage(image)
+  const read = img?.directionRead
+  if (!img || !base || !read || typeof read !== 'object' || read.direction !== base.direction || !read.en) return image
+  const drawn = read.endDrawn && read.endDrawn === base.end ? next.end : null
+  return { ...img, directionRead: { ...read, direction: next.direction, endDrawn: drawn } } as T
+}
+
+/** 실사 저장 그림 PNG 상한(리드 D) — 넘으면 JPEG 로 보낸다(요청 몸 상한 4.5MB 에 닿지 않게). */
+export const REAL_SAVE_PNG_LIMIT = 3 * 1024 * 1024
+
+/** 실사 가운데 장 저장 그림 형식 — PNG data URL 길이로 정한다. */
+export function realSaveImageType(pngDataUrlLength: number): 'image/png' | 'image/jpeg' {
+  return pngDataUrlLength > REAL_SAVE_PNG_LIMIT ? 'image/jpeg' : 'image/png'
 }
 
 /** 상세의 [화살표 고치기] — 지금 그림이 세 장 실사일 때만 보이고(지난 판을 보는 동안은 아님), 그 샷을 그리는 중이면 잠근다. */

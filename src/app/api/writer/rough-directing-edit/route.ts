@@ -8,6 +8,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getUser } from '@/lib/supabase/auth'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { capacityReservationRejection } from '@/lib/api/quota'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
@@ -75,9 +76,13 @@ const BodySchema = z.discriminatedUnion('action', [
 
 export async function POST(req: Request) {
   let capacityContext: { projectId: string; kind: string; userId: string } | null = null
+  // 오류 말은 그 사용자의 화면 말로(검토 rev-realarrow 5 — 진실은 user_metadata.locale, 없으면 en). 예전엔 늘 한국어였다.
+  //   끝 장 · 고친 줄 두 호출은 출시 시험(end-frame-read-draw)이 호출 글자를 못 박아 말을 넘기지 못한다 — 알려진 오류는 아래에서 이 말로 다시 만든다.
+  let locale: AppLocale = 'en'
   try {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    locale = parseAppLocale((user as { user_metadata?: { locale?: unknown } }).user_metadata?.locale) ?? 'en'
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     const body = parsed.data
@@ -88,7 +93,7 @@ export async function POST(req: Request) {
 
     // 덮어쓸 그림은 늘 이 프로젝트 폴더 안이어야 한다 — 주소가 브라우저가 고칠 수 있는 rough_storyboard 에서 온다(2026-11-01 리뷰 M5).
     if (body.action === 'separate') {
-      const data = await separateArrowLayer(body.projectId, body.shotId, undefined, { projectFolderOnly: true, expectDirection: body.direction })
+      const data = await separateArrowLayer(body.projectId, body.shotId, locale, { projectFolderOnly: true, expectDirection: body.direction })
       return NextResponse.json({ data })
     }
     if (body.action === 'read-direction') {
@@ -106,16 +111,17 @@ export async function POST(req: Request) {
     }
     if (body.action === 'regenerate-frame') {
       const frame = body.frame === 'direction' ? 'direction' : 'start'
-      const data = await regenerateRoughFrame(body.projectId, body.shotId, frame, undefined, { projectFolderOnly: true })
+      const data = await regenerateRoughFrame(body.projectId, body.shotId, frame, locale, { projectFolderOnly: true })
       return NextResponse.json({ data })
     }
-    const data = await saveDirectingFrame(body.projectId, body.shotId, body.image, undefined, { projectFolderOnly: true })
+    const data = await saveDirectingFrame(body.projectId, body.shotId, body.image, locale, { projectFolderOnly: true })
     return NextResponse.json({ data })
   } catch (e) {
-    if (e instanceof ForeignMediaPathError) return NextResponse.json({ error: e.message }, { status: 403 })
-    if (e instanceof StaleDirectionError) return NextResponse.json({ error: e.message, code: 'stale_direction' }, { status: 409 })
-    if (e instanceof DirectionUnreadableError) return NextResponse.json({ error: e.message, code: 'direction_unreadable' }, { status: 422 })
-    if (e instanceof DirectionTranslateError) return NextResponse.json({ error: e.message, code: 'direction_translate_failed' }, { status: 422 })
+    // 알려진 오류는 사용자의 화면 말로 다시 만든다(lib 이 기본 말로 만든 것이어도).
+    if (e instanceof ForeignMediaPathError) return NextResponse.json({ error: new ForeignMediaPathError(locale).message }, { status: 403 })
+    if (e instanceof StaleDirectionError) return NextResponse.json({ error: new StaleDirectionError(locale).message, code: 'stale_direction' }, { status: 409 })
+    if (e instanceof DirectionUnreadableError) return NextResponse.json({ error: new DirectionUnreadableError(locale).message, code: 'direction_unreadable' }, { status: 422 })
+    if (e instanceof DirectionTranslateError) return NextResponse.json({ error: new DirectionTranslateError(locale).message, code: 'direction_translate_failed' }, { status: 422 })
     // 내용 규칙 거절·검사 장애도 자리 부족과 같은 자리에서 표준 상황코드로 바꾼다(#creem-moderation).
     const blocked = capacityContext && moderationRejectionResponse(e, capacityContext)
     if (blocked) return blocked

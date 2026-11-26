@@ -242,7 +242,7 @@ export function notifyReferenceImageTooSmall(): void {
   toast.error(
     translate(
       locale,
-      'The start image is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.',
+      'One of the images to send is too small for this video model and could not be enlarged, so nothing was generated. Choose another video model or remake the images.',
     ),
     { id: 'video-reference-too-small' },
   )
@@ -272,6 +272,11 @@ export function isVideoModeRefused(status: number, body: unknown): boolean {
 export function notifyVideoModeRefused(body: unknown): void {
   const code = (body as { code?: unknown }).code as string
   toast.error(translate(useLocaleStore.getState().locale, VIDEO_MODE_REFUSALS[code]!), { id: 'video-mode-refused' })
+}
+
+/** 그 방식 거절의 안내 글(영어 원문 = i18n 키) — 채팅도 카드 안내와 같은 까닭을 말한다(검토 rev-video 8 ②). 방식 거절이 아니면 null. */
+export function videoModeRefusalText(code: string): string | null {
+  return Object.hasOwn(VIDEO_MODE_REFUSALS, code) ? VIDEO_MODE_REFUSALS[code]! : null
 }
 
 /**

@@ -5,6 +5,7 @@
 //   이미지 = shots.storyboard_image.versions, 영상 = 그 샷의 Take, Artist = 칸마다 남은 후보(고른 것 + 최근 5장).
 //   약속: tests/director/version-history.test.ts
 import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/director/storyboard-image-versions'
+import { isArrowVersionId } from '@/lib/storyboard/real-arrow-edit'
 import { compareDirectorVideoTakeOrder } from '@/lib/director-video-take-selection'
 import { historyPick, type VersionSummary } from '@/lib/artist/style-versions'
 import type { StoryboardImage } from '@/types/director'
@@ -27,8 +28,9 @@ export interface PastImageVersion {
   stopped: boolean
 }
 
-/** 지난 이미지 판 — 지금 그림인 판을 뺀 나머지, 가장 새 판(번호가 큰 것)부터. 판이 하나뿐이거나 그림이 없으면 빈 목록. */
-export function pastImageVersions(image: StoryboardImage | null | undefined): PastImageVersion[] {
+/** 지난 이미지 판 — 지금 그림인 판을 뺀 나머지, 가장 새 판(번호가 큰 것)부터. 판이 하나뿐이거나 그림이 없으면 빈 목록.
+ *  arrowMiddleThumb(Storyboard 만, 검토 rev-realarrow 1): 화살표를 고친 판(arrows-…)은 시작 장이 밑 판과 같아 가운데 장을 작은 그림으로 쓴다. */
+export function pastImageVersions(image: StoryboardImage | null | undefined, opts?: { arrowMiddleThumb?: boolean }): PastImageVersion[] {
   const currentId = currentStoryboardVersion(image)?.id ?? null
   return storyboardImageVersions(image)
     .filter((version) => version.id !== currentId)
@@ -36,7 +38,7 @@ export function pastImageVersions(image: StoryboardImage | null | undefined): Pa
     .map((version) => ({
       id: version.id,
       n: version.n,
-      thumbUrl: version.frames?.start ?? version.url,
+      thumbUrl: (opts?.arrowMiddleThumb && isArrowVersionId(version.id) ? version.frames?.direction : null) ?? version.frames?.start ?? version.url,
       upload: version.source === 'upload',
       stopped: version.cancelled === true,
     }))
