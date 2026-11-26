@@ -88,7 +88,7 @@ describe('한 화면', () => {
     expect(out).toContain('data-testid="prose-article"')
     expect(out).toContain('직접 작성')
     expect(out).toContain('AI 다시 쓰기')
-    expect(out).toContain('브레이크다운하기')
+    expect(out).toContain('Artist로 가기')
   })
 
   // 왜: 예전 채팅 탭은 가운데가 채팅이라 오른쪽 채팅을 닫았다. 그 기억이 남아 있어도 한 화면에서는 오른쪽 채팅이 열려야 고칠 수 있다.
