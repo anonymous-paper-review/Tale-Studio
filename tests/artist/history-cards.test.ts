@@ -163,6 +163,28 @@ describe('혼자 정한 것', () => {
     expect(selectCandidate).not.toHaveBeenCalled()
   })
 
+  it('그 칸을 다시 그리는 중이면 인물 · 배경 상세의 [채택]이 꺼지고 까닭이 보이며, 눌러도 고르지 않는다', async () => {
+    // 왜: 다시 그리는 중에 채택하면 끝난 새 그림이 그 채택을 덮는다 — Director · Storyboard 상세와 같은 규칙(검토 rev-director 11/26).
+    useArtistStore.setState({
+      generatingViews: [{ characterId: 'minho', appearanceKey: 'current', view: 'main' }],
+      generatingLocations: ['hall:night'],
+    } as never)
+    const person = leftOf(render(CharacterViewDialog as never, { charId: 'minho', appearanceKey: 'current', view: 'main', viewCandidateId: 'old1', onClose: () => {} }))
+      .find(named('VersionViewingBar'))!
+    expect(person.props.adoptDisabled).toBe(true)
+    expect(person.props.adoptReason).toBe('You can adopt it after the image is remade.')
+    await (person.props.onAdopt as () => Promise<void>)()
+    expect(selectCandidate).not.toHaveBeenCalled()
+    // 다른 부품을 그리기 전에 꾸민 훅 자리를 비운다(앞 창의 상태 칸이 남지 않게).
+    hooks.slots = []
+    const place = leftOf(render(WorldViewDialog as never, { locationId: 'hall', shot: 'wideShot', appearanceKey: 'night', viewCandidateId: 'night-old', onClose: () => {} }))
+      .find(named('VersionViewingBar'))!
+    expect(place.props.adoptDisabled).toBe(true)
+    expect(place.props.adoptReason).toBe('You can adopt it after the image is remade.')
+    await (place.props.onAdopt as () => Promise<void>)()
+    expect(selectLocationCandidate).not.toHaveBeenCalled()
+  })
+
   it('다른 작품 스타일 판에서 그린 지난 그림은 상세에서 볼 수 있지만 [채택]이 꺼지고 어느 판 · 스타일인지 보인다', () => {
     // 왜: 작품 스타일은 하나다(10/28 오너) — 서버도 다른 스타일 그림 고르기를 거절한다. 상세 기록의 [불러오기]가 꺼지는 것과 같은 판정.
     const switchedAt = '2026-11-24T00:00:00.000Z'

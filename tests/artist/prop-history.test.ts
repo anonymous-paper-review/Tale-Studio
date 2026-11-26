@@ -134,6 +134,16 @@ describe('같이 정한 것', () => {
 })
 
 describe('혼자 정한 것', () => {
+  it('그 칸을 다시 그리는 중이면 소품 상세의 [채택]이 꺼지고 까닭이 보이며, 눌러도 고르지 않는다', async () => {
+    // 왜: 다시 그리는 중에 채택하면 끝난 새 그림이 그 채택을 덮는다 — Director · Storyboard 상세와 같은 규칙(검토 rev-director 11/26).
+    useArtistStore.setState({ selectedPropAppearances: { obj_ring: 'broken' }, generatingProps: ['obj_ring\u0000broken'] } as never)
+    const bar = leftOf(render(PropViewDialog as never, { propId: 'obj_ring', viewCandidateId: 'broken-old', onClose: () => {} })).find(named('VersionViewingBar'))!
+    expect(bar.props.adoptDisabled).toBe(true)
+    expect(bar.props.adoptReason).toBe('You can adopt it after the image is remade.')
+    await (bar.props.onAdopt as () => Promise<void>)()
+    expect(selectPropCandidate).not.toHaveBeenCalled()
+  })
+
   it('다른 작품 스타일 판 그림이라 서버가 거절하면 소품 그림은 그대로이고 그 까닭을 돌려준다', async () => {
     // 왜: 화면 판정과 서버 판정이 어긋나도(다른 창에서 스타일을 바꿈) 카드 그림을 잘못 바꾸지 않는다 — 인물 · 배경 고르기와 같다.
     useArtistStore.setState({ selectPropCandidate: realSelect } as never)

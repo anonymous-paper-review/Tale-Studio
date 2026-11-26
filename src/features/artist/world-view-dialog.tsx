@@ -192,9 +192,13 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
     : null
   // 다른 작품 스타일 판에서 그린 그림이면 채택할 수 없다 — 상세 기록(시계)의 [불러오기]와 같은 판정 · 같은 덧말.
   const viewingState = viewingCandidate ? historyStyle.describe?.(viewingCandidate) ?? null : null
+  // 그 칸을 다시 그리는 중이면 채택하지 않는다 — 끝난 새 그림이 채택을 덮는다(Director · Storyboard 상세와 같은 규칙, 검토 11/26).
+  const adoptReason = viewingState?.disabled
+    ? t('It is in another style, so it cannot be adopted')
+    : isGenerating ? t('You can adopt it after the image is remade.') : null
   // [채택] — 그 모습 칸의 그림을 고른다(기록 [불러오기]와 같은 길, 다시 그리지 않는다). 못 고르면 보던 그림에 남아 까닭을 보인다.
   const adopt = async () => {
-    if (!viewingCandidate || viewingState?.disabled) return
+    if (!viewingCandidate || adoptReason) return
     setAdopting(true)
     setAdoptError(null)
     try {
@@ -291,8 +295,8 @@ export function WorldViewDialog({ locationId, shot, appearanceKey: appearanceKey
         <VersionViewingBar
           text={t('Viewing an earlier picture · {time}', { time: relativeTime(viewingCandidate.generatedAt, t) })}
           note={viewingState?.note}
-          adoptDisabled={!!viewingState?.disabled}
-          adoptReason={viewingState?.disabled ? t('It is in another style, so it cannot be adopted') : null}
+          adoptDisabled={!!adoptReason}
+          adoptReason={adoptReason}
           busy={adopting}
           error={adoptError}
           onAdopt={adopt}
