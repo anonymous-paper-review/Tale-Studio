@@ -94,6 +94,14 @@ describe('소품 카드의 모습 칸', () => {
     expect(dialog).toContain('두 동강 난 같은 칼')
   })
 
+  // 왜: 올린 그림은 소품의 기본 그림 자리(props 행)에만 들어간다 — 모습 칸을 보면서 올리면 기본 그림이 바뀌어 사람이 헷갈린다.
+  it('소품 모습 칸을 보는 동안은 창에 [레퍼런스 이미지 올리기]가 보이지 않는다', () => {
+    seed({ propAssets: [sword({ appearances: [BROKEN] })], selectedPropAppearances: { sword: 'broken' } })
+    expect(renderToStaticMarkup(createElement(PropDetailPanels, { propId: 'sword' }))).not.toContain('data-testid="prop-detail-upload"')
+    seed({ selectedPropAppearances: {} })
+    expect(renderToStaticMarkup(createElement(PropDetailPanels, { propId: 'sword' }))).toContain('data-testid="prop-detail-upload"')
+  })
+
   // 왜: 데모(보기 전용 공유)는 만들기 · 그리기가 막혀 눌러도 아무 일이 없다(소품 [그리기]와 같은 규칙).
   it('데모(보기 전용 공유) 화면에서는 소품 [+ 모습 추가]가 보이지 않는다', () => {
     mocks.demo = true

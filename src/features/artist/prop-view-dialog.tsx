@@ -98,16 +98,19 @@ function PropDetailLeft({ propId }: { propId: string }) {
             data-testid="prop-detail-instruction"
           />
           <div className="flex flex-wrap items-center justify-end gap-2">
-            <Button
-              size="sm"
-              variant="outline"
-              disabled={generating || uploading}
-              onClick={() => fileRef.current?.click()}
-              data-testid="prop-detail-upload"
-            >
-              {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
-              {t('Upload a reference image')}
-            </Button>
+            {/* 올린 그림은 기본 그림 자리(props 행)에만 들어간다 — 모습 칸을 보는 동안은 숨긴다(m1126 A3, 헷갈림 막기). */}
+            {variant ? null : (
+              <Button
+                size="sm"
+                variant="outline"
+                disabled={generating || uploading}
+                onClick={() => fileRef.current?.click()}
+                data-testid="prop-detail-upload"
+              >
+                {uploading ? <Loader2 className="size-3.5 animate-spin" /> : <Upload className="size-3.5" />}
+                {t('Upload a reference image')}
+              </Button>
+            )}
             {notice === 'content-check-softer' && failure ? (
               <Button
                 variant="outline"
