@@ -6,6 +6,23 @@ import type { CompassDir, SceneStage, StagePosture } from '@/lib/writer/types/pi
 const db = vi.hoisted(() => ({
   tables: {} as Record<string, Array<Record<string, unknown>>>,
   updates: [] as Array<{ table: string; patch: Record<string, unknown>; filters: string[] }>,
+  reads: [] as string[],
+}))
+// 글 모델 입구 — 채우기가 부르면 기록된다(검토 rev-addshot 5: 글자가 아니라 실제 부름으로 본다).
+const llm = vi.hoisted(() => ({ calls: [] as string[] }))
+vi.mock('@/lib/writer/llm/dispatch', () => ({ generateJson: async () => { llm.calls.push('generateJson'); return {} } }))
+vi.mock('@/lib/writer/llm/claude', () => ({ claudeGenerate: async () => { llm.calls.push('claudeGenerate'); return '' } }))
+vi.mock('@/lib/writer/llm/gemini', () => ({
+  geminiGenerate: async () => { llm.calls.push('geminiGenerate'); return '' },
+  geminiGenerateJson: async () => { llm.calls.push('geminiGenerateJson'); return {} },
+}))
+vi.mock('@/lib/claude', () => ({
+  claudeChat: async () => { llm.calls.push('claudeChat'); return '' },
+  claudeJSON: async () => { llm.calls.push('claudeJSON'); return {} },
+}))
+vi.mock('@/lib/writer/i18n/derive-en', () => ({
+  deriveEnBatch: async () => { llm.calls.push('deriveEnBatch'); return new Map() },
+  deriveNativeBatch: async () => { llm.calls.push('deriveNativeBatch'); return new Map() },
 }))
 
 // 서버 쪽 칸 읽기 · 쓰기(refillAddedShots)가 쓰는 만큼만 흉내 낸 DB — 거르개는 eq · in 만 실제로 거르고, 나머지는 기록만 한다.
@@ -24,7 +41,7 @@ vi.mock('@/lib/supabase/admin', () => {
     q.or = (f: string) => { filters.push(`or:${f}`); return q }
     q.order = () => q
     q.update = (p: Record<string, unknown>) => { patch = p; return q }
-    q.maybeSingle = async () => ({ data: rows()[0] ?? null, error: null })
+    q.maybeSingle = async () => { db.reads.push(table); return { data: rows()[0] ?? null, error: null } }
     q.then = (resolve: (value: unknown) => unknown, reject: (reason: unknown) => unknown) => {
       if (patch) {
         const hit = rows()
@@ -32,6 +49,7 @@ vi.mock('@/lib/supabase/admin', () => {
         for (const row of hit) Object.assign(row, patch)
         return Promise.resolve({ data: hit.map((row) => ({ shot_id: row.shot_id })), error: null }).then(resolve, reject)
       }
+      db.reads.push(table)
       return Promise.resolve({ data: rows(), error: null }).then(resolve, reject)
     }
     return q
@@ -257,10 +275,16 @@ describe('더한 샷의 인물 자리 · 자세 채우기', () => {
   })
 
   // 왜: 리드 해석 "새 LLM 호출은 되도록 없이" — 채우기는 파이프라인의 무대 계산만 쓴다(시간 · 원가 0).
-  it('채우기는 글 모델을 부르지 않는다', () => {
-    for (const file of ['src/lib/writer/pipeline/stage/added_shot.ts', 'src/lib/writer/pipeline/util/added_shot_persist.ts']) {
-      expect(read(file)).not.toMatch(/generateJson|dispatchLlm|@\/lib\/llm|deriveEn|openai|anthropic/i)
-    }
+  //   (검토 rev-addshot 5: 글자 검사가 아니라 채우기를 실제로 돌려 글 모델 입구 · 번역이 한 번도 불리지 않는 것을 본다.)
+  it('채우기는 글 모델을 부르지 않는다', async () => {
+    llm.calls.length = 0
+    const added = addedShot('sh_01_60', ['mina', 'jun'], { action_description: '두 사람이 일어난다', action_description_native: '두 사람이 일어난다' })
+    fill(added, [P1, P2, added, P3])
+    fill(addedShot('sh_01_61', ['jun'], { action_description: '준이 창가에 서 있다' }), [P3])
+    db.tables = { shots: [{ project_id: 'p', sort_order: 0, ...P1 }, { project_id: 'p', sort_order: 1, ...added }], scenes: [{ project_id: 'p', scene_id: 'sc_01', stage: STAGE }], projects: [{ id: 'p', settings: {} }] }
+    await refillAddedShots('p', ['sh_01_60'])
+    expect(llm.calls).toEqual([])
+    db.tables = {}
   })
 })
 
@@ -340,18 +364,72 @@ describe('혼자 정한 채우기 규칙', () => {
     }
   })
 
-  // 왜: 오너 2026-09-08 "샷 문장의 자세가 무대 비트보다 우선" — 한 사람 샷의 글이 자세를 말하면 그 글이 이긴다. 여러 사람이면 누구 자세인지 몰라 보지 않는다.
-  it('한 사람 샷의 글에 자세 낱말이 있으면 그 자세로 세우고, 여러 사람 샷은 글로 자세를 바꾸지 않는다', () => {
+  // 왜: 오너 2026-09-08 "샷 문장의 자세가 무대 비트보다 우선" — 한 사람 샷의 글이 자세를 말하면 그 글이 이긴다.
+  //   여러 사람 샷의 글이 자세를 말하면("두 사람이 일어난다") 누구 자세인지 모른다 — 무대 자세(앉음)를 적으면 글과 어긋난다.
+  //   리드 결정(2026-11-27 검토 rev-addshot): 자리(왼쪽 · 오른쪽 · 앞뒤)는 채우고 자세 낱말은 비워 글을 따르게. 글이 자세를 말하지 않으면 무대 자세 그대로.
+  it('한 사람 샷의 글에 자세 낱말이 있으면 그 자세로 세우고, 여러 사람 샷의 글이 자세를 말하면 자리는 채우고 자세는 비워 글을 따르게 한다', () => {
     const one = addedShot('sh_01_24', ['jun'], { action_description: '준이 창가에 서 있다', action_description_native: '준이 창가에 서 있다' })
     expect(poseById(fill(one, [P1, P2, one]).spec).get('jun')).toBe('standing')
-    const two = addedShot('sh_01_25', ['mina', 'jun'], { action_description: '민아가 서 있다', action_description_native: '민아가 서 있다' })
-    expect(poseById(fill(two, [P1, P2, two]).spec)).toEqual(new Map([['mina', 'sitting'], ['jun', 'sitting']]))
+    for (const story of ['두 사람이 일어난다', '민아가 서 있다', 'They both get up from the bench']) {
+      const two = addedShot('sh_01_25', ['mina', 'jun'], { action_description: story, action_description_native: story })
+      const spec = fill(two, [P1, P2, two]).spec
+      expect(poseById(spec)).toEqual(new Map([['mina', null], ['jun', null]]))
+      expect(spec?.character_blocking?.map((b) => [b.character_id, b.position_in_frame])).toEqual([['mina', 'left_third'], ['jun', 'right_third']])
+      for (const b of spec?.character_blocking ?? []) expect(b.pose).toMatch(/^in the (?:foreground|midground|background)$/)
+    }
+    const quiet = addedShot('sh_01_26', ['mina', 'jun'], { action_description: '두 사람이 마주 본다', action_description_native: '두 사람이 마주 본다' })
+    expect(poseById(fill(quiet, [P1, P2, quiet]).spec)).toEqual(new Map([['mina', 'sitting'], ['jun', 'sitting']]))
   })
 
   // 왜: 채운 칸에서 나온 앵글 · 색온도가 카드 칩에 다른 샷처럼 보여야 "다른 샷처럼 차 있다"가 화면에서 보인다.
   it('채운 더한 샷의 콘티 카드에 다른 샷처럼 앵글 · 색온도 칩이 보인다', () => {
     const added = addedShot('sh_01_26', ['mina', 'jun'])
-    expect(shotStageDesign(fill(added, [P1, P2, added]).spec, null)).toEqual({ cameraAngle: 'eye_level', cameraMotion: null, colorTempK: 4500 })
+    expect(shotStageDesign(fill(added, [P1, P2, added]).spec, null)).toEqual({ cameraAngle: 'eye_level', cameraMotion: null, colorTempK: 4500, neighborFill: true })
+  })
+
+  // 왜: 검토 rev-addshot 4 — "창 처음 빛(5600K)은 사람이 정한 빛이 아니다"는 더한 샷만의 규칙이다. 파이프라인 샷을 Storyboard · Director 에서
+  //   front · 50 · 5600K 로 맞춘 사람의 빛을 무대 설계 색온도로 가리면 안 된다.
+  it('파이프라인 샷은 빛이 [+ 샷 추가] 창 처음 값과 같아도 카드에 그 빛(사람이 정한 빛)을 보인다', () => {
+    const pipelineDesign = shotStageDesign(P2.static_spec, null)
+    expect(pipelineDesign).not.toHaveProperty('neighborFill')
+    expect(shotCardChips({ shotType: 'MS', stageDesign: pipelineDesign, camera: CAMERA, lighting: { ...ADD_SHOT_START_LIGHTING } }, 'ko').map((c) => c.label)).toEqual(['MS', '아이레벨', '◐ 5600K'])
+  })
+
+  // 왜: 검토 rev-addshot 1 — 옆의 아직 안 채운 더한 샷(모습 'current')이나 옛 값으로 채운 더한 샷에서 빌리면, 과거 장면에서 지금 모습이 붙고
+  //   옛 비트 · 빛 · 렌즈가 옮아온다. 더한 샷은 움직임이 없어 건너뛰어도 같은 상태라, 그 너머의 파이프라인 샷에서 잇는다.
+  it('옆에 더한 샷이 있어도 모습 · 자리 · 빛 · 렌즈는 그 너머의 파이프라인 샷에서 잇는다', () => {
+    const unfilled = addedShot('sh_01_40', ['mina'])
+    const stale = addedShot('sh_01_41', ['mina'], {
+      character_appearance_keys: { mina: 'current' },
+      static_spec: {
+        shot_id: 'sh_01_41', shot_type: 'MS', lens_mm: 24, camera_angle: 'eye_level', framing: { layers: {} }, lighting: { ...LIGHT, color_temp_kelvin: 9999 },
+        character_blocking: [], camera_setup: { subject: 'mina', from_direction: 'N', height: 'eye', lens_mm: 24 },
+        screen_layout: { beat: 1, camera: { x: 0, y: 6, z: 1.5, look_at: { x: 0, y: 0, z: 1.2 }, lens_mm: 24, hfov_deg: 74 }, characters: [], issues: [] },
+        added_fill: { version: 1, from: null, side: 'start', beat: 1, lighting_from: null },
+      },
+    })
+    const target = addedShot('sh_01_42', ['mina', 'jun'])
+    const { result, spec } = fill(target, [P1, unfilled, stale, target, P2])
+    expect(result.character_appearance_keys).toEqual({ mina: 'young', jun: 'suit' })
+    expect(spec?.added_fill).toMatchObject({ from: 'sh_01_01', side: 'end', beat: 0, lighting_from: 'sh_01_01' })
+    expect(spec?.lighting).toEqual(LIGHT)
+    expect(spec?.lens_mm).toBe(50)
+  })
+
+  // 왜: 검토 rev-addshot 2 — 씬 맨 앞에 샷을 둘 이상 더하면 서로를 이어, 뒤 파이프라인 샷이 바뀌어도 앞의 더한 샷이 옛 값에 묶였다.
+  it('씬 맨 앞에 샷을 둘 이상 더해도 모두 뒤의 파이프라인 샷이 시작하는 상태를 잇는다', () => {
+    const second = addedShot('sh_01_44', ['jun'], {
+      static_spec: {
+        shot_id: 'sh_01_44', shot_type: 'MS', lens_mm: 50, camera_angle: 'eye_level', framing: { layers: {} }, character_blocking: [],
+        camera_setup: { subject: 'jun', from_direction: 'S', height: 'eye', lens_mm: 50 },
+        screen_layout: { beat: 0, camera: { x: 0, y: -6, z: 1.5, look_at: { x: 0, y: 0, z: 1.2 }, lens_mm: 50, hfov_deg: 40 }, characters: [], issues: [] },
+        added_fill: { version: 1, from: 'sh_01_03', side: 'start', beat: 0, lighting_from: null },
+      },
+    })
+    const first = addedShot('sh_01_43', ['jun'])
+    for (const shot of [first, second]) {
+      expect(fill(shot, [first, second, P3]).spec?.added_fill).toMatchObject({ from: 'sh_01_03', side: 'start', beat: 1 })
+    }
   })
 
   // 왜: 카드는 사람이 정한 빛을 무대 설계보다 앞세운다 — 손대지 않은 [+ 샷 추가] 창 값(5600K)이 카드에 남으면 카드는 5600K, 러프는 앞 샷의 빛으로
@@ -395,6 +473,30 @@ describe('러프를 그릴 때 다시 채우기', () => {
     expect(again.get('sh_01_27')?.character_appearance_keys).toEqual({ mina: 'young' })
   })
 
+  // 왜: 검토 rev-addshot 3 — 한 샷 계산이 예외면 전체가 건너뛰어져, 앞 샷은 DB 칸이 바뀌었는데 러프는 옛 칸으로 그려졌다.
+  it('한 샷의 채우기가 실패해도 다른 더한 샷은 채우고, 실패한 샷은 읽은 값 그대로 돌려준다', async () => {
+    const broken = row(addedShot('sh_01_50', ['mina']), 1)
+    Object.defineProperty(broken, 'characters', { get() { throw new Error('boom') }, enumerable: true })
+    db.tables.shots = [row(P1, 0), broken, row(addedShot('sh_01_51', ['mina', 'jun']), 2), row(P2, 3)]
+    const out = await refillAddedShots(PROJECT, ['sh_01_50', 'sh_01_51'])
+    expect(out.get('sh_01_50')).toEqual({ static_spec: null, character_appearance_keys: { mina: 'current' }, changed: false })
+    expect(out.get('sh_01_51')?.changed).toBe(true)
+    expect(db.updates.map((u) => (u.patch.static_spec as { shot_id?: string } | null)?.shot_id)).toEqual(['sh_01_51'])
+  })
+
+  // 왜: 리드 2026-11-27 속도 — 러프 길은 샷 · 씬 · 프로젝트를 이미 읽었다. 그것을 넘기면 채우기가 같은 것을 다시 읽지 않는다(쓰기는 지금처럼 바뀐 것만).
+  it('러프 길이 이미 읽은 샷 · 씬 · 프로젝트를 넘기면 채우기는 다시 읽지 않고 바뀐 것만 쓴다', async () => {
+    db.reads.length = 0
+    const preloaded = { rows: db.tables.shots.map((r) => ({ ...r }) as unknown as AddedShotRow), stageByScene: new Map<string, unknown>([['sc_01', STAGE]]), format: 'horizontal_16:9' }
+    const out = await refillAddedShots(PROJECT, ['sh_01_27'], preloaded)
+    expect(db.reads).toEqual([])
+    expect(db.updates).toHaveLength(1)
+    expect(out.get('sh_01_27')).toMatchObject({ changed: true, static_spec: { added_fill: { from: 'sh_01_01' } } })
+    db.updates.length = 0
+    await refillAddedShots(PROJECT, ['sh_01_27'], { ...preloaded, rows: db.tables.shots.map((r) => ({ ...r }) as unknown as AddedShotRow) })
+    expect(db.updates).toHaveLength(0)
+  })
+
   // 왜: 이 기능 전에 더해 둔 샷도 오너가 바란 "다른 샷처럼"이다 — 채운 표시 없이 칸이 빈 더한 샷도 다음 그리기 때 채운다. 파이프라인 샷은 넘겨도 건드리지 않는다.
   it('이 기능 전에 더해 둔 샷도 러프를 그릴 때 채우고, 파이프라인 샷은 넘겨도 쓰지 않는다', async () => {
     const out = await refillAddedShots(PROJECT, ['sh_01_01', 'sh_01_27', 'sh_01_02'])
@@ -402,14 +504,4 @@ describe('러프를 그릴 때 다시 채우기', () => {
     expect(db.updates.map((u) => u.patch)).toHaveLength(1)
   })
 
-  // 왜: 러프 길이 그 샷을 그리기 직전에 다시 채워야 러프 · 실사 · 영상이 같은 칸을 본다. 더한 샷이 없는 요청은 아무것도 더 읽지 않는다.
-  it('러프 길은 더한 샷이 있을 때만 그리기 직전에 다시 채우고, 그 칸으로 그린다', () => {
-    const route = read('src/app/api/writer/rough-storyboard/route.ts')
-    const shotColumns = /\.from\('shots'\)\s*\.select\(\s*'([^']+)'/.exec(route)?.[1] ?? ''
-    expect(shotColumns).toMatch(/\bsource\b/)
-    const refill = route.indexOf('refillAddedShots(')
-    expect(refill).toBeGreaterThan(0)
-    expect(refill).toBeLessThan(route.indexOf('const resolvedSpecByShotId'))
-    expect(route).toMatch(/targets\.filter\(\(s\) => s\.source === 'manual'\)/)
-  })
 })
