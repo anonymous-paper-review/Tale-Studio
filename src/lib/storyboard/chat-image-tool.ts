@@ -30,9 +30,28 @@ To make or remake a shot's live-action image, emit (in the same updates block):
 - Leave "change" out to draw the image just as the shot describes (for a shot that has no live-action image yet, or "draw it again").
 - Leave "id" out to make live-action images for every shot that has none yet (the same as the Start button).
 - It runs at once and uses no Takes. Each shot runs one image at a time, so emit at most one generateImage per shot.
-- When the user asks to change how a shot looks, do not edit the shot text with updateShot; emit generateImage with a change. The story, arrows and dialogue are edited in Writer.
+- When the user asks to change how a shot looks, do not edit the shot text with updateShot; emit generateImage with a change.
+- When the user also asks to change text (dialogue, narration, the shot's story or description, a name, the length), make that text change with the edit tools as usual. generateImage only redraws the picture and never changes text. Never say text was changed unless the edit result confirms it.
 - Emit generateImage only when the user asks to make, remake or change a picture. Your reply says which shot (by its board name) you are redrawing and what will change.
 </live-action-images>`
+
+// 사람이 그림만 고쳐 달라고 했나 — 도구 고리가 "그림 요청만의 답"을 글 고치기 확인(requireEdit) 없이 받아도 되는 때(검토 2026-11-26 rev-director).
+//   그림을 가리키는 말(이미지 · 그림 · 실사 · 사진 · 그려 · image · picture · redraw …)이 있고, 글을 가리키는 말(대사 · 내레이션 · 자막 · 설명 · 이야기 ·
+//   대본 · 문구 · 제목 · 이름 · N초 · dialogue · narration · description · story · text · name · duration …)이 없을 때만 그렇다.
+//   인물 · 배경 · 표정 · 빛 · 구도는 그림의 생김새라 글 말로 세지 않는다(AI 안내가 그림 바꿀 점으로 부르는 것과 같다).
+//   "대사는 그대로"처럼 글을 두라는 말은 빼고 본다. 애매하면 false — 예전처럼 실행을 확인한다(리드 "불확실하면 안전한 쪽").
+//   약속: tests/chat/storyboard-image-tool.test.ts · storyboard-image-loop.test.ts · storyboard-chat-store.test.ts
+const PICTURE_WORDS = /(이미지|그림|실사|사진|그려|그리기|\b(images?|pictures?|photos?|redraw|repaint|draw)\b)/i // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+const TEXT_TARGET = '대사|내레이션|나레이션|자막|설명|스토리|이야기|줄거리|대본|문구|문장|제목|이름' // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+const TEXT_TARGET_EN = 'dialogue|dialog|lines?|narration|captions?|subtitles?|description|story|text|wording|script|title|names?'
+const TEXT_WORDS = new RegExp(`(${TEXT_TARGET}|\\d+\\s*초|\\b(${TEXT_TARGET_EN}|rename|duration|seconds?)\\b)`, 'i') // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+const KEEP_TEXT = new RegExp(`(${TEXT_TARGET})(은|는|이|가|을|를|도)?\\s*(그대로|유지)|\\bkeep\\s+(the\\s+)?(${TEXT_TARGET_EN})\\b|\\b(${TEXT_TARGET_EN})\\s+(unchanged|as\\s+is)\\b`, 'gi') // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+
+/** 사람이 그림만 고쳐 달라고 했나(Storyboard 채팅) — 위 주석. */
+export function requestsPictureOnlyChange(message: string): boolean {
+  const asked = message.replace(KEEP_TEXT, ' ')
+  return PICTURE_WORDS.test(asked) && !TEXT_WORDS.test(asked)
+}
 
 /** 채팅 답의 updates 중 실사 그림 요청인가(서버가 모양을 이미 걸렀다) — 채팅 저장소가 씬 · 샷 고치기와 가른다. */
 export function isStoryboardImageUpdate(update: unknown): update is StoryboardImageUpdate {
