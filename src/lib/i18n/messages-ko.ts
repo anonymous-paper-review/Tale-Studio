@@ -23,6 +23,12 @@ export const KO: Record<string, string> = {
   'People ({count}/{total})': '등장인물 ({count}/{total})',
   'Places ({count}/{total})': '장소 ({count}/{total})',
   'Remake start and end images · Takes 0': '시작·끝 이미지 다시 만들기 · Takes 0',
+  // 샷 상세 고치기 칸 → Lumi(채팅)(오너 2026-11-26 D6) — 채팅에 남는 말은 화면 말로 보낸다.
+  '@{shot} Fix the image and make it again: {change}': '@{shot} 이미지를 고쳐서 다시 만들어 줘: {change}',
+  '@{shot} Fix the video and make a new Take: {change}': '@{shot} 영상을 고쳐서 새 Take 로 다시 만들어 줘: {change}',
+  'Ask Lumi to fix': 'Lumi 에게 고쳐 달라고 하기',
+  'Lumi is busy with another request. Try again when it is done.': 'Lumi 가 다른 일을 하는 중이에요. 끝나면 다시 눌러 주세요.',
+  'Lumi adds this to the shot prompt. Apply it in the chat to make it again.': 'Lumi 가 이 내용을 샷 프롬프트에 넣어 고쳐요. 채팅에서 [적용]하면 다시 만들어요.',
   'Make start and end images · Takes 0': '시작·끝 이미지 만들기 · Takes 0',
   'Next: make the video': '다음: 영상 만들기',
   'Next: make the video · {count} Takes': '다음: 영상 만들기 · {count} Take',

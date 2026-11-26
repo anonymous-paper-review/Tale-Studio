@@ -27,6 +27,15 @@ describe('Take 사용량 계산', () => {
       expect(takeCostForVideo('seedance-2.5')).toBe(8)
     })
 
+    // 왜: 오너 O4(2026-11-26) "H3 Max · H3 Max Turbo 1 Take(1080p 두 배)" — fal 원가 768p 초당 $0.08 로 Happy Horse(1 Take)보다 싸다.
+    it('H3 Max · H3 Max Turbo 는 720p 한 편에 1 Take, 1080p 한 편에 2 Take 를 쓴다', () => {
+      for (const key of ['h3-max', 'h3-max-turbo'] as const) {
+        expect(takeCostForVideo(key, '720p'), key).toBe(1)
+        expect(takeCostForVideo(key, '1080p'), key).toBe(2)
+        expect(takeCostForVideo(key), key).toBe(1)
+      }
+    })
+
     it('모델을 지정하지 않으면 영상 Take 1을 적용한다', () => {
       expect(takeCostForVideo(null)).toBe(1)
       expect(takeCostForVideo(undefined)).toBe(1)

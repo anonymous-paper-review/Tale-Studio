@@ -42,6 +42,7 @@ import { aspectRatioFromFormat } from '@/types/project'
 import type { ShotNodeData, VideoOverride } from '@/types/director'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
+import { AskLumiButton } from './ask-lumi-button'
 import { VideoResolutionButtons } from '@/features/director/video-resolution-buttons'
 import { LockedFrame, smallFrameStyle } from './locked-frame'
 
@@ -162,8 +163,8 @@ export function ShotVideoTab({ shotNodeId, data, layout, initialTakeId }: {
 
   const fixBlock = (
     <div className="flex min-w-0 flex-col gap-4">
-      <FixImage nodeId={shotNodeId} data={data} />
-      <FixVideo key={current?.id ?? 'first'} shotNodeId={shotNodeId} data={data} current={current} busy={busy} />
+      <FixImage nodeId={shotNodeId} data={data} layout={layout} />
+      <FixVideo key={current?.id ?? 'first'} shotNodeId={shotNodeId} data={data} current={current} busy={busy} layout={layout} />
     </div>
   )
 
@@ -209,8 +210,8 @@ function SectionTitle({ dot, title, hint }: { dot: string; title: string; hint: 
   )
 }
 
-/** 이미지 고치기 — 시작 · 끝을 함께 다시 만든다(1단계, 오너 답 5번). 바꾸고 싶은 점은 이번 생성에만 붙는다. */
-function FixImage({ nodeId, data }: { nodeId: string; data: ShotNodeData }) {
+/** 이미지 고치기 — 시작 · 끝을 함께 다시 만든다(1단계, 오너 답 5번). 바꾸고 싶은 점은 Lumi(채팅)에게 보낸다(오너 2026-11-26 D6). */
+function FixImage({ nodeId, data, layout }: { nodeId: string; data: ShotNodeData; layout: 'popup' | 'panel' }) {
   const t = useT()
   const projectFormat = useProjectFormatStore((s) => s.format)
   const [change, setChange] = useState('')
@@ -227,16 +228,18 @@ function FixImage({ nodeId, data }: { nodeId: string; data: ShotNodeData }) {
         <div className="min-w-[180px] flex-1 space-y-2">
           <Textarea value={change} onChange={(e) => setChange(e.target.value)} rows={2}
             placeholder={t('Write only what you want to change in the start and end images (e.g. show the umbrella handle)')} />
-          <StoryboardImageButton nodeId={nodeId} data={data} changeNote={change}
-            idleLabel={t(frames.start ? 'Remake start and end images · Takes 0' : 'Make start and end images · Takes 0')} />
+          {change.trim() ? <AskLumiButton shotNodeId={nodeId} kind="image" change={change} closeDetail={layout === 'popup'} onSent={() => setChange('')} />
+            : <StoryboardImageButton nodeId={nodeId} data={data}
+              idleLabel={t(frames.start ? 'Remake start and end images · Takes 0' : 'Make start and end images · Takes 0')} />}
         </div>
       </div>
     </section>
   )
 }
 
-/** 영상 고치기 — 늘 새 Take 를 만든다. 보고 있던 Take 의 설정을 이어받고, 여기서 바꾼 것만 새 Take 에 얹는다. */
-function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; data: ShotNodeData; current: ShotDetailTake | null; busy: boolean }) {
+/** 영상 고치기 — 늘 새 Take 를 만든다. 보고 있던 Take 의 설정을 이어받고, 여기서 바꾼 모델 · 해상도만 새 Take 에 얹는다.
+ *  바꿀 점(글)은 Lumi(채팅)에게 보낸다(오너 2026-11-26 D6) — 채팅이 샷 프롬프트를 고치고 [적용]하면 새 Take 로 다시 만든다. */
+function FixVideo({ shotNodeId, data, current, busy, layout }: { shotNodeId: string; data: ShotNodeData; current: ShotDetailTake | null; busy: boolean; layout: 'popup' | 'panel' }) {
   const t = useT()
   const videoBatchBusy = useDirectorCanvasStore((s) => s.videoBatchBusy)
   const generateVideoForShot = useDirectorCanvasStore((s) => s.generateVideoForShot)
@@ -277,7 +280,7 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
         setNotice(t("I couldn't check your Takes, so I didn't start. Please try again in a moment."))
         return
       }
-      const made = await generateVideoForShot(shotNodeId, newTakeRequest({
+      await generateVideoForShot(shotNodeId, newTakeRequest({
         takeId: current?.id ?? null,
         take: current?.data ?? null,
         shotPrompt: effectivePrompt(data),
@@ -328,7 +331,9 @@ function FixVideo({ shotNodeId, data, current, busy }: { shotNodeId: string; dat
         <p className="text-caption text-subtle-foreground">{t('A Take is being made. You can make a new one when it is done.')}</p>
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
-        <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => void make()}>{label}</Button>
+        {/* 바꿀 점이 있으면 Lumi(채팅)에게(오너 2026-11-26 D6), 비우면 지금처럼 이 자리에서 새 Take. */}
+        {change.trim() ? <AskLumiButton shotNodeId={shotNodeId} kind="video" change={change} closeDetail={layout === 'popup'} onSent={() => setChange('')} />
+          : <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => void make()}>{label}</Button>}
         {current ? (
           <Button type="button" size="sm" variant="outline" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => openDeleteConfirm(current.id)}>
             <Trash2 className="size-3.5" />{t('Delete this Take')}

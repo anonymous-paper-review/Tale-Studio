@@ -334,11 +334,12 @@ describe('Director 샷 상세 화면', () => {
     expect(tab).toMatch(/<StoryboardImageButton nodeId=\{nodeId\} data=\{data\}/)
   })
 
-  it('이미지 탭의 다시 만들기 단추는 "시작·끝 이미지 다시 만들기 · Takes 0" 하나이고 바꾸고 싶은 점을 이번 생성에 실어 보낸다', () => {
-    // 왜: D6 · 오너 답 5번 — 시작 · 끝 함께 다시 만든다. 바꾸고 싶은 점은 이번 생성에만 붙는다(혼자 정한 것).
+  it('이미지 탭의 다시 만들기 단추는 "시작·끝 이미지 다시 만들기 · Takes 0" 하나이고, 바꾸고 싶은 점을 적으면 그 자리에 [Lumi 에게 고쳐 달라고 하기]가 선다', () => {
+    // 왜: D6 · 오너 답 5번 — 시작 · 끝 함께 다시 만든다. 바꾸고 싶은 점은 이제 바로 다시 그리지 않고 채팅(Lumi)으로 간다
+    //   (오너 2026-11-26 D6 "이미지 영상 등 모든 작업은 채팅창에 있는 기능 활용" — 길은 tests/director/fix-via-chat.test.ts).
     expect(render('popup')).toContain('Remake start and end images · Takes 0')
-    const button = readFileSync('src/features/director/storyboard-image-button.tsx', 'utf8')
-    expect(button).toMatch(/changeNote\.trim\(\) \? generateStoryboardImage\(nodeId, \{ changeNote \}\) : generateStoryboardImage\(nodeId\)/)
+    const tab = readFileSync('src/features/director/shot-detail/shot-image-tab.tsx', 'utf8')
+    expect(tab).toMatch(/change\.trim\(\) \? <AskLumiButton shotNodeId=\{nodeId\} kind="image"/)
   })
 
   it('영상 탭은 그 샷의 Take 를 새것부터 카드로 쌓고, 고른 ★ 가 없으면 가장 최근 완성 Take 에 "★ 최종 (자동)"을 보인다', () => {

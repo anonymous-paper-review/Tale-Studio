@@ -5,6 +5,7 @@ import { buildFalReferenceToVideoRequest } from '@/lib/director/fal-video-reques
 import { computeIgnoredFields } from '@/lib/fal/model-schemas'
 import { nextVideoFallbackModel } from '@/lib/director/video-fallback'
 import { madeVideoResolution } from '@/lib/director-video-takes'
+import { buildVideoPrompt } from '@/lib/director/video-prompt'
 
 const START = 'https://example.test/start.png'
 const END = 'https://example.test/end.png'
@@ -47,6 +48,17 @@ describe('H3 Max 계열 영상 모델', () => {
       expect(request.input, key).not.toHaveProperty('negative_prompt')
       expect(request.input, key).not.toHaveProperty('generate_audio')
     }
+  })
+
+  it('H3 Max Turbo 는 시작 그림을 참고 그림 1번으로 싣고 지시문이 그 그림을 첫 장면이라고 말한다', () => {
+    // 왜: 리드 2026-11-26 — Turbo 에는 첫 장면 칸이 없다. 시작 그림을 참고 그림 1번에 두고, 지시문의 그림 순서 문장이 그 그림이 샷의 시작이라고 알린다
+    //   (지금 지시문 그대로 — 새 문장을 더하지 않는다). 손으로 이은 참고 그림이 있어도 시작 그림이 맨 앞이다.
+    const roles = ['start', 'ref', 'end'] as const
+    const request = buildFalReferenceToVideoRequest('h3-max-turbo', 'x', [START, REF, END], 5, '16:9', '720p', [...roles])
+    expect((request.input.reference_image_urls as string[])[0]).toBe(START)
+    const { fullPrompt } = buildVideoPrompt({ prompt: 'A woman waits at the crosswalk.', generationMethod: 'I2V', modelKey: 'h3-max-turbo', durationSeconds: 5, referenceImageRoles: [...roles] })
+    expect(fullPrompt).toContain('image 1 = START')
+    expect(fullPrompt).toContain('The START image is the beginning of the shot')
   })
 
   it('H3 Max 는 참고 그림 목록에도 시작 · 끝 · 참고 그림을 순서대로 싣는다', () => {

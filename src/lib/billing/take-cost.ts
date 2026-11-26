@@ -22,7 +22,7 @@ export const TAKE_COST_BY_MODEL: Record<VideoModelKey, number> = {
   'seedance-2.5': 8, // 원가 비례(2.0 의 1.53배) — 오너 확인 대상
   'kling-o3': 5, // 잠정 — 기획 확정 대상
   veo: 5, // 잠정 — 기획 확정 대상
-  // ⏳ 2026-11-26 오너 확인 중(리드 추천 1): fal 원가 768p 초당 $0.08 — Happy Horse(1, 초당 $0.14)보다 싸다. 1080p 는 지금 규칙대로 두 배.
+  // 오너 O4(2026-11-26) 확정 "H3 Max · H3 Max Turbo 1 Take(1080p 두 배)" — fal 원가 768p 초당 $0.08 로 Happy Horse(1, 초당 $0.14)보다 싸다.
   'h3-max': 1,
   'h3-max-turbo': 1,
 }
