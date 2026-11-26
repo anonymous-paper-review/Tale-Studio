@@ -27,7 +27,7 @@ import { aspectRatioFromFormat } from '@/types/project'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
-import { RealArrowEditDialog } from '@/features/storyboard/real-arrow-edit'
+import { RealArrowEditDialog, sameProjectReload } from '@/features/storyboard/real-arrow-edit'
 import { realArrowEntry } from '@/lib/storyboard/real-arrow-edit'
 import { AskLumiButton } from './ask-lumi-button'
 import { LockedFrame } from './locked-frame'
@@ -256,7 +256,8 @@ function EditArrowsEntry({ data, writerShotId, projectId, viewingPast }: { data:
         shotId={writerShotId}
         image={data.storyboardImage}
         drawing={generation.generating}
-        onChanged={() => useDirectorCanvasStore.getState().hydrateFreshFromDb()}
+        // 끝 장이 늦게 끝났을 때 그사이 다른 프로젝트를 열었으면 다시 읽지 않는다(검토 rev-realarrow 4).
+        onChanged={sameProjectReload(projectId, () => useDirectorCanvasStore.getState().projectId, () => useDirectorCanvasStore.getState().hydrateFreshFromDb())}
       />
     </>
   )

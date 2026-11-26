@@ -117,6 +117,24 @@ describe('Storyboard 채팅의 실사 그림 요청', () => {
     expect(mocks.images).not.toHaveBeenCalled()
   })
 
+  // 왜(검토 rev-flow 리드 2 · 오너 N3): 서버의 거절 목록과 따로, Storyboard 화면은 고치기 도구 호출을 받아도 실행하지 않는다 — 그대로 실행하면 Storyboard 에서 대사가 바뀐다.
+  it('Storyboard 채팅은 고치기 도구 호출을 받아도 실행하지 않고, 쓸 수 없다는 결과를 모델에 돌려준다', async () => {
+    const edit = { type: 'tool_use', id: 'edit-1', name: 'edit_project', input: { resource: 'dialogue', id: 'sh_01_02', revision: 'r1', patch: { text: '잘 가' } } }
+    let round = 0
+    fetchMock.mockImplementation(async (url: string, init?: RequestInit) => {
+      if (url !== '/api/writer/chat') return Response.json({})
+      round++
+      if (round === 1) return Response.json({ toolTurn: { content: [edit], stopReason: 'tool_use' }, toolSupport: true })
+      const body = JSON.parse(String(init?.body)) as { toolMessages?: Array<{ role: string; content: Array<{ type: string; content?: string }> }> }
+      const returned = body.toolMessages?.at(-1)?.content.find((block) => block.type === 'tool_result')?.content ?? ''
+      return Response.json({ toolSupport: true, reply: returned.includes('unsupported') ? '대사는 Writer 콘티에서 고칠 수 있어요.' : '고쳤어요.' })
+    })
+    await chat.getState().sendMessage("@샷 2 대사를 '잘 가'로 바꿔 줘")
+    await vi.waitFor(() => expect(chat.getState().loading).toBe(false))
+    expect(mocks.execute).not.toHaveBeenCalled()
+    expect(chat.getState().messages.at(-1)?.content).toContain('대사는 Writer 콘티에서 고칠 수 있어요')
+  })
+
   // 왜(오너 O7 · 2026-11-26 개발 서버 실측): 그림만 고쳐 달라는 부탁은 그림 요청만으로 다 한 것이다 — 실행 확인 없이 그 그림을 맡긴다.
   it('그림만 고쳐 달라는 부탁에 그림 요청만으로 답하면 실행 확인 없이 그 그림을 맡긴다', async () => {
     fetchMock.mockImplementation(async (url: string) =>

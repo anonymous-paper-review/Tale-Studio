@@ -12,6 +12,7 @@ import { createStudioToolResources } from '@/stores/chat-tool-bindings'
 import { createStudioWorkflow } from '@/stores/chat-workflow-bindings'
 import { chatToolReceipt, guardChatToolReply, latestEdits, omitRepeatedToolEdits, requestsImageInspection, requestsSupportedChatEdit } from '@/lib/chat-tools/receipt'
 import type { ToolCall, ToolMessage, ToolOutcome, ToolResult } from '@/lib/chat-tools/protocol'
+import { STORYBOARD_EDIT_REFUSAL, toolCallAllowedOnStage } from '@/lib/chat-tools/protocol'
 import { isImageModelKey } from '@/lib/image-models'
 import { toast } from 'sonner'
 import type { DialogueLine, StageId } from '@/types'
@@ -4068,7 +4069,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           },
         })
         executeWorkflow = workflow
-        const loop = await runChatToolLoop({ request, execute: call => call.name === 'inspect_project' ? executeProjectInspection(projectId, stage, call.input, controller.signal, turnArtistSelection) : call.name === 'project_workflow' ? workflow(call) : execute(call), isCurrent: isCurrentSession, signal: controller.signal, onResult: outcome => completedTools.push(outcome), requireEdit: requestsSupportedChatEdit(stage, trimmed), requireInspection: requestsImageInspection(stage, trimmed), locale: contentLocale() })
+        const loop = await runChatToolLoop({ request, execute: call => call.name === 'inspect_project' ? executeProjectInspection(projectId, stage, call.input, controller.signal, turnArtistSelection) : call.name === 'project_workflow' ? workflow(call) : execute(call), refuse: call => toolCallAllowedOnStage(stage, call.name) ? null : { status: 'unsupported', message: STORYBOARD_EDIT_REFUSAL }, isCurrent: isCurrentSession, signal: controller.signal, onResult: outcome => completedTools.push(outcome), requireEdit: requestsSupportedChatEdit(stage, trimmed), requireInspection: requestsImageInspection(stage, trimmed), locale: contentLocale() })
         data = loop.data
         toolLoopStopped = loop.stopped
         toolOutcomes = loop.results

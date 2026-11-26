@@ -35,7 +35,7 @@ const shot = (shotId: string, sortOrder: number): Shot => ({
   generationMethod: 'I2V', dialogueLines: [], camera: { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 },
   lighting: { position: 'front', brightness: 50, colorTemp: 5000 },
 })
-const CHIP = { cameraAngle: 'eye_level', cameraMotion: null, colorTempK: 4500 }
+const CHIP = { cameraAngle: 'eye_level', cameraMotion: null, colorTempK: 4500, neighborFill: true }
 
 type FetchCall = [string, { body?: string } | undefined]
 let fetchMock: ReturnType<typeof vi.fn>

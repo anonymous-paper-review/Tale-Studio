@@ -525,7 +525,14 @@ export async function POST(req: Request) {
       })
     } catch (err) {
       const existingJobId = existingStoryboardJobId(err)
-      if (existingJobId) return NextResponse.json({ ok: true, jobId: existingJobId, status: 'queued', replayed: true })
+      if (existingJobId) {
+        // 그 샷의 실사 끝 장 다시 그리기(N4b)면 이어받지 않는다 — 시작 · 끝을 다시 만든 줄 알고 끝 장 하나만 바뀐 그림을 받게 된다(검토 rev-realarrow 2).
+        const { data: existing } = await supabaseAdmin.from('generation_jobs').select('target').eq('id', existingJobId).maybeSingle()
+        if ((existing as { target?: { realEnd?: unknown } } | null)?.target?.realEnd) {
+          return NextResponse.json({ error: 'This shot is being drawn. You can change it when it is done.', code: 'busy' }, { status: 409 })
+        }
+        return NextResponse.json({ ok: true, jobId: existingJobId, status: 'queued', replayed: true })
+      }
       // 트리거가 자리 없음으로 거절한 것만 429(막힌 축 포함)로 옮긴다 — 그 외는 기존 오류 경로.
       const rejected = capacityReservationRejection(err, { projectId, kind: 'shot_storyboard', userId: access.userId })
       if (rejected) return rejected

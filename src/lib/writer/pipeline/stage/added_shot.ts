@@ -21,7 +21,7 @@ import type {
 import { applyStageToShots, defaultCameraSetup, stageStatesForBeat } from '@/lib/writer/pipeline/stage/apply'
 import { aspectRatioOf, isCompassDir } from '@/lib/writer/pipeline/stage/geometry'
 import { deriveTransitions, normalizeStageTransitions, transitionKey } from '@/lib/writer/pipeline/stage/ledger'
-import { postureFromPoseText } from '@/lib/writer/pipeline/stage/posture_text'
+import { postureFromMotionText, postureFromPoseText } from '@/lib/writer/pipeline/stage/posture_text'
 import { isDefaultLighting } from '@/lib/writer/shot-config-from-design'
 import { angleOfCamera } from '@/lib/writer/shot-edit'
 import { ADDED_FILL_VERSION, isAddedFillSpec } from '@/lib/writer/pipeline/stage/added_fill_mark'
@@ -157,6 +157,18 @@ function parseStage(value: unknown): SceneStage | null {
 }
 
 const LENS_DEFAULT = 35
+// 일어나기 · 몸 일으키기 — 파이프라인 자세 낱말(posture_text)에 없는 말이라 여기서만 더 본다(여러 사람 샷의 "글이 자세를 말하는가" 판정 전용).
+const RISE_WORDS = /일어나|일어난|일어섰|일으키|\bget(?:s|ting)?\s+up\b|\bgot\s+up\b|\bris(?:e|es|ing)\b|\brose\b|\bstand(?:s|ing)?\s+up\b/i
+/** 배치에서 자세를 뺀다 — 자세를 비운 샷은 누운 자세 문장("lying down")도 싣지 않는다. */
+function withoutPosture<T extends { posture?: unknown }>(place: T): T {
+  const copy = { ...place }
+  delete copy.posture
+  return copy
+}
+/** 샷 글이 자세나 자세 바꿈을 말하는가 — 파이프라인 자세 낱말(문장 어디든) 또는 일어나기 말. */
+function mentionsPosture(text: string | undefined): boolean {
+  return !!text && (postureFromMotionText(text) !== null || RISE_WORDS.test(text))
+}
 /** 영어(인쇄 가능한 ASCII)로만 된 글. */
 const ENGLISH_TEXT = /^[\x20-\x7E]+$/
 const lensOf = (row: AddedShotRow | undefined): number | null => {
@@ -213,9 +225,11 @@ function stagePlacement(
     if (ownerIndex < 0 || ownerIndex === refIndex) return side
     return refIndex < ownerIndex ? 'start' : 'end'
   }
-  // 한 사람 샷은 글의 자세 낱말이 이긴다(오너 2026-09-08 #posture-authority 와 같은 규칙). 여러 사람이면 누구 자세인지 몰라 보지 않는다.
+  // 한 사람 샷은 글의 자세 낱말이 이긴다(오너 2026-09-08 #posture-authority 와 같은 규칙).
+  //   여러 사람 샷의 글이 자세를 말하면(“두 사람이 일어난다”) 누구 자세인지 모른다 — 자리는 채우고 자세 낱말은 비워 글을 따르게 한다(리드 2026-11-27 검토 결정).
   const text = [shot.action_description_native, shot.action_description].find((t): t is string => typeof t === 'string' && !!t.trim())
   const textPosture = characters.length === 1 ? postureFromPoseText(text)?.posture ?? null : null
+  const postureSilent = characters.length > 1 && mentionsPosture(text)
   const chosen: StageCharacterState[] = states.start.map((startState) => {
     const id = startState.character_id
     const pick = pickSide(id)
@@ -273,9 +287,13 @@ function stagePlacement(
   if (!out?.screen_layout) return null
   // 그 샷 인물만 남긴다 — 다른 씬 인물은 자리 목록에도 "그리지 말 것"에도 넣지 않는다(나중에 그 인물을 더해도 막지 않게).
   const keep = new Set(characters)
-  const blocking = out.character_blocking.filter((b) => keep.has(b.character_id))
-  if (characters.some((id) => !blocking.some((b) => b.character_id === id))) return null
   const layout = out.screen_layout
+  const startOf = new Map(layout.characters.map((c) => [c.character_id, c.start] as const))
+  // 자세를 비울 때는 자세 낱말 · 메모 없이 깊이만 적는다(“in the midground”) — 러프 인물 줄 · 실사 인물 줄이 글의 자세를 따른다.
+  const blocking = out.character_blocking
+    .filter((b) => keep.has(b.character_id))
+    .map((b) => (postureSilent ? { ...b, pose: `in the ${startOf.get(b.character_id)?.depth_band ?? 'midground'}` } : b))
+  if (characters.some((id) => !blocking.some((b) => b.character_id === id))) return null
   const issues = applied.issues.filter((i) => i.severity !== 'INFO' && !i.constraint).map((i) => i.message)
   return {
     spec: {
@@ -285,7 +303,9 @@ function stagePlacement(
         beat: layout.beat,
         camera: layout.camera,
         ...(layout.axis_corrected ? { axis_corrected: true } : {}),
-        characters: layout.characters.filter((c) => keep.has(c.character_id) && !c.distant).map(({ character_id, start }) => ({ character_id, start })),
+        characters: layout.characters
+          .filter((c) => keep.has(c.character_id) && !c.distant)
+          .map(({ character_id, start }) => ({ character_id, start: postureSilent ? withoutPosture(start) : start })),
         issues,
       },
     },
@@ -303,8 +323,11 @@ export function fillAddedShot(input: AddedShotFillInput): AddedShotFill | null {
   if (!isFillableAddedShot(shot)) return null
   const scene = input.sceneShots.filter((s) => (s.scene_id ?? null) === (shot.scene_id ?? null))
   const at = scene.findIndex((s) => s.shot_id === shot.shot_id)
-  const before = (at >= 0 ? scene.slice(0, at) : scene).filter((s) => s.shot_id !== shot.shot_id).reverse()
-  const after = at >= 0 ? scene.slice(at + 1) : []
+  // 빌리는 샷 = 더한 샷이 아닌 샷(파이프라인이 만든 샷)만 — 더한 샷은 움직임이 없어 건너뛰어도 같은 상태다. 옆의 아직 안 채운 더한 샷('current')이나
+  //   옛 값으로 채운 더한 샷에 묶이지 않는다(2026-11-27 검토 rev-addshot 1 · 2). 자리 순서(장부 핀)는 씬 전체 순서로 본다.
+  const lends = (s: AddedShotRow) => s.shot_id !== shot.shot_id && !isFillableAddedShot(s)
+  const before = (at >= 0 ? scene.slice(0, at) : scene).filter(lends).reverse()
+  const after = (at >= 0 ? scene.slice(at + 1) : []).filter(lends)
   const characters = strings(shot.characters)
 
   // 모습 키: 같은 씬 가까운 앞 샷 → 뒤 샷 → 지금 값 → 'current'. 키는 지금 인물 목록과 정확히 같게(실사 일괄의 계약 검사).

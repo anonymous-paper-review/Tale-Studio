@@ -46,6 +46,7 @@ import { deriveEnBatch } from '@/lib/writer/i18n/derive-en'
 import { ensureEntityNamesEn, ensureStageLandmarkLabelsEn, sceneLocationLabelsEn } from '@/lib/writer/i18n/entity-names'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import { refillAddedShots } from '@/lib/writer/pipeline/util/added_shot_persist'
+import type { AddedShotRow } from '@/lib/writer/pipeline/stage/added_shot'
 
 
 export const runtime = 'nodejs'
@@ -218,7 +219,7 @@ export async function POST(req: Request) {
         supabaseAdmin
           .from('shots')
           .select(
-            'shot_id, scene_id, source, shot_type, action_description, characters, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard, design_ref, check_notes, prompt, static_spec, dynamic_spec, created_at',
+            'shot_id, scene_id, source, shot_type, action_description, action_description_native, characters, character_appearance_keys, camera_config, lighting_config, focal_length, aperture, duration_seconds, rough_storyboard, design_ref, check_notes, prompt, static_spec, dynamic_spec, created_at',
           )
           .eq('project_id', projectId)
           .order('sort_order'),
@@ -406,11 +407,17 @@ export async function POST(req: Request) {
 
     // 더한 샷 채우기(오너 2026-11-27 N2): 채팅 · [+ 샷 추가]로 더한 샷은 그리기 직전에 같은 씬 앞뒤 샷 · 씬 무대로 빈 칸(자리 · 자세 · 모습 · 빛)을
     //   다시 맞춘다 — 인물 · 샷 크기 · 앵글을 고친 뒤 옛 자리가 남지 않게. 바뀐 것만 저장하고, 이 러프는 DB 에 있는 그 칸으로 그린다(실사 · 영상이 같은 칸을 본다).
-    //   더한 샷이 없는 요청은 아무것도 더 읽지 않는다 — 파이프라인 샷 칸의 글은 한 글자도 안 바뀐다. 실패하면 채우기 없이 지금처럼. 약속: tests/writer/added-shot-fill.test.ts
+    //   더한 샷이 없는 요청은 아무것도 더 읽지 않는다 — 파이프라인 샷 칸의 글은 한 글자도 안 바뀐다. 이미 읽은 샷 · 씬 무대 · 화면 비율을 넘겨 다시 읽지 않는다.
+    //   실패하면 채우기 없이 지금처럼(한 샷 실패는 그 샷만). 약속: tests/writer/added-shot-fill.test.ts · added-shot-fill-rough.test.ts
     const addedTargets = targets.filter((s) => s.source === 'manual')
     if (addedTargets.length) {
       try {
-        const refilled = await refillAddedShots(projectId, addedTargets.map((s) => s.shot_id as string))
+        const rawFormat = (project.settings as { format?: unknown } | null)?.format
+        const refilled = await refillAddedShots(projectId, addedTargets.map((s) => s.shot_id as string), {
+          rows: (shots ?? []) as unknown as AddedShotRow[],
+          stageByScene: new Map((scenes ?? []).map((sc) => [sc.scene_id as string, sc.stage as unknown])),
+          format: typeof rawFormat === 'string' ? rawFormat : null,
+        })
         for (const s of addedTargets) {
           const next = refilled.get(s.shot_id as string)
           if (next) s.static_spec = next.static_spec

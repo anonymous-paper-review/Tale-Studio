@@ -61,6 +61,8 @@ import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/directo
 import { freshDirectionRead } from '@/lib/writer/direction-read'
 import { PHOTO_TEXTURE_PEOPLE } from '@/lib/style-facets/photo-sheet-line'
 import type { GenerationJob } from '@/lib/generation-jobs'
+import { IMAGE_JOB_KINDS } from '@/lib/generation-quota'
+import { isTakeBilledJobKind } from '@/lib/billing/take-cost'
 
 // 이 시험을 위해 지은 샷 — 실사 시트 v1(완료, 세 장, 러프 시각 500), 행동 글 · 카메라 무브가 있는 샷 설계. 프로젝트 = 작업 공간 ws-1 · p1.
 const WS = 'ws-1'
@@ -71,6 +73,8 @@ const LINE = 'She stands and walks out of frame to the right.'
 const LINE_KO = '그녀가 일어나 오른쪽으로 나간다.'
 let shotRow: Record<string, unknown>
 let project: Record<string, unknown>
+let shotReads: number
+let onShotRead: ((n: number) => void) | null
 let jobs: Array<Record<string, unknown>>
 let fetched: string[]
 
@@ -79,7 +83,13 @@ function query(table: string) {
   q.select = () => q
   q.eq = () => q
   q.in = () => q
-  q.maybeSingle = async () => ({ data: table === 'shots' ? structuredClone(shotRow) : table === 'projects' ? project : table === 'generation_jobs' ? (jobs[0] ?? null) : null, error: null })
+  q.maybeSingle = async () => {
+    if (table === 'shots') {
+      shotReads += 1
+      onShotRead?.(shotReads)
+    }
+    return { data: table === 'shots' ? structuredClone(shotRow) : table === 'projects' ? project : table === 'generation_jobs' ? (jobs[0] ?? null) : null, error: null }
+  }
   q.then = (resolve: (v: unknown) => unknown, reject: (e: unknown) => unknown) =>
     Promise.resolve({ data: table === 'generation_jobs' ? jobs : [], error: null }).then(resolve, reject)
   return q
@@ -104,6 +114,8 @@ beforeEach(async () => {
   drawnPng = await png(720, 1280)
   jobs = []
   fetched = []
+  shotReads = 0
+  onShotRead = null
   project = { workspace_id: WS, style_anchor_key: 'real', custom_style_anchor: null }
   shotRow = {
     storyboard_image: { url: V1.start, status: 'completed', errorMessage: null, generatedAt: 10, frames: { ...V1 }, roughGeneratedAt: 500 },
@@ -264,11 +276,53 @@ describe('끝 장 다시 그리기', () => {
     await expect(keepRealDirectionLine(PROJECT, 'sh_1', { text: 'x', lang: 'en' }, 'en', { expectDirection: V1.direction })).rejects.toMatchObject({ name: 'StaleDirectionError' })
   })
 
-  // 왜(혼자 정한 것 c): 두 번 눌러도 같은 끝 장에 그림 값이 두 번 들지 않게 — 그 샷의 실사 끝 장 작업이 돌고 있으면 그 작업 번호를 돌려준다.
-  it('그 샷의 실사 끝 장 작업이 돌고 있으면 새로 내지 않고 그 작업 번호를 돌려준다', async () => {
-    await arrowSaved()
-    jobs = [{ id: 'job-end', kind: 'shot_storyboard', target: { writerShotId: 'sh_1', realEnd: { versionId: 'x', direction: 'y', line: LINE } }, created_at: new Date().toISOString() }]
+  // 왜(혼자 정한 것 c · 검토 rev-realarrow 2): 두 번 눌러도 같은 끝 장에 그림 값이 두 번 들지 않게 그 작업 번호를 돌려준다. 그런데 그사이 다시 저장해
+  //   판이 바뀌었으면 그 작업은 옛 판의 끝 장이다 — 이어받으면 화면이 엉뚱한 작업을 기다리고 새 판의 끝 장은 그려지지 않아 바쁨으로 거절한다.
+  //   2026-11-27 문장 바꿈(리드 결정, 이번 묶음 새 시험): 예전 '그 샷의 실사 끝 장 작업이 돌고 있으면 새로 내지 않고 그 작업 번호를 돌려준다'.
+  it('그 샷의 실사 끝 장 작업이 돌고 있으면 같은 판 · 같은 가운데 장이면 그 작업 번호를 돌려주고, 다른 판이면 바쁨으로 거절한다', async () => {
+    const saved = await arrowSaved()
+    jobs = [{ id: 'job-end', kind: 'shot_storyboard', target: { writerShotId: 'sh_1', realEnd: { versionId: saved.versionId, direction: saved.url, line: LINE } }, created_at: new Date().toISOString() }]
     await expect(redrawRealEndFrame(PROJECT, 'sh_1', 'en', { userId: 'user-1' })).resolves.toMatchObject({ jobId: 'job-end', replayed: true })
+    jobs = [{ id: 'job-old', kind: 'shot_storyboard', target: { writerShotId: 'sh_1', realEnd: { versionId: 'arrows-old', direction: V1.direction, line: LINE } }, created_at: new Date().toISOString() }]
+    await expect(redrawRealEndFrame(PROJECT, 'sh_1', 'en', { userId: 'user-1' })).rejects.toMatchObject({ name: 'RealShotBusyError' })
+    expect(mocks.reserve).not.toHaveBeenCalled()
+  })
+
+  // 왜(검토 rev-realarrow 2): 저장 ↔ 끝 장 예약 사이에 다른 창에서 다시 저장하면 읽은 줄은 새 가운데 장의 것인데 작업은 옛 판에 적힌다 —
+  //   예약 전에 읽은 줄의 가운데 장이 이 요청이 본 가운데 장인지 본다.
+  it('끝 장 작업을 내기 직전 읽은 줄의 가운데 장이 이 요청이 본 가운데 장과 다르면 내지 않는다', async () => {
+    await arrowSaved()
+    const raced = `${B}/raced_direction.png?v=9`
+    shotReads = 0
+    onShotRead = (n) => {
+      // 첫 읽기(끝 장 요청) 뒤, 줄을 읽으러 다시 읽을 때 다른 창의 저장으로 가운데 장이 바뀌어 있다.
+      if (n === 2) {
+        const img = shotRow.storyboard_image as Record<string, unknown>
+        shotRow.storyboard_image = { ...img, frames: { ...(img.frames as object), direction: raced }, versions: (img.versions as Array<Record<string, unknown>>).map((v) => (v.id === img.versionId ? { ...v, frames: { ...(v.frames as object), direction: raced } } : v)) }
+      }
+    }
+    await expect(redrawRealEndFrame(PROJECT, 'sh_1', 'en', { userId: 'user-1' })).rejects.toMatchObject({ name: 'StaleDirectionError' })
+    expect(mocks.reserve).not.toHaveBeenCalled()
+  })
+
+  // 왜(같이 정한 것 · N4b "이미지만"): 끝 장 다시 그리기는 확인용 그림 한 장이다 — 영상 작업 · Take 를 쓰는 작업을 내지 않는다.
+  it('실사 끝 장 다시 그리기는 그림 한 장만 만들고 영상은 만들지 않는다(Take 0)', async () => {
+    await arrowSaved()
+    await redrawRealEndFrame(PROJECT, 'sh_1', 'en', { userId: 'user-1' })
+    expect(mocks.reserve).toHaveBeenCalledTimes(1)
+    expect(reserved()).toMatchObject({ kind: 'shot_storyboard', model: 'openai/gpt-image-2/edit' })
+    expect(IMAGE_JOB_KINDS).toContain(reserved().kind)
+    expect(isTakeBilledJobKind(reserved().kind)).toBe(false)
+    expect(mocks.submit).toHaveBeenCalledTimes(1)
+    expect(submitted().model).toBe('openai/gpt-image-2/edit')
+  })
+
+  // 왜(리드 C): 고치지 않은 실사(콘티대로 그린 그림)를 읽은 줄이 콘티 줄을 이기지 않게 — 줄 읽기 · 끝 장 다시 그리기 · 고친 줄 남기기는 화살표 판에만.
+  it('화살표를 고치지 않은 판에는 실사 줄 읽기 · 끝 장 다시 그리기 · 고친 줄 남기기를 받지 않는다', async () => {
+    await expect(readRealDirection(PROJECT, 'sh_1')).rejects.toMatchObject({ name: 'RealNotArrowVersionError' })
+    await expect(redrawRealEndFrame(PROJECT, 'sh_1', 'en', { userId: 'user-1' })).rejects.toMatchObject({ name: 'RealNotArrowVersionError' })
+    await expect(keepRealDirectionLine(PROJECT, 'sh_1', { text: 'x', lang: 'en' }, 'en')).rejects.toMatchObject({ name: 'RealNotArrowVersionError' })
+    expect(mocks.readMarks).not.toHaveBeenCalled()
     expect(mocks.reserve).not.toHaveBeenCalled()
   })
 
@@ -341,6 +395,8 @@ describe('실사 화살표 요청 길', () => {
 
   // 왜(혼자 정한 것 g · k): 화면이 까닭을 사람 말로 알리고(그리는 중 · 못 읽음) [다시 시도]를 달 수 있게 까닭 표시를 같이 준다.
   it('그리는 중이면 까닭 표시 busy, 못 읽었으면 direction_unreadable 로 답한다', async () => {
+    // 리드 C(2026-11-27) 뒤로 끝 장 다시 그리기는 화살표 판에만 받는다 — 화살표를 저장한 판에서 본다.
+    await saveRealDirectingFrame(PROJECT, 'sh_1', dataUrl(), 'en')
     jobs = [{ id: 'job-full', kind: 'storyboard_real_grid', target: { writerShotIds: ['sh_1'] }, created_at: new Date().toISOString() }]
     const busy = await post({ action: 'regenerate-frame', projectId: PROJECT, shotId: 'sh_1', frame: 'end' })
     expect(busy.status).toBe(409)
@@ -352,5 +408,56 @@ describe('실사 화살표 요청 길', () => {
     expect((await unreadable.json()).code).toBe('direction_unreadable')
     // 실사 길은 끝 장만 다시 그린다(시작 · 가운데 장 다시 그리기는 받지 않는다).
     expect((await post({ action: 'regenerate-frame', projectId: PROJECT, shotId: 'sh_1', frame: 'start' })).status).toBe(400)
+  })
+})
+
+describe('검토 rev-realarrow — 폴더 · 형식 · 말', () => {
+  const FOREIGN = 'https://media.test/other-ws/other-project/shots/x_storyboard_start.png?v=1'
+  const post = (body: Record<string, unknown>) => POST(new Request('http://localhost/api/storyboard/real-directing-edit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }))
+
+  // 왜(검토 rev-realarrow 7 · 보안): 실사 시트 주소는 브라우저가 고칠 수 있는 칸에서 온다 — 남의 프로젝트 그림을 서버가 받아 AI 에 보내거나 크기를 재지 않게.
+  it('실사 가운데 장 · 판 세 장이 이 프로젝트 폴더 주소가 아니면 서버는 그 그림을 가져오지 않는다', async () => {
+    const saved = await saveRealDirectingFrame(PROJECT, 'sh_1', dataUrl(), 'en')
+    // 줄 읽기 — 시작 장이 남의 폴더면 읽지 않는다.
+    const img = current()
+    shotRow.storyboard_image = { ...img, frames: { ...(img.frames as object), start: FOREIGN }, versions: (img.versions as Array<Record<string, unknown>>).map((v) => (v.id === saved.versionId ? { ...v, frames: { ...(v.frames as object), start: FOREIGN } } : v)) }
+    await expect(readRealDirection(PROJECT, 'sh_1')).resolves.toBeNull()
+    await expect(redrawRealEndFrame(PROJECT, 'sh_1', 'en', { userId: 'user-1' })).rejects.toMatchObject({ name: 'ForeignMediaPathError' })
+    expect(mocks.readMarks).not.toHaveBeenCalled()
+    expect(fetched.filter((u) => u.includes('other-ws'))).toEqual([])
+    // 완료 처리 — 그 판의 세 장 중 하나라도 남의 폴더면 크기를 재러 가져오지 않는다.
+    const job = { id: 'job-1', project_id: PROJECT, kind: 'shot_storyboard', target: { workspaceId: WS, writerShotId: 'sh_1', realEnd: { versionId: saved.versionId, direction: saved.url, line: LINE } } } as unknown as GenerationJob
+    await expect(finalizeRealEndFrameJob(job, 'https://fal.test/end.png', { stopped: false })).rejects.toMatchObject({ name: 'ForeignMediaPathError' })
+    expect(fetched.filter((u) => u.includes('other-ws'))).toEqual([])
+  })
+
+  // 왜(리드 D): 16:9 큰 칸 PNG 가 요청 몸 상한에 닿으면 화면이 JPEG 로 보낸다 — 서버가 JPEG 를 받아 같은 이름 규칙(.jpg)으로 올린다.
+  it('실사 가운데 장 저장은 JPEG 그림도 받아 JPEG 로 올린다', async () => {
+    const jpeg = await sharp(framePng).jpeg({ quality: 90 }).toBuffer()
+    const saved = await saveRealDirectingFrame(PROJECT, 'sh_1', `data:image/jpeg;base64,${jpeg.toString('base64')}`, 'en')
+    const [[path, , options]] = mocks.upload.mock.calls as Array<[string, Buffer, { contentType: string }]>
+    expect(path).toMatch(/_a[0-9a-f-]{36}_storyboard_direction\.jpg$/)
+    expect(options.contentType).toBe('image/jpeg')
+    expect(saved.url).toContain('.jpg?v=')
+  })
+
+  // 왜(검토 rev-realarrow 5): 영어 화면에 한국어 오류가 뜨면 안 된다 — 실사 길의 서버 말은 그 사용자의 화면 말(user_metadata.locale)로.
+  it('실사 화살표 요청의 오류 말은 사용자의 화면 말로 답한다', async () => {
+    await saveRealDirectingFrame(PROJECT, 'sh_1', dataUrl(), 'en')
+    jobs = [{ id: 'job-full', kind: 'storyboard_real_grid', target: { writerShotIds: ['sh_1'] }, created_at: new Date().toISOString() }]
+    mocks.getUser.mockResolvedValue({ id: 'user-1', user_metadata: { locale: 'en' } })
+    expect((await (await post({ action: 'regenerate-frame', projectId: PROJECT, shotId: 'sh_1', frame: 'end' })).json()).error).toBe('This shot is being drawn. You can change it when it is done.')
+    mocks.getUser.mockResolvedValue({ id: 'user-1', user_metadata: { locale: 'ko' } })
+    expect((await (await post({ action: 'regenerate-frame', projectId: PROJECT, shotId: 'sh_1', frame: 'end' })).json()).error).toBe('이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.')
+    // 화살표 판이 아닌 요청 · 못 읽음도 사람 말과 까닭 표시를 같이 준다.
+    jobs = []
+    mocks.readMarks.mockResolvedValue(null)
+    mocks.getUser.mockResolvedValue({ id: 'user-1', user_metadata: { locale: 'en' } })
+    const unreadable = await (await post({ action: 'regenerate-frame', projectId: PROJECT, shotId: 'sh_1', frame: 'end' })).json()
+    expect(unreadable).toMatchObject({ code: 'direction_unreadable', error: 'The AI could not read the arrows, so the end frame was not redrawn. Press Edit and redraw the end frame and write the motion.' })
+    shotRow.storyboard_image = { url: V1.start, status: 'completed', errorMessage: null, generatedAt: 10, frames: { ...V1 } }
+    const notArrow = await post({ action: 'read-direction', projectId: PROJECT, shotId: 'sh_1' })
+    expect(notArrow.status).toBe(409)
+    expect(await notArrow.json()).toMatchObject({ code: 'not_arrow_version', error: 'Only a version whose arrows you edited can be read or redrawn. Edit the arrows first.' })
   })
 })
