@@ -44,7 +44,6 @@ import {
 import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
 import { directorHasFinishedVideo, type DirectorShotState } from '@/lib/director/shot-state'
 import { editorHandoverView, type RemakeResult } from '@/lib/director/editor-handover'
-import { clearImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
 import { useWriterStore, type WriterChatUpdate } from '@/stores/writer-store'
 import {
   buildScriptLines,
@@ -3127,8 +3126,6 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
 
     if (get().directorHandoff && isCancellationUtterance(trimmed)) {
       set({ directorHandoff: null, pendingNavigatePath: null })
-      // 넘김을 거두면 넘어가면서 이미지 만들기(D0)도 거둔다 — 남으면 10분 안 다른 길의 Director 진입에서 일괄이 시작된다(검토 b 낮음 6).
-      clearImagesOnDirectorEntry()
       get().appendLocalExchange(stage, trimmed, translate(contentLocale(), 'Cancelled the pending stage move. Your saved work is unchanged.'))
       return
     }
