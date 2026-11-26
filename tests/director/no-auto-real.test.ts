@@ -99,12 +99,14 @@ describe('C4 — 생성 버튼이 보고 있던 화면을 빼앗지 않는다', 
   })
 })
 
-describe('Director 채팅 — 영상의 시작·끝·참조 그림 연결을 안내한다', () => {
-  it('영상의 시작·끝·참조 그림을 연결하는 방법을 안내하고 허용한다', () => {
+// 2026-11-23 오너 결정(11/22 밤 "시작+끝 방식 폐기")으로 바꾼 문장 — 예전 describe: 「Director 채팅 — 영상의 시작·끝·참조 그림 연결을 안내한다」.
+describe('Director 채팅 — 영상의 시작·참조 그림 연결을 안내한다', () => {
+  // 예전: 「영상의 시작·끝·참조 그림을 연결하는 방법을 안내하고 허용한다」.
+  it('영상의 시작·참조 그림을 연결하는 방법만 안내하고 허용한다', () => {
     expect(chatRoute).toContain('"type":"connectFrame"')
     expect(chatRoute).toContain("'connectFrame'")
     expect(chatRoute).toContain("'frame-start'")
-    expect(chatRoute).toContain("'frame-end'")
+    expect(chatRoute).not.toContain('frame-end')
     expect(chatRoute).toContain("'frame-ref'")
     expect(chatRoute).toContain('VALID_FRAME_TARGET_HANDLES')
   })

@@ -153,20 +153,22 @@ describe('H3 영상 요청', () => {
     const prepared = await prepare('h3-max-turbo')
     if (prepared instanceof Response) throw new Error(`prepare failed: ${prepared.status} ${await prepared.clone().text()}`)
     const sent = falInput(prepared).reference_image_urls as string[]
-    expect(sent).toHaveLength(2)
+    // 끝 그림은 오너 dev 때 시작+끝 폐기(main 2026-11-27 N4a)로 보내지 않는다 — 기본 방식(시작+프롬프트)은 시작 한 장이다.
+    expect(sent).toHaveLength(1)
     expect(sent.every((url) => url.includes('/video-refs/'))).toBe(true)
-    expect(prepared.inputSnapshot.reference_image_urls).toEqual([START, END])
+    expect(prepared.inputSnapshot.reference_image_urls).toEqual([START])
     expect(prepared.inputSnapshot.fal_reference_image_urls).toEqual(sent)
-    expect(mocks.uploads.map((upload) => [upload.width, upload.height])).toEqual([[256, 459], [256, 459]])
+    expect(mocks.uploads.map((upload) => [upload.width, upload.height])).toEqual([[256, 459]])
   })
 
-  it('H3 Max 는 첫 · 마지막 장면 칸에도 키운 주소를 싣는다', async () => {
-    // 왜(m-qa): 대체 미니맥스도 end_image_url 에서 같은 422 가 났다 — 장면 칸도 같은 그림이다.
+  // 2026-11-27 오너 결정(N4a · dev 때 "Start, End 프레임 생성 방식은 일단 폐기")으로 바꾼 문장 — 예전: 「H3 Max 는 첫 · 마지막 장면 칸에도 키운 주소를 싣는다」.
+  it('H3 Max 는 첫 장면 칸에도 키운 주소를 싣고, 마지막 장면 칸은 비운다', async () => {
+    // 왜(m-qa): 대체 미니맥스도 장면 칸에서 같은 422 가 났다 — 장면 칸도 같은 그림이다. 끝 그림은 이제 어느 길로도 보내지 않는다(N4a).
     const prepared = await prepare('h3-max')
     if (prepared instanceof Response) throw new Error('prepare failed')
     const input = falInput(prepared)
     expect(String(input.image_url)).toContain('/video-refs/')
-    expect(String(input.end_image_url)).toContain('/video-refs/')
+    expect(input).not.toHaveProperty('end_image_url')
   })
 
   it('다른 모델(Seedance 등)의 영상 요청은 한 글자도 안 바뀐다 — 그림을 읽지도 올리지도 않는다', async () => {
@@ -175,7 +177,8 @@ describe('H3 영상 요청', () => {
     if (prepared instanceof Response) throw new Error('prepare failed')
     expect(fetched.filter((url) => url === START || url === END)).toEqual([])
     expect(mocks.uploads).toEqual([])
-    expect(falInput(prepared).image_urls).toEqual([START, END])
+    // 끝 그림은 오너 시작+끝 폐기(N4a)로 보내지 않는다.
+    expect(falInput(prepared).image_urls).toEqual([START])
     expect(prepared.inputSnapshot).not.toHaveProperty('fal_reference_image_urls')
   })
 
@@ -184,7 +187,8 @@ describe('H3 영상 요청', () => {
     sizeByUrl = { [START]: LARGE, [END]: LARGE }
     const prepared = await prepare('h3-max-turbo')
     if (prepared instanceof Response) throw new Error('prepare failed')
-    expect(falInput(prepared).reference_image_urls).toEqual([START, END])
+    // 끝 그림은 오너 시작+끝 폐기(N4a)로 보내지 않는다.
+    expect(falInput(prepared).reference_image_urls).toEqual([START])
     expect(mocks.uploads).toEqual([])
     expect(prepared.inputSnapshot).not.toHaveProperty('fal_reference_image_urls')
   })

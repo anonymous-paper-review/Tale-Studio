@@ -70,6 +70,12 @@ export interface VideoModelSpec {
   aspectRatios?: readonly string[]
   /** 참고 그림 목록 상한(fal 스키마) — 넘치면 뒤에서부터 덜어 낸다. 없으면 그대로. */
   maxRefImages?: number
+  /**
+   * ② 레퍼런스 방식에서 한 번에 보낼 그림 수(오너 2026-11-27 N4a · dev fb1120-video 값 — fal 스키마 11/22 확인).
+   *   Seedance 2.0 · Happy Horse · H3 9 · Seedance 2.5 는 30 까지 받지만 다른 모델과 같은 9 · Veo 는 fal 표에 상한이 없어 구글 문서의 참고 그림 3장 ·
+   *   Kling 은 4. 넘으면 소품 → 배경 → 인물 순으로 뒤에서부터 덜어 낸다(video-submit). 손 배선 길은 이 값을 쓰지 않는다(지금 그대로).
+   */
+  maxImageUrls: number
   /** 참고 그림의 가장 작은 변(px) — 더 작은 그림은 서버가 비율 그대로 키워 보낸다(H3 = 256, m-qa 2026-11-27). 없으면 크기를 보지 않는다. */
   minImageSide?: number
   /** 늘 같이 보내는 값 — H3 는 글 다시 쓰기를 끈다(prompt_expansion_mode 는 필수 칸, 대체 미니맥스와 같은 값). */
@@ -108,6 +114,7 @@ const H3_COMMON: Omit<VideoModelSpec, 'key' | 'label' | 'endpoint'> = {
   negativePrompt: false,
   aspectRatios: H3_ASPECT_RATIOS,
   maxRefImages: 9,
+  maxImageUrls: 9,
   // fal 거절 실측(m-qa 2026-11-27): "Minimum dimensions are 256x256" — 9:16 일괄 실사 칸(235 × 421)은 서버가 키워 보낸다(video-ref-min-size).
   minImageSide: 256,
   fixedInput: { prompt_expansion_mode: 'disabled' },
@@ -125,6 +132,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['720p', '1080p'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.14,
+    maxImageUrls: 9,
     negativePrompt: false,
   },
   seedance: {
@@ -138,6 +146,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['480p', '720p', '1080p'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.3024,
+    maxImageUrls: 9,
   },
   // 2026-11-01 오너: 디렉터 영상 모델에 Seedance 2.5 를 더한다. fal 에는 미국 서버 입구(us)만 있다.
   //   fal 은 30초까지 받지만 Take 가 길이와 상관없는 한 편 값이라 다른 모델과 같은 15초에서 끊는다. 4k 는 없다.
@@ -153,6 +162,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['480p', '720p', '1080p'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.4622,
+    maxImageUrls: 9,
   },
   'kling-o3': {
     key: 'kling-o3',
@@ -165,6 +175,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: [],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.112,
+    maxImageUrls: 4,
   },
   veo: {
     key: 'veo',
@@ -177,6 +188,7 @@ export const VIDEO_MODELS: Record<VideoModelKey, VideoModelSpec> = {
     resolutions: ['720p', '1080p', '4k'],
     defaultResolution: '720p',
     pricePerSecNoAudio: 0.2,
+    maxImageUrls: 3,
   },
   // 2026-11-26 오너 D4 "영상모델 H3 Max 계열 추가" — fal 의 MiniMax H3 Max(첫 · 마지막 장면 칸 있음)와 H3 Max Turbo(참고 그림만).
   //   대체 모델 "미니맥스"(video-fallback)도 H3 Max 다 — 그쪽은 늘 768P · 참고 그림이 없으면 image-to-video 입구.
