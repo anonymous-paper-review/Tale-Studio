@@ -1,7 +1,7 @@
 ---
 name: tale-studio design system
 version: 1.1.1
-last_updated: 2026-11-24
+last_updated: 2026-11-26
 owner: shared
 canonical_implementation: src/app/globals.css
 source_of_truth: 토큰 값은 globals.css. design.md는 *역할 / 사용 룰 / 스케일 정량 명세*.
@@ -537,9 +537,9 @@ Radix primitive 는 body 로 portal — `<html data-stage>` 덕에 지금 단계
 └──────┴──────────────────────────────────────┴──────────────┘
 ```
 
-- **레일** `src/components/layout/sidebar.tsx`: 맨 위 Tale 로고(30×26, 누르면 프로젝트 목록) · 단계 칸(v3 채움 아이콘 · 라벨 · 끝낸 단계 체크 · 지금 단계 밝은 바탕과 단계 색 아이콘) · 아래 Take · 공유 · 내보내기 · Help · 프로필. 칸 모습 판정은 `src/lib/stage-rail.ts` `railStageState`(약속 tests/project/rail-done-mark.test.ts).
+- **레일** `src/components/layout/sidebar.tsx`: 맨 위 Tale 로고(30×26, 누르면 프로젝트 목록) · 단계 칸(v3 채움 아이콘 · 라벨 · 끝낸 단계 체크 · 지금 단계 밝은 바탕과 단계 색 아이콘) · 아래 [메뉴](Take · 공유 · 내보내기 · Help) · 프로필. 칸 모습 판정은 `src/lib/stage-rail.ts` `railStageState`(약속 tests/project/rail-done-mark.test.ts).
   11/5 색: 지금 단계 아이콘 = 그 단계 색(`text-stage`) · 이름 #F5F4EE, 다른 단계 아이콘 #C2C0B6(`text-muted-foreground`) · 이름은 끝냄 #C2C0B6 · 안 연 #8E8B82, 끝낸 단계 체크 크림 #F5F4EE. 아래 단추는 아이콘 · 글 사이 4(`FooterIconItem`).
-  화면이 낮아져도 단계 칸 크기는 유지하고 단계 목록에는 스크롤바를 만들지 않는다. 공간이 부족하면 Take · 공유 · 내보내기 · Help를 햄버거 메뉴에 모은다(오너 2026-11-24). 이때 프로필도 같은 메뉴에 넣어 단계 버튼 자리를 확보한다.
+  화면이 낮아져도 단계 칸 크기는 유지하고 단계 목록에는 스크롤바를 만들지 않는다. Take · 공유 · 내보내기 · Help 는 화면 높이와 상관없이 늘 햄버거 [메뉴] 하나에 모은다(오너 2026-11-26 — 11/24 에는 낮은 화면만) — 누르면 레일 오른쪽 판(2칸 격자)에 펼치고, 닫아도 Help 입력 · 내보내기 진행은 남는다(`sidebar-actions.tsx`). 프로필은 메뉴 밖, 레일에 남는다(약속 tests/project/rail-menu.test.ts).
 - **위 막대** `src/components/layout/studio-top-bar.tsx` `StudioTopBar`: 단계 칩(`StageChip`) · 프로젝트 제목 + 연필(`ProjectTitleField`, 이름 바꾸기) · 오른쪽 자리. 스튜디오 레이아웃이 모든 단계 화면 위에 놓고(위에 붙는 sticky), Producer 시작 화면은 탭이 든 자기 막대를 같은 컴포넌트로 그린다. 화면이 오른쪽 자리에 단추를 놓을 때는 `<TopBarActions>`(포털).
 - **대시보드 머리** `src/components/dashboard/dashboard-header.tsx` `DashboardHeader`: 스튜디오 밖(/projects · /projects/new · /playground · /queue · /account) 공용 — `TaleLockup` · 탭 묶음 · 오른쪽 자리(새 프로젝트 등).
   11/5 R2~R6: 막대 바탕은 페이지 바탕을 따르고(이 화면들은 `bg-lobby`) 아래 선이 없다. 높이 78(위아래 20) · 로고 묶음 26 · 로고와 탭 사이 89.
@@ -586,6 +586,8 @@ Storyboard 나누기 · 첫 러프. 설명은 부르는 쪽이 준다 — 안 �
 덮개가 받은 휠 · 손가락 끌기를 포인터 아래 `[data-ai-busy-scroll]` 칸으로 넘겨 보기 · 스크롤만 된다(`src/lib/ai-busy-scroll.ts`, 칸이 겹치면 안쪽 칸).
 `card="loading"` 은 Lumi 없이 같은 새 카드(그림만 없음, 색은 놓인 화면의 지금 단계). 약속 tests/project/busy-overlay-clear.test.ts. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
 Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
+**단계 화면을 여는 동안**(오너 2026-11-26): 레일로 옮겨 오거나 프로젝트를 여는 동안 그 단계가 자기 자료를 다 읽기 전에는 Editor 클립 준비와 같은 카드(그 단계 옷 · 설명 없음 · 잠금 아님)를 화면 가운데에 둔다 —
+`<StageWaitCard stage />`(`src/components/feedback/stage-wait.tsx`, 언제는 `src/lib/stage-wait.ts` · `src/hooks/use-stage-wait.ts`, 레일을 누른 순간은 `app/studio/<단계>/loading.tsx`). 제목은 "산문을 불러오는 중…"처럼 무엇을 읽는지. Director 는 캔버스 판 위를 덮는다(`cover`). 약속 tests/project/stage-wait.test.ts.
 실패 안내의 오류 모습 큰 Lumi 도 단계를 넘어가는 기다림의 실패에만 둔다 — Storyboard 보드에서 컷을 다시 그리다 난 실패는 작은 카드(약속 tests/writer/board-wait-lumi.test.ts).
 
 **노드 · 카드 위에서 기다릴 때**(SYS, DG 기준) — `src/components/feedback/node-wait.tsx` `<NodeWaitCard lumi title description? progress? note? announce? />`(화면 읽기 알림 `announce` 는 여럿 중 하나만 — 보드 · Director 는 첫 카드):
