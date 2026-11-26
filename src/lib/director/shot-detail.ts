@@ -6,6 +6,7 @@ import { IMAGE_MODEL_ORDER, imageModelSupportsSheetCanvas, normalizeImageModelKe
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
 import { currentStoryboardVersion, versionOfFrames } from '@/lib/director/storyboard-image-versions'
 import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
+import type { ProjectFormat } from '@/types/project'
 import type { DirectorNode, ShotNodeData, StoryboardImage, VideoNodeData, VideoOverride } from '@/types/director'
 
 export type ShotDetailTab = 'image' | 'video'
@@ -23,10 +24,25 @@ export function shotDetailFrames(image: StoryboardImage | null | undefined): { s
   return { start: storyboardImageStartFrame(image ?? null), end: storyboardImageEndFrame(image ?? null) }
 }
 
+/**
+ * Writer 샷 시트(세 칸) 크기 — 프로젝트 포맷별, 'legacy' = 포맷을 모르는 예전 프로젝트. 시트 스펙(rough-storyboard-grid sheetGeometry)과 같아야 한다
+ * (tests/director/nano-banana-sheet.test.ts 가 잠근다). 화면은 시트 스펙 모듈(Writer 파이프라인)을 불러오지 않고 이 표로 모델 칸을 고른다.
+ */
+export const WRITER_SHEET_CANVAS: Record<ProjectFormat | 'legacy', string> = {
+  'horizontal_16:9': '1024x1712',
+  'vertical_9:16': '1536x896',
+  'cinema_2.39:1': '1024x1296',
+  'square_1:1': '640x1792',
+  legacy: '1024x1536',
+}
+
 /** 이미지 모델 칸 — 실제로 도는 모델만(오너 답 5번). Writer 샷은 러프 세 장을 한 장에서 다시 칠하는 시트 길이라
- *  시트를 그릴 수 있는 모델만 돈다(나머지는 GPT Image 2 로 바뀌었다). 캔버스에서 만든 샷은 한 장 생성이라 전부 돈다. */
-export function detailImageModels(data: Pick<ShotNodeData, 'writerShotId'>): ImageModelKey[] {
-  return data.writerShotId ? IMAGE_MODEL_ORDER.filter(imageModelSupportsSheetCanvas) : [...IMAGE_MODEL_ORDER]
+ *  시트를 그릴 수 있는 모델만 돈다(나머지는 GPT Image 2 로 바뀌었다). 캔버스에서 만든 샷은 한 장 생성이라 전부 돈다.
+ *  format(프로젝트 포맷)을 주면 비율로만 그리는 모델(Nano Banana 2)도 그 포맷의 시트에 맞을 때 넣는다(리드 Q2 길 a, 정사각은 빠짐). */
+export function detailImageModels(data: Pick<ShotNodeData, 'writerShotId'>, format?: ProjectFormat | null): ImageModelKey[] {
+  if (!data.writerShotId) return [...IMAGE_MODEL_ORDER]
+  const canvas = format === undefined ? null : WRITER_SHEET_CANVAS[format ?? 'legacy']
+  return IMAGE_MODEL_ORDER.filter((key) => imageModelSupportsSheetCanvas(key, canvas))
 }
 
 /** Take 의 지금 단계 — 만드는 중 · 멈춤(화면에서 멈췄고 아직 안 끝남) · 완성 · 실패 · 아직 안 만듦. */
@@ -41,9 +57,10 @@ export function takePhaseOf(data: Pick<VideoNodeData, 'status' | 'lastAttemptSta
 }
 
 /** 이미지 모델 칸에서 골라져 보일 모델 — 서버가 실제로 돌리는 것. Writer 샷은 시트를 못 그리는 모델을 GPT Image 2 로 바꿔 돈다(리드 검토 c ④). */
-export function detailImageModel(data: Pick<ShotNodeData, 'writerShotId' | 'imageModel'>): ImageModelKey {
+export function detailImageModel(data: Pick<ShotNodeData, 'writerShotId' | 'imageModel'>, format?: ProjectFormat | null): ImageModelKey {
   const saved = normalizeImageModelKey(data.imageModel)
-  return data.writerShotId ? resolveSheetImageModel(saved) : saved
+  if (!data.writerShotId) return saved
+  return resolveSheetImageModel(saved, format === undefined ? null : WRITER_SHEET_CANVAS[format ?? 'legacy'])
 }
 
 export interface ShotDetailTake {

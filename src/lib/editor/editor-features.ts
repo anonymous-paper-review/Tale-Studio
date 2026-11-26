@@ -6,6 +6,7 @@
 import type { AppLocale } from '@/lib/locale'
 import { translate } from '@/lib/i18n/translate'
 import { TRANSITION_CHOICES } from '@/lib/editor/transition'
+import { MUSIC_MODELS } from '@/lib/editor/music-models'
 
 /** 있는 기능 — 단추 · 메뉴 이름은 화면 글 그대로 따옴표에 넣는다. */
 export function editorFeatureLines(locale: AppLocale = 'en'): string[] {
@@ -35,8 +36,10 @@ export function editorFeatureLines(locale: AppLocale = 'en'): string[] {
     t('The {effects} tab next to {project}: drag a video transition ({cross}, {dipBlack}, {dipWhite}) onto the front half of a clip to put it at the start or the back half to put it at the end, drag {fade} onto the front or back half of an audio clip for a fade in or fade out, and drag a video effect ({bw}, {blur}, {bc}) onto a video clip.', {
       effects: q('Effects'), project: q('Project'), ...transitions, fade: q('Constant power'), ...effects,
     }),
-    t("Select a clip and open {controls}: {motion} ({posX}, {posY}, {scale}) and {opacity}, one value for the whole clip; the clip's video effects ({bw} on or off, {blurName} 0 to 100%, {brightness} and {contrast} from -100% to +100%, {remove} takes one off); the start and end transitions and their length; {speed}; and for an audio clip its {volume} and fades. Double-click a value's % to reset it.", {
+    // 흐림 [일정하게] · [시작 → 끝](D14, 2026-11-22) — 흐림만 클립 처음에서 끝까지 곧게 바뀔 수 있다.
+    t("Select a clip and open {controls}: {motion} ({posX}, {posY}, {scale}) and {opacity}, one value for the whole clip; the clip's video effects ({bw} on or off; {gaussian} as {constant}, one {blurName} value from 0 to 100%, or {startEnd}, where the blur changes in a straight line from its {start} % at the start of the clip to its {end} % at the end; {brightness} and {contrast} from -100% to +100%; {remove} takes one off); the start and end transitions and their length; {speed}; and for an audio clip its {volume} and fades. Double-click a value's % to reset it.", {
       controls: q('Effect controls'), motion: q('Motion'), posX: q('Position X'), posY: q('Position Y'), scale: q('Scale'), opacity: q('Opacity'), bw: effects.bw,
+      gaussian: effects.blur, constant: q('Constant'), startEnd: q('Start → End'), start: q('Start'), end: q('End'),
       blurName: q('Blur'), brightness: q('Brightness'), contrast: q('Contrast'), remove: q('Remove effect'), speed: q('Speed'), volume: q('Volume'),
     }),
     t("Titles (added with {type}): white bold text over the video. In {controls}: {text}, {size} (10 to 100) and {position} ({upper}, {center}, {lower} or {band}), plus motion, opacity and transitions. Drag a title's edges to change its length.", {
@@ -61,6 +64,11 @@ export function editorFeatureLines(locale: AppLocale = 'en'): string[] {
       import: q('Import…'), myFiles: `"${t('My files · {count}', { count: 'N' })}"`, project: q('Project'), delete: q('Delete'), volume: q('Volume (applies to draft)'),
       mute: q('Mute'), unmute: q('Unmute'), deleteAudio: q('Delete audio'),
     }),
+    // [생성] 음악 만들기(2026-11-26 m1126 E1 · 리드 O2) — 만들기는 사람이 [생성]에서 한다. Lumi 는 음악을 만들지 않는다.
+    t("The {generate} tab next to {controls}: write the mood, pick {eleven} (instrumental or with vocals, 3 seconds to 3 minutes) or {minimax} (songs with lyrics; leave the lyrics empty and it writes them; the model picks the length), and press {make}. Finished music appears in {made} in the {project} tab; drag it onto an audio track or press {add}, then trim, move, change its volume and fade it like any audio clip. Lumi does not make music.", {
+      generate: q('Generate'), controls: q('Effect controls'), eleven: `"${MUSIC_MODELS['elevenlabs-music'].label}"`, minimax: `"${MUSIC_MODELS['minimax-music-2.6'].label}"`,
+      make: q('Make music'), made: `"${t('Made music · {count}', { count: 'N' })}"`, project: q('Project'), add: q('Add to timeline'),
+    }),
     t('Output, in the {exportTab} tab: {draftRender} records the timeline in real time into one video file with everything the monitor shows (all tracks, motion, opacity, transitions, effects, titles, subtitles and audio fades; keep the tab open and visible, it takes as long as the film). {shotZip} downloads the original shot videos in timeline order, without any edits.', {
       exportTab: q('Export'), draftRender: q('Draft Render'), shotZip: q('Shot ZIP'),
     }),
@@ -82,8 +90,8 @@ export function editorMissingLines(locale: AppLocale = 'en'): string[] {
     t("Deleting: a delete item in a clip's right-click menu on the video track. After {split}, take off the piece you don't want with {hide} (leaves a gap), {ripple} (closes it) or the Delete key.", {
       split: q('Split here'), hide: q('Hide clip'), ripple: q('Ripple delete'),
     }),
-    t('Picture changes: colour grading beyond {bc}, crop, rotate, reverse, freeze frame, and keyframes (motion, opacity and effects keep one value for the whole clip).', {
-      bc: q('Brightness & Contrast'),
+    t('Picture changes: colour grading beyond {bc}, crop, rotate, reverse, freeze frame, and keyframes (motion, opacity and effects keep one value for the whole clip, except that {gaussian} can be {startEnd}, which changes only in a straight line from the start of the clip to its end).', {
+      bc: q('Brightness & Contrast'), gaussian: q('Gaussian blur'), startEnd: q('Start → End'),
     }),
     t('Text styling: title font or colour, subtitle font, size, colour or timing, and title card font, colour or image size.'),
     t('Timeline: overlapping clips on the same track, copy and paste, and more than one sequence.'),

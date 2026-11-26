@@ -13,6 +13,8 @@ import {
   listCapacitySkips,
   userOwnsProject,
 } from '@/lib/generation-jobs'
+import { listFailedPropImageJobs, listQueuedPropImageJobs } from '@/lib/artist/prop-jobs'
+import { artistImagesStarted } from '@/lib/artist/images-started'
 
 export const runtime = 'nodejs'
 
@@ -29,7 +31,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ error: 'forbidden' }, { status: 403 })
   }
 
-  const [failures, queuedMain, worldFailures, queuedWorld, capacitySkips] = await Promise.all([
+  const [failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps, imagesStarted] = await Promise.all([
     listFailedCharacterViewJobs(projectId),
     listQueuedMainJobs(projectId),
     listFailedWorldShotJobs(projectId), // 약속 B8(2026-09-04): 배경 실패 표시·우회 재시도의 근거
@@ -37,6 +39,12 @@ export async function GET(req: Request) {
     // 서버 초안이 자리 때문에 건너뛴 칸의 축 — 화면은 내 한도에 막힌 칸만 이어 그린다(2026-10-27 디자이너 QA 1차 #06).
     //   기록을 못 읽어도 상태 조회는 막지 않는다(빈 값이면 모든 빈칸을 내 한도로 본다).
     listCapacitySkips(projectId).catch(() => ({})),
+    // 소품 그림(D7 2026-11-22) — 카드 "그림 실패" 표시 · 서버가 그리는 중인 소품. 배경과 같은 규칙.
+    //   소품 기록을 못 읽어도 인물 · 배경 상태 조회는 막지 않는다(빈 값 = 실패 · 대기 없음으로 본다).
+    listFailedPropImageJobs(projectId).catch(() => []),
+    listQueuedPropImageJobs(projectId).catch(() => []),
+    // Artist 새 흐름(m1126 O1): 그림을 그리기 시작했는가 — 아니면 화면이 그림체와 [만들기]를 보인다. 모르면 null.
+    artistImagesStarted(projectId),
   ])
-  return NextResponse.json({ failures, queuedMain, worldFailures, queuedWorld, capacitySkips })
+  return NextResponse.json({ failures, queuedMain, worldFailures, queuedWorld, capacitySkips, propFailures, queuedProps, imagesStarted })
 }

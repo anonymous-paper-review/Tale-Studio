@@ -209,7 +209,7 @@ export function Sidebar() {
       {/* Stage navigation — 레일 칸 표(lib/stage-rail RAIL_ITEMS) 순서: Producer · Writer · Artist · Storyboard · Director · Editor.
           Writer 칸은 씬 스토리(id producer) · 콘티(id conti)를 함께 맡는다(O1 2026-11-26) — 칸의 단계는 대표 단계(stage)로 그린다.
           아이콘 + 라벨이 한 버튼 안에 들어간다: 활성 배경이 둘을 함께 감싸야 하나의 탭으로 읽힌다.
-          단계 칸은 줄이거나 스크롤하지 않고, 높이가 부족하면 아래 보조 단추를 메뉴로 접는다. */}
+          단계 칸은 줄이거나 스크롤하지 않는다. 아래 보조 단추는 늘 [메뉴] 하나로 접혀 있다(오너 2026-11-26 m1126 G2). */}
       <div className="sidebar-stage-nav flex min-h-max flex-1 shrink-0 flex-col items-center gap-1.5">
         {RAIL_ITEMS.map((item) => {
           const stage = STAGES.find((s) => s.id === item.id)!
@@ -342,7 +342,7 @@ export function Sidebar() {
         })}
       </div>
 
-      {/* 푸터 액션 — Take · 공유 · 내보내기 · Help · 프로필(v3 순서): 아이콘 · 캡션 크기와 세로 간격을 FooterIconItem 로 통일.
+      {/* 푸터 액션 — [메뉴](Take · 공유 · 내보내기 · Help, v3 순서) · 프로필: 아이콘 · 캡션 크기와 세로 간격을 FooterIconItem 로 통일.
           AI 가 일하는 동안은 통째로 inert(누르기 · 키보드 포커스 모두 막힘, 2026-10-27 오너 재확인).
           inert 안쪽에는 마우스가 닿지 않는다 — 막힌 까닭(title) · 금지 커서는 막지 않는 바깥 묶음에 둔다(검토). */}
       <div

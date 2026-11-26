@@ -62,6 +62,8 @@ import {
   toggleMentionToken,
   foundationMentions,
 } from '@/lib/card-mention'
+import { artistMentionItems } from '@/lib/artist/mention-items'
+import { breakdownRows } from '@/lib/artist/breakdown'
 import { SceneGateControls } from '@/features/writer/scene-gate-panel'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
@@ -416,12 +418,14 @@ export function GlobalChat() {
   const producerBackgrounds = useProducerStore((s) => s.backgrounds)
   const artistCharacters = useArtistStore((s) => s.characterAssets)
   const artistWorlds = useArtistStore((s) => s.worldAssets)
+  const artistProps = useArtistStore((s) => s.propAssets)
   const writerManifest = useWriterStore((s) => s.sceneManifest)
   const writerShots = useWriterStore((s) => s.shots)
   // t() 는 매 렌더 새 함수 참조라 memo deps에 그대로 넣으면 메모이제이션이 무력화된다 —
   //   번역 결과(문자열, 값 비교 가능)만 미리 뽑아 deps에 넣는다.
   const characterHint = t('Character')
   const locationHint = t('Location')
+  const propHint = t('Prop')
   const directorNodes = useDirectorCanvasStore((s) => s.nodes)
   // Director 씬 · 샷 멘션 이름은 보드와 같은 전체 번호("러프 샷 8" · "Previz Shot 8", 오너 2026-11-02 "전체 번호로 통일") — 말은 카드와 같은 화면 언어(2026-11-14 답 7).
   const directorNames = useMemo(() => boardNodeNames(writerManifest, writerShots, locale), [writerManifest, writerShots, locale])
@@ -434,14 +438,11 @@ export function GlobalChat() {
       ]
     }
     if (currentStage === 'artist') {
-      return [
-        ...artistCharacters
-          .filter((c) => c.name?.trim())
-          .map((c) => ({ id: c.characterId, label: c.name, hint: characterHint })),
-        ...artistWorlds
-          .filter((w) => w.name?.trim())
-          .map((w) => ({ id: w.locationId, label: w.name, hint: locationHint })),
-      ]
+      // D9(2026-11-22): 인물 · 배경 · 소품 카드 이름. 카드가 아직 없는 첫 화면(글 목록)은 글 목록 줄 이름.
+      return artistMentionItems(
+        { characters: artistCharacters, worlds: artistWorlds, props: artistProps, breakdown: breakdownRows(producerCast, producerBackgrounds) },
+        { character: characterHint, location: locationHint, prop: propHint },
+      )
     }
     // 보드 단계(콘티 · Storyboard, O1 2026-11-26) — 씬 · 샷 · 스크립트 줄을 @로 고른다.
     if (isBoardStage(currentStage)) {
@@ -463,6 +464,8 @@ export function GlobalChat() {
     producerBackgrounds,
     artistCharacters,
     artistWorlds,
+    artistProps,
+    propHint,
     writerManifest,
     writerShots,
     characterHint,
@@ -484,10 +487,11 @@ export function GlobalChat() {
     for (const c of producerCast) put(c.localId, c.name)
     for (const c of artistCharacters) put(c.characterId, c.name)
     for (const w of artistWorlds) put(w.locationId, w.name)
+    for (const p of artistProps) put(p.propId, p.name)
     for (const c of writerManifest?.characters ?? []) put(c.characterId, c.name)
     for (const l of writerManifest?.locations ?? []) put(l.locationId, l.name)
     return map
-  }, [producerCast, artistCharacters, artistWorlds, writerManifest])
+  }, [producerCast, artistCharacters, artistWorlds, artistProps, writerManifest])
   // 샷 id 는 지금 보드의 전체 번호로(오너 2026-11-02 "전체 번호로 통일") — id 숫자는 샷을 더하거나 지우면 보드와 어긋난다.
   const shotLabelById = useMemo(() => boardShotLabels(writerManifest, writerShots, chatLocale), [writerManifest, writerShots, chatLocale])
   const scrubProse = (text: string) => scrubInternalIdsInProse(text, chatLocale, scrubNameById, shotLabelById)
@@ -1555,7 +1559,7 @@ export function GlobalChat() {
                       STAGE_BADGE_CLASS[pendingProposal.stage],
                     )}
                   >
-                    Suggestion
+                    {t('Suggestion')}
                   </span>
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold"><MarkdownText text={scrubProse(pendingProposal.target)} /></p>

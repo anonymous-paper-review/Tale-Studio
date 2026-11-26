@@ -13,7 +13,7 @@ import { latestShotTake, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSet
 import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
-import { effectivePrompt, useDirectorCanvasStore } from '@/stores/director-store'
+import { useDirectorCanvasStore } from '@/stores/director-store'
 import { isShotData } from '@/types/director'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { directorNodeLabel } from '@/features/director/node-label'
@@ -89,7 +89,8 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
     },
     notice: nextNotice,
   }
-  const meta = [scene ? directorNodeLabel(scene.data, boardNames) : null, t('{seconds}s', { seconds: data.durationSeconds }), effectivePrompt(data)].filter(Boolean).join(' · ')
+  // 제목 아래 줄은 씬 이름 · 길이만(오너 2026-11-26 D3) — 이미지 생성 프롬프트는 이미지 탭의 프롬프트 칸에서 보고 고친다.
+  const meta = [scene ? directorNodeLabel(scene.data, boardNames) : null, t('{seconds}s', { seconds: data.durationSeconds })].filter(Boolean).join(' · ')
 
   return (
     <div ref={rootRef} className={cn('flex min-h-0 flex-col gap-4', layout === 'panel' && 'h-full overflow-y-auto p-5')} data-testid="director-shot-detail">
@@ -109,7 +110,7 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
           </button>
         ) : null}
       </header>
-      <p className="line-clamp-2 shrink-0 text-caption text-subtle-foreground">{meta}</p>
+      <p className="line-clamp-2 shrink-0 text-caption text-subtle-foreground" data-testid="shot-detail-meta">{meta}</p>
       {tab === 'image'
         ? <ShotImageTab nodeId={shotNodeId} data={data} layout={layout} makeVideo={makeVideo} />
         : <ShotVideoTab shotNodeId={shotNodeId} data={data} layout={layout} initialTakeId={initialTakeId} />}

@@ -13,6 +13,7 @@ import { isPortOneSubscriptionId } from '@/lib/billing/portone-public'
 import {
   canBuyTakePack,
   groupRecentActivity,
+  markMusicActivity,
   summarizeSubscription,
   takeBreakdown,
   type ActivityItem,
@@ -94,6 +95,17 @@ export async function GET() {
 
     const rows = (ledger ?? []) as LedgerRow[]
     const packPurchasedBefore = rows.some((row) => row.kind === 'grant_purchase')
+    // 최근 내역 중 음악 작업(editor_music)에 묶인 Take 를 골라 "음악 만들기"로 보이게 한다(2026-11-26 리드 O3) — 장부 행에는 작업 종류가 없다.
+    const grouped = groupRecentActivity(rows)
+    const jobIds = [...new Set(grouped.filter((item) => item.refKind === 'generation_job' && item.refId).map((item) => item.refId as string))]
+    let musicJobIds = new Set<string>()
+    if (jobIds.length) {
+      const { data: musicJobs, error: musicError } = await supabaseAdmin.from('generation_jobs').select('id').in('id', jobIds).eq('kind', 'editor_music')
+      // 못 읽어도 내역은 보인다 — 이름만 예전(영상 생성)으로 남는다.
+      if (musicError) console.error('[billing/account] music job lookup failed:', musicError.message)
+      else musicJobIds = new Set(((musicJobs ?? []) as Array<{ id: string }>).map((job) => job.id))
+    }
+    const recent = markMusicActivity(grouped, musicJobIds)
 
     const body: BillingAccountResponse = {
       email,
@@ -102,7 +114,7 @@ export async function GET() {
       mode,
       subscription: summarizeSubscription(plan, subscription ?? null),
       balance: unlimited ? null : takeBreakdown(rows),
-      recent: groupRecentActivity(rows),
+      recent,
       packPurchasedBefore,
       canBuyPack: canBuyTakePack({ plan, packPurchasedBefore }),
       hasPaddleCustomer: typeof customer?.mor_customer_id === 'string',

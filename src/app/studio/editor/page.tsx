@@ -15,6 +15,9 @@ import { ProjectPanel } from '@/features/editor/video-source-panel'
 import { defaultTitleText } from '@/lib/editor/title-clip'
 import { EffectControls } from '@/features/editor/effect-controls'
 import { SourceMonitor } from '@/features/editor/source-monitor'
+import { MusicPanel } from '@/features/editor/music-panel'
+import { TopLeftTabs, type TopLeftTab } from '@/features/editor/top-left-tabs'
+import { placeableMusic, useEditorMusicStore } from '@/stores/editor-music-store'
 import { EditorTopActions, EditorWorkbar, ExportTab, ShortcutsDialog, type EditorTab } from '@/features/editor/editor-workbar'
 import { SnapMarkerButtons } from '@/features/editor/timeline-markers'
 import { AudioMeter } from '@/features/editor/audio-meter'
@@ -89,6 +92,7 @@ export default function PostPage() {
     addAudioSource,
     removeAudioSource,
     addAudioClipFromSource,
+    addAudioClipFromMusic,
     addAudioTrack,
     addVideoTrack,
     removeVideoTrack,
@@ -145,7 +149,8 @@ export default function PostPage() {
   const [exportingZip, setExportingZip] = useState(false)
   // 새 배치(시안 E1, 2단계 ① 2026-11-14): 둘째 줄 탭 · 위 왼쪽 판 탭([소스 | 효과 컨트롤]) · 소스 탭에 연 샷 · 단축키 창.
   const [tab, setTab] = useState<EditorTab>('edit')
-  const [topLeftTab, setTopLeftTab] = useState<'source' | 'effects'>('effects')
+  // [생성](2026-11-26 오너 E1) — 음악 만들기 판. 만든 곡 목록은 프로젝트를 열 때 서버에서 읽는다(프로젝트 판 "만든 음악"도 같은 목록).
+  const [topLeftTab, setTopLeftTab] = useState<TopLeftTab>('effects')
   const [sourceShotId, setSourceShotId] = useState<string | null>(null)
   const [shortcutsOpen, setShortcutsOpen] = useState(false)
   const projectFormat = useProjectFormatStore((s) => s.format)
@@ -154,6 +159,19 @@ export default function PostPage() {
   useEffect(() => {
     if (hasSelection) setTopLeftTab('effects')
   }, [hasSelection, selectedShotIds, selectedAudioIds])
+  const musicItems = useEditorMusicStore((s) => s.items)
+  const musicDecoded = useEditorMusicStore((s) => s.decoded)
+  const music = useMemo(() => placeableMusic(musicItems, musicDecoded), [musicItems, musicDecoded])
+  useEffect(() => {
+    if (projectId) void useEditorMusicStore.getState().load(projectId)
+  }, [projectId])
+  const handleAddMusic = useCallback(
+    (musicId: string, atSec: number, trackId?: string) => {
+      const song = music.find((m) => m.id === musicId)
+      if (song) addAudioClipFromMusic(song, atSec, trackId)
+    },
+    [music, addAudioClipFromMusic],
+  )
 
   // Draft Render (#draft-render 2026-08-26): 타임라인 전체를 브라우저에서 이어 붙여 파일로 저장.
   //   실시간 녹화라 진행 라벨을 버튼에 그대로 노출하고, 진행 중 재클릭 = 취소.
@@ -519,30 +537,9 @@ export default function PostPage() {
             {/* 위 줄 — 높이 조절 대상 */}
             <div style={{ height: panelSizes.previewH }} className="flex shrink-0 overflow-hidden">
               <div style={{ width: topLeftW }} className="flex h-full min-w-[340px] shrink flex-col overflow-hidden rounded-[20px] bg-panel">
-                <div role="tablist" className="flex shrink-0 items-center gap-4 px-4 pt-3">
-                  {(
-                    [
-                      ['source', t('Source')],
-                      ['effects', t('Effect controls')],
-                    ] as const
-                  ).map(([value, label]) => (
-                    <button
-                      key={value}
-                      type="button"
-                      role="tab"
-                      aria-selected={topLeftTab === value}
-                      onClick={() => setTopLeftTab(value)}
-                      className={cn(
-                        'relative pb-1.5 text-label transition-colors after:absolute after:inset-x-0 after:bottom-0 after:h-0.5',
-                        topLeftTab === value ? 'font-semibold text-foreground after:bg-foreground' : 'font-medium text-subtle-foreground hover:text-foreground',
-                      )}
-                    >
-                      {label}
-                    </button>
-                  ))}
-                </div>
+                <TopLeftTabs value={topLeftTab} onChange={setTopLeftTab} />
                 <div className="min-h-0 flex-1 overflow-y-auto">
-                  {topLeftTab === 'source' ? <SourceMonitor shotId={sourceShotId} /> : <EffectControls />}
+                  {topLeftTab === 'generate' ? <MusicPanel /> : topLeftTab === 'source' ? <SourceMonitor shotId={sourceShotId} /> : <EffectControls />}
                 </div>
               </div>
               <ResizeHandle
@@ -590,6 +587,8 @@ export default function PostPage() {
                     setBinDropSec(null)
                   }}
                   onSetBinDropSec={setBinDropSec}
+                  music={music}
+                  onAddMusic={handleAddMusic}
                 />
               </div>
 

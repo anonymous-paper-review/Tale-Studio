@@ -20,6 +20,8 @@ import { supabaseAdmin } from '@/lib/supabase/admin'
 import { markDirectorVideoAttemptFailed } from '@/lib/director-video-takes'
 import { failDirectorVideoAttemptOrFallback } from '@/lib/director/video-fallback'
 import { falImageFetch, falVideoFetch } from '@/lib/writer/llm/fal'
+import { falMusicFetch } from '@/lib/fal/music'
+import { isTakeBilledJobKind } from '@/lib/billing/take-cost'
 import { FalUnknownKeyError } from '@/lib/fal/keys'
 import { recordWriterObservabilityEvent } from '@/lib/writer/debug-events'
 import { releaseTakesForJob } from '@/lib/billing/take-hold'
@@ -36,8 +38,9 @@ async function terminalizeJob(job: GenerationJob, message: string): Promise<Gene
     await markDirectorVideoAttemptFailed(job.project_id, job.id, evidence)
   } else {
     await failGenerationJob(job.id, evidence)
-    // #payments-phase-2 #gen-quota-atomic-gate: unlinked shot_video/shot_previz_video 도 hold 대상이다.
-    if (job.kind === 'shot_video' || job.kind === 'shot_previz_video') {
+    // #payments-phase-2 #gen-quota-atomic-gate: unlinked shot_video/shot_previz_video 도 hold 대상이다. 2026-11-26 부터 음악(editor_music)도 —
+    //   Take 를 묶는 종류는 take-cost.ts TAKE_BILLED_JOB_KINDS 한 곳에 있다.
+    if (isTakeBilledJobKind(job.kind)) {
       try {
         await releaseTakesForJob(job.id)
       } catch (releaseError) {
@@ -125,12 +128,14 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
   //   동일하게 터미널 처리한다(재시도해도 어느 키로 조회할지 모른다).
   //   2026-10-11 에 지운 자체 호스팅(provider 'local') 예전 작업도 키가 없으니 이 경로로
   //   들어와 대기 상태로 방치되지 않는다.
-  let result: Awaited<ReturnType<typeof falImageFetch | typeof falVideoFetch>>
+  let result: Awaited<ReturnType<typeof falImageFetch | typeof falVideoFetch | typeof falMusicFetch>>
   try {
     if (!job.fal_key_id) throw new FalUnknownKeyError(job.fal_key_id)
     result = job.kind === 'shot_video' || job.kind === 'shot_previz_video'
       ? await falVideoFetch(job.model, job.request_id, job.fal_key_id)
-      : await falImageFetch(job.model, job.request_id, job.fal_key_id)
+      : job.kind === 'editor_music'
+        ? await falMusicFetch(job.model, job.request_id, job.fal_key_id)
+        : await falImageFetch(job.model, job.request_id, job.fal_key_id)
   } catch (error) {
     if (error instanceof FalUnknownKeyError || isPermanentProviderLookupFailure(error)) {
       // fal ApiError 는 404(NOT_FOUND)에서 message 가 빈 문자열이다. 그대로 넘기면 terminalizeJob 의
@@ -158,7 +163,9 @@ export async function reconcileJobFromFal(job: GenerationJob): Promise<Generatio
     job,
     job.kind === 'shot_video' || job.kind === 'shot_previz_video'
       ? { media: 'video', url: result.url, payload: result.raw }
-      : { media: 'image', url: result.url, payload: result.raw },
+      : job.kind === 'editor_music'
+        ? { media: 'audio', url: result.url, payload: result.raw }
+        : { media: 'image', url: result.url, payload: result.raw },
   )
 }
 

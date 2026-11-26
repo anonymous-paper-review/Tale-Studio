@@ -23,7 +23,7 @@ export interface ModerationRejectionContext {
    * 화면은 이 자리에 실린 이름으로만 "어느 인물·배경의 설정을 고쳐야 하나"를 말해 줄 수 있다.
    * 라우트가 거절 시점에 이름을 알 때만 싣는다 — 모를 때는 없으며, 화면은 이름 없는 예전 안내로 돌아간다.
    */
-  target?: { kind: 'character' | 'world'; name: string }
+  target?: { kind: 'character' | 'world' | 'prop'; name: string }
 }
 
 /** 막힘 — 클라이언트가 "설명을 고쳐 다시" 안내를 띄우는 코드. */

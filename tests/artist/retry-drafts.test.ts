@@ -121,6 +121,8 @@ describe('POST /api/artist/retry-drafts', () => {
 
     expect(response.status).toBe(200)
     // split pools (2026-08-26): retry-drafts counts against the image pool kinds
+    //   D7(2026-11-22): 소품 그림(prop_image)도 그림 자리로 센다 — 그림 종류가 하나 늘었다.
+    //   2026-11-26(m1126 E1 · 리드 답): Editor [생성] 음악(editor_music)도 그림 자리로 센다 — DB 자리 트리거와 같은 나눔(본문만 바꿈).
     expect(mocks.countQueuedJobsByUser).toHaveBeenCalledWith(USER.id, [
       'character_view',
       'world_shot',
@@ -128,6 +130,8 @@ describe('POST /api/artist/retry-drafts', () => {
       'image_generation',
       'storyboard_real_grid',
       'shot_rough_storyboard',
+      'prop_image',
+      'editor_music',
     ])
     expect(mocks.triggerAssetDrafts).toHaveBeenCalledTimes(1)
     expect(mocks.triggerAssetDrafts).toHaveBeenCalledWith(PROJECT_ID)
