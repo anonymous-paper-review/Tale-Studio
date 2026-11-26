@@ -136,6 +136,10 @@ export type ShotNodeData = {
   promptOverride?: string
   /** legacy prompt를 v2 필드로 1회 이관했는지 표시하는 멱등 플래그. */
   promptMigratedV2?: boolean
+  /** 이 브라우저가 마지막으로 읽은 Writer 지문(prompt · action_description) — 재수화마다 새로 적는다(director-prompt-sync.ts). */
+  writerFingerprint?: string
+  /** DB(shots.director_prompt)에 아직 못 올린 고친 글 — 저장 실패 · 처음 맞춤 대기. base = 그 글을 쓸 때 본 Writer 지문(null = 모름). 올라가면 지운다. */
+  directorPromptUnsaved?: { base: string | null }
   /** 사용자 업로드 보조 참고 이미지 (생성물 아님 — storyboardImage와 구분, 결정 #37) */
   referenceImages: DirectorReferenceImage[]
   /** Manual image-reference wiring source node IDs. URLs are resolved at generation time. */

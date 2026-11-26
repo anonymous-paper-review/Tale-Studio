@@ -1,4 +1,4 @@
-// Director 에서 고친 샷 프롬프트(채팅 [적용] · 샷 상세 프롬프트 칸)는 DB(shots.director_prompt)에 남아 다른 기기 · 다른 프로젝트를 다녀와도 그대로이고, Writer 가 샷 글을 다시 쓰면 비워진다 (오너 2026-11-26 O5 · 리드 승인)
+// Director 에서 고친 샷 프롬프트(채팅 [적용] · 샷 상세 프롬프트 칸)는 DB(shots.director_prompt)에 남아 다른 기기 · 다른 프로젝트를 다녀와도 그대로이고, Writer 가 샷 글 · 샷 이야기를 다시 쓰면 비워지며, 다시 읽을 때 칸이 없거나 아직 못 올린 고친 글은 지우지 않고 올린다 (오너 2026-11-26 O5 · 리드 승인 · 검토 rev-billing)
 import { readFileSync } from 'node:fs'
 import { QueryClient } from '@tanstack/react-query'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
@@ -10,6 +10,8 @@ vi.mock('@/lib/query-client', () => ({ getQueryClient: () => shared.client }))
 const db = vi.hoisted(() => ({
   shots: [] as Array<Record<string, unknown>>,
   writes: [] as Array<{ table: string; payload: Record<string, unknown>; shotId: unknown }>,
+  /** true 면 쓰기가 실패한다(네트워크 · 칸 없음 등) — 시도는 writes 에 남는다. */
+  failWrites: false,
 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
@@ -19,7 +21,7 @@ vi.mock('@/lib/supabase/client', () => ({
       const result = () => {
         if (payload) {
           db.writes.push({ table, payload, shotId })
-          return { data: null, error: null }
+          return db.failWrites ? { data: null, error: { message: 'write failed' } } : { data: null, error: null }
         }
         if (table === 'shots') return { data: db.shots, error: null }
         return { data: [], error: null }
@@ -49,8 +51,20 @@ const WRITER_TEXT = 'A tired woman sits alone in a night subway car.'
 let shotId = ''
 
 const shotRow = (writerShotId: string, extra: Record<string, unknown> = {}) => ({
-  shot_id: writerShotId, canvas_position: null, storyboard_image: null, image_inputs: [], director_refs: null, director_prompt: null, ...extra,
+  shot_id: writerShotId, canvas_position: null, storyboard_image: null, image_inputs: [], director_refs: null, director_prompt: null,
+  prompt: WRITER_TEXT, action_description: 'She sits alone.', action_description_native: null, ...extra,
 })
+/** 운영 마이그레이션 전 행 — director_prompt 칸이 아예 없다. */
+const rowWithoutColumn = (writerShotId: string, extra: Record<string, unknown> = {}) => {
+  const { director_prompt: _missing, ...row } = shotRow(writerShotId, extra)
+  return row
+}
+/** 그사이 다른 곳(Writer · 다른 기기 · 마이그레이션)이 행을 바꿨다 — 샷 사물함을 비워 다음 읽기가 새 행을 받게 한다(화면에서는 Writer 저장이 같은 일을 한다). */
+const rowsChangedElsewhere = () => shared.client.clear()
+/** 이 브라우저에 남아 있던 고친 글(이 기능 전 · 저장 없이) — 저장을 부르지 않고 노드에만 둔다. */
+const setLocalEditWithoutSaving = (text: string) => useDirectorCanvasStore.setState((state) => ({
+  nodes: state.nodes.map((n) => (n.id === shotId && isShotData(n.data) ? { ...n, data: { ...n.data, promptOverride: text } } : n)),
+}))
 const promptWrites = () => db.writes.filter((w) => w.table === 'shots' && 'director_prompt' in w.payload)
 const shotData = (id: string) => {
   const node = api().nodes.find((n) => n.id === id)
@@ -61,6 +75,7 @@ beforeEach(() => {
   shared.client = new QueryClient()
   db.shots = []
   db.writes = []
+  db.failWrites = false
   vi.useFakeTimers()
   vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL) => {
     const url = typeof input === 'string' ? input : input.toString()
@@ -113,15 +128,95 @@ describe('Director 고친 프롬프트 저장', () => {
     expect(effectivePrompt(shotData(shotId)!)).toBe('Edited on another device.')
   })
 
-  it('DB 에 고친 글이 없으면(null) 이 브라우저에 남은 옛 고친 글을 지우고 Writer 글로 돌아간다', async () => {
-    // 왜: Writer 가 샷 글을 다시 써서 DB 가 고친 글을 비웠을 수 있다 — 브라우저에 남은 옛 고친 글이 새 이야기를 덮으면 안 된다.
+  it('이 브라우저가 이미 DB 와 맞춘 프로젝트에서 DB 의 고친 글이 비었으면(Writer 가 다시 씀 · 다른 기기에서 지움) 이 브라우저의 옛 고친 글을 지우고 Writer 글로 돌아간다', async () => {
+    // 왜: 저장된 고친 글이 비었다는 것은 누군가 비운 것이다 — 브라우저에 남은 옛 고친 글이 새 이야기를 덮으면 안 된다.
+    //   (옛 이름: 'DB 에 고친 글이 없으면(null) 이 브라우저에 남은 옛 고친 글을 지우고 Writer 글로 돌아간다' — 검토(rev-billing) · 리드 2026-11-26:
+    //   처음 맞출 때 · 저장 실패 뒤 · 칸이 없을 때까지 지워 고친 글이 말없이 사라졌다. 이제 "이미 맞춘 프로젝트"에서만 지운다.)
+    db.shots = [shotRow('sh_01_01')]
+    await api().hydrateFromDb('p1')
     api().updateNodeData<'shot'>(shotId, { promptOverride: 'Old local edit.' })
     await vi.advanceTimersByTimeAsync(600)
+    expect(promptWrites().map((w) => w.payload.director_prompt)).toEqual(['Old local edit.'])
     db.writes = []
     db.shots = [shotRow('sh_01_01', { director_prompt: null })]
     await api().hydrateFromDb('p1')
     expect(shotData(shotId)?.promptOverride).toBeUndefined()
     expect(effectivePrompt(shotData(shotId)!)).toBe(WRITER_TEXT)
+    await vi.advanceTimersByTimeAsync(600)
+    expect(promptWrites()).toEqual([])
+  })
+
+  it('이 브라우저에서 처음 DB 와 맞출 때 DB 에 고친 글이 없고 이 브라우저에만 고친 글이 있으면(이 기능 전에 고친 글) 지우지 않고 DB 로 올린다 — Writer 글이 그대로일 때만', async () => {
+    // 왜: 검토 ② — 이 기능 전 고친 글은 브라우저에만 있다. 첫 진입에서 DB 의 빈 값으로 덮으면 사용자의 고친 글이 모두 사라진다.
+    setLocalEditWithoutSaving('Edited before the column existed.')
+    db.shots = [shotRow('sh_01_01', { director_prompt: null })]
+    await api().hydrateFromDb('p1')
+    expect(shotData(shotId)?.promptOverride).toBe('Edited before the column existed.')
+    await vi.advanceTimersByTimeAsync(600)
+    expect(promptWrites().map((w) => w.payload.director_prompt)).toEqual(['Edited before the column existed.'])
+  })
+
+  it('처음 맞출 때라도 그 고친 글을 쓴 뒤 Writer 가 샷 글이나 샷 이야기를 바꿨으면 올리지 않고 Writer 글로 돌아간다', async () => {
+    // 왜: 리드 — Writer 가 이야기를 바꿔 비워야 하는 경우와 갈라야 한다. 칸이 없던 때 읽은 Writer 글과 지금 Writer 글이 다르면 옛 고친 글이다.
+    db.shots = [rowWithoutColumn('sh_01_01')]
+    await api().hydrateFromDb('p1')
+    setLocalEditWithoutSaving('Edit against the old story.')
+    db.shots = [shotRow('sh_01_01', { director_prompt: null, action_description: 'She stands up and leaves.' })]
+    rowsChangedElsewhere()
+    await api().hydrateFromDb('p1')
+    expect(shotData(shotId)?.promptOverride).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(promptWrites()).toEqual([])
+  })
+
+  it('행에 director_prompt 칸이 없으면(운영 마이그레이션 전) 이 브라우저의 고친 글을 건드리지 않고, 처음 맞춘 것으로도 치지 않는다', async () => {
+    // 왜: 검토 ① — 배포 틈에 칸이 없는 것을 "비었음"으로 읽으면 들어오는 사람마다 고친 글이 지워진다.
+    setLocalEditWithoutSaving('Edit during the deploy gap.')
+    db.shots = [rowWithoutColumn('sh_01_01')]
+    await api().hydrateFromDb('p1')
+    expect(shotData(shotId)?.promptOverride).toBe('Edit during the deploy gap.')
+    expect(api().directorPromptSyncedProjects.p1).toBeUndefined()
+    // 칸이 생긴 뒤 첫 진입이 처음 맞춤이다 — 그때 올린다.
+    db.shots = [shotRow('sh_01_01', { director_prompt: null })]
+    rowsChangedElsewhere()
+    await api().hydrateFromDb('p1')
+    await vi.advanceTimersByTimeAsync(600)
+    expect(promptWrites().map((w) => w.payload.director_prompt)).toEqual(['Edit during the deploy gap.'])
+    expect(api().directorPromptSyncedProjects.p1).toBe(true)
+  })
+
+  it('고친 글 저장이 실패하면 다음에 들어올 때 DB 로 덮지 않고 그 글을 다시 올린다 — 그사이 Writer 글이 그대로일 때만', async () => {
+    // 왜: 검토 ③ — 저장이 한 번 실패하면 다시 올리지 않아 다음 재수화가 지웠다.
+    db.shots = [shotRow('sh_01_01')]
+    await api().hydrateFromDb('p1')
+    db.failWrites = true
+    api().updateNodeData<'shot'>(shotId, { promptOverride: 'Edit that failed to save.' })
+    await vi.advanceTimersByTimeAsync(600)
+    db.failWrites = false
+    db.writes = []
+    db.shots = [shotRow('sh_01_01', { director_prompt: null })]
+    rowsChangedElsewhere()
+    await api().hydrateFromDb('p1')
+    expect(shotData(shotId)?.promptOverride).toBe('Edit that failed to save.')
+    await vi.advanceTimersByTimeAsync(600)
+    expect(promptWrites().map((w) => w.payload.director_prompt)).toEqual(['Edit that failed to save.'])
+  })
+
+  it('고친 글 저장이 실패한 뒤 Writer 가 샷 이야기를 바꿨으면 다시 올리지 않고 Writer 글로 돌아간다', async () => {
+    // 왜: 바뀐 이야기 위에 옛 고친 글을 되살리면 방아쇠 규칙(Writer 가 다시 쓰면 비운다)이 깨진다.
+    db.shots = [shotRow('sh_01_01')]
+    await api().hydrateFromDb('p1')
+    db.failWrites = true
+    api().updateNodeData<'shot'>(shotId, { promptOverride: 'Edit that failed to save.' })
+    await vi.advanceTimersByTimeAsync(600)
+    db.failWrites = false
+    db.writes = []
+    db.shots = [shotRow('sh_01_01', { director_prompt: null, action_description: 'She stands up and leaves.' })]
+    rowsChangedElsewhere()
+    await api().hydrateFromDb('p1')
+    expect(shotData(shotId)?.promptOverride).toBeUndefined()
+    await vi.advanceTimersByTimeAsync(600)
+    expect(promptWrites()).toEqual([])
   })
 
   it('고친 글을 저장하기 전(0.5초 안)에 다시 읽어도 막 고친 글을 덮지 않고, 그 뒤 저장한다', async () => {

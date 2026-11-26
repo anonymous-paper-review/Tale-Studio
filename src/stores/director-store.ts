@@ -57,6 +57,7 @@ import type { Json } from '@/types/database'
 import { invalidateShots, loadShotsResult } from '@/lib/shots-cache'
 import { parseDirectorRefs } from '@/lib/director/director-refs'
 import { latestShotTake, promptWithChange, takeSettings } from '@/lib/director/shot-detail'
+import { decideDirectorPromptHydrate, KEEP, type DirectorPromptRow } from '@/lib/director/director-prompt-sync'
 import { currentStoryboardVersion, keptStoryboardImage, selectStoryboardVersion, storyboardImageVersions, withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import {
   isEmptyStableFrameInputs,
@@ -977,6 +978,7 @@ function debouncedDirectorPromptSaveToDb(
   projectId: string,
   writerShotId: string,
   getData: () => ShotNodeData | undefined,
+  delayMs = 500,
 ) {
   const existing = pendingDirectorPromptSaves.get(writerShotId)
   if (existing) clearTimeout(existing)
@@ -993,12 +995,26 @@ function debouncedDirectorPromptSaveToDb(
           .eq('project_id', projectId)
           .eq('shot_id', writerShotId)
         if (error) throw error
+        markDirectorPromptSaved(writerShotId)
         void invalidateShots(projectId) // 사물함 표시 — 다음 읽기가 새 값을 받게
       } catch (err) {
+        // 못 올림 표시(directorPromptUnsaved)는 남는다 — 다음 고침 · 다음 진입 때 다시 올린다(검토 ③).
         console.error('[director-store] director prompt DB save failed:', err)
       }
-    }, 500),
+    }, delayMs),
   )
+}
+
+/** 고친 글이 DB 에 올라갔다 — 그 샷의 "못 올림" 표시를 지운다. 그사이 새로 고쳐 저장을 기다리면 그 저장이 지운다. */
+function markDirectorPromptSaved(writerShotId: string) {
+  if (pendingDirectorPromptSaves.has(writerShotId)) return
+  useDirectorCanvasStore.setState((state) => ({
+    nodes: state.nodes.map((n) =>
+      isShotData(n.data) && n.data.writerShotId === writerShotId && n.data.directorPromptUnsaved
+        ? { ...n, data: { ...n.data, directorPromptUnsaved: undefined } }
+        : n,
+    ),
+  }))
 }
 
 const pendingVideoClipSaves = new Map<string, ReturnType<typeof setTimeout>>()
@@ -1155,6 +1171,8 @@ interface DirectorCanvasState {
   viewportInitialized: boolean
   /** 프로젝트별 Node 첫 진입 애니메이션 완료 여부. */
   viewportInitializedProjects: Record<string, boolean>
+  /** 이 브라우저가 Director 고친 글(shots.director_prompt)을 DB 와 처음 맞춘 프로젝트(검토 rev-billing · 리드 2026-11-26) — 처음 맞출 때만 브라우저에만 남은 고친 글을 올린다. */
+  directorPromptSyncedProjects: Record<string, true>
   viewMode: 'node' | 'storyboard'
   /** Storyboard 뷰 미디어 모드(#previz-video) — Previz(목각, 기본) | Real(실사). 상단바 토글이 제어. */
   storyboardMediaMode: 'previz' | 'real'
@@ -1791,6 +1809,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       viewport: { x: 0, y: 0, zoom: 1 },
       viewportInitialized: false,
       viewportInitializedProjects: {},
+      directorPromptSyncedProjects: {},
       viewMode: 'node',
       storyboardMediaMode: 'previz',
       statusFilter: 'all',
@@ -2042,11 +2061,15 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               )
             }
           }
-          // Director 고친 샷 프롬프트(shots.director_prompt, 오너 2026-11-26 O5) — DB 가 진실. null = Writer 글 그대로.
-          const directorPromptByShotId = new Map<string, string | null>()
+          // Director 고친 샷 글(shots.director_prompt, 오너 2026-11-26 O5) — 이 브라우저의 고친 글과 맞춘다(검토 rev-billing · 리드 2026-11-26).
+          //   칸이 없는 행(운영 마이그레이션 전) · 저장 대기는 건드리지 않고, 못 올린 고친 글 · 처음 맞춤은 Writer 지문이 같을 때만 올린다(director-prompt-sync.ts).
+          const directorPromptRowByShotId = new Map<string, DirectorPromptRow>()
           for (const r of shotsRes.data ?? []) {
-            if (r.shot_id) directorPromptByShotId.set(r.shot_id, typeof r.director_prompt === 'string' ? r.director_prompt : null)
+            if (r.shot_id) directorPromptRowByShotId.set(r.shot_id, r as DirectorPromptRow)
           }
+          const directorPromptColumn = [...directorPromptRowByShotId.values()].some((r) => 'director_prompt' in r)
+          const directorPromptFirstSync = get().directorPromptSyncedProjects[projectId] !== true
+          const directorPromptUploads: string[] = []
           // #wiring-persistence: DB에 저장된 안정 참조 연결. 노드 재구성 후 resolve 해 복원한다.
           const stableImageInputsByShotId = new Map<string, StableWiringRef[]>()
           // 약속 F·G: 사람이 손댄 참조 목록(shots.director_refs) — 있으면 그것이 진실이다.
@@ -2120,10 +2143,28 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                     data: {
                       ...n.data,
                       imageInputs: normalizeImageInputs(n.data.imageInputs),
-                      // 고친 프롬프트는 DB 값으로 — 저장 전(0.5초 안)인 고친 글이 있으면 그대로 둔다(곧 저장된다).
-                      ...(directorPromptByShotId.has(n.data.writerShotId) && !hasPendingDirectorPromptSave(n.data.writerShotId)
-                        ? { promptOverride: directorPromptByShotId.get(n.data.writerShotId) ?? undefined }
-                        : {}),
+                      // 고친 프롬프트 — DB 와 맞춘다(director-prompt-sync.ts). 올릴 것은 아래에서 저장을 건다.
+                      ...(() => {
+                        const row = directorPromptRowByShotId.get(n.data.writerShotId)
+                        if (!row) return {}
+                        const decision = decideDirectorPromptHydrate({
+                          row,
+                          local: {
+                            promptOverride: n.data.promptOverride,
+                            derivedPrompt: n.data.derivedPrompt,
+                            writerFingerprint: n.data.writerFingerprint,
+                            unsaved: n.data.directorPromptUnsaved,
+                          },
+                          savePending: hasPendingDirectorPromptSave(n.data.writerShotId),
+                          firstSync: directorPromptFirstSync,
+                        })
+                        if (decision.upload) directorPromptUploads.push(n.data.writerShotId)
+                        return {
+                          writerFingerprint: decision.writerFingerprint,
+                          ...(decision.promptOverride !== KEEP ? { promptOverride: decision.promptOverride } : {}),
+                          ...(decision.unsaved !== KEEP ? { directorPromptUnsaved: decision.unsaved } : {}),
+                        }
+                      })(),
                       storyboardImage: shotStoryboardMatchesHydrationSnapshot(
                         n,
                         localSnapshot.get(n.id),
@@ -2311,6 +2352,18 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
 
             return { nodes, edges, lastSavedAt: Date.now() }
           })
+          // Director 고친 글 — 못 올린 글 · 처음 맞춤 글을 바로 올리고, 칸이 있는 행을 읽었으면 이 프로젝트를 "처음 맞춤 끝"으로 적는다.
+          if (get().projectId === projectId && hydrationEpoch === hydrationToken) {
+            for (const writerShotId of directorPromptUploads) {
+              debouncedDirectorPromptSaveToDb(projectId, writerShotId, () => {
+                const n = get().nodes.find((x) => isShotData(x.data) && x.data.writerShotId === writerShotId)
+                return n && isShotData(n.data) ? n.data : undefined
+              }, 0)
+            }
+            if (directorPromptColumn && directorPromptFirstSync) {
+              set((s) => ({ directorPromptSyncedProjects: { ...s.directorPromptSyncedProjects, [projectId]: true } }))
+            }
+          }
           // hydrate 로 Video 노드 집합이 바뀌었을 수 있음 — previz 체인 엣지 재배선(멱등).
           get().rebuildShotChainNodes()
           // #wiring-persistence: DB 안정 참조 → 현재 노드 id 복원. 파생 노드(rebuild)가 생긴 뒤에
@@ -3127,6 +3180,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         if (isShotData(prev.data) && 'promptOverride' in patch) {
           const node = get().nodes.find((n) => n.id === id)
           if (node && isShotData(node.data) && node.data.writerShotId) {
+            // 못 올림 표시 — 저장이 실패해도 다음 진입이 지우지 않고 다시 올린다(검토 ③). base = 이 글을 쓸 때 본 Writer 지문.
+            const base = node.data.writerFingerprint ?? null
+            set((state) => ({
+              nodes: state.nodes.map((n) => (n.id === id && isShotData(n.data) ? { ...n, data: { ...n.data, directorPromptUnsaved: { base } } } : n)),
+            }))
             debouncedDirectorPromptSaveToDb(get().projectId, node.data.writerShotId, () => {
               const n = get().nodes.find((x) => x.id === id)
               return n && isShotData(n.data) ? n.data : undefined
@@ -6012,6 +6070,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
           selectedEdgeId: null,
           viewport: { x: 0, y: 0, zoom: 1 },
           viewportInitialized: get().viewportInitializedProjects[get().projectId] === true,
+          directorPromptSyncedProjects: {},
           popupNodeId: null,
           detailNodeId: null,
           deleteConfirmInfo: null,
@@ -6073,6 +6132,7 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
         // Node 첫 진입 애니메이션 완료 표시는 프로젝트별로 저장해 새로고침 때 반복하지 않는다.
         viewportInitialized: s.viewportInitialized,
         viewportInitializedProjects: s.viewportInitializedProjects,
+        directorPromptSyncedProjects: s.directorPromptSyncedProjects,
         viewMode: s.viewMode,
         storyboardMediaMode: s.storyboardMediaMode,
         projectId: s.projectId,
