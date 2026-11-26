@@ -317,11 +317,13 @@ describe('Director 샷 상세 화면', () => {
     expect(out).not.toMatch(/>Edit<|>Settings</)
   })
 
-  it('Writer 샷의 이미지 탭 모델 칸에는 실제로 도는 GPT Image 2 · Seedream 4 만 보인다', () => {
+  it('Writer 샷의 이미지 탭 모델 칸에는 실제로 도는 GPT Image 2 · Seedream 4 · H3 Image 만 보인다', () => {
     // 왜: 오너 답 5번 "모델 칸에는 실제로 도는 것만" — 나머지 넷은 말없이 GPT Image 2 로 바뀌었다.
+    //   오너 2026-11-26 D5 "H3image … 까지 늘려줘" — H3 Image 는 시트를 정한 크기 그대로 그려(개발 DB 실측 2/2) Writer 샷에서도 돈다.
     const out = render('popup')
     expect(out).toContain('GPT Image 2')
     expect(out).toContain('Seedream 4')
+    expect(out).toContain('H3 Image')
     for (const hidden of ['Nano Banana', 'FLUX.2 Klein', 'Grok Imagine']) expect(out, hidden).not.toContain(hidden)
   })
 
@@ -360,13 +362,14 @@ describe('Director 샷 상세 화면', () => {
     expect(ko).toContain('Take 2')
   })
 
-  it('영상 탭은 이미지 고치기와 영상 고치기를 한 화면에 보이고, 영상 고치기에는 다섯 영상 모델 · 해상도 · 이번에 쓸 Take 를 보인다', () => {
+  it('영상 탭은 이미지 고치기와 영상 고치기를 한 화면에 보이고, 영상 고치기에는 일곱 영상 모델 · 해상도 · 이번에 쓸 Take 를 보인다', () => {
     // 왜: D7 — 장면 · 인물 · 구도는 이미지 고치기, 움직임 · 카메라 · 길이는 영상 고치기에서 고친다. Take 값은 지금 계산 그대로(오너 답 11번).
+    //   오너 2026-11-26 D4 "영상모델 H3 Max 계열 추가"로 다섯 → 일곱(H3 Max · H3 Max Turbo).
     done(1)
     const out = render('panel', 'video')
     expect(out).toContain('data-testid="shot-detail-fix-image"')
     expect(out).toContain('data-testid="shot-detail-fix-video"')
-    for (const label of ['Fix the image', 'Fix the video', 'Seedance 2.0', 'Seedance 2.5', 'Happy Horse', 'Kling O3 Pro', 'Veo 3.1', '720p', '1080p']) {
+    for (const label of ['Fix the image', 'Fix the video', 'Seedance 2.0', 'Seedance 2.5', 'Happy Horse', 'Kling O3 Pro', 'Veo 3.1', 'H3 Max', 'H3 Max Turbo', '720p', '1080p']) {
       expect(out, label).toContain(label)
     }
     expect(out.match(/role="checkbox" aria-checked="true" aria-disabled="true"/g)?.length).toBe(2)

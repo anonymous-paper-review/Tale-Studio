@@ -1185,6 +1185,7 @@ export const KO: Record<string, string> = {
   'Google Gemini 3.1 · strong character consistency, up to 14 references':
     'Google Gemini 3.1 · 캐릭터 일관성이 강함, 참조 최대 14장',
   'Google Gemini 2.5 · previous generation': 'Google Gemini 2.5 · 이전 세대',
+  'MiniMax · exact sizes, up to 16 references': 'MiniMax · 정확한 크기, 참조 최대 16장',
   // #ref-gate: 생성 선행조건(인물 시트·러프·실사 스토리보드) 대기·자동 재개 안내
   'character sheets for {names}': '{names}의 인물 시트', // copy-ok: fragment
   'the rough storyboard of {shot}': '{shot}의 러프 스토리보드', // copy-ok: fragment

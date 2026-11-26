@@ -564,7 +564,7 @@ function CanvasInner() {
 
   // [자동 정렬](검토 C 3번, 2026-11-10): 누른 동안만 화면 밖 카드까지 그려 지금 크기를 재고, 다 그려지면 정렬한다.
   //   정렬이 기다림 표시를 끄면 다시 보이는 카드만 그린다(아래 onlyRenderVisibleElements).
-  //   처음 들어갔을 때의 정렬(동기화가 요청, 오너 2026-11-16)도 같은 길이다. 다만 기다리는 사이 카드가 옮겨지거나 Take 가 생겼거나 늦게 돌아 다른 곳에서 자리가
+  //   처음 들어갔을 때의 정렬(동기화가 요청, 오너 2026-11-16)도 같은 길이다. 다만 기다리는 사이 카드가 옮겨졌거나 늦게 돌아 다른 곳에서 자리가
   //   저장됐을 수 있어, 정렬 직전에 한 번 더 확인하고(confirmFirstEntryArrange) 어긋나면 정렬하지 않는다(리뷰 s11 낮음 1). 정렬하면 이 창에서는 다시 점검하지 않고
   //   첫 화면은 새 자리 기준으로 다시 맞춘다(사람이 화면을 옮겼으면 맞추지 않는다).
   const arrangePending = useDirectorCanvasStore((s) => s.arrangePending)
@@ -959,27 +959,15 @@ function CanvasInner() {
 const TOOLBAR_PILL =
   'flex h-[34px] shrink-0 items-center gap-1.5 rounded-full bg-background px-3.5 text-[13px] font-medium text-foreground shadow-node transition-colors duration-100 hover:bg-card'
 
-// Alt+←/→ 순환 뷰 시퀀스(#keyboard-only 2026-08-11) — Node → Storyboard(Previz) → Storyboard(Real).
-const DIRECTOR_VIEW_CYCLE = ['node', 'previz', 'real'] as const
-type DirectorViewStep = (typeof DIRECTOR_VIEW_CYCLE)[number]
+// Alt+←/→ 순환 뷰 시퀀스(#keyboard-only 2026-08-11) — Node ↔ Storyboard.
+//   스토리보드 보기는 실사만 보인다(오너 2026-11-26 D1 "러프/실사 버튼 없애기") — 예전 세 칸(Node → 러프 → 실사)에서 러프 칸을 뺐다.
+const DIRECTOR_VIEW_CYCLE = ['node', 'storyboard'] as const
 
 function PaletteBar() {
   const t = useT()
   const viewMode = useDirectorCanvasStore((s) => s.viewMode)
   const setViewMode = useDirectorCanvasStore((s) => s.setViewMode)
-  const storyboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
-  const setStoryboardMediaMode = useDirectorCanvasStore((s) => s.setStoryboardMediaMode)
-  // 두 상태(viewMode, mediaMode)를 하나의 걸음으로 합쳐 순환한다.
-  const viewStep: DirectorViewStep =
-    viewMode === 'node' ? 'node' : storyboardMediaMode === 'real' ? 'real' : 'previz'
-  useAltArrowCycle(DIRECTOR_VIEW_CYCLE, viewStep, (next) => {
-    if (next === 'node') {
-      setViewMode('node')
-      return
-    }
-    setViewMode('storyboard')
-    setStoryboardMediaMode(next)
-  })
+  useAltArrowCycle(DIRECTOR_VIEW_CYCLE, viewMode, setViewMode)
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   // #real-grid: 일괄 생성은 4샷 시트 러너(runRealBatch)로 통합 — 진행 플래그는 스토어 공유.
   const realBatchBusy = useDirectorCanvasStore((s) => s.realBatchBusy)
@@ -1240,27 +1228,7 @@ function PaletteBar() {
             </Tabs>
           </AltArrowHint>
 
-          {/* 러프 | 실사 미디어 토글(#previz-video) — Storyboard 뷰 전용, 상단바 상주(2026-07-22). */}
-          {viewMode === 'storyboard' && (
-            <div className="flex h-9 items-center gap-0.5 rounded-full bg-background p-1 shadow-node">
-              {(['previz', 'real'] as const).map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  onClick={() => setStoryboardMediaMode(m)}
-                  aria-pressed={storyboardMediaMode === m}
-                  className={cn(
-                    'h-full rounded-full px-3 text-[13px] transition-colors',
-                    storyboardMediaMode === m
-                      ? 'bg-accent font-semibold text-foreground'
-                      : 'font-medium text-subtle-foreground hover:text-foreground',
-                  )}
-                >
-                  {m === 'previz' ? t('Rough') : t('Real')}
-                </button>
-              ))}
-            </div>
-          )}
+          {/* 러프 | 실사 단추는 없앴다(오너 2026-11-26 D1) — 스토리보드 보기는 늘 실사. 러프는 Writer 콘티가 맡는다. */}
 
           {/* 제목(#e1 2026-07-14 스테이지 헤더 → v3 툴바 안) — 설명문은 "?" 뱃지 호버(2026-08-06). */}
           <div className="flex min-w-0 items-center gap-2">

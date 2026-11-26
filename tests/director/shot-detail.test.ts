@@ -72,15 +72,15 @@ describe('Director 샷 상세', () => {
     expect(shotDetailFrames(null)).toEqual({ start: null, end: null })
   })
 
-  it('Writer 샷의 이미지 모델 칸에는 실제로 도는 GPT Image 2 · Seedream 4 만 보인다', () => {
-    // 왜: 오너 답 5번 "모델 칸에는 실제로 도는 것만" — Writer 샷은 러프 세 장을 한 장에서 다시 칠하는 길이라 이 둘만 돌고,
-    //   나머지는 말없이 GPT Image 2 로 바뀌었다.
-    expect(detailImageModels(shot())).toEqual(['gpt-image-2', 'seedream-4'])
+  it('Writer 샷의 이미지 모델 칸에는 실제로 도는 GPT Image 2 · Seedream 4 · H3 Image 만 보인다', () => {
+    // 왜: 오너 답 5번 "모델 칸에는 실제로 도는 것만" — Writer 샷은 러프 세 장을 한 장에서 다시 칠하는 길이라 시트 크기를 지키는 모델만 돌고,
+    //   나머지는 말없이 GPT Image 2 로 바뀌었다. 오너 2026-11-26 D5 로 H3 Image(시트 크기 그대로, 개발 DB 실측 2/2)가 더해졌다.
+    expect(detailImageModels(shot())).toEqual(['gpt-image-2', 'seedream-4', 'h3-image'])
   })
 
   it('Writer 샷이 아닌 캔버스 샷의 이미지 모델 칸에는 모든 모델이 보인다', () => {
-    // 왜: 캔버스에서 직접 만든 샷은 한 장 생성 길이라 고른 모델이 그대로 돈다(혼자 정한 것).
-    expect(detailImageModels(shot({ writerShotId: null })).length).toBe(6)
+    // 왜: 캔버스에서 직접 만든 샷은 한 장 생성 길이라 고른 모델이 그대로 돈다(혼자 정한 것). 오너 2026-11-26 D5 로 H3 Image 가 더해져 일곱.
+    expect(detailImageModels(shot({ writerShotId: null })).length).toBe(7)
   })
 
   it('영상 탭은 그 샷의 Take 를 새것부터 쌓아 보이고, 고른 ★ 가 없으면 가장 최근 완성 Take 를 "★ 최종 (자동)"으로 보인다', () => {

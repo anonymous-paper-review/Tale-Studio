@@ -58,6 +58,7 @@ import {
   type ShotNodeData,
 } from '@/types/director'
 import { directorMentionTargets, directorNodeLabel, sortByBoard } from '@/features/director/node-label'
+import { chatInputHasMention, launchMentionFlight } from '@/lib/mention-flight'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { useT } from '@/lib/i18n'
 import { Lumi } from '@/components/lumi/lumi'
@@ -504,12 +505,16 @@ function ShotCell({
       ? t('{seconds}s', { seconds: Math.round(data.durationSeconds) })
       : null
 
+  // ⌘/Ctrl+클릭 = 멘션 + 누른 자리에서 채팅으로 나는 @이름(오너 2026-11-26 G3 — 다른 탭과 같은 연출).
   const mentionCardOnModifierClick = (
-    event: Pick<MouseEvent, 'ctrlKey' | 'metaKey'>,
+    event: Pick<MouseEvent, 'ctrlKey' | 'metaKey' | 'clientX' | 'clientY'>,
   ): boolean => {
     const label = mentionLabelForModifierClick(event, shotMention)
     if (!label) return false
+    // Producer · Artist 카드와 같은 길: 방향은 넣고 빼기 전의 입력칸 글로 보고(#b2) → 멘션 토글 → 비행.
+    const removing = chatInputHasMention(label)
     requestMentionToggle(label)
+    launchMentionFlight({ label, clickX: event.clientX, clickY: event.clientY, toChat: !removing })
     return true
   }
 
@@ -851,9 +856,10 @@ export function StoryboardGridView({
   const nodes = useDirectorCanvasStore((s) => s.nodes)
   const projectId = useDirectorCanvasStore((s) => s.projectId)
   const requestMentionToggle = useChatUiStore((s) => s.requestMentionToggle)
-  // 미디어 모드: Previz(러프 3프레임 보드, 기본) | Real(실사) — 상단바(PaletteBar) 토글이 제어(2026-07-22).
-  const mediaMode: StoryboardMediaMode = useDirectorCanvasStore((s) => s.storyboardMediaMode)
-  const setStoryboardMediaMode = useDirectorCanvasStore((s) => s.setStoryboardMediaMode)
+  // 미디어 모드: 늘 실사(오너 2026-11-26 D1 "스토리보드뷰에서 러프/실사 버튼 없애기") — 러프는 Writer 콘티 · Storyboard 가 맡는다.
+  //   store 의 storyboardMediaMode 는 읽지 않는다: 처음 여는 프로젝트 · 예전에 러프를 골라 둔 브라우저는 그 값이 러프라, 단추 없이 러프 카드에 갇힌다.
+  //   카드(ShotCell)의 러프 갈래는 남겨 두었다(쓰지 않음) — 되돌릴 때 단추만 되살리면 된다.
+  const mediaMode: StoryboardMediaMode = 'real'
 
   // 슬러그 → 실제 이름 로스터(#e6) — asset-storage(진입 시 DB hydrate)에서 인물·장소 이름.
   //   표시 전용: 노드 데이터·프롬프트 원문(구동)은 그대로 둔다.
@@ -907,16 +913,9 @@ export function StoryboardGridView({
     }
   }, [activeRoughShots, projectId])
   const queuedImageShots = useMemo(
-    // #f10(2026-08-27 오너): previz 모드에선 러프 재생성 잡도 "생성 중"의 근거다 — 큐 진실이라
-    //   탭을 떠났다 와도 오버레이가 복원되고, 문구가 없어 재생성을 또 누르던 문제가 사라진다.
-    () =>
-      activeShotIds(
-        activeJobs,
-        mediaMode === 'previz'
-          ? ['shot_storyboard', 'storyboard_real_grid', 'shot_rough_storyboard']
-          : ['shot_storyboard', 'storyboard_real_grid'],
-      ),
-    [activeJobs, mediaMode],
+    // 실사 카드의 "생성 중" 근거는 실사 잡(한 장 · 네 장 시트)뿐이다. 예전 러프 보기는 러프 재생성 잡도 셌다(#f10) — 러프 보기를 없앴다(D1).
+    () => activeShotIds(activeJobs, ['shot_storyboard', 'storyboard_real_grid']),
+    [activeJobs],
   )
   const queuedVideoShots = useMemo(
     () => activeShotIds(activeJobs, ['shot_video']),
@@ -1049,7 +1048,10 @@ export function StoryboardGridView({
                   if (!label) return
                   event.preventDefault()
                   event.stopPropagation()
+                  // 씬 이름도 카드와 같은 멘션 비행(오너 2026-11-26 G3 · D9 "모든 탭에서 같게").
+                  const removing = chatInputHasMention(label)
                   requestMentionToggle(label)
+                  launchMentionFlight({ label, clickX: event.clientX, clickY: event.clientY, toChat: !removing })
                 }}
               >
                 {group.label}

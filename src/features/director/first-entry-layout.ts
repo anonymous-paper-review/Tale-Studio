@@ -2,16 +2,19 @@
 //   처음 들어가면 동기화가 Writer 의 씬 · 샷 카드를 만들고, 자리는 nextScenePosition · nextShotPosition 이 정한다. 그 자리는 카드를 그리기 전에
 //   정하므로 크기를 몰라 넉넉한 크기(샷 480)로 세고 씬 묶음도 1780 씩 벌려 [자동 정렬]보다 훨씬 멀다(샷 사이 249 · 묶음 1780 ↔ 56 · 776).
 //   그래서 처음 들어가면 카드를 다 그린 뒤 [자동 정렬]을 한 번 한다(같은 길 relayoutCanvas → 같은 간격).
-//   "처음"은 DB 로 정한다(리드 2026-11-16): Writer 씬 · 샷 카드에 DB 에 저장된 자리(canvas_position)가 하나도 없고 영상 테이크도 없고
+//   "처음"은 DB 로 정한다(리드 2026-11-16): Writer 씬 · 샷 카드에 DB 에 저장된 자리(canvas_position)가 하나도 없고
 //   Director 에서 직접 만든 카드도 없으면 사람이 자리를 놓은 적이 없다(끌면 바로 저장된다). 브라우저에 옛 간격 자리가 남아 있어도 한 번 정렬하고 저장한다 —
-//   다음부터는 저장된 자리라 다시 안 놓는다. 사람이 놓은 자리(DB 에 저장된 자리 · 영상 테이크 · 직접 만든 카드)는 건드리지 않는다.
+//   다음부터는 저장된 자리라 다시 안 놓는다. 사람이 놓은 자리(DB 에 저장된 씬 · 샷 자리 · 직접 만든 카드)는 건드리지 않는다.
+//   영상 Take 는 세지 않는다(오너 2026-11-26 D7 "자동 정렬이 잘 작동하지 않는데, 첫진입 시 잘 작동하는지 확인"): Take 자리는 사람이 놓은 것이 아니라
+//   만들 때 저절로 저장된다(영상 요청이 Take 카드 자리를 함께 보낸다). 예전에는 Take 가 있으면 처음으로 보지 않아, 스토리보드 보기 · 채팅으로 영상을 만든
+//   프로젝트는 노드 보기를 처음 열어도 넓은 기본 간격 그대로였다(개발 DB 실측 씬 묶음 사이 1780 ↔ [자동 정렬] 776). 정렬은 Take 도 샷 옆에 함께 놓는다.
 //   저장된 자리는 DB 에서 직접 읽어 가른다(projectHasSavedLayout): 진입 때 DB 읽기가 둘 겹쳐 돌아 먼저 끝난 쪽은 저장된 자리를 카드에 못 싣고 버려진다.
 //   그래서 카드 자리만으로는 저장된 자리가 아직 안 들어온 것인지 없는 것인지 가를 수 없다(2026-11-16 개발 DB 에서 덮어쓴 것을 확인).
 //   새로 더하는 카드의 기본 자리 함수는 그대로 둔다(이미 놓은 프로젝트에 더할 때 겹치지 않게, 2026-11-10 검토 C).
 //   약속: tests/director/first-entry-layout.test.ts · first-entry-saved-layout.test.ts
 import type { Viewport, XYPosition } from '@xyflow/react'
 import { createClient } from '@/lib/supabase/client'
-import { isAssetData, isDerivedNodeData, isSceneData, isShotData, type DirectorNode } from '@/types/director'
+import { isAssetData, isDerivedNodeData, isSceneData, isShotData, isVideoData, type DirectorNode } from '@/types/director'
 
 /**
  * 이 창을 닫기 전까지 처음 정렬 확인을 끝낸 프로젝트(리드 2026-11-16): 저장된 자리를 찾았거나 정렬을 마쳤다.
@@ -35,8 +38,9 @@ export function resetFirstEntryMemo(): void {
 }
 
 /**
- * DB 에 이 프로젝트의 카드 자리(scenes · shots 의 canvas_position)가 하나라도 저장돼 있거나 영상 테이크가 있는가.
- * 사람이 끌었거나 [자동 정렬]을 눌렀거나 영상 작업을 시작한 프로젝트다 — 처음 정렬이 덮으면 안 된다.
+ * DB 에 이 프로젝트의 카드 자리(scenes · shots 의 canvas_position)가 하나라도 저장돼 있는가.
+ * 사람이 끌었거나 [자동 정렬]을 누른 프로젝트다 — 처음 정렬이 덮으면 안 된다. 영상 Take 는 세지 않는다(위 머리말 D7).
+ * Take 목록은 그래도 읽는다: 그 API 의 소유자 검사가 남의 프로젝트에 처음 정렬(자리 쓰기)을 시도하지 않는 막이다(아래 리뷰 s11).
  * 읽기가 실패하거나 답이 이상하면 true(= 있다고 보고 아무것도 안 한다): 모르는데 덮는 것보다 안 고치는 편이 안전하다.
  * 알아 둘 것(리뷰 s11 낮음 3): 소유자가 아니면 Take API 가 403 을 돌려줘 true 가 된다. 처음 정렬이 남의 프로젝트에 자리 저장(쓰기)을 시도하지 않는 막이가
  *   이 점검의 소유자 검사에 기댄다 — 지금은 안전하니 손대지 않는다(쓰기 자체는 DB 의 소유자 쓰기 규칙이 따로 막는다).
@@ -53,7 +57,7 @@ export async function projectHasSavedLayout(projectId: string): Promise<boolean>
       fetch(`/api/director/video-takes?projectId=${encodeURIComponent(projectId)}`).then((response) => (response.ok ? response.json() : null)),
     ])
     if (scenes.error || shots.error || !takes || !Array.isArray(takes.takes)) return true
-    const has = (scenes.data?.length ?? 0) > 0 || (shots.data?.length ?? 0) > 0 || takes.takes.length > 0
+    const has = (scenes.data?.length ?? 0) > 0 || (shots.data?.length ?? 0) > 0
     if (has) settled.add(projectId)
     return has
   } catch {
@@ -63,8 +67,8 @@ export async function projectHasSavedLayout(projectId: string): Promise<boolean>
 
 /**
  * 사람이 놓은 카드가 없어 보이는 캔버스인가(DB 쪽은 projectHasSavedLayout 이 따로 가른다):
- * 씬 · 샷 카드가 하나 이상이고 전부 Writer 에서 왔고, 영상 테이크 · 프롬프트 노드 같은 다른 카드가 없다.
- * 에셋 카드 · 파생 카드는 매번 다시 만드는 것이라 따지지 않는다.
+ * 씬 · 샷 카드가 하나 이상이고 전부 Writer 에서 왔고, 프롬프트 노드 · 독립 영상 같은 Director 에서 직접 만든 카드가 없다.
+ * 에셋 카드 · 파생 카드는 매번 다시 만드는 것이라, 샷의 Take 는 만들 때 저절로 놓이는 것이라(오너 2026-11-26 D7) 따지지 않는다.
  */
 export function isAutoPlacedCandidate(nodes: readonly DirectorNode[]): boolean {
   let cards = 0
@@ -74,6 +78,8 @@ export function isAutoPlacedCandidate(nodes: readonly DirectorNode[]): boolean {
       const fromWriter = isSceneData(data) ? !!data.writerSceneId : !!data.writerShotId
       if (!fromWriter) return false
       cards += 1
+    } else if (isVideoData(data) && data.parentShotNodeId) {
+      continue
     } else if (!isAssetData(data) && !isDerivedNodeData(data)) {
       return false
     }
