@@ -1995,6 +1995,7 @@ export const KO: Record<string, string> = {
   // 단계 화면을 여는 동안 기다리는 카드 제목(m1126 G1, lib/stage-wait STAGE_WAIT_TITLE) — Editor 는 위 'Preparing clips…' 그대로.
   'Loading the start screen…': '시작 화면을 불러오는 중…',
   'Loading the prose…': '산문을 불러오는 중…',
+  'Loading the rough storyboard…': '콘티를 불러오는 중…',
   'Loading characters and backgrounds…': '인물 · 배경을 불러오는 중…',
   'Loading the storyboard…': '스토리보드를 불러오는 중…',
   'Loading shots…': '샷을 불러오는 중…',

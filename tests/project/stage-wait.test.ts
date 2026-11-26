@@ -10,14 +10,15 @@ vi.mock('@/lib/i18n', async () => {
 })
 
 import { StageWaitCard } from '@/components/feedback/stage-wait'
-import { STAGE_WAIT_TITLE, artistRead, settleRead, stageWaiting, storyboardRead } from '@/lib/stage-wait'
+import { STAGE_WAIT_TITLE, artistRead, settleRead, stageWaitPersona, stageWaiting, storyboardRead, type StageWaitScreen } from '@/lib/stage-wait'
 import { STAGE_PERSONA } from '@/lib/lumi'
 import { translate } from '@/lib/i18n/translate'
 import { STAGES } from '@/lib/constants'
-import type { StageId } from '@/types'
 
 const read = (file: string) => readFileSync(file, 'utf8')
-const card = (stage: StageId) => renderToStaticMarkup(createElement(StageWaitCard, { stage }))
+const card = (stage: StageWaitScreen) => renderToStaticMarkup(createElement(StageWaitCard, { stage }))
+/** 카드가 덮는 화면 — 단계 표(STAGES)와, 단계 등록이 합쳐지기 전의 Writer 콘티 화면(O1). 합친 뒤에는 STAGES 에 들어 있어 겹치지 않는다. */
+const SCREENS: StageWaitScreen[] = [...new Set<StageWaitScreen>([...STAGES.map(({ id }) => id), 'conti'])]
 
 describe('언제 기다리는 카드를 보이나', () => {
   // 왜: 프로젝트 목록에서 프로젝트를 열거나 바꾸는 동안(projectId 가 비어 있음)과, 레일로 옮겨 온 단계가 아직 자기 자료를 다 읽기 전이다.
@@ -72,11 +73,22 @@ describe('기다리는 카드', () => {
     expect(code).not.toMatch(/AiBusyOverlay|holdAiBusy|useAiBusyHold|\binert\b/)
   })
 
+  // 왜: 오너 O1(2026-11-26 "콘티를 Artist 앞에") — 산문 확정 뒤 · Artist 앞에 Writer 칸 안 콘티 화면(/studio/conti)이 생긴다.
+  //   리드 지시: 단계 등록이 합쳐지기 전에도 그 경로의 기다리는 카드는 Writer 옷으로 미리 둔다(레일에서 Writer 칸에 묶인다).
+  it('콘티 화면을 여는 동안에도 Writer 옷 기다리는 카드에 "콘티를 불러오는 중…"을 보인다', () => {
+    const html = card('conti')
+    expect(html).toContain('/lumi/full/writer-loading')
+    expect(html).toContain('>콘티를 불러오는 중…</h2>')
+    expect(stageWaitPersona('conti')).toBe('writer')
+    expect(read('src/app/studio/conti/loading.tsx')).toContain('<StageWaitCard stage="conti" />')
+  })
+
   // 왜: generic "불러오는 중…" 대신 무엇을 읽는지 동사로 말한다(design §16.2). Editor 는 오너가 본보기로 든 예전 글 그대로다.
   it('기다리는 카드 제목은 단계마다 무엇을 불러오는지 말하고 Editor 는 예전 그대로 "클립 준비 중…"이다', () => {
-    expect(Object.fromEntries(STAGES.map(({ id }) => [id, translate('ko', STAGE_WAIT_TITLE[id])]))).toEqual({
+    expect(Object.fromEntries(SCREENS.map((id) => [id, translate('ko', STAGE_WAIT_TITLE[id])]))).toEqual({
       entry: '시작 화면을 불러오는 중…',
       producer: '산문을 불러오는 중…',
+      conti: '콘티를 불러오는 중…',
       artist: '인물 · 배경을 불러오는 중…',
       writer: '스토리보드를 불러오는 중…',
       director: '샷을 불러오는 중…',
