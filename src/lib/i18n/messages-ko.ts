@@ -490,7 +490,8 @@ export const KO: Record<string, string> = {
 
   // ── writer 스테이지: writer-tabs ──
   'V2 units': 'V2 유닛',
-  'Rough storyboard': '러프 스토리보드',
+  // O1 · W2(오너 2026-11-26 "러프 스토리보드 > 콘티"): 한국어 화면의 러프 스토리보드 = 콘티(Writer 의 두 번째 칸 · 콘티 보드 칸 이름). 영어는 Rough storyboard 그대로.
+  'Rough storyboard': '콘티',
   Treatment: '트리트먼트',
   Dialogue: '대사',
   // ── writer 스테이지: writer-engine-picker ──
@@ -1683,6 +1684,11 @@ export const KO: Record<string, string> = {
   'Please hand over to Writer': 'Writer로 넘겨주세요',
   'Hand over to Artist': 'Artist로 넘기기',
   'Please hand over to Artist': 'Artist로 넘겨주세요',
+  // O1(오너 2026-11-26): 씬 스토리 → 콘티 넘김 말 · 산문을 확정한 뒤 씬 스토리의 [콘티로 가기] · 꺼진 [콘티]의 까닭.
+  'Hand over to the rough storyboard': '콘티로 넘기기',
+  'Please hand over to the rough storyboard': '콘티로 넘겨주세요',
+  'Go to the rough storyboard': '콘티로 가기',
+  'Opens when you confirm the prose': '산문을 확정하면 열려요',
   'Hand over to Director': 'Director로 넘기기',
   'Please hand over to Director': 'Director로 넘겨주세요',
   'Hand over to Editor': 'Editor로 넘기기',

@@ -3,9 +3,11 @@
 //     entry    = Producer   (새로 생긴 시작 단계: 아이디어 · 산문 조건 · 화면 비율)
 //     producer = Writer     (예전 Producer 의 산문 · 씬 스토리 작업공간)
 //     artist   = Artist
-//     writer   = Storyboard (예전 Writer 의 씬 · 샷 · 러프 스토리보드)
+//     writer   = Storyboard (예전 Writer 의 씬 · 샷 · 러프 스토리보드 → O1 뒤 실사 보기)
+//     conti    = Writer 콘티 (2026-11-26 오너 O1 "콘티를 Artist 앞에": 씬 · 샷 나누기 · 목각 러프 · 화살표 · 대사, 산문 확정 뒤 · Artist 앞.
+//                레일에서는 Writer 칸 안의 두 번째 칸이다 — lib/stage-rail RAIL_ITEMS)
 //   화면에 보이는 이름은 STAGE_LABEL(constants.ts) 한 곳에서만 정한다.
-export type StageId = 'entry' | 'producer' | 'writer' | 'artist' | 'director' | 'editor'
+export type StageId = 'entry' | 'producer' | 'conti' | 'writer' | 'artist' | 'director' | 'editor'
 
 export interface StageConfig {
   id: StageId

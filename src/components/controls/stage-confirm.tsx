@@ -15,9 +15,11 @@ import type { StageId } from '@/types'
 /** 다음 단계(옷 이름) — Editor 다음은 작품 완성. */
 export type StageConfirmNext = 'writer' | 'artist' | 'storyboard' | 'director' | 'editor' | 'complete'
 
+// O1(오너 2026-11-26): 씬 스토리(producer) 다음은 콘티("좋아요, 콘티 짜기로"), 콘티 다음은 Artist("좋아요, 그림 그리기로").
 const NEXT: Record<StageId, StageConfirmNext> = {
   entry: 'writer',
-  producer: 'artist',
+  producer: 'storyboard',
+  conti: 'artist',
   artist: 'storyboard',
   writer: 'director',
   director: 'editor',

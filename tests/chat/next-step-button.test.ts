@@ -64,14 +64,16 @@ afterEach(() => {
 describe('다음 단계 버튼은 단계마다 다음 단계를 가리킨다', () => {
   // 왜: 리뉴얼 단계 순서(Writer = id producer → Artist → Storyboard = id writer → Director → Editor)를 버튼 이름이 따른다.
   //   Storyboard → Director 는 보드의 [다음: Director로] 확인 창이 맡아 이 표에 없다(tests/writer/board-director-handoff).
-  it('다음 단계 버튼의 이름은 단계마다 다음 단계를 가리키고, 확정한 Writer에서는 Artist로 가기가 된다', () => {
-    expect(nextStepAction('producer', { producerLocked: false })).toMatchObject({ kind: 'handoff', label: 'Hand over to Artist', utterance: 'Please hand over to Artist' })
+  it('다음 단계 버튼의 이름은 단계마다 다음 단계를 가리키고, 확정한 Writer 씬 스토리에서는 콘티로 가기가 된다', () => {
+    // O1(오너 2026-11-26): 씬 스토리 → 콘티 → Artist. 콘티의 다음 단계 버튼이 [Artist로 넘기기]다.
+    expect(nextStepAction('producer', { producerLocked: false })).toMatchObject({ kind: 'handoff', label: 'Hand over to the rough storyboard', utterance: 'Please hand over to the rough storyboard' })
+    expect(nextStepAction('conti', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Hand over to Artist', utterance: 'Please hand over to Artist' })
     expect(nextStepAction('artist', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Hand over to Storyboard' })
     expect(nextStepAction('writer', { producerLocked: true })).toBeNull()
     // 1110 확정 시안 D1 "다음: Editor로"(오너 2026-11-14 허락: 시안으로 바뀌는 출시 시험은 새 기대값으로).
     expect(nextStepAction('director', { producerLocked: true })).toMatchObject({ kind: 'handoff', label: 'Next: Editor' })
     expect(nextStepAction('editor', { producerLocked: true })).toBeNull()
-    expect(nextStepAction('producer', { producerLocked: true })).toMatchObject({ kind: 'open', label: 'Go to Artist', stage: 'artist' })
+    expect(nextStepAction('producer', { producerLocked: true })).toMatchObject({ kind: 'open', label: 'Go to the rough storyboard', stage: 'conti' })
   })
 })
 
@@ -118,14 +120,14 @@ describe('Writer에서 넘길 때는 산문 확정 창을 먼저 연다', () => 
     expect(useProjectStore.getState().producerLocked).toBe(false)
   })
 
-  // 왜: 확정한 산문은 다시 확정하지 않는다 — 다음 단계(Artist) 화면으로 가기만 한다.
-  it('확정한 Writer의 다음 단계 버튼은 다시 확정하지 않고 Artist 화면으로 이동만 한다', async () => {
-    useProjectStore.setState({ producerLocked: true, reachedStage: 'artist' })
+  // 왜: 확정한 산문은 다시 확정하지 않는다 — 다음 단계(콘티, O1 2026-11-26) 화면으로 가기만 한다.
+  it('확정한 Writer 씬 스토리의 다음 단계 버튼은 다시 확정하지 않고 콘티 화면으로 이동만 한다', async () => {
+    useProjectStore.setState({ producerLocked: true, reachedStage: 'conti' })
     await useGlobalChatStore.getState().requestNextStep()
     expect(useGlobalChatStore.getState().handoffConfirm).toBeNull()
     expect(useWriterRoomStore.getState().confirmOpen).toBe(false)
-    expect(nav.handoffToStage).toHaveBeenCalledWith('artist')
-    expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/artist')
+    expect(nav.handoffToStage).toHaveBeenCalledWith('conti')
+    expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/conti')
     expect(writerStarts()).toHaveLength(0)
     expect(userLines()).toEqual([])
   })

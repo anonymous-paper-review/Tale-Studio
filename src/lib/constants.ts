@@ -2,6 +2,7 @@ import type { StageConfig, StageId } from '@/types'
 
 export const STAGES = [
   // 리뉴얼 1차(2026-10-19): 화면 이름 Producer → Writer → Artist → Storyboard → Director → Editor.
+  //   O1(오너 2026-11-26 "콘티를 Artist 앞에"): Writer 씬 스토리 → Writer 콘티(id conti) → Artist 순서로 열린다. 레일 칸은 그대로 여섯(lib/stage-rail).
   //   id 는 옛 이름 그대로다(types/project.ts StageId 주석): entry=Producer, producer=Writer, writer=Storyboard.
   //   넘어간 Producer · Writer 는 잠금이 아니라 "완료" — 뒤 단계의 변화를 앞으로 다시 맞추지 않는다.
   {
@@ -19,6 +20,17 @@ export const STAGES = [
     agent: 'Writer',
     path: '/studio/producer',
     handoffLabel: 'Breakdown',
+    // O1(오너 2026-11-26): 산문을 확정하면 Artist 가 아니라 콘티가 열린다(씬 · 샷 나누기가 Artist 앞으로 왔다).
+    nextStage: 'conti',
+  },
+  {
+    // 화면 이름 Writer — 콘티(오너 2026-11-26 O1 "콘티를 Artist 앞에"): 씬 · 샷 나누기 · 목각 러프 · 화살표 · 대사.
+    //   레일에서는 Writer 칸 안의 두 번째 칸이다(lib/stage-rail). 산문 확정으로 열리고 [Artist로 가기]로 Artist 를 연다.
+    id: 'conti',
+    name: "The Writers' Room",
+    agent: 'Writer',
+    path: '/studio/conti',
+    handoffLabel: 'Go to Artist',
     nextStage: 'artist',
   },
   {
@@ -68,6 +80,8 @@ export const DEFAULT_SHOT_DURATION = 8
 export const STAGE_LABEL: Record<StageId, string> = {
   entry: 'Producer',
   producer: 'Writer',
+  // 콘티는 Writer 칸 안의 칸이라 이름표도 Writer 다 — "콘티"라는 칸 이름은 위 막대 [씬 스토리 | 콘티]가 보여 준다(O1).
+  conti: 'Writer',
   writer: 'Storyboard',
   artist: 'Artist',
   director: 'Director',
@@ -82,6 +96,7 @@ export const STAGE_LABEL: Record<StageId, string> = {
 export const STAGE_AGENT_NAME: Record<StageId, string> = {
   entry: 'Producer',
   producer: 'Writer',
+  conti: 'Writer',
   writer: 'Storyboard',
   artist: 'Concept Artist',
   director: 'Director',
@@ -93,6 +108,8 @@ export const STAGE_AGENT_NAME: Record<StageId, string> = {
 export const STAGE_BADGE_CLASS: Record<StageId, string> = {
   entry: 'bg-stage-producer/15 text-stage-producer border-stage-producer/30',
   producer: 'bg-stage-writer/15 text-stage-writer border-stage-writer/30',
+  // 콘티 = Writer 색(O1 — 레일의 Writer 칸 안).
+  conti: 'bg-stage-writer/15 text-stage-writer border-stage-writer/30',
   writer: 'bg-stage-storyboard/15 text-stage-storyboard border-stage-storyboard/30',
   artist: 'bg-stage-artist/15 text-stage-artist border-stage-artist/30',
   director: 'bg-stage-director/15 text-stage-director border-stage-director/30',
@@ -103,6 +120,7 @@ export const STAGE_BADGE_CLASS: Record<StageId, string> = {
 export const STAGE_FACE_COLOR: Record<StageId, string> = {
   entry: 'var(--stage-producer)',
   producer: 'var(--stage-writer)',
+  conti: 'var(--stage-writer)',
   writer: 'var(--stage-storyboard)',
   artist: 'var(--stage-artist)',
   director: 'var(--stage-director)',
@@ -115,6 +133,8 @@ export const STAGE_CHAT_TITLE: Record<StageId, string> = {
   entry: 'Planning with Lumi',
   producer: 'Prose with Lumi',
   artist: 'Art with Lumi',
+  // 콘티는 지금 Storyboard 보드 채팅(씬 · 샷 · 연출)을 그대로 쓴다(O1).
+  conti: 'Directing with Lumi',
   writer: 'Directing with Lumi',
   // Director · Editor 는 11/13 시안 D5 대로 단계 이름을 적는다(오너 11/14 "추천대로") — 다른 단계는 v3 그대로.
   director: 'Lumi · Director',
@@ -125,6 +145,7 @@ export const STAGE_CHAT_TITLE: Record<StageId, string> = {
 export const STAGE_PLACEHOLDER: Record<StageId, string> = {
   entry: 'Tell us about your story…',
   producer: 'E.g. rewrite it, or make the ending funnier',
+  conti: 'E.g. make shot 8 darker',
   writer: 'E.g. make shot 8 darker',
   // 새 인물 · 배경은 채팅으로 만들지 않는다(디자이너 QA 1차 #04) — 있는 인물을 고치는 예시를 든다.
   artist: "E.g. make the main character's hair shorter",
@@ -157,6 +178,12 @@ export const STAGE_THINKING_PHRASES: Record<StageId, readonly string[]> = {
     'Looking over the cast cards',
     'Weighing genre and tone',
     'Choosing the next question',
+  ],
+  conti: [
+    'Retracing the scene structure',
+    'Looking over the shot list',
+    'Gauging the rhythm of the dialogue',
+    'Sorting out the scope of the edit',
   ],
   writer: [
     'Retracing the scene structure',
@@ -193,6 +220,11 @@ export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
   // Producer(entry)는 시작 화면이라 빠른 요청이 없다. Writer(producer) 는 산문 고치기 요청.
   entry: [],
   producer: ['Rewrite it', 'Make it shorter', 'Make the dialogue funnier'],
+  conti: [
+    'Add a close-up shot to the last scene',
+    'Make the dialogue more concise',
+    'Make the overall mood darker',
+  ],
   writer: [
     'Add a close-up shot to the last scene',
     'Make the dialogue more concise',
@@ -220,6 +252,8 @@ export const STAGE_PROMPT_PRESETS: Record<StageId, readonly string[]> = {
 //   editor 채팅은 조언만 한다(api/editor/chat — 오너 2026-11-14 10번, 작업물을 바꾸는 길이 없다).
 export const CHAT_SUPPORTED_STAGES: ReadonlySet<StageId> = new Set<StageId>([
   'producer',
+  // 콘티(O1) — 지금 Storyboard 보드 채팅(api/writer/chat)과 같은 씬 · 샷 고치기 채팅.
+  'conti',
   'writer',
   'artist',
   'director',

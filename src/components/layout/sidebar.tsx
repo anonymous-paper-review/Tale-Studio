@@ -22,7 +22,7 @@ import {
 import { cn } from '@/lib/utils'
 import { STAGES, STAGE_LABEL, SHELL_INSET, SHELL_RAIL_WIDTH } from '@/lib/constants'
 import { STAGE_PERSONA } from '@/lib/lumi'
-import { railStageState } from '@/lib/stage-rail'
+import { RAIL_ITEMS, railItemBadge, railItemOf, railStageState, railTarget } from '@/lib/stage-rail'
 import { STAGE_ACCESS_KEY, stageForShortcut } from '@/lib/stage-shortcuts'
 import { navigateWithStageSlide } from '@/lib/stage-transition'
 import { UserMenu } from '@/components/layout/user-menu'
@@ -49,10 +49,18 @@ import './sidebar-responsive.css'
 const STAGE_ICONS: Record<StageId, React.ElementType> = {
   entry: ProducerIcon,
   producer: WriterIcon,
+  // 콘티(O1)는 Writer 칸 안의 칸이라 Writer 아이콘이다(레일은 칸의 대표 단계 아이콘을 그린다).
+  conti: WriterIcon,
   writer: StoryboardIcon,
   artist: ArtistIcon,
   director: DirectorIcon,
   editor: EditorIcon,
+}
+
+/** 그 단계 화면의 주소를 보고 있나. */
+function onStagePath(pathname: string, stage: StageId): boolean {
+  const path = STAGES.find((s) => s.id === stage)?.path
+  return !!path && pathname.startsWith(path)
 }
 
 export function Sidebar() {
@@ -115,6 +123,18 @@ export function Sidebar() {
     [pathname, router],
   )
 
+  // 레일 칸으로 옮겨 가기(dev D1 2026-11-22 · O1 2026-11-26) — 칸의 가장 먼 열린 단계로 간다(Writer 칸: 콘티가 열렸으면 콘티, 아니면 씬 스토리).
+  //   이미 그 칸(씬 스토리 · 콘티 어느 쪽이든)을 보고 있으면 아무 데도 가지 않는다 — 칸 안 이동은 위 막대 [씬 스토리 | 콘티]가 맡는다.
+  const goToRailItem = useCallback(
+    (stageId: StageId) => {
+      const item = railItemOf(stageId)
+      if (!item) return
+      if (item.stages.some((id) => onStagePath(pathname, id))) return
+      goToStage(railTarget(item.id, useProjectStore.getState().canNavigateTo))
+    },
+    [pathname, goToStage],
+  )
+
   // Alt(Option) + Q/W/E/R/T 로 전환하고, Alt 를 누르고 있는 동안 각 셀에 키 배지를 띄운다.
   //   Ctrl/Cmd 가 아닌 이유는 stage-shortcuts.ts 주석 참조(예약 가속키 — Cmd+W 는 탭을 닫는다).
   //   입력창에 포커스가 있어도 가로챈다: 앱 메뉴 성격의 전역 단축키라 텍스트 입력과 경쟁하지 않는다.
@@ -126,7 +146,7 @@ export function Sidebar() {
       if (!target) return
       e.preventDefault() // Windows 의 Alt+문자 메뉴 활성화 차단
       setAccessKeysVisible(false)
-      goToStage(target)
+      goToRailItem(target)
     }
     const onKeyUp = (e: KeyboardEvent) => {
       if (e.key === 'Alt') setAccessKeysVisible(false)
@@ -141,7 +161,7 @@ export function Sidebar() {
       window.removeEventListener('keyup', onKeyUp)
       window.removeEventListener('blur', clear)
     }
-  }, [goToStage])
+  }, [goToRailItem])
 
   const reachedStageIndex = STAGES.findIndex((stage) => stage.id === reachedStage)
   // stalled 는 실패가 아니라 "오래 대기 중"이다 (#stale-gate 2026-08-26). 한 문구로 뭉치면
@@ -186,17 +206,19 @@ export function Sidebar() {
         <TooltipContent side="right">{t('Back to Projects')}</TooltipContent>
       </Tooltip>
 
-      {/* Stage navigation — STAGES(constants.ts) 순서 그대로 (writer 탭 2026-06-12 부활).
+      {/* Stage navigation — 레일 칸 표(lib/stage-rail RAIL_ITEMS) 순서: Producer · Writer · Artist · Storyboard · Director · Editor.
+          Writer 칸은 씬 스토리(id producer) · 콘티(id conti)를 함께 맡는다(O1 2026-11-26) — 칸의 단계는 대표 단계(stage)로 그린다.
           아이콘 + 라벨이 한 버튼 안에 들어간다: 활성 배경이 둘을 함께 감싸야 하나의 탭으로 읽힌다.
           단계 칸은 줄이거나 스크롤하지 않고, 높이가 부족하면 아래 보조 단추를 메뉴로 접는다. */}
       <div className="sidebar-stage-nav flex min-h-max flex-1 shrink-0 flex-col items-center gap-1.5">
-        {STAGES.map((stage) => {
+        {RAIL_ITEMS.map((item) => {
+          const stage = STAGES.find((s) => s.id === item.id)!
           const Icon = STAGE_ICONS[stage.id]
-          const isCommitted = pathname.startsWith(stage.path)
+          const isCommitted = item.stages.some((id) => onStagePath(pathname, id))
           // 이동 중엔 목적지가 곧 활성 — 클릭 프레임부터 하이라이트가 옮겨가 있어야
           //   "눌렸다"가 보인다. 커밋되면 pendingStage 가 해제되며 pathname 기준으로 복귀.
-          const isActive = pendingStage ? pendingStage === stage.id : isCommitted
-          const isPending = pendingStage === stage.id && !isCommitted
+          const isActive = pendingStage ? item.stages.includes(pendingStage) : isCommitted
+          const isPending = !!pendingStage && item.stages.includes(pendingStage) && !isCommitted
           // 사이드바 Editor 는 [다음: Editor로]와 같은 조건 · 같은 넘김(시안 R, 오너 2026-11-14) — 넘기기 전이라도 완성 영상이 있으면 열고, 누르면 넘긴다.
           const viaHandoff = railEditorViaHandoff({
             stage: stage.id,
@@ -215,7 +237,8 @@ export function Sidebar() {
           const busyBlocked = aiBusy && !isCommitted
           const isDisabled = (isLocked && !isArtistRetryable) || busyBlocked || (aiBusy && isArtistRetryable)
           // 다른 stage 작업 완료 배지 — 활성/잠금 stage엔 표시 안 함(활성은 진입 시 클리어됨)
-          const badge = !isActive && !isLocked ? (stageBadges[stage.id] ?? 0) : 0
+          //   Writer 칸은 씬 스토리 · 콘티 숫자를 합친다(O1).
+          const badge = !isActive && !isLocked ? railItemBadge(stage.id, stageBadges) : 0
           // v3 칸 모습 — 지금 단계(밝은 바탕 · 단계 색 아이콘) · 끝낸 단계(체크) · 열린 단계 · 아직 안 연 단계(흐림).
           const railState = railStageState(stage.id, { active: isActive && !isLocked ? stage.id : null, reached: reachedStage })
 
@@ -230,7 +253,7 @@ export function Sidebar() {
                     // 데모(URL 티켓): share 쿼리 유지 — 쿠키 차단 브라우저에서도 스테이지 이동 생존
                     //   이동 자체는 goToStage 한 곳(단축키와 공유. 세로 스트립 전환 포함).
                     else if (viaHandoff) void requestNextStep()
-                    else if (!isLocked && !isCommitted) goToStage(stage.id)
+                    else if (!isLocked && !isCommitted) goToRailItem(stage.id)
                   }}
                   aria-label={badge > 0 ? `${STAGE_LABEL[stage.id]} · ${t('Unseen completions: {count}', { count: badge })}` : STAGE_LABEL[stage.id]}
                   aria-current={isCommitted ? 'page' : undefined}
