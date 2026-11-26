@@ -34,7 +34,8 @@ import {
   buildRealGridPrompt,
   realSheetCanvas,
 } from '@/lib/director/storyboard-strip'
-import { applyDirectorRefs, directorRefsExcludeWorld, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking, readOffFrame } from '@/lib/director/shot-references'
+import { applyDirectorRefs, directorRefsExcludeWorld, loadPropsForReferences, loadSceneWorldRefs, parseDirectorRefs, readCharacterBlocking, readOffFrame } from '@/lib/director/shot-references'
+import { planSheetPropRefs, propRefRoom, propReferenceLines } from '@/lib/director/shot-prop-refs'
 import { loadSeriesFirstShotContinuity, seriesContinuityPromptLine } from '@/lib/series/continuity'
 import { parseProjectFormat } from '@/types/project'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
@@ -78,6 +79,8 @@ interface EligibleShot {
   roughGeneratedAt: number | null
   /** 실사 그림체(2026-11-23 오너 "2 모두 적용")만 채운다 — 샷 설계 · 빛 줄 · 비친 모습 샷 · 멈춘 러프 · 사람 없는 샷. 다른 그림체는 null. */
   photo: { staticSpec: unknown; cineLine: string | null; reflection: boolean; staticHold: boolean; noPeople: boolean } | null
+  /** 소품 참고(D7 2단계 · m1126 리드 R1): 칸마다 소품 칸(static_spec.prop_placement)을 읽는다 — 모든 그림체. */
+  staticSpec: unknown
 }
 
 class CharacterAppearanceContractError extends Error {}
@@ -258,6 +261,7 @@ export async function POST(req: NextRequest) {
         roughGeneratedAt: (s.rough_storyboard as { generatedAt?: number } | null)?.generatedAt ?? null,
         frames: { start: f.start, direction: f.direction, end: f.end },
         blocking: readCharacterBlocking(s.static_spec),
+        staticSpec: s.static_spec,
         photo: photoLook
           ? {
               staticSpec: s.static_spec,
@@ -384,6 +388,8 @@ export async function POST(req: NextRequest) {
     // 시리즈 연속성(2026-10-26): "앞 화 마지막 장면에서 이어 시작하기"로 만든 화의 첫 샷이 이 시트에 들어 있을 때만 —
     //   앞 화 끝 장면을 인물 · 배경 뒤(화풍 참고 앞)에 한 장 더 붙이고 그 칸을 가리키는 연속성 한 줄을 더한다.
     const continuity = await loadSeriesFirstShotContinuity(projectId, project)
+    // 소품 참고(D7 2단계, 2026-11-22 · 리드 R1) — 그림이 있는 소품. 못 읽으면 소품 없이 그린다(지금과 같다).
+    const projectProps = await loadPropsForReferences(projectId).catch(() => [])
 
     const submitted: Array<{ jobId: string; shotIds: string[] }> = []
     // #generation-capacity-trigger(2026-09-14): 자리가 없어 이번에 못 낸 시트의 샷 수 — 잔량(remaining)으로
@@ -459,6 +465,18 @@ export async function POST(req: NextRequest) {
       const worldRef = group.every((s) => s.excludeWorld) ? null : (worldRefByScene.get(group[0].scene_id) ?? null)
       const seriesFrameColumn = continuity ? group.findIndex((s) => s.shot_id === continuity.firstShotId) : -1
       const seriesFrameUrl = continuity && seriesFrameColumn >= 0 ? continuity.frameUrl : null
+      // 소품(D7 2단계 · 리드 R1 — 그림체 길 · 실사 사진 길 모두): 칸마다 그 칸에 나오는 소품 — 한 장에 3장까지, 나오는 칸이 많은 것 먼저.
+      //   인물 · 배경 · 앞 화 장면 뒤, 화풍 앞(실사 사진 길은 화풍이 없다). 참고 그림 상한을 넘으면 소품부터 뺀다.
+      //   소품 줄은 지시문 맨 끝 — 그 앞 글자는 소품이 없을 때와 같다. 소품이 없는 시트는 한 글자도 바뀌지 않는다.
+      const sheetProps = planSheetPropRefs(group.map((s) => s.staticSpec), projectProps)
+      const otherRefCount = 1 + groupRefs.length + (worldRef ? 1 : 0) + (seriesFrameUrl ? 1 : 0) + (anchor ? (anchorTwoRef ? 2 : 1) : 0)
+      const propRefs = sheetProps.refs.slice(0, propRefRoom(otherRefCount))
+      const keptProps = new Set(propRefs.map((ref) => ref.propId))
+      const propLines = propReferenceLines(
+        2 + groupRefs.length + (worldRef ? 1 : 0) + (seriesFrameUrl ? 1 : 0),
+        propRefs,
+        sheetProps.columnProps.map((column) => column.filter((ref) => keptProps.has(ref.propId))),
+      )
       const prompt = (photoLook
         ? buildPhotoGridPrompt(group.length, {
             photoLook,
@@ -484,12 +502,13 @@ export async function POST(req: NextRequest) {
         styleRefCount: anchorTwoRef ? 2 : 1,
         styleAnchors: userStyleFacets?.probeAnchors ?? null,
         styleAvoid: userStyleFacets?.negative ?? null,
-      })) + (seriesFrameUrl ? `\n- ${seriesContinuityPromptLine(seriesFrameColumn + 1)}` : '')
+      })) + (seriesFrameUrl ? `\n- ${seriesContinuityPromptLine(seriesFrameColumn + 1)}` : '') + (propLines.length ? `\n${propLines.join('\n')}` : '')
       const referenceImageUrls = [
         refUrl,
         ...groupRefs.map((r) => r.url),
         ...(worldRef ? [worldRef] : []),
         ...(seriesFrameUrl ? [seriesFrameUrl] : []),
+        ...propRefs.map((ref) => ref.url),
         ...(anchor ? [anchor.imageUrl] : []),
         ...(anchorTwoRef ? [anchor!.previewUrl as string] : []),
       ]
@@ -505,6 +524,8 @@ export async function POST(req: NextRequest) {
             ...columnCharacters.flatMap((column) => column.flatMap((c) => [c.name, c.pose, c.position])),
             ...(photoLook ? [...groupRefs.map((r) => r.look), ...group.map((s) => s.photo?.cineLine ?? null)] : []),
             sceneLighting,
+            // 사용자가 쓴 소품 이름도 함께 검사한다(D7 2단계) — 소품이 없는 시트는 지금과 같다.
+            ...propRefs.map((ref) => ref.name),
           ],
           { projectId, kind: 'storyboard_real_grid', userId: access.userId },
         )

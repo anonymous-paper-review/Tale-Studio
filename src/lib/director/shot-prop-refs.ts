@@ -2,7 +2,8 @@
 //   그 샷의 소품 칸(static_spec.prop_placement)에 나오는(소품 id 또는 이름) 소품 중 그림이 있는 것만, 한 샷 2장 · 일괄 한 장 3장까지.
 //   참고 그림이 많으면(상한 MAX_REAL_REFERENCE_IMAGES) 소품부터 뺀다 — 인물 시트 · 배경 · 화풍 참고는 그대로.
 //   참고 순서: [러프 시트, 인물 시트들, 배경, 추가 입력 · 앞 화 장면, 소품 그림들, 화풍] — 지금 지시문의 번호(인물 · 배경 · 추가)를 건드리지 않고
-//   화풍은 여전히 "마지막"이다. 소품 역할 문장은 지시문 끝에 붙는다(storyboard-strip 은 바꾸지 않는다).
+//   화풍은 여전히 "마지막"이다. 소품 역할 문장은 지시문 끝에 붙는다(storyboard-strip · photo-strip 은 바꾸지 않는다 — m1126 리드 R1: 그림체 길 · 실사 사진 길 모두).
+//   소품 그림은 소품 양식(MAIN · FRONT · SIDE · BACK · TOP · DETAIL, m1126 A2)을 채운 시트라 첫 줄이 "물건 하나를 여러 방향에서 보인 시트"라고 적는다(리드 R1 승인 문장).
 //   자리는 연필 러프가 정한다 — Writer 소품 칸의 자리(left_third 등)는 지시문에 적지 않는다. 러프와 어긋나면 모델이 물건을 옮긴다
 //   (2026-11-22 실측: 러프 오른쪽 끝 자판기 + "left third" → 3번 모두 왼쪽 · 가운데로 옮겨 크게 그림).
 //   서버 전용 의존성 금지(화면이 "참고: 소품 N" 을 보일 때 같은 규칙을 쓴다). 약속: tests/director/prop-references.test.ts
@@ -98,7 +99,7 @@ export function propReferenceLines(start: number, refs: readonly ShotPropRef[], 
   if (refs.length === 0) return []
   const listed = refs.map((ref, i) => `reference image ${start + i} = ${ref.name}`).join('; ')
   return [
-    `- PROP references (inanimate objects, never people, faces or mannequins), in order: ${listed}.`,
+    `- PROP reference sheets (each shows ONE inanimate object from several views — never people, faces or mannequins), in order: ${listed}.`,
     '- Each prop reference decides how that object looks — its shape, material, color and markings: reproduce it exactly, even when a character holds or wears it. This overrides the character-sheet rule above for these objects only. The pencil drawing decides only where the object is and how big it is.',
     '- Draw a prop only where the pencil drawing shows an object. Never add a prop to a panel that has no object there, never draw the same prop twice in one panel, and never turn a prop into a person.',
     ...(columnProps
