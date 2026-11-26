@@ -3,16 +3,28 @@
 //   "AI 자동 생성 진행 중 0%" · "Writer에서 씬을 먼저 만들면…" 같은 틀린 안내를 먼저 보였다(2026-11-26 실측). 그동안은 Editor 의 "클립 준비 중…"과
 //   같은 카드(components/feedback/stage-wait)를 보인다 — 잠금이 아니라 레일 · 채팅은 그대로 쓴다. 화면마다 무엇을 "다 읽었다"고 볼지는 아래 함수들,
 //   그 사실을 모으는 훅은 hooks/use-stage-wait. 약속: tests/project/stage-wait.test.ts (+ 단계별 open-wait 시험)
+import { STAGE_PERSONA, type LumiStagePersona } from '@/lib/lumi'
 import type { StageId } from '@/types'
 
+/** 기다리는 카드가 덮는 화면 — 단계(StageId)와 Writer 칸 안의 콘티 화면(/studio/conti, 오너 O1 2026-11-26 "콘티를 Artist 앞에").
+ *  콘티는 m-conti 의 단계 등록이 합쳐지면 StageId 에 들어간다 — 그 전에도 그 경로의 카드를 미리 둔다(리드 2026-11-26). 합친 뒤에는 StageId 와 같다. */
+export type StageWaitScreen = StageId | 'conti'
+
 /** 기다리는 카드 제목(사전 키 = 영어 원문) — 무엇을 읽는지 동사로(design §16.2). Editor 는 오너가 본보기로 든 예전 글 그대로. */
-export const STAGE_WAIT_TITLE: Record<StageId, string> = {
+export const STAGE_WAIT_TITLE: Record<StageWaitScreen, string> = {
   entry: 'Loading the start screen…',
   producer: 'Loading the prose…',
+  // 콘티 — 영어 화면은 m-conti 와 같이 "rough storyboard"(한국어 "콘티", W2).
+  conti: 'Loading the rough storyboard…',
   artist: 'Loading characters and backgrounds…',
   writer: 'Loading the storyboard…',
   director: 'Loading shots…',
   editor: 'Preparing clips…',
+}
+
+/** 그 화면 카드의 Lumi 옷 — 단계는 STAGE_PERSONA 그대로, 콘티는 레일에서 Writer 칸에 묶이므로 Writer 옷. */
+export function stageWaitPersona(screen: StageWaitScreen): LumiStagePersona {
+  return screen === 'conti' ? 'writer' : STAGE_PERSONA[screen]
 }
 
 /** Director 기다리는 카드의 상한 — 동기화가 끝내 샷 카드를 못 놓아도 이만큼 뒤에는 캔버스를 그대로 보인다. */

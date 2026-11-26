@@ -7,12 +7,10 @@
 //   cover = 이미 붙여 둔 판(Director 캔버스) 위를 덮는다 — 판은 그대로 두고 보이지만 않게. 약속: tests/project/stage-wait.test.ts
 import { AiBusyCard } from '@/components/ai-busy-overlay'
 import { useT } from '@/lib/i18n'
-import { STAGE_PERSONA } from '@/lib/lumi'
-import { STAGE_WAIT_TITLE } from '@/lib/stage-wait'
+import { STAGE_WAIT_TITLE, stageWaitPersona, type StageWaitScreen } from '@/lib/stage-wait'
 import { cn } from '@/lib/utils'
-import type { StageId } from '@/types'
 
-export function StageWaitCard({ stage, cover = false }: { stage: StageId; cover?: boolean }) {
+export function StageWaitCard({ stage, cover = false }: { stage: StageWaitScreen; cover?: boolean }) {
   const t = useT()
   return (
     <div
@@ -23,7 +21,7 @@ export function StageWaitCard({ stage, cover = false }: { stage: StageId; cover?
       data-stage-wait={stage}
     >
       {/* 설명은 비워 둔다 — 비우지 않으면 카드가 AI 작업 잠금 안내를 붙인다(읽기는 AI 작업이 아니다). */}
-      <AiBusyCard lumi={STAGE_PERSONA[stage]} title={t(STAGE_WAIT_TITLE[stage])} description="" />
+      <AiBusyCard lumi={stageWaitPersona(stage)} title={t(STAGE_WAIT_TITLE[stage])} description="" />
     </div>
   )
 }
