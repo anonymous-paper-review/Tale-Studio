@@ -3631,6 +3631,25 @@ export const KO: Record<string, string> = {
   'Move over and pick yourself': '넘어가서 직접 고르기',
   'Choose the shots to make and make them one by one.': '만들 샷을 골라 하나씩 만들어요.',
   'Move over': '넘어가기',
+  // Storyboard 실사 보기(오너 2026-11-26 m1126 S2 · O7) — 처음엔 Writer 콘티 그림, [시작] → 실사. 카드 꼬리표 · 콘티 그림 없음 안내.
+  'Rough sketch': '콘티',
+  'No rough storyboard yet': '콘티 그림이 없어요',
+  'Draw it in Writer, then press Start.': 'Writer 콘티에서 그린 뒤 [시작]을 눌러 주세요.',
+  // [시작] 때 콘티 그림이 없어 빠지는 샷 알림 — 영어는 하나 · 여럿 · 넘침 셋, 한국어는 하나 · 여럿이 같은 꼴.
+  '{shots} has no rough storyboard, so it is left out. Draw it in Writer, then press Start again.': '콘티 그림이 없는 {shots}은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  '{shots} have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots}은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  '{shots} and {count} more have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.': '콘티 그림이 없는 {shots} 외 {count}컷은(는) 빼고 만들어요. Writer 콘티에서 그린 뒤 다시 [시작]을 눌러 주세요.',
+  'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
+  // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
+  'Fix in chat': '채팅으로 고치기',
+  'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
+  'Fix the story, arrows, and dialogue in Writer.': '이야기 · 화살표 · 대사는 Writer 콘티에서 고쳐요.',
+  // 보드 진행 줄 · 화면 설명 · 첫 진입 안내.
+  'Storyboard progress': '스토리보드 진행 현황',
+  'Not real yet': '실사 없음',
+  'Storyboard: press Start to turn the rough sketches into real images. To change a card, tell the chat.': '스토리보드: [시작]을 누르면 콘티 그림을 실사 그림으로 바꿔요. 카드를 고치려면 채팅에 말해 주세요.',
+  'The rough sketches are ready. Press Start to turn them into real images.\n\nTo change a card, tell me in the chat (e.g. "@Shot 2 make her look back").':
+    '콘티 그림이 준비됐어요. [시작]을 누르면 실사 그림으로 바꿔요.\n\n카드를 고치려면 채팅에 말해 주세요(예: "@샷 2 뒤를 돌아보게").',
 
   // 2단계 ① 새 배치(시안 E1, 2026-11-14): 효과 컨트롤 · 프로젝트 판 · 소스 탭 · 모니터 단추 · 둘째 줄 · 내보내기 탭 · 단축키 창.
   'Effect controls': '효과 컨트롤',

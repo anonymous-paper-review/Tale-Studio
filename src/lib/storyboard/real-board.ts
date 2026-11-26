@@ -4,6 +4,8 @@
 //   화면이 만들 샷으로 센 것과 서버가 그릴 샷이 어긋나지 않게(서버는 실사 있는 샷 · 러프 없는 샷을 건너뛴다).
 //   약속: tests/writer/real-board.test.ts
 import { activeShotIds, type ActiveJob } from '@/lib/generation-queue'
+import { translate } from '@/lib/i18n/translate'
+import type { AppLocale } from '@/lib/locale'
 import type { GenerationJobKind } from '@/lib/generation-jobs'
 import { storyboardImageStartFrame } from '@/lib/director/storyboard-image'
 import { isRoughDrawn } from '@/lib/writer/rough-progress'
@@ -153,4 +155,20 @@ export function storyboardRealProgress(input: {
     else if (hasReal) real += 1
   }
   return { total: input.shots.length, real, making, noReal: input.shots.length - real - making }
+}
+
+/** 콘티 그림이 없는 샷 이름을 이만큼까지 적고 나머지는 수로 — 넘김 창(lib/writer/board-summary)과 같은 상한. */
+const NO_CONTI_LABEL_LIMIT = 10
+
+/** [시작] 때 콘티 그림이 없어 빠지는 샷 알림(혼자 정한 것 f) — 없으면 null. names = 보드 이름("샷 3"), 그 글의 언어로 지은 것. */
+export function noContiNotice(locale: AppLocale, names: readonly string[]): string | null {
+  if (names.length === 0) return null
+  const shots = names.slice(0, NO_CONTI_LABEL_LIMIT).join(', ')
+  const more = names.length - NO_CONTI_LABEL_LIMIT
+  if (more > 0) {
+    return translate(locale, '{shots} and {count} more have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.', { shots, count: more })
+  }
+  return names.length === 1
+    ? translate(locale, '{shots} has no rough storyboard, so it is left out. Draw it in Writer, then press Start again.', { shots })
+    : translate(locale, '{shots} have no rough storyboard, so they are left out. Draw them in Writer, then press Start again.', { shots })
 }
