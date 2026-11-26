@@ -46,9 +46,10 @@ vi.mock('@/lib/moderation/creem', async (importOriginal) => {
 
 import { _clearDesignMemoForTest, prepareDirectorVideoSubmission } from '@/lib/director/video-submit'
 import { pickVideoDirectionRead, videoDirectionLine } from '@/lib/writer/direction-read'
+import { realMiddleOutdated, resolveModeFrames } from '@/lib/director/video-mode-frames'
 import { _clearReferenceImageCacheForTest } from '@/lib/style-facets/reference-image'
 import { _clearPhotoLookCacheForTest } from '@/lib/style-facets/photo-look'
-import { REAL_DIRECTION, ROUGH, STORYBOARD, WORKSPACE, tablesFrom, videoRequest } from '../fixtures/_video-submit'
+import { REAL_DIRECTION, ROUGH, START, STORYBOARD, WORKSPACE, tablesFrom, videoRequest } from '../fixtures/_video-submit'
 
 // 이 시험을 위해 지은 샷 — 콘티에서 고친 화살표를 읽은 줄(CONTI_LINE)과, 실사 가운데 장에서 다시 고친 화살표를 읽은 줄(REAL_LINE)이 있다.
 const PROMPT = 'Medium shot of Mina standing by a rusted locker.'
@@ -121,5 +122,28 @@ describe('영상 지시의 읽은 줄 고르기', () => {
     expect(pickVideoDirectionRead(null)).toBeNull()
     expect(videoDirectionLine({ storyboard_image: realWith(realRead(REAL_DIRECTION)), rough_storyboard: rough })).toBe(REAL_LINE)
     expect(videoDirectionLine({ rough_storyboard: { ...ROUGH, directionRead: { ...contiRead, direction: 'https://storage.test/old.png' } } })).toBeNull()
+  })
+})
+
+describe('시작+미들의 "러프 바뀜" 막기와 실사 줄', () => {
+  // 이 시험을 위해 지은 실사 — 실사를 그린 뒤 콘티 러프가 바뀌었다(러프 바뀜: 실사가 참조한 러프 시각이 지금 러프보다 앞).
+  const outdated = { ...STORYBOARD, roughGeneratedAt: ROUGH.generatedAt - 1 }
+
+  // 왜(리드 — n-video 의 시작+미들 막기에 넣는 예외): 막는 까닭은 "실사 가운데 장은 고치기 전 움직임인데 영상 줄은 콘티에서 고친 움직임"이라
+  //   그림과 글이 어긋나서다(dev 리드 D1). 실사 가운데 장을 고쳐 그 장을 읽은 줄이 영상 줄이면 미들과 줄이 같은 장에서 나와 어긋나지 않는다.
+  it('실사 가운데 장을 고쳐 읽은 줄이 지금 가운데 장의 것이면 콘티가 실사 뒤에 바뀌었어도 시작+미들을 막지 않는다', () => {
+    const edited = { ...outdated, directionRead: realRead(REAL_DIRECTION) }
+    expect(pickVideoDirectionRead({ storyboard_image: edited, rough_storyboard: rough })?.source).toBe('real')
+    expect(realMiddleOutdated(edited, rough)).toBe(false)
+    expect(resolveModeFrames({ mode: 'start_middle', storyboardImage: edited, roughStoryboard: rough }))
+      .toMatchObject({ ok: true, urls: [START, REAL_DIRECTION], roles: ['start', 'direction'] })
+  })
+
+  // 왜: 정상 경로 고정 — 실사 줄이 없거나 낡았으면(다른 판 · 다시 그림) 영상 줄은 콘티 줄이라 지금처럼 러프가 바뀐 실사의 시작+미들을 막는다.
+  it('실사 줄이 없거나 낡았으면 지금처럼 러프가 바뀐 실사의 시작+미들을 막는다', () => {
+    expect(realMiddleOutdated(outdated, rough)).toBe(true)
+    const stale = { ...outdated, directionRead: realRead('https://storage.test/older-real-direction.png') }
+    expect(realMiddleOutdated(stale, rough)).toBe(true)
+    expect(resolveModeFrames({ mode: 'start_middle', storyboardImage: stale, roughStoryboard: rough })).toEqual({ ok: false, code: 'middle_outdated' })
   })
 })
