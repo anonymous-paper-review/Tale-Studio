@@ -22,7 +22,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ThumbImage } from '@/components/thumb-image'
 import { withCacheBust } from '@/components/rough-frame-cycle'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
-import { UnsavedArrowsConfirm, applyDirectionTab, directionApplyEnabled, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
+import { EndRedrawAsk, UnsavedArrowsConfirm, applyDirectionTab, directionApplyEnabled, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
 import { RoughFramesStill } from '@/features/writer/rough-frames-still'
 import { SHOT_TYPES, SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { CAMERA_ANGLES, angleOfCamera, applyStartEdit, nextApplyStep, redrawBlockedWhileDrawing, redrawDirectionOnly, sceneShotLabel, startApplyKind, startChanges, type ApplyKind, type RoughFrame } from '@/lib/writer/shot-edit'
@@ -271,6 +271,9 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange, drawing = fa
                   onSaved={() => void loadProject()}
                   ref={guard.editorRef}
                   onDirtyChange={guard.setDirty}
+                  // 가운데 장 화살표를 저장하면 끝 장도 이 화살표대로 다시 그릴지 묻고, [끝 장 다시 그리기]도 같은 물음으로(D10 · W3 2026-11-26).
+                  onArrowsSaved={() => guard.askEnd({ projectId, shotId: shot.shotId, onRedrawn: () => loadProject() })}
+                  onRedrawEnd={() => guard.askEnd({ projectId, shotId: shot.shotId, onRedrawn: () => loadProject() })}
                 />
               ) : (
                 bigFrame(tab === 'start' ? frames?.start : frames?.direction, t(tab === 'start' ? 'Start' : 'Directing'))
@@ -383,6 +386,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange, drawing = fa
         </DialogContent>
       </Dialog>
       <UnsavedArrowsConfirm {...guard.confirm} />
+      <EndRedrawAsk {...guard.endAsk} />
     </>
   )
 }
