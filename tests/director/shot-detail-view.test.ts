@@ -360,13 +360,14 @@ describe('Director 샷 상세 화면', () => {
     expect(ko).toContain('Take 2')
   })
 
-  it('영상 탭은 이미지 고치기와 영상 고치기를 한 화면에 보이고, 영상 고치기에는 다섯 영상 모델 · 해상도 · 이번에 쓸 Take 를 보인다', () => {
+  it('영상 탭은 이미지 고치기와 영상 고치기를 한 화면에 보이고, 영상 고치기에는 일곱 영상 모델 · 해상도 · 이번에 쓸 Take 를 보인다', () => {
     // 왜: D7 — 장면 · 인물 · 구도는 이미지 고치기, 움직임 · 카메라 · 길이는 영상 고치기에서 고친다. Take 값은 지금 계산 그대로(오너 답 11번).
+    //   오너 2026-11-26 D4 "영상모델 H3 Max 계열 추가"로 다섯 → 일곱(H3 Max · H3 Max Turbo).
     done(1)
     const out = render('panel', 'video')
     expect(out).toContain('data-testid="shot-detail-fix-image"')
     expect(out).toContain('data-testid="shot-detail-fix-video"')
-    for (const label of ['Fix the image', 'Fix the video', 'Seedance 2.0', 'Seedance 2.5', 'Happy Horse', 'Kling O3 Pro', 'Veo 3.1', '720p', '1080p']) {
+    for (const label of ['Fix the image', 'Fix the video', 'Seedance 2.0', 'Seedance 2.5', 'Happy Horse', 'Kling O3 Pro', 'Veo 3.1', 'H3 Max', 'H3 Max Turbo', '720p', '1080p']) {
       expect(out, label).toContain(label)
     }
     expect(out.match(/role="checkbox" aria-checked="true" aria-disabled="true"/g)?.length).toBe(2)

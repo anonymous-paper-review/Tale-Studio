@@ -73,3 +73,15 @@ describe('감독 채팅의 영상 모델 변경', () => {
     expect(updates[0]!.patch).toEqual({ label: 'river_gaze', provider: 'seedance-2.5' })
   })
 })
+
+describe('감독 채팅의 H3 Max 계열 선택 (오너 2026-11-26 D4)', () => {
+  // 왜: 화면 단추로 고를 수 있는 H3 Max · H3 Max Turbo 를 감독 채팅으로 바꾸라고 해도 똑같이 받아야 한다(모델을 고르는 곳 모두 같은 목록).
+  it('감독 채팅이 H3 Max · H3 Max Turbo 로 바꾸라고 하면 받아들인다', async () => {
+    const updates = await updatesOf([
+      { type: 'updateShot', id: 'dn_shot_1', patch: { provider: 'h3-max' } },
+      { type: 'updateShot', id: 'dn_shot_2', patch: { provider: 'h3-max-turbo' } },
+    ])
+
+    expect(updates.map((update) => update.patch)).toEqual([{ provider: 'h3-max' }, { provider: 'h3-max-turbo' }])
+  })
+})

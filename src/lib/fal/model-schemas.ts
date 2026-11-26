@@ -8,6 +8,8 @@ const FAL_VIDEO_MODEL_ENDPOINTS: Record<VideoModelKey, string> = {
   'seedance-2.5': 'bytedance/seedance-2.5/us/reference-to-video',
   'kling-o3': 'fal-ai/kling-video/o3/pro/reference-to-video',
   veo: 'fal-ai/veo3.1/reference-to-video',
+  'h3-max': 'minimax/h3-max/reference-to-video',
+  'h3-max-turbo': 'minimax/h3-max-turbo/reference-to-video',
 }
 
 const fieldSet = (fields: readonly string[]): Set<string> => new Set(fields)
@@ -79,6 +81,45 @@ const VEO31_REFERENCE_TO_VIDEO_FIELDS = [
   'auto_fix',
   'safety_tolerance',
   'image_urls',
+] as const
+
+// minimax/h3-max/reference-to-video schema (fal OpenAPI 2026-11-26). prompt_expansion_mode is required; no negative_prompt / audio toggle.
+//   First · middle · last frame inputs exist only on H3 Max (not Turbo).
+const H3_MAX_REFERENCE_TO_VIDEO_FIELDS = [
+  'prompt',
+  'reference_image_urls',
+  'reference_video_urls',
+  'reference_audio_urls',
+  'image_url',
+  'middle_image_url',
+  'middle_frame_time',
+  'end_image_url',
+  'target_audio_url',
+  'duration',
+  'resolution',
+  'seed',
+  'enable_safety_checker',
+  'sync_mode',
+  'prompt_expansion_mode',
+  'aspect_ratio',
+  'reference_conditions',
+] as const
+
+// minimax/h3-max-turbo/reference-to-video schema (fal OpenAPI 2026-11-26) — references only, no frame inputs.
+const H3_MAX_TURBO_REFERENCE_TO_VIDEO_FIELDS = [
+  'prompt',
+  'reference_image_urls',
+  'reference_video_urls',
+  'reference_audio_urls',
+  'target_audio_url',
+  'duration',
+  'resolution',
+  'seed',
+  'enable_safety_checker',
+  'sync_mode',
+  'prompt_expansion_mode',
+  'aspect_ratio',
+  'reference_conditions',
 ] as const
 
 // fal-ai/kling-video/v2.1/master/text-to-video schema used by Director's no-reference fallback.
@@ -255,6 +296,12 @@ export const FAL_INPUT_ALLOWLIST: Record<string, Set<string>> = {
 
   veo: fieldSet(VEO31_REFERENCE_TO_VIDEO_FIELDS),
   [FAL_VIDEO_MODEL_ENDPOINTS.veo]: fieldSet(VEO31_REFERENCE_TO_VIDEO_FIELDS),
+
+  'h3-max': fieldSet(H3_MAX_REFERENCE_TO_VIDEO_FIELDS),
+  [FAL_VIDEO_MODEL_ENDPOINTS['h3-max']]: fieldSet(H3_MAX_REFERENCE_TO_VIDEO_FIELDS),
+
+  'h3-max-turbo': fieldSet(H3_MAX_TURBO_REFERENCE_TO_VIDEO_FIELDS),
+  [FAL_VIDEO_MODEL_ENDPOINTS['h3-max-turbo']]: fieldSet(H3_MAX_TURBO_REFERENCE_TO_VIDEO_FIELDS),
 
   'fal-ai/kling-video/v2.1/master/text-to-video': fieldSet(KLING_V21_MASTER_TEXT_TO_VIDEO_FIELDS),
   'fal-ai/kling-video/v2.1/master/image-to-video': fieldSet(KLING_V21_MASTER_IMAGE_TO_VIDEO_FIELDS),

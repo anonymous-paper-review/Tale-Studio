@@ -172,6 +172,9 @@ export const VIDEO_ESTIMATE_SECONDS: Record<VideoModelKey, number> = {
   'happy-horse': 105,
   'kling-o3': 185,
   veo: 185,
+  // H3 Max 계열(2026-11-26): 개발 DB 자료가 아직 없어 Seedance 2.0 값.
+  'h3-max': 185,
+  'h3-max-turbo': 185,
 }
 
 /** 동시에 만드는 영상 수(사람 하나 한도 3). */
