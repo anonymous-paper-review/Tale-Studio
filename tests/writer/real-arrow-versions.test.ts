@@ -47,6 +47,18 @@ describe('화살표를 저장한 판', () => {
     expect(selectStoryboardVersion(next, 'legacy')!.frames).toEqual(V1)
   })
 
+  // 왜(혼자 정한 것 d · 콘티 저장과 같은 규칙): 저장한 가운데 장은 밑그림이 같다 — 밑층을 이어 써야 이어서 고칠 때 층 나누기에 그림 값이 다시 들지 않는다.
+  it('화살표를 저장해도 그 가운데 장의 밑층은 고친 가운데 장의 밑층으로 이어 쓴다', () => {
+    const plated = withRealCleanPlate(sheet(), V2.direction, `${B}/clean.png`)!
+    const next = withArrowVersion(plated, { id: 'arrows-1', direction: EDITED, at: 30, from: V2.direction })!
+    expect(next.cleanDirection).toEqual({ url: `${B}/clean.png`, direction: EDITED })
+    expect(realEditorPanel(next)?.cleanDirection?.url).toBe(`${B}/clean.png`)
+    // 다른 가운데 장의 밑층(낡은 것)은 잇지 않는다.
+    const stale = withRealCleanPlate(selectStoryboardVersion(sheet(), 'g1')!, V1.direction, `${B}/old-clean.png`)!
+    const picked = selectStoryboardVersion(stale, 'g2')!
+    expect(withArrowVersion(picked, { id: 'arrows-2', direction: EDITED, at: 30, from: V2.direction })!.cleanDirection).toEqual({ url: `${B}/old-clean.png`, direction: V1.direction })
+  })
+
   // 왜: 화면이 본 가운데 장(그린 밑그림)과 지금 그림의 가운데 장이 다르면 다른 판 위에 그린 것이라 저장하지 않는다.
   it('지금 그림의 가운데 장이 화면이 고친 장과 다르면 판을 만들지 않는다', () => {
     expect(withArrowVersion(sheet(), { id: 'arrows-1', direction: EDITED, at: 30, from: V1.direction })).toBeNull()

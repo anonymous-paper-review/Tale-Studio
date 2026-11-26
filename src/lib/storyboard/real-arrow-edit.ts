@@ -30,7 +30,7 @@ export function withArrowVersion(
   const frames = realEditFrames(img)
   const base = currentStoryboardVersion(img)
   if (!img || !frames || !base || frames.direction !== edit.from) return null
-  return withStoryboardVersion(
+  const next = withStoryboardVersion(
     img,
     {
       id: edit.id,
@@ -42,6 +42,9 @@ export function withArrowVersion(
     },
     { select: true },
   )
+  // 저장한 가운데 장은 밑그림이 같다 — 그 장의 밑층을 고친 장의 밑층으로 이어 쓴다(콘티 저장과 같은 규칙, 층 나누기에 그림 값이 다시 들지 않게).
+  const clean = img.cleanDirection
+  return clean?.url && clean.direction === edit.from ? { ...next, cleanDirection: { url: clean.url, direction: edit.direction } } : next
 }
 
 /** 실사 끝 장 작업이 그린 끝 장을 그 판에 넣는다 — 그 판이 없어졌거나 가운데 장이 바뀌었으면 null(끼우지 않는다).

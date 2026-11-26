@@ -17,6 +17,9 @@ interface BoardUiState {
   shotEditVersionId: string | null
   /** 그 샷 상세를 그 지난 판으로 연다(versionId null = 지금 그림으로 돌아가기). */
   openShotVersion: (shotId: string, versionId: string | null) => void
+  /** 실사 가운데 장 화살표 편집을 연 샷(오너 2026-11-27 N4b) — 상세의 큰 그림 자리를 편집기가 차지한다. 샷 · 지난 판을 새로 열거나 닫으면 비운다. */
+  realArrowShotId: string | null
+  setRealArrowShotId: (shotId: string | null) => void
   /** 지금 열려 있는 Storyboard 보드의 프로젝트(없으면 null) — 채팅이 [러프 다시 그리기]를 묻고 보여 줄지 정한다. */
   boardProjectId: string | null
   openBoard: (projectId: string) => void
@@ -42,9 +45,11 @@ export const useBoardUiStore = create<BoardUiState>((set, get) => ({
   directorConfirmOpen: false,
   setDirectorConfirmOpen: (directorConfirmOpen) => set({ directorConfirmOpen }),
   shotEditId: null,
-  setShotEditId: (shotEditId) => set({ shotEditId, shotEditVersionId: null }),
+  setShotEditId: (shotEditId) => set({ shotEditId, shotEditVersionId: null, realArrowShotId: null }),
   shotEditVersionId: null,
-  openShotVersion: (shotEditId, shotEditVersionId) => set({ shotEditId, shotEditVersionId }),
+  openShotVersion: (shotEditId, shotEditVersionId) => set({ shotEditId, shotEditVersionId, realArrowShotId: null }),
+  realArrowShotId: null,
+  setRealArrowShotId: (realArrowShotId) => set({ realArrowShotId }),
   boardProjectId: null,
   openBoard: (projectId) => set({ boardProjectId: projectId }),
   closeBoard: (projectId) =>
