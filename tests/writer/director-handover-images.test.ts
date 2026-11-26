@@ -43,7 +43,7 @@ describe('Director 넘기기 창 — 실사는 Storyboard 에서', () => {
     const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', extra)
     expect(view.title).toBe('Director로 넘어갈까요?')
     expect(view.rows).toEqual([
-      { label: '넘어가는 것', value: '샷 3 · 10초 · 인물 2 · 배경 1 · 러프 3장' },
+      { label: '넘어가는 것', value: '샷 3 · 10초 · 인물 2 · 배경 1 · 콘티 3장' },
       { label: '다음', value: '실사 그림이 없는 샷 3개 · Director에서도 만들 수 있어요' },
       { label: '그다음', value: '이미지를 확인하고 영상을 만들어요 · 샷마다 5 Take' },
     ])

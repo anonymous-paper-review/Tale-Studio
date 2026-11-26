@@ -79,7 +79,7 @@ describe('Director 넘김 확인 창', () => {
     const view = directorConfirmView(directorHandoffSummary(manifest, board()), 'ko', extra)
     expect(view.title).toBe('Director로 넘어갈까요?')
     expect(view.rows).toEqual([
-      { label: '넘어가는 것', value: '샷 3 · 10초 · 인물 2 · 배경 1 · 러프 3장' },
+      { label: '넘어가는 것', value: '샷 3 · 10초 · 인물 2 · 배경 1 · 콘티 3장' },
       { label: '다음', value: '실사 그림이 없는 샷 3개 · Director에서도 만들 수 있어요' },
       { label: '그다음', value: '이미지를 확인하고 영상을 만들어요 · 샷마다 5 Take' },
     ])
@@ -93,7 +93,7 @@ describe('Director 넘김 확인 창', () => {
     const summary = directorHandoffSummary(manifest, shots)
     expect(summary.missing.map((m) => [m.sceneNo, m.shotNo])).toEqual([[1, 2], [2, 3]])
     const view = directorConfirmView(summary, 'ko', extra)
-    expect(view.warning).toBe('러프가 없는 씬 1 · 샷 2, 씬 2 · 샷 3은(는) 이번에 빠져요.')
+    expect(view.warning).toBe('콘티 그림이 없는 씬 1 · 샷 2, 씬 2 · 샷 3은(는) 이번에 빠져요.')
     expect(view.canDrawRemaining).toBe(true)
   })
 
@@ -101,14 +101,14 @@ describe('Director 넘김 확인 창', () => {
   it('러프가 없는 샷이 있으면 넘어가는 샷 수와 러닝타임에서 그 샷을 뺀다', () => {
     const shots = board().map((s) => (s.shotId === 'b1' ? { ...s, roughStoryboard: null } : s))
     const view = directorConfirmView(directorHandoffSummary(manifest, shots), 'ko', extra)
-    expect(view.rows[0]).toEqual({ label: '넘어가는 것', value: '샷 2 · 6초 · 인물 2 · 배경 1 · 러프 2장' })
+    expect(view.rows[0]).toEqual({ label: '넘어가는 것', value: '샷 2 · 6초 · 인물 2 · 배경 1 · 콘티 2장' })
   })
 
   // 왜(혼자 정한 것): 스토리(액션)가 빈 샷은 서버가 그리지 않는다(no_info) — 누를 수 있는데 아무 일도 없는 버튼을 두지 않는다.
   it('러프가 없는 샷이 모두 스토리가 비어 그릴 수 없으면 [남은 컷 그리기]를 두지 않는다', () => {
     const shots = board().map((s) => (s.shotId === 'a2' ? { ...s, roughStoryboard: null, actionDescription: '  ' } : s))
     const view = directorConfirmView(directorHandoffSummary(manifest, shots), 'ko', extra)
-    expect(view.warning).toBe('러프가 없는 씬 1 · 샷 2은(는) 이번에 빠져요.')
+    expect(view.warning).toBe('콘티 그림이 없는 씬 1 · 샷 2은(는) 이번에 빠져요.')
     expect(view.canDrawRemaining).toBe(false)
   })
 

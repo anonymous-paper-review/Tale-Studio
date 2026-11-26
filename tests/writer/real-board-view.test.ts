@@ -32,6 +32,7 @@ const data = vi.hoisted(() => ({
   board: { shotEditId: null, setShotEditId: () => {}, directorConfirmOpen: false, setDirectorConfirmOpen: () => {}, cardDrawing: {} as Record<string, string> },
   chatUi: { mentionedRefs: [] as string[] },
   chat: { offerSuggestion: () => {}, messages: [], messagesLoadedProjectId: null },
+  roughFill: { projectId: null as string | null, pending: {} as Record<string, true>, running: false },
 }))
 vi.mock('@/stores/project-store', () => ({ useProjectStore: (select: (s: unknown) => unknown) => select(data.project) }))
 vi.mock('@/stores/writer-store', () => ({ useWriterStore: (select: (s: unknown) => unknown) => select(data.writer) }))
@@ -57,6 +58,13 @@ vi.mock('@/lib/i18n', async () => {
   return { translate, useLocale: () => 'ko', useT: () => (text: string, params?: Record<string, string | number>) => translate('ko', text, params) }
 })
 vi.mock('@/stores/locale-store', () => ({ useLocaleStore: (select: (s: unknown) => unknown) => select({ locale: 'ko' }) }))
+// 이어 그리기(서버 요청 · 효과)는 tests/writer/real-rough-fill 이 본다 — 여기서는 보드가 그리는 중을 어떻게 보이는지만.
+vi.mock('@/features/storyboard/use-rough-fill', () => ({ useStoryboardRoughFill: () => {} }))
+// 이어 그리기 상태는 다른 상점처럼 값으로 꾸민다(프로젝트 거르기는 진짜 roughFillPendingOf).
+vi.mock('@/lib/storyboard/rough-fill-store', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('@/lib/storyboard/rough-fill-store')>()
+  return { ...actual, useRoughFillPending: (projectId: string | null) => actual.roughFillPendingOf(data.roughFill, projectId) }
+})
 
 import { RealBoardView } from '@/features/storyboard/real-board-view'
 
@@ -70,6 +78,7 @@ beforeEach(() => {
   data.jobs = []
   data.director = { realBatchBusy: false, realBatchCancelled: false, realBatchShotIds: null }
   data.board.cardDrawing = {}
+  data.roughFill = { projectId: null, pending: {}, running: false }
 })
 
 describe('Storyboard 실사 보기 보드', () => {
@@ -101,6 +110,28 @@ describe('Storyboard 실사 보기 보드', () => {
   it('[시작] 일괄이 도는 동안 실사가 없고 콘티가 있는 카드는 차례를 기다린다고 보인다', () => {
     data.director = { realBatchBusy: true, realBatchCancelled: false, realBatchShotIds: ['a'] }
     expect(cards(board()).map((c) => c.wait)).toEqual(['queued', 'none', 'none'])
+  })
+
+  // 왜(리드 2026-11-26 — Storyboard 가 빠진 콘티 그림을 이어 그린다): 콘티 그림을 그리는 동안 그 카드에만 기다림 — 보드 · 채팅은 잠그지 않는다(S5 · O7과 같은 결).
+  it('콘티 그림을 그리는 작업이 떠 있는 카드에는 콘티 그림 기다림이 보이고, 진행 줄의 만드는 중에 든다', () => {
+    data.jobs = [{ id: 'r1', kind: 'shot_rough_storyboard', target: { writerShotIds: ['c'] } }]
+    const html = board()
+    expect(cards(html).map((c) => c.wait)).toEqual(['none', 'none', 'rough'])
+    expect(html.replace(/<!-- -->/g, '')).toContain('만드는 중 1')
+  })
+
+  // 왜(깜박임 방지): 이어 그리기가 보낸 샷은 작업이 큐에 오르기 전에도 기다림 — 다른 프로젝트의 표시는 보지 않는다.
+  it('Storyboard 가 이어 그리기로 보낸 샷은 작업이 큐에 오르기 전에도 그 카드에 콘티 그림 기다림을 보인다', () => {
+    data.roughFill = { projectId: 'p1', pending: { c: true }, running: true }
+    expect(cards(board()).map((c) => c.wait)).toEqual(['none', 'none', 'rough'])
+    data.roughFill = { projectId: 'other-project', pending: { c: true }, running: true }
+    expect(cards(board()).map((c) => c.wait)).toEqual(['none', 'none', 'none'])
+  })
+
+  // 왜(리드 2026-11-26): Storyboard 화면이 열려 있는 동안 빠진 콘티 그림을 이어 그린다 — 보드가 보이는 샷(보드 순서)과 지금 그리는 샷을 이어 그리기에 넘긴다.
+  it('Storyboard 보드는 열려 있는 동안 빠진 콘티 그림을 이어 그린다', () => {
+    const view = readFileSync('src/features/storyboard/real-board-view.tsx', 'utf8')
+    expect(view).toMatch(/useStoryboardRoughFill\(\{ projectId, shots: boardShotList, roughDrawing, activeJobs, locale \}\)/)
   })
 
   // 왜(혼자 정한 것 d): 지금 보드의 진행 줄 자리에 실사 기준 숫자.

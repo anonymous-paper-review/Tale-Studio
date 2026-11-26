@@ -2,6 +2,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   realDrawingShotIds,
+  roughDrawingNotice,
   storyboardCardPicture,
   storyboardCardWait,
   storyboardRealProgress,
@@ -185,3 +186,48 @@ describe('진행 줄 숫자', () => {
     expect(progress).toEqual({ total: 4, real: 1, making: 2, noReal: 1 })
   })
 })
+
+describe('Storyboard 가 이어 그리는 콘티 그림(리드 2026-11-26)', () => {
+  const board = [
+    { shotId: 'a', roughStoryboard: conti('a') },
+    { shotId: 'c', roughStoryboard: null },
+    { shotId: 'd', roughStoryboard: null },
+  ]
+  const none = new Set<string>()
+  const idle: RealBatchFlags = { busy: false, cancelled: false, shotIds: null }
+
+  // 왜(리드 결정 — Storyboard 가 빠진 러프를 이어 그린다): 그리는 동안 빈 카드가 고장처럼 보이지 않게 그 카드에 기다림을 보인다.
+  it('콘티 그림을 그리는 중인 샷 카드는 그 카드에 콘티 그림 기다림을 보인다', () => {
+    expect(storyboardCardWait({ shotId: 'c', hasReal: false, hasConti: false, drawing: none, batch: idle, roughDrawing: new Set(['c']) })).toBe('rough')
+    expect(storyboardCardWait({ shotId: 'd', hasReal: false, hasConti: false, drawing: none, batch: idle, roughDrawing: new Set(['c']) })).toBe('none')
+  })
+
+  // 왜(리드 결정): 콘티 그림이 아직 없는 샷은 실사로 못 바꾼다 — [시작]이 빼고, 그리는 중인 샷은 따로 세어 이름을 알린다.
+  it('[시작]은 콘티 그림을 그리는 중인 샷을 세지 않고 따로 알린다', () => {
+    const view = storyboardStartView({ shots: board, realOf: () => null, drawing: none, batch: idle, roughDrawing: new Set(['c']) })
+    expect(view.targets).toEqual(['a'])
+    expect(view.roughDrawing).toEqual(['c'])
+    expect(view.noConti).toEqual(['d'])
+  })
+
+  // 왜(리드 결정 "그린 뒤에는 [시작]이 그 샷도 넣는다"): 콘티 그림이 생기면 다음 [시작]이 그 샷을 실사로 만든다.
+  it('콘티 그림이 다 그려지면 [시작]이 그 샷도 센다', () => {
+    const drawn = board.map((s) => (s.shotId === 'c' ? { ...s, roughStoryboard: conti('c') } : s))
+    expect(storyboardStartView({ shots: drawn, realOf: () => null, drawing: none, batch: idle, roughDrawing: none }).targets).toEqual(['a', 'c'])
+  })
+
+  // 왜: 빼고 만든 샷이 말없이 남으면 [시작]이 안 먹은 것처럼 보인다 — 어느 샷이 왜 빠졌고 언제 다시 누르면 되는지 알린다.
+  it('콘티 그림을 그리는 중인 샷을 빼고 시작하면 그 샷 이름과 다 그린 뒤 다시 누르라는 말을 알린다', () => {
+    expect(roughDrawingNotice('ko', ['샷 3'])).toBe('콘티 그림을 그리는 중인 샷 3은(는) 빼고 만들어요. 다 그리면 [시작]을 다시 눌러 주세요.')
+    expect(roughDrawingNotice('en', ['Shot 3'])).toBe('Shot 3 is still getting its rough storyboard, so it is left out. Press Start again when it is drawn.')
+    expect(roughDrawingNotice('en', ['Shot 3', 'Shot 4'])).toBe('Shot 3, Shot 4 are still getting their rough storyboards, so they are left out. Press Start again when they are drawn.')
+    expect(roughDrawingNotice('ko', [])).toBeNull()
+  })
+
+  // 왜: 진행 줄의 "만드는 중"은 카드에 기다림이 보이는 수와 같아야 한다.
+  it('진행 줄의 만드는 중에는 콘티 그림을 그리는 중인 샷도 든다', () => {
+    const progress = storyboardRealProgress({ shots: board, realOf: () => null, drawing: none, batch: idle, roughDrawing: new Set(['c']) })
+    expect(progress).toEqual({ total: 3, real: 0, making: 1, noReal: 2 })
+  })
+})
+
