@@ -2977,7 +2977,7 @@ export const KO: Record<string, string> = {
   'No characters yet. Characters come from the confirmed prose.': '아직 인물이 없어요. 인물은 확정한 산문에서 나와요.',
   'No backgrounds yet. Backgrounds come from the confirmed prose.': '아직 배경이 없어요. 배경은 확정한 산문에서 나와요.',
   'No props yet. Objects you set in Producer become props.': '아직 소품이 없어요. Producer 에서 사물로 정한 것이 소품이 돼요.',
-  'No props. Props are the important objects picked from the story when you press Make, plus objects you set in Producer.': '소품이 없어요. [만들기] 때 이야기에서 고른 중요한 물건과 Producer 에서 사물로 정한 것이 소품이 돼요.',
+  'No props. Props are the important objects picked from the story when you run the breakdown, plus objects you set in Producer.': '소품이 없어요. [브레이크다운하기]로 산문을 확정할 때 이야기에서 고른 중요한 물건과 Producer 에서 사물로 정한 것이 소품이 돼요.',
   'Looks {count}': '모습 {count}',
   'Complete · to Storyboard': '완료하기 · Storyboard로',
   'Filter cards': '카드 걸러 보기',
