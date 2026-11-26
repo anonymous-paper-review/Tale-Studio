@@ -66,6 +66,22 @@ describe('혼자 정한 것', () => {
     expect(upload.mock.calls[0][0]).toBe('workspace-1/project-1/videos/clip-1/job-1_chain-frame-2850.jpg')
   })
 
+  // 왜(검토 rev-video 2): 다른 브라우저 · 기기에서 같은 앞 Take 의 같은 시각을 다시 잡으면 이름은 같고 그림 바이트는 조금 다르다(디코더 · 압축 차이) —
+  //   덮어쓰지 않는 보관함이 내용이 다르다며 거절해 500 이 났다. 같은 작업 · 같은 시각이면 같은 장면이라 이미 있는 그림을 쓴다.
+  it('같은 작업 · 같은 시각의 이음 장면이 이미 있으면 다른 기기에서 다시 잡아도 그 그림 주소를 돌려준다', async () => {
+    seedCompletedTake()
+    const upload = vi.fn().mockResolvedValue({ error: { statusCode: '409', message: 'The resource already exists' } })
+    const info = vi.fn().mockResolvedValue({ data: { size: JPEG_BYTES.length + 17, metadata: { size: JPEG_BYTES.length + 17, mimetype: 'image/jpeg' } }, error: null })
+    mocks.storageFrom.mockReturnValue({ upload, info })
+
+    const response = await uploadImage(chainFrameUpload('2850'))
+
+    expect(response.status).toBe(200)
+    await expect(response.json()).resolves.toEqual({
+      publicUrl: mediaPublicUrl('workspace-1/project-1/videos/clip-1/job-1_chain-frame-2850.jpg'),
+    })
+  })
+
   // 왜: 잡은 시각은 파일 이름이 된다 — 숫자가 아닌 값(경로 글자 등)을 이름에 넣지 않는다.
   it('잡은 시각이 밀리초 숫자가 아니면 보관하지 않는다', async () => {
     mocks.from.mockReturnValueOnce(single({ workspace_id: 'workspace-1' }))

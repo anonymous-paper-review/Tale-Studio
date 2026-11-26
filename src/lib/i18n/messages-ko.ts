@@ -67,7 +67,7 @@ export const KO: Record<string, string> = {
   'Write only what you want to change in the start and end images (e.g. show the umbrella handle)': '시작 · 끝 이미지에서 바꾸고 싶은 것만 적어요 (예: 우산 손잡이가 보이게)',
   'Fix the video': '영상 고치기',
   'When the motion, camera or length are off': '움직임·카메라·길이가 다를 때',
-  'The start and end images changed · A new Take will use them': '시작 · 끝 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요',
+  'The start image changed · A new Take will use it': '시작 이미지가 바뀌었어요 · 새 Take 에 반영돼요',
   'What to change in the motion or camera · Leave it empty to keep the shot prompt': '움직임·카메라에서 바꿀 점 · 비워 두면 샷 프롬프트 그대로',
   'The start and end images are being remade. Make the Take when they are done.': '시작 · 끝 이미지를 다시 만드는 중이에요. 다 되면 Take 를 만들어요.',
   'Video model': '영상 모델',
@@ -3678,6 +3678,8 @@ export const KO: Record<string, string> = {
   "Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.": '동시에 만드는 영상이 많아 {shots} 영상은 시작하지 못했어요. 하나가 끝나면 다시 부탁해 주세요.',
   "Too many videos are being made at once, so I didn't start the videos for {shots}. Ask again once one is done.": '동시에 만드는 영상이 많아 {shots} 영상은 시작하지 못했어요. 하나가 끝나면 다시 부탁해 주세요.',
   "I couldn't start the video for {shots}. Please ask again in a moment.": '{shots} 영상을 시작하지 못했어요. 잠시 뒤 다시 부탁해 주세요.',
+  "I didn't start the video for {shots}.": '{shots} 영상은 시작하지 않았어요.',
+  "I didn't start the videos for {shots}.": '{shots} 영상은 시작하지 않았어요.',
   "I couldn't start the videos for {shots}. Please ask again in a moment.": '{shots} 영상을 시작하지 못했어요. 잠시 뒤 다시 부탁해 주세요.',
   // 2xx 가 아닌데 새 Take 가 만드는 중으로 남은 다시 만들기(리드 결정 — 503 결과 모름 · 409 영수증 필요 · 400 + jobId · queued).
   "I can't tell yet whether the video for {shots} was accepted. You can see the result on the card.": '{shots} 영상은 접수됐는지 아직 몰라요. 카드에서 결과를 볼 수 있어요.',

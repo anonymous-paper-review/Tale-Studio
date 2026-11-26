@@ -145,8 +145,8 @@ describe('Director 샷 상세', () => {
     expect(newTakeRequest({ takeId: null, take: null, shotPrompt: 'A girl shivers.', change: '' })).toEqual({})
   })
 
-  it('마지막 Take 를 만든 뒤 시작 · 끝 이미지를 다시 만들었으면 "이미지가 바뀌었어요"로 본다', () => {
-    // 왜: D7 "시작 이미지가 바뀌었어요 · 새 Take를 만들면 반영돼요" — 이미지가 Take 보다 새로우면 그 Take 는 옛 이미지로 만든 것이다.
+  it('마지막 Take 를 만든 뒤 시작 이미지를 다시 만들었으면 "시작 이미지가 바뀌었어요"로 본다', () => {
+    // 왜: D7 · 검토 rev-video 8 ①(오너 N4a — 영상에는 시작 이미지만 쓰고 끝 이미지는 보내지 않는다) — 시작 이미지가 Take 보다 새로우면 그 Take 는 옛 시작 이미지로 만든 것이다.
     const made = take('v1', 1, { createdAt: '2026-11-14T01:00:00.000Z' }).data as VideoNodeData
     expect(imageChangedSinceTake(Date.parse('2026-11-14T02:00:00.000Z'), made)).toBe(true)
     expect(imageChangedSinceTake(Date.parse('2026-11-14T00:30:00.000Z'), made)).toBe(false)
@@ -166,8 +166,9 @@ describe('Director 샷 상세', () => {
     expect(takeSettings(shot({ provider: 'seedance' }), null)).toEqual({ model: 'seedance', resolution: '720p' })
   })
 
-  it('Take 가 쓴 이미지 버전이 지금 버전과 다르면 "이미지가 바뀌었어요"로 보고, 그 버전으로 되돌리면 바뀌지 않은 것으로 본다', () => {
-    // 왜: D7 · 리드 B — v2 로 만든 Take 를 보다가 v1 로 되돌리면 시각으로는 "안 바뀜"이지만 실제로는 다른 그림이다. 버전이 시각보다 먼저다.
+  it('Take 가 쓴 시작 이미지가 지금 시작 이미지와 다르면 "시작 이미지가 바뀌었어요"로 보고, 그 그림의 판으로 되돌리면 바뀌지 않은 것으로 본다', () => {
+    // 왜: D7 · 리드 B · 검토 rev-video 8 ①(오너 N4a — 영상에는 시작 이미지만 쓴다) — v2 로 만든 Take 를 보다가 v1 로 되돌리면 시각으로는 "안 바뀜"이지만
+    //   시작 그림이 다르다. 쓴 시작 그림이 시각보다 먼저다(실사 화살표만 고친 판은 시작 그림이 같아 바뀜이 아니다 — video-mode-picker.test.ts).
     const v = (id: string, tag: string, at: number) => ({ id, url: `https://media.test/${tag}-s.png`, frames: { start: `https://media.test/${tag}-s.png`, direction: `https://media.test/${tag}-d.png`, end: `https://media.test/${tag}-e.png` }, generatedAt: at, source: 'generated' as const })
     const two = withStoryboardVersion(withStoryboardVersion(null, v('job-1', 'a', Date.parse('2026-11-14T00:00:00Z')), { select: true }), v('job-2', 'b', Date.parse('2026-11-14T01:00:00Z')), { select: true })
     const madeWithV2 = take('t1', 1, { createdAt: '2026-11-14T02:00:00Z', madeFrames: { start: 'https://media.test/b-s.png?v=1', end: 'https://media.test/b-e.png' } }).data as VideoNodeData

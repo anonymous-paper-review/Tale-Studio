@@ -10,6 +10,7 @@ import {
   VIDEO_MODES,
   isVideoMode,
   previousShotInScene,
+  videoMadeByJobId,
   type VideoMode,
   type VideoModeBlock,
   type VideoModeFacts,
@@ -80,12 +81,16 @@ export function shotVideoModeFacts(input: {
   const previousNode = previousId ? input.nodes.find((n) => isShotData(n.data) && n.data.writerShotId === previousId) ?? null : null
   const { takes, final } = previousNode ? shotDetailTakes(input.nodes, previousNode.id) : { takes: [], final: null }
   const chosen = final ? takes.find((take) => take.id === final.id) ?? null : null
-  const ready = chosen && chosen.data.videoUrl && chosen.data.videoClipId && chosen.data.generationJobId ? chosen : null
+  // 그 Take 를 같은 Take 로 다시 만드는 중이면 끝나면 앞 영상이 바뀐다 — 다 만들 때까지 이어서를 끈다("앞 샷 영상을 아직 만드는 중", 검토 rev-video 4).
+  const remaking = !!chosen && takePhaseOf(chosen.data) === 'making'
+  // 이어서 장면은 지금 영상 파일을 낸 작업으로 잡고 올린다 — 다시 만들기가 실패 · 멈춤이면 Take 의 마지막 작업은 그 영상을 낸 작업이 아니다(검토 rev-video 4).
+  const madeJobId = chosen && !remaking ? videoMadeByJobId(chosen.data) : null
+  const ready = chosen && madeJobId && chosen.data.videoUrl && chosen.data.videoClipId ? chosen : null
   // ★ Take 영상은 있는데 만든 작업 기록이 없다(복사한 프로젝트 · 기록 전 옛 Take) — 이어서는 꺼지고 까닭을 따로 말한다.
-  const previousNoRecord = !!chosen && !!chosen.data.videoUrl && !!chosen.data.videoClipId && !chosen.data.generationJobId
+  const previousNoRecord = !!chosen && !remaking && !!chosen.data.videoUrl && !!chosen.data.videoClipId && !madeJobId
   const previousVideo: VideoModeFacts['previousVideo'] = ready
     ? 'ready'
-    : takes.some((take) => takePhaseOf(take.data) === 'making') ? 'generating' : 'none'
+    : remaking || takes.some((take) => takePhaseOf(take.data) === 'making') ? 'generating' : 'none'
   const plannedSec = previousNode && isShotData(previousNode.data) && typeof previousNode.data.durationSeconds === 'number' ? previousNode.data.durationSeconds : null
   return {
     facts: {
@@ -96,8 +101,8 @@ export function shotVideoModeFacts(input: {
       // dev 리드 D1 — 실사가 참조한 러프가 바뀌었으면(실사 카드의 "러프 바뀜"과 같은 판정) 시작+미들을 끈다. 서버도 409 middle_outdated.
       middleOutdated: realMiddleOutdated(data?.storyboardImage, writerShot?.roughStoryboard),
     },
-    previous: ready
-      ? { videoClipId: ready.data.videoClipId!, generationJobId: ready.data.generationJobId!, videoUrl: ready.data.videoUrl!, plannedSec }
+    previous: ready && madeJobId
+      ? { videoClipId: ready.data.videoClipId!, generationJobId: madeJobId, videoUrl: ready.data.videoUrl!, plannedSec }
       : null,
     previousNoRecord,
   }

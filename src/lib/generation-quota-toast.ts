@@ -274,6 +274,11 @@ export function notifyVideoModeRefused(body: unknown): void {
   toast.error(translate(useLocaleStore.getState().locale, VIDEO_MODE_REFUSALS[code]!), { id: 'video-mode-refused' })
 }
 
+/** 그 방식 거절의 안내 글(영어 원문 = i18n 키) — 채팅도 카드 안내와 같은 까닭을 말한다(검토 rev-video 8 ②). 방식 거절이 아니면 null. */
+export function videoModeRefusalText(code: string): string | null {
+  return Object.hasOwn(VIDEO_MODE_REFUSALS, code) ? VIDEO_MODE_REFUSALS[code]! : null
+}
+
 /**
  * 429/402/내용 규칙 거절이면 안내하고 true. 호출부 관용구: `if (await notifyIfQuotaExceeded(res, body)) return`.
  * 안내 대상이 아니면 아무 것도 하지 않고 false — 나머지 오류 처리는 호출부 몫이다.

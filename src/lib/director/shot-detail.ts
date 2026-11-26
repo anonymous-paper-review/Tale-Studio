@@ -4,7 +4,7 @@
 import { storyboardImageEndFrame, storyboardImageStartFrame } from '@/lib/director/storyboard-image'
 import { IMAGE_MODEL_ORDER, imageModelSupportsSheetCanvas, normalizeImageModelKey, resolveSheetImageModel, type ImageModelKey } from '@/lib/image-models'
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
-import { currentStoryboardVersion, versionOfFrames } from '@/lib/director/storyboard-image-versions'
+import { currentStoryboardVersion, storyboardImageVersions, versionOfFrames } from '@/lib/director/storyboard-image-versions'
 import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
 import type { ContinueFrom, VideoMode } from '@/lib/director/video-modes'
 import type { ProjectFormat } from '@/types/project'
@@ -130,7 +130,7 @@ export function newTakeRequest(input: {
   }
 }
 
-/** 그 Take 를 만든 뒤 시작 · 끝 이미지를 다시 만들었나 — 이미지가 더 새로우면 그 Take 는 옛 이미지로 만든 것이다(D7). */
+/** 그 Take 를 만든 뒤 시작 이미지를 다시 만들었나 — 이미지가 더 새로우면 그 Take 는 옛 이미지로 만든 것이다(D7). */
 export function imageChangedSinceTake(imageGeneratedAt: number | null | undefined, take: Pick<VideoNodeData, 'createdAt' | 'lastAttemptAt'>): boolean {
   const madeAt = Date.parse(String(take.lastAttemptAt ?? take.createdAt ?? ''))
   return typeof imageGeneratedAt === 'number' && Number.isFinite(madeAt) && imageGeneratedAt > madeAt
@@ -156,12 +156,28 @@ export function takeImageLabel(
     : { key: 'Image v{n}', params: { n: used.start } }
 }
 
-/** 보던 Take 와 지금 이미지가 다른가 — Take 가 쓴 버전을 알면 버전으로(되돌린 옛 버전도 "바뀜"), 모르면 만든 때와 그린 때로. */
+/** 주소 뒤 ?v= (캐시 깨기)는 같은 그림이다. */
+function bareImageUrl(url: string | null | undefined): string | null {
+  return url ? url.split('?')[0]! : null
+}
+
+/**
+ * 보던 Take 와 지금 시작 이미지가 다른가 — 영상에는 시작 이미지만 쓴다(오너 N4a — 끝 이미지는 보내지 않는다, 검토 rev-video 8 ①).
+ *   Take 가 쓴 시작 그림을 알면 그 그림 자체로 견준다(되돌린 옛 판도 시작 그림이 다르면 "바뀜"). 판 번호로 견주지 않는다 — 실사 화살표만 고치면
+ *   시작 그림이 같은 새 판이 생긴다(N4b). 모르면 만든 때와, 지금 시작 그림이 처음 생긴 때(같은 시작 그림의 가장 이른 판)로 견준다.
+ */
 export function imageChangedForTake(image: StoryboardImage | null | undefined, take: Pick<VideoNodeData, 'madeFrames' | 'createdAt' | 'lastAttemptAt'>): boolean {
   if (!image) return false
-  const used = takeImageVersions(image, take)
   const current = currentStoryboardVersion(image)
-  if (used?.start != null && current) return used.start !== current.n
+  const currentStart = bareImageUrl(current ? current.frames?.start ?? current.url : null)
+  const usedStart = bareImageUrl(take.madeFrames?.start)
+  if (usedStart && currentStart) return usedStart !== currentStart
   if (image.status !== 'completed') return false
-  return imageChangedSinceTake(image.generatedAt, take)
+  const sameStart = currentStart
+    ? storyboardImageVersions(image)
+        .filter((version) => bareImageUrl(version.frames?.start ?? version.url) === currentStart)
+        .map((version) => version.generatedAt)
+        .filter((at): at is number => typeof at === 'number' && Number.isFinite(at))
+    : []
+  return imageChangedSinceTake(sameStart.length ? Math.min(...sameStart) : image.generatedAt, take)
 }

@@ -3,7 +3,7 @@ import { NextResponse } from 'next/server'
 import { getUser } from '@/lib/supabase/auth'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { uploadThumbnail } from '@/lib/storage-thumb'
-import { uploadImmutableObject } from '@/lib/storage/immutable-object'
+import { ImmutableObjectMismatchError, uploadImmutableObject } from '@/lib/storage/immutable-object'
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import sharp from 'sharp'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
@@ -155,7 +155,13 @@ export async function POST(req: Request) {
         // 잡은 시각이 다르면 그림도 다르다 — 시각마다 파일을 따로 둬 같은 앞 작업에서 다시 잡아도 덮어쓰기 거절이 나지 않게 한다.
         const atSuffix = typeof chainFrameAtMs === 'string' ? `-${Number(chainFrameAtMs)}` : ''
         const storagePath = `${project.workspace_id}/${projectId}/videos/${clip.id}/${job.id}_chain-frame${atSuffix}.jpg`
-        await uploadImmutableObject(storagePath, buffer, mimeType)
+        try {
+          await uploadImmutableObject(storagePath, buffer, mimeType)
+        } catch (error) {
+          // 같은 이름이 이미 있다 = 같은 작업 · 같은 시각에서 잡은 같은 장면이다(다른 브라우저 · 기기에서 다시 잡으면 바이트만 조금 다르다, 검토 rev-video 2).
+          //   덮어쓰지 않고 이미 있는 그림을 쓴다 — 서버의 이어서 출처 확인은 이름(작업 · 시각)만 본다.
+          if (!(error instanceof ImmutableObjectMismatchError)) throw error
+        }
         return NextResponse.json({ publicUrl: mediaPublicUrl(storagePath) })
       }
 

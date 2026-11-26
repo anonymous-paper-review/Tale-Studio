@@ -338,7 +338,7 @@ function FixVideo({ shotNodeId, data, current, busy, layout }: { shotNodeId: str
     <section className="space-y-3 rounded-[16px] bg-card p-4" data-testid="shot-detail-fix-video">
       <SectionTitle dot="bg-state-video" title={t('Fix the video')} hint={t('When the motion, camera or length are off')} />
       {imageChanged ? (
-        <p className="rounded-[10px] bg-warning/15 px-3 py-2 text-caption font-medium text-warning">{t('The start and end images changed · A new Take will use them')}</p>
+        <p className="rounded-[10px] bg-warning/15 px-3 py-2 text-caption font-medium text-warning">{t('The start image changed · A new Take will use it')}</p>
       ) : null}
       {current ? (
         <Textarea value={change} onChange={(e) => setChange(e.target.value)} rows={2}

@@ -219,6 +219,26 @@ function videoModeTail(input: {
   }
 }
 
+/**
+ * 가운데 장(DIRECTION)을 받을 칸이 없는 모델로 넘길 때(자동 대체 미니맥스 — 연출 스케치는 보내지 않는다) — 글에 "Image 2 is the START frame overlaid…"
+ *   방식 문장과 그림 순서의 "image 2 = DIRECTION"이 남으면 보내지 않은 그림을 말한다. 방식 문장을 떼고 그림 순서는 남는 그림으로 다시 쓴다
+ *   (검토 rev-video 7). 시작 그림 진실 문장("Image 1 is the visual ground truth")은 그대로 둔다. 부분 기록이 없거나 글에서 못 찾으면 그 조각은 그대로.
+ */
+export function promptWithoutDirectionImage(fullPrompt: string, promptParts: unknown, keptRoles: VideoReferenceImageRole[]): string {
+  const p = (promptParts ?? {}) as Partial<VideoPromptParts>
+  let out = fullPrompt
+  const swap = (part: string | undefined, next: string) => {
+    if (typeof part !== 'string' || !part) return
+    const at = out.lastIndexOf(part)
+    if (at < 0) return
+    const before = out.slice(0, at)
+    out = next ? `${before}${next}${out.slice(at + part.length)}` : `${before.replace(/ $/, '')}${out.slice(at + part.length)}`
+  }
+  swap(p.videoMode, '')
+  swap(p.referenceRoles, keptRoles.length ? referenceRolesClause(keptRoles) : '')
+  return out
+}
+
 /** 대사 화자(characters 테이블에서 해석). appearance 는 시각 앵커 재료로 일부만 쓰인다. */
 export interface DialogueSpeaker {
   name: string

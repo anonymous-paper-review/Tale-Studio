@@ -5,12 +5,12 @@ import { readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { DirectorNode } from '@/types/director'
 
-const mocks = vi.hoisted(() => ({ run: vi.fn(), balance: { balance: 40 as number | null, mode: 'enforce' as 'enforce' | 'shadow' | 'off', failed: false }, refusal: vi.fn((): { shotNodeId: string } | null => null) }))
+const mocks = vi.hoisted(() => ({ run: vi.fn(), balance: { balance: 40 as number | null, mode: 'enforce' as 'enforce' | 'shadow' | 'off', failed: false }, refusal: vi.fn((): { shotNodeId: string } | null => null), modeRefusal: vi.fn((): { shotNodeId: string; code: string } | null => null) }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 vi.mock('@/lib/billing/use-take-balance', () => ({ fetchTakeBalance: vi.fn(async () => mocks.balance), refetchTakeBalance: vi.fn() }))
 vi.mock('@/lib/director/video-batch-client', async (importOriginal) => ({ ...await importOriginal<typeof import('@/lib/director/video-batch-client')>(), runVideoBatch: mocks.run }))
-// 내 영상 동시 한도(429) 거절 — 다시 만들기가 그 샷이 한도에 걸렸는지 읽는 값만 바꾼다(나머지 상점은 그대로).
-vi.mock('@/stores/director-store', async (importOriginal) => ({ ...await importOriginal<typeof import('@/stores/director-store')>(), videoLimitRefusal: () => mocks.refusal() }))
+// 내 영상 동시 한도(429) · 영상 방식(이어서 출처 바뀜 등) 거절 — 다시 만들기가 그 샷이 왜 막혔는지 읽는 값만 바꾼다(나머지 상점은 그대로).
+vi.mock('@/stores/director-store', async (importOriginal) => ({ ...await importOriginal<typeof import('@/stores/director-store')>(), videoLimitRefusal: () => mocks.refusal(), videoModeRefusal: () => mocks.modeRefusal() }))
 
 import { useGlobalChatStore as chat } from '@/stores/global-chat-store'
 import { useProjectStore as project } from '@/stores/project-store'
@@ -70,6 +70,8 @@ afterEach(() => {
   director.setState({ generateStoryboardImage: originalGenerate, generateVideoForShot: originalVideo, remakeShotVideo: originalRemake })
   mocks.refusal.mockReset()
   mocks.refusal.mockReturnValue(null)
+  mocks.modeRefusal.mockReset()
+  mocks.modeRefusal.mockReturnValue(null)
   vi.unstubAllGlobals()
 })
 
@@ -525,6 +527,27 @@ describe('말로 부탁하면 바로 실행(오너 9번)', () => {
     expect(said).toContain('Started making videos for Shot 1 · 5 Takes. Progress shows on the line above the cards.')
     expect(said).toContain("Too many videos are being made at once, so I didn't start the videos for Shots 2 · 4. Ask again once one is done.")
     expect(translate('ko', "Too many videos are being made at once, so I didn't start the video for {shots}. Ask again once one is done.", { shots: '샷 2·4' })).toBe('동시에 만드는 영상이 많아 샷 2·4 영상은 시작하지 못했어요. 하나가 끝나면 다시 부탁해 주세요.')
+  })
+
+  // 왜(검토 rev-video 8 ②): 샷 상세에서 이어서로 고른 Take 를 채팅으로 다시 만들 때 그사이 앞 샷 영상이 바뀌었으면 서버가 옛 이음 장면을 막는다 —
+  //   잠시 뒤 다시 부탁해도 같은 까닭으로 막히니 "잠시 뒤 다시" 대신 카드 안내와 같은 뜻(앞 샷 영상이 바뀌었어요 · 이어서를 다시 골라 주세요)을 말한다.
+  it('다시 만들기가 앞 샷 영상이 바뀌어 막힌 샷은 "잠시 뒤 다시" 대신 "앞 샷 영상이 바뀌었어요 · 이어서를 다시 골라 주세요"라고 한다', async () => {
+    const failedTake = (id: string, parent: string) => ({ id, type: 'video', position: { x: 0, y: 0 }, data: { kind: 'video', label: id, parentShotNodeId: parent, status: 'failed', lastAttemptStatus: 'failed', videoUrl: null, final: false, takeNumber: 1, override: {} } }) as unknown as DirectorNode
+    const started: string[] = []
+    const remake = vi.fn(async (id: string, opts?: { onAccepted?: (jobId: string) => void }) => {
+      if (id === 's1') { started.push(id); opts?.onAccepted?.(`job-${id}`); return `job-${id}` }
+      mocks.modeRefusal.mockReturnValue({ shotNodeId: id, code: 'continue_source_changed' })
+      return null
+    })
+    director.setState({ nodes: [shot('s1', IMG('s1')), failedTake('v1', 's1'), shot('s2', IMG('s2')), failedTake('v2', 's2')], remakeShotVideo: remake })
+    reply([{ type: 'generateVideos' }])
+    await chat.getState().sendMessage('실패한 샷 다시 만들어줘')
+    expect(started).toEqual(['s1'])
+    const said = chat.getState().messages.filter((m) => m.role === 'model').map((m) => m.content)
+    expect(said).toContain("I didn't start the video for Shot 2. The previous shot's video has changed. Choose Continuation again to use its new last frame.")
+    expect(said.join('\n')).not.toContain('Please ask again in a moment')
+    expect(`${translate('ko', "I didn't start the video for {shots}.", { shots: '샷 2' })} ${translate('ko', "The previous shot's video has changed. Choose Continuation again to use its new last frame.")}`)
+      .toBe('샷 2 영상은 시작하지 않았어요. 앞 샷 영상이 바뀌었어요. 새 영상의 마지막 장면으로 이으려면 이어서를 다시 골라 주세요.')
   })
 
   // 왜: lead_rules 3 — 글 카드가 기다리는 샷은 다시 만들기도 그 카드에 묶었다가 [적용] 뒤 새 글로 만든다(이어받는 Take 설정은 그대로).
