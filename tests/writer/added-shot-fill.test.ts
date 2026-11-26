@@ -42,7 +42,7 @@ vi.mock('@/lib/supabase/admin', () => {
 import { fillAddedShot, isAddedFillSpec, isFillableAddedShot, type AddedShotRow } from '@/lib/writer/pipeline/stage/added_shot'
 import { refillAddedShots } from '@/lib/writer/pipeline/util/added_shot_persist'
 import { roughIsStaticHold, poseOf } from '@/lib/director/still-prompt'
-import { shotStageDesign } from '@/lib/writer/board-card'
+import { shotCardChips, shotStageDesign } from '@/lib/writer/board-card'
 import { ADD_SHOT_START_LIGHTING } from '@/lib/writer/add-shot-defaults'
 
 const read = (rel: string) => readFileSync(rel, 'utf8')
@@ -335,6 +335,16 @@ describe('혼자 정한 채우기 규칙', () => {
   it('채운 더한 샷의 콘티 카드에 다른 샷처럼 앵글 · 색온도 칩이 보인다', () => {
     const added = addedShot('sh_01_26', ['mina', 'jun'])
     expect(shotStageDesign(fill(added, [P1, P2, added]).spec, null)).toEqual({ cameraAngle: 'eye_level', cameraMotion: null, colorTempK: 4500 })
+  })
+
+  // 왜: 카드는 사람이 정한 빛을 무대 설계보다 앞세운다 — 손대지 않은 [+ 샷 추가] 창 값(5600K)이 카드에 남으면 카드는 5600K, 러프는 앞 샷의 빛으로
+  //   그려져 같은 샷이 두 빛을 갖는다(2026-11-27 dev 계정 화면 확인, 씬 4 끝 카드). 이은 빛이 없으면 지금처럼 창 값을 보인다.
+  it('[+ 샷 추가] 창의 빛을 처음 값 그대로 둔 더한 샷의 카드는 앞뒤 샷에서 이은 색온도를 보인다', () => {
+    const board = addedShot('sh_01_29', ['mina'], { lighting_config: { ...ADD_SHOT_START_LIGHTING } })
+    const stageDesign = shotStageDesign(fill(board, [P1, board]).spec, null)
+    const chips = (design: typeof stageDesign) => shotCardChips({ shotType: 'MS', stageDesign: design, camera: CAMERA, lighting: { ...ADD_SHOT_START_LIGHTING } }, 'ko').map((c) => c.label)
+    expect(chips(stageDesign)).toEqual(['MS', '아이레벨', '◐ 4500K'])
+    expect(chips(null)).toEqual(['MS', '◐ 5600K'])
   })
 })
 
