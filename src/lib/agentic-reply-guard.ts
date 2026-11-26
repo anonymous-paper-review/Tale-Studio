@@ -41,6 +41,12 @@ export function droppedCharactersNotice(ids: readonly string[], locale: AppLocal
   return wrap(translate(locale, 'Characters not in the cast list were left out: {ids}. To add a new character, add them in the Producer stage.', { ids: list }))
 }
 
+/** Storyboard 채팅이 Artist 배경 목록에 없는 장소로 씬을 만들거나 고쳤을 때 답 끝에 붙이는 안내(W6 오너 2026-11-26).
+ *  이을 배경이 없어 그 씬은 배경 그림을 참고하지 않고 그려진다 — 채팅 답이 "배경으로 만들었다"고 해도 사실을 한 줄로 알린다. */
+export function unknownPlacesNotice(places: readonly string[], locale: AppLocale = UNSPECIFIED_LOCALE_FALLBACK): string {
+  return wrap(translate(locale, 'Not in the Artist backgrounds: {places}. Scenes set there are drawn without a background image.', { places: places.join(', ') }))
+}
+
 /** 실패 경로에서 첫 ```json 펜스 이후를 잘라내고 안내 문구로 대체 (raw JSON 노출 방어). */
 export function stripLeakedUpdatesBlock(
   text: string,

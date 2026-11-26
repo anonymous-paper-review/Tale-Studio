@@ -943,6 +943,9 @@ export const KO: Record<string, string> = {
     '응답이 중간에 잘려서 {count}건만 적용했어요. 나머지는 범위를 나눠 다시 요청해 주세요.',
   'Characters not in the cast list were left out: {ids}. To add a new character, add them in the Producer stage.':
     '등장인물 목록에 없는 인물 {ids} 은(는) 반영하지 않았어요. 새 인물이 필요하면 Producer 단계에서 추가해 주세요.',
+  // W6(오너 2026-11-26): 채팅이 Artist 배경 목록에 없는 장소로 씬을 만들거나 고쳤을 때 답 끝 안내.
+  'Not in the Artist backgrounds: {places}. Scenes set there are drawn without a background image.':
+    'Artist 배경에 없는 장소예요: {places}. 이 장소의 씬은 배경 그림 없이 그려요.',
   'The source check needed for approval is missing. Read it again and ask for the change again.':
     '승인에 필요한 원천 확인 정보가 없습니다. 다시 읽어 변경을 요청해 주세요.',
   'The target changed after the approval request. Read it again and ask for the change again.':
