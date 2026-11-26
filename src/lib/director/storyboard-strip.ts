@@ -4,6 +4,7 @@
 //
 // server-only (sharp). 크롭은 기존 cropRoughGridFrames('strip1') 재사용 — 합성 지오메트리와
 // 크롭 지오메트리가 같은 STRIP_COLS/GRID_ROWS 비례에서 나오므로 왕복이 정합.
+import { REPAINT_INSET_FRAC } from '@/lib/writer/rough-grid-crop'
 import { gridMovementLines, stripMovementLines } from '@/lib/director/direction-line-prompt'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
@@ -148,6 +149,51 @@ export async function composeRoughReferenceStrip(
     // 지오메트리를 프레임 AR 로 골랐으므로 fill 왜곡은 미미(레거시 주석의 전제를 선택으로 보존).
     const resized = await sharp(await insetFrame(bufs[i])).resize(w, h, { fit: 'fill' }).png().toBuffer()
     overlays.push({ input: resized, left, top })
+  }
+  return {
+    buffer: await sharp(template).composite(overlays).png().toBuffer(),
+    geometry,
+    sheetFormat,
+  }
+}
+
+/**
+ * 그림 고치기의 바탕 시트(검토 rev-director 1번 · 리드 2026-11-26) — 지금 실사 세 칸(시작 · 방향 · 끝)을 러프 시트 틀에 앉힌다.
+ *   러프 합성(composeRoughReferenceStrip)과 달리 칸 가장자리를 자르지 않는다: 실사 칸은 이미 마무리 자르기(REPAINT_INSET_FRAC)로 칸 안쪽만 잘라 낸 그림이라,
+ *   그 자르기가 다시 잘라 낼 칸 안쪽 자리에 그대로 앉히고 바깥 띠는 그림 가장자리를 거울로 이어 채운다 —
+ *   모델이 그대로 다시 그리면 마무리 뒤 시야가 바탕과 같다(예전에는 고칠 때마다 약 12% 당겨지고 쌓였다). 약속: tests/director/fix-base-field.test.ts
+ */
+export async function composeRealFixStrip(
+  frames: { start: string; direction: string; end: string },
+  format: ProjectFormat | null = null,
+): Promise<ComposedReferenceSheet> {
+  const bufs = await Promise.all([fetchImage(frames.start), fetchImage(frames.direction), fetchImage(frames.end)])
+  const { geometry, sheetFormat, template } = await pickGeometryByFrameAr('strip1', format, bufs[0])
+  const meta = await sharp(template).metadata()
+  const width = meta.width
+  const height = meta.height
+  if (!width || !height) throw new Error('strip template metadata missing')
+  const { cols, rows, frameAxis } = geometry
+  const cellOf = (i: number): { x: readonly [number, number]; y: readonly [number, number] } =>
+    frameAxis === 'rows' ? { x: cols[0], y: rows[i] } : { x: cols[i], y: rows[0] }
+  // 마무리 자르기(cropRoughGridFrames 'repaint')와 같은 인셋 — 칸 0 의 크기에 비례.
+  const insetX = Math.max(2, Math.round((cols[0][1] - cols[0][0]) * width * REPAINT_INSET_FRAC))
+  const insetY = Math.max(2, Math.round((rows[0][1] - rows[0][0]) * height * REPAINT_INSET_FRAC))
+  const overlays: sharp.OverlayOptions[] = []
+  for (let i = 0; i < bufs.length; i++) {
+    const { x, y } = cellOf(i)
+    const left = Math.round(x[0] * width)
+    const top = Math.round(y[0] * height)
+    const w = Math.max(1, Math.round((x[1] - x[0]) * width))
+    const h = Math.max(1, Math.round((y[1] - y[0]) * height))
+    const innerW = Math.max(1, w - insetX * 2)
+    const innerH = Math.max(1, h - insetY * 2)
+    const placed = await sharp(bufs[i])
+      .resize(innerW, innerH, { fit: 'fill' })
+      .extend({ top: insetY, bottom: h - innerH - insetY, left: insetX, right: w - innerW - insetX, extendWith: 'mirror' })
+      .png()
+      .toBuffer()
+    overlays.push({ input: placed, left, top })
   }
   return {
     buffer: await sharp(template).composite(overlays).png().toBuffer(),

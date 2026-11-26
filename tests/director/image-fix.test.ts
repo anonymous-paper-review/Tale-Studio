@@ -5,6 +5,8 @@ const mocks = vi.hoisted(() => ({
   from: vi.fn(),
   falImageSubmit: vi.fn(),
   composed: [] as Array<{ start: string; direction: string; end: string }>,
+  /** 고치기 바탕을 합친 세 칸(자르지 않는 합성기 — 검토 rev-director 1번). */
+  fixComposed: [] as Array<{ start: string; direction: string; end: string }>,
   stripPrompts: [] as string[],
   uploads: [] as string[],
   reserved: [] as Array<Record<string, unknown>>,
@@ -54,6 +56,10 @@ vi.mock('@/lib/director/storyboard-strip', async (importOriginal) => ({
     mocks.composed.push(frames)
     return { buffer: Buffer.from('sheet'), sheetFormat: 'horizontal_16:9', geometry: { frameAxis: 'rows', repaintCanvas: '1024x1712' } }
   },
+  composeRealFixStrip: async (frames: { start: string; direction: string; end: string }) => {
+    mocks.fixComposed.push(frames)
+    return { buffer: Buffer.from('fix sheet'), sheetFormat: 'horizontal_16:9', geometry: { frameAxis: 'rows', repaintCanvas: '1024x1712' } }
+  },
   buildRealStripPrompt: (shotPrompt: string) => {
     mocks.stripPrompts.push(shotPrompt)
     return 'ROUGH STRIP PROMPT'
@@ -99,6 +105,7 @@ const submitted = () => mocks.falImageSubmit.mock.calls[0]?.[0] as { prompt: str
 beforeEach(() => {
   vi.clearAllMocks()
   mocks.composed = []
+  mocks.fixComposed = []
   mocks.stripPrompts = []
   mocks.uploads = []
   mocks.reserved = []
@@ -122,7 +129,9 @@ describe('이미지 고치기 = 지금 그림을 바탕으로', () => {
     // 왜: 오너 2026-11-26 채팅 고치기 재료 (a) "지금 그림을 참고로" — 예전에는 연필 러프에서 새로 칠해 바꿀 점 밖도 매번 달라졌다(4a02fe1f "맥락있게 수정이 안 된다").
     const response = await POST(request({ changeNote: 'add raindrops on the window behind her' }))
     expect(response.status).toBe(200)
-    expect(mocks.composed).toEqual([REAL])
+    // 지금 실사 세 칸은 자르지 않는 합성기로 합친다(러프 합성기는 칸 가장자리를 잘라 고칠 때마다 당겨졌다 — 검토 rev-director 1번 · fix-base-field.test.ts).
+    expect(mocks.fixComposed).toEqual([REAL])
+    expect(mocks.composed).toEqual([])
     expect(mocks.uploads.some((path) => path.endsWith(`${storageKeySegment('sh_01_01')}_storyboard_fix_strip.png`))).toBe(true)
     const sent = submitted()
     expect(sent.reference_image_urls[0]).toMatch(/_storyboard_fix_strip\.png/)

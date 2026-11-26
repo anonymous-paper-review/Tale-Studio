@@ -45,6 +45,7 @@ vi.mock('@/lib/series/continuity', () => ({ loadSeriesFirstShotContinuity: async
 vi.mock('@/lib/director/storyboard-strip', async (importOriginal) => ({
   ...(await importOriginal<typeof import('@/lib/director/storyboard-strip')>()),
   composeRoughReferenceStrip: async () => ({ buffer: Buffer.from('sheet'), sheetFormat: 'horizontal_16:9', geometry: { frameAxis: 'rows', repaintCanvas: '1024x1712' } }),
+  composeRealFixStrip: async () => ({ buffer: Buffer.from('fix sheet'), sheetFormat: 'horizontal_16:9', geometry: { frameAxis: 'rows', repaintCanvas: '1024x1712' } }),
 }))
 vi.mock('@/lib/storage/media', () => ({
   mediaUpload: async () => ({ error: null }),
