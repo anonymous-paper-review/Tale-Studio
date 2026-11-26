@@ -485,8 +485,18 @@ async function selectModeFrames(
       : shot.scene_id && !directorRefsExcludeWorld(parseDirectorRefs(shot.director_refs))
         ? (await loadSceneWorldRefs(projectId, [shot.scene_id])).get(shot.scene_id) ?? null
         : null
+    // 지시문은 영어다 — 인물은 저장된 영어 이름(움직임 약속 · 실사 그림체 지시문과 같은 promptName)으로 부르고, 없으면 이름 그대로.
+    const characterIds = (plan?.characterRefs ?? []).map((ref) => ref.characterId)
+    const { data: nameRows } = characterIds.length
+      ? await supabaseAdmin.from('characters').select('character_id, name, name_en, name_en_source').eq('project_id', projectId).in('character_id', characterIds)
+      : { data: [] }
+    const rows = (Array.isArray(nameRows) ? nameRows : []) as Array<{ character_id?: unknown; name?: unknown; name_en?: unknown; name_en_source?: unknown }>
+    const sheetName = (ref: { characterId: string; name: string }) => {
+      const row = rows.find((candidate) => candidate.character_id === ref.characterId)
+      return row ? promptName(row, ref.name) : ref.name
+    }
     references = {
-      characters: (plan?.characterRefs ?? []).map((ref) => ({ url: ref.url, label: `character sheet: ${ref.name}` })),
+      characters: (plan?.characterRefs ?? []).map((ref) => ({ url: ref.url, label: `character sheet: ${sheetName(ref)}` })),
       world: worldRef ? { url: worldRef, label: 'the location' } : null,
       props: await loadShotPropReferenceImages(projectId, shot),
     }
