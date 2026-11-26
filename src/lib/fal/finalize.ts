@@ -47,6 +47,7 @@ import { updateStoryboardImage } from '@/lib/director/storyboard-image-store'
 import { isJobCancelled } from '@/lib/director/job-cancellations'
 import { finalizeRoughEndFrameJob } from '@/lib/writer/directing-edit'
 import { finalizeRealEndFrameJob } from '@/lib/storyboard/real-directing-edit'
+import { withFixedRealRead } from '@/lib/storyboard/real-arrow-edit'
 import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { editorMusicPath } from '@/lib/editor/music-path'
@@ -1131,17 +1132,23 @@ async function finalizeStoryboardStripJob(
 
   // 버전 하나를 쌓고 지금 그림으로 — 위 칸(url = start 하위 호환 대표 프레임 · frames)은 이 버전을 비춘다.
   //   화면에서 멈춘 작업(오너 7번)이면 기록에만 넣고 지금 그림은 그대로 둔다.
+  //   지금 그림을 참고로 고친 작업(채팅 고치기 — 작업 기록 fix_base_frames)이면 그 바탕 판의 실사 줄(N4b 화살표를 읽은 줄)을 새 판이 잇는다(리드 A 2026-11-27).
   const stopped = await isJobCancelled(job.id)
-  await updateStoryboardImage(job.project_id, writerShotId, (current) => withStoryboardVersion(current, {
-    id: job.id,
-    url: startUrl,
-    frames: { start: startUrl, direction: directionUrl, end: endUrl },
-    generatedAt: Date.now(),
-    source: 'generated',
-    // 약속 I4: 참조한 러프의 시각 — 러프가 바뀌면 "러프 바뀜"(자동 재생성은 하지 않는다, 오너 I5).
-    roughGeneratedAt: job.target.roughGeneratedAt ?? null,
-    ...(stopped ? { cancelled: true as const } : {}),
-  }, { select: !stopped }))
+  const fixBase = (job.input_snapshot as { fix_base_frames?: { direction?: unknown; end?: unknown } } | null)?.fix_base_frames
+  const fixedFrom = typeof fixBase?.direction === 'string' && typeof fixBase.end === 'string' ? { direction: fixBase.direction, end: fixBase.end } : null
+  await updateStoryboardImage(job.project_id, writerShotId, (current) => {
+    const next = withStoryboardVersion(current, {
+      id: job.id,
+      url: startUrl,
+      frames: { start: startUrl, direction: directionUrl, end: endUrl },
+      generatedAt: Date.now(),
+      source: 'generated',
+      // 약속 I4: 참조한 러프의 시각 — 러프가 바뀌면 "러프 바뀜"(자동 재생성은 하지 않는다, 오너 I5).
+      roughGeneratedAt: job.target.roughGeneratedAt ?? null,
+      ...(stopped ? { cancelled: true as const } : {}),
+    }, { select: !stopped })
+    return stopped ? next : withFixedRealRead(next, fixedFrom, { direction: directionUrl, end: endUrl })
+  })
 
   await completeGenerationJob(job.id, startUrl)
   await cleanupRefSheet(job) // #ref-sheet-ttl — 일회용 합성 레퍼런스 회수(성공 후, 무해 실패)

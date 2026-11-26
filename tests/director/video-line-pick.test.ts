@@ -147,3 +147,25 @@ describe('시작+미들의 "러프 바뀜" 막기와 실사 줄', () => {
     expect(resolveModeFrames({ mode: 'start_middle', storyboardImage: stale, roughStoryboard: rough })).toEqual({ ok: false, code: 'middle_outdated' })
   })
 })
+
+describe('실사 줄과 콘티 줄이 둘 다 살아 있을 때', () => {
+  const outdated = { ...STORYBOARD, roughGeneratedAt: ROUGH.generatedAt - 1 }
+
+  // 왜(리드 B): 실사에서 고친 뒤 콘티에서 다시 고쳤으면(또는 그 반대) 사람이 마지막으로 정한 움직임이 맞다 — 읽은(고친) 시각이 더 나중인 줄을 싣는다.
+  it('실사 줄과 콘티 줄이 둘 다 살아 있으면 더 나중에 고친 줄을 싣는다', () => {
+    const realLater = { ...STORYBOARD, directionRead: { ...realRead(REAL_DIRECTION), at: 50 } }
+    const contiAt = (at: number) => ({ ...ROUGH, directionRead: { ...contiRead, at } })
+    expect(pickVideoDirectionRead({ storyboard_image: realLater, rough_storyboard: contiAt(40) })).toEqual({ en: REAL_LINE, source: 'real' })
+    expect(pickVideoDirectionRead({ storyboard_image: realLater, rough_storyboard: contiAt(60) })).toEqual({ en: CONTI_LINE, source: 'conti' })
+    expect(videoDirectionLine({ storyboard_image: realLater, rough_storyboard: contiAt(60) })).toBe(CONTI_LINE)
+  })
+
+  // 왜(리드 B): 콘티 줄이 이기면 실사 가운데 장은 그 줄과 다른 움직임이다 — 시작+미들은 지금처럼 "러프 바뀜"으로 막는다.
+  it('콘티 줄이 더 나중이면 시작+미들은 지금처럼 "러프 바뀜"으로 막는다', () => {
+    const edited = { ...outdated, directionRead: { ...realRead(REAL_DIRECTION), at: 50 } }
+    const contiLater = { ...rough, directionRead: { ...contiRead, at: 60 } }
+    expect(realMiddleOutdated(edited, contiLater)).toBe(true)
+    expect(resolveModeFrames({ mode: 'start_middle', storyboardImage: edited, roughStoryboard: contiLater })).toEqual({ ok: false, code: 'middle_outdated' })
+    expect(realMiddleOutdated(edited, { ...rough, directionRead: { ...contiRead, at: 40 } })).toBe(false)
+  })
+})

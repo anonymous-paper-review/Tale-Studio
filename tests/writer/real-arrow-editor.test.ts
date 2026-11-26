@@ -6,7 +6,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/lib/supabase/admin', () => ({ supabaseAdmin: { from: vi.fn() } }))
 
-import { DirectingArrowEditor, directingEditUrl } from '@/features/writer/directing-arrow-editor'
+import { DirectingArrowEditor, arrowSaveNeeded, directingEditUrl, saveImageDataUrl } from '@/features/writer/directing-arrow-editor'
 import { directingSaveBody } from '@/lib/writer/directing-edit-url'
 import { KO as messagesKo } from '@/lib/i18n/messages-ko'
 
@@ -65,5 +65,39 @@ describe('실사 가운데 장 편집기', () => {
     // 까닭을 보이는 동안은 "그리던 줄이 아직" 알림을 겹쳐 보이지 않는다.
     expect(locked).not.toContain('The end frame is not drawn from this line yet.')
     expect(render({ surface: 'real' })).not.toContain('data-locked="true"')
+  })
+})
+
+describe('검토 rev-realarrow — 실사 편집기', () => {
+  // 왜(검토 rev-realarrow 3): 그린 것 없이 저장하면 새 판이 하나 더 생기고 읽은 줄이 낡는다(가운데 장 주소가 바뀐다) — 실사는 그린 것이 있을 때만 저장한다.
+  it('실사 편집기는 그린 것이 없으면 저장하지 않고, 콘티 편집기는 지금처럼 저장한다', () => {
+    expect(arrowSaveNeeded('real', false)).toBe(false)
+    expect(arrowSaveNeeded('real', true)).toBe(true)
+    expect(arrowSaveNeeded('rough', false)).toBe(true)
+    const source = readFileSync('src/features/writer/directing-arrow-editor.tsx', 'utf8')
+    expect(source).toMatch(/if \(!arrowSaveNeeded\(surface, hadStrokes\)\) return true/)
+    expect(source).toMatch(/disabled=\{busy \|\| !ready \|\| !arrowSaveNeeded\(surface, undoCount > 0\)\}/)
+  })
+
+  // 왜(리드 D): 16:9 큰 칸 PNG 가 요청 몸 상한(4.5MB)에 닿지 않게 — 실사 길은 PNG 가 3MB 를 넘으면 JPEG 로 보낸다. 콘티는 서버가 PNG 만 받아 늘 PNG.
+  it('실사 편집기는 저장할 PNG 가 3MB 를 넘으면 JPEG 로 보내고, 콘티는 늘 PNG 로 보낸다', () => {
+    const canvas = (pngLength: number) => ({ toDataURL: (type?: string) => (type === 'image/jpeg' ? 'data:image/jpeg;base64,J' : `data:image/png;base64,${'P'.repeat(pngLength)}`) })
+    expect(saveImageDataUrl(canvas(10), 'real')).toMatch(/^data:image\/png/)
+    expect(saveImageDataUrl(canvas(3 * 1024 * 1024), 'real')).toBe('data:image/jpeg;base64,J')
+    expect(saveImageDataUrl(canvas(3 * 1024 * 1024), 'rough')).toMatch(/^data:image\/png/)
+    expect(readFileSync('src/features/writer/directing-arrow-editor.tsx', 'utf8')).toMatch(/image: saveImageDataUrl\(out, surface\)/)
+  })
+
+  // 왜(같이 정한 것 · 리드 · D10): [그대로]로 남긴 고친 줄도 편집기 아래에 남는다 — 누가 쓴 줄인지 이름표로 보인다(실사 편집기도 콘티와 같다).
+  it('AI 가 읽은 움직임 한 줄이 편집기 아래에 보이고, 사람이 고친 줄이면 "고친 움직임"이다', () => {
+    const ai = render({ surface: 'real' })
+    expect(ai).toContain('data-testid="directing-read-line"')
+    expect(ai).toContain(READ.en)
+    expect(ai).toContain('Motion the AI read')
+    expect(ai).not.toContain('Edited movement')
+    const user = render({ surface: 'real', panel: panel({ ...READ, source: 'user', en: 'She sits back down.' }) })
+    expect(user).toContain('She sits back down.')
+    expect(user).toContain('Edited movement')
+    expect(user).not.toContain('Motion the AI read')
   })
 })

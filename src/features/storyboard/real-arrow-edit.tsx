@@ -10,15 +10,42 @@ import { useState } from 'react'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { DirectingArrowEditor } from '@/features/writer/directing-arrow-editor'
-import { EndRedrawAsk, UnsavedArrowsConfirm, endRedrawDeps, useUnsavedArrowsGuard, type EndAskTarget } from '@/features/writer/unsaved-arrows-confirm'
+import { EndRedrawAsk, UnsavedArrowsConfirm, closeRequest, endRedrawDeps, runEndRedraw, useUnsavedArrowsGuard, type EndAskTarget } from '@/features/writer/unsaved-arrows-confirm'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { refreshGenerationQueue } from '@/lib/generation-queue'
 import { useT } from '@/lib/i18n'
 import { realEditorPanel } from '@/lib/storyboard/real-arrow-edit'
 import { directingEditUrl } from '@/lib/writer/directing-edit-url'
-import { redrawEndFrame } from '@/lib/writer/end-frame-ask'
 
 type Guard = ReturnType<typeof useUnsavedArrowsGuard>
+
+/** 실사 끝 장 대상 — 실사 길로 보내고, 그리는 동안(저장 뒤 자동 · 물음 창 [다시 그리기] 모두) 그 카드 표시(cardDrawing)를 켜고 끈다(검토 rev-realarrow 2).
+ *  카드 표시는 보드 카드 기다림 · 상세 잠금 · 편집기 잠금이 같이 본다 — 큐에 오르기 전 틈도 잠긴다. */
+export function realEndTarget(projectId: string, shotId: string, onChanged: () => Promise<void>): EndAskTarget {
+  return {
+    projectId,
+    shotId,
+    onRedrawn: onChanged,
+    endpoint: directingEditUrl('real'),
+    track: (busy) => {
+      const board = useBoardUiStore.getState()
+      if (busy) board.markCardDrawing(projectId, shotId)
+      else board.clearCardDrawing(projectId, shotId)
+    },
+  }
+}
+
+/** [Lumi 에게 고쳐 달라고 하기] — 저장하지 않은 화살표가 있으면 보내기 전에 먼저 묻는다(보내면 창이 닫혀 그린 것을 잃는다, 검토 rev-realarrow 6). 순수 함수. */
+export function fixSendRequest(dirty: boolean): 'ask' | 'send' {
+  return closeRequest(dirty) === 'ask' ? 'ask' : 'send'
+}
+
+/** 끝 장이 늦게 끝나 다시 읽을 때 — 지금 프로젝트가 그 프로젝트일 때만(그사이 옮겼으면 옛 프로젝트 그림으로 지금 화면을 덮지 않는다, 검토 rev-realarrow 4). */
+export function sameProjectReload(projectId: string, currentProjectId: () => string | null, reload: () => Promise<void>): () => Promise<void> {
+  return async () => {
+    if (currentProjectId() === projectId) await reload()
+  }
+}
 
 /**
  * 화살표를 저장한 뒤 — 묻지 않고 실사 끝 장을 다시 그린다(N4b). 작업을 받으면 바로 다시 읽어 읽은 줄을 편집기 아래에 보이고,
@@ -32,16 +59,15 @@ export function startRealEndRedraw(input: {
   askLine: (target: EndAskTarget) => void
 }): Promise<boolean> {
   const { projectId, shotId, onChanged, t, askLine } = input
-  const target: EndAskTarget = { projectId, shotId, onRedrawn: onChanged, endpoint: directingEditUrl('real') }
-  useBoardUiStore.getState().markCardDrawing(projectId, shotId)
-  return redrawEndFrame(projectId, shotId, {
+  const target = realEndTarget(projectId, shotId, onChanged)
+  return runEndRedraw(target, {
     ...endRedrawDeps(target, t),
     accepted: async () => {
       refreshGenerationQueue()
       await onChanged()
     },
     unreadable: () => askLine(target),
-  }).finally(() => useBoardUiStore.getState().clearCardDrawing(projectId, shotId))
+  })
 }
 
 /** 편집 칸 — 머리(제목 · 설명 · [그림으로 돌아가기]) + 실사 편집기. onBack 이 없으면(겹창) 머리를 그리지 않는다 — 창 머리가 대신한다. */
@@ -66,10 +92,12 @@ export function RealArrowEditPane({
   onBack?: () => void
 }) {
   const t = useT()
-  // 끝 장을 다시 그리는 중(저장 뒤 ~ 다 그릴 때까지) — 큐에 오르기 전 틈에도 다시 저장하지 못하게 잠근다.
+  // 끝 장을 다시 그리는 중(저장 뒤 ~ 다 그릴 때까지) — 큐에 오르기 전 틈에도 다시 저장하지 못하게 잠근다. 물음 창 [다시 그리기] 길은
+  //   그 카드 표시(cardDrawing)로 잠긴다(같은 표시를 이 화면도 본다 — Director 에서도).
   const [redrawing, setRedrawing] = useState(false)
+  const cardDrawing = useBoardUiStore((state) => state.cardDrawing[shotId] === projectId)
   const panel = realEditorPanel(image)
-  const target: EndAskTarget = { projectId, shotId, onRedrawn: onChanged, endpoint: directingEditUrl('real') }
+  const target = realEndTarget(projectId, shotId, onChanged)
   const redraw = () => {
     setRedrawing(true)
     void startRealEndRedraw({ projectId, shotId, onChanged, t, askLine: (next) => void guard.askEnd(next) }).finally(() => setRedrawing(false))
@@ -94,7 +122,7 @@ export function RealArrowEditPane({
           shotId={shotId}
           panel={panel}
           surface="real"
-          lockedReason={drawing || redrawing ? t('This shot is being drawn. You can change it when it is done.') : null}
+          lockedReason={drawing || redrawing || cardDrawing ? t('This shot is being drawn. You can change it when it is done.') : null}
           onSaved={() => void onChanged()}
           ref={guard.editorRef}
           onDirtyChange={guard.setDirty}

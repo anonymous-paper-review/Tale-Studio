@@ -13,8 +13,11 @@ import { userOwnsProject } from '@/lib/generation-jobs'
 import { capacityReservationRejection } from '@/lib/api/quota'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { DirectionTranslateError, DirectionUnreadableError, ForeignMediaPathError, StaleDirectionError } from '@/lib/writer/directing-edit'
+import { translate } from '@/lib/i18n'
+import { parseAppLocale, type AppLocale } from '@/lib/locale'
 import {
   RealFramesMissingError,
+  RealNotArrowVersionError,
   RealShotBusyError,
   keepRealDirectionLine,
   readRealDirection,
@@ -42,9 +45,12 @@ export async function POST(req: Request) {
   const blocked = demoWriteBlock(req)
   if (blocked) return blocked
   let context: { projectId: string; kind: 'image_generation' | 'shot_storyboard'; userId: string } | null = null
+  // 오류 말은 그 사용자의 화면 말로(검토 rev-realarrow 5 — 진실은 user_metadata.locale, 없으면 en).
+  let locale: AppLocale = 'en'
   try {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    locale = parseAppLocale((user as { user_metadata?: { locale?: unknown } }).user_metadata?.locale) ?? 'en'
     const parsed = BodySchema.safeParse(await req.json().catch(() => null))
     if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     const body = parsed.data
@@ -52,29 +58,33 @@ export async function POST(req: Request) {
     context = { projectId: body.projectId, kind: body.action === 'regenerate-frame' ? 'shot_storyboard' : 'image_generation', userId: user.id }
 
     if (body.action === 'separate') {
-      const data = await separateRealArrowLayer(body.projectId, body.shotId, undefined, { expectDirection: body.direction, userId: user.id })
+      const data = await separateRealArrowLayer(body.projectId, body.shotId, locale, { expectDirection: body.direction, userId: user.id })
       return NextResponse.json({ data })
     }
     if (body.action === 'save') {
-      const data = await saveRealDirectingFrame(body.projectId, body.shotId, body.image, undefined, { expectDirection: body.direction })
+      const data = await saveRealDirectingFrame(body.projectId, body.shotId, body.image, locale, { expectDirection: body.direction })
       return NextResponse.json({ data })
     }
     if (body.action === 'read-direction') {
-      const read = await readRealDirection(body.projectId, body.shotId)
+      const read = await readRealDirection(body.projectId, body.shotId, locale)
       return NextResponse.json({ data: { read } })
     }
     if (body.action === 'keep-line') {
-      const read = await keepRealDirectionLine(body.projectId, body.shotId, body.line, undefined, { expectDirection: body.direction })
+      const read = await keepRealDirectionLine(body.projectId, body.shotId, body.line, locale, { expectDirection: body.direction })
       return NextResponse.json({ data: { read } })
     }
-    const data = await redrawRealEndFrame(body.projectId, body.shotId, undefined, { line: body.line ?? null, userId: user.id })
+    const data = await redrawRealEndFrame(body.projectId, body.shotId, locale, { line: body.line ?? null, userId: user.id })
     return NextResponse.json({ data })
   } catch (e) {
     if (e instanceof ForeignMediaPathError) return NextResponse.json({ error: e.message }, { status: 403 })
     if (e instanceof StaleDirectionError) return NextResponse.json({ error: e.message, code: 'stale_direction' }, { status: 409 })
     if (e instanceof RealShotBusyError) return NextResponse.json({ error: e.message, code: 'busy' }, { status: 409 })
     if (e instanceof RealFramesMissingError) return NextResponse.json({ error: e.message, code: 'no_real_frames' }, { status: 409 })
-    if (e instanceof DirectionUnreadableError) return NextResponse.json({ error: e.message, code: 'direction_unreadable' }, { status: 422 })
+    if (e instanceof RealNotArrowVersionError) return NextResponse.json({ error: e.message, code: 'not_arrow_version' }, { status: 409 })
+    // 실사 상세에는 콘티의 "연출 탭"이 없다 — 못 읽음은 실사 말로(검토 rev-realarrow 8).
+    if (e instanceof DirectionUnreadableError) {
+      return NextResponse.json({ error: translate(locale, 'The AI could not read the arrows, so the end frame was not redrawn. Press Edit and redraw the end frame and write the motion.'), code: 'direction_unreadable' }, { status: 422 })
+    }
     if (e instanceof DirectionTranslateError) return NextResponse.json({ error: e.message, code: 'direction_translate_failed' }, { status: 422 })
     // 내용 규칙 거절 · 자리 부족은 표준 상황코드로(콘티 길과 같다).
     const moderated = context && moderationRejectionResponse(e, context)

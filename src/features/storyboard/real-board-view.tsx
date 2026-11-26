@@ -415,7 +415,7 @@ export function RealBoardView() {
                         const wait = waitOf(shot.shotId)
                         const picture = storyboardCardPicture(shot.roughStoryboard, images[shot.shotId])
                         // 지난 판 줄(S3) — 실사가 있는 카드만(Director 와 같은 판 기록). 콘티(러프)는 판 기록이 없다.
-                        const history = picture.kind === 'real' ? historyStrip(pastImageVersions(images[shot.shotId] as StoryboardImage | null)) : null
+                        const history = picture.kind === 'real' ? historyStrip(pastImageVersions(images[shot.shotId] as StoryboardImage | null, { arrowMiddleThumb: true })) : null
                         return (
                           // 줄은 DOM 칸 하나를 기준으로 뜬다 — 카드 부품을 grid 칸으로 감싸 카드 높이는 지금처럼 줄 높이에 맞는다.
                           <VersionHistoryHover

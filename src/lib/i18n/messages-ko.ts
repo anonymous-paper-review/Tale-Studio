@@ -3169,10 +3169,16 @@ export const KO: Record<string, string> = {
   // 실사 가운데 장 화살표 고치기(오너 2026-11-27 N4b) — 저장하면 끝 장을 저절로 다시 그린다.
   'The end frame is not drawn from this line yet. Videos use this line.': '끝 장은 아직 이 줄로 그리지 않았어요. 영상에는 이 줄이 들어가요.',
   'This shot has no three-frame image to edit. Make the image first.': '고칠 세 장 그림이 없는 샷이에요. 먼저 그림을 만들어 주세요.',
+  'Only a version whose arrows you edited can be read or redrawn. Edit the arrows first.': '화살표를 고친 판만 줄을 읽거나 끝 장을 다시 그릴 수 있어요. 먼저 화살표를 고쳐 주세요.',
   'Edit arrows': '화살표 고치기',
   'Edit the arrows on the middle frame': '가운데 장 화살표 고치기',
   'When you save, the end frame is redrawn to match your arrows. It takes over a minute.': '저장하면 고친 화살표대로 끝 장을 다시 그려요. 1분 넘게 걸려요.',
   'Back to the picture': '그림으로 돌아가기',
+  // 검토 rev-realarrow 8 — 실사 길 알림(실사 상세에는 연출 탭이 없다) · 끝 장 다시 그리기 멈추기.
+  'The AI could not read the arrows, so the end frame was not redrawn. Press Edit and redraw the end frame and write the motion.': 'AI 가 화살표를 읽지 못해 끝 장을 다시 그리지 않았어요. [고쳐서 끝 장 다시 그리기]를 눌러 움직임을 적어 주세요.',
+  'The middle frame changed meanwhile, so your line was not kept. Open Edit arrows again.': '그사이 가운데 장이 바뀌어 고친 줄을 남기지 않았어요. [화살표 고치기]를 다시 열어 주세요.',
+  'Stopped. The end frame being redrawn was discarded, so the end frame stays as it was.': '멈췄어요. 다시 그리던 끝 장은 버려져 끝 장은 그대로예요.',
+  'Stopped. If the images being made finish later, they stay in the versions. The end frame being redrawn was discarded.': '멈췄어요. 그리던 이미지는 뒤늦게 끝나면 버전으로 남아요. 다시 그리던 끝 장은 버려져요.',
   'Kept your line. The end frame stays as it is.': '고친 줄을 남겼어요. 끝 장은 그대로예요.',
   'Could not translate your line, so it was not kept. The previous line stays. Try again.': '고친 줄을 영어로 옮기지 못해 남기지 못했어요. 전에 있던 줄은 그대로예요. 다시 시도해 주세요.',
   'The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.': '그사이 연출 장이 바뀌어 고친 줄을 남기지 않았어요. 연출 탭을 다시 열어 주세요.',
