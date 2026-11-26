@@ -38,6 +38,16 @@ Animate from the START frame composition to the END frame composition over ${dur
 Slow, deliberate, readable movement — this is a previsualization for judging camera work and blocking. Nothing else changes.`
 }
 
+/**
+ * 오너 dev 때 V1 "영상 생성에는 무조건 실사 그림만" · T1 "추천대로"(main 에도 같이, 2026-11-27 N4a) — 목각(러프 시작 · 끝) 영상 길은 닫혔다.
+ *   주인 확인 뒤, 작업 기록 · Take · 잔액(예산 · 동시성) 확인 · 외부 제출보다 먼저 410 으로 답한다.
+ *   아래 제출 코드는 지울 목록에 있다(n-video 보고) — 지울 때까지 타입 검사가 그대로 돌게 함수로 막는다.
+ *   약속: tests/billing/previz-record-before-submit.test.ts
+ */
+function previzVideoRetired(): boolean {
+  return true
+}
+
 export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
@@ -50,6 +60,12 @@ export async function POST(req: Request) {
     // 소유자만 — 로그인만으로 남의 프로젝트 조작 가능하던 구멍 (#access-audit 2026-08-15)
     const access = await requireProjectAccess(req, projectId)
     if (!access.ok) return access.response
+    if (previzVideoRetired()) {
+      return NextResponse.json(
+        { error: 'Wooden-mannequin preview videos are no longer made. Videos use live-action storyboard images only.', code: 'previz_video_retired' },
+        { status: 410 },
+      )
+    }
 
     const budget = await checkProjectVideoBudget(projectId, access.userId!) // #f4 총량 게이트
     if (!budget.ok) return videoBudgetRejectionResponse(budget, { projectId, kind: 'shot_previz_video', userId: access.userId })

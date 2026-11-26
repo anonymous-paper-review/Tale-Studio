@@ -233,10 +233,8 @@ describe('고정한 입력을 그대로 제출하는 약속', () => {
       expect.any(String),
       expect.objectContaining({ input: expect.objectContaining({
         prompt: 'Original scene',
-        image_urls: [
-          PRODUCTION_STORYBOARD_IMAGE.frames.start,
-          PRODUCTION_STORYBOARD_IMAGE.frames.end,
-        ],
+        // 끝 그림은 오너 시작+끝 폐기(2026-11-22)로 보내지 않는다.
+        image_urls: [PRODUCTION_STORYBOARD_IMAGE.frames.start],
       }) }),
     )
   })

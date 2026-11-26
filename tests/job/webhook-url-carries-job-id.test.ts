@@ -1,9 +1,10 @@
-// 남은 네 제출 경로도 완료 알림 주소에 예약한 작업 번호를 심는다
+// 남은 세 제출 경로도 완료 알림 주소에 예약한 작업 번호를 심는다
 //
 // 접수 번호 기록이 실패하면 fal 알림은 request_id 로 행을 찾을 수 없고, fal 은 알림을 다시 보내지 않는다.
 //   주소에 심은 작업 번호가 그 잡을 되찾는 유일한 단서다(되찾는 쪽: tests/job/webhook-matches-by-job-id.test.ts).
 //   이미 적용된 경로는 tests/job/submit-paths-carry-job-id*.test.ts 가 본다 — 이 파일은 남아 있던
-//   프리비즈 영상 · 실사 시트 묶음 · 러프 시트 · 영상 다음 모델 네 경로다.
+//   실사 시트 묶음 · 러프 시트 · 영상 다음 모델 세 경로다. 프리비즈(목각) 영상 경로의 시험 1개는 그 길이 닫혀(오너 T1 — 목각 영상 출시 시험은
+//   지우고 거절 시험 하나로, main 2026-11-27 N4a) 지웠다 — 닫힌 길의 시험: tests/billing/previz-record-before-submit.test.ts.
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const mocks = vi.hoisted(() => ({
@@ -109,7 +110,6 @@ vi.mock('@/lib/storage/media', async (importOriginal) => ({
   mediaPublicUrl: (path: string) => `https://media.test/${path}`,
 }))
 
-import { POST as previzPOST } from '@/app/api/director/generate-previz-video/route'
 import { POST as storyboardBatchPOST } from '@/app/api/director/generate-storyboard-batch/route'
 import { submitRoughStoryboardGrid } from '@/lib/writer/rough-submit'
 import { failDirectorVideoAttemptOrFallback } from '@/lib/director/video-fallback'
@@ -191,32 +191,6 @@ beforeEach(() => {
   mocks.falImageSubmit.mockResolvedValue({ request_id: 'fal-image-1', model: 'openai/gpt-image-2/edit', fal_key_id: FAL_KEY_ID })
   mocks.falVideoSubmit.mockResolvedValue({ request_id: 'fal-video-1', model: 'happy-horse', fal_key_id: FAL_KEY_ID })
   mocks.recordWriterObservabilityEvent.mockResolvedValue(undefined)
-})
-
-describe('프리비즈 영상 제출의 완료 알림 주소', () => {
-  const JOB_ID = 'previz-job-1'
-
-  beforeEach(() => {
-    db.shots = [{
-      shot_id: 'sh_01_01',
-      action_description: 'a man walks',
-      duration_seconds: 5,
-      rough_storyboard: { url: 'https://media.test/rough.png', frames: { start: START, end: END } },
-    }]
-    mocks.createGenerationJob.mockResolvedValue({ id: JOB_ID, fal_key_id: FAL_KEY_ID })
-  })
-
-  it('프리비즈 영상을 제출하면 완료 알림 주소에 예약한 작업 번호를 심는다', async () => {
-    const response = await previzPOST(new Request('http://localhost/api/director/generate-previz-video', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ projectId: PROJECT_ID, writerShotId: 'sh_01_01' }),
-    }))
-
-    expect(response.status).toBe(200)
-    expect(mocks.resolveWebhookUrl).toHaveBeenCalledWith(JOB_ID)
-    expect(mocks.falVideoSubmit.mock.calls[0][0]).toMatchObject({ webhookUrl: hookFor(JOB_ID) })
-  })
 })
 
 describe('실사 시트 묶음 제출의 완료 알림 주소', () => {

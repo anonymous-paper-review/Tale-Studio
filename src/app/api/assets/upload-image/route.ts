@@ -119,6 +119,11 @@ export async function POST(req: Request) {
       if (field !== 'thumbnail' && field !== 'chain_frame') {
         return NextResponse.json({ error: 'Only thumbnail or chain-frame uploads are allowed for video takes' }, { status: 400 })
       }
+      // 이어 붙일 장면의 잡은 시각(밀리초, 오너 2026-11-27 N4a ① · dev 방안 고장 2) — 파일 이름이 되므로 숫자만 받는다. 없으면 예전 이름(작업마다 하나).
+      const chainFrameAtMs = form.get('atMs')
+      if (field === 'chain_frame' && chainFrameAtMs !== null && (typeof chainFrameAtMs !== 'string' || !/^\d{1,7}$/.test(chainFrameAtMs))) {
+        return NextResponse.json({ error: 'Invalid chain-frame time' }, { status: 400 })
+      }
       if (!generationJobId || !isCanonicalSegment(generationJobId)) return NextResponse.json({ error: 'Invalid request: generationJobId is required for video thumbnails' }, { status: 400 })
       if (file.size === 0 || file.size > MAX_IMAGE_BYTES) {
         return NextResponse.json({ error: 'Video thumbnail must be an image no larger than 10 MB' }, { status: 400 })
@@ -147,7 +152,9 @@ export async function POST(req: Request) {
       }
 
       if (field === 'chain_frame') {
-        const storagePath = `${project.workspace_id}/${projectId}/videos/${clip.id}/${job.id}_chain-frame.jpg`
+        // 잡은 시각이 다르면 그림도 다르다 — 시각마다 파일을 따로 둬 같은 앞 작업에서 다시 잡아도 덮어쓰기 거절이 나지 않게 한다.
+        const atSuffix = typeof chainFrameAtMs === 'string' ? `-${Number(chainFrameAtMs)}` : ''
+        const storagePath = `${project.workspace_id}/${projectId}/videos/${clip.id}/${job.id}_chain-frame${atSuffix}.jpg`
         await uploadImmutableObject(storagePath, buffer, mimeType)
         return NextResponse.json({ publicUrl: mediaPublicUrl(storagePath) })
       }

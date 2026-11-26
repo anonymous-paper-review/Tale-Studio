@@ -1,9 +1,10 @@
 // 영상 생성이 시작될 때 Take를 안전하게 처리하고, 실패하면 사용량을 되돌린다 (#payments-phase-2 #gen-quota-atomic-gate)
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
-// Take hold 배선 (#payments-phase-2 #gen-quota-atomic-gate) — generate-previz-video 라우트가
-//   enforce 부족 시 402 + 잡을 failed 로 마킹하는지, release 가 실패 마킹 경로(director-video-takes,
+// Take hold 배선 (#payments-phase-2 #gen-quota-atomic-gate) — release 가 실패 마킹 경로(director-video-takes,
 //   fal/reconcile, fal/webhook)에서 호출되는지를 고정한다.
+//   generate-previz-video 라우트의 Take 처리 시험 3개는 오너 T1(2026-11-22 — 목각 영상 길을 닫음)로 지웠다
+//   (닫힌 길의 시험: tests/billing/previz-record-before-submit.test.ts).
 const mocks = vi.hoisted(() => ({
   requireProjectAccess: vi.fn(),
   falVideoSubmit: vi.fn(),
@@ -49,7 +50,9 @@ vi.mock('@/lib/admin', () => ({ isAdminEmail: () => false }))
 //   순서(shots.update 등)량 무관하도록 별도로 무려화(순서 직접 검증은 take-hold.test.ts 전담).
 vi.mock('@/lib/writer/debug-events', () => ({ recordWriterObservabilityEvent: vi.fn() }))
 
-import { POST } from '@/app/api/director/generate-previz-video/route'
+// 아래 '사용량 반환' 시험은 vi.resetModules + vi.doMock 으로 가짜 DB 를 바꿔 끼운다 — 파일을 읽을 때 가짜 DB 가 한 번 올라와 있어야
+//   바꿔 끼운 가짜가 먹는다. 예전에는 목각 라우트 import 가 그 일을 했고, 그 시험을 지운 뒤(오너 T1 2026-11-22)에도 같은 순서로 둔다.
+import '@/lib/supabase/admin'
 
 function query(result: unknown) {
   const value = {
@@ -72,33 +75,6 @@ function query(result: unknown) {
 
 const PROJECT_ID = '123e4567-e89b-12d3-a456-426614174000'
 
-function request(body: Record<string, unknown> = {}) {
-  return new Request('http://test/api/director/generate-previz-video', {
-    method: 'POST',
-    headers: { 'content-type': 'application/json' },
-    body: JSON.stringify({
-      projectId: PROJECT_ID,
-      writerShotId: 'shot-1',
-      ...body,
-    }),
-  })
-}
-
-const projectRow = { workspace_id: 'workspace-1' }
-const shotRow = {
-  shot_id: 'shot-1',
-  action_description: 'walks forward',
-  duration_seconds: 5,
-  rough_storyboard: { frames: { start: 'https://x/start.png', end: 'https://x/end.png' } },
-}
-
-function mockProjectShotQueued() {
-  mocks.from
-    .mockReturnValueOnce(query({ data: projectRow, error: null }))
-    .mockReturnValueOnce(query({ data: shotRow, error: null }))
-    .mockReturnValueOnce(query({ data: [], error: null }))
-}
-
 beforeEach(() => {
   vi.resetAllMocks()
   vi.unstubAllEnvs()
@@ -109,60 +85,6 @@ beforeEach(() => {
   mocks.falVideoSubmit.mockResolvedValue({ request_id: 'fal-1', model: 'happy-horse-model', fal_key_id: 'key-1' })
   mocks.createGenerationJob.mockResolvedValue({ id: 'job-1', fal_key_id: 'key-1' })
   mocks.failGenerationJob.mockResolvedValue(undefined)
-})
-
-describe('영상 미리보기 생성 — Take 사용량 처리', () => {
-  it('사용량을 받지 않는 모드에서는 영상 생성을 정상 제출한다', async () => {
-    delete process.env.TAKE_BILLING_MODE
-    mockProjectShotQueued()
-    // generation_jobs.update (제출 뒤 request_id 교체, #previz-record-before-submit)
-    mocks.from.mockReturnValueOnce(query({ data: null, error: null }))
-    // shots.update (낙관 상태 기록)
-    mocks.from.mockReturnValueOnce(query({ data: null, error: null }))
-
-    const res = await POST(request())
-    expect(res.status).toBe(200)
-    await expect(res.json()).resolves.toEqual({ jobId: 'job-1' })
-    expect(mocks.rpc).not.toHaveBeenCalled()
-    expect(mocks.failGenerationJob).not.toHaveBeenCalled()
-  })
-
-  it('사용량을 실제로 차감하는 모드에서 잔액이 부족하면 생성을 막고 실패로 기록하며 상태를 바꾸지 않는다', async () => {
-    vi.stubEnv('TAKE_BILLING_MODE', 'enforce')
-    mockProjectShotQueued()
-    mocks.rpc.mockResolvedValue({ data: { ok: false, balance: 0, held: 0, insufficient: true }, error: null })
-
-    const res = await POST(request())
-    expect(res.status).toBe(402)
-    await expect(res.json()).resolves.toEqual({ error: 'insufficient_takes', required: 1, balance: 0 })
-    expect(mocks.rpc).toHaveBeenCalledWith('take_hold', {
-      p_workspace: 'workspace-1',
-      p_amount: 1,
-      p_job: 'job-1',
-      p_enforce: true,
-    })
-    expect(mocks.failGenerationJob).toHaveBeenCalledWith('job-1', 'insufficient_takes')
-    // 낙관 상태 update(from 4번째 호출)는 hold 실패 후 도달하지 않는다.
-    expect(mocks.from).toHaveBeenCalledTimes(3)
-  })
-
-  it('기록만 하는 모드에서는 잔액이 부족해도 생성을 정상 제출한다', async () => {
-    vi.stubEnv('TAKE_BILLING_MODE', 'shadow')
-    mockProjectShotQueued()
-    mocks.from.mockReturnValueOnce(query({ data: null, error: null })) // generation_jobs.update (request_id 교체)
-    mocks.from.mockReturnValueOnce(query({ data: null, error: null })) // shots.update
-    mocks.rpc.mockResolvedValue({ data: { ok: true, balance: -1, held: 1, insufficient: false }, error: null })
-
-    const res = await POST(request())
-    expect(res.status).toBe(200)
-    expect(mocks.rpc).toHaveBeenCalledWith('take_hold', {
-      p_workspace: 'workspace-1',
-      p_amount: 1,
-      p_job: 'job-1',
-      p_enforce: false,
-    })
-    expect(mocks.failGenerationJob).not.toHaveBeenCalled()
-  })
 })
 
 describe('사용량 반환 — 생성 실패 처리', () => {

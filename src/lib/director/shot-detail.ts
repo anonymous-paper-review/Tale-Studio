@@ -6,6 +6,7 @@ import { IMAGE_MODEL_ORDER, imageModelSupportsSheetCanvas, normalizeImageModelKe
 import { selectHandoffTake } from '@/lib/director-video-take-selection'
 import { currentStoryboardVersion, versionOfFrames } from '@/lib/director/storyboard-image-versions'
 import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
+import type { ContinueFrom, VideoMode } from '@/lib/director/video-modes'
 import type { ProjectFormat } from '@/types/project'
 import type { DirectorNode, ShotNodeData, StoryboardImage, VideoNodeData, VideoOverride } from '@/types/director'
 
@@ -101,7 +102,9 @@ export function promptWithChange(prompt: string, change: string, subject: 'image
  *  영상 고치기에서 바꾼 모델 · 해상도 · 바꿀 점은 새 Take 에만 실린다(보고 있던 Take 는 그대로).
  *  바꿀 점은 쌓이지 않는다(리드 검토 c ③): 새 Take 의 바탕은 늘 지금 샷 프롬프트이고, 바꿀 점은 그 Take 에 기록으로 남아
  *  만들 때 한 번만 붙는다(상점이 붙인다). 칸에 적은 것이 이어받을 바꿀 점과 같으면 그대로 두고, 다르면(지움 포함) 바꾼다.
- *  첫 Take 는 이어받을 것이 없다. shotPrompt 는 옛 호출을 위해 남겨 둔 값이다. */
+ *  첫 Take 는 이어받을 것이 없다. shotPrompt 는 옛 호출을 위해 남겨 둔 값이다.
+ *  mode · continueFrom(오너 2026-11-27 N4a): 고른 영상 방식은 새 Take 에 늘 새로 적고, 이어서면 방금 잡은 장면을 출처로 싣는다
+ *  (이어서가 아니면 출처를 싣지 않는다 — 보내는 요청은 상점이 이어받은 옛 출처를 지운다, takeOverrideForRequest). */
 export function newTakeRequest(input: {
   takeId: string | null
   take: Pick<VideoNodeData, 'override'> | null
@@ -109,6 +112,8 @@ export function newTakeRequest(input: {
   change: string
   provider?: VideoModelKey
   resolution?: VideoResolution
+  mode?: VideoMode
+  continueFrom?: ContinueFrom | null
 }): { inheritFromVideoNodeId?: string; videoOverride?: VideoOverride } {
   const note = input.change.trim()
   const inherited = ((input.take?.override ?? {}) as VideoOverride).changeNote?.trim() ?? ''
@@ -116,6 +121,8 @@ export function newTakeRequest(input: {
     ...(input.provider ? { provider: input.provider } : {}),
     ...(input.resolution ? { resolution: input.resolution } : {}),
     ...(note !== inherited ? { changeNote: note } : {}),
+    ...(input.mode ? { videoMode: input.mode } : {}),
+    ...(input.mode === 'continue' && input.continueFrom ? { continueFrom: input.continueFrom } : {}),
   }
   return {
     ...(input.takeId ? { inheritFromVideoNodeId: input.takeId } : {}),
@@ -132,6 +139,21 @@ export function imageChangedSinceTake(imageGeneratedAt: number | null | undefine
 /** Take 가 쓴 이미지 버전("시작 v1 + 끝 v1", D7 · 리드 B) — 작업 기록의 그림 주소를 샷의 버전 목록과 맞춘다. 모르면 null. */
 export function takeImageVersions(image: StoryboardImage | null | undefined, take: Pick<VideoNodeData, 'madeFrames'>): { start: number | null; end: number | null } | null {
   return versionOfFrames(image, take.madeFrames ?? null)
+}
+
+/**
+ * Take 줄에 적는 쓴 그림 이름 — 끝 그림을 따로 쓴 옛 Take 는 "시작 v1 + 끝 v1", 끝을 쓰지 않은 Take(영상 방식 넷, 오너 2026-11-27 N4a)는 "그림 v1".
+ *   쓴 그림 판을 모르면 null.
+ */
+export function takeImageLabel(
+  image: StoryboardImage | null | undefined,
+  take: Pick<VideoNodeData, 'madeFrames'>,
+): { key: string; params: Record<string, number> } | null {
+  const used = takeImageVersions(image, take)
+  if (!used?.start) return null
+  return used.end != null
+    ? { key: 'Start v{start} + End v{end}', params: { start: used.start, end: used.end } }
+    : { key: 'Image v{n}', params: { n: used.start } }
 }
 
 /** 보던 Take 와 지금 이미지가 다른가 — Take 가 쓴 버전을 알면 버전으로(되돌린 옛 버전도 "바뀜"), 모르면 만든 때와 그린 때로. */

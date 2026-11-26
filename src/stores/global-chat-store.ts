@@ -1,6 +1,7 @@
 import { summarizeChatUsage, type ChatLlmUsage } from '@/lib/chat-trace'
 import { create } from 'zustand'
 import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
+import type { ContinueFrom, VideoMode } from '@/lib/director/video-modes'
 import { createChatRequestSession, ChatResponseError } from '@/lib/chat-response'
 import { runChatToolLoop } from '@/lib/chat-tools/loop'
 import { writerInputRoute } from '@/lib/chat-harness'
@@ -41,7 +42,7 @@ import {
   videoLimitRefusal,
   type DirectorCanvasUpdate,
 } from '@/stores/director-store'
-import { isShotData, isVideoData, type DirectorNode } from '@/types/director'
+import { isShotData, isVideoData, type DirectorNode, type VideoOverride } from '@/types/director'
 import { directorHasFinishedVideo, type DirectorShotState } from '@/lib/director/shot-state'
 import { editorHandoverView, type RemakeResult } from '@/lib/director/editor-handover'
 import { clearImagesOnDirectorEntry } from '@/lib/director/entry-images-intent'
@@ -1637,6 +1638,10 @@ export interface DirectorVideoFix {
   fromTakeId?: string
   provider?: VideoModelKey
   resolution?: VideoResolution
+  /** 샷 상세에서 고른 영상 방식(오너 2026-11-27 N4a) — 없으면 이어받는 Take 의 방식. */
+  videoMode?: VideoMode
+  /** 이어서면 누를 때 잡은 앞 영상 마지막 장면. */
+  continueFrom?: ContinueFrom
 }
 /** 샷 상세 영상 고치기가 맡긴 그 부탁의 설정(askLumiToFix 가 적는다). */
 export interface DirectorVideoFixIntent {
@@ -1645,6 +1650,20 @@ export interface DirectorVideoFixIntent {
   fromTakeId: string | null
   provider: VideoModelKey
   resolution: VideoResolution
+  videoMode?: VideoMode
+  continueFrom?: ContinueFrom
+}
+
+/** 맡긴 고치기 설정 → 다시 만들기의 새 Take 설정(모델 · 해상도 · 방식 · 이어서 출처). 얹을 것이 없으면 undefined(지금처럼 이어받은 설정 그대로). */
+export function fixVideoOverride(fix: DirectorVideoFix | undefined): VideoOverride | undefined {
+  if (!fix) return undefined
+  const override: VideoOverride = {
+    ...(fix.provider ? { provider: fix.provider } : {}),
+    ...(fix.resolution ? { resolution: fix.resolution } : {}),
+    ...(fix.videoMode ? { videoMode: fix.videoMode } : {}),
+    ...(fix.videoMode === 'continue' && fix.continueFrom ? { continueFrom: fix.continueFrom } : {}),
+  }
+  return Object.keys(override).length > 0 ? override : undefined
 }
 
 /** 그 샷들의 고치기 — 바꿀 점은 모두에, 맡긴 설정은 그 샷에만. 아무것도 없으면 undefined(옛 모양 그대로). */
@@ -1654,7 +1673,13 @@ function fixesFor(ids: readonly string[], change: string | undefined, intent: Di
     const fix: DirectorVideoFix = {
       ...(change ? { change } : {}),
       ...(intent && intent.shotNodeId === id
-        ? { ...(intent.fromTakeId ? { fromTakeId: intent.fromTakeId } : {}), provider: intent.provider, resolution: intent.resolution }
+        ? {
+            ...(intent.fromTakeId ? { fromTakeId: intent.fromTakeId } : {}),
+            provider: intent.provider,
+            resolution: intent.resolution,
+            ...(intent.videoMode ? { videoMode: intent.videoMode } : {}),
+            ...(intent.videoMode === 'continue' && intent.continueFrom ? { continueFrom: intent.continueFrom } : {}),
+          }
         : {}),
     }
     if (Object.keys(fix).length > 0) out[id] = fix
@@ -1842,9 +1867,7 @@ async function startVideosFor(input: {
           onAccepted: () => resolve({ accepted: true }),
           ...(fix?.change ? { changeNote: fix.change } : {}),
           ...(fix?.fromTakeId ? { fromTakeId: fix.fromTakeId } : {}),
-          ...(fix?.provider || fix?.resolution
-            ? { videoOverride: { ...(fix.provider ? { provider: fix.provider } : {}), ...(fix.resolution ? { resolution: fix.resolution } : {}) } }
-            : {}),
+          ...(fixVideoOverride(fix) ? { videoOverride: fixVideoOverride(fix) } : {}),
         })
           .then((takeId) => resolve({ accepted: false, takeId }), () => resolve({ accepted: false, takeId: null }))
       })

@@ -319,16 +319,11 @@ function VideoNodeImpl({ id, data, selected }: NodeProps<DirectorNode>) {
         top={66}
         title={t('START frame input')}
       />
-      <LabeledTargetHandle
-        id="frame-end"
-        label={t('End')}
-        top={86}
-        title={t('END frame input')}
-      />
+      {/* 끝(END) 구멍은 없다(오너 dev 때 "Start, End 프레임 생성 방식은 일단 폐기" · 2026-11-27 N4a) — 영상은 끝 그림을 쓰지 않는다. 참조 구멍이 그 자리로 올라온다. */}
       <LabeledTargetHandle
         id="frame-ref"
         label={t('Reference')}
-        top={106}
+        top={86}
         title={t('REF frame input')}
       />
       {/* 영상 재생 / 썸네일 / 상태 — single-play: playingNodeId===id 일 때만 <video> 마운트.

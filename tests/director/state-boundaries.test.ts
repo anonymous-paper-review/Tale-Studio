@@ -519,7 +519,8 @@ describe('영상 생성 흐름의 약속', () => {
     })
   })
 
-  it('직접 연결한 시작·참조·끝 화면은 역할에 맞게 보낸다', async () => {
+  // 왜: 오너 dev 때(2026-11-22) "기존에 있던 Start, End 프레임 생성 방식은 일단 폐기" · main 2026-11-27 N4a — 끝 칸에 이은 화면은 영상 요청에 싣지 않는다.
+  it('직접 연결한 시작 · 참조 화면은 역할에 맞게 보내고, 끝 칸에 이은 화면은 보내지 않는다', async () => {
     vi.useFakeTimers()
     const store = useDirectorCanvasStore.getState()
     useDirectorCanvasStore.setState({
@@ -569,12 +570,12 @@ describe('영상 생성 흐름의 약속', () => {
       referenceImageUrls: [
         'https://media.example/source-start.png',
         'https://media.example/source-default.png',
-        'https://media.example/source-end.png',
       ],
-      referenceImageRoles: ['start', 'ref', 'end'],
+      referenceImageRoles: ['start', 'ref'],
       generationMethod: 'I2V',
     })
     expect(body.referenceImageUrls).not.toContain('https://media.example/source-direction.png')
+    expect(body.referenceImageUrls).not.toContain('https://media.example/source-end.png')
   })
 
   it('이전 영상의 마지막 화면을 다음 영상의 시작으로 쓰고 영상 자체는 보내지 않는다', async () => {

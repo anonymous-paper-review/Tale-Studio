@@ -706,6 +706,8 @@ function CanvasInner() {
         return
       }
       const route = connectRouteForTargetHandle(params.targetHandle)
+      // 옛 끝(END) 칸 — 구멍을 없앴다(N4a). 들어와도 아무 일도 하지 않는다(관계 창도 열지 않는다).
+      if (route === 'ignore') return
       // Prompt 노드 출력(right) → Shot T 입력(prompt) 연결이면 와이어링 + prompt 동기
       if (route === 'prompt-wire') {
         wirePromptToShot(params.source, params.target)
@@ -719,11 +721,7 @@ function CanvasInner() {
       }
       if (route === 'frame-wire') {
         const targetHandle = params.targetHandle
-        if (
-          targetHandle === 'frame-start' ||
-          targetHandle === 'frame-end' ||
-          targetHandle === 'frame-ref'
-        ) {
+        if (targetHandle === 'frame-start' || targetHandle === 'frame-ref') {
           wireFrameToVideo(params.source, params.target, targetHandle)
         }
         return

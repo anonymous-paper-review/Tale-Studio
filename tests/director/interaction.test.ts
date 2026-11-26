@@ -82,10 +82,11 @@ describe('connectRouteForTargetHandle (연결할 곳에 따른 처리)', () => {
   it('Shot의 참고 이미지 칸에 연결하면 이미지로 이어진다', () => {
     expect(connectRouteForTargetHandle('image-reference')).toBe('image-wire')
   })
-  it('Video의 START·END·REF 칸에 연결하면 장면 입력으로 이어진다', () => {
+  // 2026-11-23 오너 결정(11/22 밤 "시작+끝 방식 폐기")으로 바꾼 문장 — 예전: 「Video의 START·END·REF 칸에 연결하면 장면 입력으로 이어진다」.
+  it('Video의 START·REF 칸에 연결하면 장면 입력으로 이어지고, 옛 END 칸으로 들어오는 연결은 아무 일도 하지 않는다', () => {
     expect(connectRouteForTargetHandle('frame-start')).toBe('frame-wire')
-    expect(connectRouteForTargetHandle('frame-end')).toBe('frame-wire')
     expect(connectRouteForTargetHandle('frame-ref')).toBe('frame-wire')
+    expect(connectRouteForTargetHandle('frame-end')).toBe('ignore')
   })
   it('이전 Video의 마지막 장면을 연결하면 다음 Video로 이어진다', () => {
     expect(connectRouteForTargetHandle('video-chain')).toBe('video-chain')
