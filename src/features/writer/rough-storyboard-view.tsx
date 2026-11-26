@@ -19,7 +19,7 @@
 
 import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
-import { AlertCircle, AlertTriangle, ChevronDown, Clock, ImageIcon, Loader2, MoreHorizontal, Plus, RefreshCw } from 'lucide-react'
+import { AlertCircle, AlertTriangle, ArrowRight, ChevronDown, Clock, ImageIcon, Loader2, MoreHorizontal, Plus, RefreshCw } from 'lucide-react'
 import { toast } from 'sonner'
 import { Badge } from '@/components/ui/badge'
 import {
@@ -40,9 +40,10 @@ import { StoryboardShotDialog } from '@/features/writer/storyboard-shot-dialog'
 import { AddItemDialog, type AddMode } from '@/features/writer/add-item-dialog'
 import { AddedRedrawStatus } from '@/features/writer/added-redraw-status'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
-import { boardStageOf } from '@/lib/writer/board-stage'
+import { boardStageOf, type BoardStage } from '@/lib/writer/board-stage'
 import { ContiSplitStart } from '@/features/writer/conti-split-start'
 import { STAGE_PERSONA } from '@/lib/lumi'
+import { stageIndex } from '@/lib/stage-gate'
 import { SHOT_TYPE_DESCRIPTIONS } from '@/features/writer/shot-type-info'
 import { handOverToDirector } from '@/features/writer/storyboard-director'
 import { StoryboardDirectorDialog } from '@/features/writer/storyboard-director-dialog'
@@ -168,15 +169,18 @@ export function applyRoughStoryboardZoomShortcut(
   return applyStoryboardZoomShortcut(zoomLevel, event)
 }
 
-export function RoughStoryboardView() {
+export function RoughStoryboardView({ stage }: { stage?: BoardStage } = {}) {
   const t = useT()
   // useCallback/useEffect 본문 안에서는 t() 대신 translate()+locale 을 쓴다(#i18n-s5-batch3) —
   //   useT() 의 반환 함수는 매 렌더 새 참조라 deps 에 넣으면 메모이제이션이 무너진다. locale 은
   //   원시값이라 실제로 로케일이 바뀔 때만 재계산을 트리거한다.
   const locale = useLocaleStore((s) => s.locale)
   const projectId = useProjectStore((s) => s.projectId)
-  // 이 보드가 붙은 단계(콘티 · Storyboard, O1 2026-11-26) — 첫 안내 · 넘김 권유 · 알림 · 잠금 Lumi 가 이 단계를 따른다.
-  const boardStage = useProjectStore((s) => boardStageOf(s.currentStage))
+  // 이 보드가 붙은 단계(콘티 · Storyboard, O1 2026-11-26) — 첫 안내 · 넘김 권유 · 알림 · 잠금 Lumi · Artist 그림 채우기가 이 단계를 따른다.
+  //   작업 공간이 화면 주소로 정해 넘긴다 — 지금 단계 값은 이 보드가 처음 붙는 순간 아직 앞 화면이라, 그 값을 보면 첫 효과에서 콘티 보드가
+  //   자기를 Storyboard 로 알아 Artist 그림을 그렸다(검토 rev-flow 2026-11-26 1번). 주소 없이 그린 때(시험)만 지금 단계 값을 본다.
+  const storeBoardStage = useProjectStore((s) => boardStageOf(s.currentStage))
+  const boardStage = stage ?? storeBoardStage
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const shots = useWriterStore((s) => s.shots)
   const loadProject = useWriterStore((s) => s.loadProject)
@@ -1157,6 +1161,9 @@ export function RoughStoryboardView() {
     // 산문은 확정했는데(저장 단계 conti) 씬 · 샷 나누기가 걸리지 않은 콘티 — 다시 거는 단추를 둔다(O1 2026-11-26).
     //   예전 흐름으로 Artist 까지 간 프로젝트(저장 단계 artist)는 지금처럼 Artist [만들기]로 나눈다.
     const contiSplitPending = boardStage === 'conti' && reachedStage === 'conti' && status?.current_status === 'awaiting_confirmation'
+    // 예전 흐름(콘티가 Artist 앞에 오기 전)으로 Artist 까지 연 프로젝트 — 실행이 산문 초안 그대로라 씬 · 샷은 Artist [만들기]가 나눈다.
+    //   "다음" · [콘티로 가기] · 레일 Writer 가 이 콘티로 데려오므로 할 일과 Artist 로 가는 단추를 보인다(검토 rev-flow 2026-11-26 3번, 혼자 정한 것).
+    const splitInArtist = boardStage === 'conti' && stageIndex(reachedStage) >= stageIndex('artist') && status?.draft === true
     return (
       <div className="flex min-h-0 flex-1 flex-col">
         <WriterHeader description={headerDescription} />
@@ -1165,8 +1172,18 @@ export function RoughStoryboardView() {
         ) : (
           <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center">
             <ImageIcon className="size-10 text-subtle-foreground" />
-            <p className="text-body font-semibold text-foreground">{contiSplitPending ? t('The prose is confirmed. Start splitting it into scenes and shots.') : waiting ? progress.label : t('No scenes or shots generated yet')}</p>
-            {contiSplitPending ? (
+            <p className="text-body font-semibold text-foreground">{splitInArtist ? t('Scenes and shots are split by Make in Artist.') : contiSplitPending ? t('The prose is confirmed. Start splitting it into scenes and shots.') : waiting ? progress.label : t('No scenes or shots generated yet')}</p>
+            {splitInArtist ? (
+              <>
+                <p className="max-w-md text-caption text-muted-foreground">
+                  {t('This project splits the confirmed prose into scenes and shots when you press Make in Artist. The rough storyboard appears here after that.')}
+                </p>
+                <Button onClick={() => void useGlobalChatStore.getState().requestNextStep()} data-testid="conti-split-in-artist">
+                  {t('Go to Artist')}
+                  <ArrowRight className="size-4" />
+                </Button>
+              </>
+            ) : contiSplitPending ? (
               <ContiSplitStart />
             ) : status?.pipeline_failed ? (
               <>

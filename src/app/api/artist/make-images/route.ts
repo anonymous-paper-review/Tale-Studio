@@ -6,6 +6,7 @@
 import { NextResponse } from 'next/server'
 import { demoWriteBlock } from '@/lib/demo/guard-server'
 import { requireProjectAccess } from '@/lib/api/guard'
+import { supabaseAdmin } from '@/lib/supabase/admin'
 import { quotaRejectionResponse } from '@/lib/api/quota'
 import { checkGenerationCapacity } from '@/lib/generation-quota'
 import { triggerAssetDrafts } from '@/lib/artist/draft-trigger'
@@ -58,6 +59,12 @@ export async function POST(req: Request) {
       style = catalog.key
     }
 
+    // 저장 단계가 아직 콘티인데 Artist 화면에서 그림을 만든다 — 화면이 저장보다 앞서 열렸다(검토 rev-flow 2026-11-26 2번).
+    //   저장 단계를 Artist 로 올린 뒤 건다: 콘티면 첫 그림 걸기가 "Artist 전"으로 보고 미뤄 아무것도 그리지 않은 채 됐다고 했다(draft-trigger).
+    if (project.current_stage === 'conti') {
+      const { error } = await supabaseAdmin.from('projects').update({ current_stage: 'artist' }).eq('id', projectId).eq('current_stage', 'conti')
+      if (error) throw new Error(`stage update failed: ${error.message}`)
+    }
     const result = await triggerAssetDrafts(projectId)
     if ('skipped_no_look' in result && result.skipped_no_look) return reject(MAKE_IMAGES_CODES.noLook, 'The designs are not ready yet')
     return NextResponse.json({ ok: true, style, ...result })

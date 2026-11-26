@@ -20,13 +20,14 @@ export const maxDuration = 300
 
 const requestSchema = z.object({ projectId: z.string().min(1) })
 
-/** Storyboard 를 연다 — 이미 더 뒤(Director · Editor)면 낮추지 않는다. 열지 못하면 던진다(됐다고 하지 않는다). */
+/** Storyboard 를 연다 — 이미 더 뒤(Director · Editor)면 낮추지 않는다. 열지 못하면 던진다(됐다고 하지 않는다).
+ *  콘티(O1, Artist 앞 단계)도 올린다 — 화면만 앞서 Artist 가 열린 콘티 프로젝트에서 0행을 바꾸고 됐다고 했다(검토 rev-flow 2026-11-26 2번). */
 async function openStoryboard(projectId: string): Promise<void> {
   const { error } = await supabaseAdmin
     .from('projects')
     .update({ current_stage: 'writer' })
     .eq('id', projectId)
-    .in('current_stage', ['entry', 'producer', 'artist'])
+    .in('current_stage', ['entry', 'producer', 'conti', 'artist'])
   if (error) throw new Error(`stage update failed: ${error.message}`)
 }
 

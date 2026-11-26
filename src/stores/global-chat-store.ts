@@ -2419,10 +2419,11 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const project = useProjectStore.getState()
     const { projectId, currentStage } = project
     if (!projectId || get().loading || get().handoffConfirm) return
-    const action = nextStepAction(currentStage, { producerLocked: project.producerLocked })
+    const action = nextStepAction(currentStage, { producerLocked: project.producerLocked, reachedStage: project.reachedStage })
     if (!action) return
     if (action.kind === 'open') {
       // 잠긴 Producer: 다시 넘기지 않고 Writer 화면으로 간다. Writer 가 결과 없이 끝나 되돌아온 경우만 같은 내용으로 다시 넘긴다.
+      //   Artist 가 열린 콘티도 다시 넘기지 않고 Artist 로 간다(검토 rev-flow 3번).
       if (project.canNavigateTo(action.stage)) {
         const path = await handoffToStage(action.stage)
         if (path && useProjectStore.getState().projectId === projectId) set({ pendingNavigatePath: path })

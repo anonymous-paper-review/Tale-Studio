@@ -8,6 +8,7 @@
 //   알약 탭 · 탭 옆 도구(러프 보드의 [+ 씬 추가] · [+ 샷 추가]) · 오른쪽 액션(확대 · 축소 등). [마스터 시트]는 두지 않는다(오너 결정 3).
 
 import type { ReactNode } from 'react'
+import { usePathname } from 'next/navigation'
 import { ArrowRight } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { PageHeader } from '@/components/layout/page-header'
@@ -21,7 +22,8 @@ import { boardStats, boardStatsLabel } from '@/lib/writer/board-summary'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useWriterStore } from '@/stores/writer-store'
-import { boardStageOf } from '@/lib/writer/board-stage'
+import { boardStageAt } from '@/lib/writer/board-stage'
+import { stageIndex } from '@/lib/stage-gate'
 import { StoryboardHeader } from '@/features/storyboard/storyboard-header'
 
 interface WriterHeaderProps {
@@ -41,8 +43,13 @@ export function WriterHeader({ description, tools, actions, hideNextStep = false
   const sceneManifest = useWriterStore((state) => state.sceneManifest)
   const shots = useWriterStore((state) => state.shots)
   const stats = boardStats(sceneManifest, shots)
-  const boardStage = useProjectStore((s) => boardStageOf(s.currentStage))
+  // 머리 이름 · 다음 단추는 화면 주소의 단계를 따른다 — 지금 단계 값은 화면이 처음 붙는 순간 아직 앞 화면이다(검토 rev-flow 1번, board-stage.ts).
+  const pathname = usePathname()
+  const storeStage = useProjectStore((s) => s.currentStage)
+  const boardStage = boardStageAt(pathname, storeStage)
   const handoffConfirmOpen = useGlobalChatStore((state) => state.handoffConfirm !== null)
+  // Artist 가 이미 열렸으면(넘긴 뒤 돌아온 콘티 · 예전 흐름 프로젝트) [Artist로 가기]는 넘김 없이 Artist 로 가기만 한다 — 씬 · 샷이 없어도 켠다(검토 rev-flow 3번).
+  const artistOpen = useProjectStore((state) => stageIndex(state.reachedStage) >= stageIndex('artist'))
   // [다음: Director로 →] — 일반 다음 단계 버튼은 이 단계에서 넘길 곳이 없어 아무것도 보이지 않았다. 넘김 창은 러프 보드가 그린다.
   const openDirectorConfirm = useBoardUiStore((state) => state.setDirectorConfirmOpen)
   const chatBusy = useGlobalChatStore((state) => state.loading)
@@ -76,7 +83,7 @@ export function WriterHeader({ description, tools, actions, hideNextStep = false
             // 콘티 → Artist(O1 · W4): 다음 단계 단추와 같은 길(넘김 문장을 채팅에 남기며 넘김). 씬 · 샷이 생기기 전에는 꺼진다 — 러프는 다 그리지 않아도 된다.
             <Button
               className="shrink-0"
-              disabled={stats.shots === 0 || chatBusy || handoffConfirmOpen}
+              disabled={(stats.shots === 0 && !artistOpen) || chatBusy || handoffConfirmOpen}
               onClick={() => void useGlobalChatStore.getState().requestNextStep()}
               data-testid="conti-next-artist"
             >
