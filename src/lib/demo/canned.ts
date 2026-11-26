@@ -14,7 +14,8 @@ export const CANNED_CHAT: Record<StageId, string> = {
   producer: PRODUCER_REPLY,
   // 콘티(O1 2026-11-26)는 지금 Storyboard 보드(씬 · 샷 · 러프)를 쓴다 — 같은 안내.
   conti: 'This is a shared preview. In the real project, you review and edit the scene structure and rough storyboard here.',
-  writer: 'This is a shared preview. In the real project, you review and edit the scene structure and rough storyboard here.',
+  // Storyboard(O1 · S4 2026-11-26): 콘티 그림을 [시작]으로 실사로 바꾸고, 실사 카드는 채팅으로 고치는 자리(O7).
+  writer: 'This is a shared preview. In the real project, you turn the rough sketches into real images with Start here, and fix each real card through the chat.',
   artist: 'This is a shared preview. In the real project, you create and refine character and world cards here.',
   director: 'This is a shared preview. In the real project, you direct shots, camera and video on the canvas here.',
   editor: 'This is a shared preview. In the real project, you edit cuts on the timeline here.',

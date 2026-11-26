@@ -5,7 +5,10 @@ const calls = vi.hoisted(() => ({
   redraw: vi.fn(),
   start: vi.fn(async () => {}),
   notify: vi.fn(),
+  mark: vi.fn(),
+  clear: vi.fn(),
 }))
+vi.mock('@/features/writer/board-ui-store', () => ({ useBoardUiStore: { getState: () => ({ markCardDrawing: calls.mark, clearCardDrawing: calls.clear }) } }))
 vi.mock('@/lib/storyboard/redraw-image', () => ({ redrawStoryboardImage: calls.redraw }))
 vi.mock('@/lib/storyboard/start-real', () => ({ startStoryboardReal: calls.start }))
 
@@ -95,5 +98,26 @@ describe('Storyboard 채팅의 실사 그림 요청 맡기기', () => {
     calls.redraw.mockResolvedValue({ ok: false, reason: 'missing_sheets', message: '미나 시트가 없어요' })
     await run([{ type: 'generateImage', id: 'sh_01_01', change: 'x' }])
     expect(calls.notify).toHaveBeenCalledWith('⚠ 미나 시트가 없어요')
+  })
+
+  // 왜(W5 공유 규칙 cardDrawing · 리드 지시 "S5 에서 그대로"): 맡긴 그리기가 작업 큐에 오르기 전(서버가 받는 몇 초)에도 그 카드에 기다림을 보인다 — 다 그리면 내린다.
+  it('채팅이 샷 하나를 다시 그리라고 맡기면 큐에 오르기 전에도 그 카드에 기다림을 걸고, 다 그리면 내린다', async () => {
+    let finish!: (value: 'drawn') => void
+    calls.redraw.mockImplementation(async () => {
+      expect(calls.mark).toHaveBeenCalledWith('p1', 'sh_01_01')
+      return { ok: true, jobId: 'job-1', done: new Promise((resolve) => { finish = resolve }) }
+    })
+    await run([{ type: 'generateImage', id: 'sh_01_01', change: 'x' }])
+    expect(calls.clear).not.toHaveBeenCalled()
+    finish('drawn')
+    await vi.waitFor(() => expect(calls.clear).toHaveBeenCalledWith('p1', 'sh_01_01'))
+  })
+
+  // 왜: 맡기지 못했으면(그리는 중 · 시트 없음 등) 기다릴 것이 없다 — 건 기다림을 바로 내린다.
+  it('다시 그리기를 맡기지 못하면 그 카드에 건 기다림을 바로 내린다', async () => {
+    calls.redraw.mockResolvedValue({ ok: false, reason: 'missing_sheets', message: '미나 시트가 없어요' })
+    await run([{ type: 'generateImage', id: 'sh_01_01', change: 'x' }])
+    expect(calls.mark).toHaveBeenCalledWith('p1', 'sh_01_01')
+    expect(calls.clear).toHaveBeenCalledWith('p1', 'sh_01_01')
   })
 })

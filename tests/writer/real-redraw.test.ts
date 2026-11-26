@@ -1,4 +1,4 @@
-// Storyboard 실사 카드 한 장 다시 그리기(채팅 O7) — Director 샷 상세 [이미지 고치기]와 같은 서버 요청 · 같은 글을 보내고, 못 맡긴 까닭과 끝남을 돌려주는지 검사한다
+// Storyboard 실사 카드 한 장 다시 그리기(채팅 O7) — Director 샷 상세 [이미지 고치기]와 같은 서버 요청 · 같은 꼴(그림 글 그대로 + 바꿀 점 따로)로 보내고, 못 맡긴 까닭과 끝남을 돌려주는지 검사한다
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
 const calls = vi.hoisted(() => ({
@@ -10,7 +10,6 @@ vi.mock('@/lib/generation-queue', () => ({ refreshGenerationQueue: calls.refresh
 vi.mock('@/lib/generation-quota-toast', () => ({ notifyIfQuotaExceeded: calls.quota }))
 vi.mock('@/lib/generation-jobs-client', () => ({ pollGenerationJob: calls.poll }))
 
-import { promptWithChange } from '@/lib/director/shot-detail'
 import { writerDirectorPromptSource } from '@/features/director/hooks/use-writer-director-sync'
 import { redrawRequestBody, redrawStoryboardImage } from '@/lib/storyboard/redraw-image'
 
@@ -33,20 +32,27 @@ beforeEach(() => {
 afterEach(() => vi.unstubAllGlobals())
 
 describe('채팅이 맡기는 실사 다시 그리기', () => {
-  // 왜(오너 O7 · 리드 "지시문을 바꾸는 고침은 리드에게"): Director 상세의 "바꾸고 싶은 점"과 글자까지 같은 글이라야 같은 그림 규칙(main d4f57647)을 탄다.
-  it('채팅의 다시 그리기는 Director 샷 상세 [이미지 고치기]와 같은 서버 요청에 같은 글(샷 그림 글 + 바꿀 점)을 싣는다', async () => {
+  // 왜(오너 O7 · m-director 와 맞춘 계약 2026-11-26): Director 상세 [이미지 고치기]와 같은 꼴 — 그림 글은 그대로, 바꿀 점은 따로(changeNote).
+  //   서버가 지금 실사 세 장을 1번 참고로 "바꿀 점만 바꾸기"로 그린다(지금 그림이 없으면 예전처럼 러프에서 + 바꿀 점). 글에 붙이면 그 고치기 길을 못 탄다.
+  it('채팅의 다시 그리기는 Director 샷 상세 [이미지 고치기]와 같은 서버 요청에 샷 그림 글을 그대로, 바꿀 점은 따로 싣는다', async () => {
     await redrawStoryboardImage({ projectId: 'p1', shot: rich, change: 'Make her expression sadder' })
     expect(sent[0].url).toBe('/api/director/generate-storyboard')
     expect(sent[0].body).toEqual({
       projectId: 'p1',
       writerShotId: 'sh_01_02',
-      prompt: promptWithChange(writerDirectorPromptSource(rich), 'Make her expression sadder'),
+      prompt: writerDirectorPromptSource(rich),
+      changeNote: 'Make her expression sadder',
     })
   })
 
-  // 왜(정상 경로 고정): 직접 더한 샷처럼 그림 글이 없는 샷은 Director 와 같이 샷 글(액션)에 바꿀 점을 붙인다.
-  it('샷 그림 글이 없는 샷은 샷 글에 바꿀 점을 붙여 보낸다', () => {
-    expect(redrawRequestBody('p1', plain, 'Rain heavier').prompt).toBe('Mina runs to the bus\n\nChange from the previous image: Rain heavier')
+  // 왜(정상 경로 고정): 직접 더한 샷처럼 그림 글이 없는 샷은 Director 와 같이 샷 글(액션)을 그림 글로 쓴다.
+  it('샷 그림 글이 없는 샷은 샷 글을 그림 글로 보내고 바꿀 점은 따로 싣는다', () => {
+    expect(redrawRequestBody('p1', plain, 'Rain heavier')).toEqual({ projectId: 'p1', writerShotId: 'sh_01_03', prompt: 'Mina runs to the bus', changeNote: 'Rain heavier' })
+  })
+
+  // 왜: 바꿀 점 없이 "다시 그려 줘"면 고치기가 아니라 샷 글대로 다시 그리기다 — 빈 바꿀 점을 보내지 않는다.
+  it('바꿀 점이 없으면 바꿀 점 칸 없이 샷 그림 글만 보낸다', () => {
+    expect(redrawRequestBody('p1', rich, '   ')).toEqual({ projectId: 'p1', writerShotId: 'sh_01_02', prompt: writerDirectorPromptSource(rich) })
   })
 
   // 왜(오너 O7 "그 카드에만 기다림"): 카드 기다림은 작업 큐가 진실이다 — 맡기자마자 큐를 읽어야 다음 조회(4초)를 기다리지 않고 카드가 바뀐다.

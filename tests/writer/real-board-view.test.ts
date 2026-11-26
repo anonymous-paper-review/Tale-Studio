@@ -29,7 +29,7 @@ const data = vi.hoisted(() => ({
   images: { projectId: 'p1', images: {} as Record<string, unknown>, load: async () => {} },
   jobs: [] as unknown[],
   director: { realBatchBusy: false, realBatchCancelled: false, realBatchShotIds: null as string[] | null },
-  board: { shotEditId: null, setShotEditId: () => {}, directorConfirmOpen: false, setDirectorConfirmOpen: () => {} },
+  board: { shotEditId: null, setShotEditId: () => {}, directorConfirmOpen: false, setDirectorConfirmOpen: () => {}, cardDrawing: {} as Record<string, string> },
   chatUi: { mentionedRefs: [] as string[] },
   chat: { offerSuggestion: () => {}, messages: [], messagesLoadedProjectId: null },
 }))
@@ -69,6 +69,7 @@ beforeEach(() => {
   data.images = { projectId: 'p1', images: { b: real('b') }, load: async () => {} }
   data.jobs = []
   data.director = { realBatchBusy: false, realBatchCancelled: false, realBatchShotIds: null }
+  data.board.cardDrawing = {}
 })
 
 describe('Storyboard 실사 보기 보드', () => {
@@ -87,6 +88,12 @@ describe('Storyboard 실사 보기 보드', () => {
   // 왜(오너 S5 · O7): 화면을 막지 않고 그리는 카드에만 기다림 — 다른 카드는 그대로다.
   it('실사를 그리는 작업이 떠 있는 카드에만 기다림이 보이고 다른 카드는 그대로다', () => {
     data.jobs = [{ id: 'j1', kind: 'shot_storyboard', target: { writerShotId: 'b' } }]
+    expect(cards(board()).map((c) => c.wait)).toEqual(['none', 'drawing', 'none'])
+  })
+
+  // 왜(W5 공유 규칙 cardDrawing · 리드 지시): 채팅이 맡긴 다시 그리기는 작업이 큐에 오르기 전에도 그 카드에 기다림 — 다른 프로젝트 표시는 보지 않는다.
+  it('채팅이 맡긴 다시 그리기는 작업이 큐에 오르기 전에도 그 카드에만 기다림을 보인다', () => {
+    data.board.cardDrawing = { b: 'p1', a: 'other-project' }
     expect(cards(board()).map((c) => c.wait)).toEqual(['none', 'drawing', 'none'])
   })
 
