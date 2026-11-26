@@ -3735,6 +3735,9 @@ export const KO: Record<string, string> = {
   '{shots} and {count} more are still getting their rough storyboards, so they are left out. Press Start again when they are drawn.': '콘티 그림을 그리는 중인 {shots} 외 {count}컷은(는) 빼고 만들어요. 다 그리면 [시작]을 다시 눌러 주세요.',
   '{shot} is still getting its rough storyboard. Ask again when it is drawn.': '{shot}은(는) 콘티 그림을 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',
   'Drawing the rough sketch': '콘티 그림을 그리고 있어요',
+  // Storyboard 가 씬 · 샷 나누기를 기다리는 잠금 안내(검토 2026-11-26 rev-flow) — Storyboard 는 나누기가 끝나면 풀고 콘티 그림은 카드마다 그린다.
+  'Splitting into scenes and shots. This can take a few minutes. The screen and chat stay locked until the split is done, then each card draws its rough sketch.': '씬 · 샷을 나누고 있어요. 몇 분 걸릴 수 있어요. 나누기가 끝날 때까지 화면과 채팅은 잠기고, 그 뒤 카드마다 콘티 그림을 그려요.',
+  'Draw the rough sketches': '콘티 그림 그리기',
   'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
   // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 화살표 · 대사는 Writer 콘티에서.
   'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
