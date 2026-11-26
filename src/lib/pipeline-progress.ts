@@ -185,8 +185,9 @@ export function writerRoughWork(
     const failed = eligible.filter((s) => s.roughStoryboard?.status === 'failed').length
     return {
       key: 'writer-rough',
+      // 러프는 Writer 안의 콘티가 그린다(오너 2026-11-26 O1) — 말하는 이도 Writer(STAGE_AGENT_NAME.conti).
       label: translate(locale, '{agent} is drawing the rough storyboard', {
-        agent: STAGE_AGENT_NAME.writer,
+        agent: STAGE_AGENT_NAME.conti,
       }),
       done,
       total: eligible.length,
@@ -222,7 +223,7 @@ export function writerRoughWork(
   return {
     key: 'writer-rough',
     label: translate(locale, '{agent} is drawing the rough storyboard', {
-      agent: STAGE_AGENT_NAME.writer,
+      agent: STAGE_AGENT_NAME.conti,
     }),
     done,
     total: batch.members.size,
@@ -443,7 +444,7 @@ const KIND_WORK: Record<GenerationJobKind, { labelKey: string; agent: string; st
   },
   shot_rough_storyboard: {
     labelKey: '{agent} is drawing the rough storyboard',
-    agent: STAGE_AGENT_NAME.writer,
+    agent: STAGE_AGENT_NAME.conti,
     stage: 'writer',
   },
   shot_storyboard: {
@@ -495,7 +496,7 @@ export function queueWorks(
 /** 레인별 배치 라벨 — KIND_WORK 와 같은 어휘(에이전트 이름 + 무엇을 만드는지). */
 const LANE_WORK: Record<GenerationLane, { labelKey: string; agent: string }> = {
   artist: { labelKey: '{agent} is generating images', agent: STAGE_AGENT_NAME.artist },
-  'writer-rough': { labelKey: '{agent} is drawing the rough storyboard', agent: STAGE_AGENT_NAME.writer },
+  'writer-rough': { labelKey: '{agent} is drawing the rough storyboard', agent: STAGE_AGENT_NAME.conti },
   'director-storyboard': { labelKey: '{agent} is generating shooting-ready images', agent: STAGE_AGENT_NAME.director },
   'director-video': { labelKey: '{agent} is generating videos', agent: STAGE_AGENT_NAME.director },
   'director-previz': { labelKey: '{agent} is generating previz videos', agent: STAGE_AGENT_NAME.director },
