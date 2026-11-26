@@ -5,8 +5,10 @@
 //   고치기는 생성 요청을 바로 부르지 않는다 — Director 샷 상세(O5)와 같은 [Lumi 에게 고쳐 달라고 하기]로 채팅에 보내고 창을 닫는다(lib/storyboard/fix-in-chat).
 //   채팅이 그 샷 실사를 다시 그리고,
 //   그리는 동안 그 카드에만 기다림이 뜬다. 그 샷을 그리는 중이면 고치기를 끄고 까닭을 보인다(같은 샷 두 번 맡기기는 서버가 거절한다).
-//   이야기 · 화살표 · 대사는 Writer 콘티에서 고친다(O7) — 여기서는 보기만 한다. 지난 판 · [채택](m-history)은 이 창에 붙는다.
-//   약속: tests/writer/real-dialog.test.ts
+//   이야기 · 화살표 · 대사는 Writer 콘티에서 고친다(O7) — 여기서는 보기만 한다.
+//   지난 판(오너 2026-11-26 S3): 카드의 지난 판 줄에서 연 판이면 큰 그림 자리에 그 판을 보이고, 그 아래 보는 판 줄의 [채택]이
+//   Director 와 같은 이미지 판 고르기 길로 그 판을 지금 그림으로 만든다(lib/storyboard/adopt-version, 다시 그리지 않음). 그리는 중이면 끈다.
+//   약속: tests/writer/real-dialog.test.ts · real-history.test.ts · real-history-view.test.ts
 import { useState } from 'react'
 import { ImageOff, MessageCircle } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -20,6 +22,11 @@ import { sendFixToChat } from '@/lib/storyboard/fix-in-chat'
 import { storyboardMentionLabels } from '@/lib/storyboard/mention'
 import { realDrawingShotIds, storyboardCardPicture } from '@/lib/storyboard/real-board'
 import { useStoryboardRealImages } from '@/lib/storyboard/real-images-store'
+import { adoptStoryboardVersion } from '@/lib/storyboard/adopt-version'
+import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/director/storyboard-image-versions'
+import { VersionViewingBar } from '@/components/version-history/version-viewing-bar'
+import { useBoardUiStore } from '@/features/writer/board-ui-store'
+import type { StoryboardImage } from '@/types/director'
 import { boardShots } from '@/lib/writer/board-summary'
 import { manifestEntities, resolveEntityNames } from '@/lib/writer/resolve-entity-names'
 import { useProjectStore } from '@/stores/project-store'
@@ -45,6 +52,10 @@ function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () =
   const activeJobs = useActiveGenerationJobs(projectId)
   const [change, setChange] = useState('')
   const [busyNotice, setBusyNotice] = useState(false)
+  // 지난 판 줄에서 연 판(S3) — 이 샷 상세를 그 판으로 열었을 때만. [채택]을 저장하는 중 · 저장 실패.
+  const viewingId = useBoardUiStore((state) => (state.shotEditId === shotId ? state.shotEditVersionId : null))
+  const [adopting, setAdopting] = useState(false)
+  const [adoptError, setAdoptError] = useState<string | null>(null)
 
   const entry = boardShots(sceneManifest, shots).find((item) => item.shot.shotId === shotId)
   if (!entry) return null
@@ -57,6 +68,23 @@ function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () =
   const nameOf = new Map((sceneManifest?.characters ?? []).map((c) => [c.characterId, c.name]))
   const lines = (shot.dialogueLines ?? []).filter((line) => line.text?.trim())
   const canSend = !!mentionLabel && !!change.trim() && !drawing
+  // 보고 있는 지난 판 — 지금 그림인 판이면 없다(채택하면 지금 그림이 되어 저절로 사라진다).
+  const raw = images[shotId] && typeof images[shotId] === 'object' ? (images[shotId] as StoryboardImage) : null
+  const current = currentStoryboardVersion(raw)
+  const viewing = viewingId && viewingId !== current?.id ? storyboardImageVersions(raw).find((version) => version.id === viewingId) ?? null : null
+  const backToCurrent = () => useBoardUiStore.getState().openShotVersion(shotId, null)
+  // [채택] — Director 상세와 같은 판 고르기(다시 그리지 않는다). 카드 그림을 새로 읽은 뒤 보는 판을 닫는다. 못 고르면 보던 판에 남아 까닭을 보인다.
+  const adopt = async () => {
+    if (!viewing || drawing || !projectId) return
+    setAdopting(true)
+    setAdoptError(null)
+    try {
+      if (await adoptStoryboardVersion(projectId, shotId, viewing.id)) backToCurrent()
+      else setAdoptError(t('Could not adopt this version. Please try again.'))
+    } finally {
+      setAdopting(false)
+    }
+  }
 
   const send = () => {
     if (!canSend || !mentionLabel) return
@@ -76,7 +104,19 @@ function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () =
       </DialogHeader>
       <div className="grid min-h-0 flex-1 grid-cols-1 overflow-y-auto md:grid-cols-[minmax(0,1.4fr)_minmax(0,1fr)] md:overflow-hidden">
         <div className="flex min-w-0 flex-col gap-3 p-6 md:overflow-y-auto">
-          {picture.kind === 'none' ? (
+          {viewing ? (
+            // 지난 판(S3) — 그 판의 시작 · 연출 · 끝을 같은 순환으로 보인다.
+            <div className="relative overflow-hidden rounded-[14px]">
+              <RoughFrameCycle
+                key={viewing.id}
+                panel={{ url: viewing.frames?.start ?? viewing.url, generatedAt: viewing.generatedAt, ...(viewing.frames ? { frames: viewing.frames } : {}) }}
+                alt={label}
+                introPlay
+                sizeToImage
+                frameTag
+              />
+            </div>
+          ) : picture.kind === 'none' ? (
             <div className="flex aspect-video flex-col items-center justify-center gap-1.5 rounded-[14px] bg-art-placeholder p-3 text-center">
               <ImageOff className="size-6 text-subtle-foreground" aria-hidden />
               <p className="text-caption font-medium text-muted-foreground">{t('No rough storyboard yet')}</p>
@@ -98,6 +138,19 @@ function RealShotDialogBody({ shotId, onClose }: { shotId: string; onClose: () =
               ) : null}
             </div>
           )}
+          {viewing ? (
+            <VersionViewingBar
+              text={current ? t('Viewing v{n} · Current v{current}', { n: viewing.n, current: current.n }) : t('Viewing v{n}', { n: viewing.n })}
+              adoptDisabled={drawing}
+              adoptReason={drawing ? t('You can adopt it after the image is remade.') : null}
+              busy={adopting}
+              error={adoptError}
+              onAdopt={adopt}
+              onBack={() => { setAdoptError(null); backToCurrent() }}
+              testId="storyboard-detail-viewing"
+              adoptTestId="storyboard-detail-adopt"
+            />
+          ) : null}
           <p className="text-body leading-relaxed text-foreground">{resolveEntityNames(shot.actionDescription, entityNames)}</p>
         </div>
         <div className="flex min-w-0 flex-col gap-4 border-t border-border-subtle p-6 md:overflow-y-auto md:border-l md:border-t-0">

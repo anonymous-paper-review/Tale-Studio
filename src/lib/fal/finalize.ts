@@ -44,6 +44,7 @@ import {
 import { storageKeySegment } from '@/lib/storage/key-segment'
 import { updateStoryboardImage } from '@/lib/director/storyboard-image-store'
 import { isJobCancelled } from '@/lib/director/job-cancellations'
+import { finalizeRoughEndFrameJob } from '@/lib/writer/directing-edit'
 import { withStoryboardVersion } from '@/lib/director/storyboard-image-versions'
 import { mediaPublicUrl, mediaUpload } from '@/lib/storage/media'
 import { editorMusicPath } from '@/lib/editor/music-path'
@@ -819,6 +820,8 @@ export async function finalizeImageGenerationJob(
   falPayload?: unknown,
 ): Promise<string> {
   await recordFalResponseSnapshot(job, falPayload)
+  // D10 ②(2026-11-22): 러프 끝 장 작업이면 끝 장을 바꿔 끼운다 — 작업 번호를 기다리던 화면이 그 뒤 샷 목록을 다시 읽는다.
+  if (job.target.roughEnd) return finalizeRoughEndFrameJob(job, falImageUrl)
   await completeGenerationJob(job.id, falImageUrl)
   return falImageUrl
 }

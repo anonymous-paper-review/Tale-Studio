@@ -31,7 +31,7 @@ it('현재 큐가 비어 있어도 사흘 전 저장한 Writer 이미지 완료�
   const result = await GET(new Request('http://local/api/generation/active?projectId=project'))
   expect(result.status).toBe(200)
   expect((await result.json()).data).toMatchObject({
-    jobs: [], batches: [], completions: [{ stage: 'writer', lane: 'writer-rough', at: Date.parse(completedAt), units: 2 }],
+    jobs: [], batches: [], completions: [{ stage: 'conti', lane: 'writer-rough', at: Date.parse(completedAt), units: 2 }],
   })
   expect(mocks.completed).toHaveBeenCalledWith('project')
 })

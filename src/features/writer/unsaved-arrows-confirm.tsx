@@ -7,12 +7,32 @@
 //   입구 A 에서 [시작] 탭으로 바꿀 때도 같은 물음을 거친다(편집기가 사라지며 그린 것이 없어진다, 리드 2026-11-14).
 //   연출 장을 다시 만들 때도 묻는다 — 그때는 저장해도 바뀌니 [계속 그리기] · [버리고 다시 만들기] 둘(검토 a 54016e65).
 //   페이지를 떠나거나 새로 고칠 때는 브라우저 기본 물음(beforeunload)을 띄운다 — 저장하면 푼다.
-//   약속: tests/writer/directing-editor-unsaved.test.ts
+//   화살표를 저장하면 끝 장도 이 화살표대로 다시 그릴지 묻는다(D10 · 2026-11-22 리드 Q2) — 두 입구가 같은 물음(EndRedrawAsk)을 쓴다.
+//   ②(오너 Q1 · Q3): 물음 창이 열리면 읽는 AI 가 연출 장을 한 줄로 읽는다(7~11초) — 그 줄을 화면 말로 보이고 고칠 수 있게 한다.
+//   끝 장은 작업으로 그려 1분 넘게 걸린다 — 고르면 창은 바로 닫히고, 알림이 작업이 끝날 때까지 기다린다.
+//   약속: tests/writer/directing-editor-unsaved.test.ts · tests/writer/end-frame-ask.test.ts
 import { useRef, useState } from 'react'
 import { Loader2 } from 'lucide-react'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { Textarea } from '@/components/ui/textarea'
 import { useT } from '@/lib/i18n'
+import {
+  askLineText,
+  canRedrawEnd,
+  editedLinePayload,
+  keepEditedLine,
+  redrawEndFrame,
+  resolveEndAsk,
+  type EndAskChoice,
+  type EndRedrawDeps,
+  type KeepLineDeps,
+} from '@/lib/writer/end-frame-ask'
+import type { DirectionRead } from '@/lib/writer/direction-read'
+import { pollGenerationJob } from '@/lib/generation-jobs-client'
+import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
+import { useLocaleStore } from '@/stores/locale-store'
 import type { DirectingArrowEditorHandle } from '@/features/writer/directing-arrow-editor'
 
 export type UnsavedChoice = 'save' | 'discard' | 'keep'
@@ -75,8 +95,94 @@ export async function applyDirectionTab(
 
 export type UnsavedPurpose = 'close' | 'switch' | 'redraw'
 
-/** 두 입구가 같이 쓰는 지킴 — 편집기 ref · 저장하지 않은 화살표 여부 · 닫기 · 탭 바꾸기 요청 · 물음 창 props. */
+/** 끝 장 물음의 대상 — 어느 프로젝트의 어느 샷인지, 다시 그린 뒤 무엇을 다시 읽을지. */
+export interface EndAskTarget {
+  projectId: string
+  shotId: string
+  onRedrawn: () => void | Promise<void>
+}
+
+/** 끝 장 다시 그리기의 실제 부품 — 요청 · 작업 기다리기 · 알림 · 다시 읽기. 물음의 [다시 그리기]와 [이 장만 다시 만들기](끝)가 같이 쓴다. */
+export function endRedrawDeps(target: EndAskTarget, t: ReturnType<typeof useT>): EndRedrawDeps {
+  const frame = t('End frame')
+  return {
+    post: async (body) => {
+      const res = await fetch('/api/writer/rough-directing-edit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const j = await res.json().catch(() => null)
+      return {
+        ok: res.ok,
+        jobId: res.ok ? (j?.data?.jobId ?? null) : null,
+        error: res.ok ? null : (j?.error ?? `HTTP ${res.status}`),
+        code: res.ok ? null : (j?.code ?? null),
+      }
+    },
+    waitJob: (jobId) => pollGenerationJob(jobId),
+    reload: () => reloadAfterRoughFrameEdit(target.projectId, target.onRedrawn),
+    notify: {
+      info: (message) => toast.info(message),
+      success: (message) => toast.success(message),
+      error: (message, retry, detail) => toast.error(message, { description: detail ?? undefined, action: { label: t('Try again'), onClick: retry } }),
+    },
+    messages: {
+      drawing: t('Redrawing the end frame, which takes over a minute'),
+      done: t('Redrew the {frame}. The other two are unchanged.', { frame }),
+      failed: t('Could not redraw the end frame. It stays as it was.'),
+      unreadable: t('The AI could not read the arrows, so the end frame was not redrawn. Write the motion in the directing tab.'),
+      translateFailed: t('Could not translate the motion line. Try again.'),
+    },
+  }
+}
+
+/** [그대로] + 고친 줄 남기기의 실제 부품(리드 (A) 2026-11-23) — 요청 · 다시 읽기(편집기 아래 줄이 고친 줄로 바뀐다) · 알림. */
+export function keepLineDeps(target: EndAskTarget, t: ReturnType<typeof useT>): KeepLineDeps {
+  return {
+    post: async (body) => {
+      const res = await fetch('/api/writer/rough-directing-edit', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(body),
+      })
+      const j = await res.json().catch(() => null)
+      return { ok: res.ok, code: res.ok ? null : (j?.code ?? null) }
+    },
+    reload: () => reloadAfterRoughFrameEdit(target.projectId, target.onRedrawn),
+    notify: {
+      success: (message) => toast.success(message),
+      error: (message, retry) => toast.error(message, retry ? { action: { label: t('Try again'), onClick: retry } } : undefined),
+    },
+    messages: {
+      kept: t('Kept your line. The end frame stays as it is.'),
+      translateFailed: t('Could not translate your line, so it was not kept. The previous line stays. Try again.'),
+      stale: t('The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.'),
+      failed: t('Could not keep your line. The previous line stays.'),
+    },
+  }
+}
+
+/** 지금 연출 장을 읽은 줄 — 이미 읽은 줄이 있으면 서버가 다시 읽지 않는다. 못 읽었거나 요청이 안 되면 null. */
+async function fetchDirectionRead(projectId: string, shotId: string): Promise<DirectionRead | null> {
+  try {
+    const res = await fetch('/api/writer/rough-directing-edit', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ action: 'read-direction', projectId, shotId }),
+    })
+    if (!res.ok) return null
+    const j = await res.json().catch(() => null)
+    return (j?.data?.read as DirectionRead | null) ?? null
+  } catch {
+    return null
+  }
+}
+
+/** 두 입구가 같이 쓰는 지킴 — 편집기 ref · 저장하지 않은 화살표 여부 · 닫기 · 탭 바꾸기 요청 · 물음 창 props · 끝 장 물음. */
 export function useUnsavedArrowsGuard(close: () => void) {
+  const t = useT()
+  const locale = useLocaleStore((s) => s.locale)
   const editorRef = useRef<DirectingArrowEditorHandle>(null)
   const [dirty, setDirty] = useState(false)
   // 물음 창이 열려 있으면 무엇을 하려다 물었는지(닫기 · 탭 바꾸기)와 고른 뒤 이어서 할 일.
@@ -107,6 +213,31 @@ export function useUnsavedArrowsGuard(close: () => void) {
       setPending(null)
     }
   }
+  // 끝 장 물음 — 화살표를 저장한 뒤(또는 편집기 아래 줄 [고쳐서 끝 장 다시 그리기]로) 열고, 고르면 저장을 끝낸다
+  //   (창 [적용] · [저장하고 닫기]는 고른 뒤 닫힌다). 열리자마자 지금 연출 장을 한 줄로 읽는다(이미 읽은 줄이면 바로). 그리기는 기다리지 않는다.
+  const [endAsk, setEndAsk] = useState<{ target: EndAskTarget; done: () => void; reading: boolean; read: DirectionRead | null; text: string } | null>(null)
+  const askEnd = (target: EndAskTarget) =>
+    new Promise<void>((done) => {
+      setEndAsk({ target, done, reading: true, read: null, text: '' })
+      void fetchDirectionRead(target.projectId, target.shotId).then((read) =>
+        setEndAsk((current) => (current && current.target === target ? { ...current, reading: false, read, text: askLineText(read, locale) } : current)),
+      )
+    })
+  const chooseEnd = (choice: EndAskChoice) => {
+    const current = endAsk
+    setEndAsk(null)
+    if (!current) return
+    if (choice === 'redraw' && !canRedrawEnd(current)) return current.done()
+    const line = editedLinePayload(current.read, current.text, locale)
+    // [그대로] 단추는 고친 줄만 남긴다(리드 (A)) — 안 고쳤으면 keepEditedLine 이 아무것도 보내지 않는다. Esc · ✕ 는 'keep' 이라 버린다.
+    resolveEndAsk(
+      choice,
+      () => void redrawEndFrame(current.target.projectId, current.target.shotId, endRedrawDeps(current.target, t), line),
+      () => void keepEditedLine(current.target.projectId, current.target.shotId, keepLineDeps(current.target, t), line, current.read?.direction ?? null),
+    )
+    current.done()
+  }
+  const setEndText = (text: string) => setEndAsk((current) => (current ? { ...current, text } : current))
   return {
     editorRef,
     dirty,
@@ -116,7 +247,86 @@ export function useUnsavedArrowsGuard(close: () => void) {
     requestSwitch,
     requestRedraw,
     confirm: { open: pending !== null, purpose: pending?.purpose ?? 'close', saving, onChoose: choose },
+    askEnd,
+    endAsk: {
+      open: endAsk !== null,
+      reading: endAsk?.reading ?? false,
+      unreadable: !!endAsk && !endAsk.reading && !endAsk.read,
+      // 남은 줄이 사람이 고친 줄이면 이름표가 "고친 움직임"(리드 2026-11-23).
+      userLine: endAsk?.read?.source === 'user',
+      text: endAsk?.text ?? '',
+      onTextChange: setEndText,
+      onChoose: chooseEnd,
+    },
   }
+}
+
+/** "끝 장도 이 화살표대로 다시 그릴까요?" — 읽은 한 줄(고칠 수 있음) · [그대로] · [다시 그리기].
+ *  [그대로] 단추는 끝 장을 그리지 않고, 줄을 고쳤으면 고친 줄을 남긴다('keep-line' — 영상이 그 줄을 쓴다, 리드 (A) · D2 2026-11-23).
+ *  Esc · ✕ · 바깥 누르기는 끝 장도 그리지 않고 고친 줄도 버린다('keep' — 그림 값이 들지 않는 쪽, 잘못 눌러도 아무것도 바뀌지 않는다).
+ *  읽는 동안은 "화살표를 읽는 중…"으로 [다시 그리기]를 잠그고, 못 읽었으면 빈 줄에 직접 적게 한다(줄을 적어야 켜진다). */
+export function EndRedrawAsk({
+  open,
+  reading,
+  unreadable,
+  userLine = false,
+  text,
+  onTextChange,
+  onChoose,
+}: {
+  open: boolean
+  reading: boolean
+  unreadable: boolean
+  /** 남은 줄이 사람이 고친 줄(source user)이면 true — 이름표가 "고친 움직임". */
+  userLine?: boolean
+  text: string
+  onTextChange: (text: string) => void
+  onChoose: (choice: EndAskChoice) => void
+}) {
+  const t = useT()
+  return (
+    <Dialog open={open} onOpenChange={(next) => { if (!next) onChoose('keep') }}>
+      <DialogContent data-testid="end-redraw-ask">
+        <DialogHeader>
+          <DialogTitle>{t('Redraw the end frame to match these arrows?')}</DialogTitle>
+          <DialogDescription className="break-keep">{t('The start and directing frames stay as they are. Only the end frame is redrawn, which takes over a minute.')}</DialogDescription>
+        </DialogHeader>
+        <div className="flex flex-col gap-1.5">
+          <label htmlFor="end-redraw-line" className="text-label font-semibold text-foreground">
+            {userLine ? t('Edited movement') : t('Motion the AI read')}
+          </label>
+          {reading ? (
+            <p className="flex items-center gap-2 rounded-lg bg-card px-3 py-2.5 text-caption text-muted-foreground" data-testid="end-redraw-reading">
+              <Loader2 className="size-3.5 animate-spin" />
+              {t('Reading the arrows…')}
+            </p>
+          ) : (
+            <Textarea
+              id="end-redraw-line"
+              value={text}
+              onChange={(e) => onTextChange(e.target.value)}
+              rows={3}
+              maxLength={600}
+              placeholder={t('Describe how the shot ends, for example: the figure on the left walks out to the right.')}
+              className="break-keep"
+              data-testid="end-redraw-line"
+            />
+          )}
+          <p className="break-keep text-caption text-muted-foreground">
+            {unreadable ? t('The AI could not read the arrows. Write the motion yourself.') : t('You can edit the line. The end frame is drawn from it.')}
+          </p>
+        </div>
+        <DialogFooter>
+          <Button variant="secondary" onClick={() => onChoose('keep-line')} data-testid="end-redraw-keep">
+            {t('Keep as is')}
+          </Button>
+          <Button onClick={() => onChoose('redraw')} disabled={!canRedrawEnd({ reading, text })} data-testid="end-redraw-redraw">
+            {t('Redraw')}
+          </Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  )
 }
 
 /** "저장하지 않은 화살표가 있어요" — [계속 그리기] · [버리고 닫기] · [저장하고 닫기](탭을 바꿀 때는 "…바꾸기"). Esc · ✕ 는 계속 그리기(그린 것을 지킨다). */
