@@ -10,9 +10,13 @@ interface BoardUiState {
   /** Director 넘김 확인 창(프로토타입 S7). */
   directorConfirmOpen: boolean
   setDirectorConfirmOpen: (open: boolean) => void
-  /** 샷 고치기 팝업에 연 샷(없으면 닫힘) — 보드 카드 · 대사 탭 어디서 눌러도 같은 팝업. */
+  /** 샷 고치기 팝업에 연 샷(없으면 닫힘) — 보드 카드 · 대사 탭 어디서 눌러도 같은 팝업. 이 길로 열면 보던 지난 판은 비운다. */
   shotEditId: string | null
   setShotEditId: (shotId: string | null) => void
+  /** 지난 판 줄(오너 2026-11-26 S3)에서 연 실사 판(채택 전) — 상세가 그 판을 먼저 보이고 [채택]을 단다. 지금 그림인 판이면 보일 것이 없다. */
+  shotEditVersionId: string | null
+  /** 그 샷 상세를 그 지난 판으로 연다(versionId null = 지금 그림으로 돌아가기). */
+  openShotVersion: (shotId: string, versionId: string | null) => void
   /** 지금 열려 있는 Storyboard 보드의 프로젝트(없으면 null) — 채팅이 [러프 다시 그리기]를 묻고 보여 줄지 정한다. */
   boardProjectId: string | null
   openBoard: (projectId: string) => void
@@ -38,7 +42,9 @@ export const useBoardUiStore = create<BoardUiState>((set, get) => ({
   directorConfirmOpen: false,
   setDirectorConfirmOpen: (directorConfirmOpen) => set({ directorConfirmOpen }),
   shotEditId: null,
-  setShotEditId: (shotEditId) => set({ shotEditId }),
+  setShotEditId: (shotEditId) => set({ shotEditId, shotEditVersionId: null }),
+  shotEditVersionId: null,
+  openShotVersion: (shotEditId, shotEditVersionId) => set({ shotEditId, shotEditVersionId }),
   boardProjectId: null,
   openBoard: (projectId) => set({ boardProjectId: projectId }),
   closeBoard: (projectId) =>
