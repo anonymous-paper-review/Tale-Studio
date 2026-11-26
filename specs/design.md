@@ -586,6 +586,8 @@ Storyboard 나누기 · 첫 러프. 설명은 부르는 쪽이 준다 — 안 �
 덮개가 받은 휠 · 손가락 끌기를 포인터 아래 `[data-ai-busy-scroll]` 칸으로 넘겨 보기 · 스크롤만 된다(`src/lib/ai-busy-scroll.ts`, 칸이 겹치면 안쪽 칸).
 `card="loading"` 은 Lumi 없이 같은 새 카드(그림만 없음, 색은 놓인 화면의 지금 단계). 약속 tests/project/busy-overlay-clear.test.ts. 덮개 없이 화면 가운데에 큰 Lumi `loading`(폭 300)만 두는 곳: 새 프로젝트 만들기(`/projects/new`, Producer 옷 · 실패면 `error`) ·
 Editor 클립 준비. `lumi` 를 안 주는 잠금(그림 다시 그리기 · 샷 고치기 팝업 위 등)은 도는 원의 작은 카드 그대로(약속 tests/project/busy-overlay-lumi.test.ts).
+**단계 화면을 여는 동안**(오너 2026-11-26): 레일로 옮겨 오거나 프로젝트를 여는 동안 그 단계가 자기 자료를 다 읽기 전에는 Editor 클립 준비와 같은 카드(그 단계 옷 · 설명 없음 · 잠금 아님)를 화면 가운데에 둔다 —
+`<StageWaitCard stage />`(`src/components/feedback/stage-wait.tsx`, 언제는 `src/lib/stage-wait.ts` · `src/hooks/use-stage-wait.ts`, 레일을 누른 순간은 `app/studio/<단계>/loading.tsx`). 제목은 "산문을 불러오는 중…"처럼 무엇을 읽는지. Director 는 캔버스 판 위를 덮는다(`cover`). 약속 tests/project/stage-wait.test.ts.
 실패 안내의 오류 모습 큰 Lumi 도 단계를 넘어가는 기다림의 실패에만 둔다 — Storyboard 보드에서 컷을 다시 그리다 난 실패는 작은 카드(약속 tests/writer/board-wait-lumi.test.ts).
 
 **노드 · 카드 위에서 기다릴 때**(SYS, DG 기준) — `src/components/feedback/node-wait.tsx` `<NodeWaitCard lumi title description? progress? note? announce? />`(화면 읽기 알림 `announce` 는 여럿 중 하나만 — 보드 · Director 는 첫 카드):

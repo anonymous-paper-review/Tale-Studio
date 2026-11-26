@@ -65,6 +65,8 @@ import { StageHelpBadge } from '@/components/stage-help-badge'
 import { NextStepButton } from '@/components/handoff/next-step-button'
 import { TopBarActions } from '@/components/layout/studio-top-bar'
 import { useHoldChatClosed } from '@/hooks/use-hold-chat-closed'
+import { useDirectorWait } from '@/hooks/use-stage-wait'
+import { StageWaitCard } from '@/components/feedback/stage-wait'
 import { LumiChatPill } from '@/features/director/lumi-chat-pill'
 import { PickAllBar, ShotStatusFilterMenu } from '@/features/director/shot-status'
 import { StoryboardZoomPill } from '@/features/director/storyboard-zoom-pill'
@@ -1543,6 +1545,8 @@ function workButtonClass(primary: boolean): string {
 export default function DirectorCanvasPage() {
   // v3 D1(2026-11-03): Director 는 채팅을 닫은 채 시작하고 툴바의 Lumi 알약으로 연다 — 떠나면 들어오기 전 모습으로 돌아간다(오너 2026-11-03 확인).
   useHoldChatClosed('director')
+  // 씬 · 샷을 읽고 샷 카드가 캔버스에 놓이기 전에는 빈 캔버스 안내 대신 Director 기다리는 카드로 판을 덮는다(오너 2026-11-26 m1126 G1, hooks/use-stage-wait).
+  const directorWait = useDirectorWait()
   // 고름은 한때 쓰는 것(시안 D2, 혼자 정한 것 d) — Esc 로 풀고, 화면을 떠나면 풀린다.
   useEffect(() => {
     const onKey = (event: KeyboardEvent) => {
@@ -1723,6 +1727,8 @@ export default function DirectorCanvasPage() {
 
         {/* 결정 #12 완료: D-3 NodePopup이 카메라/조명/렌즈 편집을 흡수.
             우측 Inspector aside 제거됨 (D-3 마일스톤, 2026-05-25) */}
+        {/* 기다리는 동안 판 위만 덮는다 — 캔버스는 그대로 붙여 둬 처음 화면 맞추기 · 자동 정렬이 도는 때가 바뀌지 않는다(m1126 G1). */}
+        {directorWait ? <StageWaitCard stage="director" cover /> : null}
       </div>
 
     </div>

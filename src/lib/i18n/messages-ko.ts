@@ -1992,6 +1992,12 @@ export const KO: Record<string, string> = {
   'Click to cancel': '클릭하면 취소돼요',
   'Preparing clips…': '클립 준비 중…',
   'Preparing clips… {percent}%': '클립 준비 중… {percent}%',
+  // 단계 화면을 여는 동안 기다리는 카드 제목(m1126 G1, lib/stage-wait STAGE_WAIT_TITLE) — Editor 는 위 'Preparing clips…' 그대로.
+  'Loading the start screen…': '시작 화면을 불러오는 중…',
+  'Loading the prose…': '산문을 불러오는 중…',
+  'Loading characters and backgrounds…': '인물 · 배경을 불러오는 중…',
+  'Loading the storyboard…': '스토리보드를 불러오는 중…',
+  'Loading shots…': '샷을 불러오는 중…',
   'Rendering… {percent}%': '렌더링 중… {percent}%',
   'Draft render records in real time. Keep this tab visible until it finishes.':
     '드래프트 렌더는 실시간으로 녹화돼요. 끝날 때까지 이 탭을 화면에 켜 둬 주세요.',

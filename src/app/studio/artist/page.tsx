@@ -5,6 +5,8 @@ import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { useSequentialPoll } from '@/hooks/use-sequential-poll'
 import { useRouter } from 'next/navigation'
 import { AlertTriangle, ArrowRight, Check, Loader2, ZoomIn, ZoomOut } from 'lucide-react'
+import { StageWaitCard } from '@/components/feedback/stage-wait'
+import { useArtistWait } from '@/hooks/use-stage-wait'
 import { Button } from '@/components/ui/button'
 import { ChoiceChip } from '@/components/controls/choice-chip'
 import { PageHeader } from '@/components/layout/page-header'
@@ -72,6 +74,8 @@ export default function VisualPage() {
   } = useArtistStore()
 
   const projectId = useProjectStore((s) => s.projectId)
+  // 인물 · 배경과 진행 상태를 처음 다 읽기 전에는 예전 진행 화면 · 빈 카드 대신 Artist 기다리는 카드(오너 2026-11-26 m1126 G1, hooks/use-stage-wait).
+  const artistWait = useArtistWait()
   // 약속 D15(2026-09-04): 보던 탭은 스토어가 기억한다 — 떠났다 돌아와도 그대로.
   const tab = useArtistStore((s) => s.uiTab)
   const setTab = useArtistStore((s) => s.setUiTab)
@@ -488,6 +492,7 @@ export default function VisualPage() {
   const legacyProgressBusy = legacyProgressHolds({ gateOpen, phase, status: writerStatus })
   useAiBusyHold(legacyProgressBusy)
 
+  if (artistWait) return <StageWaitCard stage="artist" />
   if (phase === 'list') {
     return (
       <>
