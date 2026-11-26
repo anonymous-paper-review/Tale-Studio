@@ -3745,7 +3745,7 @@ export const KO: Record<string, string> = {
   'The model picks the length.': '길이는 모델이 정해요',
   'Made music · {count}': '만든 음악 · {count}',
   'Music you make appears here.': '만든 음악이 여기에 쌓여요.',
-  'Making… usually 1 to 2 minutes': '만드는 중… 보통 1~2분',
+  'Making… this can take a few minutes': '만드는 중… 몇 분 걸릴 수 있어요',
   'Could not make this music': '만들지 못했어요',
   'The music service did not accept this text. Change the mood and make it again.': '음악 서비스가 이 글을 받지 않았어요. 분위기 글을 고쳐 다시 만들어 주세요.',
   'There were not enough Takes.': 'Take 가 모자랐어요.',

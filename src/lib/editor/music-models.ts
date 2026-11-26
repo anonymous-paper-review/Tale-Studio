@@ -138,6 +138,12 @@ export function buildMusicInput(req: MusicRequest): { endpoint: string; input: R
   }
 }
 
+/** [생성] 목록의 곡 길이 — 분:초(20초 → 0:20, 152초 → 2:32). 목록에는 줄 표시가 없어 타임코드(초:장)는 분으로 읽힌다. */
+export function formatMusicLength(sec: number): string {
+  const total = Math.max(0, Math.floor(Number.isFinite(sec) ? sec : 0))
+  return `${Math.floor(total / 60)}:${String(total % 60).padStart(2, '0')}`
+}
+
 /** 곡 이름 — 분위기 글 첫 줄 앞 40자(넘으면 …). */
 export function musicTitle(prompt: string): string {
   const line = prompt.trim().split(/\r?\n/)[0]?.trim() ?? ''

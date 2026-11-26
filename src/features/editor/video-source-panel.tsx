@@ -261,7 +261,8 @@ export function ProjectPanel({
                         })
                       }
                       title={`${song.title}\n${t('(Drag: add to audio track)')}`}
-                      className="flex cursor-grab items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-card active:cursor-grabbing"
+                      // 긴 곡 이름(한 줄 truncate)이 판 안쪽 표 폭을 넓혀 판 전체가 오른쪽에서 잘리지 않게 폭 계산을 줄 안에 가둔다(ScrollArea 최소 폭 함정).
+                      className="flex cursor-grab items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors [contain:inline-size] hover:bg-card active:cursor-grabbing"
                     >
                       <div className="flex h-8 w-6 shrink-0 items-center justify-center rounded bg-card">
                         <Music className="size-3.5 text-stage" />

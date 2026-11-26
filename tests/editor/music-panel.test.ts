@@ -37,6 +37,7 @@ import {
   MUSIC_MODEL_ORDER,
   buildMusicInput,
   defaultMusicLengthSec,
+  formatMusicLength,
   musicRequestProblem,
   musicTitle,
 } from '@/lib/editor/music-models'
@@ -266,20 +267,29 @@ describe('혼자 정한 것', () => {
     expect(mocks.toast.error).toHaveBeenCalledWith('MiniMax Music 2.6 은 분위기 글을 10자 이상 써 주세요.')
   })
 
+  it('만든 곡의 길이는 [생성] 목록에 분:초로 보인다 — 20초는 0:20, 2분 32초는 2:32', () => {
+    // 왜: 목록에는 "A ·" 같은 줄 표시가 없어 타임코드(초:장, "20:01")가 20분으로 읽힌다(개발 서버 화면 확인 2026-11-26). 프로젝트 판은 다른 줄과 같은 "A · 초:장" 그대로다.
+    expect(formatMusicLength(20.06)).toBe('0:20')
+    expect(formatMusicLength(152)).toBe('2:32')
+    useEditorMusicStore.setState({ items: [item({ requestedDurationSec: 20 })], decoded: { m1: { durationSec: 152.4, peaks: [] } } })
+    expect(text(html(createElement(MusicPanel)))).toContain('잔잔한 피아노와 새벽 바다 2:32')
+  })
+
   it('곡 이름은 분위기 글 첫 줄 앞 40자다', () => {
     // 왜: 목록 · 타임라인 조각에서 곡을 구별할 이름이 필요하다. 따로 이름 칸을 두지 않는다.
     expect(musicTitle('잔잔한 피아노\n둘째 줄')).toBe('잔잔한 피아노')
     expect(musicTitle('가'.repeat(45))).toBe(`${'가'.repeat(40)}…`)
   })
 
-  it('만드는 중인 곡은 "만드는 중… 보통 1~2분"을 보이고, 끝나면 목록을 다시 읽어 끝 상태로 바뀐다 — 화면을 다시 열어도 만드는 중인 곡을 이어서 지켜본다', async () => {
-    // 왜: 1~2분을 막고 기다리게 하지 않는다. 만들기는 서버가 하므로 다른 단계에 갔다 와도(다시 열어도) 이어진다.
+  it('만드는 중인 곡은 "만드는 중… 몇 분 걸릴 수 있어요"를 보이고, 끝나면 목록을 다시 읽어 끝 상태로 바뀐다 — 화면을 다시 열어도 만드는 중인 곡을 이어서 지켜본다', async () => {
+    // 왜: 몇 분을 막고 기다리게 하지 않는다. 만들기는 서버가 하므로 다른 단계에 갔다 와도(다시 열어도) 이어진다.
+    //   걸리는 시간은 모델마다 다르다(개발 서버 실측 2026-11-26: ElevenLabs 20초 곡 12초 · MiniMax 노래 165초) — "보통 1~2분"이라 하지 않는다.
     let finish: (url: string) => void = () => {}
     mocks.poll.mockImplementationOnce(() => new Promise<string>((resolve) => (finish = resolve)))
     fetchMock.mockResolvedValueOnce(json({ items: [item({ status: 'queued', url: null })] }))
     await music().load('project-music')
     expect(mocks.poll).toHaveBeenCalledWith('job-1', expect.anything())
-    expect(text(html(createElement(MusicPanel)))).toContain('만드는 중… 보통 1~2분')
+    expect(text(html(createElement(MusicPanel)))).toContain('만드는 중… 몇 분 걸릴 수 있어요')
     fetchMock.mockResolvedValueOnce(json({ items: [item()] }))
     finish('https://media.test/ws/project/editor/music/m1.mp3')
     await vi.waitFor(() => expect(music().items[0]?.status).toBe('completed'))

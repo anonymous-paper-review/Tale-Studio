@@ -16,13 +16,14 @@ import { useEditorStore, selectVideoLayout } from '@/stores/editor-store'
 import { useProjectStore } from '@/stores/project-store'
 import { useTakeBalance } from '@/lib/billing/use-take-balance'
 import { takeCostForMusic, takeValuesShown } from '@/lib/billing/take-cost'
-import { sequenceLengthSec, formatClipLength } from '@/lib/editor/sequence-info'
+import { sequenceLengthSec } from '@/lib/editor/sequence-info'
 import {
   MUSIC_LENGTH_MAX_SEC,
   MUSIC_LENGTH_MIN_SEC,
   MUSIC_MODELS,
   MUSIC_MODEL_ORDER,
   defaultMusicLengthSec,
+  formatMusicLength,
 } from '@/lib/editor/music-models'
 import { countText } from '@/lib/i18n/count-text'
 import { useT } from '@/lib/i18n'
@@ -91,9 +92,13 @@ export function MusicPanel() {
     void audio.play().catch(() => setPlayingId(null))
   }
 
-  const onCreate = () => {
+  // 만들기를 보내면 새 줄(목록 맨 위)이 보이게 판을 조금만 내린다 — 판이 낮아 목록이 칸 아래에 숨어 있으면 만드는 중인지 모른다.
+  const listRef = useRef<HTMLElement | null>(null)
+  const onCreate = async () => {
     if (projectId) setProject(projectId)
-    void create(sequenceSec)
+    const sent = await create(sequenceSec)
+    if (!sent) return
+    requestAnimationFrame(() => listRef.current?.querySelector('[data-music-row]')?.scrollIntoView({ block: 'nearest', behavior: 'smooth' }))
   }
   const cost = takeCostForMusic()
   const makeLabel = takeValuesShown(takes) ? countText(t, cost, 'Make music · 1 Take', 'Make music · {count} Takes', { count: cost }) : t('Make music')
@@ -158,13 +163,13 @@ export function MusicPanel() {
             <span className="text-meta leading-8 text-subtle-foreground">{t('The model picks the length.')}</span>
           )}
         </Row>
-        <Button variant="secondary" className="self-start rounded-full" disabled={creating || !projectId} onClick={onCreate}>
+        <Button variant="secondary" className="self-start rounded-full" disabled={creating || !projectId} onClick={() => void onCreate()}>
           {creating ? <Loader2 className="size-3.5 animate-spin" /> : null}
           {makeLabel}
         </Button>
       </section>
 
-      <section className="flex flex-col gap-1.5">
+      <section ref={listRef} className="flex flex-col gap-1.5">
         <h3 className="text-meta font-semibold text-subtle-foreground">{t('Made music · {count}', { count: items.length })}</h3>
         {items.length === 0 ? <p className="text-meta text-subtle-foreground">{t('Music you make appears here.')}</p> : null}
         {items.map((item) => {
@@ -179,13 +184,13 @@ export function MusicPanel() {
                   {item.title}
                 </span>
                 {item.status === 'completed' && lengthSec ? (
-                  <span className="shrink-0 font-num text-meta text-subtle-foreground tabular-nums">{formatClipLength(lengthSec)}</span>
+                  <span className="shrink-0 font-num text-meta text-subtle-foreground tabular-nums">{formatMusicLength(lengthSec)}</span>
                 ) : null}
               </div>
               {item.status === 'queued' ? (
                 <p className="flex items-center gap-1.5 text-meta text-subtle-foreground">
                   <Loader2 className="size-3 animate-spin" />
-                  {t('Making… usually 1 to 2 minutes')}
+                  {t('Making… this can take a few minutes')}
                 </p>
               ) : null}
               {item.status === 'failed' ? (
