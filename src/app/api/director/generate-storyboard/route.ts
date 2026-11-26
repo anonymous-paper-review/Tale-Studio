@@ -29,6 +29,8 @@ import { appendCheckConstraints, parseCheckConstraints } from '@/lib/writer/chec
 import { englishTimeOfDay, isReflectionShot, quotePreviousShot, roughIsStaticHold, stillCharacterLabel, stillConstraints } from '@/lib/director/still-prompt'
 import { buildPhotoStripPrompt, type PhotoCharacterLabel } from '@/lib/director/photo-strip'
 import { buildStripFixPrompt } from '@/lib/director/strip-fix-prompt'
+import { directorPromptOf } from '@/lib/director/director-prompt'
+import { freshDirectionLine } from '@/lib/writer/direction-read'
 import { currentStripFrames } from '@/lib/director/storyboard-image'
 import { promptWithChange } from '@/lib/director/shot-detail'
 import { realCineLine } from '@/lib/director/real-cine-line'
@@ -62,7 +64,7 @@ export async function POST(req: Request) {
   const demoBlocked = demoWriteBlock(req)
   if (demoBlocked) return demoBlocked
   try {
-    const { projectId, writerShotId, prompt: requestPrompt, referenceImageUrls, aspectRatio, traceId, imageModel, characterRefCount: bodyCharCount, worldRefCount: bodyWorldCount, changeNote } =
+    const { projectId, writerShotId, prompt: requestPrompt, referenceImageUrls, aspectRatio, traceId, imageModel, characterRefCount: bodyCharCount, worldRefCount: bodyWorldCount, changeNote, promptSource } =
       (await req.json()) as {
         projectId?: string
         writerShotId?: string
@@ -75,6 +77,8 @@ export async function POST(req: Request) {
         worldRefCount?: number
         /** 바꿀 점(오너 2026-11-26 O5 · (a)) — 글에 붙이지 않고 따로 받는다. 지금 실사 그림이 있으면 그 그림을 바탕으로 고친다. */
         changeNote?: string
+        /** 'director' = Director 화면이 지금 보이는 글(막 고친 글 포함)을 보냈다 — DB 의 고친 글(director_prompt)로 바꾸지 않는다. */
+        promptSource?: string
       }
     // 바꿀 점은 한두 문장이다 — 긴 글이 시트 지시문을 밀어내지 않게, 돈이 드는 요청 전에 막는다.
     if (changeNote !== undefined && (typeof changeNote !== 'string' || changeNote.length > 1000)) {
@@ -117,7 +121,7 @@ export async function POST(req: Request) {
         .maybeSingle(),
       supabaseAdmin
         .from('shots')
-        .select('shot_id, scene_id, source, sort_order, rough_storyboard, check_notes, characters, character_appearance_keys, static_spec, director_refs, dynamic_spec, design_ref, prompt, action_description, action_description_native, storyboard_image')
+        .select('shot_id, scene_id, source, sort_order, rough_storyboard, check_notes, characters, character_appearance_keys, static_spec, director_refs, dynamic_spec, design_ref, prompt, director_prompt, action_description, action_description_native, storyboard_image')
         .eq('project_id', projectId)
         .eq('shot_id', writerShotId)
         .maybeSingle(),
@@ -206,11 +210,16 @@ export async function POST(req: Request) {
     // #u17-2(2026-08-31 오너 지시): 수동 샷(shots.prompt=NULL)의 한국어 액션 원문 유출 방어 —
     //   영상 라우트(#w-c)와 동일하게 서버 최종 방어로 EN 파생. 이미 영어면 LLM 없이 통과,
     //   실패 항목은 맵에 없어 원문 폴백. 배치 그리드 라우트는 산문을 싣지 않아 해당 없음.
-    let promptEn = prompt
+    // Director 에서 고친 샷 글(shots.director_prompt)이 있으면 화면이 보낸 글보다 먼저 쓴다(리드 2026-11-26) —
+    //   Storyboard 다시 그리기 · 다른 기기는 Writer 글을 보낸다. 없으면 보낸 글 그대로(지금과 같다).
+    //   Director 화면은 지금 보이는 글(저장 전 0.5초 안에 막 고친 글 포함)을 보내므로 그 글을 그대로 쓴다 — DB 는 아직 옛 글일 수 있다.
+    const directorPrompt = promptSource === 'director' ? null : directorPromptOf(shot)
+    const shotPrompt = directorPrompt ?? prompt
+    let promptEn = shotPrompt
     // 바꿀 점도 같은 한 번의 번역에 싣는다(한국어면 영어로, 이미 영어면 LLM 없이 그대로).
     let changeEn = change
     try {
-      const derived = await deriveEnBatch([{ id: 'p', native: prompt }, ...(change ? [{ id: 'c', native: change }] : [])], 'director storyboard prompt')
+      const derived = await deriveEnBatch([{ id: 'p', native: shotPrompt }, ...(change ? [{ id: 'c', native: change }] : [])], 'director storyboard prompt')
       const en = derived.get('p')
       if (en) promptEn = en
       const enChange = derived.get('c')
@@ -254,6 +263,10 @@ export async function POST(req: Request) {
     //   (그 뒤 러프가 바뀌었으면 "러프 바뀜"이 남는다). 바탕 그림에 기록이 없으면 적지 않는다(옛 실사처럼 판정하지 않음).
     const baseRoughAt = fixFrames ? (currentImage as { roughGeneratedAt?: unknown } | null)?.roughGeneratedAt : undefined
     const roughGeneratedAt = fixFrames ? (typeof baseRoughAt === 'number' ? baseRoughAt : undefined) : roughFramesAt
+    // 콘티에서 고친 화살표를 읽고 그 줄로 끝 장을 다시 그린 샷만 — 그 줄을 움직임으로 싣는다(오너 2026-11-22 R1, 리드 2026-11-26 나눔).
+    //   줄이 없거나 낡았거나 [그대로]를 골라 끝 장에 안 쓴 줄이면 null — 지시문은 한 글자도 바뀌지 않는다.
+    //   고치기(바꿀 점 · 지금 그림 바탕)에는 싣지 않는다 — 바꿀 점 밖은 지금 그림 그대로여야 한다.
+    const directionLine = stripFrames && !fixFrames ? freshDirectionLine(shot?.rough_storyboard) : null
 
     // #n-1(2026-08-05): 같은 씬 직전 샷의 종료 상태를 서버측 첨부 — 샷별 독립 잡이던 실사의
     //   연속성 봉합. DB pull 이라 잡 간 의존이 생기지 않는다 (architecture §0: 둘 다 진실을 읽는다).
@@ -264,11 +277,12 @@ export async function POST(req: Request) {
     if (typeof shotMeta?.sort_order === 'number' && shotMeta.sort_order > 0) {
       const { data: prev } = await supabaseAdmin
         .from('shots')
-        .select('scene_id, prompt, action_description')
+        .select('scene_id, prompt, director_prompt, action_description')
         .eq('project_id', projectId)
         .eq('sort_order', shotMeta.sort_order - 1)
         .maybeSingle()
-      const prevText = (((prev?.prompt as string) || (prev?.action_description as string)) ?? '').trim()
+      // 앞 샷도 Director 에서 고친 글이 있으면 그 글을 옮긴다 — 고친 앞 샷과 옷 · 소품이 어긋나지 않게.
+      const prevText = ((directorPromptOf(prev) || (prev?.prompt as string) || (prev?.action_description as string)) ?? '').trim()
       if (prev?.scene_id === shotMeta.scene_id && prevText) {
         // 실사 그림체는 앞 샷 글을 문장 단위로 인용한다 — 110자에서 잘라 문장 중간에서 끊겼다(2026-11-23). 다른 그림체는 지금 그대로.
         continuityPrevText = photoLook ? quotePreviousShot(prevText) : prevText.slice(0, 110)
@@ -376,6 +390,7 @@ export async function POST(req: Request) {
               extraRefCount: refCounts.extraRefCount,
               characterRefs: characterRefLabels,
               cineLine,
+              directionLine,
               sceneLighting,
               reflection: isReflectionShot((shot ?? {}) as Parameters<typeof isReflectionShot>[0], (characterRefLabels ?? []).map((r) => r.name)),
               staticHold: roughIsStaticHold(shot as Parameters<typeof roughIsStaticHold>[0]),
@@ -395,6 +410,7 @@ export async function POST(req: Request) {
           anchorKeepsGrade: anchor?.anchorKind === 'sublook',
           styleRefCount: anchor?.usePreviewRef && anchor.previewUrl ? 2 : 1,
           frameAxis: composed.geometry.frameAxis,
+          directionLine,
         })) + (propLines.length ? `\n${propLines.join('\n')}` : ''),
         // #real-strip-guard(2026-08-06)→#fal-canvas→#sheet-formats(2026-08-17): 캔버스는 합성이
         //   고른 지오메트리를 따른다 — 레퍼런스·캔버스·프롬프트 축·크롭이 한 시트 계약으로 정합.
@@ -450,6 +466,8 @@ export async function POST(req: Request) {
           }
         : null,
       ...(stripRefUrl ? { strip_ref_url: stripRefUrl } : {}),
+      // 샷 글을 Director 에서 고친 글로 그렸는지(리드 2026-11-26) — 화면이 보낸 글과 다를 수 있어 기록으로 남긴다.
+      ...(directorPrompt ? { prompt_source: 'director_prompt' } : {}),
       // 고치기(오너 O5 · (a)) — 바꿀 점과 바탕으로 삼은 지금 세 칸(어느 판을 고쳤는지 기록으로 남긴다).
       ...(changeEn ? { change_note: changeEn } : {}),
       ...(fixFrames ? { fix_base_frames: fixFrames } : {}),
@@ -473,6 +491,8 @@ export async function POST(req: Request) {
           continuityPrevText,
           ...(characterRefLabels ?? []).flatMap((r) => [r.name, r.pose, ...(photoLook ? [r.look] : [])]),
           ...(photoLook ? [cineLine] : []),
+          // 콘티에서 고친 화살표를 읽은 줄(오너 R1) — 사람이 연출 장에 쓴 손글씨 · 고친 글이 옮겨진다. 없는 샷은 지금과 같다.
+          ...(directionLine ? [directionLine] : []),
           // 사용자가 쓴 소품 이름도 함께 검사한다(D7 2단계) — 소품이 없는 샷은 지금과 같다.
           ...propRefs.map((ref) => ref.name),
         ],

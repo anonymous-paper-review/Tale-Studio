@@ -75,11 +75,18 @@ const ROUGH = { start: 'https://r/start.png', direction: 'https://r/dir.png', en
 const REAL = { start: 'https://m/real-start.png', direction: 'https://m/real-dir.png', end: 'https://m/real-end.png' }
 let db: Record<string, Array<Record<string, unknown>>>
 
+// 표 이름으로 답하고, eq 로 건 칸이 행에 있으면 그 값으로 거른다(앞 샷 찾기 — sort_order).
 function queryFor(table: string) {
+  const filters: Record<string, unknown> = {}
   const q: Record<string, unknown> = {}
-  for (const name of ['select', 'eq', 'in', 'order', 'gte', 'limit', 'not', 'is']) q[name] = () => q
-  q.maybeSingle = q.single = async () => ({ data: db[table]?.[0] ?? null, error: null })
-  q.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ data: db[table] ?? [], error: null }).then(resolve)
+  for (const name of ['select', 'in', 'order', 'gte', 'limit', 'not', 'is']) q[name] = () => q
+  q.eq = (column: string, value: unknown) => {
+    filters[column] = value
+    return q
+  }
+  const rows = () => (db[table] ?? []).filter((row) => Object.entries(filters).every(([key, value]) => !(key in row) || row[key] === value))
+  q.maybeSingle = q.single = async () => ({ data: rows()[0] ?? null, error: null })
+  q.then = (resolve: (value: unknown) => unknown) => Promise.resolve({ data: rows(), error: null }).then(resolve)
   return q
 }
 const request = (body: Record<string, unknown>) => new Request('http://localhost/api/director/generate-storyboard', {
@@ -167,5 +174,42 @@ describe('이미지 고치기 = 지금 그림을 바탕으로', () => {
     const response = await POST(request({ changeNote: 'x'.repeat(1001) }))
     expect(response.status).toBe(400)
     expect(mocks.falImageSubmit).not.toHaveBeenCalled()
+  })
+})
+
+describe('Director 에서 고친 글(director_prompt)을 그림 서버가 먼저 쓴다', () => {
+  it('샷에 Director 에서 고친 글이 있으면 그림 서버는 화면이 보낸 글 대신 그 글로 그린다 — Storyboard 다시 그리기가 Writer 글을 보내도', async () => {
+    // 왜: 리드 2026-11-26 — Storyboard 다시 그리기 · 다른 기기는 Writer 글을 보낸다. 서버가 DB 의 고친 글을 먼저 써야 어디서 만들어도 같은 글이다.
+    db.shots[0]!.director_prompt = 'A woman waits on a rainy platform holding a red umbrella.'
+    await POST(request({}))
+    expect(mocks.stripPrompts[0]).toContain('A woman waits on a rainy platform holding a red umbrella.')
+    expect(mocks.reserved[0]!.inputSnapshot).toMatchObject({ prompt_source: 'director_prompt' })
+  })
+
+  it('Director 에서 고친 글이 없으면(null) 화면이 보낸 글 그대로 그린다', async () => {
+    // 왜: 정상 경로 고정 — 고친 적 없는 샷 · 캔버스 샷은 지금과 같다.
+    db.shots[0]!.director_prompt = null
+    await POST(request({ prompt: 'A woman waits on a rainy platform at night.' }))
+    expect(mocks.stripPrompts[0]).toContain('A woman waits on a rainy platform at night.')
+    expect(mocks.reserved[0]!.inputSnapshot).not.toHaveProperty('prompt_source')
+  })
+
+  it('Director 화면이 자기 글이라고 알린 요청은 DB 의 고친 글로 바꾸지 않고 보낸 글로 그린다', async () => {
+    // 왜: Director 화면은 막 고친 글(저장 전 0.5초 안)을 보낸다 — DB 는 아직 옛 글일 수 있다.
+    db.shots[0]!.director_prompt = 'An older edit that is still in the database.'
+    await POST(request({ prompt: 'The edit applied a moment ago.', promptSource: 'director' }))
+    expect(mocks.stripPrompts[0]).toContain('The edit applied a moment ago.')
+    expect(mocks.stripPrompts[0]).not.toContain('An older edit')
+    expect(mocks.reserved[0]!.inputSnapshot).not.toHaveProperty('prompt_source')
+  })
+
+  it('앞 샷을 Director 에서 고쳤으면 이어짐 줄도 앞 샷의 고친 글을 옮긴다', async () => {
+    // 왜: 이어짐 줄("앞 샷은 … 였다")이 옛 Writer 글을 옮기면 고친 앞 샷과 옷 · 소품이 어긋난다.
+    db.shots = [
+      { ...db.shots[0]!, shot_id: 'sh_01_02', sort_order: 1, scene_id: 'sc_01' },
+      { shot_id: 'sh_01_01', sort_order: 0, scene_id: 'sc_01', prompt: 'She buys a ticket.', director_prompt: 'She buys a ticket in a yellow raincoat.', action_description: null },
+    ]
+    await POST(request({ writerShotId: 'sh_01_02' }))
+    expect(mocks.stripPrompts[0]).toContain('the previous shot showed "She buys a ticket in a yellow raincoat."')
   })
 })

@@ -182,17 +182,18 @@ describe('연출 탭의 읽은 한 줄', () => {
   // 왜(리드 Q-b · D2): 물음 창을 닫은 뒤에도 줄을 보고 고칠 수 있게 연출 탭 편집기 아래에 둔다. [그대로]를 고른 줄은 영상에는 이미 들어가지만
   //   (리드 D2 2026-11-23 — 영상은 지금 연출 장을 읽은 줄을 쓴다) 끝 장 · 실사에는 아직 안 쓰였다 — 실사는 끝 장을 그 줄로 그린 뒤에만 줄을 싣는다.
   //   2026-11-23 문장 바꿈(리드 D2): 예전 '…아직 끝 장에 안 쓴 줄이면 그렇다고 알린다' — 그때 알림은 "아직 쓰지 않은 줄이에요(끝 장 · 영상)"였다.
-  //   m1126 W3(리드 2026-11-26 나눔): 실사 · 영상 지시문에 싣기(R1 · Q4)는 m-director 몫이라 그때까지 실사 · 영상 말을 뺀 중립 문장으로 둔다 —
-  //   m-director 가 R1 · Q4 를 넣을 때 이 문장과 기대 글을 dev 의 'Videos use this line. …'로 되돌린다.
-  it('연출 탭 편집기 아래에 지금 연출 장을 읽은 줄과 [고쳐서 끝 장 다시 그리기]가 보이고, 아직 끝 장에 안 쓴 줄이면 그렇다고 알린다', () => {
+  //   m1126 W3(리드 2026-11-26 나눔): 실사 · 영상 지시문에 싣기(R1 · Q4)는 m-director 몫이라 그때까지 실사 · 영상 말을 뺀 중립 문장으로 뒀다 —
+  //   m-director 가 R1 · Q4 를 넣으며(리드 지시) 이 문장과 기대 글을 dev 의 'Videos use this line. …'로 되돌렸다(dev 4538fffe 와 같은 이름).
+  //   (옛 이름: '…아직 끝 장에 안 쓴 줄이면 그렇다고 알린다')
+  it('연출 탭 편집기 아래에 지금 연출 장을 읽은 줄과 [고쳐서 끝 장 다시 그리기]가 보이고, 아직 끝 장에 안 쓴 줄이면 영상에는 들어가고 끝 장 · 실사는 다시 그려야 맞는다고 알린다', () => {
     const unused = render({ ...LINE, direction: 'https://media.test/r/direction.png' })
     expect(unused).toContain(LINE.en) // 시험은 영어 화면(기본 말)이다.
     expect(unused).toContain('Edit and redraw the end frame')
-    expect(unused).toContain('This line is not used for the end frame yet.')
-    expect(messagesKo['This line is not used for the end frame yet.']).toBe('아직 끝 장에 쓰지 않은 줄이에요.')
+    expect(unused).toContain('Videos use this line. To match, redraw the end frame with it, then the live-action images.')
+    expect(messagesKo['Videos use this line. To match, redraw the end frame with it, then the live-action images.']).toBe('영상에는 이 줄이 들어가요. 끝 장을 이 줄로 다시 그린 뒤 실사도 다시 그려야 맞아요.')
     const used = render({ ...LINE, direction: 'https://media.test/r/direction.png', endDrawn: 'https://media.test/r/end.png' })
     expect(used).toContain(LINE.en)
-    expect(used).not.toContain('This line is not used for the end frame yet.')
+    expect(used).not.toContain('Videos use this line.')
     // 줄이 없거나 낡았으면(옛 연출 장을 읽은 줄) 보이지 않는다.
     expect(render({ ...LINE, direction: 'https://media.test/r/old-direction.png' })).not.toContain(LINE.en)
     for (const rel of ['src/features/writer/storyboard-shot-dialog.tsx', 'src/features/writer/shot-detail-dialog.tsx']) {
@@ -297,10 +298,11 @@ describe('물음 창 [그대로]와 고친 줄', () => {
   })
 
   // 왜(리드 (A)): 고른 줄로 끝 장을 그린다 — 고르기 전에 물음 창에서 알린다.
-  //   m1126 W3(리드 2026-11-26 나눔): "[그대로]를 골라도 영상에는 이 줄이 들어가요"는 영상 지시문에 싣기(Q4, m-director)가 들어온 뒤의 말이라 그때 되돌린다.
-  it('물음 창은 줄을 고칠 수 있고 끝 장은 이 줄대로 그린다고 알린다', () => {
+  //   m1126 W3(리드 2026-11-26 나눔): "[그대로]를 골라도 영상에는 이 줄이 들어가요"는 영상 지시문에 싣기(Q4, m-director)가 들어온 뒤의 말이라
+  //   m-director 가 Q4 를 넣으며(리드 지시) dev 문장으로 되돌렸다. (옛 이름: '물음 창은 줄을 고칠 수 있고 끝 장은 이 줄대로 그린다고 알린다')
+  it('물음 창은 줄을 고칠 수 있고, 끝 장은 이 줄대로 그리며 [그대로]를 골라도 영상에는 이 줄이 들어간다고 알린다', () => {
     const confirm = read('src/features/writer/unsaved-arrows-confirm.tsx')
-    expect(confirm).toMatch(/t\('You can edit the line\. The end frame is drawn from it\.'\)/)
-    expect(messagesKo['You can edit the line. The end frame is drawn from it.']).toBe('줄을 고칠 수 있어요. 끝 장은 이 줄대로 그려요.')
+    expect(confirm).toMatch(/t\('You can edit the line\. The end frame is drawn from it, and videos use it even if you choose Keep as is\.'\)/)
+    expect(messagesKo['You can edit the line. The end frame is drawn from it, and videos use it even if you choose Keep as is.']).toBe('줄을 고칠 수 있어요. 끝 장은 이 줄대로 그리고, [그대로]를 골라도 영상에는 이 줄이 들어가요.')
   })
 })

@@ -3153,8 +3153,8 @@ export const KO: Record<string, string> = {
   'Reading the arrows…': '화살표를 읽는 중…',
   'The AI could not read the arrows. Write the motion yourself.': 'AI 가 화살표를 읽지 못했어요. 움직임을 직접 적어 주세요.',
   // 실사 · 영상 지시문에 싣기(R1 · Q4)는 m-director 몫이라 그 전까지 중립 문장(리드 2026-11-26) — 들어오면 dev 문장으로 바꾼다.
-  'You can edit the line. The end frame is drawn from it.': '줄을 고칠 수 있어요. 끝 장은 이 줄대로 그려요.',
-  'This line is not used for the end frame yet.': '아직 끝 장에 쓰지 않은 줄이에요.',
+  'You can edit the line. The end frame is drawn from it, and videos use it even if you choose Keep as is.': '줄을 고칠 수 있어요. 끝 장은 이 줄대로 그리고, [그대로]를 골라도 영상에는 이 줄이 들어가요.',
+  'Videos use this line. To match, redraw the end frame with it, then the live-action images.': '영상에는 이 줄이 들어가요. 끝 장을 이 줄로 다시 그린 뒤 실사도 다시 그려야 맞아요.',
   'Kept your line. The end frame stays as it is.': '고친 줄을 남겼어요. 끝 장은 그대로예요.',
   'Could not translate your line, so it was not kept. The previous line stays. Try again.': '고친 줄을 영어로 옮기지 못해 남기지 못했어요. 전에 있던 줄은 그대로예요. 다시 시도해 주세요.',
   'The directing frame changed meanwhile, so your line was not kept. Open the directing tab again.': '그사이 연출 장이 바뀌어 고친 줄을 남기지 않았어요. 연출 탭을 다시 열어 주세요.',

@@ -617,7 +617,7 @@ export function DirectingArrowEditor({
           <span className="text-caption font-semibold text-subtle-foreground">{directionRead.source === 'user' ? t('Edited movement') : t('Motion the AI read')}</span>
           <p className="break-keep text-caption text-foreground">{askLineText(directionRead, locale)}</p>
           {readUnused ? (
-            <p className="break-keep text-caption text-muted-foreground">{t('This line is not used for the end frame yet.')}</p>
+            <p className="break-keep text-caption text-muted-foreground">{t('Videos use this line. To match, redraw the end frame with it, then the live-action images.')}</p>
           ) : null}
           {onRedrawEnd ? (
             <Button size="sm" variant="outline" className="self-start" disabled={busy} onClick={onRedrawEnd} data-testid="directing-read-line-redraw">

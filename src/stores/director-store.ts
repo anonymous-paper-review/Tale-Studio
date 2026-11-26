@@ -4307,6 +4307,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
                 projectId,
                 writerShotId,
                 prompt: basePrompt,
+                // 지금 보이는 글(막 고친 글 포함)이라고 알린다 — 서버가 DB 의 옛 고친 글(director_prompt)로 바꾸지 않게(리드 2026-11-26).
+                promptSource: 'director',
                 ...(changeNote ? { changeNote } : {}),
                 referenceImageUrls,
                 characterRefCount: assetRefs.characterRefCount,
@@ -4959,6 +4961,8 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
             ? {
                 shotId: shotNode.id,
                 writerShotId: shotNode.data.writerShotId,
+                // 지금 보이는 글(막 고친 글 포함)이라고 알린다 — 서버가 DB 의 옛 고친 글(director_prompt)로 바꾸지 않게(리드 2026-11-26).
+                promptSource: 'director',
               }
             : {
                 standaloneVideoKey: videoNode.data.standaloneVideoKey,

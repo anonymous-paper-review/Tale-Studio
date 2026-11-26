@@ -313,7 +313,7 @@ export function EndRedrawAsk({
             />
           )}
           <p className="break-keep text-caption text-muted-foreground">
-            {unreadable ? t('The AI could not read the arrows. Write the motion yourself.') : t('You can edit the line. The end frame is drawn from it.')}
+            {unreadable ? t('The AI could not read the arrows. Write the motion yourself.') : t('You can edit the line. The end frame is drawn from it, and videos use it even if you choose Keep as is.')}
           </p>
         </div>
         <DialogFooter>

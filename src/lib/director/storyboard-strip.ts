@@ -4,6 +4,7 @@
 //
 // server-only (sharp). 크롭은 기존 cropRoughGridFrames('strip1') 재사용 — 합성 지오메트리와
 // 크롭 지오메트리가 같은 STRIP_COLS/GRID_ROWS 비례에서 나오므로 왕복이 정합.
+import { gridMovementLines, stripMovementLines } from '@/lib/director/direction-line-prompt'
 import { readFile } from 'node:fs/promises'
 import path from 'node:path'
 import sharp from 'sharp'
@@ -207,6 +208,8 @@ export function buildRealGridPrompt(
     /** #viz-gap 실험 arm: 컬럼(=샷) 순서대로의 시네 라인. 연필이 못 옮기는 조명/초점/DoF/렌즈/색만.
      *  생략(기본)이면 현행 프롬프트 그대로 — 라이브 라우트 무변경. renderRepaintCineLine 산출물. */
     cineLines?: (string | null | undefined)[]
+    /** 콘티에서 고친 화살표를 읽고 그 줄로 끝 장을 다시 그린 칸의 줄(오너 R1, freshDirectionLine) — 칸(=샷) 순서대로, 줄 있는 칸만 싣는다. */
+    directionLines?: (string | null | undefined)[]
     /** #real-grid-identity(2026-08-12, 실측 a5cb2cae sh_04_18): 레퍼런스 순서와 칸별 배정.
      *  옛 프롬프트의 "corresponding character(s)"는 대응 관계가 어디에도 정의돼 있지 않아
      *  모델이 자유 추측했고, 소수 인물이 다수 인물에 흡수되는 바꿔치기가 실측됐다.
@@ -304,6 +307,7 @@ export function buildRealGridPrompt(
         ]
       : []),
     ...renderGridCineBlock(cineLines),
+    ...gridMovementLines(opts.directionLines),
     ...(hasStyleRef && opts.styleAvoid?.trim() ? [`- ${opts.styleAvoid.trim()}`] : []),
     `- No text anywhere except row 2's arrow labels.`,
   ].join('\n')
@@ -434,6 +438,8 @@ export function buildRealStripPrompt(
     hasStyleRef: boolean
     /** #viz-gap 실험 arm: 이 샷의 시네 라인(비운반 채널만). 생략 시 현행 프롬프트 그대로. */
     cineLine?: string | null
+    /** 콘티에서 고친 화살표를 읽고 그 줄로 끝 장을 다시 그린 샷의 줄(오너 R1, freshDirectionLine). 없으면 지시문 그대로. */
+    directionLine?: string | null
     /** #F-006: 씬 시간대(scenes.time_of_day). 샷 산문의 시간대 단어는 확률적(실측 4/7 샷에만
      *  존재)이라 씬 진실로 고정한다. 그리드 쪽 주석 참조 — 앵커 절과의 권위 관계 동일. */
     sceneLighting?: string | null
@@ -517,6 +523,7 @@ export function buildRealStripPrompt(
         ]
       : []),
     `- Shot description: ${shotPrompt}`,
+    ...stripMovementLines(opts.directionLine),
     ...(cineLine && cineLine.trim()
       ? [
           `- Cinematography — realize these lighting, focus, lens and color intents the pencil cannot show; apply them WITHOUT changing framing, composition or poses: ${cineLine.trim()}`,

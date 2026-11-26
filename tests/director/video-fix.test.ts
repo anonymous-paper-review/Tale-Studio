@@ -129,3 +129,31 @@ describe('영상 고치기 = 움직임 글 지키기', () => {
     expect(prepared instanceof Response && prepared.status).toBe(400)
   })
 })
+
+describe('Director 에서 고친 글(director_prompt)을 영상 서버가 먼저 쓴다', () => {
+  it('샷에 Director 에서 고친 글이 있으면 영상 서버는 화면이 보낸 글 대신 그 글로 만든다 — 그 글은 Writer 글과 달라 작가의 움직임 글은 지금 규칙대로 싣지 않는다', async () => {
+    // 왜: 리드 2026-11-26 — Storyboard · 다른 기기 · 묶음 이어가기는 Writer 글을 보낸다. 서버가 DB 의 고친 글을 먼저 써야 다음 영상도 같은 글이다.
+    //   움직임 글을 고친 글 위에도 실을지는 오너 결정 대기(끝 보고 결정 2) — 지금은 화면에서 고친 글로 만들 때와 같다.
+    seed({ director_prompt: 'Medium shot of Mina standing by a rusted locker, holding a flashlight.' })
+    const text = await fullPrompt()
+    expect(text).toContain('Medium shot of Mina standing by a rusted locker, holding a flashlight.')
+    expect(text).not.toContain(MOTION)
+  })
+
+  it('Director 화면이 자기 글이라고 알린 요청은 DB 의 고친 글로 바꾸지 않고 보낸 글로 만든다', async () => {
+    // 왜: Director 화면은 막 고친 글(저장 전 0.5초 안)을 보낸다 — DB 는 아직 옛 글일 수 있다.
+    seed({ director_prompt: 'An older edit that is still in the database.' })
+    const text = await fullPrompt({ prompt: 'Mina grips the locker handle.', promptSource: 'director' })
+    expect(text).toContain('Mina grips the locker handle.')
+    expect(text).not.toContain('An older edit')
+  })
+
+  it('Director 에서 고친 글이 없으면(null) 화면이 보낸 글 그대로 만들고 움직임 글도 지금처럼 싣는다', async () => {
+    // 왜: 정상 경로 고정 — 고친 적 없는 샷의 영상 지시문은 글자까지 지금과 같다.
+    seed({ director_prompt: null })
+    const withNull = await fullPrompt()
+    seed()
+    expect(withNull).toBe(await fullPrompt())
+    expect(withNull).toContain(`${MOTION} ${PROMPT}`)
+  })
+})
