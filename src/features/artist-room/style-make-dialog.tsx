@@ -5,6 +5,9 @@
 //   [만들기] = 확정 산문 초안을 이어 가며 인물 · 배경 디자인 뒤에 멈추게 한다(artistGate). 그림은 Take 가 들지 않는다(take-cost: Take 는 영상 · 음악만).
 //   "내 그림체 올리기" 카드는 2026-10-27 오너 지시로 내렸다("추후 정비해서 다시 올릴거야") — 이미 올린 그림체가 있는 프로젝트는
 //   그 그림체 카드와 지우기(✕)만 보인다. 올리기 · 분석 서버 경로와 Writer 채팅의 그림체 첨부는 그대로다.
+//   mode 'images'(m1126 O1 · O6 — Artist 새 흐름): 디자인 · 씬 · 샷은 산문 확정 뒤에 이미 끝났다. [만들기]는 고른 그림체를 서버가
+//   저장하게 하고(바꿨을 때만 — 산문을 확정한 뒤라 화면에서 직접 저장하지 못한다) 인물 · 배경 · 소품 그림만 그린다
+//   (artist-store makeImages → /api/artist/make-images). Writer 실행은 건드리지 않는다. 올린 내 그림체는 그대로 쓴다(✕ 지우기 없음).
 import { useEffect, useState } from 'react'
 import { Check, ImageIcon, Loader2, Lock, X } from 'lucide-react'
 import { toast } from 'sonner'
@@ -20,11 +23,23 @@ import { breakdownRows, rowsToDraw } from '@/lib/artist/breakdown'
 import { useAiBusyHold } from '@/hooks/use-ai-busy-hold'
 import { seriesMakeCounts } from '@/features/series/artist-series'
 import { useSeriesInfo } from '@/features/series/use-series-info'
+import { useArtistStore } from '@/stores/artist-store'
 import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useProducerStore, type StyleAnchor } from '@/stores/producer-store'
 import { useProjectStore } from '@/stores/project-store'
 
-export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boolean; onOpenChange: (open: boolean) => void; onStarted: () => void }) {
+export function StyleMakeDialog({
+  open,
+  onOpenChange,
+  onStarted,
+  mode = 'pipeline',
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  onStarted: () => void
+  /** pipeline = 산문 초안에서 디자인 · 그림까지(예전 흐름), images = 그림만(m1126 O1 새 흐름). */
+  mode?: 'pipeline' | 'images'
+}) {
   const t = useT()
   // 스타일 이름은 화면 언어로(2026-10-21) — DB 이름은 한국어 하나뿐이다.
   const locale = useLocale()
@@ -91,6 +106,15 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
     if (!canMake) return
     setMaking(true)
     try {
+      if (mode === 'images') {
+        // 새 흐름: 그림체는 서버가 그림과 함께 저장한다(바꿨을 때만, 그림 지시의 그림체 값까지) — 저장되면 화면의 그림체도 그것으로.
+        const result = await useArtistStore.getState().makeImages(locked || custom ? null : picked)
+        if (result.style) useProducerStore.setState({ styleAnchorKey: result.style, customStyleAnchor: null })
+        if (!result.ok) return
+        onOpenChange(false)
+        onStarted()
+        return
+      }
       const producer = useProducerStore.getState()
       if (!locked && !producer.customStyleAnchor && picked && picked !== producer.styleAnchorKey) {
         if (!(await producer.setStyleAnchor(picked))) {
@@ -127,7 +151,7 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
                 <Lock className="size-4 shrink-0 text-muted-foreground" aria-hidden />
                 <span>
                   {t('The art style is fixed to the picture you uploaded.')}{' '}
-                  <span className="text-muted-foreground">{t('To pick another style, remove my art style with ✕.')}</span>
+                  {mode === 'images' ? null : <span className="text-muted-foreground">{t('To pick another style, remove my art style with ✕.')}</span>}
                 </span>
               </p>
             ) : null}
@@ -146,6 +170,7 @@ export function StyleMakeDialog({ open, onOpenChange, onStarted }: { open: boole
               removing={removing}
               busy={making}
               onRemoveCustom={() => void removeCustom()}
+              removable={mode !== 'images'}
               prevStyleId={prevStyleId}
               prevIsCustom={prevIsCustom}
             />
@@ -189,7 +214,7 @@ const TILE_ART = 'relative flex aspect-[41/28] items-center justify-center overf
  *   이미 올린 내 그림체가 있으면 그 카드(보기 · ✕)가 맨 앞이고, 그 그림체를 쓰는 동안 다른 스타일은 고를 수 없다(✕로 내려야 고른다).
  *   currentKey = 재생성 창의 지금 작품 스타일("지금" 표시, 직접 올린 그림체면 'custom').
  */
-export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSetting, removing, busy, onRemoveCustom, prevStyleId, prevIsCustom, currentKey = null }: {
+export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSetting, removing, busy, onRemoveCustom, removable = true, prevStyleId, prevIsCustom, currentKey = null }: {
   anchors: readonly StyleAnchor[]
   picked: string | null
   onPick: (key: string) => void
@@ -199,6 +224,8 @@ export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSettin
   removing: boolean
   busy: boolean
   onRemoveCustom: () => void
+  /** 올린 내 그림체 ✕(지우기)를 보이나 — 산문을 확정한 뒤의 [이미지 만들기] 창은 지우지 못한다(m1126 O1). */
+  removable?: boolean
   prevStyleId: string | null
   prevIsCustom: boolean
   currentKey?: string | null
@@ -213,6 +240,7 @@ export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSettin
         <div className="flex min-w-0 flex-col gap-2" data-testid="artist-style-custom">
           <span className={cn(TILE_ART, 'outline-stage')}>
             {styleSetting ? <Loader2 className="size-5 animate-spin" aria-hidden /> : <ThumbImage src={custom.url} alt={custom.label} className="size-full object-cover" />}
+            {removable ? (
             <Button
               type="button"
               size="icon"
@@ -225,6 +253,7 @@ export function StyleGrid({ anchors, picked, onPick, custom, locked, styleSettin
             >
               {removing ? <Loader2 className="size-3 animate-spin" aria-hidden /> : <X className="size-3" aria-hidden />}
             </Button>
+            ) : null}
           </span>
           <span className="flex min-w-0 flex-col gap-0.5">
             <span className="flex min-w-0 items-center gap-1.5">

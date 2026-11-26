@@ -1125,6 +1125,10 @@ export const KO: Record<string, string> = {
   'Background description (what changes from the default)': '배경 설명 (기본 모습과 달라지는 점)',
   'E.g. the same market, but burned out and abandoned under snow': '예: 같은 시장인데 불타 버려진 채 눈에 덮인 모습',
   'Saving creates the tab and generates its image right away, using the default background as the reference.': '저장하면 탭이 생기고 기본 배경을 참조해 이미지를 바로 만들어요.',
+  // Artist 새 흐름(m1126 O1 · O6) — [만들기] 전.
+  'You can change the style when you make the images.': '그림체는 이미지를 만들 때 바꿀 수 있어요.',
+  'The images have already been started. To change the style, use Regenerate everything.': '이미 그림을 그리기 시작했어요. 그림체를 바꾸려면 [재생성하기]를 써 주세요.',
+  'No images yet. Press Make images to draw the characters, backgrounds and props in this style.': '아직 그림이 없어요. [이미지 만들기]를 누르면 이 그림체로 인물 · 배경 · 소품 그림을 그려요.',
   // 소품 모습 추가(m1126 A3) — 배경 모습 창과 같은 결.
   'E.g. Broken, Rusty, Opened': '예: 부러진, 녹슨, 열린',
   'Prop description (what changes from the default)': '소품 설명 (기본 모습과 달라지는 점)',

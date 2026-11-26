@@ -26,7 +26,16 @@ const NOTE_TEXT = {
   single: 'Regenerating keeps the earlier version here',
 } as const
 
-export function StyleVersionBar({ completed, drawing }: { completed: boolean; drawing: boolean }) {
+export function StyleVersionBar({
+  completed,
+  drawing,
+  beforeImages = false,
+}: {
+  completed: boolean
+  drawing: boolean
+  /** Artist 새 흐름(m1126 O1)의 [만들기] 전 — 그린 그림이 없어 불러오기 · 재생성하기를 숨기고, 그림체는 [만들기] 창에서 바꾼다고 알린다. */
+  beforeImages?: boolean
+}) {
   const t = useT()
   const locale = useLocale()
   const versions = useArtistVersionStore((s) => s.versions)
@@ -59,6 +68,11 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
           <b className="truncate text-label font-semibold text-foreground">{label}</b>
           <span className="text-caption text-subtle-foreground" data-testid="artist-style-version-n">{t('Work style · v{n}', { n: header.n })}</span>
         </span>
+        {beforeImages ? (
+          <span className="ml-auto text-caption text-muted-foreground" data-testid="artist-style-before-images">
+            {t('You can change the style when you make the images.')}
+          </span>
+        ) : (
         <span className="ml-auto flex items-center gap-2">
           <Button
             variant="ghost"
@@ -80,8 +94,9 @@ export function StyleVersionBar({ completed, drawing }: { completed: boolean; dr
             <RefreshCw className="size-3.5" />{t('Regenerate everything')}
           </Button>
         </span>
+        )}
       </div>
-      {note ? <p className="text-caption text-muted-foreground" role="status" data-testid="artist-style-note">{note}</p> : null}
+      {note && !beforeImages ? <p className="text-caption text-muted-foreground" role="status" data-testid="artist-style-note">{note}</p> : null}
       {header.note === 'stopped' ? <RegenStoppedActions /> : null}
       {header.note === 'loadFailed' ? <LoadFailedActions /> : null}
     </div>
