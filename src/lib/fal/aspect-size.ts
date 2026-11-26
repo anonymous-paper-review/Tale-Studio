@@ -28,6 +28,27 @@ export function imageSizeForAspect(ar?: string): string {
 /** Nano Banana 2 가 받는 비율 — fal 스키마(2026-11-26 OpenAPI, t2i · edit 같음). 'auto' 는 뺐다. */
 export const NANO_BANANA_2_RATIOS = ['21:9', '16:9', '3:2', '4:3', '5:4', '1:1', '4:5', '3:4', '2:3', '9:16', '4:1', '1:4', '8:1', '1:8'] as const
 
+/** Nano Banana 1 · 2 편집이 모두 받는 비율(1세대에는 4:1 · 1:4 · 8:1 · 1:8 이 없다). */
+const NANO_BANANA_COMMON_RATIOS = ['21:9', '16:9', '3:2', '4:3', '5:4', '1:1', '4:5', '3:4', '2:3', '9:16'] as const
+
+/** 'W:H'(앞에 horizontal_ 등이 붙어도)에 가장 가까운 Nano Banana 비율 — 호출자가 화면비를 정한 편집(캔버스 샷)이 쓴다(검토 rev-director 5번). 못 읽으면 그대로. */
+export function nearestNanoBananaRatio(ratio: string): string {
+  const match = ratio.replace(/^(horizontal_|vertical_|cinema_)/, '').match(/^(\d+(?:\.\d+)?):(\d+(?:\.\d+)?)$/)
+  if (!match) return ratio
+  const want = Math.log(Number(match[1]) / Number(match[2]))
+  let best: string = NANO_BANANA_COMMON_RATIOS[0]
+  let gap = Infinity
+  for (const candidate of NANO_BANANA_COMMON_RATIOS) {
+    const [w, h] = candidate.split(':').map(Number)
+    const next = Math.abs(Math.log(w / h) - want)
+    if (next < gap) {
+      best = candidate
+      gap = next
+    }
+  }
+  return best
+}
+
 /**
  * 가로 × 세로에 가장 가까운 Nano Banana 2 비율과 어긋난 정도(로그 비, 0 = 같음 · 0.063 ≈ 6.3%).
  *   Nano Banana 2 는 정확한 크기를 받지 않아 시트(러프 세 장을 한 장에서 다시 칠함)는 이 비율로 그린 뒤 시트 크기로 맞춰 자른다(리드 Q2 길 a, 2026-11-26).
