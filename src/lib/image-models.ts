@@ -30,6 +30,8 @@
 //   추가한다 — 모르는 모델을 나열하면 422 로 죽는 가짜 선택지가 된다(tests/image-models.test.ts 가 잠근다).
 // ============================================================================
 
+import { nearestNanoBanana2Ratio } from '@/lib/fal/aspect-size'
+
 export type ImageModelKey =
   | 'gpt-image-2'
   | 'nano-banana-2'
@@ -177,16 +179,26 @@ export function imageModelSupportsReference(key: ImageModelKey): boolean {
 // 자격 = image_size 를 실제로 존중 + edit(레퍼런스) 지원. gpt-image-2 는 canvas 표기가 legacy
 // aspect_ratio 지만 image_size 를 수락하는 검증된 시트 경로다(완료 239건 실측).
 // h3-image(2026-11-26 D5): 개발 DB 실측 2/2 — 요청한 시트 캔버스 그대로 돌려줌(1536×896 · 1024×1536, 계약 위반 0).
+// nano-banana-2(2026-11-26 리드 Q2 길 a): 정확한 크기는 못 받지만 시트 크기에 가장 가까운 비율로 그리게 하고(fal.ts), finalize 가 칸 모양으로
+//   맞춰 자른다(sheet-fit.ts). 실측 2/2 칸 자리 맞음(16:9 프로젝트 768×1376 · 9:16 프로젝트 1376×768). 가까운 비율이 없는 시트(정사각 640×1792 →
+//   1:4 도 43% 어긋남)와 시트 크기를 모를 때는 쓰지 않는다. 1세대 nano-banana 는 그대로 시트에 쓰지 않는다.
 export const DEFAULT_SHEET_IMAGE_MODEL: ImageModelKey = 'gpt-image-2'
 const SHEET_CAPABLE: ReadonlySet<ImageModelKey> = new Set(['gpt-image-2', 'seedream-4', 'h3-image'])
+/** 시트를 비율로만 그리는 모델 — 시트 크기에 가장 가까운 비율이 이만큼(로그 비 8%) 안일 때만 시트에 쓴다. */
+const SHEET_BY_RATIO: ReadonlySet<ImageModelKey> = new Set(['nano-banana-2'])
+export const SHEET_RATIO_MAX_GAP = 0.08
 
-export function imageModelSupportsSheetCanvas(key: ImageModelKey): boolean {
-  return SHEET_CAPABLE.has(key)
+/** 이 모델로 시트(sheetCanvas 'WxH')를 그릴 수 있는가 — 비율로만 그리는 모델은 시트 크기를 알 때만 판정한다. */
+export function imageModelSupportsSheetCanvas(key: ImageModelKey, sheetCanvas?: string | null): boolean {
+  if (SHEET_CAPABLE.has(key)) return true
+  if (!SHEET_BY_RATIO.has(key) || !sheetCanvas) return false
+  const size = /^(\d+)x(\d+)$/.exec(sheetCanvas.trim())
+  return !!size && nearestNanoBanana2Ratio(Number(size[1]), Number(size[2])).gap <= SHEET_RATIO_MAX_GAP
 }
 
-/** 시트 계약 경로용 모델 강제 — 부적합 선택(기본 모델 포함)은 검증된 시트 모델로 대체한다. */
-export function resolveSheetImageModel(requested: ImageModelKey | null | undefined): ImageModelKey {
-  return requested && imageModelSupportsSheetCanvas(requested) ? requested : DEFAULT_SHEET_IMAGE_MODEL
+/** 시트 계약 경로용 모델 강제 — 부적합 선택(기본 모델 포함)은 검증된 시트 모델로 대체한다. sheetCanvas = 이번 시트 크기('WxH'). */
+export function resolveSheetImageModel(requested: ImageModelKey | null | undefined, sheetCanvas?: string | null): ImageModelKey {
+  return requested && imageModelSupportsSheetCanvas(requested, sheetCanvas) ? requested : DEFAULT_SHEET_IMAGE_MODEL
 }
 
 /**

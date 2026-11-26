@@ -11,7 +11,7 @@ import { pickFalKey, falKeyById, FalUnknownKeyError } from '@/lib/fal/keys';
 // 의존도, 요청 본문도 늘지 않는다. 표식은 moderatedSubmitInput() 만 붙일 수 있다.
 import type { ModerationProof } from '@/lib/moderation/creem';
 import { fitPromptToLimit } from '@/lib/fal/prompt-limit';
-import { imageSizeForAspect } from '@/lib/fal/aspect-size';
+import { imageSizeForAspect, nearestNanoBanana2Ratio } from '@/lib/fal/aspect-size';
 
 let imageCallCount = 0;
 let videoCallCount = 0;
@@ -250,10 +250,17 @@ export function buildFalImageInput(opts: FalImageOptions, model: string): Record
     return grokInput;
   }
   // nano-banana(#nano-banana): T2I=prompt+aspect_ratio / edit=prompt+image_urls — 그 외 키 전송 금지.
+  //   시트(정한 가로 × 세로)를 Nano Banana 2 로 다시 칠할 때만(리드 Q2 길 a, 2026-11-26): 크기 칸이 없어 가장 가까운 비율로 그리게 하고,
+  //   받은 시트는 finalize 가 시트 크기로 맞춰 자른다. 정한 크기가 없는 편집(에셋 · Artist)은 지금처럼 비율 없이 첫 그림을 따른다.
   if (isNanoBananaModel(model)) {
     const bananaInput: Record<string, unknown> = { prompt: opts.prompt };
+    const exact = model.startsWith('fal-ai/nano-banana-2') ? normalizeImageSize(opts.image_size) : undefined;
+    const sheetRatio = exact && typeof exact === 'object' ? nearestNanoBanana2Ratio(exact.width, exact.height).ratio : null;
     if (isImageEditModel(model)) {
       bananaInput.image_urls = opts.reference_image_urls ?? [];
+      if (sheetRatio) bananaInput.aspect_ratio = sheetRatio;
+    } else if (sheetRatio) {
+      bananaInput.aspect_ratio = sheetRatio;
     } else if (opts.aspect_ratio) {
       bananaInput.aspect_ratio = opts.aspect_ratio.replace(/^(horizontal_|vertical_|cinema_)/, '');
     }

@@ -63,7 +63,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   const hasImage = !!frames.start
   const frameStyle = mediaFrameStyle(projectFormat, layout === 'popup' ? 360 : 200)
   // 실제로 도는 모델을 골라진 칸으로(리드 검토 c ④) — Writer 샷에 시트를 못 그리는 옛 모델이 저장돼 있으면 GPT Image 2.
-  const model = detailImageModel(data)
+  const model = detailImageModel(data, projectFormat)
 
   const toggle = (field: 'characterAssetIds' | 'worldAssetIds', id: string) => {
     const list = data[field]
@@ -131,7 +131,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
       </Field>
       <Field label={t('Image model')}>
         <div className="grid grid-cols-2 gap-2">
-          {detailImageModels(data).map((key) => {
+          {detailImageModels(data, projectFormat).map((key) => {
             const active = model === key
             return (
               <button key={key} type="button" aria-pressed={active} onClick={() => updateNodeData<'shot'>(nodeId, { imageModel: key })}
