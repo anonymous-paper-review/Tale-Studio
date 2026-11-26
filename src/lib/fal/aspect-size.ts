@@ -24,3 +24,25 @@ export function imageSizeForAspect(ar?: string): string {
   }
   return 'auto'
 }
+
+/** Nano Banana 2 가 받는 비율 — fal 스키마(2026-11-26 OpenAPI, t2i · edit 같음). 'auto' 는 뺐다. */
+export const NANO_BANANA_2_RATIOS = ['21:9', '16:9', '3:2', '4:3', '5:4', '1:1', '4:5', '3:4', '2:3', '9:16', '4:1', '1:4', '8:1', '1:8'] as const
+
+/**
+ * 가로 × 세로에 가장 가까운 Nano Banana 2 비율과 어긋난 정도(로그 비, 0 = 같음 · 0.063 ≈ 6.3%).
+ *   Nano Banana 2 는 정확한 크기를 받지 않아 시트(러프 세 장을 한 장에서 다시 칠함)는 이 비율로 그린 뒤 시트 크기로 맞춰 자른다(리드 Q2 길 a, 2026-11-26).
+ */
+export function nearestNanoBanana2Ratio(width: number, height: number): { ratio: string; gap: number } {
+  const want = Math.log(width / height)
+  let best: string = NANO_BANANA_2_RATIOS[0]
+  let gap = Infinity
+  for (const ratio of NANO_BANANA_2_RATIOS) {
+    const [w, h] = ratio.split(':').map(Number)
+    const next = Math.abs(Math.log(w / h) - want)
+    if (next < gap) {
+      best = ratio
+      gap = next
+    }
+  }
+  return { ratio: best, gap }
+}

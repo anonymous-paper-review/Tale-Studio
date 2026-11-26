@@ -283,7 +283,8 @@ describe('Director 샷 상세 화면', () => {
 
   it('Writer 샷에 예전 모델이 저장돼 있으면 이미지 모델 칸은 실제로 도는 GPT Image 2 를 고른 것으로 보인다', () => {
     // 왜: 리드 검토 c ④ — 아무 칸도 안 골라져 보이면 무엇으로 도는지 모른다.
-    director.getState().updateNodeData<'shot'>(shotId, { imageModel: 'nano-banana-2' })
+    //   예전 모델 = 시트를 못 그리는 1세대 Nano Banana(2026-11-26 리드 Q2 로 Nano Banana 2 는 이 프로젝트 시트에 돈다 — 기대값의 예시만 바꿈).
+    director.getState().updateNodeData<'shot'>(shotId, { imageModel: 'nano-banana' })
     expect(render('popup')).toMatch(/aria-pressed="true"[^>]*>GPT Image 2</)
   })
 
@@ -317,14 +318,16 @@ describe('Director 샷 상세 화면', () => {
     expect(out).not.toMatch(/>Edit<|>Settings</)
   })
 
-  it('Writer 샷의 이미지 탭 모델 칸에는 실제로 도는 GPT Image 2 · Seedream 4 · H3 Image 만 보인다', () => {
-    // 왜: 오너 답 5번 "모델 칸에는 실제로 도는 것만" — 나머지 넷은 말없이 GPT Image 2 로 바뀌었다.
-    //   오너 2026-11-26 D5 "H3image … 까지 늘려줘" — H3 Image 는 시트를 정한 크기 그대로 그려(개발 DB 실측 2/2) Writer 샷에서도 돈다.
+  it('Writer 샷의 이미지 탭 모델 칸에는 실제로 도는 GPT Image 2 · Nano Banana 2 · Seedream 4 · H3 Image 만 보인다', () => {
+    // 왜: 오너 답 5번 "모델 칸에는 실제로 도는 것만" — 나머지 셋은 말없이 GPT Image 2 로 바뀌었다.
+    //   오너 2026-11-26 D5 "H3image, 나노바나나, GPT 이미지 2.0까지 늘려줘" — H3 Image 는 시트를 정한 크기 그대로 그리고(개발 DB 실측 2/2),
+    //   Nano Banana 2 는 시트 크기에 가까운 비율로 그린 뒤 맞춰 자른다(리드 Q2 길 a, 이 세로 9:16 프로젝트 시트에 맞음).
     const out = render('popup')
     expect(out).toContain('GPT Image 2')
+    expect(out).toContain('Nano Banana 2')
     expect(out).toContain('Seedream 4')
     expect(out).toContain('H3 Image')
-    for (const hidden of ['Nano Banana', 'FLUX.2 Klein', 'Grok Imagine']) expect(out, hidden).not.toContain(hidden)
+    for (const hidden of ['>Nano Banana<', 'FLUX.2 Klein', 'Grok Imagine']) expect(out, hidden).not.toContain(hidden)
   })
 
   it('이미지 탭에서 참고 이미지를 올리면 지금처럼 사용 권리 확인을 먼저 받고, 다시 만들기는 지금 단추(만드는 동안 잠김 · 바꾸기 전 확인)를 쓴다', () => {
@@ -334,11 +337,12 @@ describe('Director 샷 상세 화면', () => {
     expect(tab).toMatch(/<StoryboardImageButton nodeId=\{nodeId\} data=\{data\}/)
   })
 
-  it('이미지 탭의 다시 만들기 단추는 "시작·끝 이미지 다시 만들기 · Takes 0" 하나이고 바꾸고 싶은 점을 이번 생성에 실어 보낸다', () => {
-    // 왜: D6 · 오너 답 5번 — 시작 · 끝 함께 다시 만든다. 바꾸고 싶은 점은 이번 생성에만 붙는다(혼자 정한 것).
+  it('이미지 탭의 다시 만들기 단추는 "시작·끝 이미지 다시 만들기 · Takes 0" 하나이고, 바꾸고 싶은 점을 적으면 그 자리에 [Lumi 에게 고쳐 달라고 하기]가 선다', () => {
+    // 왜: D6 · 오너 답 5번 — 시작 · 끝 함께 다시 만든다. 바꾸고 싶은 점은 이제 바로 다시 그리지 않고 채팅(Lumi)으로 간다
+    //   (오너 2026-11-26 D6 "이미지 영상 등 모든 작업은 채팅창에 있는 기능 활용" — 길은 tests/director/fix-via-chat.test.ts).
     expect(render('popup')).toContain('Remake start and end images · Takes 0')
-    const button = readFileSync('src/features/director/storyboard-image-button.tsx', 'utf8')
-    expect(button).toMatch(/changeNote\.trim\(\) \? generateStoryboardImage\(nodeId, \{ changeNote \}\) : generateStoryboardImage\(nodeId\)/)
+    const tab = readFileSync('src/features/director/shot-detail/shot-image-tab.tsx', 'utf8')
+    expect(tab).toMatch(/change\.trim\(\) \? <AskLumiButton shotNodeId=\{nodeId\} kind="image"/)
   })
 
   it('영상 탭은 그 샷의 Take 를 새것부터 카드로 쌓고, 고른 ★ 가 없으면 가장 최근 완성 Take 에 "★ 최종 (자동)"을 보인다', () => {

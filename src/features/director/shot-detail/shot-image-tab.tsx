@@ -26,6 +26,7 @@ import { aspectRatioFromFormat } from '@/types/project'
 import { newDirectorId, type ShotNodeData } from '@/types/director'
 import { StoryboardImageButton } from '@/features/director/storyboard-image-button'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
+import { AskLumiButton } from './ask-lumi-button'
 import { LockedFrame } from './locked-frame'
 
 // 버전 줄 넘기기 단추(‹ ›) — 시안에 없어(시안 없음) 칩과 같은 높이(24) · 테두리의 동그란 단추로 둔다. 꺼지면 40%(디자이너 R).
@@ -83,7 +84,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
   const hasImage = !!frames.start
   const frameStyle = mediaFrameStyle(projectFormat, layout === 'popup' ? 360 : 200)
   // 실제로 도는 모델을 골라진 칸으로(리드 검토 c ④) — Writer 샷에 시트를 못 그리는 옛 모델이 저장돼 있으면 GPT Image 2.
-  const model = detailImageModel(data)
+  const model = detailImageModel(data, projectFormat)
 
   const toggle = (field: 'characterAssetIds' | 'worldAssetIds', id: string) => {
     const list = data[field]
@@ -163,7 +164,7 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
       </Field>
       <Field label={t('Image model')}>
         <div className="grid grid-cols-2 gap-2">
-          {detailImageModels(data).map((key) => {
+          {detailImageModels(data, projectFormat).map((key) => {
             const active = model === key
             return (
               <button key={key} type="button" aria-pressed={active} onClick={() => updateNodeData<'shot'>(nodeId, { imageModel: key })}
@@ -207,7 +208,9 @@ export function ShotImageTab({ nodeId, data, layout, makeVideo }: {
       </div>
       {generationError ? <p className="rounded-md border border-destructive/40 bg-destructive/10 px-3 py-2 text-caption text-destructive">{generationError}</p> : null}
       <div className="flex flex-wrap items-center gap-2" data-testid="shot-detail-image-actions">
-        <StoryboardImageButton nodeId={nodeId} data={data} changeNote={change} idleLabel={t(hasImage ? 'Remake start and end images · Takes 0' : 'Make start and end images · Takes 0')} />
+        {/* 바꾸고 싶은 점이 있으면 바로 다시 그리지 않고 Lumi(채팅)에게 보낸다(오너 2026-11-26 D6) — 비우면 지금처럼 같은 설정으로 다시 만든다. */}
+        {change.trim() ? <AskLumiButton shotNodeId={nodeId} kind="image" change={change} closeDetail={layout === 'popup'} onSent={() => setChange('')} />
+          : <StoryboardImageButton nodeId={nodeId} data={data} idleLabel={t(hasImage ? 'Remake start and end images · Takes 0' : 'Make start and end images · Takes 0')} />}
         {hasImage && makeVideo ? (
           <Button type="button" size="sm" variant="outline" disabled={makeVideo.disabled} onClick={makeVideo.run}>{makeVideo.label}</Button>
         ) : null}

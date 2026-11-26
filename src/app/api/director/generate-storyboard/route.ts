@@ -281,6 +281,8 @@ export async function POST(req: Request) {
     let stripRefUrl: string | null = null
     let sceneLighting: string | null = null
     let stripSheetFormat: ReturnType<typeof parseProjectFormat> = null
+    // 이번 시트 크기('WxH') — 비율로만 그리는 모델(Nano Banana 2)이 이 시트를 그릴 수 있는지 판정한다(리드 Q2 길 a).
+    let stripSheetCanvas: string | null = null
     if (stripFrames) {
       // #F-006: 씬 시간대를 스트립 리페인트에 배선 — 샷 산문의 시간대 단어는 확률적이라(실측
       //   1e166e55 sc_04: 7샷 중 4샷에만 존재) scenes.time_of_day 진실로 고정한다.
@@ -303,6 +305,7 @@ export async function POST(req: Request) {
       //   반환 지오메트리가 캔버스·프롬프트 축·finalize 크롭의 공통 진실이 된다.
       const composed = await composeRoughReferenceStrip(stripFrames, projectFormat)
       stripSheetFormat = composed.sheetFormat
+      stripSheetCanvas = composed.geometry.repaintCanvas
       const refPath = `${project.workspace_id}/${projectId}/shots/${storageKeySegment(writerShotId)}_storyboard_ref_strip.png`
       const { error: upErr } = await mediaUpload(refPath, composed.buffer, { contentType: 'image/png', upsert: true })
       if (upErr) throw upErr
@@ -377,7 +380,8 @@ export async function POST(req: Request) {
     // #sheet-model-guard(2026-09-01): 스트립 repaint 는 정확한 캔버스 계약 — 샷별 선택이
     //   시트 부적합 모델(nano-banana 등)이면 검증된 시트 모델로 강제한다. 비스트립 단일
     //   생성은 사용자의 선택 그대로.
-    const effectiveModelKey = stripFrames ? resolveSheetImageModel(requestedModelKey) : requestedModelKey
+    //   Nano Banana 2(리드 Q2 길 a)는 이번 시트 크기에 가까운 비율이 있을 때만 그대로 — 없으면(정사각 시트) GPT Image 2.
+    const effectiveModelKey = stripFrames ? resolveSheetImageModel(requestedModelKey, stripSheetCanvas) : requestedModelKey
     const requestedImageModel = effectiveModelKey
       ? resolveImageEndpoint(effectiveModelKey, !!finalOpts.reference_image_urls?.length).endpoint
       : null

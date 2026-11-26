@@ -24,6 +24,7 @@ import { removeEvictedImageFiles } from '@/lib/artist/image-file-cleanup'
 import { portraitUrlForSheet } from '@/lib/artist/portrait-file'
 import { cropRoughGridFrames } from '@/lib/writer/rough-grid-crop'
 import { sheetGeometry } from '@/lib/writer/rough-storyboard-grid'
+import { fitStripFramesToCells } from '@/lib/director/sheet-fit'
 import { parseProjectFormat } from '@/types/project'
 import sharp from 'sharp'
 
@@ -1098,6 +1099,11 @@ async function finalizeStoryboardStripJob(
   } else {
     // #repaint-crop: 실사 표면 — 연필 휴리스틱 대신 스펙 셀 고정+인셋 (rough-grid-crop 주석 참조)
     ;[frames] = await cropRoughGridFrames(stripBuf, 'strip1', 1, sheetFmt, 'repaint')
+    // 비율로만 그리는 모델(Nano Banana 2, 리드 Q2 길 a)이 시트를 가장 가까운 비율로 그려 왔으면 세 칸을 칸 모양으로 가운데를 남겨 맞춘다.
+    //   정한 크기 그대로 온 시트(2% 안)는 그대로다(sheet-fit.ts).
+    const geometry = sheetGeometry('strip1', sheetFmt)
+    const cellAspect = ((geometry.cols[0][1] - geometry.cols[0][0]) * expW) / ((geometry.rows[0][1] - geometry.rows[0][0]) * expH)
+    frames = await fitStripFramesToCells(frames, { width: sw, height: sh }, { width: expW, height: expH }, cellAspect)
   }
   // 경로를 변수로 뽑아 원본 업로드와 썸네일 생성이 **같은 문자열**을 쓴다 — 문자열을 두 번
   //   쓰면 오타 하나로 짝이 어긋나고, 404 폴백 때문에 조용히 원본이 나간다(#thumb-pipeline).
