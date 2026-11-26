@@ -1,4 +1,5 @@
 import { cameraToText } from '@/lib/director/camera-text'
+import { videoMovement } from '@/lib/director/direction-line-prompt'
 import { compileMotionContract, type MotionContract } from '@/lib/director/motion-contract'
 import type { ContractSubject, GearDesign } from '@/lib/director/video-design'
 import { findCameraBrand, findCameraMovement } from '@/lib/knowledge'
@@ -22,6 +23,8 @@ export type VideoPromptParts = {
   referenceRoles?: string
   /** 영상 고치기의 바꿀 점(오너 2026-11-26 O5 · (e)(f)) — 움직임 약속 바로 뒤에 실린다. 고치기가 아니면 미설정. */
   change?: string
+  /** 콘티에서 고친 연출 장을 읽은 줄(오너 2026-11-22 Q4) — 있으면 맨 앞에 실리고 움직임은 이 줄이 정한다. 없으면 미설정. */
+  directionRead?: string
 }
 
 export type VideoReferenceImageRole = 'start' | 'end' | 'ref'
@@ -72,6 +75,12 @@ export type BuildVideoPromptInput = {
    *   앞쪽이라 길이 상한에 잘리지 않는다. 없거나 비면 지금과 글자까지 같다.
    */
   change?: string
+  /**
+   * 콘티에서 고친 연출 장을 AI 가 읽은 한 줄의 영어판(오너 2026-11-22 Q4 · 리드 D2 — freshDirectionRead 의 en, 끝 장과 상관없이).
+   *   있으면 영상의 움직임은 이 줄이 정한다: 맨 앞에 싣고 옛 움직임 약속(dynamicSpec · 설계 없는 샷 규칙)은 싣지 않는다.
+   *   장면 글 · 대사 · 카메라 · 그림 역할은 그대로. 없거나 빈 글이면 지금과 글자까지 같다(dev e45d538e 와 같은 규칙, main 구조 위).
+   */
+  directionLine?: string | null
 }
 
 /** 실사 그림체 영상 지시문의 앞부분 상한 — 글 상한이 없는 모델(Seedance · Veo …)도 이만큼까지만(옛 1,400 · 1,650자는 문장 중간에서 잘렸다). */
@@ -255,12 +264,14 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   const { prompt, camera, movementPreset, cameraPreset, generationMethod, modelKey, durationSeconds, startEndReference, referenceImageRoles, dynamicSpec, dialogueLines, dialogueSpeakers, characterNames } = parts
   const aligned = parts.aligned === true
   const moved = editedCamera(camera, parts.designCamera, parts.designAngle)
-  const contract: MotionContract = compileMotionContract(dynamicSpec, durationSeconds, {
+  // 오너 Q4: 콘티에서 고친 연출 장을 읽은 줄이 있으면 움직임은 그 줄이 정한다 — 옛 움직임 약속 · 설계 없는 샷 규칙("장면 글의 동작만")은 싣지 않는다.
+  const movement = videoMovement(parts.directionLine)
+  const contract: MotionContract = compileMotionContract(movement ? null : dynamicSpec, durationSeconds, {
     names: characterNames ? new Map(Object.entries(characterNames)) : null,
     aligned,
     subjects: parts.subjects ?? null,
     cameraOverride: cameraOverrideText(moved),
-    fallback: parts.fallbackContract === true,
+    fallback: parts.fallbackContract === true && !movement,
   })
   const dialogue = dialogueClause(dialogueLines, dialogueSpeakers, { aligned, introduced: contract.introduced })
   // 설계의 카메라 값을 아는 요청은 카메라를 움직임 약속 한 곳에서만 말한다.
@@ -279,6 +290,7 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   // 영상 고치기의 바꿀 점(오너 O5 · (e)(f)) — 움직임 약속 바로 뒤 · 대사와 샷 글 앞. 상한은 뒤에서 자르므로 여기는 잘리지 않는다.
   const changeText = parts.change?.trim() ? `Change from the previous take: ${parts.change.trim()}` : ''
   if (changeText) prompt_parts.change = changeText
+  if (movement) prompt_parts.directionRead = movement.line
   // 계약문이 맨 앞(모델이 앞 토큰을 강하게 가중) — 그 뒤 장면 묘사·수동 카메라·기어.
   //   계약 있는 경로는 캡을 950 으로: 계약(~400자)이 묘사문에 밀려 잘리지 않게. 레거시(계약 없음)는 500 유지.
   // 대사는 계약 바로 뒤(#g7) — 앞 토큰 가중을 받되 모션 계약을 밀어내지 않는 자리.
@@ -289,8 +301,10 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
   //   계약 경로 캡 +450.
   // 실사 그림체(2026-11-23): 움직임 약속이 있는 길은 1,400 · 1,650자에서 자르지 않는다 — 샷 글이 문장 중간에서 끊겼다(시브셀러 2 · 4 · 6 · 8, 우산 1).
   //   CONTRACT_BODY_MAX_CHARS 까지, 넘치면 문장 경계에서 줄인다. 글 상한이 있는 입구(Kling · Happy Horse, 그림 없는 글 영상)는 그 상한까지.
-  const designed = aligned && !!contract.text
-  const cap = designed ? CONTRACT_BODY_MAX_CHARS : contract.text ? (dialogue ? 1650 : 1400) : dialogue ? 750 : 500
+  // 읽은 줄(오너 Q4)은 움직임 약속 자리를 대신해 맨 앞이다 — 실사 그림체는 지금처럼 문장 경계에서 줄이고(설계된 길),
+  //   다른 그림체는 줄 길이만큼 상한을 늘려 줄이 장면 글 자리를 빼앗지 않게 한다(dev e45d538e). 줄이 없으면 지금 그대로.
+  const designed = aligned && (!!contract.text || !!movement)
+  const cap = (designed ? CONTRACT_BODY_MAX_CHARS : contract.text ? (dialogue ? 1650 : 1400) : dialogue ? 750 : 500) + (movement && !designed ? movement.text.length + 2 : 0)
   // Veo 로 고른 영상은 맨 끝에 검은 화면 지시가 붙는다 — 글 영상 입구의 상한은 그 자리까지 합친 것이다.
   const blackInstruction = modelKey === 'veo' && durationSeconds < 8
     ? `Show the described action only for the first ${durationSeconds} seconds; after ${durationSeconds}s the frame must be a completely black screen — no subject, no motion — until the video ends.`
@@ -300,7 +314,7 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
     designed
       ? `${limit === null ? head : clipSentences(head, Math.max(0, limit - tail.length - 1))} ${tail}`
       : `${head} ${tail}`.slice(0, legacyMax)
-  const pieces = [contract.text, changeText, dialogue, prompt, movementFragment, gearFragment, cameraText].filter(Boolean)
+  const pieces = [movement?.text ?? '', contract.text, changeText, dialogue, prompt, movementFragment, gearFragment, cameraText].filter(Boolean)
   let fullPrompt = designed
     ? clipSentences(closeSentence(joinSentences(pieces)), limit === null ? cap : Math.min(cap, limit))
     : pieces.join('. ').slice(0, cap)

@@ -30,6 +30,7 @@ import { englishTimeOfDay, isReflectionShot, quotePreviousShot, roughIsStaticHol
 import { buildPhotoStripPrompt, type PhotoCharacterLabel } from '@/lib/director/photo-strip'
 import { buildStripFixPrompt } from '@/lib/director/strip-fix-prompt'
 import { directorPromptOf } from '@/lib/director/director-prompt'
+import { freshDirectionLine } from '@/lib/writer/direction-read'
 import { currentStripFrames } from '@/lib/director/storyboard-image'
 import { promptWithChange } from '@/lib/director/shot-detail'
 import { realCineLine } from '@/lib/director/real-cine-line'
@@ -262,6 +263,10 @@ export async function POST(req: Request) {
     //   (그 뒤 러프가 바뀌었으면 "러프 바뀜"이 남는다). 바탕 그림에 기록이 없으면 적지 않는다(옛 실사처럼 판정하지 않음).
     const baseRoughAt = fixFrames ? (currentImage as { roughGeneratedAt?: unknown } | null)?.roughGeneratedAt : undefined
     const roughGeneratedAt = fixFrames ? (typeof baseRoughAt === 'number' ? baseRoughAt : undefined) : roughFramesAt
+    // 콘티에서 고친 화살표를 읽고 그 줄로 끝 장을 다시 그린 샷만 — 그 줄을 움직임으로 싣는다(오너 2026-11-22 R1, 리드 2026-11-26 나눔).
+    //   줄이 없거나 낡았거나 [그대로]를 골라 끝 장에 안 쓴 줄이면 null — 지시문은 한 글자도 바뀌지 않는다.
+    //   고치기(바꿀 점 · 지금 그림 바탕)에는 싣지 않는다 — 바꿀 점 밖은 지금 그림 그대로여야 한다.
+    const directionLine = stripFrames && !fixFrames ? freshDirectionLine(shot?.rough_storyboard) : null
 
     // #n-1(2026-08-05): 같은 씬 직전 샷의 종료 상태를 서버측 첨부 — 샷별 독립 잡이던 실사의
     //   연속성 봉합. DB pull 이라 잡 간 의존이 생기지 않는다 (architecture §0: 둘 다 진실을 읽는다).
@@ -385,6 +390,7 @@ export async function POST(req: Request) {
               extraRefCount: refCounts.extraRefCount,
               characterRefs: characterRefLabels,
               cineLine,
+              directionLine,
               sceneLighting,
               reflection: isReflectionShot((shot ?? {}) as Parameters<typeof isReflectionShot>[0], (characterRefLabels ?? []).map((r) => r.name)),
               staticHold: roughIsStaticHold(shot as Parameters<typeof roughIsStaticHold>[0]),
@@ -404,6 +410,7 @@ export async function POST(req: Request) {
           anchorKeepsGrade: anchor?.anchorKind === 'sublook',
           styleRefCount: anchor?.usePreviewRef && anchor.previewUrl ? 2 : 1,
           frameAxis: composed.geometry.frameAxis,
+          directionLine,
         })) + (propLines.length ? `\n${propLines.join('\n')}` : ''),
         // #real-strip-guard(2026-08-06)→#fal-canvas→#sheet-formats(2026-08-17): 캔버스는 합성이
         //   고른 지오메트리를 따른다 — 레퍼런스·캔버스·프롬프트 축·크롭이 한 시트 계약으로 정합.
@@ -484,6 +491,8 @@ export async function POST(req: Request) {
           continuityPrevText,
           ...(characterRefLabels ?? []).flatMap((r) => [r.name, r.pose, ...(photoLook ? [r.look] : [])]),
           ...(photoLook ? [cineLine] : []),
+          // 콘티에서 고친 화살표를 읽은 줄(오너 R1) — 사람이 연출 장에 쓴 손글씨 · 고친 글이 옮겨진다. 없는 샷은 지금과 같다.
+          ...(directionLine ? [directionLine] : []),
           // 사용자가 쓴 소품 이름도 함께 검사한다(D7 2단계) — 소품이 없는 샷은 지금과 같다.
           ...propRefs.map((ref) => ref.name),
         ],

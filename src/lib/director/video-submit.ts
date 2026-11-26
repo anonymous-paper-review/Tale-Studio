@@ -22,6 +22,7 @@ import {
   buildVideoPrompt,
 } from '@/lib/director/video-prompt'
 import { directorPromptOf } from '@/lib/director/director-prompt'
+import { freshDirectionRead } from '@/lib/writer/direction-read'
 import { loadShotDesignByMainId, resolveShotDesign } from '@/lib/writer/shot-design-state'
 import type { ShotDesign, ShotDynamicSpec } from '@/lib/writer/types/pipeline'
 import { getGenerationJobById, linkGenerationJobToChatTrace, userOwnsProject } from '@/lib/generation-jobs'
@@ -555,7 +556,7 @@ async function prepareVideoRequest(
       // #motion-contract: dynamic_spec(모션 계약 소스) + design_ref(구버전 state 폴백 조인 키) 동봉.
       standalone
         ? Promise.resolve({ data: null, error: null })
-        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, static_spec, design_ref, dialogue_lines, character_appearance_keys, prompt, director_prompt, storyboard_image').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
+        : supabaseAdmin.from('shots').select('shot_id, dynamic_spec, static_spec, design_ref, dialogue_lines, character_appearance_keys, prompt, director_prompt, storyboard_image, rough_storyboard').eq('project_id', projectId).eq('shot_id', writerShotId).maybeSingle(),
     ])
     if (projectError) throw projectError
     if (shotError) throw shotError
@@ -741,8 +742,12 @@ async function prepareVideoRequest(
       !standalone && typeof shot?.prompt === 'string' && shot.prompt.trim() === prompt.trim()
     // 실사 그림체: 카메라는 움직임 약속 한 곳이 정한다 — 작가의 움직임 글에서 카메라 말을 빼고 인물 · 환경의 움직임만 싣는다.
     const motionProse = aligned && writerMotionPrompt && dynamicSpec ? withoutCameraMoves(writerMotionPrompt) : writerMotionPrompt
+    // 콘티에서 고친 연출 장을 AI 가 읽은 줄(오너 2026-11-22 Q4 · 리드 D2 — 끝 장과 상관없이 지금 연출 장을 읽은 줄, freshDirectionRead).
+    //   있으면 영상의 움직임은 그 줄이 정한다 — 작가의 옛 움직임 글은 붙이지 않고, 옛 움직임 약속은 buildVideoPrompt 가 뺀다.
+    //   없거나 낡았으면(연출 장 주소가 바뀜) null — 지시 · 검사 · 기록이 이 기능 전과 같다.
+    const directionLine = standalone ? null : freshDirectionRead((shot as { rough_storyboard?: unknown } | null)?.rough_storyboard)?.en ?? null
     const promptForVideo =
-      motionProse && writerMotionPrompt && promptIsStoredComposition && !promptEn.includes(writerMotionPrompt)
+      motionProse && writerMotionPrompt && promptIsStoredComposition && !promptEn.includes(writerMotionPrompt) && !directionLine
         ? `${motionProse} ${promptEn}`
         : promptEn
     const dialogueLines = !standalone && Array.isArray(shot!.dialogue_lines) ? (shot!.dialogue_lines as DialogueLine[]) : null
@@ -883,6 +888,8 @@ async function prepareVideoRequest(
       } : {}),
       // 영상 고치기(오너 O5 · (e)(f)) — 바꿀 점은 샷 글에 붙이지 않고(그래야 움직임 글이 남는다) 움직임 약속 바로 뒤에.
       ...(changeEn ? { change: changeEn } : {}),
+      // 콘티에서 고친 연출 장을 읽은 줄(오너 Q4) — 맨 앞, 움직임은 이 줄이 정한다.
+      ...(directionLine ? { directionLine } : {}),
     })
     // #creem-moderation(2026-10-11): 최종 프롬프트가 확정된 직후·자리 예약(submitPreparedVideo) 전에
     //   사용자 글만 검사한다 — 샷 산문(모션 프롬프트 포함)과 대사. 모션 계약·카메라 기재·negative_prompt
@@ -893,6 +900,8 @@ async function prepareVideoRequest(
     const moderationParts = [
       promptForVideo,
       ...(changeEn ? [changeEn] : []),
+      // 읽은 줄에는 사람이 연출 장에 쓴 손글씨 · 고친 글이 옮겨진다(오너 Q4) — 사용자 글처럼 같이 검사한다.
+      ...(directionLine ? [directionLine] : []),
       ...(dialogueLines ?? []).map((line) => line?.text),
       ...(subjects ? [...subjects.values()].flatMap((person) => [person.name, person.anchor]) : []),
       ...(aligned && dialogueSpeakers ? Object.values(dialogueSpeakers).flatMap((speaker) => [speaker.name, speaker.appearance]) : []),
@@ -946,6 +955,8 @@ async function prepareVideoRequest(
       // 배열 키는 존재할 때만 — 구버전 예약 잡의 리플레이 비교(snapshotValueMatches)와 호환.
       ...(referenceImageUrlsV2?.length ? { reference_image_urls: referenceImageUrlsV2 } : {}),
       ...(alignedReferenceImageRoles ? { reference_image_roles: alignedReferenceImageRoles } : {}),
+      // 실은 읽은 줄(오너 Q4) — 실었을 때만 적는다(없는 요청은 이 기능 전 기록 모양 그대로, 재생 비교 보호).
+      ...(directionLine ? { direction_read: promptParts.directionRead ?? directionLine } : {}),
       movement_preset: movementPreset ?? null,
       camera_preset: cameraPreset ?? null,
       ...(videoClipId ? {} : { new_take_metadata: normalizedNewTakeMetadata }),
