@@ -10,7 +10,7 @@ import { WriterGenerationView } from '@/features/writer/writer-generation-view'
 import { WriterV2Preview } from '@/features/writer/writer-v2-preview'
 import { StageWaitCard } from '@/components/feedback/stage-wait'
 import { useStoryboardWait } from '@/hooks/use-stage-wait'
-import { boardStageAt } from '@/lib/writer/board-stage'
+import { boardStageAt, boardStageOfPath } from '@/lib/writer/board-stage'
 import { createClient } from '@/lib/supabase/client'
 import { cn } from '@/lib/utils'
 import { useWriterStatus } from '@/lib/writer/use-writer-status'
@@ -65,6 +65,9 @@ export function WriterWorkspace() {
   const pathname = usePathname()
   const storeStage = useProjectStore((state) => state.currentStage)
   const boardStage = boardStageAt(pathname, storeStage)
+  // 빈 Artist 그림 채우기는 Storyboard 주소(/studio/writer)에 붙은 보드만 한다 — 콘티 주소면 지금 단계 값이 무엇이든 하지 않는다:
+  //   붙는 첫 순간(값이 아직 앞 화면)도, [Artist로 가기]가 값을 artist 로 올린 떠나는 순간(화면을 옮기기 전)도(리드 2026-11-26, m-artist 재현).
+  const artistFill = boardStageOfPath(pathname) === 'writer'
   const debugGeneration = useGenerationDebug()
 
   // V2 프로젝트 진입 동선 (#v2-tab 2026-08-17): 이전엔 engine=v2 면 프리뷰가 워크스페이스를
@@ -136,7 +139,7 @@ export function WriterWorkspace() {
           visibleTab === 'storyboard' ? cn('flex min-h-0 flex-1 flex-col', slideClass) : 'hidden',
         )}
       >
-        <RoughStoryboardView stage={boardStage} />
+        <RoughStoryboardView stage={boardStage} artistFill={artistFill} />
       </div>
       <div
         aria-hidden={visibleTab !== 'dialogue'}

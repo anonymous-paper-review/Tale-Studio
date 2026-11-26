@@ -13,6 +13,12 @@ export function boardStageOf(stage: string | null | undefined): BoardStage {
   return stage === 'conti' ? 'conti' : 'writer'
 }
 
+/** 화면 주소가 보드 주소(콘티 /studio/conti · Storyboard /studio/writer)면 그 단계, 아니면 null — 지금 단계 값을 보지 않는다. */
+export function boardStageOfPath(pathname: string | null | undefined): BoardStage | null {
+  const stage = pathname ? stageIdFromPathname(pathname) : null
+  return stage === 'conti' || stage === 'writer' ? stage : null
+}
+
 /** 보드가 붙은 화면 주소의 단계. 단계 주소가 아니면(주소가 없는 시험 · 미리 보기) 저장소의 지금 단계를 본다. */
 export function boardStageAt(pathname: string | null | undefined, storeStage: string | null | undefined): BoardStage {
   return boardStageOf((pathname ? stageIdFromPathname(pathname) : null) ?? storeStage)
