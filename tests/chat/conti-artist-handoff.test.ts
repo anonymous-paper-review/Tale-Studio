@@ -63,6 +63,17 @@ describe('콘티 → Artist', () => {
     expect(nav.handoffToStage).toHaveBeenCalledWith('artist', { verify: true })
   })
 
+  // 왜(혼자 정한 것): Artist 가 이미 열렸으면(넘긴 뒤 돌아온 콘티 · 예전 흐름으로 Artist 까지 연 프로젝트) 다시 넘길 것이 없다 — 예전 흐름은
+  //   씬 · 샷을 Artist [만들기]가 나눠 콘티가 비어 있어, 넘김 조건(씬 · 샷)에 막혀 Artist 로 갈 수 없었다(검토 rev-flow 2026-11-26 3번).
+  it('Artist 가 이미 열린 콘티에서 [Artist로 가기]를 누르면 다시 넘기지 않고 씬 · 샷이 없어도 Artist 로 가기만 한다', async () => {
+    useProjectStore.setState({ reachedStage: 'artist' })
+    useWriterStore.setState({ sceneManifest: null, shots: [] })
+    await useGlobalChatStore.getState().requestNextStep()
+    expect(userLines()).toEqual([])
+    expect(nav.handoffToStage).toHaveBeenCalledWith('artist')
+    expect(useGlobalChatStore.getState().pendingNavigatePath).toBe('/studio/artist')
+  })
+
   // 왜(혼자 정한 것): 씬 · 샷을 아직 나누지 않았으면(나누는 중 · 실패) Artist 로 넘길 콘티가 없다 — 넘기지 않고 까닭을 말한다.
   it('씬 · 샷이 아직 없으면 콘티에서 Artist 로 넘기지 않고 씬 · 샷을 먼저 나눠야 한다고 말한다', async () => {
     useWriterStore.setState({ shots: [] })

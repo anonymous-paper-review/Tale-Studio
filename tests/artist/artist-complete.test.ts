@@ -103,7 +103,7 @@ describe('Artist 완료하기', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.runUpdate).toHaveBeenCalledWith(expect.objectContaining({ status: 'running', state: expect.objectContaining({ _artistCompleted: true }) }))
-    expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'writer' }, ['entry', 'producer', 'artist'])
+    expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'writer' }, ['entry', 'producer', 'conti', 'artist'])
     expect(mocks.trigger).toHaveBeenCalledWith('http://localhost', 'p1')
   })
 
@@ -119,7 +119,7 @@ describe('Artist 완료하기', () => {
       expect(response.status, status).toBe(200)
       expect(mocks.runUpdate).not.toHaveBeenCalled()
       expect(mocks.trigger).not.toHaveBeenCalled()
-      expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'writer' }, ['entry', 'producer', 'artist'])
+      expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'writer' }, ['entry', 'producer', 'conti', 'artist'])
     }
   })
 
@@ -131,7 +131,20 @@ describe('Artist 완료하기', () => {
 
     expect(response.status).toBe(200)
     expect(mocks.runUpdate).not.toHaveBeenCalled()
-    expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'writer' }, ['entry', 'producer', 'artist'])
+    expect(mocks.projectUpdate).toHaveBeenCalledWith({ current_stage: 'writer' }, ['entry', 'producer', 'conti', 'artist'])
+  })
+
+  // 왜: 화면만 앞서 Artist 가 열린 콘티 프로젝트(저장 단계 conti)에서 [완료하기]가 저장 단계를 하나도 바꾸지 못한 채 됐다고 했다 —
+  //   Storyboard 는 화면에서만 열리고 새로고침하면 닫혔다(검토 rev-flow 2026-11-26 2번). 콘티(O1)는 Artist 앞 단계다.
+  it('저장 단계가 콘티여도 완료하기는 저장 단계를 Storyboard 로 올린다', async () => {
+    mocks.getActiveRun.mockResolvedValue({ id: 'run-1', status: 'completed', current_stage: 'persistShots', state: {}, updated_at: 'x' })
+
+    const response = await completeArtist(request())
+
+    expect(response.status).toBe(200)
+    const [patch, from] = mocks.projectUpdate.mock.calls.at(-1) as [unknown, string[]]
+    expect(patch).toEqual({ current_stage: 'writer' })
+    expect(from).toContain('conti')
   })
 
   // 왜: [만들기] 전(산문 초안이 그대로)이거나 실행이 없으면 넘길 씬 · 샷이 없다.
