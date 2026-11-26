@@ -11,9 +11,17 @@ import { useGlobalChatStore } from '@/stores/global-chat-store'
 import { useChatUiStore } from '@/stores/chat-ui-store'
 import { useLocaleStore } from '@/stores/locale-store'
 import { useWriterStore } from '@/stores/writer-store'
+import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
 
 export type FixKind = 'image' | 'video'
 export type AskLumiResult = 'sent' | 'busy' | 'empty' | 'no-shot'
+/** 영상 고치기 칸에서 고른 설정 — 그 부탁에 맡겨 새 Take 까지 가게 한다(검토 rev-director 2번). */
+export interface AskLumiVideoTake {
+  /** 보고 있던 Take(없으면 null — 가장 최근 Take 를 이어받는다). */
+  fromTakeId: string | null
+  provider: VideoModelKey
+  resolution: VideoResolution
+}
 
 /** 그 샷의 채팅 @이름 — 채팅 고르기 목록 · 카드 ⌘/Ctrl+클릭과 같은 이름("Real Shot 3" · "실사 샷 3", 화면 말). */
 function shotMentionLabel(shotNodeId: string): string | null {
@@ -29,7 +37,7 @@ function shotMentionLabel(shotNodeId: string): string | null {
  * 고치기 칸의 글을 채팅으로 보낸다. closeDetail = 스토리보드 보기 팝업(화면을 막는 창)이면 닫아 채팅의 [적용]이 보이게 한다.
  * 채팅이 다른 말을 처리하는 중이면 보내지 않는다(sendMessage 는 바쁘면 조용히 버린다) — 부른 쪽이 까닭을 보인다.
  */
-export function askLumiToFix(input: { shotNodeId: string; kind: FixKind; change: string; closeDetail: boolean }): AskLumiResult {
+export function askLumiToFix(input: { shotNodeId: string; kind: FixKind; change: string; closeDetail: boolean; take?: AskLumiVideoTake }): AskLumiResult {
   const change = input.change.trim()
   if (!change) return 'empty'
   const chat = useGlobalChatStore.getState()
@@ -41,6 +49,19 @@ export function askLumiToFix(input: { shotNodeId: string; kind: FixKind; change:
   if (input.closeDetail) director.closeShotDetail()
   director.selectNode(input.shotNodeId)
   useChatUiStore.getState().setCollapsed(false)
+  // 영상 고치기: 고른 모델 · 해상도 · 보던 Take 를 이 부탁에 맡긴다 — Lumi 답 · "응" 뒤 새 Take 요청까지 간다(검토 rev-director 2번).
+  //   예전에는 버려지고 가장 최근 Take 설정으로 나갔다(H3 Max 1080p 를 골랐는데 Seedance 720p 로 Take 를 씀).
+  if (input.kind === 'video' && input.take) {
+    useGlobalChatStore.setState({
+      directorVideoFixIntent: {
+        projectId: director.projectId,
+        shotNodeId: input.shotNodeId,
+        fromTakeId: input.take.fromTakeId,
+        provider: input.take.provider,
+        resolution: input.take.resolution,
+      },
+    })
+  }
   const key = input.kind === 'image' ? '@{shot} Fix the image and make it again: {change}' : '@{shot} Fix the video and remake it as a new Take: {change}'
   void chat.sendMessage(translate(useLocaleStore.getState().locale, key, { shot: label, change }))
   return 'sent'

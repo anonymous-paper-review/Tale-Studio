@@ -57,6 +57,16 @@ describe('고치기 칸 → Director 채팅', () => {
     for (const message of sent) expect(asksRemake(message), message).toBe(true)
   })
 
+  it('영상 고치기를 Lumi 에게 보낼 때 고른 영상 모델 · 해상도와 보던 Take 를 그 부탁에 함께 맡긴다', () => {
+    // 왜(검토 rev-director 2번): 채팅 길로 바꾼 뒤 팝업에서 고른 모델 · 해상도가 버려지고 가장 최근 Take 설정으로 Take 가 나갔다(예: H3 Max 1080p 를 골랐는데 Seedance 720p).
+    expect(askLumiToFix({ shotNodeId: shotId, kind: 'video', change: 'slow push in', closeDetail: false, take: { fromTakeId: 'take-1', provider: 'h3-max', resolution: '1080p' } })).toBe('sent')
+    expect(useGlobalChatStore.getState().directorVideoFixIntent).toEqual({ projectId: 'fix-chat-project', shotNodeId: shotId, fromTakeId: 'take-1', provider: 'h3-max', resolution: '1080p' })
+    // 그림 고치기는 맡기지 않는다(그림 모델은 샷 칸에 이미 저장된다).
+    useGlobalChatStore.setState({ directorVideoFixIntent: null })
+    askLumiToFix({ shotNodeId: shotId, kind: 'image', change: 'show the umbrella handle', closeDetail: false })
+    expect(useGlobalChatStore.getState().directorVideoFixIntent).toBeNull()
+  })
+
   it('보낼 때 그 샷을 골라 채팅 맥락에 그 샷의 프롬프트 전체가 실린다', () => {
     // 왜: 채팅 맥락은 샷 프롬프트를 앞 60자만 싣고 고른 노드만 전체를 싣는다 — 스토리보드 보기 팝업은 샷을 고르지 않아, 채팅이 60자만 보고 새 글을 썼다.
     expect(serializeDirectorCanvasContext(api())).not.toContain(FULL_PROMPT)

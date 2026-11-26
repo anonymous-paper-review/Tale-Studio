@@ -333,7 +333,8 @@ function FixVideo({ shotNodeId, data, current, busy, layout }: { shotNodeId: str
       ) : null}
       <div className="flex flex-wrap items-center gap-2">
         {/* 바꿀 점이 있으면 Lumi(채팅)에게(오너 2026-11-26 D6), 비우면 지금처럼 이 자리에서 새 Take. */}
-        {change.trim() ? <AskLumiButton shotNodeId={shotNodeId} kind="video" change={change} closeDetail={layout === 'popup'} onSent={() => setChange('')} />
+        {change.trim() ? <AskLumiButton shotNodeId={shotNodeId} kind="video" change={change} closeDetail={layout === 'popup'} onSent={() => setChange('')}
+            take={{ fromTakeId: current?.id ?? null, provider, resolution }} />
           : <Button type="button" size="sm" variant="outline" disabled={disabled} onClick={() => void make()}>{label}</Button>}
         {current ? (
           <Button type="button" size="sm" variant="outline" className="gap-1.5 text-destructive hover:text-destructive" onClick={() => openDeleteConfirm(current.id)}>

@@ -1377,7 +1377,7 @@ interface DirectorCanvasState {
    *  opts.onAccepted — 접수 알림: 서버가 2xx 로 받아 jobId 를 준 때 한 번. 2xx 가 아니면(몸에 jobId · queued 가 실려 와도 — 4xx · 503 결과 모름)
    *  · 500 · 연결 끊김 · 실패 알림은 아니다(리드 결정 — 결과를 모르는 것은 부른 쪽이 새 Take 가 만드는 중으로 남았는지로 따로 말한다).
    *  Lumi 는 이것으로 다음 샷을 보낸다(board 검토 b · entry D8 이 같이 쓴다). opts.onJob — 진행 알림 그대로. 둘 다 없으면 지금 그대로. */
-  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void; changeNote?: string }) => Promise<string | null>
+  remakeShotVideo: (shotNodeId: string, opts?: { onJob?: GenerationJobObserver; onAccepted?: (jobId: string) => void; changeNote?: string; fromTakeId?: string; videoOverride?: VideoOverride }) => Promise<string | null>
   generateVideoForShot: (
     shotNodeId: string,
     options?: DirectorGenerationRequestOptions,
@@ -4709,7 +4709,11 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
       },
 
       remakeShotVideo: (shotNodeId, opts) => {
-        const latest = latestShotTake(get().nodes, shotNodeId)
+        // 샷 상세 영상 고치기에서 보던 Take 가 있으면 그 Take 를 이어받는다(검토 rev-director 2번) — 없으면 지금처럼 가장 최근 Take.
+        const viewed = opts?.fromTakeId
+          ? get().nodes.find((n) => n.id === opts.fromTakeId && isVideoData(n.data) && n.data.parentShotNodeId === shotNodeId)
+          : undefined
+        const latest = viewed && isVideoData(viewed.data) ? { id: viewed.id, data: viewed.data } : latestShotTake(get().nodes, shotNodeId)
         // 알림이 없으면 지금과 같은 부름(샷 상세 · D8). 접수 알림은 2xx 로 받아 jobId 를 준 첫 알림 한 번뿐이다 —
         //   거절 길(4xx)도 몸에 jobId · queued 가 있으면 진행 알림을 부르고, 그 뒤 실패는 부른 것이 끝나도 노드 id 를 돌려준다(board 검토 b · entry).
         let accepted = false
@@ -4723,10 +4727,12 @@ export const useDirectorCanvasStore = create<DirectorCanvasState>()(
               }
             }
           : undefined
-        // 채팅 고치기의 바꿀 점(오너 O8 (e)(f)) — 이어받은 설정 위에 이번 새 Take 의 바꿀 점으로 얹는다(샷 상세 영상 고치기와 같은 칸).
+        // 채팅 고치기의 바꿀 점(오너 O8 (e)(f)) · 샷 상세에서 고른 모델 · 해상도(검토 rev-director 2번) — 이어받은 설정 위에 이번 새 Take 에만 얹는다(샷 상세 [새 Take]와 같은 칸).
         const changeNote = opts?.changeNote?.trim()
-        const options = latest || onJob || changeNote
-          ? { ...(latest ? { inheritFromVideoNodeId: latest.id } : {}), ...(onJob ? { onJob } : {}), ...(changeNote ? { videoOverride: { changeNote } } : {}) }
+        const videoOverride: VideoOverride = { ...(opts?.videoOverride ?? {}), ...(changeNote ? { changeNote } : {}) }
+        const hasOverride = Object.keys(videoOverride).length > 0
+        const options = latest || onJob || hasOverride
+          ? { ...(latest ? { inheritFromVideoNodeId: latest.id } : {}), ...(onJob ? { onJob } : {}), ...(hasOverride ? { videoOverride } : {}) }
           : undefined
         return get().generateVideoForShot(shotNodeId, options)
       },

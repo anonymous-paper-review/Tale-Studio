@@ -1,5 +1,6 @@
 import { summarizeChatUsage, type ChatLlmUsage } from '@/lib/chat-trace'
 import { create } from 'zustand'
+import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
 import { createChatRequestSession, ChatResponseError } from '@/lib/chat-response'
 import { runChatToolLoop } from '@/lib/chat-tools/loop'
 import { writerInputRoute } from '@/lib/chat-harness'
@@ -244,7 +245,9 @@ interface GlobalChatState {
   /** Director 에서 Lumi 가 영상을 되물은 중(재검토 b 보통 A · 낮음 3) — 목록이면 같은 단계에서 "응 · 좋아 · yes"일 때 그 목록 그대로 만들고,
    *  번호를 물었으면 다음 말의 "3번" · 맨 숫자를 샷 번호로 읽는다. 다른 말이면 버린다. */
   /** named — 그 부탁에서 사람이 번호로 댄 샷(영상이 있어도 다시 만들기로 새 Take 를 만든다, 리드 11/14). */
-  directorVideoAsk: { projectId: string; shotIds: string[]; remake?: boolean; named?: string[]; changes?: Record<string, string> } | { projectId: string; numbers: true; remake?: boolean; change?: string } | null
+  directorVideoAsk: { projectId: string; shotIds: string[]; remake?: boolean; named?: string[]; fixes?: Record<string, DirectorVideoFix> } | { projectId: string; numbers: true; remake?: boolean; change?: string; intent?: DirectorVideoFixIntent } | null
+  /** 샷 상세 영상 고치기가 Lumi 에게 보낸 그 부탁의 설정(고른 모델 · 해상도 · 보던 Take, 검토 rev-director 2번) — 그 답을 처리할 때 한 번 쓰고 비운다. */
+  directorVideoFixIntent: DirectorVideoFixIntent | null
   /** 그림에서 그림체를 정하는 중인 프로젝트(매체 고르기 · 저장) — 그동안 스타일 선택 창을 자동으로 띄우지 않는다. */
   styleSettingFor: string | null
   /** Producer 본문을 막고 로딩 원을 보일 일 — 새 프로젝트가 넘긴 일 · 만화 옮기기(2026-10-09 오너, lib/producer/busy.ts). */
@@ -1516,7 +1519,7 @@ async function askHoldReason(requested: readonly string[] | null, addedShotIds: 
 }
 
 /** 되묻는 말 — "샷 1·3·4 영상 3개(Take 15)를 만들까요? '응'이라고 하면 시작해요." Take 를 안 쓰는 계정이면 Take 수는 뺀다. */
-async function confirmVideosLine(shotIds: readonly string[], locale: AppLocale, remake = false): Promise<string> {
+async function confirmVideosLine(shotIds: readonly string[], locale: AppLocale, remake = false, fixes?: Readonly<Record<string, DirectorVideoFix>>): Promise<string> {
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
   const nodes = useDirectorCanvasStore.getState().nodes
   const names = directorBoardNames(locale)
@@ -1524,7 +1527,7 @@ async function confirmVideosLine(shotIds: readonly string[], locale: AppLocale, 
   // 지연 로드 — Take 계산기 · 잔액 훅(영상 러너와 같은 까닭).
   const [{ videoBatchTakeCosts }, { fetchTakeBalance }] = await Promise.all([import('@/lib/director/video-batch-plan'), import('@/lib/billing/use-take-balance')])
   const takes = await fetchTakeBalance()
-  const cost = (remake ? remakeTakeCosts(nodes, shotIds) : videoBatchTakeCosts(nodes, shotIds)).reduce((sum, n) => sum + n, 0)
+  const cost = (remake ? remakeTakeCosts(nodes, shotIds, fixes) : videoBatchTakeCosts(nodes, shotIds)).reduce((sum, n) => sum + n, 0)
   const free = takes.mode === 'off' && !takes.failed
   if (shotIds.length === 1) {
     return free ? t('Shall I make the video for {shots}? Say yes to start.', { shots }) : countText(t, cost, 'Shall I make the video for {shots} (1 Take)? Say yes to start.', 'Shall I make the video for {shots} ({takes} Takes)? Say yes to start.', { shots, takes: cost })
@@ -1585,7 +1588,7 @@ async function holdOnTextCard(
     remakes: [...new Set([...(before.remakes ?? []), ...(more.remakes ?? [])])],
     named: [...new Set([...(before.named ?? []), ...(more.named ?? [])])],
     ...(mergeChanges(before.imageChanges, more.imageChanges) ? { imageChanges: mergeChanges(before.imageChanges, more.imageChanges) } : {}),
-    ...(mergeChanges(before.videoChanges, more.videoChanges) ? { videoChanges: mergeChanges(before.videoChanges, more.videoChanges) } : {}),
+    ...(mergeChanges(before.videoFixes, more.videoFixes) ? { videoFixes: mergeChanges(before.videoFixes, more.videoFixes) } : {}),
   }
   const edits = Array.isArray(card.proposal.payload.edits) ? (card.proposal.payload.edits as DirectorTextEdit[]) : []
   const impact = [...directorTextEditLines(locale, edits, nodes, names), ...(await heldWorkLines(then, locale, names))]
@@ -1618,16 +1621,42 @@ interface HeldDirectorWork {
   named?: string[]
   /** 그림 고치기의 바꿀 점(샷 노드 id → 글, 오너 2026-11-26 O8 (a)) — [적용] 뒤 지금 그림을 바탕으로 바꿀 점만 고친다. */
   imageChanges?: Record<string, string>
-  /** 영상 다시 만들기의 바꿀 점(샷 노드 id → 글, 오너 O8 (e)(f)) — [적용] 뒤 새 Take 에 따로 싣는다. */
-  videoChanges?: Record<string, string>
+  /** 영상 다시 만들기의 고치기(샷 노드 id → 바꿀 점 · 고른 모델 · 해상도 · 보던 Take, 오너 O8 (e)(f) · 검토 rev-director 2번) — [적용] 뒤 새 Take 에 싣는다. */
+  videoFixes?: Record<string, DirectorVideoFix>
 }
 
-/** 같은 바꿀 점을 그 샷들에 — 바꿀 점이 없으면 undefined(옛 모양 그대로). */
-function changesFor(ids: readonly string[], change: string | undefined): Record<string, string> | undefined {
-  return change && ids.length > 0 ? Object.fromEntries(ids.map((id) => [id, change])) : undefined
+/** 영상 다시 만들기의 고치기 한 샷 몫 — 바꿀 점(Lumi 가 담은 글)과, 샷 상세 영상 고치기에서 고른 모델 · 해상도 · 보던 Take. */
+export interface DirectorVideoFix {
+  change?: string
+  fromTakeId?: string
+  provider?: VideoModelKey
+  resolution?: VideoResolution
 }
-/** 두 바꿀 점 목록을 합친다 — 뒤(새 부탁)가 이긴다. 둘 다 없으면 undefined. */
-function mergeChanges(a: Record<string, string> | undefined, b: Record<string, string> | undefined): Record<string, string> | undefined {
+/** 샷 상세 영상 고치기가 맡긴 그 부탁의 설정(askLumiToFix 가 적는다). */
+export interface DirectorVideoFixIntent {
+  projectId: string
+  shotNodeId: string
+  fromTakeId: string | null
+  provider: VideoModelKey
+  resolution: VideoResolution
+}
+
+/** 그 샷들의 고치기 — 바꿀 점은 모두에, 맡긴 설정은 그 샷에만. 아무것도 없으면 undefined(옛 모양 그대로). */
+function fixesFor(ids: readonly string[], change: string | undefined, intent: DirectorVideoFixIntent | null | undefined): Record<string, DirectorVideoFix> | undefined {
+  const out: Record<string, DirectorVideoFix> = {}
+  for (const id of ids) {
+    const fix: DirectorVideoFix = {
+      ...(change ? { change } : {}),
+      ...(intent && intent.shotNodeId === id
+        ? { ...(intent.fromTakeId ? { fromTakeId: intent.fromTakeId } : {}), provider: intent.provider, resolution: intent.resolution }
+        : {}),
+    }
+    if (Object.keys(fix).length > 0) out[id] = fix
+  }
+  return Object.keys(out).length > 0 ? out : undefined
+}
+/** 두 목록을 합친다 — 뒤(새 부탁)가 이긴다. 둘 다 없으면 undefined. */
+function mergeChanges<T>(a: Record<string, T> | undefined, b: Record<string, T> | undefined): Record<string, T> | undefined {
   return a || b ? { ...a, ...b } : undefined
 }
 
@@ -1648,7 +1677,7 @@ async function heldWorkLines(held: HeldDirectorWork, locale: AppLocale, names: R
     const [{ videoBatchTakeCosts }, { fetchTakeBalance }] = await Promise.all([import('@/lib/director/video-batch-plan'), import('@/lib/billing/use-take-balance')])
     const takes = await fetchTakeBalance()
     const ids = [...videos, ...remakes]
-    const cost = [...videoBatchTakeCosts(nodes, videos), ...remakeTakeCosts(nodes, remakes)].reduce((sum, n) => sum + n, 0)
+    const cost = [...videoBatchTakeCosts(nodes, videos), ...remakeTakeCosts(nodes, remakes, held.videoFixes)].reduce((sum, n) => sum + n, 0)
     lines.push(takes.mode === 'off' && !takes.failed
       ? shotsLine(locale, ids.length, 'Applying also makes the video for {shots} right away.', 'Applying also makes the videos for {shots} right away.', { shots: shots(ids) })
       : shotsLine(locale, ids.length, cost === 1 ? 'Applying also makes the video for {shots} right away · 1 Take.' : 'Applying also makes the video for {shots} right away · {takes} Takes.', 'Applying also makes the videos for {shots} right away · {takes} Takes.', { shots: shots(ids), takes: cost }))
@@ -1687,7 +1716,7 @@ async function runHeldDirectorWork(held: HeldDirectorWork, ctx: {
     }
   }
   if (held.videos.length > 0) await startVideosFor({ shotIds: held.videos, say: ctx.say, onJob: ctx.onJob, isCurrent: ctx.isCurrent, named: held.named })
-  if ((held.remakes ?? []).length > 0) await startVideosFor({ shotIds: held.remakes ?? [], say: ctx.say, onJob: ctx.onJob, isCurrent: ctx.isCurrent, remake: true, named: held.named, changes: held.videoChanges })
+  if ((held.remakes ?? []).length > 0) await startVideosFor({ shotIds: held.remakes ?? [], say: ctx.say, onJob: ctx.onJob, isCurrent: ctx.isCurrent, remake: true, named: held.named, fixes: held.videoFixes })
 }
 
 /**
@@ -1705,8 +1734,8 @@ async function startVideosFor(input: {
   /** 그 부탁에서 사람이 번호로 댄 샷 — 다시 만들기면 영상이 있어도 새 Take(리드 11/14). 알림 카드 · 칩 · 묶음 말은 넘기지 않는다
    *  (그사이 영상이 생긴 샷을 빼는 옛 규칙 그대로). "이미 영상이 있어요" 줄은 부탁을 받은 자리(답 가지 · 번호 대답)가 먼저 말한다. */
   named?: readonly string[]
-  /** 다시 만들기의 바꿀 점(샷 노드 id → 글, 오너 2026-11-26 O8 (e)(f)) — 그 샷의 새 Take 에 따로 싣는다. 새 영상(다시 만들기 아님)에는 쓰지 않는다. */
-  changes?: Readonly<Record<string, string>>
+  /** 다시 만들기의 고치기(샷 노드 id → 바꿀 점 · 고른 모델 · 해상도 · 보던 Take, 오너 O8 (e)(f) · 검토 rev-director 2번) — 그 샷의 새 Take 에 싣는다. 새 영상(다시 만들기 아님)에는 쓰지 않는다. */
+  fixes?: Readonly<Record<string, DirectorVideoFix>>
 }): Promise<void> {
   const locale = contentLocale()
   const t = (key: string, vars?: Record<string, string | number>) => translate(locale, key, vars)
@@ -1717,7 +1746,7 @@ async function startVideosFor(input: {
   if (card && waiting.length > 0) {
     const waitingNamed = waiting.filter((id) => input.named?.includes(id))
     await holdOnTextCard(card, input.remake
-      ? { images: [], allBlankImages: false, videos: [], remakes: waiting, named: waitingNamed, ...(input.changes ? { videoChanges: { ...input.changes } } : {}) }
+      ? { images: [], allBlankImages: false, videos: [], remakes: waiting, named: waitingNamed, ...(input.fixes ? { videoFixes: { ...input.fixes } } : {}) }
       : { images: [], allBlankImages: false, videos: waiting, named: waitingNamed }, input.say)
     input = { ...input, shotIds: input.shotIds.filter((id) => !card.bound.has(id)) }
     if (input.shotIds.length === 0) return
@@ -1768,7 +1797,7 @@ async function startVideosFor(input: {
     input.say(t("I couldn't check your Takes, so I didn't start. Please ask again in a moment."))
     return
   }
-  const costs = input.remake ? remakeTakeCosts(nodes, input.shotIds) : videoBatchTakeCosts(nodes, input.shotIds)
+  const costs = input.remake ? remakeTakeCosts(nodes, input.shotIds, input.fixes) : videoBatchTakeCosts(nodes, input.shotIds)
   const plan = planVideoBatch(costs, takes.balance, takes.mode)
   if (plan.mode === 'enforce' && plan.short) {
     input.say(`${describeVideoBatchPlan(plan, t)[0]} ${t('I did not start any videos. Add Takes or ask for fewer shots.')}`)
@@ -1794,8 +1823,16 @@ async function startVideosFor(input: {
       // 접수(서버가 2xx 로 받아 jobId 를 줌)되면 그 샷은 시작한 것으로 치고 다음 샷을 보낸다 — 영상이 끝나기를(5초마다 확인)
       //   기다리지 않는다(검토 b (a)~(g) 보통 1). 접수 없이 부른 것이 끝나면 시작하지 못한 것이다 — 실패해도 노드 id 를 돌려주는 길이 있다.
       const outcome = await new Promise<{ accepted: true } | { accepted: false; takeId: string | null }>((resolve) => {
-        const changeNote = input.changes?.[id]
-        useDirectorCanvasStore.getState().remakeShotVideo(id, { onJob: input.onJob, onAccepted: () => resolve({ accepted: true }), ...(changeNote ? { changeNote } : {}) })
+        const fix = input.fixes?.[id]
+        useDirectorCanvasStore.getState().remakeShotVideo(id, {
+          onJob: input.onJob,
+          onAccepted: () => resolve({ accepted: true }),
+          ...(fix?.change ? { changeNote: fix.change } : {}),
+          ...(fix?.fromTakeId ? { fromTakeId: fix.fromTakeId } : {}),
+          ...(fix?.provider || fix?.resolution
+            ? { videoOverride: { ...(fix.provider ? { provider: fix.provider } : {}), ...(fix.resolution ? { resolution: fix.resolution } : {}) } }
+            : {}),
+        })
           .then((takeId) => resolve({ accepted: false, takeId }), () => resolve({ accepted: false, takeId: null }))
       })
       if (outcome.accepted) {
@@ -2140,6 +2177,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
   startComicStyleGate: null,
   styleAttachmentGate: null,
   directorVideoAsk: null,
+  directorVideoFixIntent: null,
   styleSettingFor: null,
   boardBusy: null,
   deferredProposals: [],
@@ -3159,9 +3197,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             return
           }
           get().appendLocalUser('director', trimmed)
-          const askedChange = 'numbers' in videoAsk && videoAsk.remake ? changesFor(shotIds, videoAsk.change) : undefined
-          set({ directorVideoAsk: { projectId, shotIds, ...(videoAsk.remake ? { remake: true, named: shotIds } : {}), ...(askedChange ? { changes: askedChange } : {}) } })
-          const line = await confirmVideosLine(shotIds, contentLocale(), videoAsk.remake)
+          const askedFixes = 'numbers' in videoAsk && videoAsk.remake ? fixesFor(shotIds, videoAsk.change, videoAsk.intent) : undefined
+          set({ directorVideoAsk: { projectId, shotIds, ...(videoAsk.remake ? { remake: true, named: shotIds } : {}), ...(askedFixes ? { fixes: askedFixes } : {}) } })
+          const line = await confirmVideosLine(shotIds, contentLocale(), videoAsk.remake, askedFixes)
           if (!isCurrentSession()) return
           sayLines([...lines, line])
           return
@@ -3179,7 +3217,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             const shotIds = answered.filter((id) => !already.includes(id))
             if (shotIds.length === 0) {
               if (already.length === 0) say(translate(contentLocale(), 'There are no such shots right now.'))
-            } else await startVideosFor({ shotIds, say, isCurrent: isCurrentSession, remake: videoAsk.remake, named: shotIds, changes: 'numbers' in videoAsk && videoAsk.remake ? changesFor(shotIds, videoAsk.change) : undefined })
+            } else await startVideosFor({ shotIds, say, isCurrent: isCurrentSession, remake: videoAsk.remake, named: shotIds, fixes: 'numbers' in videoAsk && videoAsk.remake ? fixesFor(shotIds, videoAsk.change, videoAsk.intent) : undefined })
           })
           return
         }
@@ -3189,7 +3227,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           return
         }
         if ('shotIds' in videoAsk && saysYes(trimmed)) {
-          await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => startVideosFor({ shotIds: videoAsk.shotIds, say, isCurrent: isCurrentSession, remake: videoAsk.remake, named: videoAsk.named, changes: videoAsk.changes }))
+          await runDirectorTurn(projectId, trimmed, isCurrentSession, (say) => startVideosFor({ shotIds: videoAsk.shotIds, say, isCurrent: isCurrentSession, remake: videoAsk.remake, named: videoAsk.named, fixes: videoAsk.fixes }))
           return
         }
         if ('shotIds' in videoAsk && isCancellationUtterance(trimmed)) {
@@ -4631,6 +4669,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           // 영상 다시 만들기의 바꿀 점(오너 O8 (e)(f)) — 다시 만들기일 때만 새 Take 에 싣는다(처음 만드는 영상에는 "앞 Take 에서 바꿀 점"이 없다).
           const firstVideoUpdate = updates.find((update) => update.type === 'generateVideos')
           const videoChange = remake && firstVideoUpdate?.type === 'generateVideos' ? firstVideoUpdate.change : undefined
+          // 샷 상세 영상 고치기가 맡긴 설정(고른 모델 · 해상도 · 보던 Take) — 이 답에서 한 번 쓰고 비운다(검토 rev-director 2번). 다시 만들기일 때만 쓴다.
+          const intentNow = get().directorVideoFixIntent
+          if (intentNow) set({ directorVideoFixIntent: null })
+          const videoIntent = remake && intentNow && intentNow.projectId === projectId ? intentNow : null
           // 이 부탁에서 사람이 번호로 댄 샷(뺀 번호는 빼고) — 영상 있는 샷의 새 Take 는 이 샷만(리드 11/14).
           let namedVideoIds: string[] = []
           if (videoRequests.length > 0) {
@@ -4661,15 +4703,15 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
             if (grounding.kind === 'run') videoIds = grounding.shotIds
             if (grounding.kind === 'confirm') confirmIds = grounding.shotIds
             // 번호를 물었다 — 다음 말의 "3번" · 맨 숫자를 샷 번호로 읽는다.
-            if (grounding.kind === 'ask' && !hold && !onlyMaking && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true, ...(remake ? { remake } : {}), ...(videoChange ? { change: videoChange } : {}) } })
+            if (grounding.kind === 'ask' && !hold && !onlyMaking && projectId && isCurrentSession()) set({ directorVideoAsk: { projectId, numbers: true, ...(remake ? { remake } : {}), ...(videoChange ? { change: videoChange } : {}), ...(videoIntent ? { intent: videoIntent } : {}) } })
           }
           // 되묻기 목록 중 이 답의 글 카드가 건 샷은 그 카드 [적용]이 곧 허락이다 — 카드에 묶고, 나머지만 "응"으로 묻는다.
           //   묶는 영상은 지금 이미지가 있는 샷만 — 없거나 그리는 중이면 그 자리에서 말하고 묶지 않는다([적용]은 카드 줄이 말한 그 목록만, 리드 11/14).
           const boundVideos = withImagesOnly([...videoIds, ...confirmIds].filter((id) => bound.has(id)), locale, lumiSays)
           if (remake) {
             held.remakes = boundVideos
-            const boundChanges = changesFor(boundVideos, videoChange)
-            if (boundChanges) held.videoChanges = boundChanges
+            const boundFixes = fixesFor(boundVideos, videoChange, videoIntent)
+            if (boundFixes) held.videoFixes = boundFixes
           } else held.videos = boundVideos
           held.named = boundVideos.filter((id) => namedVideoIds.includes(id))
           confirmIds = confirmIds.filter((id) => !bound.has(id))
@@ -4701,14 +4743,14 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           }
           const nowVideos = videoIds.filter((id) => !bound.has(id))
           if (nowVideos.length > 0) {
-            await startVideosFor({ shotIds: nowVideos, say: lumiSays, onJob: observeGeneration, isCurrent: isCurrentSession, remake, named: namedVideoIds, changes: changesFor(nowVideos, videoChange) })
+            await startVideosFor({ shotIds: nowVideos, say: lumiSays, onJob: observeGeneration, isCurrent: isCurrentSession, remake, named: namedVideoIds, fixes: fixesFor(nowVideos, videoChange, videoIntent) })
           }
           // 앞 턴의 글 카드가 아직 기다리면 그 카드가 건 샷도 그 카드에 묶는다.
           if (waitingCard && confirmIds.some((id) => waitingCard.bound.has(id))) {
             const waitingIds = confirmIds.filter((id) => waitingCard.bound.has(id))
             const waitingNamed = waitingIds.filter((id) => namedVideoIds.includes(id))
             await holdOnTextCard(waitingCard, remake
-              ? { images: [], allBlankImages: false, videos: [], remakes: waitingIds, named: waitingNamed, ...(changesFor(waitingIds, videoChange) ? { videoChanges: changesFor(waitingIds, videoChange) } : {}) }
+              ? { images: [], allBlankImages: false, videos: [], remakes: waitingIds, named: waitingNamed, ...(fixesFor(waitingIds, videoChange, videoIntent) ? { videoFixes: fixesFor(waitingIds, videoChange, videoIntent) } : {}) }
               : { images: [], allBlankImages: false, videos: waitingIds, named: waitingNamed }, lumiSays)
             confirmIds = confirmIds.filter((id) => !waitingCard.bound.has(id))
           }
@@ -4722,8 +4764,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
               const askIds = withImagesOnly(confirmIds, locale, lumiSays)
               const confirmNamed = askIds.filter((id) => namedVideoIds.includes(id))
               if (askIds.length > 0) {
-                set({ directorVideoAsk: { projectId, shotIds: askIds, ...(remake ? { remake } : {}), ...(remake && confirmNamed.length > 0 ? { named: confirmNamed } : {}), ...(changesFor(askIds, videoChange) ? { changes: changesFor(askIds, videoChange) } : {}) } })
-                lumiSays(await confirmVideosLine(askIds, locale, remake))
+                const askFixes = fixesFor(askIds, videoChange, videoIntent)
+                set({ directorVideoAsk: { projectId, shotIds: askIds, ...(remake ? { remake } : {}), ...(remake && confirmNamed.length > 0 ? { named: confirmNamed } : {}), ...(askFixes ? { fixes: askFixes } : {}) } })
+                lumiSays(await confirmVideosLine(askIds, locale, remake, askFixes))
               }
             }
           }
@@ -6207,6 +6250,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       startComicStyleGate: null,
       styleAttachmentGate: null,
       directorVideoAsk: null,
+      directorVideoFixIntent: null,
       styleSettingFor: null,
       boardBusy: null,
       deferredProposals: [],
