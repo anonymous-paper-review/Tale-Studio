@@ -6,7 +6,8 @@ import { translate } from '@/lib/i18n/translate'
 import { countText } from '@/lib/i18n/count-text'
 import type { AppLocale } from '@/lib/locale'
 import { writerProgressView } from '@/lib/writer/progress-view'
-import type { RoughProgress } from '@/lib/writer/rough-progress'
+import { isRoughDrawn, type RoughProgress } from '@/lib/writer/rough-progress'
+import type { RoughStoryboardImage } from '@/types'
 import type { WriterStatus } from '@/lib/writer/use-writer-status'
 
 /** 한 순간의 사실 — 화면이 렌더마다 모은다. */
@@ -43,6 +44,22 @@ export const INITIAL_BOARD_LOCK: BoardLockState = { awaitingFirstDraw: false, wa
 /** 실행이 일하는 중인가 — Artist [완료하기] · 씬 초안 확정을 기다리는 정지는 일이 아니다. */
 export function isBoardRunActive(status: Partial<WriterStatus> | null | undefined): boolean {
   return !!(status?.started && !status.pipeline_completed && !status.pipeline_failed && status.current_status === 'running')
+}
+
+/** 잠금이 세는 샷 — 그림이 이미 있는 카드를 다시 그리는 것은 세지 않는다(W5 오너 2026-11-26 "화면 막는 창 대신 카드에 기다림").
+ *  처음 그리는 컷(그림 없음 · 실패해 그림이 없음)만 잠근다. 판정은 저장된 그림(shots.rough_storyboard)으로 —
+ *  다시 그리는 동안에도 저장된 그림은 끝날 때까지 바뀌지 않아 그리는 중에 잠금이 켜졌다 꺼졌다 하지 않는다. 약속: tests/writer/card-redraw-wait.test.ts */
+export function lockingShots<T extends { roughStoryboard?: RoughStoryboardImage | null }>(shots: readonly T[]): T[] {
+  return shots.filter((shot) => !isRoughDrawn(shot.roughStoryboard ?? null))
+}
+
+/** 여러 컷을 다시 그릴 때(채팅 [러프 다시 그리기] · [남은 컷 다시 그리기]) 보드를 잠그나 — 그림이 없는 컷이 하나라도 있으면 그 컷의 첫 그리기라 잠근다. */
+export function redrawLocksBoard(
+  shotIds: readonly string[],
+  shots: ReadonlyArray<{ shotId: string; roughStoryboard?: RoughStoryboardImage | null }>,
+): boolean {
+  const byId = new Map(shots.map((shot) => [shot.shotId, shot]))
+  return shotIds.some((id) => !isRoughDrawn(byId.get(id)?.roughStoryboard ?? null))
 }
 
 export function isBoardDrawing(facts: BoardLockFacts): boolean {

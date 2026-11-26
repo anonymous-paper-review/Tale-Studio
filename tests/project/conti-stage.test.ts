@@ -84,4 +84,10 @@ describe('콘티의 모습', () => {
     expect(existsSync('src/app/studio/conti/page.tsx')).toBe(true)
     expect(readFileSync('src/app/studio/conti/page.tsx', 'utf8')).toMatch(/<WriterWorkspace \/>/)
   })
+
+  // 왜(혼자 정한 것): 보드는 열릴 때 씬 · 샷을 직접 읽는다 — 화면 틀이 미리 읽기(워밍)로 같은 것을 또 읽으면 콘티를 열 때마다 두 번 읽는다.
+  it('콘티 화면을 열면 씬 · 샷을 보드가 한 번만 읽는다 — 화면 틀은 보드 단계(콘티 · Storyboard)에서 미리 읽지 않는다', () => {
+    const layout = readFileSync('src/app/studio/layout.tsx', 'utf8')
+    expect(layout).toMatch(/if \(!isBoardStage\(stage\)\) void useWriterStore\.getState\(\)\.loadProject\(\)/)
+  })
 })

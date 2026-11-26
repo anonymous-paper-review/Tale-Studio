@@ -25,6 +25,11 @@ interface BoardUiState {
   takeRoughRedraw: (projectId: string) => string[] | null
   /** 카드를 [나중에] · Esc 로 내렸다 — 그 카드의 요청(같은 프로젝트 · 같은 샷)이 아직 기다리면 지운다(2026-11-02 리뷰 3차 M3). */
   cancelRoughRedraw: (projectId: string, shotIds: readonly string[]) => void
+  /** 고치기 창이 맡긴 뒤 닫힌 그리기(연출만 다시 만들기)를 기다리는 카드 — 샷 id → 프로젝트 id. 보드가 그 카드에 기다림을 보인다(W5 오너 2026-11-26). */
+  cardDrawing: Record<string, string>
+  markCardDrawing: (projectId: string, shotId: string) => void
+  /** 끝났다(실패해도) — 그 프로젝트의 표시만 지운다. */
+  clearCardDrawing: (projectId: string, shotId: string) => void
 }
 
 let nextRequestId = 0
@@ -54,4 +59,13 @@ export const useBoardUiStore = create<BoardUiState>((set, get) => ({
     if (!request || request.projectId !== projectId || request.shotIds.length !== shotIds.length) return
     if (request.shotIds.every((id, index) => id === shotIds[index])) set({ roughRedrawRequest: null })
   },
+  cardDrawing: {},
+  markCardDrawing: (projectId, shotId) => set((state) => ({ cardDrawing: { ...state.cardDrawing, [shotId]: projectId } })),
+  clearCardDrawing: (projectId, shotId) =>
+    set((state) => {
+      if (state.cardDrawing[shotId] !== projectId) return state
+      const next = { ...state.cardDrawing }
+      delete next[shotId]
+      return { cardDrawing: next }
+    }),
 }))
