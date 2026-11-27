@@ -1782,6 +1782,8 @@ export const KO: Record<string, string> = {
   '{count} fields are empty': '빈 칸 {count}개',
   // Writer 마스터 시트(2026-10-01) — 클라이언트에게 보내는 이미지 문서
   'Downloaded the master sheet.': '마스터 시트를 내려받았어요.',
+  // 받는 사이 다른 프로젝트로 바꾸면 받지 않는다(P1 검토 뒤따름 2026-11-27).
+  "The project changed, so the master sheet wasn't downloaded. Please download it again.": '프로젝트가 바뀌어 마스터 시트를 받지 못했어요. 다시 받아 주세요.',
   'Master sheet export failed: {message}': '마스터 시트를 내보내지 못했어요: {message}',
   '{count} shots have no rough images yet': '러프 그림이 아직 없는 샷 {count}개',
   'Page {page} / {total}': '{page} / {total}쪽',
