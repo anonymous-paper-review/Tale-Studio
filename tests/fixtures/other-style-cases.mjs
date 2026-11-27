@@ -1,5 +1,5 @@
-// 실사 그림체가 아닌 길의 입력 모음 — 실사 샷 · 인물 시트는 2026-11-23 main, 영상은 2026-11-27 main(오너 N4a 영상 방식 넷)의 지시문(other-style-prompts.json)과
-//   글자까지 같은지 본다(tests/director/other-styles-unchanged.test.ts). 영상 경우는 지금 서버가 보내는 모양만 쓴다(같은 시험 파일이 모양을 확인한다).
+// 실사 그림체가 아닌 길의 입력 모음 — 실사 샷 · 인물 시트는 2026-11-23 main, 영상은 2026-11-27 main(오너 N4a 영상 방식 넷 · 3차 겹마침표 고침)의 지시문(other-style-prompts.json)과
+//   글자까지 같은지 본다(tests/director/other-styles-unchanged.test.ts). 영상 경우는 지금 서버가 보내는 모양만 쓴다(같은 시험 파일이 경우 쪽 규칙을 확인한다).
 const ZERO = { horizontal: 0, vertical: 0, pan: 0, tilt: 0, roll: 0, zoom: 0 }
 const KYO = { name: 'Kyotaro', position: 'right_third', pose: 'sitting on the wooden bench next to Komatsu, holding the camera open for viewing while the sun goes down behind the willow and the water glitters in front of them' }
 const KOM = { name: 'Komatsu', position: 'frame_edge_left', pose: 'leaning her upper body closer' }

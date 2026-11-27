@@ -110,6 +110,15 @@ function joinSentences(parts: string[]): string {
     .reduce((out, part) => (out ? `${out}${/[.。!?！？…]["'”’)]*$/u.test(out) ? ' ' : '. '}${part}` : part), '')
 }
 
+/**
+ * 실사가 아닌 길의 조각 잇기(오너 2026-11-27 3차 "고쳐줘") — ". "로 잇되, 앞 조각이 문장 끝(마침표 · 물음표 · 느낌표 · 말줄임 · 따옴표 안 마침표)이면
+ *   마침표를 또 붙이지 않고 빈칸 하나로 잇는다("…follows.. A woman sits.." 겹마침표). 문장 끝 판정은 실사 길(joinSentences)과 같고,
+ *   조각은 다듬지 않는다 — 마침표 말고는 글자가 바뀌지 않게.
+ */
+function joinPieces(parts: string[]): string {
+  return parts.reduce((out, part) => (out ? `${out}${/[.。!?！？…]["'”’)]*$/u.test(out) ? ' ' : '. '}${part}` : part), '')
+}
+
 /** 끝이 문장 부호가 아니면 마침표를 붙인다 — 뒤에 그림 순서 문장이 이어진다. */
 const closeSentence = (text: string) => (text && !/[.。!?！？…]["'”’)]*$/u.test(text) ? `${text}.` : text)
 
@@ -388,9 +397,10 @@ export function buildVideoPrompt(parts: BuildVideoPromptInput): { fullPrompt: st
       ? `${limit === null ? head : clipSentences(head, Math.max(0, limit - tail.length - 1))} ${tail}`
       : `${head} ${tail}`.slice(0, legacyMax)
   const pieces = [movement?.text ?? '', contract.text, changeText, dialogue, prompt, movementFragment, gearFragment, cameraText].filter(Boolean)
+  // 실사 그림체 길은 이 고침 밖이다 — 설계 없는 실사 지시문은 지금 그대로 ". "로 잇는다(실사 지시문은 한 글자도 바뀌지 않게, 리드 11/27 3차).
   let fullPrompt = designed
     ? clipSentences(closeSentence(joinSentences(pieces)), limit === null ? cap : Math.min(cap, limit))
-    : pieces.join('. ').slice(0, cap)
+    : (aligned ? pieces.join('. ') : joinPieces(pieces)).slice(0, cap)
 
   // #u17-3(2026-08-31 오너 확정, 실측 sh_02_04): 장면 묘사문(shots.prompt)은 writer 가 상상한
   //   프레임 묘사라 실제 생성된 레퍼런스와 조명·배경·질감이 어긋날 수 있다 — 이미지 경로는

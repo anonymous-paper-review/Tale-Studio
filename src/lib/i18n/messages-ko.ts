@@ -277,6 +277,8 @@ export const KO: Record<string, string> = {
   'Blocked': '실행 대기',
   'Read failed': '조회 실패',
   'Execution results': '실행 결과',
+  // Director 채팅으로 대사를 고친 뒤 붙는 한 줄(오너 2026-11-27 3차 — 새 Take 부터, 이미 만든 Take 는 그대로 · 표시 없음).
+  'The changed dialogue goes into videos made from now on. Videos already made keep their dialogue.': '새로 만드는 영상부터 고친 대사가 들어가요. 이미 만든 영상은 그대로예요.',
   'The rough request is still being confirmed or completed. Its record is kept to prevent duplicate generation.': '러프 접수 또는 완료를 확인 중입니다. 중복 생성을 막기 위해 작업 기록을 유지합니다.',
   'Scene {number}': '씬 {number}',
   'Generation is not complete for everyone. {names}: not handled. These names appear in your request, but no usable new-appearance proposal was received for them, so their new appearances were not started. Received proposals still require approval.': '아직 전체 생성이 완료된 것은 아니에요. {names}: 미처리. 요청에 이름이 언급됐지만, 사용할 수 있는 새 모습 제안을 받지 못해 시작하지 않았어요. 전달된 제안도 승인 뒤에만 시작해요.',
