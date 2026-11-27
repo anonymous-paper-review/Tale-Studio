@@ -10,7 +10,7 @@ import { createChatToolExecutor, sameToolValue, type ToolResource } from '@/lib/
 import type { ArtistSourceSnapshot } from '@/lib/artist/source-snapshot'
 import { createStudioToolResources } from '@/stores/chat-tool-bindings'
 import { createStudioWorkflow } from '@/stores/chat-workflow-bindings'
-import { chatToolReceipt, guardChatToolReply, latestEdits, omitRepeatedToolEdits, requestsImageInspection, requestsSupportedChatEdit } from '@/lib/chat-tools/receipt'
+import { DIALOGUE_EDIT_NOTE, chatToolReceipt, dialogueEditNote, guardChatToolReply, latestEdits, omitRepeatedToolEdits, requestsImageInspection, requestsSupportedChatEdit } from '@/lib/chat-tools/receipt'
 import type { ToolCall, ToolMessage, ToolOutcome, ToolResult } from '@/lib/chat-tools/protocol'
 import { STORYBOARD_EDIT_REFUSAL, toolCallAllowedOnStage } from '@/lib/chat-tools/protocol'
 import { isImageModelKey } from '@/lib/image-models'
@@ -4013,7 +4013,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
     const modelUsages: ChatLlmUsage[] = []
     let pendingReplyId: string | null = null
     try {
-      const toolsEnabled = !!projectId && ['producer', 'conti', 'writer', 'artist'].includes(stage) && !dialogueTarget
+      // Director 채팅은 대사 읽기 · 고치기 앱 도구만 받는다(오너 2026-11-27 3차 — 서버가 대사 자원 하나로 좁힌다).
+      const toolsEnabled = !!projectId && ['producer', 'conti', 'writer', 'artist', 'director'].includes(stage) && !dialogueTarget
       const requestSession = createChatRequestSession({
         signal: controller.signal,
         onStatus: status => { responseStatus = status },
@@ -4289,6 +4290,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const waitForLegacy = !dialogueTarget && toolsEnabled && ((requestedHandoff && requestsSupportedChatEdit(stage, trimmed)) || (isBoardStage(stage) && data.updates?.length) || (stage === 'artist' && (data.proposals?.length || data.locationProposals?.length)))
       // 답을 실행 결과로 바꿀 때 실제로 지우고 더한 것을 함께 알리는 한 줄("적용: 샷 2개 지움 · 샷 1개 더함", 리뷰 4차 후속 L2).
       let appliedStructureLine = ''
+      // Director 채팅으로 대사를 고쳐 저장했으면 새로 만드는 영상부터 들어간다고 알린다(오너 3차) — 모델 말에 맡기지 않는다.
+      if (stage === 'director') reply = [reply, dialogueEditNote(toolOutcomes, contentLocale() === 'ko', reply)].filter(Boolean).join('\n\n')
       reply = guardChatToolReply(reply, toolOutcomes, contentLocale() === 'ko')
       if (lockedReply) reply = lockedReply
       if (styleLockedReply) reply = styleLockedReply
@@ -5744,7 +5747,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const saved = (await (resource.readSaved ?? resource.read)()).find(row => row.id === approved.id)
         if (!isCurrentSession()) return false
         if (!saved || !Object.entries(patch).every(([key, value]) => sameToolValue(saved.values[key], value))) throw new Error(translate(contentLocale(), "Couldn't confirm that the requested values were saved."))
-        speak(`${proposal.target}: ${contentLocale() === 'ko' ? '저장을 확인했습니다.' : 'Saved and verified.'}`)
+        // Director 채팅의 대사 고침(줄 빼기 승인)도 새로 만드는 영상부터 들어간다고 알린다(오너 2026-11-27 3차).
+        const dialogueNote = proposal.stage === 'director' && approved.resource === 'dialogue' ? translate(contentLocale(), DIALOGUE_EDIT_NOTE) : ''
+        speak([`${proposal.target}: ${contentLocale() === 'ko' ? '저장을 확인했습니다.' : 'Saved and verified.'}`, dialogueNote].filter(Boolean).join('\n\n'))
         patchTrace({ appliedCount: 1, pendingProposal: false })
         return true
       }

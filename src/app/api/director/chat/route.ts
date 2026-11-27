@@ -22,6 +22,28 @@ import {
   type ChatLlmUsage,
 } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
+import { prepareChatTools, rejectedToolCallIds } from '@/lib/chat-tools/protocol'
+import { supabaseAdmin } from '@/lib/supabase/admin'
+import { parseDialogueLanguage, type DialogueLanguage } from '@/lib/writer/pipeline/util/output-language'
+
+// Director 채팅의 대사 고치기(오너 2026-11-27 3차 "대사 수정 기능을 채팅창에서도") — 콘티 · Storyboard 채팅과 같은 앱 도구(대사 자원)로만 고친다.
+//   앱 도구를 켠 요청에만 싣는다. 대사는 영상 고치기의 바꿀 점과 섞지 않는다(리드 3차). 고친 대사는 새로 만드는 영상(Take)부터 들어간다.
+const DIRECTOR_DIALOGUE_TOOL_GUIDE = `
+<dialogue_tool>
+- A storyboard shot's dialogue (spoken lines and narration) is changed only with the app tools: read_project with resource "dialogue", then edit_project with that shot's complete dialogueLines. Keep every unchanged line with all of its fields; characterId null means narration; use only character IDs that appear in the read rows. You can change a line's text or its speaker, add lines and remove lines (removing a line waits for the user's approval).
+- Dialogue rows use the storyboard shot ids and boardLabel, not the canvas node ids. Find the shot the user names through boardLabel. A shot added on the Director canvas has no dialogue row: say that its dialogue can't be changed in this chat.
+- Never put a dialogue change in updateShot, or in the "change" of generateVideos or generateImage. The tools here change only dialogue, never a shot's story, prompt or the shots themselves.
+- After a saved dialogue edit, the app itself adds one line saying that the changed dialogue goes into videos made from now on and that Takes already made keep their dialogue. Never write that yourself — not even in other words — even if earlier replies in this conversation did. Do not remake videos unless the user asks.
+</dialogue_tool>`
+
+const DIALOGUE_LANGUAGE_NAME: Record<DialogueLanguage, string> = { ko: 'Korean', en: 'English', ja: 'Japanese', zh: 'Chinese' }
+
+/** 대사 언어(#dialogue-language-chat 2026-08-27 오너) — 채팅으로 고치는 대사도 프로젝트 대사 언어로. 그 메시지에서 다른 언어를 분명히 요구하면 그 요청이 이긴다. */
+function dialogueLanguageLine(lang: DialogueLanguage | undefined): string {
+  if (!lang) return ''
+  const name = DIALOGUE_LANGUAGE_NAME[lang]
+  return `\nDialogue language: this project's dialogue is written in ${name}. Write new or changed dialogue text in ${name}, unless the user explicitly asks for another language in this message. The reply language and the dialogue language are separate.`
+}
 
 // ──────────────────────────────────────────────────────────────────────
 // Legacy system prompt — `director-store.ts` (구 P4) 사용 시
@@ -583,6 +605,8 @@ export async function POST(req: Request) {
       canvasContext,
       projectId,
       traceId: requestedTraceId,
+      chatTools: toolsEnabled,
+      toolMessages,
     } = await req.json()
 
     if (!message || typeof message !== 'string') {
@@ -596,9 +620,11 @@ export async function POST(req: Request) {
     //   fetchProjectLocale 이 null 을 주고, responseLanguageDirective(null) 이 종전 동작(무주입)으로 폴백.
     let projectLocale: AppLocale | null = null
     let localeSwitched: AppLocale | null = null
+    let ownsProject = false
     if (typeof projectId === 'string' && projectId) {
       try {
-        if (await userOwnsProject(projectId, user.id)) {
+        ownsProject = await userOwnsProject(projectId, user.id)
+        if (ownsProject) {
           // 채팅 언어 규칙 v2(#chat-locale-follow v2): 웹페이지 언어 상속 + 다른 언어 3회 연속·명시 요청 시 전환.
           const resolved = await resolveChatLocale({
             projectId,
@@ -617,11 +643,26 @@ export async function POST(req: Request) {
     const normalizedHistory = normalizeHistory(history)
     const traceId = createChatTraceId(requestedTraceId)
 
+    // 앱 도구(대사 읽기 · 고치기)는 그 프로젝트 주인의 요청에만 연다 — 저장은 화면이 그 프로젝트 권한으로 한다(Writer 채팅과 같은 규칙).
+    if (toolsEnabled === true && !ownsProject) return NextResponse.json({ error: 'forbidden' }, { status: 403 })
+
     // 분기: canvasContext가 있으면 agentic 모드 (Director Canvas), 없으면 legacy 모드
     if (typeof canvasContext === 'string' && canvasContext.trim()) {
       let llmUsage: ChatLlmUsage | null = null
+      // 대사 자원 하나(read_project · edit_project) — 화면 열기 · 들여다보기 도구는 주지 않는다(3차).
+      const appTools = prepareChatTools('director', toolsEnabled, toolMessages)
+      let dialogueLanguage: DialogueLanguage | undefined
+      if (appTools) {
+        try {
+          const { data: projRow } = await supabaseAdmin.from('projects').select('settings').eq('id', projectId).maybeSingle()
+          dialogueLanguage = parseDialogueLanguage((projRow?.settings as { dialogueLanguage?: unknown } | null)?.dialogueLanguage)
+        } catch (err) {
+          console.warn('[director/chat] dialogue language lookup skipped:', err instanceof Error ? err.message : err)
+        }
+      }
       const systemPrompt =
         DIRECTOR_CANVAS_SYSTEM +
+        (appTools ? DIRECTOR_DIALOGUE_TOOL_GUIDE + dialogueLanguageLine(dialogueLanguage) : '') +
         CHAT_OUTPUT_FORMAT_GUIDE +
         CHAT_UPDATES_BATCH_GUIDE +
         responseLanguageDirective(projectLocale)
@@ -633,11 +674,17 @@ export async function POST(req: Request) {
         0.7,
         `chat:${traceId}`,
         {
+          ...(appTools ? { appTools } : {}),
           onUsage: (usage) => {
             llmUsage = usage
           },
         },
       )
+      if (appTools?.turn) {
+        // 그 요청에 주지 않은 이름의 도구 호출은 거절 목록으로 넘긴다 — 화면은 실행하지 않는다(Writer 채팅과 같은 규칙).
+        const rejected = rejectedToolCallIds(appTools.turn, appTools.tools)
+        return NextResponse.json({ toolTurn: appTools.turn, ...(rejected.length ? { rejectedToolCalls: rejected } : {}), toolSupport: true, toolUsage: llmUsage, contentLocale: projectLocale, localeSwitched })
+      }
       const {
         reply,
         updates,

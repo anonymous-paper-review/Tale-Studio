@@ -36,8 +36,34 @@ export function guardChatToolReply(reply: string, outcomes: ToolOutcome[], korea
   return [reply, receipt].filter(Boolean).join('\n\n')
 }
 
+/**
+ * 대사 고치기 · 더하기 · 빼기 부탁인가(Director 채팅 — 오너 2026-11-27 3차). 대사 · 내레이션 말과 고치기 · 더하기 · 빼기 말이 함께 있어야 하고,
+ *   하지 말라는 말이면 아니다. 영상 · 카메라 부탁("샷 3 영상 다시")은 아니다. 고치기를 허락하는 판정이 아니라 고치기 결과를 기다릴지의 힌트다.
+ */
+export function requestsDialogueEdit(message: string): boolean {
+  const text = withoutMediaGenerationProhibition(message)
+  if (/(지\s*마|말고|말아|don't|do not)/i.test(text)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+  if (!/(대사|내레이션|dialogue|narration)/i.test(text)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+  return /(바꿔|바꾼|바꾸|변경(?:해|한|하고)|수정(?:해|한|하고)|고쳐|고치|번역(?:해|한|하고)|더해|추가(?:해|한|하고)|넣어|빼|지워|삭제(?:해|한|하고)|\b(change|update|edit|translate|rename|add|remove|delete)\b)/i.test(text) // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+}
+
+/** 대사를 고쳐 저장했을 때 알리는 한 줄(영어 원문 = i18n 키) — 새로 만드는 영상(Take)부터 들어가고 이미 만든 영상은 그대로다(오너 2026-11-27 3차). */
+export const DIALOGUE_EDIT_NOTE = 'The changed dialogue goes into videos made from now on. Videos already made keep their dialogue.'
+
+/** 모델 답이 이미 "새로 만드는 영상부터 들어간다"는 뜻을 말했는가 — 화면 줄을 또 붙이지 않게(화면 확인 11/27: 대화 앞 차례를 따라 모델이 되풀이했다). */
+const SAYS_DIALOGUE_GOES_TO_NEW_VIDEOS = /만드는\s*영상(?:에|부터)|(?:videos?|takes?)\b[^.]*\bfrom now on|\bfrom now on\b[^.]*\b(?:videos?|takes?)\b/i // i18n-ok: 모델 답(한국어 · 영어)을 판별하는 정규식.
+
+/** 대사를 고친 결과가 저장됐으면 답에 붙일 한 줄, 아니면 '' — 모델 답(reply)이 같은 뜻을 이미 말했으면 ''. */
+export function dialogueEditNote(outcomes: ToolOutcome[], korean: boolean, reply = ''): string {
+  const saved = latestEdits(outcomes).some(({ call, result }) => (call.input as Record<string, unknown>)?.resource === 'dialogue' && result.status === 'ok' && result.unchanged !== true)
+  if (!saved || SAYS_DIALOGUE_GOES_TO_NEW_VIDEOS.test(reply)) return ''
+  return translate(korean ? 'ko' : 'en', DIALOGUE_EDIT_NOTE)
+}
+
 /** A narrow recovery hint for explicit edit requests; it never authorizes a write by itself. */
 export function requestsSupportedChatEdit(stageId: string, message: string): boolean {
+  // Director 채팅은 대사만 고친다(3차) — 대사 고치기 · 더하기 · 빼기 부탁일 때만 고치기 결과를 기다린다.
+  if (stageId === 'director') return requestsDialogueEdit(message)
   // Storyboard(id writer) 채팅은 도구로 고치지 않는다 — 실사 고치기 · 대사 고침(답의 updateDialogue, Q1)만 하고 이야기 · 샷은 콘티로 안내한다(오너 2026-11-27 N3). 도구 고치기를 요구하지 않는다.
   if (stageId === 'writer') return false
   // 콘티는 Storyboard 와 같은 보드 채팅 도구를 쓴다(O1 2026-11-26) — 씬 · 샷 · 대사 고치기는 콘티 채팅의 일이다.
