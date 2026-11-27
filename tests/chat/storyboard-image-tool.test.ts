@@ -21,14 +21,15 @@ describe('Storyboard 채팅 실사 그림 도구', () => {
     expect(STORYBOARD_IMAGE_TOOL_GUIDE).toMatch(/do not edit the shot text/i)
   })
 
-  // 왜(오너 2026-11-27 N3 "추천대로" — 실사 고치기만 하고 글은 콘티로 안내, 대사 탭 직접 고치기는 그대로): "대사를 바꾸고 다시 그려 줘"에
-  //   그림 요청만 내고 "바꿀게요"라고 하면 대사는 그대로다 — 글 부분은 고치지 않고 콘티 · 대사 탭으로 안내하며, 글을 바꿨다고 말하지 않게 한다.
-  it('Storyboard 채팅 AI 안내는 대사 · 샷 글을 바꿔 달라는 말이 섞이면 그 글은 고치지 않고 Writer 콘티(대사는 대사 탭)로 안내하며, 그림 요청만으로 글을 바꿨다고 말하지 말라고 한다', () => {
+  // 왜(오너 2026-11-27 N3 "추천대로" — 이야기 · 샷은 콘티 · Q1 "대사 수정 기능을 채팅창에서도" · 리드 "도구 하나로"): "대사를 바꾸고 다시 그려 줘"에
+  //   그림 요청만 내고 "바꿀게요"라고 하면 대사는 그대로다 — 대사는 대사 도구로 고치고, 이야기 · 샷 글은 콘티로 안내하며 바꿨다고 말하지 않게 한다.
+  //   (2026-11-27 이름 바꿈 · 오너 Q1 — 옛 이름 'Storyboard 채팅 AI 안내는 대사 · 샷 글을 바꿔 달라는 말이 섞이면 그 글은 고치지 않고 Writer 콘티(대사는 대사 탭)로 안내하며, 그림 요청만으로 글을 바꿨다고 말하지 말라고 한다')
+  it('Storyboard 채팅 AI 안내는 그림과 함께 대사를 바꿔 달라면 대사는 대사 도구로 고치고, 이야기 · 샷 글은 고치지 않고 Writer 콘티로 안내하며, 그림 요청만으로 글을 바꿨다고 말하지 말라고 한다', () => {
     expect(STORYBOARD_IMAGE_TOOL_GUIDE).not.toMatch(/make that text change with the edit tools/i)
     expect(STORYBOARD_IMAGE_TOOL_GUIDE).toMatch(/generateImage only redraws the picture and never changes text/i)
-    expect(STORYBOARD_IMAGE_TOOL_GUIDE).toMatch(/never say text was changed/i)
+    expect(STORYBOARD_IMAGE_TOOL_GUIDE).toMatch(/change it with the dialogue tool/i)
+    expect(STORYBOARD_IMAGE_TOOL_GUIDE).toMatch(/never say that other text was changed/i)
     expect(STORYBOARD_IMAGE_TOOL_GUIDE).toMatch(/rough storyboard/i)
-    expect(STORYBOARD_IMAGE_TOOL_GUIDE).toMatch(/Dialogue tab/)
   })
 
   // 왜(architecture §3 "모델 출력의 무검증 실행 금지"): 받을 모양만 받는다 — 샷 id · 바꿀 점은 글, 바꿀 점은 다듬어 길이를 자른다.
@@ -90,9 +91,11 @@ describe('Storyboard 채팅은 글 고치기 부탁으로 세지 않는다(콘�
     expect(requestsSupportedChatEdit('writer', "Change shot 2's image so she looks back")).toBe(false)
   })
 
-  // 왜(오너 2026-11-27 N3): 대사 · 샷 글을 바꿔 달라는 부탁에 Storyboard 가 고치기를 요구하면, 콘티로 가라는 안내 대신
-  //   "요청한 변경의 실행을 확인하지 못했습니다"로 끝나고 섞인 그림 요청까지 버린다. 글은 콘티에서 고친다.
-  it('Storyboard 채팅에서는 대사 · 내레이션 · 샷 설명 · 이름 · 길이를 바꿔 달라는 말도 글 고치기 부탁으로 세지 않는다 — 글은 콘티에서 고친다', () => {
+  // 왜(오너 2026-11-27 N3): 글을 바꿔 달라는 부탁에 Storyboard 가 고치기를 다시 요구하면, 콘티로 가라는 안내 대신
+  //   "요청한 변경의 실행을 확인하지 못했습니다"로 끝나고 섞인 그림 요청까지 버린다. 이야기 · 샷은 콘티에서 고친다.
+  //   대사 · 내레이션은 오너 Q1 로 여기서도 대사 도구로 고치지만, 고치기 결과를 다시 요구하지는 않는다(섞인 그림 요청이 버려지지 않게 — Director 와 다른 점).
+  //   (2026-11-27 이름 바꿈 · 리드 지시 "지금 사실로 이름만, 기대는 그대로" — 옛 이름 'Storyboard 채팅에서는 대사 · 내레이션 · 샷 설명 · 이름 · 길이를 바꿔 달라는 말도 글 고치기 부탁으로 세지 않는다 — 글은 콘티에서 고친다')
+  it('Storyboard 채팅에서는 대사 · 내레이션 · 샷 설명 · 이름 · 길이를 바꿔 달라는 말도 고치기 결과를 다시 요구하는 부탁으로 세지 않는다 — 대사는 대사 도구로, 이야기 · 샷은 콘티에서 고친다', () => {
     expect(requestsSupportedChatEdit('writer', "@샷 2 대사를 '잘 가'로 바꾸고 다시 그려 줘")).toBe(false)
     expect(requestsSupportedChatEdit('writer', '샷 2 설명을 고치고 이미지도 다시 만들어 줘')).toBe(false)
     expect(requestsSupportedChatEdit('writer', '샷 4 내레이션 수정하고 그림도 바꿔 줘')).toBe(false)

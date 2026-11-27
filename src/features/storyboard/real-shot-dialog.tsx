@@ -2,8 +2,9 @@
 
 // Storyboard 샷 상세(오너 2026-11-26 m1126 O7 · 혼자 정한 것 g · h) — 카드를 누르면(대사 탭의 연필도) 열린다. 시안 없음.
 //   왼쪽: 큰 그림(실사, 없으면 콘티 그림에 "콘티" 꼬리표) · 샷 글. 오른쪽: 대사(읽기만) · "바꾸고 싶은 점" + [채팅으로 고치기].
-//   대사 칸은 늘 보인다(오너 2026-11-27 P1) — 대사가 있으면 이 화면의 대사 탭에서 바로 고칠 수 있다고, 없으면 "대사 없음"과 Writer 콘티에서 넣는다고 안내한다
-//   (대사 탭은 있는 줄의 글만 고친다 — 검토 rev-flow-2-2 3번, components/shot-dialogue, Director 상세와 같은 부품).
+//   대사 칸은 늘 보인다(오너 2026-11-27 P1) — 줄을 누르면 그 자리에서 글을 고친다(오너 Q1 "추천대로", 대사 탭과 같은 키 · 규칙 · 저장 길).
+//   말하는 사람 · 줄 더하기 · 빼기는 채팅이나 Writer 콘티라고 안내하고, 대사가 없으면 "대사 없음"과 넣는 곳을 안내한다(components/shot-dialogue, Director 상세와 같은 부품).
+//   공유 보기에서는 고치지 않는다(저장이 되지 않는다) — 안내도 싣지 않는다. 줄을 고치는 중 Esc 는 창을 닫지 않는다(keepOpenWhileEditingLine).
 //   고치기는 생성 요청을 바로 부르지 않는다 — Director 샷 상세(O5)와 같은 [Lumi 에게 고쳐 달라고 하기]로 채팅에 보내고 창을 닫는다(lib/storyboard/fix-in-chat).
 //   채팅이 그 샷 실사를 다시 그리고,
 //   그리는 동안 그 카드에만 기다림이 뜬다. 그 샷을 그리는 중이면 고치기를 끄고 까닭을 보인다(같은 샷 두 번 맡기기는 서버가 거절한다).
@@ -32,6 +33,8 @@ import { currentStoryboardVersion, storyboardImageVersions } from '@/lib/directo
 import { VersionViewingBar } from '@/components/version-history/version-viewing-bar'
 import { useBoardUiStore } from '@/features/writer/board-ui-store'
 import { EndRedrawAsk, UnsavedArrowsConfirm, useUnsavedArrowsGuard } from '@/features/writer/unsaved-arrows-confirm'
+import { keepOpenWhileEditingLine } from '@/features/writer/use-dialogue-line-edits'
+import { isDemoSession } from '@/lib/demo/context'
 import { RealArrowEditPane, fixSendRequest, sameProjectReload } from '@/features/storyboard/real-arrow-edit'
 import { realArrowEntry } from '@/lib/storyboard/real-arrow-edit'
 import type { StoryboardImage } from '@/types/director'
@@ -68,6 +71,8 @@ function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClos
   const activeJobs = useActiveGenerationJobs(projectId)
   const [change, setChange] = useState('')
   const [busyNotice, setBusyNotice] = useState(false)
+  // 대사 칸에서 줄을 눌러 고치기(오너 Q1) — 공유 보기는 저장이 되지 않아 끈다(혼자 정한 것).
+  const canEditDialogue = !isDemoSession()
   // 지난 판 줄에서 연 판(S3) — 이 샷 상세를 그 판으로 열었을 때만. [채택]을 저장하는 중 · 저장 실패.
   const viewingId = useBoardUiStore((state) => (state.shotEditId === shotId ? state.shotEditVersionId : null))
   // 실사 가운데 장 화살표 편집을 연 샷(N4b).
@@ -126,7 +131,7 @@ function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClos
   }
 
   return (
-    <DialogContent frame="work" className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[960px]" data-testid="storyboard-shot-detail">
+    <DialogContent frame="work" className="flex max-h-[92vh] flex-col gap-0 p-0 sm:max-w-[960px]" data-testid="storyboard-shot-detail" onEscapeKeyDown={keepOpenWhileEditingLine}>
       <DialogHeader className="shrink-0 border-b border-border-subtle px-6 py-4">
         <DialogTitle>{label}</DialogTitle>
         <DialogDescription>
@@ -213,8 +218,9 @@ function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClos
             lines={shot.dialogueLines}
             characterNames={nameOf}
             entityNames={entityNames}
-            hint={t('You can also edit the dialogue right in the Dialogue tab of this screen.')}
-            emptyHint={t('Add dialogue in the rough storyboard on the Writer screen.')}
+            edit={canEditDialogue ? { shotId: shot.shotId, screen: 'storyboard' } : null}
+            hint={canEditDialogue ? t("Click a line to edit it here. To change who speaks or to add or delete lines, use the chat or Writer's rough storyboard.") : null}
+            emptyHint={canEditDialogue ? t("To add dialogue, use the chat or Writer's rough storyboard.") : null}
           />
           <label className="flex flex-col gap-2">
             <span className="text-label font-semibold text-foreground">{t('What to change')}</span>
@@ -232,8 +238,8 @@ function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClos
             {t('Ask Lumi to fix')}
           </Button>
           {busyNotice ? <p className="text-caption text-destructive">{t('Lumi is busy with another request. Try again when it is done.')}</p> : null}
-          {/* 실사 그림의 화살표는 이 창의 [화살표 고치기]로 고친다(오너 2026-11-27 N4b) — 이야기 · 대사만 Writer 콘티로 안내한다. */}
-          <p className="text-caption text-subtle-foreground">{t('Fix the story and dialogue in Writer.')}</p>
+          {/* 실사 그림의 화살표는 이 창의 [화살표 고치기]로(오너 2026-11-27 N4b), 대사는 위 대사 칸 · 채팅으로(오너 Q1) 고친다 — 이야기만 Writer 콘티로 안내한다. */}
+          <p className="text-caption text-subtle-foreground">{t('Fix the story in Writer.')}</p>
         </div>
       </div>
     </DialogContent>

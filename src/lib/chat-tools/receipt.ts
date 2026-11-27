@@ -39,12 +39,16 @@ export function guardChatToolReply(reply: string, outcomes: ToolOutcome[], korea
 /**
  * 대사 고치기 · 더하기 · 빼기 부탁인가(Director 채팅 — 오너 2026-11-27 3차). 대사 · 내레이션 말과 고치기 · 더하기 · 빼기 말이 함께 있어야 하고,
  *   하지 말라는 말이면 아니다. 영상 · 카메라 부탁("샷 3 영상 다시")은 아니다. 고치기를 허락하는 판정이 아니라 고치기 결과를 기다릴지의 힌트다.
+ *   실제로 고쳐 달라는 말만 센다(검토 rev-video-3 중간 1): 영상 · Take 를 다시 만들어 달라는 말, 고쳤는지 묻는 영어 질문(Did you … / Have you …),
+ *   지난 고침을 가리키는 꼴(바꾼 · 수정한 · 추가한 …)은 세지 않는다. 물음표로 끝나는 정중한 부탁("바꿔 줄래?" · "Can you change …?")은 센다.
  */
 export function requestsDialogueEdit(message: string): boolean {
   const text = withoutMediaGenerationProhibition(message)
   if (/(지\s*마|말고|말아|don't|do not)/i.test(text)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
   if (!/(대사|내레이션|dialogue|narration)/i.test(text)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
-  return /(바꿔|바꾼|바꾸|변경(?:해|한|하고)|수정(?:해|한|하고)|고쳐|고치|번역(?:해|한|하고)|더해|추가(?:해|한|하고)|넣어|빼|지워|삭제(?:해|한|하고)|\b(change|update|edit|translate|rename|add|remove|delete)\b)/i.test(text) // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+  if (/(영상|비디오|테이크|\b(videos?|takes?|clips?|remake|regenerate|re-?render)\b)/i.test(text)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+  if (/^\s*(did|have|has|was|were|is|are|does|do)\b/i.test(text)) return false
+  return /(바꿔|바꾸|변경(?:해|하고)|수정(?:해|하고)|고쳐|고치|번역(?:해|하고)|더해|추가(?:해|하고)|넣어|빼|지워|삭제(?:해|하고)|\b(change|update|edit|translate|rename|add|remove|delete)\b)/i.test(text) // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
 }
 
 /** 대사를 고쳐 저장했을 때 알리는 한 줄(영어 원문 = i18n 키) — 새로 만드는 영상(Take)부터 들어가고 이미 만든 영상은 그대로다(오너 2026-11-27 3차). */
@@ -64,7 +68,8 @@ export function dialogueEditNote(outcomes: ToolOutcome[], korean: boolean, reply
 export function requestsSupportedChatEdit(stageId: string, message: string): boolean {
   // Director 채팅은 대사만 고친다(3차) — 대사 고치기 · 더하기 · 빼기 부탁일 때만 고치기 결과를 기다린다.
   if (stageId === 'director') return requestsDialogueEdit(message)
-  // Storyboard(id writer) 채팅은 글을 고치지 않는다 — 실사 고치기만 하고 글은 콘티로 안내한다(오너 2026-11-27 N3). 고치기를 요구하지 않는다.
+  // Storyboard(id writer) 채팅은 실사 고치기와 대사 고치기(Director 와 같은 대사 도구)만 하고 이야기 · 샷은 콘티로 안내한다(오너 2026-11-27 N3 · Q1, 리드 "도구 하나로").
+  //   고치기 결과는 다시 요구하지 않는다(Director 와 다른 점) — 다시 요구하면 대사를 못 고친 답이 "실행되지 않았다"로 바뀌며 섞인 그림 요청까지 버린다(N3).
   if (stageId === 'writer') return false
   // 콘티는 Storyboard 와 같은 보드 채팅 도구를 쓴다(O1 2026-11-26) — 씬 · 샷 · 대사 고치기는 콘티 채팅의 일이다.
   const stage = toolStageOf(stageId)

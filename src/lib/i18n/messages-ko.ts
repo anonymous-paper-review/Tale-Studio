@@ -594,6 +594,8 @@ export const KO: Record<string, string> = {
   'Could not save the line. Save it again or undo the change.': '대사를 저장하지 못했어요. 다시 저장하거나 되돌려 주세요.',
   'Save again': '다시 저장',
   'Empty lines are not saved. To delete a line, open the shot editor with the pencil button.': '빈 대사는 저장하지 않아요. 줄을 지우려면 연필 단추로 샷 고치기 창을 여세요.',
+  // Storyboard 대사 탭 · 두 샷 팝업은 연필이 줄을 못 지운다 — 줄 지우기는 채팅이나 Writer 콘티(오너 Q1 — 틀린 안내 바로잡기).
+  "Empty lines are not saved. To delete a line, use the chat or Writer's rough storyboard.": '빈 대사는 저장하지 않아요. 줄을 지우려면 채팅이나 Writer 콘티에서 지워요.',
   'This line changed while you were editing. Click it to edit again.': '고치는 동안 이 대사가 바뀌었어요. 다시 눌러 고쳐 주세요.',
   'No dialogue yet': '아직 대사가 없어요',
   'This rewrites the existing {count} dialogue lines. Press again to run': '기존 대사 {count}개를 새로 씁니다. 한 번 더 누르면 실행돼요',
@@ -1793,12 +1795,13 @@ export const KO: Record<string, string> = {
   'Scene length': '씬 길이',
   'Shot size': '샷 크기',
   'No dialogue': '대사 없음',
-  // 샷 팝업의 대사 칸 안내(오너 2026-11-27 P1) — Storyboard 팝업은 같은 화면의 대사 탭, Director 상세는 고칠 곳 둘과 새 영상부터 들어간다는 것.
-  'You can also edit the dialogue right in the Dialogue tab of this screen.': '대사는 이 화면의 대사 탭에서 바로 고칠 수도 있어요.',
-  'Edit the dialogue in the rough storyboard on the Writer screen or in the Dialogue tab on Storyboard. New videos use the edited dialogue.': '대사는 Writer 콘티나 Storyboard 대사 탭에서 고쳐요. 고친 대사는 새로 만드는 영상부터 들어가요.',
-  // 대사 없는 샷은 대사 탭에 누를 줄이 없다 — 넣는 곳은 Writer 콘티(P1 검토 rev-flow-2-2 3번). 대사를 아직 못 읽었으면 "대사 없음" 대신(검토 1번).
-  'Add dialogue in the rough storyboard on the Writer screen.': '대사는 Writer 콘티에서 넣어요.',
-  'Add dialogue in the rough storyboard on the Writer screen. New videos use the added dialogue.': '대사는 Writer 콘티에서 넣어요. 넣은 대사는 새로 만드는 영상부터 들어가요.',
+  // 샷 팝업의 대사 칸 안내(오너 2026-11-27 P1 · Q1 "추천대로") — 줄을 누르면 여기서 바로 고치고, 말하는 사람 · 줄 더하기 · 빼기 · 넣기는 채팅이나 Writer 콘티.
+  //   Director 상세는 고친 대사가 새로 만드는 영상부터 들어간다는 것도. 대사를 아직 못 읽었으면 "대사 없음" 대신(검토 rev-flow-2-2 1번).
+  "Click a line to edit it here. To change who speaks or to add or delete lines, use the chat or Writer's rough storyboard.": '줄을 누르면 여기서 바로 고쳐요. 말하는 사람 · 줄 더하기 · 빼기는 채팅이나 Writer 콘티에서 해요.',
+  "To add dialogue, use the chat or Writer's rough storyboard.": '대사는 채팅이나 Writer 콘티에서 넣어요.',
+  "Click a line to edit it here. To change who speaks or to add or delete lines, use the chat or Writer's rough storyboard. New videos use the edited dialogue.": '줄을 누르면 여기서 바로 고쳐요. 말하는 사람 · 줄 더하기 · 빼기는 채팅이나 Writer 콘티에서 해요. 고친 대사는 새로 만드는 영상부터 들어가요.',
+  "To add dialogue, use the chat or Writer's rough storyboard. New videos use the added dialogue.": '대사는 채팅이나 Writer 콘티에서 넣어요. 넣은 대사는 새로 만드는 영상부터 들어가요.',
+  'Edit dialogue line {line} ({speaker})': '대사 {line} ({speaker}) 고치기',
   'Loading the dialogue…': '대사를 불러오는 중…',
   "Couldn't load the dialogue.": '대사를 불러오지 못했어요.',
   Duration: '길이',
@@ -3779,14 +3782,14 @@ export const KO: Record<string, string> = {
   'Turn the rough sketches into real images · {count} · No Takes used': '콘티 그림 {count}장을 실사 그림으로 바꿔요 · Takes 안 써요',
   // 샷 상세(카드를 누르면) — 고치기는 채팅으로(O7), 이야기 · 대사는 Writer 콘티에서(실사 화살표는 상세의 [화살표 고치기] — 오너 2026-11-27 N4b).
   'This shot is being drawn. You can change it when it is done.': '이 샷을 그리는 중이에요. 다 그린 뒤 고칠 수 있어요.',
-  'Fix the story and dialogue in Writer.': '이야기 · 대사는 Writer 콘티에서 고쳐요.',
+  'Fix the story in Writer.': '이야기는 Writer 콘티에서 고쳐요.',
   // 채팅이 실사를 다시 그리라고 했는데 맡기지 못했을 때(채팅 한 줄).
   "Couldn't find the shot to draw. Ask again with the shot name.": '그릴 샷을 찾지 못했어요. 샷 이름으로 다시 부탁해 주세요.',
   '{shot} is being drawn right now. Ask again when it is done.': '{shot}은(는) 지금 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',
   '{shot} has no rough storyboard. Draw it in Writer, then ask again.': '{shot}은(는) 콘티 그림이 없어요. Writer 콘티에서 그린 뒤 다시 부탁해 주세요.',
   "Couldn't redraw {shot}. Please ask again.": '{shot}을(를) 다시 그리지 못했어요. 다시 부탁해 주세요.',
-  // Storyboard 채팅은 글을 고치지 않는다(오너 2026-11-27 N3) — 모델이 글 고치기를 냈으면 떨구고 답 끝에 붙이는 안내.
-  "Storyboard doesn't change text. Edit the story, shots and dialogue in Writer's rough storyboard. Dialogue can also be edited right in the Dialogue tab.": 'Storyboard에서는 글을 바꾸지 않아요. 이야기 · 샷 · 대사는 Writer 콘티에서 고칠 수 있어요(대사는 대사 탭에서 바로 고칠 수도 있어요).',
+  // Storyboard 채팅은 이야기 · 샷은 바꾸지 않고 대사만 대사 도구로 고친다(오너 2026-11-27 N3 · Q1) — 새 영상부터 한 줄은 DIALOGUE_EDIT_NOTE(Director 와 같은 한 줄).
+  "Storyboard doesn't change the story or shots. Edit them in Writer's rough storyboard.": 'Storyboard에서는 이야기 · 샷을 바꾸지 않아요. Writer 콘티에서 고쳐요.',
   // 보드 진행 줄 · 화면 설명 · 첫 진입 안내.
   'Storyboard progress': '스토리보드 진행 현황',
   'Not real yet': '실사 없음',

@@ -1,4 +1,4 @@
-// Director 샷 상세(스토리보드형 팝업 · 노드형 왼쪽 패널)에 그 샷의 대사가 늘 보이는지 — 영상이 쓰는 그 Writer 샷의 대사, 대사 없음과 넣을 곳 · 고칠 곳 안내, Writer 자료를 아직 못 읽었으면 "대사 없음" 대신 불러오는 중 · 불러오지 못함 — 을 상세를 실제로 그려 검사한다 (오너 2026-11-27 P1 · 검토 rev-flow-2-2)
+// Director 샷 상세(스토리보드형 팝업 · 노드형 왼쪽 패널)에 그 샷의 대사가 늘 보이고 줄을 눌러 그 자리에서 고치는지 — 영상이 쓰는 그 Writer 샷의 대사, 대사 없음과 넣을 곳 · 고칠 곳 안내, Writer 자료를 아직 못 읽었으면 "대사 없음" 대신 불러오는 중 · 불러오지 못함, 공유 보기, 팝업의 Esc — 을 상세를 실제로 그려 검사한다 (오너 2026-11-27 P1 · Q1 · 검토 rev-flow-2-2)
 import { createElement } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -12,6 +12,29 @@ vi.mock('@/lib/use-debug-prompts', () => ({ useDebugPrompts: () => false }))
 vi.mock('@/lib/billing/use-take-balance', () => ({ useTakeBalance: () => ({ balance: 100, mode: 'shadow', loading: false }), fetchTakeBalance: async () => ({ failed: false }) }))
 // 정적 그리기에는 누르기가 없다 — 단추는 그대로 그리고, data-testid 가 있는 단추의 누르기만 받아 둔다(시험이 대신 누른다).
 const clicks = vi.hoisted(() => new Map<string, () => void>())
+// 대사 줄(DialogueLineRow)의 props · 저장 · 공유 보기 · 팝업 창의 Esc 처리 — 시험이 대신 누른다.
+const ui = vi.hoisted(() => ({ demo: false, rows: [] as Array<Record<string, unknown>>, saves: [] as Array<{ shotId: string; lines: unknown }>, escape: null as null | ((event: unknown) => void) }))
+vi.mock('@/lib/demo/context', async (original) => ({ ...(await original<typeof import('@/lib/demo/context')>()), isDemoSession: () => ui.demo }))
+vi.mock('@/features/writer/dialogue-line-save', async (original) => ({
+  ...(await original<typeof import('@/features/writer/dialogue-line-save')>()),
+  saveShotDialogue: async (shotId: string, lines: unknown) => { ui.saves.push({ shotId, lines }) },
+}))
+vi.mock('@/features/writer/dialogue-line-row', async (original) => {
+  const real = await original<typeof import('@/features/writer/dialogue-line-row')>()
+  const { createElement: h } = await import('react')
+  return { ...real, DialogueLineRow: (props: Parameters<typeof real.DialogueLineRow>[0]) => { ui.rows.push(props as unknown as Record<string, unknown>); return h(real.DialogueLineRow, props) } }
+})
+vi.mock('@/components/ui/dialog', async (original) => {
+  const real = await original<typeof import('@/components/ui/dialog')>()
+  const { createElement: h } = await import('react')
+  type Props = { children?: unknown; className?: string; open?: boolean; onEscapeKeyDown?: (event: unknown) => void }
+  return {
+    ...real,
+    Dialog: ({ open, children }: Props) => (open ? children : null),
+    DialogContent: ({ children, className, onEscapeKeyDown }: Props) => { ui.escape = onEscapeKeyDown ?? null; return h('div', { className }, children as never) },
+    DialogTitle: ({ children }: Props) => h('h2', null, children as never),
+  }
+})
 vi.mock('@/components/ui/button', async (original) => {
   const real = await original<typeof import('@/components/ui/button')>()
   const { createElement: h } = await import('react')
@@ -26,6 +49,7 @@ vi.mock('@/components/ui/button', async (original) => {
 })
 
 import { DirectorShotDetail } from '@/features/director/shot-detail/director-shot-detail'
+import { DirectorNodePopup } from '@/features/director/canvas-popups/DirectorNodePopup'
 import { shotDetailDialogue } from '@/lib/director/shot-detail'
 import { dialogueLinesView } from '@/lib/writer/board-card'
 import { translate } from '@/lib/i18n/translate'
@@ -46,8 +70,8 @@ const WRITER_SHOTS = [
   { shotId: 'sh_01_02', sceneId: 'sc_01', sortOrder: 0, dialogueLines: [{ characterId: 'mina', text: '가자, 버스 온다.' }, { characterId: null, text: '그날 밤은 길었다.' }] },
   { shotId: 'sh_01_03', sceneId: 'sc_01', sortOrder: 1, dialogueLines: [{ characterId: 'mina', text: '  ' }] },
 ] as unknown as Shot[]
-const EDIT_HINT = 'Edit the dialogue in the rough storyboard on the Writer screen or in the Dialogue tab on Storyboard. New videos use the edited dialogue.'
-const ADD_HINT = 'Add dialogue in the rough storyboard on the Writer screen. New videos use the added dialogue.'
+const EDIT_HINT = "Click a line to edit it here. To change who speaks or to add or delete lines, use the chat or Writer's rough storyboard. New videos use the edited dialogue."
+const ADD_HINT = "To add dialogue, use the chat or Writer's rough storyboard. New videos use the added dialogue."
 const LOADING = 'Loading the dialogue…'
 const FAILED = "Couldn't load the dialogue."
 const RETRY = 'Load it again'
@@ -83,6 +107,10 @@ const shown = (text: string) => text.replaceAll('&', '&amp;').replaceAll("'", '&
 
 beforeEach(() => {
   clicks.clear()
+  ui.demo = false
+  ui.rows = []
+  ui.saves = []
+  ui.escape = null
   director.setState({ projectId: PROJECT, nodes: [], edges: [], realBatchBusy: false, generatingNodeIds: {} })
   shotId = director.getState().addShotNode(null, { x: 0, y: 0 })
   director.getState().updateNodeData<'shot'>(shotId, { storyboardImage: IMAGE })
@@ -114,9 +142,10 @@ describe('Director 샷 상세의 대사', () => {
     ])
   })
 
-  // 왜(오너 P1 "카드 클릭 시 나타나는 팝업에 대사 꼭 보이게"): 카드는 대사 첫 줄만 보인다 — 상세에서 그 샷의 대사 전부를 누가 하는지와 함께 보고,
-  //   여기서는 보기만 하니 고칠 곳과 고친 대사가 새로 만드는 영상부터 들어간다는 것을 알린다(이미 만든 Take 는 그대로).
-  it('대사가 있는 샷의 상세는 대사 칸에 줄마다 말하는 사람과 대사를 보이고, 고칠 곳과 새 영상부터 들어간다는 안내를 단다', () => {
+  // 왜(오너 P1 "카드 클릭 시 나타나는 팝업에 대사 꼭 보이게" · Q1 "추천대로"): 카드는 대사 첫 줄만 보인다 — 상세에서 그 샷의 대사 전부를 누가 하는지와 함께 보고,
+  //   줄을 누르면 여기서 바로 고친다는 것과 고친 대사가 새로 만드는 영상부터 들어간다는 것을 알린다(이미 만든 Take 는 그대로).
+  //   (2026-11-27 이름 바꿈 · 오너 Q1 — 옛 이름 '대사가 있는 샷의 상세는 대사 칸에 줄마다 말하는 사람과 대사를 보이고, 고칠 곳과 새 영상부터 들어간다는 안내를 단다')
+  it('대사가 있는 샷의 상세는 대사 칸에 줄마다 말하는 사람과 대사를 보이고, 줄을 누르면 여기서 바로 고친다는 것과 새 영상부터 들어간다는 안내를 단다', () => {
     const block = dialogueBlock(render('sh_01_02'))
     expect(block).toContain(ko('Dialogue'))
     expect(block).toContain('미나')
@@ -128,8 +157,9 @@ describe('Director 샷 상세의 대사', () => {
     expect(block).not.toContain(ko(ADD_HINT))
   })
 
-  // 왜(검토 3번): Storyboard 대사 탭은 이미 있는 줄의 글만 고친다 — 대사 없는 샷에 "대사 탭에서 고쳐요"라고 하면 가도 누를 줄이 없다. 대사를 넣는 곳은 Writer 콘티다.
-  it('대사가 없는 샷의 상세는 "대사 없음"과 함께 대사는 Writer 콘티에서 넣는다는 안내를 달고, 대사 탭에서 고친다는 안내는 달지 않는다', () => {
+  // 왜(검토 3번 · 오너 Q1): 상세 · 대사 탭은 이미 있는 줄의 글만 고친다 — 대사 없는 샷에 대사를 넣는 곳은 채팅이나 Writer 콘티다.
+  //   (2026-11-27 이름 바꿈 · 오너 Q1 — 옛 이름 '대사가 없는 샷의 상세는 "대사 없음"과 함께 대사는 Writer 콘티에서 넣는다는 안내를 달고, 대사 탭에서 고친다는 안내는 달지 않는다')
+  it('대사가 없는 샷의 상세는 "대사 없음"과 함께 대사는 채팅이나 Writer 콘티에서 넣는다는 안내를 달고, 줄을 고친다는 안내는 달지 않는다', () => {
     const block = dialogueBlock(render('sh_01_03'))
     expect(block).toContain(ko('Dialogue'))
     expect(block).toContain(ko('No dialogue'))
@@ -204,7 +234,7 @@ describe('Director 샷 상세의 대사', () => {
     const empty = dialogueBlock(render('sh_01_03'))
     expect(empty).toContain('Dialogue')
     expect(empty).toContain('No dialogue')
-    expect(empty).toContain(ADD_HINT)
+    expect(empty).toContain(shown(ADD_HINT))
     useWriterStore.setState({ loadedProjectId: null, loadAttempt: { projectId: PROJECT, status: 'loading' } })
     const loading = dialogueBlock(render('sh_01_02'))
     expect(loading).toContain(LOADING)
@@ -214,5 +244,53 @@ describe('Director 샷 상세의 대사', () => {
     expect(failed).toContain(RETRY)
     for (const block of [empty, loading, failed]) expect(block).not.toMatch(/[가-힣]/)
     for (const text of [ADD_HINT, LOADING, FAILED]) expect(ko(text), text).not.toBe(text)
+  })
+})
+
+describe('Director 샷 상세에서 대사 고치기', () => {
+  type Row = { text: string; label: string; onStart: () => void; onDraftChange: (draft: string) => void; onCommit: (via: 'key' | 'blur') => void }
+  // 왜(오너 Q1 "추천대로"): Director 에서 영상을 보다가 대사를 그 자리에서 고친다 — 대사 탭과 같은 키 · 규칙 · 저장 길이라, 새로 만드는 영상(Take)이 고친 대사를 쓴다.
+  it('Director 샷 상세의 대사 줄을 누르면 그 자리에서 고치고, Enter 로 끝내면 그 Writer 샷 대사에서 그 줄 글만 바꿔 대사 탭과 같은 길로 저장한다', () => {
+    render('sh_01_02')
+    const row = ui.rows.find((props) => props.text === '그날 밤은 길었다.') as unknown as Row | undefined
+    expect(row).toBeDefined()
+    expect(row!.label).toBe('대사 2 (V.O.) 고치기')
+    row!.onStart()
+    row!.onDraftChange('그날 밤은 짧았다.')
+    row!.onCommit('key')
+    expect(ui.saves).toEqual([{ shotId: 'sh_01_02', lines: [
+      { characterId: 'mina', text: '가자, 버스 온다.' },
+      { characterId: null, text: '그날 밤은 짧았다.' },
+    ] }])
+  })
+
+  // 왜(혼자 정한 것 — 고치기를 끄는 때): 공유 보기에서는 저장이 되지 않는다 — 누를 수 있게 보이거나 "여기서 고쳐요"라고 하면 틀린 말이다.
+  //   Director 에서 더한 샷 · Writer 자료를 못 읽은 때는 고칠 Writer 대사가 없다(위 시험들).
+  it('Director 샷 상세는 공유 보기에서 대사 줄을 눌러 고칠 수 없고, 여기서 고친다는 안내도 싣지 않는다', () => {
+    // 공유 보기에서는 캔버스 고치기도 막히므로 Writer 샷을 먼저 잇고 공유 보기로 그린다.
+    director.getState().updateNodeData<'shot'>(shotId, { writerShotId: 'sh_01_02' })
+    ui.demo = true
+    syncStores()
+    const block = dialogueBlock(renderToStaticMarkup(createElement(DirectorShotDetail, { shotNodeId: shotId, initialTab: 'image', layout: 'popup', onClose: () => {} })))
+    expect(ui.rows).toEqual([])
+    expect(block).toContain('가자, 버스 온다.')
+    expect(block).not.toContain('role="button"')
+    expect(block).not.toContain(ko(EDIT_HINT))
+  })
+
+  // 왜: 팝업 창은 Esc 를 먼저 받아 닫는다(Radix) — 줄을 고치다 Esc 로 그만두면 영상 · 이미지 탭까지 닫힌다. 고치는 줄 밖의 Esc 는 지금처럼 닫는다.
+  it('Director 샷 팝업에서 대사 줄을 고치는 중 Esc 는 팝업을 닫지 않고, 고치는 줄 밖에서 누른 Esc 는 지금처럼 닫는다', () => {
+    director.getState().updateNodeData<'shot'>(shotId, { writerShotId: 'sh_01_02' })
+    director.setState({ viewMode: 'storyboard', detailNodeId: shotId, detailTab: 'image' })
+    syncStores()
+    renderToStaticMarkup(createElement(DirectorNodePopup))
+    expect(ui.escape).toBeTypeOf('function')
+    const press = (editing: boolean) => {
+      const event = { target: { closest: (selector: string) => (editing && selector.includes('data-state="editing"') ? {} : null) }, preventDefault: vi.fn() }
+      ui.escape!(event)
+      return event.preventDefault
+    }
+    expect(press(true)).toHaveBeenCalledOnce()
+    expect(press(false)).not.toHaveBeenCalled()
   })
 })

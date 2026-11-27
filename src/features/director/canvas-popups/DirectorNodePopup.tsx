@@ -12,6 +12,7 @@ import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
 import { DirectorShotDetail } from '@/features/director/shot-detail/director-shot-detail'
 import { useBoardNodeNames } from '@/features/director/hooks/use-board-node-names'
 import { directorNodeLabel } from '@/features/director/node-label'
+import { keepOpenWhileEditingLine } from '@/features/writer/use-dialogue-line-edits'
 
 /**
  * popupNodeId 기반으로 노드 종류별 popup으로 라우팅.
@@ -45,7 +46,8 @@ export function DirectorNodePopup() {
   if (shotNodeId) {
     return (
       <Dialog open onOpenChange={(open) => { if (!open) useDirectorCanvasStore.getState().closeShotDetail() }}>
-        <DialogContent frame="work" className="max-h-[92vh] overflow-y-auto sm:max-w-[1000px]">
+        {/* 대사 칸에서 줄을 고치는 중 Esc 는 고치기만 취소한다 — 창이 Esc 를 먼저 받아 닫지 않게(오너 Q1). */}
+        <DialogContent frame="work" className="max-h-[92vh] overflow-y-auto sm:max-w-[1000px]" onEscapeKeyDown={keepOpenWhileEditingLine}>
           <DialogTitle className="sr-only">{shotNode ? directorNodeLabel(shotNode.data, boardNames) : ''}</DialogTitle>
           <DirectorShotDetail
             key={`${node.id}:${shownId === detailNodeId ? detailTab : ''}`}

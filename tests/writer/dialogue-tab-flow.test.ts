@@ -231,14 +231,26 @@ describe('대사 탭 바로 고치기 — 누르기 · 끝내기', () => {
     expect(props(lineRow(FIRST))).toMatchObject({ state: { kind: 'idle' }, text: '아, 민호는 또야?' })
   })
 
-  // 왜: 리드 지시(빈 글은 저장하지 않고 원래 글로) — 실수로 다 지운 것과 줄 지우기를 구분한다. 줄 지우기는 샷 고치기 창에서 한다.
+  // 왜: 리드 지시(빈 글은 저장하지 않고 원래 글로) — 실수로 다 지운 것과 줄 지우기를 구분한다.
+  //   줄 지우기는 콘티에서는 샷 고치기 창, Storyboard(이 시험의 화면)에서는 채팅이나 Writer 콘티다 — Storyboard 연필은 줄을 못 지우는 샷 팝업을 연다
+  //   (2026-11-27 기대 바꿈 · 오너 Q1 "Storyboard 대사 탭의 틀린 안내 바로잡기" — 예전 기대 '…연필 단추로 샷 고치기 창을 여세요.').
   it('대사 글을 다 지우고 끝내면 저장하지 않고 원래 글로 되돌린다', () => {
     props(lineRow(FIRST)).onStart()
     props(lineRow(FIRST)).onDraftChange('   ')
     props(lineRow(FIRST)).onCommit('key')
     expect(saves.calls).toEqual([])
-    expect(toast.info).toHaveBeenCalledWith('빈 대사는 저장하지 않아요. 줄을 지우려면 연필 단추로 샷 고치기 창을 여세요.')
+    expect(toast.info).toHaveBeenCalledWith('빈 대사는 저장하지 않아요. 줄을 지우려면 채팅이나 Writer 콘티에서 지워요.')
     expect(props(lineRow(FIRST))).toMatchObject({ state: { kind: 'idle' }, text: '아, 민호는 또야?' })
+  })
+
+  // 왜(오너 Q1 — 화면마다 맞는 말): Writer 콘티의 연필은 줄을 지울 수 있는 샷 고치기 창을 연다 — 콘티 대사 탭은 지금 그 말 그대로다.
+  it('Writer 콘티 대사 탭에서 줄을 다 지우고 끝내면 지금처럼 연필 단추로 여는 샷 고치기 창에서 지우라고 알린다', () => {
+    useProjectStore.setState({ currentStage: 'conti' })
+    props(lineRow(FIRST)).onStart()
+    props(lineRow(FIRST)).onDraftChange('   ')
+    props(lineRow(FIRST)).onCommit('key')
+    expect(saves.calls).toEqual([])
+    expect(toast.info).toHaveBeenCalledWith('빈 대사는 저장하지 않아요. 줄을 지우려면 연필 단추로 샷 고치기 창을 여세요.')
   })
 
   // 왜(혼자 정한 것): 고치는 동안 채팅이 같은 샷의 대사를 바꾸면 줄 순서가 달라질 수 있다 — 엉뚱한 줄을 덮어쓰지 않는다.

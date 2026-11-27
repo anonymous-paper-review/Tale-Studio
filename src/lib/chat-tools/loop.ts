@@ -25,9 +25,13 @@ export async function runChatToolLoop(options: {
   maxCalls?: number
   maxSameFailure?: number
   onResult?: (outcome: ToolOutcome) => void
-  /** 사람이 앱 도구로 할 수 있는 글 고치기를 부탁했다 — 고치기 결과 없이 끝나지 않게 한 번 더 묻는다. Storyboard 채팅은 글을 고치지 않아 늘 끈다(오너 2026-11-27 N3). */
+  /** 사람이 앱 도구로 할 수 있는 글 고치기를 부탁했다 — 고치기 결과 없이 끝나지 않게 한 번 더 묻는다.
+   *  Storyboard 채팅은 대사 도구로 고치지만 결과를 다시 요구하지 않아 늘 끈다(오너 2026-11-27 N3 — 섞인 그림 요청 보호). */
   requireEdit?: boolean
-  /** 이 화면에서 실행하지 않을 호출이면 모델에 돌려줄 결과(Storyboard 의 고치기 — 검토 rev-flow 리드 2). 서버가 거절한 호출(rejectedToolCalls)과 같이 다룬다. */
+  /** 한 번 더 물어도 고치기 결과가 없으면 모델 답 · updates 를 그대로 둔다(Director · Storyboard — 검토 rev-video-3 중간 1).
+   *  끄면 지금처럼 일반 문구로 바꾸고 updates 를 버린다(다른 단계). 다시 묻는 말이 "결과 없이 됐다고 하지 말라"고 이미 시켰다. */
+  keepAnswerOnNoEdit?: boolean
+  /** 이 화면에서 실행하지 않을 호출이면 모델에 돌려줄 결과(Storyboard 의 대사 밖 고치기 — 검토 rev-flow 리드 2 · 오너 Q1). 서버가 거절한 호출(rejectedToolCalls)과 같이 다룬다. */
   refuse?: (call: ToolCall) => ToolResult | null
   /** The user explicitly asked to look up an image; a text answer must follow a storage read. */
   requireInspection?: boolean
@@ -88,6 +92,8 @@ export async function runChatToolLoop(options: {
             { role: 'user', content: [{ type: 'text', text: 'Execution check: the original user explicitly requested an edit supported by the app tools, but no edit was executed. Use read_project to inspect the target and edit_project to carry out the request. If the request is ambiguous or blocked, ask or explain the exact reason; do not claim completion without an edit result.' }] })
           continue
         }
+        // Director · Storyboard 는 모델의 답(고칠 수 없는 까닭 · 함께 낸 영상 만들기 등)을 지킨다(검토 rev-video-3 중간 1).
+        if (options.keepAnswerOnNoEdit) return { data, results, stopped: 'no_edit' }
         return { data: { reply: translate(options.locale ?? 'ko', 'The requested edit was not executed. Please specify the target and the change.'), trace: data.trace, contentLocale: data.contentLocale }, results, stopped: 'no_edit' }
       }
       if (options.requireInspection && (data.toolSupport === true || results.length > 0) && !results.some(outcome => outcome.call.name === 'inspect_project')) {
