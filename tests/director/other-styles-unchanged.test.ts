@@ -12,7 +12,7 @@ import { CASES, VIDEO_CASES } from '../fixtures/other-style-cases.mjs'
 const frozen = JSON.parse(readFileSync('tests/fixtures/other-style-prompts.json', 'utf8')) as Record<string, string>
 const parts = { buildRealGridPrompt, buildRealStripPrompt, buildVideoPrompt, compileMotionContract, buildCharacterTurnaroundPrompt, SHOT_REFERENCE_LABEL }
 const now = CASES(parts) as unknown as Record<string, string>
-type VideoCase = { videoMode?: string | null; generationMethod: string; referenceImageRoles?: string[]; startEndReference?: boolean }
+type VideoCase = { videoMode?: string | null; generationMethod: string; referenceImageRoles?: string[] }
 const videoCases = VIDEO_CASES(parts) as unknown as Record<string, VideoCase>
 
 function expectFrozen(kind: string) {
@@ -37,16 +37,15 @@ describe('일본 멜로와 다른 그림체는 지금 그대로', () => {
 })
 
 describe('혼자 정한 것', () => {
-  // 왜: 옛 고정은 서버가 더는 보내지 않는 모양(시작 · 끝 두 장 · 방식 없음)을 지키고 있었다(11/27 리드). 다시 그렇게 낡지 않게, 고정 경우가
-  //   지금 서버가 보내는 모양만 쓰는지 본다 — 방식 넷을 모두 담고(방식이 늘면 경우도 늘린다), 끝 그림 역할은 없고, 그림이 있는 영상은 늘 그림 역할을 싣는다.
-  it('다른 그림체 영상 고정 경우는 지금 서버가 보내는 모양만 쓴다 — 방식 넷을 모두 담고 끝 그림 역할은 없다', () => {
+  // 왜: 옛 고정은 서버가 더는 보내지 않는 모양(시작 · 끝 두 장 · 방식 없음)을 지키고 있었다(11/27 리드) — 고정 경우가 다시 그렇게 되지 않게 경우 쪽 규칙 셋만 본다
+  //   (방식이 늘면 경우도 늘린다). 서버가 넘기는 모양이 바뀌는 것은 이 시험이 아니라 video-modes 시험이 잡는다.
+  it('다른 그림체 영상 고정 경우는 방식 넷을 모두 담고, 끝 그림 역할이 없고, 그림이 있는 영상만 그림 역할을 싣는다', () => {
     const cases = Object.values(videoCases)
     expect(cases.length).toBeGreaterThan(0)
     expect([...new Set(cases.map((c) => c.videoMode).filter(Boolean))].sort()).toEqual([...VIDEO_MODES].sort())
     for (const [key, c] of Object.entries(videoCases)) {
       expect({ key, end: (c.referenceImageRoles ?? []).includes('end') }).toEqual({ key, end: false })
-      if (c.generationMethod === 'I2V') expect({ key, roles: (c.referenceImageRoles ?? []).length > 0 }).toEqual({ key, roles: true })
-      else expect({ key, images: !!c.referenceImageRoles?.length || !!c.startEndReference || !!c.videoMode }).toEqual({ key, images: false })
+      expect({ key, roles: (c.referenceImageRoles ?? []).length > 0 }).toEqual({ key, roles: c.generationMethod === 'I2V' })
     }
   })
 })
