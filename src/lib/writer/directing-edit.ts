@@ -34,8 +34,9 @@ import { moderatedSubmitInput } from '@/lib/moderation/creem'
 import { recordModerationPass } from '@/lib/api/moderation'
 import type { AppLocale } from '@/lib/locale'
 
-// locale 을 안 넘기는 호출부(rough-directing-edit/route.ts)가 조용히 안 깨지도록 기존 동작(항상
-//   한국어)을 기본값으로 보존한다 — producer-gate.ts/card-mention.ts 와 동일 취급.
+// 말을 모르는 길의 기본 말(예전 동작 그대로 한국어) — 라우트(rough-directing-edit)는 2026-11-27 P3 부터 모든 호출에 사용자 말(화면이 보낸 말 먼저)을 넘긴다.
+//   이 기본값이 쓰이는 곳: 끝 장 완료 처리(finalizeRoughEndFrameJob — 웹훅 길이라 사용자 말을 모른다) · inProjectFolder(오류를 삼켜 말이 나가지 않는다) ·
+//   함수를 직접 부르는 옛 시험. producer-gate.ts/card-mention.ts 와 동일 취급.
 const UNSPECIFIED_LOCALE_FALLBACK: AppLocale = 'ko'
 
 const GROK_EDIT_MODEL = 'xai/grok-imagine-image/edit'

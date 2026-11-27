@@ -16,6 +16,8 @@ import { useT } from '@/lib/i18n'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 import { redrawEndFrame } from '@/lib/writer/end-frame-ask'
 import { endRedrawDeps } from '@/features/writer/unsaved-arrows-confirm'
+import { directingEditHeaders } from '@/lib/writer/directing-edit-url'
+import { useLocaleStore } from '@/stores/locale-store'
 
 export type RoughFrameKey = 'start' | 'direction' | 'end'
 export const ROUGH_FRAME_ORDER: readonly RoughFrameKey[] = ['start', 'direction', 'end']
@@ -55,7 +57,7 @@ export function RoughFramesStill({
       toast.info(t('Redrawing the {frame}, about 30 seconds', { frame: labels[frame] }))
       const res = await fetch('/api/writer/rough-directing-edit', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: directingEditHeaders(useLocaleStore.getState().locale),
         body: JSON.stringify({ action: 'regenerate-frame', projectId, shotId, frame }),
       })
       const j = await res.json().catch(() => null)

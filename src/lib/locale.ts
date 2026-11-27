@@ -25,6 +25,14 @@ export function parseAppLocale(v: unknown): AppLocale | null {
   return v === 'en' || v === 'ko' ? v : null
 }
 
+/** 화면 말을 실어 보내는 요청 머리 — 화살표 편집 길(콘티 · 실사)이 쓴다. 요청 몸 모양은 출시 시험이 못 박아 머리로 보낸다(검토 rev-realarrow 2차). */
+export const UI_LOCALE_HEADER = 'x-ui-locale'
+
+/** 서버가 쓸 사용자 말 — 화면이 보낸 말 → 계정에 저장된 말(user_metadata.locale, 언어 메뉴를 눌렀을 때만 저장) → en. 채팅 라우트와 같은 차례. */
+export function requestUiLocale(sent: unknown, saved: unknown): AppLocale {
+  return parseAppLocale(sent) ?? parseAppLocale(saved) ?? 'en'
+}
+
 /** 잠긴 프로젝트는 콘텐츠 언어, 아직 잠기지 않았으면 현재 화면 언어를 따른다. */
 export function pickContentLocale(input: { projectLocale: AppLocale | null; locked: boolean | null; uiLocale: AppLocale }): AppLocale {
   if (input.projectLocale && input.locked !== false) return input.projectLocale
