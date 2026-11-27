@@ -1,7 +1,7 @@
 // [내보내기] 메뉴의 "마스터 시트 이미지로 저장"(2026-10-20 오너 "storyboard 탭에서 마스터시트 지워주고 export로 기능 빼줘").
 //   예전 Storyboard 마스터 시트 탭과 같은 시트 · 같은 파일(한 장이면 PNG, 여러 장이면 장마다 PNG 를 담은 ZIP)을 미리보기 없이 바로 받는다.
 //   그리기(캔버스) · 압축 · 내려받기는 호출부가 넘긴다 — 이 파일은 순서만 정한다(DOM 의존 없음).
-//   약속: tests/writer/master-sheet-export.test.ts · 시트 내용과 파일 이름: tests/writer/master-sheet.test.ts
+//   약속: tests/writer/master-sheet-export.test.ts · 받는 사이 프로젝트 바꾸기: tests/writer/master-sheet-project-switch.test.ts · 시트 내용과 파일 이름: tests/writer/master-sheet.test.ts
 import { buildMasterSheet, masterSheetExportPlan, type MasterSheetPage, type MasterSheetResult } from '@/lib/writer/master-sheet'
 import type { AppLocale } from '@/lib/locale'
 import type { ProjectFormat, SceneManifest, Shot } from '@/types'
@@ -15,8 +15,8 @@ export interface MasterSheetPageContext {
 }
 
 export interface MasterSheetExportDeps<Canvas> {
-  /** Storyboard 화면과 같은 자료(씬 · 샷 · 인물 · 배경). */
-  load: () => Promise<{ sceneManifest: SceneManifest | null; shots: readonly Shot[] }>
+  /** Storyboard 화면과 같은 자료(씬 · 샷 · 인물 · 배경). null = 받는 사이 다른 프로젝트로 바뀌어 받기를 시작한 그 프로젝트 자료가 아니다(masterSheetBoardFor). */
+  load: () => Promise<{ sceneManifest: SceneManifest | null; shots: readonly Shot[] } | null>
   /** 시트 글자를 찍을 언어 — 다른 내보내기처럼 프로젝트 언어. */
   projectLocale: () => Promise<AppLocale>
   renderPage: (page: MasterSheetPage, context: MasterSheetPageContext) => Promise<Canvas>
@@ -29,7 +29,21 @@ export interface MasterSheetExportDeps<Canvas> {
 
 export type MasterSheetExportOutcome =
   | { kind: 'empty' }
+  | { kind: 'project-changed' }
   | { kind: 'saved'; fileName: string; pages: number; missingFrameShots: number }
+
+/** 마스터 시트에 쓸 자료 — 받기를 시작한 그 프로젝트를 Writer 자료로 다 읽었을 때만 그 자료(P1 검토 고침의 뒤따름, 리드 2026-11-27).
+ *  그사이 다른 프로젝트로 바뀌었으면 null — 비었거나 새 프로젝트 자료로 처음 프로젝트 제목의 시트를 만들지 않는다.
+ *  같은 프로젝트인데 다 읽지 못했으면(씬 0개 · 읽기 실패) 빈 자료 — 지금처럼 "아직 씬 · 샷이 없어요"(store 에 남은 것은 쓰지 않는다). */
+export function masterSheetBoardFor(
+  projectId: string,
+  writer: { loadedProjectId: string | null; sceneManifest: SceneManifest | null; shots: readonly Shot[] },
+  currentProjectId: string | null,
+): { sceneManifest: SceneManifest | null; shots: readonly Shot[] } | null {
+  if (writer.loadedProjectId === projectId) return { sceneManifest: writer.sceneManifest, shots: writer.shots }
+  if (currentProjectId !== projectId) return null
+  return { sceneManifest: null, shots: [] }
+}
 
 /** Storyboard 자료로 마스터 시트를 만든다 — 샷이 없으면 null. */
 export function masterSheetFromBoard(input: {
@@ -64,12 +78,13 @@ export function masterSheetFromBoard(input: {
   })
 }
 
-/** 마스터 시트를 만들어 받는다. 씬 · 샷이 아직 없으면 아무것도 받지 않고 'empty'. */
+/** 마스터 시트를 만들어 받는다. 씬 · 샷이 아직 없으면 아무것도 받지 않고 'empty', 받는 사이 프로젝트가 바뀌었으면 'project-changed'. */
 export async function exportMasterSheet<Canvas>(
   input: { projectTitle: string; projectFormat: ProjectFormat | null },
   deps: MasterSheetExportDeps<Canvas>,
 ): Promise<MasterSheetExportOutcome> {
   const board = await deps.load()
+  if (!board) return { kind: 'project-changed' }
   const sheet = masterSheetFromBoard({ projectFormat: input.projectFormat, sceneManifest: board.sceneManifest, shots: board.shots })
   if (!sheet || sheet.pages.length === 0) return { kind: 'empty' }
   const context: MasterSheetPageContext = {

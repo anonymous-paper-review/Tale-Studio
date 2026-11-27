@@ -198,7 +198,7 @@ export function ExportMenu() {
     if (!projectId) return
     const toastId = toast.loading(t('Preparing the master sheet…'))
     try {
-      const [{ exportMasterSheet }, { renderMasterSheetPageCanvas, canvasToPngBlob }, { useWriterStore }, { default: JSZip }] = await Promise.all([
+      const [{ exportMasterSheet, masterSheetBoardFor }, { renderMasterSheetPageCanvas, canvasToPngBlob }, { useWriterStore }, { default: JSZip }] = await Promise.all([
         import('@/lib/export/master-sheet'),
         import('@/features/writer/master-sheet-render'),
         import('@/stores/writer-store'),
@@ -211,8 +211,8 @@ export function ExportMenu() {
             // 30초 보관본을 거치지 않는다 — 러프를 다 그린 직후에 받아도 새 그림이 들어가게(검토 지적).
             await invalidateShots(projectId)
             await useWriterStore.getState().loadProject()
-            const { sceneManifest, shots } = useWriterStore.getState()
-            return { sceneManifest, shots }
+            // 받는 사이 다른 프로젝트로 바꿨으면 그 자료(비었거나 새 프로젝트 것)로 시트를 만들지 않는다 — 받기를 시작한 프로젝트를 다 읽었을 때만(P1 검토 뒤따름 2026-11-27).
+            return masterSheetBoardFor(projectId, useWriterStore.getState(), useProjectStore.getState().projectId)
           },
           projectLocale: () => fetchProjectLocale(projectId),
           renderPage: renderMasterSheetPageCanvas,
@@ -231,6 +231,10 @@ export function ExportMenu() {
       )
       if (outcome.kind === 'empty') {
         toast.error(t('No scenes or shots generated yet'), { id: toastId })
+        return
+      }
+      if (outcome.kind === 'project-changed') {
+        toast.error(t("The project changed, so the master sheet wasn't downloaded. Please download it again."), { id: toastId })
         return
       }
       toast.success(t('Downloaded the master sheet.'), { id: toastId })
