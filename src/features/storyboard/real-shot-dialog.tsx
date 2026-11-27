@@ -2,7 +2,8 @@
 
 // Storyboard 샷 상세(오너 2026-11-26 m1126 O7 · 혼자 정한 것 g · h) — 카드를 누르면(대사 탭의 연필도) 열린다. 시안 없음.
 //   왼쪽: 큰 그림(실사, 없으면 콘티 그림에 "콘티" 꼬리표) · 샷 글. 오른쪽: 대사(읽기만) · "바꾸고 싶은 점" + [채팅으로 고치기].
-//   대사 칸은 늘 보인다(오너 2026-11-27 P1) — 없으면 "대사 없음", 이 화면의 대사 탭에서 바로 고칠 수 있다고 안내한다(components/shot-dialogue, Director 상세와 같은 부품).
+//   대사 칸은 늘 보인다(오너 2026-11-27 P1) — 대사가 있으면 이 화면의 대사 탭에서 바로 고칠 수 있다고, 없으면 "대사 없음"과 Writer 콘티에서 넣는다고 안내한다
+//   (대사 탭은 있는 줄의 글만 고친다 — 검토 rev-flow-2-2 3번, components/shot-dialogue, Director 상세와 같은 부품).
 //   고치기는 생성 요청을 바로 부르지 않는다 — Director 샷 상세(O5)와 같은 [Lumi 에게 고쳐 달라고 하기]로 채팅에 보내고 창을 닫는다(lib/storyboard/fix-in-chat).
 //   채팅이 그 샷 실사를 다시 그리고,
 //   그리는 동안 그 카드에만 기다림이 뜬다. 그 샷을 그리는 중이면 고치기를 끄고 까닭을 보인다(같은 샷 두 번 맡기기는 서버가 거절한다).
@@ -213,6 +214,7 @@ function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClos
             characterNames={nameOf}
             entityNames={entityNames}
             hint={t('You can also edit the dialogue right in the Dialogue tab of this screen.')}
+            emptyHint={t('Add dialogue in the rough storyboard on the Writer screen.')}
           />
           <label className="flex flex-col gap-2">
             <span className="text-label font-semibold text-foreground">{t('What to change')}</span>

@@ -197,10 +197,31 @@ export function imageChangedForTake(image: StoryboardImage | null | undefined, t
   return imageChangedSinceTake(sameStart.length ? Math.min(...sameStart) : image.generatedAt, take)
 }
 
+/** Writer 자료(씬 · 샷)가 그 캔버스 프로젝트 것으로 다 와 있나(P1 검토 2026-11-27) — 대사 칸은 다 와 있을 때만 "대사 없음"이라고 말한다.
+ *  ready = 그 프로젝트를 다 읽었다 · failed = 가장 나중 읽기가 그 프로젝트를 못 읽었다 · loading = 그 밖(읽는 중, 아직 시작 전 — 새로 고침 직후 프로젝트가 정해지기 전 —, 다른 프로젝트 자료뿐).
+ *  약속: tests/director/shot-detail-dialogue.test.ts · tests/writer/load-project.test.ts */
+export type WriterLoadView = 'ready' | 'loading' | 'failed'
+export function writerLoadFor(
+  load: { loadedProjectId: string | null; loadAttempt: { projectId: string; status: 'loading' | 'failed' } | null },
+  projectId: string | null | undefined,
+): WriterLoadView {
+  if (!projectId) return 'loading'
+  if (load.loadedProjectId === projectId) return 'ready'
+  return load.loadAttempt?.projectId === projectId && load.loadAttempt.status === 'failed' ? 'failed' : 'loading'
+}
+
 /** 샷 상세의 대사(오너 2026-11-27 P1) — 영상이 쓰는 것과 같은 그 Writer 샷(writerShotId)의 대사. 영상 서버도 낼 때 shots.dialogue_lines 를 읽는다(video-submit).
- *  editable = 고칠 Writer 샷이 있다(Writer 콘티 · Storyboard 대사 탭). Director 에서 손으로 더한 샷은 Writer 샷이 없어 대사도 고칠 곳도 없다.
+ *  editable = 고칠 Writer 샷이 있다(대사가 있으면 Writer 콘티 · Storyboard 대사 탭에서 고치고, 없으면 Writer 콘티에서 넣는다).
+ *  Director 에서 손으로 더한 샷은 Writer 샷이 없어 대사도 고칠 곳도 없다 — Writer 자료를 기다리지 않는다.
+ *  Writer 자료가 그 프로젝트 것으로 다 오기 전(load ≠ ready)에는 대사를 말하지 않는다(검토 1 · 2번).
  *  약속: tests/director/shot-detail-dialogue.test.ts */
-export function shotDetailDialogue(writerShots: ReadonlyArray<Pick<Shot, 'shotId' | 'dialogueLines'>>, writerShotId: string | null | undefined): { lines: DialogueLine[]; editable: boolean } {
-  const shot = writerShotId ? writerShots.find((item) => item.shotId === writerShotId) : undefined
-  return shot ? { lines: shot.dialogueLines ?? [], editable: true } : { lines: [], editable: false }
+export function shotDetailDialogue(
+  writerShots: ReadonlyArray<Pick<Shot, 'shotId' | 'dialogueLines'>>,
+  writerShotId: string | null | undefined,
+  load: WriterLoadView,
+): { status: WriterLoadView; lines: DialogueLine[]; editable: boolean } {
+  if (!writerShotId) return { status: 'ready', lines: [], editable: false }
+  if (load !== 'ready') return { status: load, lines: [], editable: false }
+  const shot = writerShots.find((item) => item.shotId === writerShotId)
+  return shot ? { status: 'ready', lines: shot.dialogueLines ?? [], editable: true } : { status: 'ready', lines: [], editable: false }
 }
