@@ -3,7 +3,8 @@
 // Director 샷 상세(디자이너 11/13 시안 D6 · D7, 오너 2026-11-14) — 샷 하나에 이미지 · 영상 탭.
 //   스토리보드형은 팝업(DirectorNodePopup), 노드형은 왼쪽 패널(DirectorDetailPanel)이 이 부품을 같은 내용으로 연다.
 //   두 탭 위에 그 샷의 대사 칸(오너 2026-11-27 P1) — 영상이 쓰는 그 Writer 샷(writerShotId)의 대사, 없으면 "대사 없음"(components/shot-dialogue, Storyboard 팝업과 같은 부품).
-//   여기서는 보기만 한다 — 고칠 곳(Writer 콘티 · Storyboard 대사 탭)과 새 영상부터 들어간다는 것만 알린다.
+//   여기서는 보기만 한다 — 대사가 있으면 고칠 곳(Writer 콘티 · Storyboard 대사 탭), 없으면 넣을 곳(Writer 콘티)과 새 영상부터 들어간다는 것만 알린다.
+//   Writer 자료가 이 캔버스 프로젝트 것으로 다 오기 전에는 "대사 없음" 대신 불러오는 중 · 불러오지 못함(+ [다시 불러오기])(검토 rev-flow-2-2 1 · 2번).
 //   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts · shot-detail-dialogue.test.ts
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
@@ -11,7 +12,7 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useT } from '@/lib/i18n'
 import { countText } from '@/lib/i18n/count-text'
 import { cn } from '@/lib/utils'
-import { latestShotTake, shotDetailDialogue, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings, videoTabLabelKey, type ShotDetailTab } from '@/lib/director/shot-detail'
+import { latestShotTake, shotDetailDialogue, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings, videoTabLabelKey, writerLoadFor, type ShotDetailTab } from '@/lib/director/shot-detail'
 import { ShotDialogue } from '@/components/shot-dialogue'
 import { manifestEntities } from '@/lib/writer/resolve-entity-names'
 import { useWriterStore } from '@/stores/writer-store'
@@ -61,6 +62,10 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   // 대사는 Writer 샷에서 — Director 화면에도 Writer 씬 · 샷이 올라와 있다(use-writer-director-sync). 영상 서버가 읽는 칸과 같다.
   const writerShots = useWriterStore((s) => s.shots)
   const sceneManifest = useWriterStore((s) => s.sceneManifest)
+  // 그 자료가 이 캔버스 프로젝트 것으로 다 왔을 때만 대사를 말한다 — 샷 id 는 프로젝트마다 겹친다(sh_01_01 …).
+  const canvasProjectId = useDirectorCanvasStore((s) => s.projectId)
+  const loadedProjectId = useWriterStore((s) => s.loadedProjectId)
+  const loadAttempt = useWriterStore((s) => s.loadAttempt)
   const node = nodes.find((n) => n.id === shotNodeId)
   const imageGeneration = useStoryboardImageGeneration(node && isShotData(node.data) ? node.data : null)
   if (!node || !isShotData(node.data)) return null
@@ -99,7 +104,7 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   }
   // 제목 아래 줄은 씬 이름 · 길이만(오너 2026-11-26 D3) — 이미지 생성 프롬프트는 이미지 탭의 프롬프트 칸에서 보고 고친다.
   const meta = [scene ? directorNodeLabel(scene.data, boardNames) : null, t('{seconds}s', { seconds: data.durationSeconds })].filter(Boolean).join(' · ')
-  const dialogue = shotDetailDialogue(writerShots, data.writerShotId)
+  const dialogue = shotDetailDialogue(writerShots, data.writerShotId, writerLoadFor({ loadedProjectId, loadAttempt }, canvasProjectId))
   const characterNames = new Map((sceneManifest?.characters ?? []).map((c) => [c.characterId, c.name]))
 
   return (
@@ -126,7 +131,10 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
         lines={dialogue.lines}
         characterNames={characterNames}
         entityNames={manifestEntities(sceneManifest)}
+        status={dialogue.status}
+        onRetry={() => void useWriterStore.getState().loadProject()}
         hint={dialogue.editable ? t('Edit the dialogue in the rough storyboard on the Writer screen or in the Dialogue tab on Storyboard. New videos use the edited dialogue.') : null}
+        emptyHint={dialogue.editable ? t('Add dialogue in the rough storyboard on the Writer screen. New videos use the added dialogue.') : null}
       />
       {tab === 'image'
         ? <ShotImageTab nodeId={shotNodeId} data={data} layout={layout} makeVideo={makeVideo} />

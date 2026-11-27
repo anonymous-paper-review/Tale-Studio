@@ -1792,6 +1792,11 @@ export const KO: Record<string, string> = {
   // 샷 팝업의 대사 칸 안내(오너 2026-11-27 P1) — Storyboard 팝업은 같은 화면의 대사 탭, Director 상세는 고칠 곳 둘과 새 영상부터 들어간다는 것.
   'You can also edit the dialogue right in the Dialogue tab of this screen.': '대사는 이 화면의 대사 탭에서 바로 고칠 수도 있어요.',
   'Edit the dialogue in the rough storyboard on the Writer screen or in the Dialogue tab on Storyboard. New videos use the edited dialogue.': '대사는 Writer 콘티나 Storyboard 대사 탭에서 고쳐요. 고친 대사는 새로 만드는 영상부터 들어가요.',
+  // 대사 없는 샷은 대사 탭에 누를 줄이 없다 — 넣는 곳은 Writer 콘티(P1 검토 rev-flow-2-2 3번). 대사를 아직 못 읽었으면 "대사 없음" 대신(검토 1번).
+  'Add dialogue in the rough storyboard on the Writer screen.': '대사는 Writer 콘티에서 넣어요.',
+  'Add dialogue in the rough storyboard on the Writer screen. New videos use the added dialogue.': '대사는 Writer 콘티에서 넣어요. 넣은 대사는 새로 만드는 영상부터 들어가요.',
+  'Loading the dialogue…': '대사를 불러오는 중…',
+  "Couldn't load the dialogue.": '대사를 불러오지 못했어요.',
   Duration: '길이',
   // ── misc: queue/page.tsx ──
   'In progress': '진행 중',

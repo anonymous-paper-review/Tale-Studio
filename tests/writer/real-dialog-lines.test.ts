@@ -1,4 +1,4 @@
-// Storyboard 카드를 누르면 뜨는 샷 팝업에 대사가 늘 보이는지 — 대사 없는 샷도 "대사" 자리와 "대사 없음", 말하는 사람은 보드 카드와 같은 이름, 한국어 · 영어 — 를 검사한다 (오너 2026-11-27 P1)
+// Storyboard 카드를 누르면 뜨는 샷 팝업에 대사가 늘 보이는지 — 대사 없는 샷도 "대사" 자리와 "대사 없음", 말하는 사람은 보드 카드와 같은 이름, 대사가 있으면 대사 탭 · 없으면 Writer 콘티로 안내, 한국어 · 영어 — 를 검사한다 (오너 2026-11-27 P1 · 검토 rev-flow-2-2)
 import { createElement, type ReactNode } from 'react'
 import { renderToStaticMarkup } from 'react-dom/server'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -44,6 +44,8 @@ import { translate } from '@/lib/i18n/translate'
 
 // 이 시험을 위해 지은 보드 — 샷 a 는 대사 두 줄(미나 · 내레이션), 샷 b 는 대사가 없다(빈 줄 하나만).
 const conti = { url: 'https://x/rough.png', status: 'completed', errorMessage: null, generatedAt: 1, frames: { start: 'https://x/s.png', direction: 'https://x/d.png', end: 'https://x/e.png' } }
+const TAB_HINT = 'You can also edit the dialogue right in the Dialogue tab of this screen.'
+const ADD_HINT = 'Add dialogue in the rough storyboard on the Writer screen.'
 const dialog = (shotId: string) => renderToStaticMarkup(createElement(RealShotDialog, { shotId, onOpenChange: () => {} }))
 /** 대사 칸만 — 다른 칸(바꾸고 싶은 점 등)의 글과 섞어 읽지 않게. */
 const dialogueBlock = (html: string) => {
@@ -83,8 +85,18 @@ describe('Storyboard 샷 팝업의 대사', () => {
   })
 
   // 왜(오너 P1 · 2026-11-02 "대사 탭에서 바로 고치기"): 팝업은 대사를 보기만 한다 — 같은 화면의 대사 탭에서 바로 고칠 수 있다는 것을 거기서 알린다.
-  it('팝업의 대사 칸은 이 화면의 대사 탭에서 바로 고칠 수 있다고 안내한다', () => {
-    expect(dialogueBlock(dialog('a'))).toContain(translate('ko', 'You can also edit the dialogue right in the Dialogue tab of this screen.'))
+  it('대사가 있는 샷의 팝업은 이 화면의 대사 탭에서 바로 고칠 수 있다고 안내한다', () => {
+    const block = dialogueBlock(dialog('a'))
+    expect(block).toContain(translate('ko', TAB_HINT))
+    expect(block).not.toContain(translate('ko', ADD_HINT))
+  })
+
+  // 왜(검토 3번): 대사 탭은 이미 있는 줄의 글만 고친다 — 대사 없는 샷은 대사 탭에 누를 줄이 없고, 그 줄의 연필은 이 팝업으로 돌아온다. 대사를 넣는 곳은 Writer 콘티다.
+  it('대사가 없는 샷의 팝업은 대사 탭 안내 대신, 대사는 Writer 콘티에서 넣는다고 안내한다', () => {
+    const block = dialogueBlock(dialog('b'))
+    expect(block).toContain(translate('ko', ADD_HINT))
+    expect(block).not.toContain(translate('ko', TAB_HINT))
+    expect(translate('ko', ADD_HINT)).not.toBe(ADD_HINT)
   })
 
   // 왜(화면 문구 두 말 규칙): 영어 화면에서는 대사 칸의 머리 · 없음 · 안내가 영어다 — 한국어가 섞이면 안 된다.
@@ -94,7 +106,7 @@ describe('Storyboard 샷 팝업의 대사', () => {
     const block = dialogueBlock(dialog('b'))
     expect(block).toContain('Dialogue')
     expect(block).toContain('No dialogue')
-    expect(block).toContain('You can also edit the dialogue right in the Dialogue tab of this screen.')
+    expect(block).toContain(ADD_HINT)
     expect(block).not.toMatch(/[가-힣]/)
   })
 })

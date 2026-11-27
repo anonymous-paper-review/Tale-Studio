@@ -218,10 +218,18 @@ function notifySaveError(message: string, detail?: string) {
   })
 }
 
+/** 가장 나중에 시작한 Writer 자료 읽기의 상태(P1 검토 2026-11-27) — 다 읽으면 남기지 않는다. */
+export type WriterLoadAttempt = { projectId: string; status: 'loading' | 'failed' }
+
 interface WriterState {
   sceneManifest: SceneManifest | null
   shots: Shot[]
   error: string | null
+  /** 지금 들고 있는 씬 · 샷이 어느 프로젝트를 다 읽은 것인지 — loadProject 가 씬 · 샷을 다 읽어 넣었을 때만 정하고, 비우면 null(P1 검토 2026-11-27).
+   *  Director 샷 상세의 대사 칸은 이것이 캔버스 프로젝트일 때만 "대사 없음"이라고 말한다(lib/director/shot-detail writerLoadFor). */
+  loadedProjectId: string | null
+  /** 가장 나중에 시작한 loadProject 가 아직 읽는 중이거나 못 읽은 프로젝트 — 다 읽으면 null. 못 읽음 = 오류 · 씬 0개 · 샷 목록 오류. */
+  loadAttempt: WriterLoadAttempt | null
 
   loadProject: () => Promise<void>
   /** Director 배선 2 (2026-09-06): 러프·previz 두 칸만 DB 로 다시 채운다 — 잡이 큐에서 빠진 순간 큐 훅이 부른다.
@@ -253,10 +261,15 @@ interface WriterState {
   reset: () => void
 }
 
+/** loadProject 차례 — 겹쳐 읽으면 가장 나중에 시작한 읽기만 읽는 중 · 못 읽음 표시를 정한다. */
+let loadSeq = 0
+
 export const useWriterStore = create<WriterState>((set, get) => ({
   sceneManifest: null,
   shots: [],
   error: null,
+  loadedProjectId: null,
+  loadAttempt: null,
 
   updateScene: (id, changes) => {
     if (isDemoSession()) return
@@ -894,6 +907,8 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       sceneManifest: null,
       shots: [],
       error: null,
+      loadedProjectId: null,
+      loadAttempt: null,
     }),
 
   generatePrevizVideo: async (shotId) => {
@@ -1010,6 +1025,12 @@ export const useWriterStore = create<WriterState>((set, get) => ({
   loadProject: async () => {
     const projectId = useProjectStore.getState().projectId
     if (!projectId) return
+    // 읽는 중 · 못 읽음 표시(P1 검토 2026-11-27) — 표시만 더했다. 돌려주는 값(없음)과 오류 삼키기는 그대로다.
+    const seq = ++loadSeq
+    const settle = (status: 'failed' | null) => {
+      if (seq === loadSeq) set({ loadAttempt: status ? { projectId, status } : null })
+    }
+    set({ loadAttempt: { projectId, status: 'loading' } })
 
     try {
       const supabase = createClient()
@@ -1017,7 +1038,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         { data: scenes },
         { data: characters },
         { data: locations },
-        { data: shotsData },
+        { data: shotsData, error: shotsError },
       ] = await Promise.all([
         supabase
           .from('scenes')
@@ -1035,7 +1056,16 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         loadShotsResult(projectId),
       ])
 
-      if (!scenes?.length) return
+      // 읽는 사이 다른 프로젝트로 바뀌었으면 늦게 온 옛 자료를 넣지 않는다(검토 2번) — 비운 뒤 옛 씬 · 샷이 다시 들어와 같은 이름 샷의 남의 대사가 보였다.
+      if (useProjectStore.getState().projectId !== projectId) {
+        settle(null)
+        return
+      }
+      // 씬이 0개면 넣지 않고 끝난다(전과 같음) — 로그인이 끊겨 빈 목록이 온 것과 가를 수 없어 못 읽음으로 남긴다.
+      if (!scenes?.length) {
+        settle('failed')
+        return
+      }
 
       const manifest: SceneManifest = {
         scenes: scenes.map((s, i) => ({
@@ -1097,9 +1127,13 @@ export const useWriterStore = create<WriterState>((set, get) => ({
       set({
         sceneManifest: manifest,
         shots,
+        // 샷 목록을 못 읽으면 빈 샷 목록이 들어간다(전과 같음) — 다 읽은 것으로 남기지 않아 대사 칸이 거짓 "대사 없음"을 말하지 않게 한다.
+        loadedProjectId: shotsError ? null : projectId,
       })
+      settle(shotsError ? 'failed' : null)
     } catch (err) {
       console.error('[writer-store] loadProject failed:', err)
+      settle('failed')
     }
   },
 }))
