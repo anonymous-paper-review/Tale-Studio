@@ -2,14 +2,19 @@
 
 // Director 샷 상세(디자이너 11/13 시안 D6 · D7, 오너 2026-11-14) — 샷 하나에 이미지 · 영상 탭.
 //   스토리보드형은 팝업(DirectorNodePopup), 노드형은 왼쪽 패널(DirectorDetailPanel)이 이 부품을 같은 내용으로 연다.
-//   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts
+//   두 탭 위에 그 샷의 대사 칸(오너 2026-11-27 P1) — 영상이 쓰는 그 Writer 샷(writerShotId)의 대사, 없으면 "대사 없음"(components/shot-dialogue, Storyboard 팝업과 같은 부품).
+//   여기서는 보기만 한다 — 고칠 곳(Writer 콘티 · Storyboard 대사 탭)과 새 영상부터 들어간다는 것만 알린다.
+//   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts · shot-detail-dialogue.test.ts
 import { useEffect, useRef, useState } from 'react'
 import { X } from 'lucide-react'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { useT } from '@/lib/i18n'
 import { countText } from '@/lib/i18n/count-text'
 import { cn } from '@/lib/utils'
-import { latestShotTake, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings, videoTabLabelKey, type ShotDetailTab } from '@/lib/director/shot-detail'
+import { latestShotTake, shotDetailDialogue, shotDetailFrames, shotDetailTakes, takePhaseOf, takeSettings, videoTabLabelKey, type ShotDetailTab } from '@/lib/director/shot-detail'
+import { ShotDialogue } from '@/components/shot-dialogue'
+import { manifestEntities } from '@/lib/writer/resolve-entity-names'
+import { useWriterStore } from '@/stores/writer-store'
 import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
@@ -53,6 +58,9 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   const takeBalance = useTakeBalance()
   // 이름은 캔버스 · 보드와 같은 것("Shot 4" · "Scene 1") — Writer 의 원래 id(sh_01_04)를 보이지 않는다.
   const boardNames = useBoardNodeNames()
+  // 대사는 Writer 샷에서 — Director 화면에도 Writer 씬 · 샷이 올라와 있다(use-writer-director-sync). 영상 서버가 읽는 칸과 같다.
+  const writerShots = useWriterStore((s) => s.shots)
+  const sceneManifest = useWriterStore((s) => s.sceneManifest)
   const node = nodes.find((n) => n.id === shotNodeId)
   const imageGeneration = useStoryboardImageGeneration(node && isShotData(node.data) ? node.data : null)
   if (!node || !isShotData(node.data)) return null
@@ -91,6 +99,8 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   }
   // 제목 아래 줄은 씬 이름 · 길이만(오너 2026-11-26 D3) — 이미지 생성 프롬프트는 이미지 탭의 프롬프트 칸에서 보고 고친다.
   const meta = [scene ? directorNodeLabel(scene.data, boardNames) : null, t('{seconds}s', { seconds: data.durationSeconds })].filter(Boolean).join(' · ')
+  const dialogue = shotDetailDialogue(writerShots, data.writerShotId)
+  const characterNames = new Map((sceneManifest?.characters ?? []).map((c) => [c.characterId, c.name]))
 
   return (
     <div ref={rootRef} className={cn('flex min-h-0 flex-col gap-4', layout === 'panel' && 'h-full overflow-y-auto p-5')} data-testid="director-shot-detail">
@@ -111,6 +121,13 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
         ) : null}
       </header>
       <p className="line-clamp-2 shrink-0 text-caption text-subtle-foreground" data-testid="shot-detail-meta">{meta}</p>
+      <ShotDialogue
+        className="shrink-0"
+        lines={dialogue.lines}
+        characterNames={characterNames}
+        entityNames={manifestEntities(sceneManifest)}
+        hint={dialogue.editable ? t('Edit the dialogue in the rough storyboard on the Writer screen or in the Dialogue tab on Storyboard. New videos use the edited dialogue.') : null}
+      />
       {tab === 'image'
         ? <ShotImageTab nodeId={shotNodeId} data={data} layout={layout} makeVideo={makeVideo} />
         : <ShotVideoTab shotNodeId={shotNodeId} data={data} layout={layout} initialTakeId={initialTakeId} />}

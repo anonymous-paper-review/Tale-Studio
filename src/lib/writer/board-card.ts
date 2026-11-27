@@ -136,6 +136,14 @@ export interface CardDialogue {
   more: number
 }
 
+/** 샷 팝업의 대사 줄 전부(오너 2026-11-27 P1) — 글이 있는 줄만, 화자는 카드 · 대사 탭과 같은 규칙(모르는 id 는 그대로, 내레이션은 V.O.).
+ *  Storyboard 샷 팝업 · Director 샷 상세가 같은 부품(components/shot-dialogue)으로 보인다. 약속: tests/director/shot-detail-dialogue.test.ts */
+export function dialogueLinesView(lines: readonly DialogueLine[] | null | undefined, nameById: ReadonlyMap<string, string>): Array<{ speaker: string; text: string }> {
+  return (lines ?? [])
+    .filter((line) => line.text?.trim())
+    .map((line) => ({ speaker: line.characterId ? (nameById.get(line.characterId) ?? line.characterId) : 'V.O.', text: line.text.trim() }))
+}
+
 /** 카드의 대사 한 줄 — 글이 있는 첫 줄. 화자는 대사 탭과 같다(모르는 id 는 그대로, 내레이션은 V.O.). */
 export function cardDialogue(lines: readonly DialogueLine[] | null | undefined, nameById: ReadonlyMap<string, string>): CardDialogue | null {
   const spoken = (lines ?? []).filter((line) => line.text?.trim())

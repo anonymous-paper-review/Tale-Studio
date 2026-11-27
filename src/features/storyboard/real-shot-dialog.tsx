@@ -2,6 +2,7 @@
 
 // Storyboard 샷 상세(오너 2026-11-26 m1126 O7 · 혼자 정한 것 g · h) — 카드를 누르면(대사 탭의 연필도) 열린다. 시안 없음.
 //   왼쪽: 큰 그림(실사, 없으면 콘티 그림에 "콘티" 꼬리표) · 샷 글. 오른쪽: 대사(읽기만) · "바꾸고 싶은 점" + [채팅으로 고치기].
+//   대사 칸은 늘 보인다(오너 2026-11-27 P1) — 없으면 "대사 없음", 이 화면의 대사 탭에서 바로 고칠 수 있다고 안내한다(components/shot-dialogue, Director 상세와 같은 부품).
 //   고치기는 생성 요청을 바로 부르지 않는다 — Director 샷 상세(O5)와 같은 [Lumi 에게 고쳐 달라고 하기]로 채팅에 보내고 창을 닫는다(lib/storyboard/fix-in-chat).
 //   채팅이 그 샷 실사를 다시 그리고,
 //   그리는 동안 그 카드에만 기다림이 뜬다. 그 샷을 그리는 중이면 고치기를 끄고 까닭을 보인다(같은 샷 두 번 맡기기는 서버가 거절한다).
@@ -17,6 +18,7 @@ import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Textarea } from '@/components/ui/textarea'
 import { RoughFrameCycle } from '@/components/rough-frame-cycle'
+import { ShotDialogue } from '@/components/shot-dialogue'
 import { sceneShotName } from '@/lib/board-names'
 import { useActiveGenerationJobs } from '@/lib/generation-queue'
 import { useLocale, useT } from '@/lib/i18n'
@@ -83,7 +85,6 @@ function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClos
   const drawing = realDrawingShotIds(activeJobs).has(shotId) || cardDrawing
   const entityNames = manifestEntities(sceneManifest)
   const nameOf = new Map((sceneManifest?.characters ?? []).map((c) => [c.characterId, c.name]))
-  const lines = (shot.dialogueLines ?? []).filter((line) => line.text?.trim())
   const canSend = !!mentionLabel && !!change.trim() && !drawing
   // 보고 있는 지난 판 — 지금 그림인 판이면 없다(채택하면 지금 그림이 되어 저절로 사라진다).
   const raw = images[shotId] && typeof images[shotId] === 'object' ? (images[shotId] as StoryboardImage) : null
@@ -207,16 +208,12 @@ function RealShotDialogBody({ shotId, onClose, guard }: { shotId: string; onClos
           <p className="text-body leading-relaxed text-foreground">{resolveEntityNames(shot.actionDescription, entityNames)}</p>
         </div>
         <div className="flex min-w-0 flex-col gap-4 border-t border-border-subtle p-6 md:overflow-y-auto md:border-l md:border-t-0">
-          {lines.length > 0 ? (
-            <ul className="flex flex-col gap-1.5 text-label">
-              {lines.map((line, i) => (
-                <li key={i} className="leading-relaxed">
-                  <span className="font-semibold text-foreground">{line.characterId ? (nameOf.get(line.characterId) ?? line.characterId) : 'V.O.'}</span>{' '}
-                  <span className="text-muted-foreground">&ldquo;{resolveEntityNames(line.text, entityNames)}&rdquo;</span>
-                </li>
-              ))}
-            </ul>
-          ) : null}
+          <ShotDialogue
+            lines={shot.dialogueLines}
+            characterNames={nameOf}
+            entityNames={entityNames}
+            hint={t('You can also edit the dialogue right in the Dialogue tab of this screen.')}
+          />
           <label className="flex flex-col gap-2">
             <span className="text-label font-semibold text-foreground">{t('What to change')}</span>
             <Textarea
