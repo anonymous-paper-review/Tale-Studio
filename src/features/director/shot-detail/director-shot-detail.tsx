@@ -3,7 +3,8 @@
 // Director 샷 상세(디자이너 11/13 시안 D6 · D7, 오너 2026-11-14) — 샷 하나에 이미지 · 영상 탭.
 //   스토리보드형은 팝업(DirectorNodePopup), 노드형은 왼쪽 패널(DirectorDetailPanel)이 이 부품을 같은 내용으로 연다.
 //   두 탭 위에 그 샷의 대사 칸(오너 2026-11-27 P1) — 영상이 쓰는 그 Writer 샷(writerShotId)의 대사, 없으면 "대사 없음"(components/shot-dialogue, Storyboard 팝업과 같은 부품).
-//   여기서는 보기만 한다 — 대사가 있으면 고칠 곳(Writer 콘티 · Storyboard 대사 탭), 없으면 넣을 곳(Writer 콘티)과 새 영상부터 들어간다는 것만 알린다.
+//   줄을 누르면 그 자리에서 글을 고친다(오너 Q1 "추천대로" — 대사 탭과 같은 키 · 규칙 · 저장 길). 말하는 사람 · 줄 더하기 · 빼기 · 넣기는 채팅이나 Writer 콘티라고,
+//   고친 대사는 새로 만드는 영상부터 들어간다고 알린다. 고치기를 끄는 때: 공유 보기 · Writer 자료를 아직 못 읽음 · Director 에서 더한 샷 · 지워진 Writer 샷.
 //   Writer 자료가 이 캔버스 프로젝트 것으로 다 오기 전에는 "대사 없음" 대신 불러오는 중 · 불러오지 못함(+ [다시 불러오기])(검토 rev-flow-2-2 1 · 2번).
 //   규칙: lib/director/shot-detail · 약속: tests/director/shot-detail.test.ts · shot-detail-view.test.ts · shot-detail-dialogue.test.ts
 import { useEffect, useRef, useState } from 'react'
@@ -16,6 +17,7 @@ import { latestShotTake, shotDetailDialogue, shotDetailFrames, shotDetailTakes, 
 import { ShotDialogue } from '@/components/shot-dialogue'
 import { manifestEntities } from '@/lib/writer/resolve-entity-names'
 import { useWriterStore } from '@/stores/writer-store'
+import { isDemoSession } from '@/lib/demo/context'
 import { fetchTakeBalance, useTakeBalance } from '@/lib/billing/use-take-balance'
 import { useStoryboardImageGeneration } from '@/features/director/hooks/use-storyboard-image-generation'
 import { takeCostForVideo, takeValuesShown } from '@/lib/billing/take-cost'
@@ -105,6 +107,8 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
   // 제목 아래 줄은 씬 이름 · 길이만(오너 2026-11-26 D3) — 이미지 생성 프롬프트는 이미지 탭의 프롬프트 칸에서 보고 고친다.
   const meta = [scene ? directorNodeLabel(scene.data, boardNames) : null, t('{seconds}s', { seconds: data.durationSeconds })].filter(Boolean).join(' · ')
   const dialogue = shotDetailDialogue(writerShots, data.writerShotId, writerLoadFor({ loadedProjectId, loadAttempt }, canvasProjectId))
+  // 고칠 Writer 샷이 있고 저장이 되는 때만 줄을 눌러 고친다(공유 보기는 저장이 되지 않는다).
+  const editDialogue = dialogue.editable && data.writerShotId && !isDemoSession() ? { shotId: data.writerShotId, screen: 'director' as const } : null
   const characterNames = new Map((sceneManifest?.characters ?? []).map((c) => [c.characterId, c.name]))
 
   return (
@@ -133,8 +137,9 @@ export function DirectorShotDetail({ shotNodeId, initialTab = 'image', initialTa
         entityNames={manifestEntities(sceneManifest)}
         status={dialogue.status}
         onRetry={() => void useWriterStore.getState().loadProject()}
-        hint={dialogue.editable ? t('Edit the dialogue in the rough storyboard on the Writer screen or in the Dialogue tab on Storyboard. New videos use the edited dialogue.') : null}
-        emptyHint={dialogue.editable ? t('Add dialogue in the rough storyboard on the Writer screen. New videos use the added dialogue.') : null}
+        edit={editDialogue}
+        hint={editDialogue ? t("Click a line to edit it here. To change who speaks or to add or delete lines, use the chat or Writer's rough storyboard. New videos use the edited dialogue.") : null}
+        emptyHint={editDialogue ? t("To add dialogue, use the chat or Writer's rough storyboard. New videos use the added dialogue.") : null}
       />
       {tab === 'image'
         ? <ShotImageTab nodeId={shotNodeId} data={data} layout={layout} makeVideo={makeVideo} />

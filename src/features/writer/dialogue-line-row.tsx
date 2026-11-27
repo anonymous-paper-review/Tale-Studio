@@ -3,6 +3,7 @@
 // 대사(Dialogue) 탭의 대사 한 줄(2026-11-02 오너 "탭 안에서 바로 고치기") — 누르면 그 자리에서 글을 고친다.
 //   보기 · 고치기 · 저장 중 · 저장 실패 네 모습이 같은 바깥 상자(div)를 쓴다 — 저장하는 동안 포커스를 둔 상자가 그대로 남아,
 //   저장이 끝나도 키보드 포커스가 그 줄에 있다. 무엇을 할지(키 · 저장 여부)는 lib/writer/dialogue-line-edit 이 정하고 여기는 보이기만 한다.
+//   두 샷 팝업(Storyboard 샷 팝업 · Director 샷 상세, 오너 2026-11-27 Q1)도 이 줄을 쓴다 — compact 는 팝업 대사 칸의 작은 글씨 모습(이름 굵게).
 import { useId } from 'react'
 import { AlertCircle, Loader2, Pencil } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -33,6 +34,8 @@ interface DialogueLineRowProps {
   disabled?: boolean
   /** 선택된 인물의 대사(굵게). */
   focused?: boolean
+  /** 팝업 대사 칸의 작은 모습 — 이름은 보통 굵은 글씨, 대사는 흐린 글씨(대사 탭은 대본 모습). */
+  compact?: boolean
   rowRef?: (element: HTMLDivElement | null) => void
   onStart: () => void
   onDraftChange: (draft: string) => void
@@ -52,6 +55,7 @@ export function DialogueLineRow({
   state,
   disabled,
   focused,
+  compact,
   rowRef,
   onStart,
   onDraftChange,
@@ -63,10 +67,10 @@ export function DialogueLineRow({
   const t = useT()
   const textId = useId()
   const speakerLabel = (
-    <span className={cn('mr-2 font-num text-micro font-semibold uppercase tracking-wide', speakerClassName)}>{speaker}</span>
+    <span className={cn(compact ? 'mr-1.5 text-label font-semibold' : 'mr-2 font-num text-micro font-semibold uppercase tracking-wide', speakerClassName)}>{speaker}</span>
   )
   const quoted = (value: string) => (
-    <span id={textId} className={cn('text-[15px] leading-7 text-foreground', focused && 'font-medium')}>
+    <span id={textId} className={cn(compact ? 'text-label leading-relaxed text-muted-foreground' : 'text-[15px] leading-7 text-foreground', focused && 'font-medium')}>
       &ldquo;{value}&rdquo;
     </span>
   )
@@ -75,7 +79,7 @@ export function DialogueLineRow({
     return (
       <div ref={rowRef} data-testid="dialogue-line" data-state="editing" className={cn(rowClassName, 'flex flex-col gap-1')}>
         <div className="flex items-start gap-1">
-          <span className="pt-1.5">{speakerLabel}</span>
+          <span className={compact ? 'pt-1' : 'pt-1.5'}>{speakerLabel}</span>
           <Textarea
             autoFocus
             rows={1}
@@ -100,7 +104,7 @@ export function DialogueLineRow({
               else onCancel()
             }}
             onBlur={() => onCommit('blur')}
-            className="min-h-0 flex-1 resize-none px-2 py-1 text-[15px] leading-7 md:text-[15px]"
+            className={cn('min-h-0 flex-1 resize-none px-2 py-1', compact ? 'text-label leading-relaxed md:text-label' : 'text-[15px] leading-7 md:text-[15px]')}
           />
         </div>
         <span className="pl-1 text-micro text-subtle-foreground">{t('Enter to save · Esc to cancel')}</span>

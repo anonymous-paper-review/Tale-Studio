@@ -64,7 +64,8 @@ Keep using the existing approval/JSON paths for operations these tools do not su
 </app-tools>`
 
 /** options.edit === false: 고치기 도구(edit_project)를 뺀다 · options.resume === false: 화면 도구에서 Writer 실행 다시 돌리기(resume)를 뺀다 —
- *  Storyboard 채팅은 글을 고치지 않고 씬 · 샷을 다시 나누지 않는다(오너 2026-11-27 N3, 검토 rev-flow 리드 2 · 7). 화면 열기 대상에는 Writer 콘티(conti)가 있다(리드 6). */
+ *  Storyboard 채팅은 도구로 고치지 않고 씬 · 샷을 다시 나누지 않는다(오너 2026-11-27 N3, 검토 rev-flow 리드 2 · 7) — 대사 고침은 답의 updates(updateDialogue)로만 온다(Q1).
+ *  화면 열기 대상에는 Writer 콘티(conti)가 있다(리드 6). */
 export function prepareChatTools(stage: string, enabled: unknown, history: unknown, workflow: unknown = false, domain: unknown = false, options: { edit?: boolean; resume?: boolean } = {}): ChatToolContext | undefined {
   const resources = toolResourcesForStage(stage)
   if (enabled !== true || resources.length === 0) return undefined
@@ -137,10 +138,10 @@ export function rejectedToolCallIds(turn: ToolTurn, tools: ReadonlyArray<{ name:
   return turn.content.filter((block): block is ToolCall => block.type === 'tool_use' && !given.has(String(block.name))).map((call) => call.id)
 }
 
-/** 그 화면이 도구 호출을 실행해도 되는가 — Storyboard(writer)는 글을 고치지 않는다(오너 N3, 리드 2). 콘티 · 다른 화면은 그대로. */
+/** 그 화면이 도구 호출을 실행해도 되는가 — Storyboard(writer)는 도구로 고치지 않는다(오너 N3, 리드 2 — 대사는 updates 의 updateDialogue 로만, Q1). 콘티 · 다른 화면은 그대로. */
 export function toolCallAllowedOnStage(stage: string, name: string): boolean {
   return !(stage === 'writer' && name === 'edit_project')
 }
 
 /** Storyboard 에서 고치기 도구를 부르면 모델에 돌려줄 결과 글(모델이 읽는다 — 사람에게는 모델이 화면 언어로 전한다). */
-export const STORYBOARD_EDIT_REFUSAL = 'Storyboard does not change text and nothing was executed. The story, shots and dialogue are edited on the rough storyboard of the Writer screen; dialogue can also be edited in the Dialogue tab.'
+export const STORYBOARD_EDIT_REFUSAL = 'Storyboard does not edit with tools and nothing was executed. Change dialogue with an updateDialogue update in the updates block; the story and shots are edited on the rough storyboard of the Writer screen.'

@@ -3941,7 +3941,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           ),
           ...(lineRefs.length > 0 ? { lineRefs } : {}),
           // Storyboard 실사 그림 도구(오너 2026-11-26 m1126 O7) — Storyboard 단계 채팅만(콘티는 Artist 앞이라 실사를 못 그린다).
-          //   이 표시가 있으면 서버는 실사 고치기만 하는 Storyboard 안내 · 읽기 도구를 쓴다(오너 2026-11-27 N3 — 글은 콘티로 안내).
+          //   이 표시가 있으면 서버는 실사 고치기 · 대사 고치기만 하는 Storyboard 안내 · 읽기 도구를 쓴다(오너 2026-11-27 N3 · Q1 — 이야기 · 샷은 콘티로 안내).
+          //   대사 고침은 콘티 채팅 고침과 같은 모양(updateShot · dialogueLines)으로 와서 아래 보드 채팅 저장 길(applyChatUpdates)을 그대로 탄다.
           //   "전체 대사를 한국어로 맞추고 Director 로" 길(dialogueTarget)은 리드 답 전까지 지금대로 글을 고치는 요청으로 보낸다(n-flow 결정 대기 1).
           ...(stage === 'writer' && !dialogueTarget ? { storyboardImages: true } : {}),
         }

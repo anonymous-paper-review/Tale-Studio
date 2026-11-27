@@ -25,7 +25,7 @@ export async function runChatToolLoop(options: {
   maxCalls?: number
   maxSameFailure?: number
   onResult?: (outcome: ToolOutcome) => void
-  /** 사람이 앱 도구로 할 수 있는 글 고치기를 부탁했다 — 고치기 결과 없이 끝나지 않게 한 번 더 묻는다. Storyboard 채팅은 글을 고치지 않아 늘 끈다(오너 2026-11-27 N3). */
+  /** 사람이 앱 도구로 할 수 있는 글 고치기를 부탁했다 — 고치기 결과 없이 끝나지 않게 한 번 더 묻는다. Storyboard 채팅은 도구로 고치지 않아(대사는 답의 updateDialogue, Q1) 늘 끈다(오너 2026-11-27 N3). */
   requireEdit?: boolean
   /** 이 화면에서 실행하지 않을 호출이면 모델에 돌려줄 결과(Storyboard 의 고치기 — 검토 rev-flow 리드 2). 서버가 거절한 호출(rejectedToolCalls)과 같이 다룬다. */
   refuse?: (call: ToolCall) => ToolResult | null
