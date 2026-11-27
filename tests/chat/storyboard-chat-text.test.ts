@@ -51,6 +51,7 @@ const toolNamesOf = () => toolsOf().map((tool) => tool.name)
 const workflowActionsOf = () => ((toolsOf().find((tool) => tool.name === 'project_workflow')?.input_schema as { properties: { action: { enum: string[] } } } | undefined)?.properties.action.enum ?? [])
 
 const STORY_NOTICE = 'Storyboard에서는 이야기 · 샷을 바꾸지 않아요'
+const DIALOGUE_NOT_SAVED = '이번 대사 고침은 저장하지 않았어요. 다시 부탁해 주세요.'
 
 beforeEach(() => {
   mocks.settings = {}
@@ -161,6 +162,21 @@ describe('콘티 채팅은 그대로 글을 고친다', () => {
 })
 
 describe('Storyboard 채팅은 대사를 고친다', () => {
+  // 왜(검토 rev-flow-2-4 낮음 4): 모델이 대사 고침을 대사 도구 대신 답의 JSON 으로 내면 서버가 버린다 — "이야기 · 샷은 바꾸지 않아요"만으로는
+  //   모델 답이 "대사를 바꿨어요"라고 해도 대사가 저장되지 않은 줄 모른다. 버린 고침에 대사가 있으면 그 말을 하고, 이야기 · 샷이 섞였으면 둘 다 말한다.
+  it('Storyboard 채팅 답의 JSON 에 대사 고침이 섞여 와 버려지면 대사는 저장하지 않았다고 답 끝에 알리고, 이야기 · 샷 고침도 섞였으면 그 안내도 함께 붙인다', async () => {
+    mocks.chat.mockResolvedValue(fenced('샷 2 대사를 바꿨어요.', [TEXT_EDIT]))
+    const only = (await ask({ storyboardImages: true })).json
+    expect(only.updates).toEqual([])
+    expect(only.reply).toContain(DIALOGUE_NOT_SAVED)
+    expect(only.reply).not.toContain(STORY_NOTICE)
+    const mixed = { type: 'updateShot', id: 'sh_01_02', patch: { actionDescription: '새 이야기', dialogueLines: [{ characterId: 'mina', text: '잘 가' }] } }
+    mocks.chat.mockResolvedValue(fenced('샷 2 이야기와 대사를 바꿨어요.', [mixed]))
+    const both = (await ask({ storyboardImages: true })).json
+    expect(both.reply).toContain(DIALOGUE_NOT_SAVED)
+    expect(both.reply).toContain(STORY_NOTICE)
+  })
+
   // 왜(#dialogue-language-chat): 콘티 채팅처럼 프로젝트 대사 언어로 대사를 쓴다 — 사람이 그 메시지에서 다른 말을 요구할 때만 그 말로.
   it('Storyboard 채팅 AI 안내도 프로젝트 대사 언어로 대사를 쓰라고 한다', async () => {
     mocks.settings = { dialogueLanguage: 'ko' }

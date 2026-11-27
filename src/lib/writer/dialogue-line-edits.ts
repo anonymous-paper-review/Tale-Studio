@@ -34,8 +34,8 @@ export interface LineEditDeps {
   lines: (shotId: string) => DialogueLine[] | null
   /** 그 샷의 대사 목록을 저장한다 — 실패하면 던진다. */
   save: (shotId: string, lines: DialogueLine[]) => Promise<void>
-  /** 저장하지 않은 까닭을 사람에게 — empty(다 지움) · conflict(고치는 사이 그 줄이 바뀜). */
-  notify: (reason: 'empty' | 'conflict') => void
+  /** 저장하지 않은 까닭을 사람에게 — empty(다 지움) · conflict(고치는 사이 그 줄이 바뀜) · reverted(창을 닫아 저장 못 한 줄을 저장된 글로 되돌림). */
+  notify: (reason: 'empty' | 'conflict' | 'reverted') => void
 }
 
 export type DialogueLineView =
@@ -65,6 +65,8 @@ export type LineEdits = ReturnType<typeof createLineEdits>
 /** deps 는 부를 때마다 읽는다(화면 말이 바뀌어도 새 알림 글을 쓰게). onChange 는 상태가 바뀔 때마다 새 상태로 부른다. */
 export function createLineEdits(deps: () => LineEditDeps, onChange: (state: LineEditsState) => void) {
   let state: LineEditsState = NO_LINE_EDITS
+  // 창(팝업 · 대사 탭)이 닫혔나 — 닫힌 뒤에는 [다시 저장] · [되돌리기]를 보일 곳이 없어, 저장 못 한 줄을 저장된 글로 되돌린다(검토 rev-flow-2-4 낮음 2).
+  let disposed = false
   const set = (next: LineEditsState) => {
     state = next
     onChange(next)
@@ -75,13 +77,26 @@ export function createLineEdits(deps: () => LineEditDeps, onChange: (state: Line
     delete saves[key]
     set({ ...state, saves })
   }
+  /** 저장하지 못한 고침을 버리고 고치기 전 글로 돌린다(화면 값도 같은 길로 다시 저장) — 그새 그 줄이 바뀌었으면 손대지 않는다. 되돌렸으면 참. */
+  const revertEntry = (entry: LineSave): boolean => {
+    const reverted = revertLineEdit({ lines: deps().lines(entry.shotId) ?? [], index: entry.index, original: entry.original, saved: entry.saved })
+    if (reverted) void deps().save(entry.shotId, reverted).catch(() => {})
+    return !!reverted
+  }
   const runSave = (entry: LineSave, lines: DialogueLine[]) => {
     set({ ...state, saves: { ...state.saves, [entry.key]: { ...entry, status: 'saving' } } })
     deps().save(entry.shotId, lines).then(
       () => dropSave(entry.key),
       () => {
         const current = state.saves[entry.key]
-        if (current) set({ ...state, saves: { ...state.saves, [entry.key]: { ...current, status: 'failed' } } })
+        if (!current) return
+        // 닫힌 뒤에 실패했다 — 보일 곳이 없으니 저장된 글로 되돌리고 알린다(그새 다른 곳에서 그 줄이 바뀌었으면 그 값을 둔다).
+        if (disposed) {
+          dropSave(entry.key)
+          if (revertEntry(current)) deps().notify('reverted')
+          return
+        }
+        set({ ...state, saves: { ...state.saves, [entry.key]: { ...current, status: 'failed' } } })
       },
     )
   }
@@ -133,8 +148,21 @@ export function createLineEdits(deps: () => LineEditDeps, onChange: (state: Line
       const entry = state.saves[key]
       if (!entry) return
       dropSave(key)
-      const reverted = revertLineEdit({ lines: deps().lines(entry.shotId) ?? [], index: entry.index, original: entry.original, saved: entry.saved })
-      if (reverted) void deps().save(entry.shotId, reverted).catch(() => {})
+      revertEntry(entry)
+    },
+    /** 창이 닫힌다 — 저장에 실패한 줄은 저장된 글로 되돌리고 알린다. 아직 저장 중인 줄이 뒤에 실패해도 같다(검토 rev-flow-2-4 낮음 2). */
+    dispose() {
+      disposed = true
+      let reverted = false
+      for (const entry of Object.values(state.saves).filter((save) => save.status === 'failed')) {
+        dropSave(entry.key)
+        if (revertEntry(entry)) reverted = true
+      }
+      if (reverted) deps().notify('reverted')
+    },
+    /** 창이 (다시) 붙었다 — 개발 모드의 두 번 붙이기에서 닫힘 표시를 거둔다. */
+    arm() {
+      disposed = false
     },
   }
 }

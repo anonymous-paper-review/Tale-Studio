@@ -7,10 +7,16 @@ const db = vi.hoisted(() => ({
   writes: [] as Array<Record<string, unknown>>,
   failNext: 0,
   gate: null as null | Promise<void>,
+  /** 다시 읽기(loadProject)가 받는 저장된 행 — 표 이름 → 행. */
+  rows: {} as Record<string, Array<Record<string, unknown>>>,
 }))
 vi.mock('@/lib/supabase/client', () => ({
   createClient: () => ({
-    from: () => ({
+    from: (table: string) => ({
+      select: () => {
+        const read = { eq: () => read, order: () => read, then: (resolve: (value: { data: unknown; error: null }) => unknown) => Promise.resolve({ data: db.rows[table] ?? [], error: null }).then(resolve) }
+        return read
+      },
       update: (values: Record<string, unknown>) => {
         const fail = db.failNext > 0
         if (fail) db.failNext -= 1
@@ -26,7 +32,11 @@ vi.mock('@/lib/supabase/client', () => ({
     }),
   }),
 }))
-vi.mock('@/lib/shots-cache', async (original) => ({ ...(await original<typeof import('@/lib/shots-cache')>()), invalidateShots: vi.fn().mockResolvedValue(undefined) }))
+vi.mock('@/lib/shots-cache', async (original) => ({
+  ...(await original<typeof import('@/lib/shots-cache')>()),
+  invalidateShots: vi.fn().mockResolvedValue(undefined),
+  loadShotsResult: async () => ({ data: db.rows.shots ?? [], error: null }),
+}))
 
 import { flushShotSave, useWriterStore } from '@/stores/writer-store'
 import { useProjectStore } from '@/stores/project-store'
@@ -51,6 +61,7 @@ beforeEach(() => {
   db.writes.length = 0
   db.failNext = 0
   db.gate = null
+  db.rows = {}
   useProjectStore.setState({ projectId: 'project-story' })
   useWriterStore.setState({ sceneManifest: { scenes: [], characters: [], locations: [] }, shots: [shot], error: null })
 })
@@ -100,6 +111,24 @@ describe('샷 저장 — 이야기 칸은 이야기가 실제로 바뀌었을 �
     await save({ actionDescription: '지친 여자가 고개를 든다.', durationSeconds: 6 })
     expect(lastWrite().duration_seconds).toBe(6)
     expectNoStory('같은 글')
+  })
+
+  // 왜(검토 rev-flow-2-4 낮음 1): 콘티 샷 창에서 이야기 저장이 실패한 채 닫고, 보드 · Director 진입 등으로 Writer 자료를 다시 읽으면 화면의 그 샷은 저장된 값이 된다 —
+  //   그때 남은 이야기 표시로 다음 대사 저장이 다시 읽은 이야기(화면 말)를 영어 주 칸에 써 Director 고친 프롬프트를 또 지웠다(35ae01aa 가 막은 고장이 돌아옴).
+  it('이야기 저장이 실패한 뒤 Writer 자료를 다시 읽으면 그 샷의 이야기 표시가 지워져, 다음 대사 저장은 이야기 칸을 쓰지 않는다', async () => {
+    db.failNext = 1
+    await expect(save({ actionDescription: '지친 여자가 창밖을 본다.' })).rejects.toThrow('network down')
+    db.rows = {
+      scenes: [{ scene_id: 'sc_01', sort_order: 0 }],
+      characters: [{ character_id: 'woman', name: '여자', role: 'protagonist' }],
+      locations: [],
+      shots: [{ shot_id: 'sh_01_01', scene_id: 'sc_01', sort_order: 0, shot_type: 'MS', action_description: 'The weary woman raises her head.', action_description_native: '지친 여자가 고개를 든다.', dialogue_lines: [{ characterId: 'woman', text: '하아.', delivery: '한숨' }] }],
+    }
+    await useWriterStore.getState().loadProject()
+    expect(useWriterStore.getState().shots[0]?.actionDescription).toBe('지친 여자가 고개를 든다.')
+    await save({ dialogueLines: [{ characterId: 'woman', text: '하아, 길었다.', delivery: '한숨' }] as Shot['dialogueLines'] })
+    expect(lastWrite().dialogue_lines).toEqual([{ characterId: 'woman', text: '하아, 길었다.', delivery: '한숨' }])
+    expectNoStory('다시 읽은 뒤 대사')
   })
 
   // 왜(혼자 정한 것): 이야기를 저장하는 사이 또 고치면, 앞 저장의 성공이 표시를 지워 뒤 고침이 영어 주 칸에 안 써지면 안 된다.

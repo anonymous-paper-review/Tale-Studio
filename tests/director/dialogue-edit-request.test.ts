@@ -105,15 +105,20 @@ afterEach(() => {
 describe('Director 채팅 대사 고치기 부탁 — 검토 rev-video-3', () => {
   // 왜(중간 1): 이 판정에 걸리면 모델이 고치지 않은 차례에서 "실행을 확인하지 못했다"로 끝난다 — 지난 고침을 확인해 달라는 말 · 고쳤는지 묻는 말 ·
   //   고친 대사로 영상을 다시 만들어 달라는 말은 고쳐 달라는 부탁이 아니다(과거형 '바꾼' · '수정한', 질문의 change, 영상 부탁).
-  it('Director 채팅에서 지난 고침을 확인해 달라는 말 · 고쳤는지 묻는 말 · 고친 대사로 영상을 다시 만들어 달라는 말은 대사 고치기 부탁으로 세지 않는다', () => {
-    for (const message of ['샷 8 대사 바꾼 거 확인해 줘', 'Did you change the dialogue in Shot 3?', '대사 수정한 거 반영해서 샷 1 영상 다시 만들어 줘', 'Remake the video for Shot 2 with the new dialogue.', 'Update the video for Shot 2 with the new dialogue.']) {
+  //   (2026-11-27 이름 바꿈 · 검토 rev-flow-2-4 낮음 3 — "대사는 빼고 다른 것을 바꿔 달라는 말"을 더함. 옛 이름 'Director 채팅에서 지난 고침을 확인해 달라는 말 · 고쳤는지 묻는 말 · 고친 대사로 영상을 다시 만들어 달라는 말은 대사 고치기 부탁으로 세지 않는다')
+  it('Director 채팅에서 지난 고침을 확인해 달라는 말 · 고쳤는지 묻는 말 · 고친 대사로 영상을 다시 만들어 달라는 말 · 대사는 빼고 다른 것을 바꿔 달라는 말은 대사 고치기 부탁으로 세지 않는다', () => {
+    for (const message of ['샷 8 대사 바꾼 거 확인해 줘', 'Did you change the dialogue in Shot 3?', '대사 수정한 거 반영해서 샷 1 영상 다시 만들어 줘', 'Remake the video for Shot 2 with the new dialogue.', 'Update the video for Shot 2 with the new dialogue.', '대사는 빼고 카메라만 바꿔 줘']) {
       expect({ message, wait: requestsSupportedChatEdit('director', message) }).toEqual({ message, wait: false })
     }
   })
 
-  // 왜(정상 경로 고정): 판정을 좁혀도 정중한 부탁 · 물음표로 끝나는 부탁은 고쳐 달라는 말이다 — 고치기 결과를 기다린다.
-  it('Director 채팅에서 물음표로 끝나는 정중한 대사 고치기 부탁은 지금처럼 고치기 부탁으로 센다', () => {
-    for (const message of ['샷 3 대사를 "가자"로 바꿔 줄래?', 'Can you change the dialogue in Shot 3 to "Hi"?', '샷 2 내레이션 줄 빼 줄 수 있어?']) {
+  // 왜(정상 경로 고정 · 검토 rev-flow-2-4 낮음 3): 판정을 좁혀도 정중한 부탁 · 물음표로 끝나는 부탁, 영상 · 테이크 속 대사를 고쳐 달라는 말, "변경 부탁해요" ·
+  //   "Is it possible to change …?" 같은 말은 고쳐 달라는 말이다 — 고치기 결과를 기다린다. 줄을 빼고 새 줄을 넣어 달라는 말("빼고")도 고치기다.
+  //   (2026-11-27 이름 바꿈 — 옛 이름 'Director 채팅에서 물음표로 끝나는 정중한 대사 고치기 부탁은 지금처럼 고치기 부탁으로 센다')
+  it('Director 채팅에서 물음표로 끝나는 정중한 부탁 · 영상 · 테이크 속 대사를 고쳐 달라는 말 · 변경을 부탁하는 말은 고치기 부탁으로 센다', () => {
+    for (const message of ['샷 3 대사를 "가자"로 바꿔 줄래?', 'Can you change the dialogue in Shot 3 to "Hi"?', '샷 2 내레이션 줄 빼 줄 수 있어?',
+      "샷 3 영상에서 대사 '안녕'을 '잘 가'로 바꿔 줘", "Change the dialogue in the shot 3 video to 'bye'", '테이크 2 대사 고쳐 줘',
+      "Is it possible to change shot 3's dialogue to 'bye'?", '샷 2 대사 변경 부탁해요', '샷 2 대사 한 줄 빼고 새 줄 넣어 줘']) {
       expect({ message, wait: requestsSupportedChatEdit('director', message) }).toEqual({ message, wait: true })
     }
   })

@@ -4293,7 +4293,9 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       reply = guardChatToolReply(reply, toolOutcomes, contentLocale() === 'ko')
       // Director · Storyboard 채팅으로 대사를 고쳐 저장했으면 새로 만드는 영상부터 들어간다고 알린다(오너 3차 · Q1, 리드 "도구 하나로" — 한 줄 하나) — 모델 말에 맡기지 않는다.
       //   실행 결과(영수증) 아래에 붙인다 — 저장된 대사와 승인 기다리는 줄 빼기가 섞인 차례에 답이 영수증으로 바뀌어도 빠지지 않게(검토 rev-video-3 낮음 2).
-      if (stage === 'director' || stage === 'writer') reply = [reply, dialogueEditNote(toolOutcomes, contentLocale() === 'ko', reply)].filter(Boolean).join('\n\n')
+      //   그림 요청이 있어 끝 답을 다시 만드는 길(아래 waitForLegacy)에도 같은 한 줄을 붙인다(검토 rev-flow-2-4 중간 1). 이미 그 뜻이 있으면 붙이지 않는다.
+      const withDialogueNote = (text: string) => (stage === 'director' || stage === 'writer') ? [text, dialogueEditNote(toolOutcomes, contentLocale() === 'ko', text)].filter(Boolean).join('\n\n') : text
+      reply = withDialogueNote(reply)
       if (lockedReply) reply = lockedReply
       if (styleLockedReply) reply = styleLockedReply
       // Unfinished prose is display-only and must survive the guard that removes unverified completion claims.
@@ -5077,7 +5079,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const guarded = guardChatToolReply(replyBeforeReceipt, toolOutcomes, contentLocale() === 'ko')
         // 답이 실행 결과로 바뀌었으면(못 한 것이 있음) 실제로 지우고 더한 것도 한 줄로 덧붙인다(리뷰 4차 후속 L2).
         const replaced = !!appliedStructureLine && guarded === chatToolReceipt(toolOutcomes, contentLocale() === 'ko')
-        const finalReply = lockedReply ?? (replaced ? `${guarded}\n${appliedStructureLine}` : guarded)
+        const finalReply = lockedReply ?? withDialogueNote(replaced ? `${guarded}\n${appliedStructureLine}` : guarded)
         set(state => ({ loading: false, messages: state.messages.map(message => message.id === replyId ? { ...message, content: finalReply } : message) }))
         if (projectId) saveChatMessage(projectId, stage, 'model', finalReply)
         pendingReplyId = null

@@ -57,6 +57,13 @@ const shotConfigDirty = new Map<string, { camera: boolean; lighting: boolean }>(
  *  값 = 바뀐 차례(저장하는 사이 또 바뀌면 그 저장의 성공으로 지우지 않는다). 열쇠 = 프로젝트 + 샷 id(샷 id 는 프로젝트마다 겹친다). 약속: tests/writer/shot-save-story.test.ts */
 const shotStoryDirty = new Map<string, number>()
 const shotStoryKey = (projectId: string, shotId: string) => `${projectId}\u0000${shotId}`
+/** Writer 자료를 다시 읽어 그 프로젝트 샷이 저장된 값으로 바뀌었다 — 이야기 표시를 지운다(검토 rev-flow-2-4 낮음 1).
+ *  남겨 두면 이야기 저장이 실패한 뒤 다시 읽었을 때, 다음 저장(대사 등)이 다시 읽은 이야기(화면 말)를 영어 주 칸에 써 Director 고친 프롬프트를 또 지웠다.
+ *  화면의 이야기는 이제 저장된 값이라 쓸 것이 없다 — 샷 고치기 창의 [다시 저장]은 창 글과 화면 값을 견줘 이야기를 다시 표시한다. */
+function clearShotStoryMarks(projectId: string) {
+  const prefix = shotStoryKey(projectId, '')
+  for (const key of [...shotStoryDirty.keys()]) if (key.startsWith(prefix)) shotStoryDirty.delete(key)
+}
 
 // 샷을 더한 순간을 듣는 곳(Storyboard 보드의 더한 샷 바로 그리기) — onShotAdded 로 붙는다.
 const shotAddedListeners = new Set<(event: AddedShotEvent) => void>()
@@ -1149,6 +1156,7 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         // 샷 목록을 못 읽으면 빈 샷 목록이 들어간다(전과 같음) — 다 읽은 것으로 남기지 않아 대사 칸이 거짓 "대사 없음"을 말하지 않게 한다.
         loadedProjectId: shotsError ? null : projectId,
       })
+      clearShotStoryMarks(projectId)
       settle(shotsError ? 'failed' : null)
     } catch (err) {
       console.error('[writer-store] loadProject failed:', err)
