@@ -132,24 +132,38 @@ export function withStoryboardImageUpdates(validated: readonly unknown[], images
 }
 
 /** Storyboard 채팅 답에서 화면에 넘길 것 — 되묻기 · 실사 그림 요청만(오너 2026-11-27 N3 — 대사는 대사 도구로, Q1). 떨군 글 고치기 수도 센다(답 끝 안내).
- *  떨군 것에 대사가 섞였나(droppedDialogue) · 이야기 · 샷 고침이 섞였나(droppedStory)도 가른다 — 답 끝 안내를 고른다(검토 rev-flow-2-4 낮음 4).
+ *  떨군 것에 대사가 섞인 샷(droppedDialogueShotIds) · 이야기 · 샷 고침이 섞였나(droppedStory)도 가른다 — 답 끝 안내를 고른다(검토 rev-flow-2-4 낮음 4).
  *  샷 고치기(updateShot)의 대사 칸은 대사, 나머지 칸 · 다른 고치기(씬 · 샷 더하기 · 지우기)는 이야기 · 샷이다. */
 export function storyboardOnlyUpdates(
   validated: readonly unknown[],
   images: readonly StoryboardImageUpdate[],
-): { updates: unknown[]; droppedTextEdits: number; droppedDialogue: boolean; droppedStory: boolean } {
+): { updates: unknown[]; droppedTextEdits: number; droppedDialogueShotIds: string[]; droppedStory: boolean } {
   const isClarify = (u: unknown) => !!u && typeof u === 'object' && (u as { type?: unknown }).type === 'clarify'
   const clarify = validated.filter(isClarify)
   const dropped = validated.filter((u) => !isClarify(u))
-  let droppedDialogue = false
+  const droppedDialogueShotIds: string[] = []
   let droppedStory = false
   for (const edit of dropped) {
-    const { type, patch } = edit as { type?: unknown; patch?: unknown }
+    const { type, id, patch } = edit as { type?: unknown; id?: unknown; patch?: unknown }
     const keys = type === 'updateShot' && !!patch && typeof patch === 'object' ? Object.keys(patch) : null
-    if (keys?.includes('dialogueLines')) droppedDialogue = true
+    if (keys?.includes('dialogueLines')) droppedDialogueShotIds.push(String(id))
     if (!keys || keys.some((key) => key !== 'dialogueLines')) droppedStory = true
   }
-  return { updates: withStoryboardImageUpdates(clarify, images), droppedTextEdits: dropped.length, droppedDialogue, droppedStory }
+  return { updates: withStoryboardImageUpdates(clarify, images), droppedTextEdits: dropped.length, droppedDialogueShotIds, droppedStory }
+}
+
+/** 이번 차례에 대사 도구(edit_project · 대사 자원)로 고친 샷 — 끝 답 JSON 이 같은 샷의 대사 고침을 되풀이해도 "저장하지 않았어요"라고 하지 않는다
+ *  (재검토 71db3c21 낮음 — "저장 확인"과 어긋났다). 그 샷의 결과(저장 · 승인 대기 · 실패)는 화면의 실행 결과가 따로 알린다. 대사 자원 id = Writer 샷 id. */
+export function dialogueToolTargets(toolMessages: unknown): Set<string> {
+  const targets = new Set<string>()
+  if (!Array.isArray(toolMessages)) return targets
+  for (const message of toolMessages as Array<{ role?: unknown; content?: unknown }>) {
+    if (message?.role !== 'assistant' || !Array.isArray(message.content)) continue
+    for (const block of message.content as Array<{ type?: unknown; name?: unknown; input?: { resource?: unknown; id?: unknown } }>) {
+      if (block?.type === 'tool_use' && block.name === 'edit_project' && block.input?.resource === 'dialogue' && typeof block.input.id === 'string') targets.add(block.input.id)
+    }
+  }
+  return targets
 }
 
 /** AI 문맥 한 덩어리 — 샷마다 실사가 있는지와 지금 판 번호. 샷 이름은 문맥의 샷 줄(보드 이름)이 이미 준다. */

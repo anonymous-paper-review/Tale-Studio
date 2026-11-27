@@ -162,6 +162,32 @@ describe('콘티 채팅은 그대로 글을 고친다', () => {
 })
 
 describe('Storyboard 채팅은 대사를 고친다', () => {
+  // 왜(재검토 71db3c21 낮음 · 리드 "같은 차례에 대사 도구 저장이 이미 있었으면 붙이지 않는다"): 모델이 대사 도구로 고친 뒤 끝 답 JSON 에 같은 고침을 되풀이하면
+  //   한 답에 "저장 확인"과 "이번 대사 고침은 저장하지 않았어요"가 같이 떠 서로 어긋났다 — 다시 부탁하면 같은 대사를 또 고친다. 그 샷의 결과는 화면의 실행 결과가 알린다.
+  //   도구로 고치지 않은 다른 샷의 대사 고침이 버려졌으면 지금처럼 알린다(혼자 정한 것 — 샷마다 가른다).
+  it('Storyboard 채팅 모델이 이번 차례에 대사 도구로 고친 샷의 대사 고침을 답의 JSON 에 되풀이하면 저장하지 않았다는 안내를 붙이지 않고, 도구로 고치지 않은 샷이면 지금처럼 붙인다', async () => {
+    // 샷 1 은 대사 도구가 아니라 거절된 샷 고치기 호출만 있었다 — 대사는 고친 적이 없다.
+    const toolMessages = [
+      { role: 'assistant', content: [
+        { type: 'tool_use', id: 'edit-1', name: 'edit_project', input: { resource: 'dialogue', id: 'sh_01_02', revision: 'r1', patch: { dialogueLines: [{ characterId: 'mina', text: '잘 가' }] } } },
+        { type: 'tool_use', id: 'edit-2', name: 'edit_project', input: { resource: 'shots', id: 'sh_01_01', revision: 'r1', patch: { dialogueLines: [{ characterId: 'mina', text: '안녕' }] } } },
+      ] },
+      { role: 'user', content: [
+        { type: 'tool_result', tool_use_id: 'edit-1', content: JSON.stringify({ status: 'ok' }) },
+        { type: 'tool_result', tool_use_id: 'edit-2', content: JSON.stringify({ status: 'unsupported' }), is_error: true },
+      ] },
+    ]
+    mocks.chat.mockResolvedValue(fenced('샷 2 대사를 바꿨어요.', [TEXT_EDIT]))
+    const repeated = (await ask({ storyboardImages: true, ...TOOLS, toolMessages })).json
+    expect(repeated.updates).toEqual([])
+    expect(repeated.reply).toContain('샷 2 대사를 바꿨어요.')
+    expect(repeated.reply).not.toContain(DIALOGUE_NOT_SAVED)
+    const other = { type: 'updateShot', id: 'sh_01_01', patch: { dialogueLines: [{ characterId: 'mina', text: '안녕' }] } }
+    mocks.chat.mockResolvedValue(fenced('샷 1 · 2 대사를 바꿨어요.', [TEXT_EDIT, other]))
+    const elsewhere = (await ask({ storyboardImages: true, ...TOOLS, toolMessages })).json
+    expect(elsewhere.reply).toContain(DIALOGUE_NOT_SAVED)
+  })
+
   // 왜(검토 rev-flow-2-4 낮음 4): 모델이 대사 고침을 대사 도구 대신 답의 JSON 으로 내면 서버가 버린다 — "이야기 · 샷은 바꾸지 않아요"만으로는
   //   모델 답이 "대사를 바꿨어요"라고 해도 대사가 저장되지 않은 줄 모른다. 버린 고침에 대사가 있으면 그 말을 하고, 이야기 · 샷이 섞였으면 둘 다 말한다.
   it('Storyboard 채팅 답의 JSON 에 대사 고침이 섞여 와 버려지면 대사는 저장하지 않았다고 답 끝에 알리고, 이야기 · 샷 고침도 섞였으면 그 안내도 함께 붙인다', async () => {
