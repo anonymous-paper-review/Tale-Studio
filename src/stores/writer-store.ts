@@ -51,6 +51,12 @@ const shotSaveRuns = new Map<string, () => Promise<void>>()
 // 이번 묶음에서 사람이 바꾼 카메라 · 조명(2026-10-20 샷 고치기) — 바꾼 것만 저장한다. 손대지 않은 샷의 빈 칸을
 //   화면 기본값으로 채우면 Director 가 그 값을 사람이 정한 것으로 읽는다.
 const shotConfigDirty = new Map<string, { camera: boolean; lighting: boolean }>()
+/** 샷 이야기 칸(action_description · _native)을 써야 하는 샷(리드 2026-11-27 결정 ② · 11/2부터 대사 탭 고장) — 이야기가 실제로 바뀌었을 때만 표시한다.
+ *  이야기를 안 바꾼 저장(대사 · 길이 · 샷 타입 …)이 화면 말 글을 영어 주 칸에 쓰면, 방아쇠(shots_clear_director_prompt — 영어 이야기 칸이 바뀌면)가
+ *  Director 에서 고친 프롬프트를 지웠다. 표시는 그 이야기를 쓴 저장이 성공해야 지운다 — 실패하면 남아 샷 고치기 창 [다시 저장]이 이야기를 쓴다.
+ *  값 = 바뀐 차례(저장하는 사이 또 바뀌면 그 저장의 성공으로 지우지 않는다). 열쇠 = 프로젝트 + 샷 id(샷 id 는 프로젝트마다 겹친다). 약속: tests/writer/shot-save-story.test.ts */
+const shotStoryDirty = new Map<string, number>()
+const shotStoryKey = (projectId: string, shotId: string) => `${projectId}\u0000${shotId}`
 
 // 샷을 더한 순간을 듣는 곳(Storyboard 보드의 더한 샷 바로 그리기) — onShotAdded 로 붙는다.
 const shotAddedListeners = new Set<(event: AddedShotEvent) => void>()
@@ -316,6 +322,13 @@ export const useWriterStore = create<WriterState>((set, get) => ({
 
   updateShot: (id, changes) => {
     if (isDemoSession()) return
+    // 이야기가 실제로 바뀌었나 — 바꾸기 전 값과 견준다(같은 글을 함께 보내는 저장은 이야기 칸을 쓰지 않는다).
+    const storyProjectId = useProjectStore.getState().projectId
+    const before = get().shots.find((s) => s.shotId === id)
+    if (storyProjectId && before && 'actionDescription' in changes && changes.actionDescription !== before.actionDescription) {
+      const key = shotStoryKey(storyProjectId, id)
+      shotStoryDirty.set(key, (shotStoryDirty.get(key) ?? 0) + 1)
+    }
     set((state) => ({
       shots: state.shots.map((s) =>
         s.shotId === id ? { ...s, ...changes } : s,
@@ -344,14 +357,18 @@ export const useWriterStore = create<WriterState>((set, get) => ({
         // 같은 프로젝트에서는 완료된 대사 저장을 포함한 최신 보드를 읽는다.
         const savedShot = useProjectStore.getState().projectId === projectId
           ? get().shots.find(current => current.shotId === id) ?? shot : shot
+        const storyKey = shotStoryKey(projectId, id)
+        const storyMark = shotStoryDirty.get(storyKey)
         const supabase = createClient()
         const { error } = await supabase
           .from('shots')
           .update({
             shot_type: savedShot.shotType,
-            // 편집은 유저 언어 → primary·_native 둘 다 native. 러프 라우트가 EN skip-or-derive. (S3b)
-            action_description: savedShot.actionDescription,
-            action_description_native: savedShot.actionDescription,
+            // 이야기 칸은 이야기가 실제로 바뀌었을 때만(리드 결정 ② — shotStoryDirty). 쓸 때는 지금처럼:
+            //   편집은 유저 언어 → primary·_native 둘 다 native. 러프 라우트가 EN skip-or-derive. (S3b)
+            ...(storyMark !== undefined
+              ? { action_description: savedShot.actionDescription, action_description_native: savedShot.actionDescription }
+              : {}),
             characters: savedShot.characters,
             duration_seconds: savedShot.durationSeconds,
             dialogue_lines: savedShot.dialogueLines,
@@ -363,7 +380,9 @@ export const useWriterStore = create<WriterState>((set, get) => ({
           .eq('project_id', projectId)
           .eq('shot_id', id)
         // 저장 실패는 기다리던 쪽(flushShotSave — 샷 고치기의 [적용])에 알린다. 그래야 옛 내용으로 다시 그리지 않는다.
+        //   이야기 표시는 남는다 — [다시 저장]이 이야기를 쓴다.
         if (error) throw new Error(error.message)
+        if (storyMark !== undefined && shotStoryDirty.get(storyKey) === storyMark) shotStoryDirty.delete(storyKey)
         void invalidateShots(projectId) // 사물함 표시 — 다른 화면의 다음 읽기가 새로 받게
       })
     }
