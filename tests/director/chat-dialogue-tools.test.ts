@@ -21,7 +21,7 @@ vi.mock('@/lib/supabase/admin', () => ({
 
 import { POST } from '@/app/api/director/chat/route'
 import { prepareChatTools, toolResourcesForStage } from '@/lib/chat-tools/protocol'
-import { requestsSupportedChatEdit } from '@/lib/chat-tools/receipt'
+import { dialogueEditNote, requestsSupportedChatEdit } from '@/lib/chat-tools/receipt'
 
 type Tool = { name: string; input_schema: { properties: { resource?: { enum?: string[] } } } }
 type ToolOpts = { appTools?: { tools: Tool[]; turn?: unknown } }
@@ -97,6 +97,16 @@ describe('혼자 정한 것', () => {
     const response = await POST(chatRequest({ chatTools: true, toolMessages: [] }))
     expect(response.status).toBe(403)
     expect(mocks.llmChat).not.toHaveBeenCalled()
+  })
+
+  // 왜: 화면이 "새로 만드는 영상부터" 줄을 늘 붙이는데 모델이 같은 뜻을 이미 말하면 답에 두 번 나온다(화면 확인 11/27 — 대화 앞 차례를 따라 모델이 되풀이했다).
+  it('대사를 고쳐 저장했을 때 모델 답이 새로 만드는 영상부터 들어간다고 이미 말했으면 같은 줄을 또 붙이지 않는다', () => {
+    const saved = [{ call: { type: 'tool_use' as const, id: 'e1', name: 'edit_project', input: { resource: 'dialogue', id: 'sh_01_01', patch: { dialogueLines: [] } } }, result: { status: 'ok' } }]
+    expect(dialogueEditNote(saved, true)).toBe('새로 만드는 영상부터 고친 대사가 들어가요. 이미 만든 영상은 그대로예요.')
+    expect(dialogueEditNote(saved, true, '샷 8 대사를 바꿨어요. 바뀐 대사는 지금부터 만드는 영상에 들어가요.')).toBe('')
+    expect(dialogueEditNote(saved, false, 'Updated Shot 8. The new line goes into videos made from now on.')).toBe('')
+    expect(dialogueEditNote(saved, false, 'Updated the dialogue for Shot 8.')).toBe('The changed dialogue goes into videos made from now on. Videos already made keep their dialogue.')
+    expect(dialogueEditNote([{ ...saved[0]!, result: { status: 'approval_required' } }], true)).toBe('')
   })
 
   // 왜: 대사를 고쳐 달라는 말에 고치기 결과 없이 끝나지 않게 한 번 더 묻는다(콘티 채팅과 같은 확인) — 영상 · 카메라 부탁에는 걸지 않는다.

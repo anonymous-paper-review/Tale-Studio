@@ -4290,7 +4290,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       // 답을 실행 결과로 바꿀 때 실제로 지우고 더한 것을 함께 알리는 한 줄("적용: 샷 2개 지움 · 샷 1개 더함", 리뷰 4차 후속 L2).
       let appliedStructureLine = ''
       // Director 채팅으로 대사를 고쳐 저장했으면 새로 만드는 영상부터 들어간다고 알린다(오너 3차) — 모델 말에 맡기지 않는다.
-      if (stage === 'director') reply = [reply, dialogueEditNote(toolOutcomes, contentLocale() === 'ko')].filter(Boolean).join('\n\n')
+      if (stage === 'director') reply = [reply, dialogueEditNote(toolOutcomes, contentLocale() === 'ko', reply)].filter(Boolean).join('\n\n')
       reply = guardChatToolReply(reply, toolOutcomes, contentLocale() === 'ko')
       if (lockedReply) reply = lockedReply
       if (styleLockedReply) reply = styleLockedReply

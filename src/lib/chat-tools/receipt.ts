@@ -50,10 +50,14 @@ export function requestsDialogueEdit(message: string): boolean {
 /** 대사를 고쳐 저장했을 때 알리는 한 줄(영어 원문 = i18n 키) — 새로 만드는 영상(Take)부터 들어가고 이미 만든 영상은 그대로다(오너 2026-11-27 3차). */
 export const DIALOGUE_EDIT_NOTE = 'The changed dialogue goes into videos made from now on. Videos already made keep their dialogue.'
 
-/** 대사를 고친 결과가 저장됐으면 답에 붙일 한 줄, 아니면 ''. */
-export function dialogueEditNote(outcomes: ToolOutcome[], korean: boolean): string {
+/** 모델 답이 이미 "새로 만드는 영상부터 들어간다"는 뜻을 말했는가 — 화면 줄을 또 붙이지 않게(화면 확인 11/27: 대화 앞 차례를 따라 모델이 되풀이했다). */
+const SAYS_DIALOGUE_GOES_TO_NEW_VIDEOS = /만드는\s*영상(?:에|부터)|(?:videos?|takes?)\b[^.]*\bfrom now on|\bfrom now on\b[^.]*\b(?:videos?|takes?)\b/i // i18n-ok: 모델 답(한국어 · 영어)을 판별하는 정규식.
+
+/** 대사를 고친 결과가 저장됐으면 답에 붙일 한 줄, 아니면 '' — 모델 답(reply)이 같은 뜻을 이미 말했으면 ''. */
+export function dialogueEditNote(outcomes: ToolOutcome[], korean: boolean, reply = ''): string {
   const saved = latestEdits(outcomes).some(({ call, result }) => (call.input as Record<string, unknown>)?.resource === 'dialogue' && result.status === 'ok' && result.unchanged !== true)
-  return saved ? translate(korean ? 'ko' : 'en', DIALOGUE_EDIT_NOTE) : ''
+  if (!saved || SAYS_DIALOGUE_GOES_TO_NEW_VIDEOS.test(reply)) return ''
+  return translate(korean ? 'ko' : 'en', DIALOGUE_EDIT_NOTE)
 }
 
 /** A narrow recovery hint for explicit edit requests; it never authorizes a write by itself. */
