@@ -1,4 +1,5 @@
-// 콘티 끝 장 · 연출 장 읽기가 이 프로젝트 폴더 밖 그림을 가져오지 않는지, 콘티 화살표 요청의 오류 말이 사용자의 화면 말인지 검사한다(검토 rev-realarrow 5 · 7 — 실사 길과 같은 틈)
+// 콘티 끝 장 · 연출 장 읽기가 이 프로젝트 폴더 밖 그림을 가져오지 않는지, 콘티 화살표 요청의 오류 말(일반 오류 포함)이 사용자의 화면 말인지 검사한다(검토 rev-realarrow 5 · 7, 오너 2026-11-27 P3)
+import { readFileSync } from 'node:fs'
 import sharp from 'sharp'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 
@@ -110,5 +111,37 @@ describe('콘티 화살표 길의 같은 틈', () => {
     expect((await en.json()).error).toBe('The directing frame changed in the meantime. Open it again and separate the layer again.')
     mocks.getUser.mockResolvedValue({ id: 'user-1', user_metadata: { locale: 'ko' } })
     expect((await (await post()).json()).error).toMatch(/[가-힣]/)
+  })
+})
+
+describe('콘티 끝 장 다시 그리기의 일반 오류 말(오너 2026-11-27 P3)', () => {
+  const post = (body: Record<string, unknown>) => POST(new Request('http://localhost/api/writer/rough-directing-edit', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }))
+  const redraw = () => post({ action: 'regenerate-frame', projectId: PROJECT, shotId: 'sh_1', frame: 'end' })
+
+  // 왜(오너 2026-11-27 답 3 "추천대로" · P3): 끝 장 다시 그리기 안의 일반 오류(러프 세 장이 없음 · 보관함 주소가 아님)는 알려진 오류 종류가 아니라
+  //   라우트가 다시 만들지 못해 영어 화면에도 "한 장을 다시 그리려면 러프 3장 세트가 있어야 해요."가 떴다.
+  it('영어 화면에서 콘티 끝 장 다시 그리기가 일반 오류로 막히면 그 말이 영어다', async () => {
+    shotRow = { rough_storyboard: { status: 'pending', generatedAt: 100, frames: { ...FRAMES } }, duration_seconds: 4 }
+    expect((await (await redraw()).json()).error).toBe('You need the 3-frame rough set to redraw a frame')
+    shotRow = { rough_storyboard: { status: 'completed', generatedAt: 100, frames: { ...FRAMES, end: 'https://elsewhere.test/r_end.png' } }, duration_seconds: 4 }
+    expect((await (await redraw()).json()).error).toBe('Not a media bucket URL: https://elsewhere.test/r_end.png')
+  })
+
+  // 왜: 정상 경로 고정 — 한국어 화면에서는 그 말이 지금처럼 한국어다.
+  it('한국어 화면에서는 콘티 끝 장 다시 그리기의 일반 오류 말이 지금처럼 한국어다', async () => {
+    mocks.getUser.mockResolvedValue({ id: 'user-1', user_metadata: { locale: 'ko' } })
+    shotRow = { rough_storyboard: { status: 'pending', generatedAt: 100, frames: { ...FRAMES } }, duration_seconds: 4 }
+    expect((await (await redraw()).json()).error).toBe('한 장을 다시 그리려면 러프 3장 세트가 있어야 해요.')
+  })
+
+  // 왜(P3 — 두 호출 같은 틀): 고친 줄 남기기 호출도 사용자의 화면 말을 받는다. 그 호출에서 나는 오류는 모두 알려진 종류라 말은 이미 화면 말이다 —
+  //   이번에 바뀌는 것은 호출 글자(말을 넘김)뿐이고, 화면 말이 그대로인지 지킨다.
+  it('영어 화면에서 콘티 고친 줄 남기기가 막히면 그 말이 영어이고, 두 호출 모두 사용자의 화면 말을 넘긴다', async () => {
+    shotRow = { rough_storyboard: { status: 'completed', generatedAt: 100, frames: { ...FRAMES } }, duration_seconds: 4 }
+    const keep = await post({ action: 'keep-line', projectId: PROJECT, shotId: 'sh_1', line: { text: 'x', lang: 'en' }, direction: `${B}/older.png` })
+    expect((await keep.json()).error).toBe('The directing frame changed in the meantime. Open it again and separate the layer again.')
+    const route = readFileSync('src/app/api/writer/rough-directing-edit/route.ts', 'utf8')
+    expect(route).toMatch(/regenerateEndFrame\(body\.projectId, body\.shotId, locale, \{ line, userId: user\.id, projectFolderOnly: true \}\)/)
+    expect(route).toMatch(/keepEditedDirectionLine\(body\.projectId, body\.shotId, body\.line, locale, \{ expectDirection: body\.direction \}\)/)
   })
 })
