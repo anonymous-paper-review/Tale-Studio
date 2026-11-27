@@ -60,11 +60,19 @@ vi.mock('zustand', async () => {
   return { create }
 })
 // 저장은 샷 고치기 팝업과 같은 길(dialogue-line-save) — 무엇을 저장하려 했는지만 받는다.
-const saves = vi.hoisted(() => ({ calls: [] as Array<{ shotId: string; lines: Array<{ text: string }> }> }))
-vi.mock('@/features/writer/dialogue-line-save', async (original) => ({
-  ...(await original<typeof import('@/features/writer/dialogue-line-save')>()),
-  saveShotDialogue: vi.fn(async (shotId: string, lines: Array<{ text: string }>) => { saves.calls.push({ shotId, lines }) }),
-}))
+const saves = vi.hoisted(() => ({ calls: [] as Array<{ shotId: string; lines: Array<{ text: string }> }>, failNext: false, applyToStore: false }))
+vi.mock('@/features/writer/dialogue-line-save', async (original) => {
+  const { useWriterStore: writer } = await import('@/stores/writer-store')
+  return {
+    ...(await original<typeof import('@/features/writer/dialogue-line-save')>()),
+    // applyToStore 면 진짜 저장처럼 화면 값을 먼저 바꾸고(updateShot), failNext 면 DB 저장이 실패한다(닫기 시험만 켠다 — 다른 시험은 지금 그대로).
+    saveShotDialogue: vi.fn(async (shotId: string, lines: Array<{ text: string }>) => {
+      if (saves.applyToStore) writer.setState((state) => ({ shots: state.shots.map((shot) => (shot.shotId === shotId ? { ...shot, dialogueLines: lines as never } : shot)) }))
+      if (saves.failNext) { saves.failNext = false; throw new Error('network down') }
+      saves.calls.push({ shotId, lines })
+    }),
+  }
+})
 vi.mock('@/hooks/use-guarded-action', () => ({ useGuardedAction: () => ({ run: vi.fn(), locked: false }) }))
 vi.mock('sonner', () => ({ toast: { info: vi.fn(), error: vi.fn(), success: vi.fn(), warning: vi.fn() } }))
 
@@ -152,6 +160,8 @@ beforeEach(() => {
   hooks.slots = []
   hooks.mounted = []
   saves.calls.length = 0
+  saves.failNext = false
+  saves.applyToStore = false
   vi.mocked(toast.info).mockClear()
   useBoardUiStore.getState().setShotEditId(null)
   useLocaleStore.setState({ locale: 'ko' })
@@ -262,6 +272,48 @@ describe('대사 탭 바로 고치기 — 누르기 · 끝내기', () => {
     props(lineRow(FIRST)).onCommit('key')
     expect(saves.calls).toEqual([])
     expect(toast.info).toHaveBeenCalledWith('고치는 동안 이 대사가 바뀌었어요. 다시 눌러 고쳐 주세요.')
+  })
+})
+
+describe('대사 탭 바로 고치기 — 닫기', () => {
+  // 왜(검토 rev-flow-2-4 낮음 2): 저장에 실패한 줄을 두고 화면(대사 탭 · 두 샷 팝업 — 같은 고치기 한 벌)을 닫으면 [다시 저장] · [되돌리기]가 사라져,
+  //   화면 글은 고친 글인데 DB · 새 영상은 옛 대사였다. 닫을 때 그 줄을 저장된 글로 되돌리고 알린다.
+  it('저장에 실패한 줄을 두고 화면을 닫으면 그 줄을 저장된 글로 되돌리고 알린다', async () => {
+    commit()
+    saves.applyToStore = true
+    saves.failNext = true
+    props(lineRow(FIRST)).onStart()
+    props(lineRow(FIRST)).onDraftChange('아, 또 먹었어?')
+    props(lineRow(FIRST)).onCommit('key')
+    await settle()
+    commit()
+    expect(props(lineRow(FIRST)).state).toMatchObject({ kind: 'failed' })
+    expect(useWriterStore.getState().shots[0].dialogueLines[0].text).toBe('아, 또 먹었어?')
+    // 화면을 닫는다(붙어 있던 효과를 정리한다).
+    for (const mounted of hooks.mounted) if (typeof mounted?.cleanup === 'function') mounted.cleanup()
+    hooks.mounted = []
+    await settle()
+    expect(useWriterStore.getState().shots[0].dialogueLines[0].text).toBe('아, min_ho는 또야?')
+    expect(toast.info).toHaveBeenCalledWith('대사를 저장하지 못해 저장된 글로 되돌렸어요.')
+  })
+
+  // 왜(혼자 정한 것 · 검토 rev-flow-2-4 낮음 2 후속): 개발 모드는 화면을 붙였다 떼었다 다시 붙인다(숨겼다 다시 보이는 화면도 같다) — 그때 닫힌 것으로 남으면
+  //   열려 있는 화면에서 저장에 실패한 줄이 곧바로 되돌려져 [다시 저장] · [되돌리기]를 볼 수 없다.
+  it('화면이 떨어졌다 다시 붙으면 그 뒤 저장에 실패한 줄은 되돌리지 않고 [다시 저장] · [되돌리기]를 그대로 보인다', async () => {
+    commit()
+    for (const mounted of hooks.mounted) if (typeof mounted?.cleanup === 'function') mounted.cleanup()
+    hooks.mounted = []
+    commit()
+    saves.applyToStore = true
+    saves.failNext = true
+    props(lineRow(FIRST)).onStart()
+    props(lineRow(FIRST)).onDraftChange('아, 또 먹었어?')
+    props(lineRow(FIRST)).onCommit('key')
+    await settle()
+    commit()
+    expect(props(lineRow(FIRST)).state).toMatchObject({ kind: 'failed' })
+    expect(useWriterStore.getState().shots[0].dialogueLines[0].text).toBe('아, 또 먹었어?')
+    expect(toast.info).not.toHaveBeenCalledWith('대사를 저장하지 못해 저장된 글로 되돌렸어요.')
   })
 })
 

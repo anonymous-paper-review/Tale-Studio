@@ -4,10 +4,12 @@ import type { DialogueLine, Shot } from '@/types'
 
 type Row = Record<string, unknown>
 type Write = { table: string; filters: Row; patch: Row }
-const db = vi.hoisted(() => ({ rows: {} as Record<string, Row[]>, from: vi.fn(), writes: [] as Write[] }))
+const db = vi.hoisted(() => ({ rows: {} as Record<string, Row[]>, from: vi.fn(), writes: [] as Write[], images: vi.fn(async (_projectId: string, _updates: unknown[], _opts: unknown) => {}) }))
 vi.mock('@/lib/supabase/client', () => ({ createClient: () => ({ from: db.from }), createCatalogClient: vi.fn() }))
 vi.mock('@/lib/chat-persistence', () => ({ saveChatMessage: vi.fn(), saveChatTrace: vi.fn(), saveChatTracePatch: vi.fn(), loadLatestChatTrace: vi.fn() }))
 vi.mock('@/lib/shots-cache', () => ({ invalidateShots: vi.fn().mockResolvedValue(undefined) }))
+// 실사 그림 요청은 맡기기만 적는다(그림 생성 없음).
+vi.mock('@/lib/storyboard/chat-images', () => ({ runStoryboardImageUpdates: db.images }))
 
 import { createChatToolExecutor } from '@/lib/chat-tools/executor'
 import { prepareChatTools, rejectedToolCallIds, type ToolTurn } from '@/lib/chat-tools/protocol'
@@ -72,7 +74,7 @@ function storyboardResources() {
   })
 }
 /** 모델 차례를 정해 둔다 — 차례마다 도구 호출 하나, 끝 차례는 답. 실사 · 상태 같은 다른 요청은 빈 답. */
-function replyTurns(turns: Array<Row | { reply: string }>) {
+function replyTurns(turns: Array<Row | { reply: string; updates?: unknown[] }>) {
   let turn = 0
   fetchMock.mockImplementation(async (input: string | URL | Request) => {
     const path = String(input)
@@ -80,7 +82,7 @@ function replyTurns(turns: Array<Row | { reply: string }>) {
     if (path !== '/api/writer/chat') return Response.json({})
     const next = turns[Math.min(turn, turns.length - 1)]!
     turn += 1
-    if ('reply' in next) return Response.json({ reply: next.reply, updates: [] })
+    if ('reply' in next) return Response.json({ reply: next.reply, updates: next.updates ?? [] })
     return Response.json({ toolSupport: true, toolTurn: { stopReason: 'tool_use', content: [{ type: 'tool_use', ...next }] } })
   })
 }
@@ -167,6 +169,25 @@ describe('같이 정한 것', () => {
     expect(returned.is_error).toBe(true)
     expect(returned.content).toMatch(/dialogue/)
     expect(returned.content).toMatch(/rough storyboard/)
+  })
+})
+
+describe('검토 rev-flow-2-4', () => {
+  // 왜(중간 1 · 오너 Q1 "채팅 답은 새로 만드는 영상부터 들어가요를 알린다"): N3 가 지키려던 섞인 부탁("대사 바꾸고 그림도 다시 그려 줘")에서
+  //   그림 요청이 있으면 끝 답을 다시 만드는 길이 그 한 줄을 빼먹었다. 대사 저장 · 그림 맡기기는 그대로 되고, 한 줄은 한 번만 붙는다.
+  it('Storyboard 채팅에서 대사 고치기와 그림 다시 그리기를 한 번에 부탁해도 답 끝에 새로 만드는 영상부터 들어간다는 한 줄이 한 번 붙는다', async () => {
+    replyTurns([
+      { id: 'read-1', name: 'read_project', input: { resource: 'dialogue', id: targetId } },
+      { id: 'edit-1', name: 'edit_project', input: { resource: 'dialogue', id: targetId, revision: 'r1', patch: { dialogueLines: edited } } },
+      { reply: '샷 1 대사를 "가자."로 바꾸고 그림도 다시 그릴게요.', updates: [{ type: 'generateImage', id: targetId }] },
+    ])
+    await useGlobalChatStore.getState().sendMessage('샷 1 대사를 "가자."로 바꾸고 그림도 다시 그려 줘')
+    await vi.waitFor(() => expect(useGlobalChatStore.getState().loading).toBe(false))
+    expect(db.writes).toHaveLength(1)
+    await vi.waitFor(() => expect(db.images).toHaveBeenCalledTimes(1))
+    const content = useGlobalChatStore.getState().messages.filter((m) => m.role === 'model').at(-1)!.content
+    expect(content).toContain(NOTE)
+    expect(content.split(NOTE)).toHaveLength(2)
   })
 })
 

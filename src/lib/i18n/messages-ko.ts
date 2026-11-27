@@ -597,6 +597,8 @@ export const KO: Record<string, string> = {
   // Storyboard 대사 탭 · 두 샷 팝업은 연필이 줄을 못 지운다 — 줄 지우기는 채팅이나 Writer 콘티(오너 Q1 — 틀린 안내 바로잡기).
   "Empty lines are not saved. To delete a line, use the chat or Writer's rough storyboard.": '빈 대사는 저장하지 않아요. 줄을 지우려면 채팅이나 Writer 콘티에서 지워요.',
   'This line changed while you were editing. Click it to edit again.': '고치는 동안 이 대사가 바뀌었어요. 다시 눌러 고쳐 주세요.',
+  // 창(대사 탭 · 샷 팝업)을 닫을 때 저장 못 한 줄은 저장된 글로 되돌린다(검토 rev-flow-2-4 낮음 2).
+  'The line could not be saved, so it went back to the saved text.': '대사를 저장하지 못해 저장된 글로 되돌렸어요.',
   'No dialogue yet': '아직 대사가 없어요',
   'This rewrites the existing {count} dialogue lines. Press again to run': '기존 대사 {count}개를 새로 씁니다. 한 번 더 누르면 실행돼요',
   'Writing dialogue… (1-2 min)': '대사 쓰는 중… (1~2분)',
@@ -3790,6 +3792,8 @@ export const KO: Record<string, string> = {
   "Couldn't redraw {shot}. Please ask again.": '{shot}을(를) 다시 그리지 못했어요. 다시 부탁해 주세요.',
   // Storyboard 채팅은 이야기 · 샷은 바꾸지 않고 대사만 대사 도구로 고친다(오너 2026-11-27 N3 · Q1) — 새 영상부터 한 줄은 DIALOGUE_EDIT_NOTE(Director 와 같은 한 줄).
   "Storyboard doesn't change the story or shots. Edit them in Writer's rough storyboard.": 'Storyboard에서는 이야기 · 샷을 바꾸지 않아요. Writer 콘티에서 고쳐요.',
+  // Storyboard 채팅 모델이 대사 고침을 대사 도구 대신 답의 JSON 으로 내 떨궜을 때(검토 rev-flow-2-4 낮음 4).
+  "This dialogue change wasn't saved. Please ask again.": '이번 대사 고침은 저장하지 않았어요. 다시 부탁해 주세요.',
   // 보드 진행 줄 · 화면 설명 · 첫 진입 안내.
   'Storyboard progress': '스토리보드 진행 현황',
   'Not real yet': '실사 없음',

@@ -3,7 +3,8 @@
 // 대사 줄 바로 고치기의 화면 쪽 — 대사 탭 · Storyboard 샷 팝업 · Director 샷 상세가 같이 쓴다(오너 2026-11-02 "탭 안에서 바로 고치기" · 2026-11-27 Q1).
 //   고치는 차례는 lib/writer/dialogue-line-edits 가 맡고 여기는 React 상태 · 알림 · 포커스만. 저장은 대사 탭과 같은 길(dialogue-line-save).
 //   Enter · Esc 로 끝내면 그 줄로 포커스를 돌린다(바깥 누르기로 끝내면 끌어오지 않는다 — 다른 곳으로 가려는 것이다).
-//   빈 줄 알림은 화면마다 줄을 지우는 곳을 말한다(emptyLineNoticeKey). 약속: tests/writer/dialogue-line-edits.test.ts · dialogue-tab-flow.test.ts
+//   빈 줄 알림은 화면마다 줄을 지우는 곳을 말한다(emptyLineNoticeKey). 창이 닫히면 저장 못 한 줄을 저장된 글로 되돌리고 알린다.
+//   약속: tests/writer/dialogue-line-edits.test.ts · dialogue-tab-flow.test.ts
 import { useEffect, useRef, useState } from 'react'
 import { toast } from 'sonner'
 import { saveShotDialogue, shotDialogueLines } from '@/features/writer/dialogue-line-save'
@@ -26,11 +27,22 @@ export function useDialogueLineEdits(screen: DialogueLineScreen) {
       save: saveShotDialogue,
       notify: (reason) => {
         const { t: translateNow, screen: screenNow } = latest.current
-        toast.info(translateNow(reason === 'empty' ? emptyLineNoticeKey(screenNow) : 'This line changed while you were editing. Click it to edit again.'))
+        const key = reason === 'empty'
+          ? emptyLineNoticeKey(screenNow)
+          : reason === 'reverted'
+            ? 'The line could not be saved, so it went back to the saved text.'
+            : 'This line changed while you were editing. Click it to edit again.'
+        toast.info(translateNow(key))
       },
     }), setState)
   }
   const line = edits.current
+  // 창(팝업 · 대사 탭)이 닫히면 저장 못 한 줄을 저장된 글로 되돌린다 — [다시 저장] · [되돌리기]가 사라진 뒤 화면이 저장 안 된 글을 보이지 않게(검토 rev-flow-2-4 낮음 2).
+  //   붙을 때 다시 연다(개발 모드는 붙였다 떼었다 다시 붙인다).
+  useEffect(() => {
+    line.arm()
+    return () => line.dispose()
+  }, [line])
   const rowRefs = useRef(new Map<LineKey, HTMLDivElement>())
   const [focusKey, setFocusKey] = useState<LineKey | null>(null)
   useEffect(() => {

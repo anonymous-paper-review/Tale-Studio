@@ -177,6 +177,16 @@ describe('Director 샷 상세의 대사', () => {
     expect(block).not.toContain(ko(ADD_HINT))
   })
 
+  // 왜(검토 rev-flow-2-4 — 시험이 없던 끄는 때): Writer 에서 지운 샷을 가리키는 Director 샷은 영상에도 대사가 실리지 않고 고칠 Writer 대사도 없다 —
+  //   "채팅이나 Writer 콘티에서 넣어요"라고 하면 넣어도 이 샷에는 들어가지 않는다.
+  it('Director 샷 상세에서 Writer 샷이 지워진 샷은 "대사 없음"만 보이고 넣을 곳 · 고칠 곳 안내를 싣지 않는다', () => {
+    const block = dialogueBlock(render('sh_gone'))
+    expect(block).toContain(ko('No dialogue'))
+    expect(ui.rows).toEqual([])
+    expect(block).not.toContain(ko(ADD_HINT))
+    expect(block).not.toContain(ko(EDIT_HINT))
+  })
+
   // 왜(검토 1번 ①): 새로 고침하거나 Director 로 바로 들어오면 캔버스가 먼저 그려지고 Writer 자료는 그 뒤에 온다 —
   //   그 사이 카드를 누르면 대사가 있는 샷도 "대사 없음"으로 보였다. 거짓 "대사 없음"을 보고 대사를 새로 넣으러 갈 수 있다.
   it('Writer 자료를 아직 읽는 중이면 "대사 없음" 대신 대사를 불러오는 중이라고 한다', () => {

@@ -85,6 +85,12 @@ export function storyboardTextNotice(locale: AppLocale): string {
   return translate(locale, "Storyboard doesn't change the story or shots. Edit them in Writer's rough storyboard.")
 }
 
+/** 모델이 대사 고침을 대사 도구 대신 답의 JSON 으로 내 떨궜다 — 대사가 저장되지 않았다고 알린다(검토 rev-flow-2-4 낮음 4).
+ *  모델 답이 "대사를 바꿨어요"라고 해도 사람이 그 사실을 알게. 다시 부탁하면 대사 도구로 고친다. */
+export function storyboardDialogueNotSavedNotice(locale: AppLocale): string {
+  return translate(locale, "This dialogue change wasn't saved. Please ask again.")
+}
+
 /** Storyboard 채팅의 대사 도구 안내(오너 2026-11-27 Q1 "채팅창에서도" · 리드 "도구 하나로") — Director 채팅 <dialogue_tool> 과 같은 규칙(같은 대사 자원 · 같은 검사 · 같은 저장).
  *  답 끝의 "새로 만드는 영상부터" 한 줄은 화면이 붙인다(receipt dialogueEditNote) — 모델은 쓰지 않는다. */
 export const STORYBOARD_DIALOGUE_TOOL_GUIDE = `
@@ -125,11 +131,25 @@ export function withStoryboardImageUpdates(validated: readonly unknown[], images
   return clarify ? [clarify] : [...validated, ...images]
 }
 
-/** Storyboard 채팅 답에서 화면에 넘길 것 — 되묻기 · 실사 그림 요청만(오너 2026-11-27 N3 — 대사는 대사 도구로, Q1). 떨군 글 고치기 수도 센다(답 끝 안내). */
-export function storyboardOnlyUpdates(validated: readonly unknown[], images: readonly StoryboardImageUpdate[]): { updates: unknown[]; droppedTextEdits: number } {
+/** Storyboard 채팅 답에서 화면에 넘길 것 — 되묻기 · 실사 그림 요청만(오너 2026-11-27 N3 — 대사는 대사 도구로, Q1). 떨군 글 고치기 수도 센다(답 끝 안내).
+ *  떨군 것에 대사가 섞였나(droppedDialogue) · 이야기 · 샷 고침이 섞였나(droppedStory)도 가른다 — 답 끝 안내를 고른다(검토 rev-flow-2-4 낮음 4).
+ *  샷 고치기(updateShot)의 대사 칸은 대사, 나머지 칸 · 다른 고치기(씬 · 샷 더하기 · 지우기)는 이야기 · 샷이다. */
+export function storyboardOnlyUpdates(
+  validated: readonly unknown[],
+  images: readonly StoryboardImageUpdate[],
+): { updates: unknown[]; droppedTextEdits: number; droppedDialogue: boolean; droppedStory: boolean } {
   const isClarify = (u: unknown) => !!u && typeof u === 'object' && (u as { type?: unknown }).type === 'clarify'
   const clarify = validated.filter(isClarify)
-  return { updates: withStoryboardImageUpdates(clarify, images), droppedTextEdits: validated.length - clarify.length }
+  const dropped = validated.filter((u) => !isClarify(u))
+  let droppedDialogue = false
+  let droppedStory = false
+  for (const edit of dropped) {
+    const { type, patch } = edit as { type?: unknown; patch?: unknown }
+    const keys = type === 'updateShot' && !!patch && typeof patch === 'object' ? Object.keys(patch) : null
+    if (keys?.includes('dialogueLines')) droppedDialogue = true
+    if (!keys || keys.some((key) => key !== 'dialogueLines')) droppedStory = true
+  }
+  return { updates: withStoryboardImageUpdates(clarify, images), droppedTextEdits: dropped.length, droppedDialogue, droppedStory }
 }
 
 /** AI 문맥 한 덩어리 — 샷마다 실사가 있는지와 지금 판 번호. 샷 이름은 문맥의 샷 줄(보드 이름)이 이미 준다. */
