@@ -9,6 +9,7 @@ import type { VideoModelKey, VideoResolution } from '@/lib/video-models'
 import type { ContinueFrom, VideoMode } from '@/lib/director/video-modes'
 import type { ProjectFormat } from '@/types/project'
 import type { DirectorNode, ShotNodeData, StoryboardImage, VideoNodeData, VideoOverride } from '@/types/director'
+import type { DialogueLine, Shot } from '@/types'
 
 export type ShotDetailTab = 'image' | 'video'
 
@@ -194,4 +195,12 @@ export function imageChangedForTake(image: StoryboardImage | null | undefined, t
         .filter((at): at is number => typeof at === 'number' && Number.isFinite(at))
     : []
   return imageChangedSinceTake(sameStart.length ? Math.min(...sameStart) : image.generatedAt, take)
+}
+
+/** 샷 상세의 대사(오너 2026-11-27 P1) — 영상이 쓰는 것과 같은 그 Writer 샷(writerShotId)의 대사. 영상 서버도 낼 때 shots.dialogue_lines 를 읽는다(video-submit).
+ *  editable = 고칠 Writer 샷이 있다(Writer 콘티 · Storyboard 대사 탭). Director 에서 손으로 더한 샷은 Writer 샷이 없어 대사도 고칠 곳도 없다.
+ *  약속: tests/director/shot-detail-dialogue.test.ts */
+export function shotDetailDialogue(writerShots: ReadonlyArray<Pick<Shot, 'shotId' | 'dialogueLines'>>, writerShotId: string | null | undefined): { lines: DialogueLine[]; editable: boolean } {
+  const shot = writerShotId ? writerShots.find((item) => item.shotId === writerShotId) : undefined
+  return shot ? { lines: shot.dialogueLines ?? [], editable: true } : { lines: [], editable: false }
 }
