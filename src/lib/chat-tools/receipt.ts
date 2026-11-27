@@ -40,13 +40,14 @@ export function guardChatToolReply(reply: string, outcomes: ToolOutcome[], korea
  * 대사 고치기 · 더하기 · 빼기 부탁인가(Director 채팅 — 오너 2026-11-27 3차). 대사 · 내레이션 말과 고치기 · 더하기 · 빼기 말이 함께 있어야 하고,
  *   하지 말라는 말이면 아니다. 영상 · 카메라 부탁("샷 3 영상 다시")은 아니다. 고치기를 허락하는 판정이 아니라 고치기 결과를 기다릴지의 힌트다.
  *   실제로 고쳐 달라는 말만 센다(검토 rev-video-3 중간 1 · rev-flow-2-4 낮음 3): 영상 · 테이크를 다시 만들어 달라는 말, 고쳤는지 묻는 말(Did / Have / Has you …),
- *   지난 고침을 가리키는 꼴(바꾼 · 수정한 · 추가한 …), "대사는 빼고 …"는 세지 않는다. 물음표로 끝나는 정중한 부탁("바꿔 줄래?" · "Can you change …?" ·
+ *   지난 고침을 가리키는 꼴(바꾼 · 수정한 · 추가한 …), "대사는 빼고 …" · "대사는 그대로 · 유지"는 세지 않는다. 물음표로 끝나는 정중한 부탁("바꿔 줄래?" · "Can you change …?" ·
  *   "Is it possible to change …?"), 영상 · 테이크 속 대사를 고쳐 달라는 말, "변경 부탁해요"는 센다. 약속: tests/director/dialogue-edit-request.test.ts
  */
 export function requestsDialogueEdit(message: string): boolean {
   const text = withoutMediaGenerationProhibition(message)
   // 하지 말라는 말 · "대사는 빼고 …"(대사 말고 다른 것)는 고치기 부탁이 아니다(검토 rev-flow-2-4 낮음 3 — "줄 빼고 새 줄 넣어"는 고치기라 은/는 + 빼고만).
-  if (/(지\s*마|말고|말아|(은|는)\s*빼고|don't|do not)/i.test(text)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
+  //   대사를 두라는 말("대사는 그대로" · "대사 유지" · "Keep the dialogue")도 아니다(재검토 71db3c21 낮음 — 이 말만, 넓히지 않음).
+  if (/(지\s*마|말고|말아|(은|는)\s*빼고|대사(?:는|를)?\s*(?:그대로|유지)|\bkeep\s+the\s+dialogue\b|don't|do not)/i.test(text)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
   if (!/(대사|내레이션|dialogue|narration)/i.test(text)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
   // 영상 · 테이크를 다시 만들어 달라는 말은 대사 고치기 부탁이 아니다 — 영상 · 테이크 속 대사를 고쳐 달라는 말("샷 3 영상에서 대사 바꿔 줘")은 고치기다(rev-flow-2-4 낮음 3).
   if (/(영상|비디오|테이크)[^.!?\n]*?(다시\s*)?(만들|생성|뽑)|다시\s*(만들|생성)|\b(remake|regenerate|re-?render)\b|\b(make|generate|create|update|change|edit)\s+(the\s+|a\s+|new\s+)?(videos?|takes?|clips?)\b/i.test(text)) return false // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.

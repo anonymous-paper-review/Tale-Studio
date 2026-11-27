@@ -25,7 +25,7 @@ import {
   type ChatLlmUsage,
 } from '@/lib/chat-trace'
 import { persistChatTraceBestEffort } from '@/lib/chat-trace-server'
-import { STORYBOARD_DIALOGUE_TOOL_GUIDE, STORYBOARD_IMAGE_TOOL_GUIDE, pickStoryboardImageUpdates, storyboardChatSystem, storyboardDialogueNotSavedNotice, storyboardImageStatusSection, storyboardOnlyUpdates, storyboardTextNotice, withStoryboardImageUpdates } from '@/lib/storyboard/chat-image-tool'
+import { STORYBOARD_DIALOGUE_TOOL_GUIDE, STORYBOARD_IMAGE_TOOL_GUIDE, dialogueToolTargets, pickStoryboardImageUpdates, storyboardChatSystem, storyboardDialogueNotSavedNotice, storyboardImageStatusSection, storyboardOnlyUpdates, storyboardTextNotice, withStoryboardImageUpdates } from '@/lib/storyboard/chat-image-tool'
 
 // #dialogue-language-chat(2026-08-27 오너): 챗으로 대사를 새로 쓰거나 고칠 때도 파이프라인과
 //   같은 대사 언어를 따른다 — 단, 사용자가 그 메시지에서 명시적으로 다른 언어를 요구하면 요청이
@@ -196,8 +196,8 @@ function parseAgenticResponse(
   droppedCharacterIds: string[]
   /** Storyboard 채팅이 떨군 글 고치기 수 — 0 보다 크면 답 끝에 안내를 붙인다. */
   droppedTextEdits: number
-  /** 떨군 것에 대사 고침이 섞였나 · 이야기 · 샷 고침이 섞였나 — 답 끝 안내를 고른다(검토 rev-flow-2-4 낮음 4). */
-  droppedDialogue: boolean
+  /** 떨군 것에 대사 고침이 섞인 샷 · 이야기 · 샷 고침이 섞였나 — 답 끝 안내를 고른다(검토 rev-flow-2-4 낮음 4). */
+  droppedDialogueShotIds: string[]
   droppedStory: boolean
   parseStatus: string
   rawUpdateCount: number
@@ -206,7 +206,7 @@ function parseAgenticResponse(
   // 펜스 추출·복구·유출 방어·신호·부분 적용 안내는 공용 가드가 담당(#p4-json-guard).
   const dropped: string[] = []
   let droppedTextEdits = 0
-  let droppedDialogue = false
+  let droppedDialogueShotIds: string[] = []
   let droppedStory = false
   const { reply, updates, raw, status } = parseFencedUpdates(
     text,
@@ -216,7 +216,7 @@ function parseAgenticResponse(
       // 떨굴 글 고치기에서 빠진 인물은 알리지 않는다 — 그 고치기 자체를 하지 않는다(대사는 대사 도구로 고치고, 그 검사가 인물을 거른다).
       const picked = storyboardOnlyUpdates(validateWriterUpdates(raw, allowedCharacterIds, []), pickStoryboardImageUpdates(raw))
       droppedTextEdits = picked.droppedTextEdits
-      droppedDialogue = picked.droppedDialogue
+      droppedDialogueShotIds = picked.droppedDialogueShotIds
       droppedStory = picked.droppedStory
       return picked.updates
     },
@@ -227,7 +227,7 @@ function parseAgenticResponse(
     updates,
     droppedCharacterIds: dropped,
     droppedTextEdits,
-    droppedDialogue,
+    droppedDialogueShotIds,
     droppedStory,
     parseStatus: status,
     rawUpdateCount: raw.length,
@@ -383,7 +383,7 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       reply,
       updates,
       droppedCharacterIds,
-      droppedDialogue,
+      droppedDialogueShotIds,
       droppedStory,
       parseStatus,
       rawUpdateCount,
@@ -399,8 +399,9 @@ async function handlePost(req: Request, context: ChatRecoveryContext) {
       // Storyboard 채팅이 답의 JSON 으로 글 고치기를 냈으면 떨구고 사실을 알린다(오너 2026-11-27 N3 — 이야기 · 샷은 콘티에서, 대사는 대사 도구로).
       //   대사를 고쳐 저장했다는 "새로 만드는 영상부터" 한 줄은 화면이 도구 결과를 보고 붙인다(receipt dialogueEditNote — Director 와 같은 한 줄).
       //   떨군 것에 대사가 섞였으면 대사가 저장되지 않았다고도 알린다 — 대사만 떨궜으면 이야기 · 샷 안내는 붙이지 않는다(대사는 여기서 고칠 수 있다, rev-flow-2-4 낮음 4).
+      //   이번 차례에 대사 도구로 고친 샷의 되풀이는 세지 않는다 — 그 결과는 화면의 실행 결과가 알린다(재검토 71db3c21 낮음).
       droppedStory ? storyboardTextNotice(replyLocale) : null,
-      droppedDialogue ? storyboardDialogueNotSavedNotice(replyLocale) : null,
+      droppedDialogueShotIds.some((shotId) => !dialogueToolTargets(toolMessages).has(shotId)) ? storyboardDialogueNotSavedNotice(replyLocale) : null,
     ].filter((notice): notice is string => !!notice)
     const replyOut = notices.length ? `${reply}\n\n${notices.join('\n\n')}` : reply
     const trace = buildChatTrace({
