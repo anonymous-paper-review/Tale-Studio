@@ -264,7 +264,8 @@ describe('끝 장 끼우기', () => {
     expect(finalize).toMatch(/if \(job\.target\.roughEnd\) return finalizeRoughEndFrameJob\(job, falImageUrl\)/)
     const route = readFileSync('src/app/api/writer/rough-directing-edit/route.ts', 'utf8')
     expect(route).toMatch(/action: z\.literal\('read-direction'\)/)
-    expect(route).toMatch(/regenerateEndFrame\(body\.projectId, body\.shotId, undefined, \{ line, userId: user\.id, projectFolderOnly: true \}\)/)
+    // 2026-11-27 글 바꿈(오너 P3 "추천대로" — 일반 오류도 사용자의 화면 말로): 예전 호출 글자는 세 번째 칸이 undefined(늘 기본 말)였다.
+    expect(route).toMatch(/regenerateEndFrame\(body\.projectId, body\.shotId, locale, \{ line, userId: user\.id, projectFolderOnly: true \}\)/)
   })
 })
 
@@ -281,7 +282,8 @@ describe('[그대로]로 고친 줄 남기기', () => {
     expect(mocks.submit).not.toHaveBeenCalled()
     const route = readFileSync('src/app/api/writer/rough-directing-edit/route.ts', 'utf8')
     expect(route).toMatch(/action: z\.literal\('keep-line'\)/)
-    expect(route).toMatch(/keepEditedDirectionLine\(body\.projectId, body\.shotId, body\.line, undefined, \{ expectDirection: body\.direction \}\)/)
+    // 2026-11-27 글 바꿈(오너 P3 "추천대로"): 예전 호출 글자는 네 번째 칸이 undefined(늘 기본 말)였다.
+    expect(route).toMatch(/keepEditedDirectionLine\(body\.projectId, body\.shotId, body\.line, locale, \{ expectDirection: body\.direction \}\)/)
   })
 
   // 왜(리드 (A)): 지시는 영어만이다 — 한국어로 고친 줄은 영어로 옮겨 남기고(화면엔 한국어 그대로), 못 옮기면 아무것도 바꾸지 않는다(AI 가 읽은 줄이 그대로 남는다).

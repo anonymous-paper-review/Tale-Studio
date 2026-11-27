@@ -35,7 +35,7 @@ import { pollGenerationJob } from '@/lib/generation-jobs-client'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 import { useLocaleStore } from '@/stores/locale-store'
 import type { DirectingArrowEditorHandle } from '@/features/writer/directing-arrow-editor'
-import { directingEditUrl } from '@/lib/writer/directing-edit-url'
+import { directingEditHeaders, directingEditUrl } from '@/lib/writer/directing-edit-url'
 
 export type UnsavedChoice = 'save' | 'discard' | 'keep'
 
@@ -131,7 +131,7 @@ export function endRedrawDeps(target: EndAskTarget, t: ReturnType<typeof useT>):
     post: async (body) => {
       const res = await fetch(endpointOf(target), {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: directingEditHeaders(useLocaleStore.getState().locale),
         body: JSON.stringify(body),
       })
       const j = await res.json().catch(() => null)
@@ -167,7 +167,7 @@ export function keepLineDeps(target: EndAskTarget, t: ReturnType<typeof useT>): 
     post: async (body) => {
       const res = await fetch(endpointOf(target), {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: directingEditHeaders(useLocaleStore.getState().locale),
         body: JSON.stringify(body),
       })
       const j = await res.json().catch(() => null)
@@ -194,7 +194,7 @@ async function fetchDirectionRead(projectId: string, shotId: string, endpoint: s
   try {
     const res = await fetch(endpoint, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: directingEditHeaders(useLocaleStore.getState().locale),
       body: JSON.stringify({ action: 'read-direction', projectId, shotId }),
     })
     if (!res.ok) return null

@@ -34,6 +34,7 @@ import { cn } from '@/lib/utils'
 import { useT } from '@/lib/i18n'
 import type { DialogueLine, RoughStoryboardImage, Shot, ShotType } from '@/types'
 import { useLocaleStore } from '@/stores/locale-store'
+import { directingEditHeaders } from '@/lib/writer/directing-edit-url'
 
 interface Draft {
   actionDescription: string
@@ -117,7 +118,7 @@ export function StoryboardShotDialog({ shotId, panel, onOpenChange, drawing = fa
     try {
       const res = await fetch('/api/writer/rough-directing-edit', {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: directingEditHeaders(locale),
         body: JSON.stringify({ action: 'regenerate-frame', projectId, shotId: shot.shotId, frame }),
       })
       if (!res.ok) {

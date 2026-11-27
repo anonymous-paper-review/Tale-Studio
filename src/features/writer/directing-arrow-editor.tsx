@@ -21,7 +21,7 @@ import { translate, useT } from '@/lib/i18n'
 import { reloadAfterRoughFrameEdit } from '@/lib/writer/rough-frame-refresh'
 import { askLineText, endAskAfterSave } from '@/lib/writer/end-frame-ask'
 import { freshDirectionRead } from '@/lib/writer/direction-read'
-import { directingEditUrl, directingSaveBody, type DirectingSurface } from '@/lib/writer/directing-edit-url'
+import { directingEditHeaders, directingEditUrl, directingSaveBody, type DirectingSurface } from '@/lib/writer/directing-edit-url'
 import { realSaveImageType } from '@/lib/storyboard/real-arrow-edit'
 import { warnBeforeLeaving } from '@/features/writer/unsaved-arrows-confirm'
 import { useLocaleStore } from '@/stores/locale-store'
@@ -368,7 +368,7 @@ export function DirectingArrowEditor({
       const direction = panel.frames?.direction ?? ''
       const res = await fetch(directingEditUrl(surface), {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: directingEditHeaders(locale),
         body: JSON.stringify({ action: 'separate', projectId, shotId, direction }),
       })
       // 낡은 화면 위에 새 그림의 밑층을 섞지 않는다 — 409 면 알리고 화면을 다시 읽어 위층도 지금 그림으로 맞춘다.
@@ -418,7 +418,7 @@ export function DirectingArrowEditor({
       ctx.drawImage(top, 0, 0)
       const res = await fetch(directingEditUrl(surface), {
         method: 'POST',
-        headers: { 'content-type': 'application/json' },
+        headers: directingEditHeaders(locale),
         body: JSON.stringify(directingSaveBody(surface, { projectId, shotId, image: saveImageDataUrl(out, surface), direction: panel.frames?.direction })),
       })
       const j = await res.json().catch(() => null)

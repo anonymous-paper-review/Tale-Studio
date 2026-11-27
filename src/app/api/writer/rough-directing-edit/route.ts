@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server'
 import { z } from 'zod'
 import { getUser } from '@/lib/supabase/auth'
-import { parseAppLocale, type AppLocale } from '@/lib/locale'
+import { UI_LOCALE_HEADER, requestUiLocale, type AppLocale } from '@/lib/locale'
 import { userOwnsProject } from '@/lib/generation-jobs'
 import { capacityReservationRejection } from '@/lib/api/quota'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
@@ -76,13 +76,13 @@ const BodySchema = z.discriminatedUnion('action', [
 
 export async function POST(req: Request) {
   let capacityContext: { projectId: string; kind: string; userId: string } | null = null
-  // 오류 말은 그 사용자의 화면 말로(검토 rev-realarrow 5 — 진실은 user_metadata.locale, 없으면 en). 예전엔 늘 한국어였다.
-  //   끝 장 · 고친 줄 두 호출은 출시 시험(end-frame-read-draw)이 호출 글자를 못 박아 말을 넘기지 못한다 — 알려진 오류는 아래에서 이 말로 다시 만든다.
+  // 오류 말은 지금 화면 말로(검토 rev-realarrow 5 · 2차 낮음 1) — 화면이 보낸 말 → 계정에 저장된 말 → en. 예전엔 늘 한국어였다.
+  //   모든 호출이 이 말을 받는다(끝 장 · 고친 줄 두 호출도 — 오너 2026-11-27 P3, 그 안의 일반 오류까지 사용자 말). 알려진 오류는 아래에서 이 말로 한 번 더 만든다(lib 안 다른 길이 기본 말로 만든 것까지).
   let locale: AppLocale = 'en'
   try {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    locale = parseAppLocale((user as { user_metadata?: { locale?: unknown } }).user_metadata?.locale) ?? 'en'
+    locale = requestUiLocale(req.headers.get(UI_LOCALE_HEADER), (user as { user_metadata?: { locale?: unknown } }).user_metadata?.locale)
     const parsed = BodySchema.safeParse(await req.json())
     if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     const body = parsed.data
@@ -101,12 +101,12 @@ export async function POST(req: Request) {
       return NextResponse.json({ data: { read } })
     }
     if (body.action === 'keep-line') {
-      const read = await keepEditedDirectionLine(body.projectId, body.shotId, body.line, undefined, { expectDirection: body.direction })
+      const read = await keepEditedDirectionLine(body.projectId, body.shotId, body.line, locale, { expectDirection: body.direction })
       return NextResponse.json({ data: { read } })
     }
     if (body.action === 'regenerate-end' || (body.action === 'regenerate-frame' && body.frame === 'end')) {
       const line = body.action === 'regenerate-frame' ? (body.line ?? null) : null
-      const data = await regenerateEndFrame(body.projectId, body.shotId, undefined, { line, userId: user.id, projectFolderOnly: true })
+      const data = await regenerateEndFrame(body.projectId, body.shotId, locale, { line, userId: user.id, projectFolderOnly: true })
       return NextResponse.json({ data })
     }
     if (body.action === 'regenerate-frame') {

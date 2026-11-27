@@ -14,7 +14,7 @@ import { capacityReservationRejection } from '@/lib/api/quota'
 import { moderationRejectionResponse } from '@/lib/api/moderation'
 import { DirectionTranslateError, DirectionUnreadableError, ForeignMediaPathError, StaleDirectionError } from '@/lib/writer/directing-edit'
 import { translate } from '@/lib/i18n'
-import { parseAppLocale, type AppLocale } from '@/lib/locale'
+import { UI_LOCALE_HEADER, requestUiLocale, type AppLocale } from '@/lib/locale'
 import {
   RealFramesMissingError,
   RealNotArrowVersionError,
@@ -45,12 +45,12 @@ export async function POST(req: Request) {
   const blocked = demoWriteBlock(req)
   if (blocked) return blocked
   let context: { projectId: string; kind: 'image_generation' | 'shot_storyboard'; userId: string } | null = null
-  // 오류 말은 그 사용자의 화면 말로(검토 rev-realarrow 5 — 진실은 user_metadata.locale, 없으면 en).
+  // 오류 말은 지금 화면 말로(검토 rev-realarrow 5 · 2차 낮음 1) — 화면이 보낸 말 → 계정에 저장된 말 → en.
   let locale: AppLocale = 'en'
   try {
     const user = await getUser()
     if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    locale = parseAppLocale((user as { user_metadata?: { locale?: unknown } }).user_metadata?.locale) ?? 'en'
+    locale = requestUiLocale(req.headers.get(UI_LOCALE_HEADER), (user as { user_metadata?: { locale?: unknown } }).user_metadata?.locale)
     const parsed = BodySchema.safeParse(await req.json().catch(() => null))
     if (!parsed.success) return NextResponse.json({ error: 'Invalid body' }, { status: 400 })
     const body = parsed.data
