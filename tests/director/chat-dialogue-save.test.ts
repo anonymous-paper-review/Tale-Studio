@@ -177,4 +177,30 @@ describe('혼자 정한 것', () => {
   it('Director 채팅의 화면 도구에는 대사 자원 하나만 있다', () => {
     expect(Object.keys(directorResources())).toEqual(['dialogue'])
   })
+
+  // 왜(리드 3차 "read_project 도 대사 자원만"): 모델이 다른 자원 이름으로 읽거나 고치려 해도 화면이 실행하지 않는다 — 샷 글 · 인물 · 설정이 Director 채팅으로 새지 않게.
+  it('Director 채팅에서 대사 말고 다른 자원(샷 글 · 씬 · 인물 · 설정)을 읽거나 고치려 하면 실행하지 않는다', async () => {
+    const execute = createChatToolExecutor({ resources: directorResources(), signal: new AbortController().signal, isCurrent: () => true })
+    for (const resource of ['shots', 'scenes', 'characters', 'backgrounds', 'settings', 'appearances']) {
+      expect({ resource, read: (await execute({ type: 'tool_use', id: `read-${resource}`, name: 'read_project', input: { resource } })).status }).toEqual({ resource, read: 'unsupported' })
+      expect({ resource, edit: (await execute({ type: 'tool_use', id: `edit-${resource}`, name: 'edit_project', input: { resource, id: targetId, revision: 'r1', patch: { actionDescription: 'x' } } })).status }).toEqual({ resource, edit: 'unsupported' })
+    }
+    expect(db.writes).toEqual([])
+  })
+
+  // 왜: 오너 3차 — 대사 고치기는 글 · 말하는 사람 · 줄 더하기 · 빼기 넷이다(Director 상세 안내가 "말하는 사람 · 줄 더하기 · 빼기는 채팅에서"라고 가리킨다).
+  //   말하는 사람을 내레이션(없음)으로 바꾸는 고침도 같은 검사 · 같은 저장으로 받는다.
+  it('Director 채팅에서 대사의 말하는 사람을 바꾸면 그 줄의 다른 칸은 그대로 두고 저장한다', async () => {
+    fetchMock.mockImplementation(async (input: string | URL | Request) => {
+      if (String(input) === `/api/writer/status/${projectId}`) return Response.json({ started: true, pipeline_completed: true })
+      throw new Error(`no request: ${String(input)}`)
+    })
+    const execute = createChatToolExecutor({ resources: directorResources(), signal: new AbortController().signal, isCurrent: () => true })
+    const read = await execute({ type: 'tool_use', id: 'read-1', name: 'read_project', input: { resource: 'dialogue', id: targetId } })
+    const revision = (read.records as Array<{ revision: string }>)[0]!.revision
+    const narrated = [{ ...lines[0]!, characterId: null }, structuredClone(lines[1]!)]
+    const result = await execute({ type: 'tool_use', id: 'speaker-1', name: 'edit_project', input: { resource: 'dialogue', id: targetId, revision, patch: { dialogueLines: narrated } } })
+    expect(result).toMatchObject({ status: 'ok' })
+    expect(db.writes).toEqual([{ table: 'shots', filters: { project_id: projectId, shot_id: targetId, dialogue_lines: JSON.stringify(lines) }, patch: { dialogue_lines: narrated } }])
+  })
 })
