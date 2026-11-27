@@ -3941,8 +3941,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           ),
           ...(lineRefs.length > 0 ? { lineRefs } : {}),
           // Storyboard 실사 그림 도구(오너 2026-11-26 m1126 O7) — Storyboard 단계 채팅만(콘티는 Artist 앞이라 실사를 못 그린다).
-          //   이 표시가 있으면 서버는 실사 고치기 · 대사 고치기만 하는 Storyboard 안내 · 읽기 도구를 쓴다(오너 2026-11-27 N3 · Q1 — 이야기 · 샷은 콘티로 안내).
-          //   대사 고침은 콘티 채팅 고침과 같은 모양(updateShot · dialogueLines)으로 와서 아래 보드 채팅 저장 길(applyChatUpdates)을 그대로 탄다.
+          //   이 표시가 있으면 서버는 실사 고치기 · 대사 고치기만 하는 Storyboard 안내와 도구(읽기 + 대사 자원만 고치기)를 쓴다(오너 2026-11-27 N3 · Q1 — 이야기 · 샷은 콘티로 안내).
+          //   대사는 Director 채팅과 같은 대사 도구로 고친다(리드 "도구 하나로") — 화면은 대사 자원 고치기만 실행한다(toolCallAllowedOnStage).
           //   "전체 대사를 한국어로 맞추고 Director 로" 길(dialogueTarget)은 리드 답 전까지 지금대로 글을 고치는 요청으로 보낸다(n-flow 결정 대기 1).
           ...(stage === 'writer' && !dialogueTarget ? { storyboardImages: true } : {}),
         }
@@ -4071,7 +4071,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           },
         })
         executeWorkflow = workflow
-        const loop = await runChatToolLoop({ request, execute: call => call.name === 'inspect_project' ? executeProjectInspection(projectId, stage, call.input, controller.signal, turnArtistSelection) : call.name === 'project_workflow' ? workflow(call) : execute(call), refuse: call => toolCallAllowedOnStage(stage, call.name) ? null : { status: 'unsupported', message: STORYBOARD_EDIT_REFUSAL }, isCurrent: isCurrentSession, signal: controller.signal, onResult: outcome => completedTools.push(outcome), requireEdit: requestsSupportedChatEdit(stage, trimmed), requireInspection: requestsImageInspection(stage, trimmed), locale: contentLocale() })
+        const loop = await runChatToolLoop({ request, execute: call => call.name === 'inspect_project' ? executeProjectInspection(projectId, stage, call.input, controller.signal, turnArtistSelection) : call.name === 'project_workflow' ? workflow(call) : execute(call), refuse: call => toolCallAllowedOnStage(stage, call.name, call.input) ? null : { status: 'unsupported', message: STORYBOARD_EDIT_REFUSAL }, isCurrent: isCurrentSession, signal: controller.signal, onResult: outcome => completedTools.push(outcome), requireEdit: requestsSupportedChatEdit(stage, trimmed), requireInspection: requestsImageInspection(stage, trimmed), locale: contentLocale() })
         data = loop.data
         toolLoopStopped = loop.stopped
         toolOutcomes = loop.results
@@ -4290,8 +4290,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const waitForLegacy = !dialogueTarget && toolsEnabled && ((requestedHandoff && requestsSupportedChatEdit(stage, trimmed)) || (isBoardStage(stage) && data.updates?.length) || (stage === 'artist' && (data.proposals?.length || data.locationProposals?.length)))
       // 답을 실행 결과로 바꿀 때 실제로 지우고 더한 것을 함께 알리는 한 줄("적용: 샷 2개 지움 · 샷 1개 더함", 리뷰 4차 후속 L2).
       let appliedStructureLine = ''
-      // Director 채팅으로 대사를 고쳐 저장했으면 새로 만드는 영상부터 들어간다고 알린다(오너 3차) — 모델 말에 맡기지 않는다.
-      if (stage === 'director') reply = [reply, dialogueEditNote(toolOutcomes, contentLocale() === 'ko', reply)].filter(Boolean).join('\n\n')
+      // Director · Storyboard 채팅으로 대사를 고쳐 저장했으면 새로 만드는 영상부터 들어간다고 알린다(오너 3차 · Q1, 리드 "도구 하나로" — 한 줄 하나) — 모델 말에 맡기지 않는다.
+      if (stage === 'director' || stage === 'writer') reply = [reply, dialogueEditNote(toolOutcomes, contentLocale() === 'ko', reply)].filter(Boolean).join('\n\n')
       reply = guardChatToolReply(reply, toolOutcomes, contentLocale() === 'ko')
       if (lockedReply) reply = lockedReply
       if (styleLockedReply) reply = styleLockedReply
@@ -5747,8 +5747,8 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
         const saved = (await (resource.readSaved ?? resource.read)()).find(row => row.id === approved.id)
         if (!isCurrentSession()) return false
         if (!saved || !Object.entries(patch).every(([key, value]) => sameToolValue(saved.values[key], value))) throw new Error(translate(contentLocale(), "Couldn't confirm that the requested values were saved."))
-        // Director 채팅의 대사 고침(줄 빼기 승인)도 새로 만드는 영상부터 들어간다고 알린다(오너 2026-11-27 3차).
-        const dialogueNote = proposal.stage === 'director' && approved.resource === 'dialogue' ? translate(contentLocale(), DIALOGUE_EDIT_NOTE) : ''
+        // Director · Storyboard 채팅의 대사 고침(줄 빼기 승인)도 새로 만드는 영상부터 들어간다고 알린다(오너 2026-11-27 3차 · Q1).
+        const dialogueNote = (proposal.stage === 'director' || proposal.stage === 'writer') && approved.resource === 'dialogue' ? translate(contentLocale(), DIALOGUE_EDIT_NOTE) : ''
         speak([`${proposal.target}: ${contentLocale() === 'ko' ? '저장을 확인했습니다.' : 'Saved and verified.'}`, dialogueNote].filter(Boolean).join('\n\n'))
         patchTrace({ appliedCount: 1, pendingProposal: false })
         return true

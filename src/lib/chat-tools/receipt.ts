@@ -64,7 +64,8 @@ export function dialogueEditNote(outcomes: ToolOutcome[], korean: boolean, reply
 export function requestsSupportedChatEdit(stageId: string, message: string): boolean {
   // Director 채팅은 대사만 고친다(3차) — 대사 고치기 · 더하기 · 빼기 부탁일 때만 고치기 결과를 기다린다.
   if (stageId === 'director') return requestsDialogueEdit(message)
-  // Storyboard(id writer) 채팅은 도구로 고치지 않는다 — 실사 고치기 · 대사 고침(답의 updateDialogue, Q1)만 하고 이야기 · 샷은 콘티로 안내한다(오너 2026-11-27 N3). 도구 고치기를 요구하지 않는다.
+  // Storyboard(id writer) 채팅은 실사 고치기와 대사 고치기(Director 와 같은 대사 도구)만 하고 이야기 · 샷은 콘티로 안내한다(오너 2026-11-27 N3 · Q1, 리드 "도구 하나로").
+  //   고치기 결과는 다시 요구하지 않는다(Director 와 다른 점) — 다시 요구하면 대사를 못 고친 답이 "실행되지 않았다"로 바뀌며 섞인 그림 요청까지 버린다(N3).
   if (stageId === 'writer') return false
   // 콘티는 Storyboard 와 같은 보드 채팅 도구를 쓴다(O1 2026-11-26) — 씬 · 샷 · 대사 고치기는 콘티 채팅의 일이다.
   const stage = toolStageOf(stageId)

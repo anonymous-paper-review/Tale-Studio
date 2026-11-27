@@ -65,10 +65,11 @@ For a compound edit-then-move request, finish and verify ALL edits before openin
 Keep using the existing approval/JSON paths for operations these tools do not support (creation, deletion, generation, Director handoff).
 </app-tools>`
 
-/** options.edit === false: 고치기 도구(edit_project)를 뺀다 · options.resume === false: 화면 도구에서 Writer 실행 다시 돌리기(resume)를 뺀다 —
- *  Storyboard 채팅은 도구로 고치지 않고 씬 · 샷을 다시 나누지 않는다(오너 2026-11-27 N3, 검토 rev-flow 리드 2 · 7) — 대사 고침은 답의 updates(updateDialogue)로만 온다(Q1).
- *  화면 열기 대상에는 Writer 콘티(conti)가 있다(리드 6). */
-export function prepareChatTools(stage: string, enabled: unknown, history: unknown, workflow: unknown = false, domain: unknown = false, options: { edit?: boolean; resume?: boolean } = {}): ChatToolContext | undefined {
+/** options.edit === false: 고치기 도구(edit_project)를 뺀다 · options.edit === 'dialogue': 고치기 도구가 대사 자원만 고친다(읽기는 그대로) ·
+ *  options.resume === false: 화면 도구에서 Writer 실행 다시 돌리기(resume)를 뺀다 —
+ *  Storyboard 채팅은 대사만 도구로 고치고 씬 · 샷을 다시 나누지 않는다(오너 2026-11-27 N3 · Q1 "채팅창에서도", 리드 "도구 하나로" — Director 채팅과 같은 대사 도구,
+ *  검토 rev-flow 리드 2 · 7). 화면 열기 대상에는 Writer 콘티(conti)가 있다(리드 6). */
+export function prepareChatTools(stage: string, enabled: unknown, history: unknown, workflow: unknown = false, domain: unknown = false, options: { edit?: boolean | 'dialogue'; resume?: boolean } = {}): ChatToolContext | undefined {
   const resources = toolResourcesForStage(stage)
   if (enabled !== true || resources.length === 0) return undefined
   const messages = history ?? []
@@ -78,14 +79,16 @@ export function prepareChatTools(stage: string, enabled: unknown, history: unkno
     throw new Error('Invalid chat tool history')
   }
   const resource = { type: 'string', enum: resources }
+  // 고치기 도구가 고칠 수 있는 자원 — 'dialogue' 면 대사 자원만(그 단계에 없으면 고치기 도구를 주지 않는다).
+  const editResources = options.edit === 'dialogue' ? resources.filter((name) => name === 'dialogue') : resources
   return {
     messages: messages as BetaMessageParam[],
     tools: [
       { name: 'read_project', description: 'Read the current project data before answering state questions or editing. Returns exact target IDs, editable values and revisions. Settings are the current working board; other resources are saved rows.', input_schema: {
         type: 'object', properties: { resource, id: { type: 'string', description: 'Optional exact ID. Omit to list targets.' } }, required: ['resource'], additionalProperties: false,
       } },
-      ...(options.edit === false ? [] : [{ name: 'edit_project', description: 'Edit one previously read target with its revision and only requested patch fields. Wait for saved/approval/failure result. No generation, creation, deletion or automatic approval.', input_schema: {
-        type: 'object' as const, properties: { resource, id: { type: 'string' as const }, revision: { type: 'string' as const }, patch: { type: 'object' as const, description: 'Only editable fields listed in the app-tools instructions; preserve unchanged dialogue metadata.' } }, required: ['resource', 'id', 'revision', 'patch'], additionalProperties: false,
+      ...(options.edit === false || editResources.length === 0 ? [] : [{ name: 'edit_project', description: 'Edit one previously read target with its revision and only requested patch fields. Wait for saved/approval/failure result. No generation, creation, deletion or automatic approval.', input_schema: {
+        type: 'object' as const, properties: { resource: { type: 'string', enum: editResources }, id: { type: 'string' as const }, revision: { type: 'string' as const }, patch: { type: 'object' as const, description: 'Only editable fields listed in the app-tools instructions; preserve unchanged dialogue metadata.' } }, required: ['resource', 'id', 'revision', 'patch'], additionalProperties: false,
       } }]),
       ...(domain === true && ['writer', 'artist'].includes(stage) ? [{ name: 'inspect_project', description: 'Read saved domain evidence for one exact target. Writer: current shot/scene specs and linked generation-time intent. Artist: all appearance descriptions; includeImage with an exact appearanceKey supplies that existing sheet/background for visual inspection. Read-only: never edits, selects candidates, approves or generates.', input_schema: {
         type: 'object' as const, properties: {
@@ -135,16 +138,26 @@ export function chatToolGuide(tools: ReadonlyArray<{ name: string; input_schema?
   return lines.join('\n')
 }
 
-/** 모델이 그 요청에 주지 않은 이름으로 부른 도구 호출(id) — 서버가 거절 목록으로 넘기고 화면은 실행하지 않는다(리드 2 · architecture §3). */
-export function rejectedToolCallIds(turn: ToolTurn, tools: ReadonlyArray<{ name: string }>): string[] {
-  const given = new Set(tools.map((tool) => tool.name))
-  return turn.content.filter((block): block is ToolCall => block.type === 'tool_use' && !given.has(String(block.name))).map((call) => call.id)
+/** 모델이 그 요청에 주지 않은 도구 호출(id) — 서버가 거절 목록으로 넘기고 화면은 실행하지 않는다(리드 2 · architecture §3).
+ *  주지 않은 이름, 그리고 고치기 도구(edit_project)를 그 요청에서 고칠 수 있는 자원 밖으로 부른 것(Storyboard 는 대사만 — 오너 Q1, 리드 "도구 하나로"). */
+export function rejectedToolCallIds(turn: ToolTurn, tools: ReadonlyArray<{ name: string; input_schema?: unknown }>): string[] {
+  const given = new Map(tools.map((tool) => [tool.name, tool]))
+  const allowed = (call: ToolCall) => {
+    const tool = given.get(String(call.name))
+    if (!tool) return false
+    if (call.name !== 'edit_project') return true
+    const resources = (tool.input_schema as { properties?: { resource?: { enum?: unknown } } } | undefined)?.properties?.resource?.enum
+    const resource = (call.input as { resource?: unknown } | null | undefined)?.resource
+    return !Array.isArray(resources) || (typeof resource === 'string' && resources.includes(resource))
+  }
+  return turn.content.filter((block): block is ToolCall => block.type === 'tool_use' && !allowed(block as ToolCall)).map((call) => call.id)
 }
 
-/** 그 화면이 도구 호출을 실행해도 되는가 — Storyboard(writer)는 도구로 고치지 않는다(오너 N3, 리드 2 — 대사는 updates 의 updateDialogue 로만, Q1). 콘티 · 다른 화면은 그대로. */
-export function toolCallAllowedOnStage(stage: string, name: string): boolean {
-  return !(stage === 'writer' && name === 'edit_project')
+/** 그 화면이 도구 호출을 실행해도 되는가 — Storyboard(writer)는 고치기 도구를 대사 자원에만 쓴다(오너 N3 · Q1, 리드 2 · "도구 하나로"). 콘티 · 다른 화면은 그대로. */
+export function toolCallAllowedOnStage(stage: string, name: string, input?: unknown): boolean {
+  if (stage !== 'writer' || name !== 'edit_project') return true
+  return (input as { resource?: unknown } | null | undefined)?.resource === 'dialogue'
 }
 
-/** Storyboard 에서 고치기 도구를 부르면 모델에 돌려줄 결과 글(모델이 읽는다 — 사람에게는 모델이 화면 언어로 전한다). */
-export const STORYBOARD_EDIT_REFUSAL = 'Storyboard does not edit with tools and nothing was executed. Change dialogue with an updateDialogue update in the updates block; the story and shots are edited on the rough storyboard of the Writer screen.'
+/** Storyboard 에서 대사 밖을 고치는 도구 호출에 모델로 돌려줄 결과 글(모델이 읽는다 — 사람에게는 모델이 화면 언어로 전한다). */
+export const STORYBOARD_EDIT_REFUSAL = 'Storyboard changes only dialogue (edit_project with resource "dialogue"), so nothing was executed. The story, shots and scenes are edited on the rough storyboard of the Writer screen.'

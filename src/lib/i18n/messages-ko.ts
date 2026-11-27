@@ -3788,9 +3788,8 @@ export const KO: Record<string, string> = {
   '{shot} is being drawn right now. Ask again when it is done.': '{shot}은(는) 지금 그리는 중이에요. 다 그린 뒤 다시 부탁해 주세요.',
   '{shot} has no rough storyboard. Draw it in Writer, then ask again.': '{shot}은(는) 콘티 그림이 없어요. Writer 콘티에서 그린 뒤 다시 부탁해 주세요.',
   "Couldn't redraw {shot}. Please ask again.": '{shot}을(를) 다시 그리지 못했어요. 다시 부탁해 주세요.',
-  // Storyboard 채팅은 이야기 · 샷은 바꾸지 않고 대사만 고친다(오너 2026-11-27 N3 · Q1), 고친 대사는 새 영상부터(COMMON-3).
+  // Storyboard 채팅은 이야기 · 샷은 바꾸지 않고 대사만 대사 도구로 고친다(오너 2026-11-27 N3 · Q1) — 새 영상부터 한 줄은 DIALOGUE_EDIT_NOTE(Director 와 같은 한 줄).
   "Storyboard doesn't change the story or shots. Edit them in Writer's rough storyboard.": 'Storyboard에서는 이야기 · 샷을 바꾸지 않아요. Writer 콘티에서 고쳐요.',
-  'New videos use the edited dialogue.': '고친 대사는 새로 만드는 영상부터 들어가요.',
   // 보드 진행 줄 · 화면 설명 · 첫 진입 안내.
   'Storyboard progress': '스토리보드 진행 현황',
   'Not real yet': '실사 없음',
