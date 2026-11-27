@@ -33,7 +33,7 @@ const DIRECTOR_DIALOGUE_TOOL_GUIDE = `
 - A storyboard shot's dialogue (spoken lines and narration) is changed only with the app tools: read_project with resource "dialogue", then edit_project with that shot's complete dialogueLines. Keep every unchanged line with all of its fields; characterId null means narration; use only character IDs that appear in the read rows. You can change a line's text or its speaker, add lines and remove lines (removing a line waits for the user's approval).
 - Dialogue rows use the storyboard shot ids and boardLabel, not the canvas node ids. Find the shot the user names through boardLabel. A shot added on the Director canvas has no dialogue row: say that its dialogue can't be changed in this chat.
 - Never put a dialogue change in updateShot, or in the "change" of generateVideos or generateImage. The tools here change only dialogue, never a shot's story, prompt or the shots themselves.
-- After a saved dialogue edit, say that the changed dialogue goes into videos made from now on and that Takes already made keep their dialogue. Do not remake videos unless the user asks.
+- After a saved dialogue edit, the app itself adds one line saying that the changed dialogue goes into videos made from now on and that Takes already made keep their dialogue — do not repeat that. Do not remake videos unless the user asks.
 </dialogue_tool>`
 
 const DIALOGUE_LANGUAGE_NAME: Record<DialogueLanguage, string> = { ko: 'Korean', en: 'English', ja: 'Japanese', zh: 'Chinese' }

@@ -47,10 +47,13 @@ export function requestsDialogueEdit(message: string): boolean {
   return /(바꿔|바꾼|바꾸|변경(?:해|한|하고)|수정(?:해|한|하고)|고쳐|고치|번역(?:해|한|하고)|더해|추가(?:해|한|하고)|넣어|빼|지워|삭제(?:해|한|하고)|\b(change|update|edit|translate|rename|add|remove|delete)\b)/i.test(text) // i18n-ok: 한국어 사용자 입력을 인식하는 정규식.
 }
 
-/** 대사를 고친 결과가 저장됐으면 답에 붙일 한 줄 — 새로 만드는 영상(Take)부터 들어가고 이미 만든 영상은 그대로다(오너 2026-11-27 3차). 아니면 ''. */
+/** 대사를 고쳐 저장했을 때 알리는 한 줄(영어 원문 = i18n 키) — 새로 만드는 영상(Take)부터 들어가고 이미 만든 영상은 그대로다(오너 2026-11-27 3차). */
+export const DIALOGUE_EDIT_NOTE = 'The changed dialogue goes into videos made from now on. Videos already made keep their dialogue.'
+
+/** 대사를 고친 결과가 저장됐으면 답에 붙일 한 줄, 아니면 ''. */
 export function dialogueEditNote(outcomes: ToolOutcome[], korean: boolean): string {
   const saved = latestEdits(outcomes).some(({ call, result }) => (call.input as Record<string, unknown>)?.resource === 'dialogue' && result.status === 'ok' && result.unchanged !== true)
-  return saved ? translate(korean ? 'ko' : 'en', 'The changed dialogue goes into videos made from now on. Videos already made keep their dialogue.') : ''
+  return saved ? translate(korean ? 'ko' : 'en', DIALOGUE_EDIT_NOTE) : ''
 }
 
 /** A narrow recovery hint for explicit edit requests; it never authorizes a write by itself. */

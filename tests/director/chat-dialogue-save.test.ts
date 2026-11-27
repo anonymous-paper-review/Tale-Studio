@@ -153,6 +153,26 @@ describe('혼자 정한 것', () => {
     expect(db.writes).toEqual([])
   })
 
+  // 왜: 줄을 빼는 고침은 승인 뒤에 저장된다 — 그때도 새로 만드는 영상부터 들어간다는 말이 빠지면 안 된다(화면 확인 11/27: 승인 답은 "저장을 확인했습니다"뿐이었다).
+  it('Director 채팅에서 뺀 대사 줄을 승인하면 그 샷에만 저장하고 새로 만드는 영상부터 들어간다고 알린다', async () => {
+    fetchMock.mockImplementation(async (input: string | URL | Request) => {
+      if (String(input) === `/api/writer/status/${projectId}`) return Response.json({ started: true, pipeline_completed: true })
+      throw new Error(`no request: ${String(input)}`)
+    })
+    const execute = createChatToolExecutor({ resources: directorResources(), signal: new AbortController().signal, isCurrent: () => true })
+    const read = await execute({ type: 'tool_use', id: 'read-1', name: 'read_project', input: { resource: 'dialogue', id: targetId } })
+    const revision = (read.records as Array<{ revision: string }>)[0]!.revision
+    const kept = [structuredClone(lines[0]!)]
+    await execute({ type: 'tool_use', id: 'shrink-1', name: 'edit_project', input: { resource: 'dialogue', id: targetId, revision, patch: { dialogueLines: kept } } })
+    const proposal = useGlobalChatStore.getState().pendingProposal!
+    expect(await useGlobalChatStore.getState().approvePendingProposal(proposal.id)).toBe(true)
+    expect(db.writes).toEqual([{ table: 'shots', filters: { project_id: projectId, shot_id: targetId, dialogue_lines: JSON.stringify(lines) }, patch: { dialogue_lines: kept } }])
+    expect(useWriterStore.getState().shots[0]!.dialogueLines).toEqual(kept)
+    const last = useGlobalChatStore.getState().messages.at(-1)
+    expect(last).toMatchObject({ stage: 'director', role: 'model' })
+    expect(last!.content).toContain('새로 만드는 영상부터 고친 대사가 들어가요. 이미 만든 영상은 그대로예요.')
+  })
+
   // 왜: Director 채팅이 고칠 수 있는 것은 대사뿐이다 — 대사 자원 말고 씬 · 샷 · 인물 · 설정 자원은 화면 도구에도 없다.
   it('Director 채팅의 화면 도구에는 대사 자원 하나만 있다', () => {
     expect(Object.keys(directorResources())).toEqual(['dialogue'])
