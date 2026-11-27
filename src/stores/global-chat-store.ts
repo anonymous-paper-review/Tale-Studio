@@ -4071,7 +4071,7 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
           },
         })
         executeWorkflow = workflow
-        const loop = await runChatToolLoop({ request, execute: call => call.name === 'inspect_project' ? executeProjectInspection(projectId, stage, call.input, controller.signal, turnArtistSelection) : call.name === 'project_workflow' ? workflow(call) : execute(call), refuse: call => toolCallAllowedOnStage(stage, call.name, call.input) ? null : { status: 'unsupported', message: STORYBOARD_EDIT_REFUSAL }, isCurrent: isCurrentSession, signal: controller.signal, onResult: outcome => completedTools.push(outcome), requireEdit: requestsSupportedChatEdit(stage, trimmed), requireInspection: requestsImageInspection(stage, trimmed), locale: contentLocale() })
+        const loop = await runChatToolLoop({ request, execute: call => call.name === 'inspect_project' ? executeProjectInspection(projectId, stage, call.input, controller.signal, turnArtistSelection) : call.name === 'project_workflow' ? workflow(call) : execute(call), refuse: call => toolCallAllowedOnStage(stage, call.name, call.input) ? null : { status: 'unsupported', message: STORYBOARD_EDIT_REFUSAL }, isCurrent: isCurrentSession, signal: controller.signal, onResult: outcome => completedTools.push(outcome), requireEdit: requestsSupportedChatEdit(stage, trimmed), keepAnswerOnNoEdit: stage === 'director' || stage === 'writer', requireInspection: requestsImageInspection(stage, trimmed), locale: contentLocale() })
         data = loop.data
         toolLoopStopped = loop.stopped
         toolOutcomes = loop.results
@@ -4290,9 +4290,10 @@ export const useGlobalChatStore = create<GlobalChatState>((set, get) => ({
       const waitForLegacy = !dialogueTarget && toolsEnabled && ((requestedHandoff && requestsSupportedChatEdit(stage, trimmed)) || (isBoardStage(stage) && data.updates?.length) || (stage === 'artist' && (data.proposals?.length || data.locationProposals?.length)))
       // 답을 실행 결과로 바꿀 때 실제로 지우고 더한 것을 함께 알리는 한 줄("적용: 샷 2개 지움 · 샷 1개 더함", 리뷰 4차 후속 L2).
       let appliedStructureLine = ''
-      // Director · Storyboard 채팅으로 대사를 고쳐 저장했으면 새로 만드는 영상부터 들어간다고 알린다(오너 3차 · Q1, 리드 "도구 하나로" — 한 줄 하나) — 모델 말에 맡기지 않는다.
-      if (stage === 'director' || stage === 'writer') reply = [reply, dialogueEditNote(toolOutcomes, contentLocale() === 'ko', reply)].filter(Boolean).join('\n\n')
       reply = guardChatToolReply(reply, toolOutcomes, contentLocale() === 'ko')
+      // Director · Storyboard 채팅으로 대사를 고쳐 저장했으면 새로 만드는 영상부터 들어간다고 알린다(오너 3차 · Q1, 리드 "도구 하나로" — 한 줄 하나) — 모델 말에 맡기지 않는다.
+      //   실행 결과(영수증) 아래에 붙인다 — 저장된 대사와 승인 기다리는 줄 빼기가 섞인 차례에 답이 영수증으로 바뀌어도 빠지지 않게(검토 rev-video-3 낮음 2).
+      if (stage === 'director' || stage === 'writer') reply = [reply, dialogueEditNote(toolOutcomes, contentLocale() === 'ko', reply)].filter(Boolean).join('\n\n')
       if (lockedReply) reply = lockedReply
       if (styleLockedReply) reply = styleLockedReply
       // Unfinished prose is display-only and must survive the guard that removes unverified completion claims.

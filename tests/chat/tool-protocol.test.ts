@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest'
 import { prepareChatTools, toolResourcesForStage } from '@/lib/chat-tools/protocol'
 
 describe('채팅 도구 연결', () => {
-  // 왜: 기존 Director와 전체 대사 인계의 제안 전용 호출을 바꾸지 않는다.
+  // 왜: 도구를 요청하지 않은 호출(전체 대사 인계 등)은 어느 단계든 도구 없이 지금처럼 간다 — Director 채팅은 도구를 켜고 부르며 그때 대사 자원 하나만 받는다(2026-11-27 3차, 검토 rev-video-3 낮음 5).
   it('도구를 요청하지 않은 기존 호출에는 도구를 붙이지 않는다', () => {
     expect(prepareChatTools('writer', false, undefined)).toBeUndefined()
     // Director 채팅은 대사 자원을 갖게 됐다(오너 2026-11-27 3차) — 도구를 요청하지 않은 Director 호출에는 지금처럼 도구가 없다.
