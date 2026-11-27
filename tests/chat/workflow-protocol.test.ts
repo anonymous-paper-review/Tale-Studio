@@ -5,7 +5,8 @@ import { guardChatToolReply } from '@/lib/chat-tools/receipt'
 it('명시적으로 켠 Producer·Writer·Artist에 공통 상태 도구를 제공한다', () => {
   // 왜: 단계별 데이터 편집 권한은 그대로 두고 공통 상태만 확인할 수 있어야 한다.
   for (const stage of ['producer', 'writer', 'artist']) expect(prepareChatTools(stage, true, [], true)?.tools.map(t => t.name)).toContain('project_workflow')
-  expect(prepareChatTools('director', true, [], true)).toBeUndefined()
+  // Director 채팅은 대사 읽기 · 고치기만 받고(오너 2026-11-27 3차) 공통 상태 도구는 받지 않는다.
+  expect(prepareChatTools('director', true, [], true)?.tools.map(t => t.name)).not.toContain('project_workflow')
 })
 it('이동 요청을 실제 화면 도착이나 저장 완료로 안내하지 않는다', () => {
   // 왜: 라우터가 거절할 수 있으므로 경로 준비만으로 도착을 확정하면 안 된다.

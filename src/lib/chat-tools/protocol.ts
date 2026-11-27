@@ -21,6 +21,8 @@ export function toolStageOf(stage: string): string {
 export function toolResourcesForStage(stageId: string): string[] {
   const stage = toolStageOf(stageId)
   if (stage === 'producer') return ['settings']
+  // Director 채팅은 대사만 읽고 고친다(오너 2026-11-27 3차 "대사 수정 기능을 채팅창에서도") — 콘티 · Storyboard 와 같은 대사 자원.
+  if (stage === 'director') return ['dialogue']
   if (stage === 'writer') return ['scenes', 'shots', 'dialogue', 'characters', 'backgrounds']
   if (stage === 'artist') return ['characters', 'backgrounds', 'appearances', 'background_appearances']
   return []
@@ -94,7 +96,8 @@ export function prepareChatTools(stage: string, enabled: unknown, history: unkno
           } : {}),
         }, required: ['target', 'id'], additionalProperties: false,
       } }] : []),
-      ...(workflow === true ? [{ name: 'project_workflow', description: `Read fresh project/run/entry state; refresh visible readiness; open an existing screen (targetStage producer = the Writer prose screen, conti = the Writer rough storyboard, writer = the Storyboard screen, artist = the Artist screen); propose the initial scene and shot run${options.resume === false ? '' : '; or explicitly resume the existing run'}. Never bypass approval or trigger generation from a status question.`, input_schema: {
+      // 화면 열기 · 실행 다시 돌리기는 Director 채팅에 주지 않는다 — 그 채팅의 앱 도구는 대사 읽기 · 고치기뿐이다(3차).
+      ...(workflow === true && stage !== 'director' ? [{ name: 'project_workflow', description: `Read fresh project/run/entry state; refresh visible readiness; open an existing screen (targetStage producer = the Writer prose screen, conti = the Writer rough storyboard, writer = the Storyboard screen, artist = the Artist screen); propose the initial scene and shot run${options.resume === false ? '' : '; or explicitly resume the existing run'}. Never bypass approval or trigger generation from a status question.`, input_schema: {
         type: 'object' as const, properties: { action: { type: 'string' as const, enum: ['status', 'refresh', 'open', 'handoff', ...(options.resume === false ? [] : ['resume'])] }, targetStage: { type: 'string' as const, enum: ['producer', 'conti', 'writer', 'artist'] } }, required: ['action'], additionalProperties: false,
       } }] : []),
     ],

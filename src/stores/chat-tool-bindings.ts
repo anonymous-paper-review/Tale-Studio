@@ -76,8 +76,9 @@ export function createStudioToolResources(options: {
     const approved = options.approved
     if (approved && approved.resource === resource && approved.id === id && sameToolValue(approved.patch, patch) && sameToolValue(approved.before, before) && sameToolValue(approved.sourceSnapshot, source)) return null
     if (!options.offerProposal) return { status: 'approval_required', message: 'User approval is required; no edit was executed.' }
-    // 씬 · 샷 · 대사 승인 카드는 그 보드 단계(콘티 · Storyboard, O1 2026-11-26)의 채팅에 뜬다 — 콘티에서 부탁했으면 콘티.
-    const proposal = createPendingProposal({ traceId: options.traceId, stage: ['scenes', 'shots', 'dialogue'].includes(resource) ? (options.stage === 'conti' ? 'conti' : 'writer') : 'artist', kind,
+    // 씬 · 샷 · 대사 승인 카드는 그 보드 단계(콘티 · Storyboard, O1 2026-11-26)의 채팅에 뜬다 — 콘티에서 부탁했으면 콘티,
+    //   Director 채팅의 대사 고침(오너 2026-11-27 3차)이면 Director.
+    const proposal = createPendingProposal({ traceId: options.traceId, stage: ['scenes', 'shots', 'dialogue'].includes(resource) ? (options.stage === 'conti' || options.stage === 'director' ? options.stage : 'writer') : 'artist', kind,
       target: String(before.name ?? id), action: translate(contentLocale(), 'Apply the requested change'), impact: [translate(contentLocale(), 'Approval saves the description or dialogue. No image or video will be generated.')],
       payload: { ...payload, toolEdit: { resource, id, patch, before, ...(source ? { sourceSnapshot: source } : {}) } },
     })

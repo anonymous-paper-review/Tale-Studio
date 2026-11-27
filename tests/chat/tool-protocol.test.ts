@@ -6,7 +6,8 @@ describe('채팅 도구 연결', () => {
   // 왜: 기존 Director와 전체 대사 인계의 제안 전용 호출을 바꾸지 않는다.
   it('도구를 요청하지 않은 기존 호출에는 도구를 붙이지 않는다', () => {
     expect(prepareChatTools('writer', false, undefined)).toBeUndefined()
-    expect(toolResourcesForStage('director')).toEqual([])
+    // Director 채팅은 대사 자원을 갖게 됐다(오너 2026-11-27 3차) — 도구를 요청하지 않은 Director 호출에는 지금처럼 도구가 없다.
+    expect(prepareChatTools('director', false, undefined)).toBeUndefined()
   })
   // 왜: 조회 범위 밖 기능을 모델이 임의 실행하지 못하게 한다.
   it('단계마다 연결한 조회와 편집 기능만 모델에게 제공한다', () => {

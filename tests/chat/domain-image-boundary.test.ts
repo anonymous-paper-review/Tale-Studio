@@ -42,10 +42,10 @@ it('이미지를 읽지 못하면 텍스트 근거만 반환하고 시각 확인
   expect(JSON.stringify(tools.messages[1])).toContain('image_unavailable')
 })
 it('근거 조회는 Writer와 Artist에서만 열고 기존 편집 권한을 늘리지 않는다', () => {
-  // 왜: 조회용 필드를 저장하거나 Director 생성 동작을 새로 열지 않는다.
+  // 왜: 조회용 필드를 저장하거나 Director 생성 동작을 새로 열지 않는다. Director 채팅은 대사 읽기 · 고치기만 받는다(오너 2026-11-27 3차 "대사 수정 기능을 채팅창에서도") — 근거 조회는 없다.
   for (const stage of ['writer', 'artist']) expect(prepareChatTools(stage, true, [], false, true)?.tools.some(t => t.name === 'inspect_project')).toBe(true)
   expect(prepareChatTools('producer', true, [], false, true)?.tools.some(t => t.name === 'inspect_project')).toBe(false)
-  expect(prepareChatTools('director', true, [], false, true)).toBeUndefined()
+  expect(prepareChatTools('director', true, [], false, true)?.tools.map(t => t.name)).toEqual(['read_project', 'edit_project'])
 })
 
 it('조회 뒤 이미지가 바뀌면 같은 도구 결과에 새 그림을 대신 넣지 않는다', async () => {
