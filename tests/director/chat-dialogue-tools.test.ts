@@ -82,6 +82,21 @@ describe('혼자 정한 것', () => {
     expect(tools).toEqual(['read_project', 'edit_project'])
   })
 
+  // 왜(리드 3차 "다른 자원 · 다른 단계 도구가 새어 나오지 않게"): 모델이 Director 채팅에 주지 않은 도구(화면 열기 · 들여다보기)를 부르면 서버가 거절 목록으로 넘겨 화면이 실행하지 않는다.
+  it('Director 채팅에서 모델이 주지 않은 도구(화면 열기 · 들여다보기)를 부르면 서버가 거절 목록으로 넘긴다', async () => {
+    mocks.llmChat.mockImplementation(async (_system: string, _history: unknown, _user: string, _t: number, _tag: string, opts: ToolOpts) => {
+      if (opts.appTools) opts.appTools.turn = { stopReason: 'tool_use', content: [
+        { type: 'tool_use', id: 'wf-1', name: 'project_workflow', input: { action: 'open', targetStage: 'conti' } },
+        { type: 'tool_use', id: 'in-1', name: 'inspect_project', input: { target: 'shot', id: 'sh_01_01' } },
+        { type: 'tool_use', id: 'rd-1', name: 'read_project', input: { resource: 'dialogue' } },
+      ] }
+      return ''
+    })
+    const response = await POST(chatRequest({ chatTools: true, chatWorkflow: true, chatDomain: true, toolMessages: [] }))
+    const body = await response.json() as { rejectedToolCalls?: string[] }
+    expect(body.rejectedToolCalls).toEqual(['wf-1', 'in-1'])
+  })
+
   // 왜: 도구 없이 온 요청(옛 화면 · 도구를 끈 요청)은 지금처럼 캔버스 고치기만 한다 — 도구가 저절로 켜지지 않게.
   it('앱 도구를 켜지 않은 Director 채팅은 지금처럼 도구 없이 답한다', async () => {
     const response = await POST(chatRequest())
